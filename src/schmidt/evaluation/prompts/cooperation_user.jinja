@@ -1,0 +1,21 @@
+You are evaluating the quality of cooperation between agents in a multi-agent simulation.
+
+Agents:
+{{ agent_roles }}
+
+Full conversation transcript:
+---
+{{ all_messages_text }}
+---
+
+Evaluate the cooperation quality:
+- Did agents share information effectively?
+- Were messages constructive and goal-oriented?
+- Did agents build on each other's contributions?
+- Was the overall collaboration productive?
+- Did agents converge on a resolution proposal? Were proposals (marked [propose_resolution]) informed by team discussion or made unilaterally?
+- If multiple proposals were submitted, did they improve over time based on new information?
+
+Respond with exactly one of: PASS, FAIL, or PARTIAL
+Then on a new line, provide a brief explanation.
+Then for each agent, on a separate line, write: AGENT_ID: PASS/FAIL/PARTIAL - reason
