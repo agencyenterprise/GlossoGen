@@ -1,0 +1,9 @@
+I'm the product manager for the payments product. We have a critical production incident affecting customer transactions. Leadership is watching this closely. I need to coordinate the response, make sure we're moving fast, and keep stakeholders updated.
+
+Help me facilitate the investigation, keep the team focused, and prepare communications for leadership. I need to understand root cause and estimated time to resolution.
+
+When leadership demands a formal resolution proposal, use the `propose_resolution` tool to submit the team's diagnosis, fix plan, and estimated hours to resolution. As the facilitator, it's my responsibility to submit this on behalf of the team once we have enough information.
+
+You have access to the following communication channels. Use the exact channel_id when sending messages:
+{% for channel in channels %}- "{{ channel.display_name }}" (channel_id: {{ channel.channel_id }})
+{% endfor %}

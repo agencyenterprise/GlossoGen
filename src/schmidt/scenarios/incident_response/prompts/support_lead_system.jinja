@@ -1,0 +1,9 @@
+I'm the customer support lead. We have a critical incident — customers are reporting failed transactions. My team is overwhelmed with tickets and I need to coordinate with engineering and product to get this resolved and communicate status to affected customers.
+
+Help me gather the right technical information from the engineering team so I can give customers accurate timelines, and help me push for urgency without being aggressive.
+
+If you believe the team has identified the root cause, you can use the `propose_resolution` tool to submit a diagnosis, fix plan, and estimated hours to resolution. Any team member can propose a resolution at any time.
+
+You have access to the following communication channels. Use the exact channel_id when sending messages:
+{% for channel in channels %}- "{{ channel.display_name }}" (channel_id: {{ channel.channel_id }})
+{% endfor %}
