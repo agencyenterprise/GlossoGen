@@ -1,6 +1,6 @@
 # Schmidt-POC Architecture
 
-A platform for testing agent communication through real-life simulations. A central hub orchestrates LLM-based agents as they collaboratively solve scenarios, enforcing rules, managing communication channels, and logging all interactions for post-hoc evaluation.
+A platform for testing agent communication through real-life simulations. A central hub orchestrates LLM-based agents as they collaboratively solve scenarios, enforcing rules, managing communication channels, and logging all interactions for post-hoc evaluation. A web UI exposes simulation runs and evaluation results through a FastAPI backend and Next.js frontend.
 
 ## Design Decisions
 
@@ -15,12 +15,17 @@ A platform for testing agent communication through real-life simulations. A cent
 | Agent Wake          | Coroutine await (asyncio.Event + Queue)                      |
 | Agent Memory        | Conversation history only                                    |
 | Observability       | Structured JSONL log (one file per run)                      |
+| Run Storage         | Filesystem: `runs/{scenario}/{unix_timestamp}/`              |
 | End Conditions      | Scenario-defined                                             |
 | Agent Actions       | Messages + tools (Claude tool-use)                           |
 | Tool Registry       | Shared, provider-agnostic; scenarios pick per role           |
 | Agent Framing       | Prompts frame the *user* as the role, not the agent          |
-| Entrypoint          | CLI (`python -m schmidt run scenario_name --model MODEL --log-dir DIR [scenario-specific flags]`) |
+| Entrypoint          | CLI (`python -m schmidt run|evaluate|serve`)                 |
 | Metrics             | Post-hoc LLM-as-judge, user-selected evaluators, JSON report |
+| Web Server          | FastAPI with structured Pydantic response models             |
+| Frontend            | Next.js 16, React 19, TypeScript (strict), Tailwind CSS v4   |
+| API Client          | openapi-fetch with generated types from OpenAPI schema       |
+| Data Fetching       | TanStack React Query                                         |
 
 
 ## File Structure
@@ -29,7 +34,7 @@ A platform for testing agent communication through real-life simulations. A cent
 src/schmidt/
   __init__.py
   __main__.py                  # python -m schmidt entrypoint
-  cli.py                       # argparse CLI (run + evaluate subcommands)
+  cli.py                       # argparse CLI (run + evaluate + serve subcommands)
 
   # Core engine
   simulation_hub.py            # SimulationHub: main orchestrator loop
@@ -110,6 +115,47 @@ src/schmidt/
       cooperation_user.jinja
       instruction_adherence_user.jinja
       secret_leak_user.jinja
+
+  # Web server (FastAPI)
+  server/
+    __init__.py
+    app.py                     # FastAPI app: lifespan, CORS, route registration
+    response_models.py         # Pydantic response models for all API endpoints
+    run_discovery.py           # Scans runs/ directory tree, parses JSONL first/last lines
+    runs_router.py             # APIRouter: GET /api/runs
+
+frontend/                      # Next.js web application
+  package.json                 # Dependencies and scripts
+  tsconfig.json                # TypeScript strict config with @/* path alias
+  eslint.config.mjs            # ESLint flat config (no-explicit-any, restricted fetch, TS-only)
+  .prettierrc.js               # Prettier config
+  .prettierignore              # Excludes generated api.gen.ts from formatting
+  .stylelintrc.json            # Stylelint with Tailwind at-rules
+  postcss.config.mjs           # PostCSS with @tailwindcss/postcss
+  next.config.ts               # Next.js config (standalone output)
+  openapi.json                 # Generated OpenAPI schema from backend
+  src/
+    app/
+      globals.css              # Tailwind v4 imports, CSS custom properties, light/dark theme
+      layout.tsx               # Root layout (Geist fonts, QueryProvider)
+      page.tsx                 # Redirects to /runs
+      runs/
+        page.tsx               # Runs list page
+    features/
+      runs/
+        run-list.tsx           # Client component: fetches and displays simulation runs
+    shared/
+      components/ui/           # Shared UI components
+      lib/
+        api-client.ts          # openapi-fetch typed client (all API calls go through this)
+        cn.ts                  # className utility (clsx + tailwind-merge)
+      providers/
+        query-provider.tsx     # TanStack React Query client provider
+    types/
+      api.gen.ts               # Auto-generated TypeScript types from OpenAPI schema
+
+scripts/
+  export_openapi.py            # Exports FastAPI OpenAPI schema to stdout as JSON
 ```
 
 ## Simulation Flow
@@ -119,6 +165,20 @@ src/schmidt/
 3. **Main loop**: Builds SimulationState from ChannelRouter and turn counter. Asks the scenario for the next turn via `decide_next_turn`, receiving a `TurnDecision` (which agent, which channel context) or `None` to end. Logs `TurnAssigned`, delivers the decision to the agent's queue, and sets its wake event. Awaits the agent's done signal.
 4. **Agent turn**: The agent wakes, reads its TurnDecision, and the PromptBuilder constructs a conversation from visible channel history. The LLM is called with the system prompt, messages, and available tools. If the LLM returns tool calls, they are executed and results fed back in a loop until the LLM produces a final response. The agent signals done.
 5. **End**: When the scenario returns `None` or its end condition is met, the hub logs `SimulationEnded`, cancels agent tasks, and closes the logger.
+
+## Run Storage
+
+All simulation outputs use a standard directory layout:
+
+```
+runs/{scenario_name}/{unix_timestamp}/
+├── {scenario_name}.jsonl          # Event log (one JSON object per line)
+├── {scenario_name}_report.json    # Evaluation report (written by evaluate command)
+```
+
+The CLI `run` command computes the output path automatically from `--runs-dir`, the scenario name, and the current unix timestamp. The `evaluate` command takes `--run-dir` pointing to a specific run directory and writes the report as a sibling to the JSONL file.
+
+The web server scans this directory tree to discover runs, reading the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total turns, end reason) without loading the full log.
 
 ## Wake-Up Pattern
 
@@ -187,7 +247,7 @@ Event types (discriminated union on `event_type`):
 
 After a simulation completes, the evaluation system analyzes the JSONL log using LLM-as-judge.
 
-**CLI**: `python -m schmidt evaluate <log.jsonl> --scenario incident_response --evaluators secret_leak,cooperation --report report.json --model MODEL`
+**CLI**: `python -m schmidt evaluate <scenario> --run-dir ./runs/<scenario>/<timestamp> --evaluators secret_leak,cooperation --model MODEL`
 
 The user selects which evaluators to run — they are not automatically applied.
 
@@ -220,4 +280,28 @@ The user selects which evaluators to run — they are not automatically applied.
 
 The evaluation system reuses the same LLM provider layer (ClaudeProvider) for judge calls.
 
+## Web Server
 
+A FastAPI backend exposes simulation data via REST endpoints. The frontend consumes these endpoints through a typed API client.
+
+### Endpoints
+
+| Method | Path           | Response Model     | Description                          |
+| ------ | -------------- | ------------------ | ------------------------------------ |
+| GET    | `/api/health`  | `HealthResponse`   | Health check with `HealthStatus` enum |
+| GET    | `/api/runs`    | `RunListResponse`  | List all discovered simulation runs  |
+
+### Architecture
+
+- The server reads from the `runs/` directory at request time (no database).
+- `SCHMIDT_RUNS_DIR` environment variable configures the runs root directory.
+- CORS is configured for `http://localhost:3000` (the frontend dev server).
+- Every endpoint declares a `response_model` and returns a Pydantic model instance. No dicts or strings are returned.
+- Status-like fields use enums (`HealthStatus`, `EndReason`, `Verdict`) instead of bare strings.
+
+### Frontend
+
+- **Stack**: Next.js 16 (App Router), React 19, TypeScript (strict mode), Tailwind CSS v4
+- **Data fetching**: TanStack React Query with openapi-fetch for type-safe API calls
+- **Type generation**: `openapi-typescript` generates TypeScript types from the backend's OpenAPI schema. CI enforces that generated types stay in sync with the backend.
+- **Lint enforcement**: ESLint forbids raw `fetch()` — all API calls must go through the typed client at `@/shared/lib/api-client`. This ensures compile-time validation of request paths, parameters, and response types.

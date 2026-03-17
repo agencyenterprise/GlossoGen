@@ -1,20 +1,59 @@
 # Installation
-install:
-	@echo "Installing dependencies..."
+install: install-server install-frontend
+
+install-server:
+	@echo "Installing server dependencies..."
 	VIRTUAL_ENV= uv sync
-	@echo "Dependencies installed"
+	@echo "Server dependencies installed"
+
+install-frontend:
+	cd frontend && npm ci
 
 # Linting
-lint:
-	@echo "Linting..."
-	VIRTUAL_ENV= uv run --no-sync black . --exclude '\.venv'
-	VIRTUAL_ENV= uv run --no-sync isort . --skip-glob '.venv/*'
-	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv
-	VIRTUAL_ENV= uv run --no-sync mypy . --exclude '^\.venv'
+lint: lint-server lint-frontend
+	@echo "All linting complete"
+
+lint-server:
+	@echo "Linting server..."
+	VIRTUAL_ENV= uv run --no-sync black . --exclude '\.venv|frontend'
+	VIRTUAL_ENV= uv run --no-sync isort . --skip-glob '.venv/*' --skip-glob 'frontend/*'
+	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend
+	VIRTUAL_ENV= uv run --no-sync mypy . --exclude '^(\.venv|frontend)'
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
 	VIRTUAL_ENV= uv run --no-sync vulture src/ --min-confidence 70
 	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir .
 	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir .
-	@echo "Linting complete"
+	@echo "Server linting complete"
 
-.PHONY: install lint
+lint-frontend:
+	@echo "Linting frontend..."
+	cd frontend && npx prettier --write "src/**/*.{ts,tsx,js,jsx,json,css,scss,md}"
+	cd frontend && npx eslint src/ --max-warnings 0
+	cd frontend && npx stylelint "src/**/*.css" --allow-empty-input
+	cd frontend && npx tsc --noEmit
+	@echo "Frontend linting complete"
+
+check-frontend:
+	@echo "Checking frontend..."
+	cd frontend && npx prettier --check "src/**/*.{ts,tsx,js,jsx,json,css,scss,md}"
+	cd frontend && npx eslint src/ --max-warnings 0
+	cd frontend && npx stylelint "src/**/*.css" --allow-empty-input
+	cd frontend && npx tsc --noEmit
+	@echo "Frontend check complete"
+
+# Development
+dev:
+	SCHMIDT_RUNS_DIR=./runs VIRTUAL_ENV= uv run -m uvicorn schmidt.server.app:app --reload --reload-dir src
+
+dev-frontend:
+	cd frontend && npm run dev
+
+# API types
+export-openapi:
+	VIRTUAL_ENV= uv run python scripts/export_openapi.py > frontend/openapi.json
+
+gen-api-types: export-openapi
+	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
+	cd frontend && npx prettier --write src/types/api.gen.ts
+
+.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend export-openapi gen-api-types

@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 jobs:
-  lint:
+  lint-server:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -23,7 +23,60 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: make install
+        run: make install-server
 
-      - name: Lint
-        run: make lint
+      - name: Lint server (black, isort, ruff, mypy, pyright, vulture, custom linters)
+        run: make lint-server
+
+  lint-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: make install-frontend
+
+      - name: Check frontend (prettier, eslint, stylelint, tsc)
+        run: make check-frontend
+
+  check-api-types:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          make install-server
+          make install-frontend
+
+      - name: Regenerate API types and check for drift
+        run: |
+          make gen-api-types
+          git diff --exit-code frontend/src/types/api.gen.ts || \
+            (echo "API types are out of date. Run 'make gen-api-types' and commit the result." && exit 1)
