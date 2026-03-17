@@ -1,0 +1,142 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Schmidt Simulation Server",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/runs": {
+      "get": {
+        "summary": "List Runs",
+        "description": "List all discovered simulation runs.",
+        "operationId": "list_runs_api_runs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health",
+        "description": "Health check endpoint.",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EndReason": {
+        "type": "string",
+        "enum": [
+          "scenario_complete",
+          "error"
+        ],
+        "title": "EndReason",
+        "description": "Why the simulation ended."
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/HealthStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "HealthResponse",
+        "description": "Response model for the health check endpoint."
+      },
+      "HealthStatus": {
+        "type": "string",
+        "enum": [
+          "ok"
+        ],
+        "title": "HealthStatus",
+        "description": "Health check status values."
+      },
+      "RunListResponse": {
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/RunSummary"
+            },
+            "type": "array",
+            "title": "Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "runs"
+        ],
+        "title": "RunListResponse",
+        "description": "Response model for the list-all-runs endpoint."
+      },
+      "RunSummary": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "scenario_name": {
+            "type": "string",
+            "title": "Scenario Name"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "total_turns": {
+            "type": "integer",
+            "title": "Total Turns"
+          },
+          "end_reason": {
+            "$ref": "#/components/schemas/EndReason"
+          },
+          "has_evaluation": {
+            "type": "boolean",
+            "title": "Has Evaluation"
+          },
+          "run_dir": {
+            "type": "string",
+            "title": "Run Dir"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "scenario_name",
+          "timestamp",
+          "total_turns",
+          "end_reason",
+          "has_evaluation",
+          "run_dir"
+        ],
+        "title": "RunSummary",
+        "description": "Summary of a single simulation run for the runs list endpoint."
+      }
+    }
+  }
+}

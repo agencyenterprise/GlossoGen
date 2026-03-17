@@ -42,6 +42,7 @@ All prompts (agent system prompts, round injections) use Jinja2 templates stored
 
 - **Strict API schemas.** Never return raw dicts. Always define a Pydantic response model. Use enums for status-like fields.
 - **Non-optional when always set.** If a field is always populated, declare it as required, not `Optional`.
+- **Web server responses must be structured Pydantic models.** Every FastAPI endpoint must declare a `response_model` and return an instance of that model. Never return plain dicts, strings, or untyped JSON. Use enums instead of bare strings for any field with a fixed set of values (status codes, categories, verdicts, etc.).
 
 ### File & Module Organization
 
