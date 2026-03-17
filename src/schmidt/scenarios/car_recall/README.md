@@ -155,5 +155,5 @@ Six tunable parameters control scenario behavior. Passed via a JSON file with th
 ```
 
 ```bash
-python -m schmidt run car_recall --model claude-sonnet-4-20250514 --log-dir ./logs --knobs knobs.json
+python -m schmidt run car_recall --model claude-sonnet-4-20250514 --runs-dir ./runs --knobs knobs.json
 ```
