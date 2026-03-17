@@ -1,15 +1,20 @@
 """Command-line interface for the schmidt simulation runner.
 
-Defines the ``schmidt`` CLI with two subcommands:
+Defines the ``schmidt`` CLI with three subcommands:
 
 * ``run``      -- load and execute a simulation scenario
 * ``evaluate`` -- score a previously-generated simulation log
+* ``serve``    -- start the FastAPI web server
 """
 
 import argparse
 import asyncio
 import logging
+import os
+import time
 from pathlib import Path
+
+import uvicorn
 
 from schmidt.event_logger import EventLogger
 from schmidt.llm.claude_provider import ClaudeProvider
@@ -24,14 +29,17 @@ from schmidt.tools.tool_registry import ToolRegistry
 logger = logging.getLogger(__name__)
 
 
-def _build_parsers() -> (
-    tuple[argparse.ArgumentParser, argparse.ArgumentParser, argparse.ArgumentParser]
-):
+def _build_parsers() -> tuple[
+    argparse.ArgumentParser,
+    argparse.ArgumentParser,
+    argparse.ArgumentParser,
+    argparse.ArgumentParser,
+]:
     """Build the top-level parser and subcommand parsers.
 
-    Returns the root parser, the ``run`` subparser, and the ``evaluate``
-    subparser so that scenario-specific arguments can be added before the
-    final parse.
+    Returns the root parser, the ``run`` subparser, the ``evaluate``
+    subparser, and the ``serve`` subparser so that scenario-specific
+    arguments can be added before the final parse.
     """
     parser = argparse.ArgumentParser(prog="schmidt")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -41,40 +49,56 @@ def _build_parsers() -> (
     run_parser.add_argument(
         "scenario_name", type=str, choices=scenario_names, help="Name of the scenario to run"
     )
-    run_parser.add_argument("--log-dir", type=str, required=True, help="Directory for JSONL logs")
+    run_parser.add_argument(
+        "--runs-dir",
+        type=str,
+        required=True,
+        help="Root directory for runs (output goes to runs-dir/scenario/timestamp/)",
+    )
     run_parser.add_argument("--model", type=str, required=True, help="Claude model to use")
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a simulation log")
-    evaluate_parser.add_argument("log_file", type=str, help="Path to the JSONL log file")
     evaluate_parser.add_argument(
-        "--scenario",
+        "scenario_name",
+        type=str,
+        choices=scenario_names,
+        help="Name of the scenario to evaluate",
+    )
+    evaluate_parser.add_argument(
+        "--run-dir",
         type=str,
         required=True,
-        choices=scenario_names,
-        dest="scenario_name",
-        help="Scenario name",
+        help="Path to the run directory (e.g. runs/car_recall/1742234567)",
     )
     evaluate_parser.add_argument(
         "--evaluators", type=str, required=True, help="Comma-separated evaluator names"
     )
-    evaluate_parser.add_argument(
-        "--report", type=str, required=True, help="Path for the JSON evaluation report"
-    )
     evaluate_parser.add_argument("--model", type=str, required=True, help="Claude model to use")
 
-    return parser, run_parser, evaluate_parser
+    serve_parser = subparsers.add_parser("serve", help="Start the web server")
+    serve_parser.add_argument(
+        "--runs-dir", type=str, required=True, help="Root directory containing simulation runs"
+    )
+    serve_parser.add_argument("--port", type=int, required=True, help="Port to listen on")
+
+    return parser, run_parser, evaluate_parser, serve_parser
 
 
 def main() -> None:
-    """Parse CLI arguments and dispatch to the ``run`` or ``evaluate`` subcommand."""
+    """Parse CLI arguments and dispatch to the ``run``, ``evaluate``, or ``serve`` subcommand."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
-    parser, run_parser, evaluate_parser = _build_parsers()
+    parser, run_parser, evaluate_parser, _ = _build_parsers()
 
-    # First pass: discover the scenario name so its class can register CLI args.
+    # First pass: discover the command (and scenario name for run/evaluate).
     known_args, _ = parser.parse_known_args()
+
+    if known_args.command == "serve":
+        args = parser.parse_args()
+        _run_serve(args=args)
+        return
 
     scenario_cls = get_scenario_class(name=known_args.scenario_name)
     if known_args.command == "run":
@@ -113,20 +137,31 @@ def _build_agent_providers(
     return agent_providers
 
 
+def _compute_run_dir(runs_dir: Path, scenario_name: str) -> Path:
+    """Compute the output directory for a new simulation run.
+
+    Uses the current unix timestamp to create a unique subdirectory:
+    ``{runs_dir}/{scenario_name}/{unix_timestamp}/``
+    """
+    unix_ts = int(time.time())
+    return runs_dir / scenario_name / str(unix_ts)
+
+
 async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
 ) -> None:
     """Wire up the simulation components and execute the simulation.
 
-    Writes a JSONL event log to ``<log-dir>/<scenario_name>.jsonl``.
+    Writes a JSONL event log to ``{runs_dir}/{scenario_name}/{timestamp}/{scenario_name}.jsonl``.
     """
-    log_dir = Path(args.log_dir)
+    runs_dir = Path(args.runs_dir)
+    run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
     agents = scenario.get_agents(default_model=args.model)
     agent_providers = _build_agent_providers(agents=agents)
     registry = ToolRegistry()
 
-    log_path = log_dir / f"{scenario.name()}.jsonl"
+    log_path = run_dir / f"{scenario.name()}.jsonl"
     event_logger = EventLogger(log_path=log_path)
 
     hub = SimulationHub(
@@ -139,11 +174,12 @@ async def _run_simulation(
 
     logger.info("Running scenario: %s", scenario.name())
     logger.info("Model: %s", args.model)
+    logger.info("Run directory: %s", run_dir)
     logger.info("Log: %s", log_path)
 
     await hub.run()
 
-    logger.info("Simulation complete. Log written to %s", log_path)
+    logger.info("Simulation complete. Run directory: %s", run_dir)
 
 
 async def _run_evaluation(
@@ -152,8 +188,9 @@ async def _run_evaluation(
 ) -> None:
     """Run the specified evaluators against a simulation log and write a JSON report."""
     evaluator_names = args.evaluators.split(",")
-    report_path = Path(args.report)
-    log_path = Path(args.log_file)
+    run_dir = Path(args.run_dir)
+    log_path = run_dir / f"{args.scenario_name}.jsonl"
+    report_path = run_dir / f"{args.scenario_name}_report.json"
 
     await scenario.run_evaluation(
         log_path=log_path,
@@ -163,3 +200,14 @@ async def _run_evaluation(
     )
 
     logger.info("Evaluation complete. Report written to %s", report_path)
+
+
+def _run_serve(args: argparse.Namespace) -> None:
+    """Start the FastAPI web server."""
+    os.environ["SCHMIDT_RUNS_DIR"] = args.runs_dir
+    uvicorn.run(
+        app="schmidt.server.app:app",
+        host="0.0.0.0",
+        port=args.port,
+        reload=False,
+    )

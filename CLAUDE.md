@@ -3,13 +3,18 @@
 ## Setup
 
 ```bash
-make install
+make install           # installs both server (uv sync) and frontend (npm ci)
+make install-server    # server only
+make install-frontend  # frontend only
 ```
 
 ## Linting
 
 ```bash
-make lint
+make lint              # runs both server and frontend linters
+make lint-server       # server only (black, isort, ruff, mypy, pyright, vulture, custom linters)
+make lint-frontend     # frontend only (prettier --write, eslint, stylelint, tsc)
+make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 ```
 
 ## Project Structure
@@ -19,7 +24,13 @@ make lint
   - `README.md` — scenario documentation (agents, channels, tools, round injections, turn logic, evaluation focus)
   - `scenario.py` — scenario class definition (channels, turn logic, tools, injections)
   - `prompts/` — Jinja2 templates for all agent system prompts and injection messages
+- `src/schmidt/server/` — FastAPI web server exposing simulation data via REST
 - `linter/` — custom linting scripts
+- `frontend/` — Next.js web application
+  - `frontend/src/app/` — Next.js App Router pages
+  - `frontend/src/features/` — feature-based modules (runs, etc.)
+  - `frontend/src/shared/` — shared components, hooks, providers, and utilities
+  - `frontend/src/types/api.gen.ts` — auto-generated TypeScript types from the backend OpenAPI schema
 
 ### Prompt Templates
 
@@ -31,6 +42,7 @@ All prompts (agent system prompts, round injections) use Jinja2 templates stored
 
 - **Strict API schemas.** Never return raw dicts. Always define a Pydantic response model. Use enums for status-like fields.
 - **Non-optional when always set.** If a field is always populated, declare it as required, not `Optional`.
+- **Web server responses must be structured Pydantic models.** Every FastAPI endpoint must declare a `response_model` and return an instance of that model. Never return plain dicts, strings, or untyped JSON. Use enums instead of bare strings for any field with a fixed set of values (status codes, categories, verdicts, etc.).
 
 ### File & Module Organization
 
@@ -60,14 +72,48 @@ All prompts (agent system prompts, round injections) use Jinja2 templates stored
 - **Be factual only.** Describe what the code does, not assumptions about why. Never use subjective language like "makes things easier", "improves performance", "for convenience", "simplifies". State behavior, not benefits.
 - **Be concise.** One to three sentences for most docstrings. Avoid restating type hints or parameter names that are already self-documenting.
 
+## Frontend
+
+Stack: Next.js 16, React 19, TypeScript (strict), Tailwind CSS v4, TanStack React Query, openapi-fetch.
+
+### API Client & Type Safety
+
+All API calls must use the generated typed client from `@/shared/lib/api-client`. Raw `fetch()` is forbidden — this is enforced by an ESLint rule. The typed client provides compile-time validation of request paths, parameters, and response types.
+
+To regenerate types after changing backend endpoints:
+
+```bash
+make gen-api-types
+```
+
+CI fails if `frontend/src/types/api.gen.ts` drifts from the backend schema.
+
+## Development
+
+```bash
+make dev            # start FastAPI backend on port 8000 (reads from ./runs/)
+make dev-frontend   # start Next.js dev server on port 3000
+```
+
+## Run Output Directory Structure
+
+All simulation outputs use a standard directory layout:
+
+```
+runs/{scenario_name}/{unix_timestamp}/
+├── {scenario_name}.jsonl          # Event log
+├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
+└── {scenario_name}_stdout.log     # (pipe stdout here)
+```
+
 ## Running Simulations
 
-Always run simulations as a background process, piping all output to a log file. This lets both the user and Claude monitor progress. Use a unique suffix (timestamp, run number, or description) for each run so previous logs are never overwritten.
+Always run simulations as a background process, piping all output to a log file. This lets both the user and Claude monitor progress. The CLI auto-generates a timestamped subdirectory under `--runs-dir`.
 
 ```bash
 set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> --model <model> --log-dir ./logs/<run_name> \
-  > ./logs/<run_name>_stdout.log 2>&1 &
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> --model <model> --runs-dir ./runs \
+  > ./runs/<scenario>_stdout.log 2>&1 &
 ```
 
 The `car_recall` scenario registers its own `--knobs` flag pointing to a JSON file with scenario configuration. Two presets are provided in `src/schmidt/scenarios/car_recall/`:
@@ -78,25 +124,24 @@ The `car_recall` scenario registers its own `--knobs` flag pointing to a JSON fi
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-    --model <model> --log-dir ./logs/<run_name> \
+    --model <model> --runs-dir ./runs \
     --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
-  > ./logs/<run_name>_stdout.log 2>&1 &
+  > ./runs/car_recall_stdout.log 2>&1 &
 ```
 
 Check progress by reading the stdout log file or the JSONL event log.
 
 ## Running Evaluations
 
-After a simulation completes, score the log with LLM-as-judge evaluators. Run as a background process like simulations.
+After a simulation completes, score the log with LLM-as-judge evaluators. Point `--run-dir` at the specific run directory. Run as a background process like simulations.
 
 ```bash
 set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate ./logs/<run_name>/<scenario>.jsonl \
-    --scenario <scenario> \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
+    --run-dir ./runs/<scenario>/<timestamp> \
     --evaluators <comma-separated evaluator names> \
-    --report ./logs/<run_name>/<scenario>_report.json \
     --model <model> \
-  > ./logs/<run_name>_eval_stdout.log 2>&1 &
+  > ./runs/<scenario>/<timestamp>/eval_stdout.log 2>&1 &
 ```
 
 Available evaluators per scenario:
