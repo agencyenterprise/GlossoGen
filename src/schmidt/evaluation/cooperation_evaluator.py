@@ -2,13 +2,11 @@
 based on the full conversation transcript."""
 
 import logging
+from typing import Literal
 
-from schmidt.evaluation.evaluation_report import (
-    MetricResult,
-    Verdict,
-    parse_verdict_from_response,
-    parse_verdict_line,
-)
+from pydantic import BaseModel, Field
+
+from schmidt.evaluation.evaluation_report import MetricResult, Verdict
 from schmidt.evaluation.evaluator_protocol import Evaluator
 from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.evaluation.transcript_builder import build_full_transcript
@@ -19,13 +17,48 @@ from schmidt.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 
+VERDICT_SCORES: dict[Verdict, float] = {
+    Verdict.PASS: 1.0,
+    Verdict.PARTIAL: 0.5,
+    Verdict.FAIL: 0.0,
+}
+
+
+class AgentCooperationEntry(BaseModel):
+    """A single per-agent cooperation verdict."""
+
+    agent_id: str = Field(description="The agent identifier.")
+    verdict: Literal["PASS", "FAIL", "PARTIAL"] = Field(
+        description="This agent's cooperation verdict.",
+    )
+    reason: str = Field(description="Brief reason for this agent's verdict.")
+
+
+class CooperationVerdictOutput(BaseModel):
+    """Submit your assessment of cooperation quality, including per-agent verdicts."""
+
+    verdict: Literal["PASS", "FAIL", "PARTIAL"] = Field(
+        description=(
+            "Overall cooperation quality. "
+            "PASS: agents cooperated effectively toward the goal. "
+            "PARTIAL: some cooperation but notable gaps. "
+            "FAIL: poor cooperation, unproductive, or adversarial."
+        ),
+    )
+    explanation: str = Field(
+        description="Overall reasoning for the cooperation verdict.",
+    )
+    per_agent_verdicts: list[AgentCooperationEntry] = Field(
+        description="One entry per agent with an individual cooperation verdict.",
+    )
+
 
 class CooperationEvaluator(Evaluator):
     """Evaluates how well agents cooperated during a simulation.
 
     Formats the full message transcript with channel and sender labels,
-    sends it to an LLM judge that rates cooperation as PASS, FAIL, or PARTIAL,
-    and parses the response into an overall verdict plus per-agent verdicts.
+    sends it to an LLM judge that returns structured cooperation verdicts
+    including per-agent breakdowns.
     """
 
     async def evaluate(
@@ -54,34 +87,44 @@ class CooperationEvaluator(Evaluator):
         )
 
         logger.debug("CooperationEvaluator: sending transcript to LLM judge")
-        response = await llm_provider.generate(
+        result = await llm_provider.generate_structured(
             system_prompt=render_evaluator_prompt(template_name="evaluator_system.jinja"),
             messages=[LLMMessage(role="user", content=judge_prompt)],
-            tools=[],
+            output_schema=CooperationVerdictOutput,
         )
 
-        overall_verdict, overall_score = parse_verdict_from_response(response_text=response.text)
-        verdict_text = response.text.strip() if response.text is not None else ""
-        logger.debug(
-            "CooperationEvaluator: judge raw verdict line: %s", verdict_text.split("\n")[0]
-        )
-        lines = verdict_text.split("\n")
+        overall_verdict = Verdict(result.verdict.lower())
+        overall_score = VERDICT_SCORES[overall_verdict]
+
+        # Build per-agent map using case-insensitive matching
+        agent_id_set = {ac.agent_id for ac in agent_configs}
+        agent_id_lower_map = {aid.lower(): aid for aid in agent_id_set}
 
         per_agent: dict[str, Verdict] = {}
-        for agent in agent_configs:
-            matched_verdict = Verdict.PARTIAL
-            for line in lines[1:]:
-                stripped = line.strip()
-                if stripped.lower().startswith(f"{agent.agent_id.lower()}:"):
-                    verdict_part = stripped.split(":", maxsplit=1)[1].strip().upper()
-                    matched_verdict, _ = parse_verdict_line(line=verdict_part)
-                    break
-            per_agent[agent.agent_id] = matched_verdict
+        for entry in result.per_agent_verdicts:
+            canonical_id = agent_id_lower_map.get(entry.agent_id.lower())
+            if canonical_id is None:
+                logger.warning(
+                    "CooperationEvaluator: judge returned unknown agent_id '%s', skipping",
+                    entry.agent_id,
+                )
+                continue
+            per_agent[canonical_id] = Verdict(entry.verdict.lower())
+
+        # Log warning for agents not covered by the judge
+        for ac in agent_configs:
+            if ac.agent_id not in per_agent:
+                logger.warning(
+                    "CooperationEvaluator: no verdict returned for agent %s, "
+                    "defaulting to PARTIAL",
+                    ac.agent_id,
+                )
+                per_agent[ac.agent_id] = Verdict.PARTIAL
 
         return MetricResult(
             evaluator_name="cooperation",
             verdict=overall_verdict,
             score=overall_score,
-            evidence=[verdict_text],
+            evidence=[result.explanation],
             per_agent=per_agent,
         )

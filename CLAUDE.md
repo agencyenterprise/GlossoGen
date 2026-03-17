@@ -45,8 +45,13 @@ All prompts (agent system prompts, round injections) use Jinja2 templates stored
 - **Prefer async.** When both sync and async options exist (database, HTTP, file I/O), use the async variant.
 - **No `TYPE_CHECKING` or `from __future__ import annotations`.** Use direct imports. If there's a circular import, fix the cycle by restructuring.
 - **No string type annotations.** Never use quotes around type hints (e.g., `"asyncio.Queue[X]"`). All types must be referenced directly.
+- **No inline ternary expressions.** Use `if`/`else` blocks instead of `x if condition else y`.
 - **Remove dead code aggressively.** Unused fields, stale imports, commented-out code — delete them.
 - **Always use `logger.exception` in except blocks.** Every `except` clause that handles an error must call `logger.exception(...)` so the full stacktrace is visible in logs. Never silently swallow exceptions or use `logger.error` without the traceback.
+
+### LLM Output Parsing
+
+- **Always use output schemas to enforce structured LLM responses.** Never parse free text from LLM responses. Define a Pydantic model for the desired output shape, pass it to `generate_structured()`, and use the validated instance directly. Each caller defines its own output model tailored to its specific semantics.
 
 ### Docstrings
 
@@ -57,15 +62,47 @@ All prompts (agent system prompts, round injections) use Jinja2 templates stored
 
 ## Running Simulations
 
-Always run simulations as a background process, piping all output to a log file. This lets both the user and Claude monitor progress.
+Always run simulations as a background process, piping all output to a log file. This lets both the user and Claude monitor progress. Use a unique suffix (timestamp, run number, or description) for each run so previous logs are never overwritten.
 
 ```bash
 set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> --model <model> --log-dir ./logs \
-  > ./logs/<scenario>_stdout.log 2>&1 &
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> --model <model> --log-dir ./logs/<run_name> \
+  > ./logs/<run_name>_stdout.log 2>&1 &
+```
+
+The `car_recall` scenario registers its own `--knobs` flag pointing to a JSON file with scenario configuration. Two presets are provided in `src/schmidt/scenarios/car_recall/`:
+
+- `knobs_baseline.json` — 5 agents, 5 rounds, all knobs set to low
+- `knobs_high_pressure.json` — 5 agents, 3 rounds, high time/goal/regulator pressure
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
+    --model <model> --log-dir ./logs/<run_name> \
+    --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
+  > ./logs/<run_name>_stdout.log 2>&1 &
 ```
 
 Check progress by reading the stdout log file or the JSONL event log.
+
+## Running Evaluations
+
+After a simulation completes, score the log with LLM-as-judge evaluators. Run as a background process like simulations.
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate ./logs/<run_name>/<scenario>.jsonl \
+    --scenario <scenario> \
+    --evaluators <comma-separated evaluator names> \
+    --report ./logs/<run_name>/<scenario>_report.json \
+    --model <model> \
+  > ./logs/<run_name>_eval_stdout.log 2>&1 &
+```
+
+Available evaluators per scenario:
+
+- **incident_response**: `secret_leak`, `instruction_adherence`, `cooperation`
+- **car_recall**: `secret_leak`, `instruction_adherence`, `cooperation`, `fact_surfacing`, `report_divergence`, `decision_correctness`
 
 ## Pre-Commit Checklist
 

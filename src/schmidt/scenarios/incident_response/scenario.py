@@ -7,14 +7,19 @@ runs for a fixed number of rounds, each consisting of war-room turns
 followed by scheduled private sidebar turns.
 """
 
+import argparse
 import logging
 from pathlib import Path
-from typing import NamedTuple
+from typing import Self
 
 from jinja2 import Environment, FileSystemLoader
 
+from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult, write_report
+from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
+from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
+from schmidt.llm.claude_provider import ClaudeProvider
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.channel import Channel
+from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.models.simulation_state import SimulationState, TurnDecision
 from schmidt.models.tool_definition import ToolParameter, ToolSpec
 from schmidt.scenario_protocol import SimulationScenario
@@ -104,13 +109,6 @@ AGENT_SYSTEM_TEMPLATES: dict[str, str] = {
 }
 
 
-class ChannelTemplateEntry(NamedTuple):
-    """A channel's display name and ID, passed to Jinja2 system prompt templates."""
-
-    display_name: str
-    channel_id: str
-
-
 AGENT_INJECTION_TEMPLATES: dict[str, str] = {
     ENGINEER_ID: "engineer_injection.jinja",
     SUPPORT_LEAD_ID: "support_lead_injection.jinja",
@@ -128,12 +126,21 @@ class IncidentResponseScenario(SimulationScenario):
     private sidebar channels according to a per-round schedule.
     """
 
+    @classmethod
+    def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:  # noqa: ARG003
+        """No scenario-specific CLI arguments needed."""
+
+    @classmethod
+    def create(cls, args: argparse.Namespace) -> Self:  # noqa: ARG003
+        """Construct the scenario. No CLI arguments are used."""
+        return cls()
+
     def __init__(self) -> None:
         self._current_round = 0
         self._turn_index = 0
         self._current_round_turns: list[TurnDecision] = []
         self._jinja = Environment(
-            loader=FileSystemLoader(str(PROMPTS_DIR)),
+            loader=FileSystemLoader(PROMPTS_DIR),
             autoescape=False,
             keep_trailing_newline=False,
         )
@@ -161,7 +168,7 @@ class IncidentResponseScenario(SimulationScenario):
             for cid in channel_ids
         ]
 
-    def get_agents(self) -> list[AgentConfig]:
+    def get_agents(self, default_model: str) -> list[AgentConfig]:
         """Return agent configurations for the Engineer, Support
         Lead, and PM.
 
@@ -188,6 +195,7 @@ class IncidentResponseScenario(SimulationScenario):
                     ),
                     channel_ids=channel_ids,
                     tool_names=["send_message", "propose_resolution"],
+                    model=default_model,
                 )
             )
         return agents
@@ -262,9 +270,6 @@ class IncidentResponseScenario(SimulationScenario):
             len(self._current_round_turns),
         )
 
-        if not self._current_round_turns:
-            return None
-
         decision = self._current_round_turns[self._turn_index]
         self._turn_index += 1
         return decision
@@ -337,3 +342,46 @@ class IncidentResponseScenario(SimulationScenario):
 
         registry.register(spec=PROPOSE_RESOLUTION_SPEC, executor=propose_resolution)
         logger.debug("Registered scenario tool: propose_resolution")
+
+    async def run_evaluation(
+        self,
+        log_path: Path,
+        evaluator_names: list[str],
+        report_path: Path,
+        model: str,
+    ) -> EvaluationReport:
+        """Run evaluators and write a JSON report."""
+        events = await load_events(log_path=log_path)
+        agent_configs = extract_agent_configs(events=events)
+        simulation_id = extract_simulation_id(events=events)
+        provider = ClaudeProvider(model=model)
+
+        metrics: list[MetricResult] = []
+        for name in evaluator_names:
+            if name not in GENERIC_EVALUATOR_REGISTRY:
+                available = ", ".join(sorted(GENERIC_EVALUATOR_REGISTRY.keys()))
+                raise ValueError(f"Unknown evaluator: '{name}'. Available: {available}")
+            evaluator = GENERIC_EVALUATOR_REGISTRY[name]()
+            logger.info("Running evaluator: %s", name)
+            result = await evaluator.evaluate(
+                events=events,
+                agent_configs=agent_configs,
+                scenario=self,
+                llm_provider=provider,
+            )
+            logger.info(
+                "Evaluator %s finished: verdict=%s, score=%.2f",
+                name,
+                result.verdict,
+                result.score,
+            )
+            metrics.append(result)
+
+        report = EvaluationReport(
+            simulation_id=simulation_id,
+            scenario_name=self.name(),
+            metrics=metrics,
+            derived=None,
+        )
+        await write_report(report=report, report_path=report_path)
+        return report

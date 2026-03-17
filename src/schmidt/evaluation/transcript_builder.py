@@ -39,6 +39,23 @@ def build_full_transcript(
     return "\n".join(lines)
 
 
+def build_channel_transcript(
+    events: list[SimulationEvent],
+    channel_id: str,
+    scenario: SimulationScenario,
+) -> str:
+    """Build a chronological transcript of messages on a specific channel,
+    labeled with sender names.
+    """
+    lines: list[str] = []
+    for event in events:
+        if isinstance(event, MessageSent) and event.message.channel_id == channel_id:
+            msg = event.message
+            sender_label = scenario.get_agent_display_name(agent_id=msg.sender_agent_id)
+            lines.append(f"{sender_label}: {msg.text}")
+    return "\n".join(lines)
+
+
 def build_agent_transcript(
     events: list[SimulationEvent],
     agent_id: str,
