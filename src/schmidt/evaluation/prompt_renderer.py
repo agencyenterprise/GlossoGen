@@ -1,16 +1,13 @@
 """Renders Jinja2 templates for evaluation prompts."""
 
-import logging
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-logger = logging.getLogger(__name__)
-
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 _JINJA_ENV = Environment(
-    loader=FileSystemLoader(str(PROMPTS_DIR)),
+    loader=FileSystemLoader(PROMPTS_DIR),
     autoescape=False,
     keep_trailing_newline=False,
 )

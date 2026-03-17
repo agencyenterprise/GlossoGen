@@ -15,3 +15,4 @@ class AgentConfig(BaseModel):
     system_prompt: str
     channel_ids: list[str]
     tool_names: list[str]
+    model: str
