@@ -89,6 +89,8 @@ AGENT_INJECTION_TEMPLATES: dict[str, str] = {
     REGULATOR_ID: "regulator_injection.jinja",
 }
 
+# Maps round number -> simulated day number. High pressure skips days 2
+# and 4, compressing the 5-day timeline into 3 rounds.
 LOW_PRESSURE_DAY_MAP: dict[int, int] = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5}
 HIGH_PRESSURE_DAY_MAP: dict[int, int] = {1: 1, 2: 3, 3: 5}
 
