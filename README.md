@@ -1,6 +1,6 @@
 # schmidt-poc
 
-A platform for testing agent communication through real-life simulations. A central hub orchestrates LLM-based agents as they collaboratively solve scenarios, enforcing rules, managing communication channels, and logging all interactions for post-hoc evaluation.
+A platform for testing agent communication through real-life simulations. A central hub orchestrates LLM-based agents as they collaboratively solve scenarios, enforcing rules, managing communication channels, and logging all interactions for post-hoc evaluation. A web UI displays simulation runs and evaluation results.
 
 ## Setup
 
@@ -8,35 +8,46 @@ A platform for testing agent communication through real-life simulations. A cent
 make install
 ```
 
+This installs both the Python server dependencies (`uv sync`) and the frontend dependencies (`npm ci`).
+
 Requires an `ANTHROPIC_API_KEY` environment variable. Create a `.env` file in the project root:
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+## Run Output Directory Structure
+
+All simulation outputs use a standard directory layout under `runs/`:
+
+```
+runs/{scenario_name}/{unix_timestamp}/
+├── {scenario_name}.jsonl          # Event log
+├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
+```
+
 ## Running a Simulation
 
-Use a unique directory name per run (e.g. timestamp or description) so previous logs are never overwritten.
+The CLI auto-generates a timestamped subdirectory under `--runs-dir`.
 
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-    --model claude-sonnet-4-20250514 --log-dir ./logs/run_001 \
-  > ./logs/run_001_stdout.log 2>&1 &
+    --model claude-sonnet-4-20250514 --runs-dir ./runs \
+  > ./runs/incident_response_stdout.log 2>&1 &
 ```
 
 Check progress by reading the stdout log or the JSONL event log in the run directory.
 
 ## Running Evaluation
 
-After a simulation completes, score the log with LLM-as-judge evaluators:
+After a simulation completes, point `--run-dir` at the specific run directory:
 
 ```bash
 set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate ./logs/run_001/incident_response.jsonl \
-    --scenario incident_response \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate incident_response \
+    --run-dir ./runs/incident_response/1742234567 \
     --evaluators secret_leak,instruction_adherence,cooperation \
-    --report ./logs/run_001/report.json \
     --model claude-sonnet-4-20250514
 ```
 
@@ -54,6 +65,29 @@ Each scenario defines its own evaluators. Available evaluators by scenario:
 
 Output is a JSON report with per-evaluator verdicts, scores, evidence, and per-agent breakdowns.
 
+## Web UI
+
+A FastAPI backend + Next.js frontend for browsing simulation runs.
+
+### Starting the Servers
+
+```bash
+make dev            # FastAPI backend on port 8000 (reads from ./runs/)
+make dev-frontend   # Next.js dev server on port 3000
+```
+
+The frontend displays a list of all simulation runs with scenario name, timestamp, turn count, end reason, and evaluation status.
+
+### API Type Safety
+
+All frontend API calls use a typed client generated from the backend's OpenAPI schema. Raw `fetch()` is forbidden (enforced by ESLint). To regenerate types after changing backend endpoints:
+
+```bash
+make gen-api-types
+```
+
+CI fails if the generated types drift from the backend schema.
+
 ## Scenarios
 
 ### Incident Response
@@ -68,7 +102,7 @@ A major automotive manufacturer decides whether to issue a vehicle recall. Five 
 
 ```
 src/schmidt/
-  cli.py                       # CLI: run + evaluate subcommands
+  cli.py                       # CLI: run, evaluate, serve subcommands
   simulation_hub.py            # Orchestrator: turn loop, agent wake/done
   agent_runner.py              # Per-agent coroutine: prompt building, LLM calls, tool loop
   channel_router.py            # Message storage + membership validation
@@ -79,6 +113,22 @@ src/schmidt/
   tools/                       # Tool registry, executor, built-in send_message
   evaluation/                  # Post-hoc LLM-as-judge evaluators
   scenarios/                   # One folder per scenario (class + Jinja2 prompt templates + README.md)
+
+  server/                      # FastAPI web server
+    app.py                     # Application setup, CORS, lifespan
+    response_models.py         # Pydantic response models (all endpoints return structured models)
+    run_discovery.py           # Scans runs/ directory for simulation logs
+    runs_router.py             # GET /api/runs endpoint
+
+frontend/                      # Next.js web application
+  src/
+    app/                       # App Router pages (runs list)
+    features/                  # Feature modules (runs)
+    shared/                    # Shared components, providers, utilities
+    types/api.gen.ts           # Auto-generated TypeScript types from OpenAPI schema
+
+scripts/
+  export_openapi.py            # Exports backend OpenAPI schema for frontend type generation
 ```
 
 Each scenario folder contains its own `README.md` describing the agents, channels, tools, round injections, turn logic, and evaluation focus for that scenario.
@@ -88,5 +138,8 @@ See [Architecture.md](Architecture.md) for design decisions, simulation flow, an
 ## Linting
 
 ```bash
-make lint
+make lint              # runs both server and frontend linters
+make lint-server       # server only (black, isort, ruff, mypy, pyright, vulture, custom linters)
+make lint-frontend     # frontend only (prettier, eslint, stylelint, tsc)
+make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 ```
