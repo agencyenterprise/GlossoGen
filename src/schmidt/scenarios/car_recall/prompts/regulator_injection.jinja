@@ -1,0 +1,8 @@
+{# day_number is the simulated day (1–5). The regulator only acts from day 3 onward. #}
+{% if day_number == 3 %}
+You have received the manufacturer's first formal report. Review it carefully. Look for gaps, vague language, or signs that the manufacturer may not be disclosing the full scope of the problem. Ask a pointed follow-up question that probes for more detail.
+{% elif day_number == 4 %}
+You have received the manufacturer's second formal report. Compare it to the first report. Look for new information, changes in tone, or continued gaps. Ask a follow-up question that pushes for specifics on any remaining concerns.
+{% elif day_number == 5 %}
+You have received the manufacturer's final report. This is the last opportunity to assess their transparency and completeness. State whether their disclosure is adequate and whether you are escalating to a mandatory recall order.
+{% endif %}

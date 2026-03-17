@@ -25,9 +25,12 @@ class EventLogger:
         return self._file is not None
 
     async def open(self) -> None:
-        """Create parent directories if needed and open the log file in binary append mode."""
+        """Create parent directories if needed and open the log file for writing.
+
+        Truncates any existing file so each simulation run produces a clean log.
+        """
         self._log_path.parent.mkdir(parents=True, exist_ok=True)
-        self._file = await aiofiles.open(self._log_path, mode="ab")
+        self._file = await aiofiles.open(self._log_path, mode="wb")
         logger.info("Event log opened: %s", self._log_path)
 
     async def log(self, event: SimulationEvent) -> None:

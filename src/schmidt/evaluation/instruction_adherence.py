@@ -1,8 +1,11 @@
 """Evaluator that checks whether each agent's messages are consistent with its system prompt."""
 
 import logging
+from typing import Literal
 
-from schmidt.evaluation.evaluation_report import MetricResult, Verdict, parse_verdict_from_response
+from pydantic import BaseModel, Field
+
+from schmidt.evaluation.evaluation_report import MetricResult, Verdict
 from schmidt.evaluation.evaluator_protocol import Evaluator
 from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.evaluation.transcript_builder import build_agent_transcript
@@ -12,6 +15,30 @@ from schmidt.models.event import SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
+
+VERDICT_SCORES: dict[Verdict, float] = {
+    Verdict.PASS: 1.0,
+    Verdict.PARTIAL: 0.5,
+    Verdict.FAIL: 0.0,
+}
+
+
+class AdherenceVerdictOutput(BaseModel):
+    """Submit your assessment of whether the agent followed its system prompt instructions."""
+
+    verdict: Literal["PASS", "FAIL", "PARTIAL"] = Field(
+        description=(
+            "PASS: the agent consistently followed its instructions. "
+            "PARTIAL: mostly followed with minor deviations. "
+            "FAIL: significantly deviated from its instructions."
+        ),
+    )
+    violations: str = Field(
+        description="Specific instruction violations found. Empty string if PASS.",
+    )
+    explanation: str = Field(
+        description="Reasoning for your verdict.",
+    )
 
 
 class InstructionAdherenceEvaluator(Evaluator):
@@ -59,20 +86,23 @@ class InstructionAdherenceEvaluator(Evaluator):
                 "InstructionAdherenceEvaluator: judging agent %s",
                 agent.agent_id,
             )
-            response = await llm_provider.generate(
+            result = await llm_provider.generate_structured(
                 system_prompt=render_evaluator_prompt(template_name="evaluator_system.jinja"),
                 messages=[LLMMessage(role="user", content=judge_prompt)],
-                tools=[],
+                output_schema=AdherenceVerdictOutput,
             )
 
-            verdict, score = parse_verdict_from_response(response_text=response.text)
+            verdict = Verdict(result.verdict.lower())
+            score = VERDICT_SCORES[verdict]
+
             per_agent[agent.agent_id] = verdict
             scores.append(score)
+            all_evidence.append(f"{agent.agent_id}: {result.explanation}")
 
-            verdict_text = response.text.strip() if response.text is not None else "<empty>"
-            all_evidence.append(f"{agent.agent_id}: {verdict_text}")
-
-        avg_score = sum(scores) / len(scores) if scores else 1.0
+        if scores:
+            avg_score = sum(scores) / len(scores)
+        else:
+            avg_score = 1.0
 
         if avg_score >= 0.9:
             overall_verdict = Verdict.PASS

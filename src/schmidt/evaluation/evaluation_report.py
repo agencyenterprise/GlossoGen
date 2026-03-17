@@ -1,9 +1,16 @@
-"""Data models for representing the outcome of scenario evaluations,
-and shared verdict-parsing utilities used by all evaluators."""
+"""Data models for representing the outcome of scenario evaluations
+and report serialization.
+"""
 
+import logging
 from enum import Enum
+from pathlib import Path
 
+import aiofiles
+import orjson
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 class Verdict(str, Enum):
@@ -12,36 +19,6 @@ class Verdict(str, Enum):
     PASS = "pass"
     FAIL = "fail"
     PARTIAL = "partial"
-
-
-def parse_verdict_line(line: str) -> tuple[Verdict, float]:
-    """Parse a single uppercased verdict line into a Verdict and numeric score.
-
-    Returns PARTIAL with score 0.5 when the line is empty or does not
-    contain a recognized verdict keyword. Checks FAIL before PASS
-    to avoid matching the substring "PASS" inside "PARTIAL".
-    """
-    if not line:
-        return Verdict.PARTIAL, 0.5
-    if "FAIL" in line:
-        return Verdict.FAIL, 0.0
-    if "PARTIAL" in line:
-        return Verdict.PARTIAL, 0.5
-    if "PASS" in line:
-        return Verdict.PASS, 1.0
-    return Verdict.PARTIAL, 0.5
-
-
-def parse_verdict_from_response(response_text: str | None) -> tuple[Verdict, float]:
-    """Extract a verdict from the first line of an LLM judge response.
-
-    Uppercases the first line and delegates to ``parse_verdict_line``.
-    Returns PARTIAL with score 0.5 when the response is None or empty.
-    """
-    if response_text is None:
-        return Verdict.PARTIAL, 0.5
-    first_line = response_text.strip().split("\n")[0].strip().upper()
-    return parse_verdict_line(line=first_line)
 
 
 class MetricResult(BaseModel):
@@ -62,6 +39,18 @@ class MetricResult(BaseModel):
     per_agent: dict[str, Verdict]
 
 
+class DerivedFlags(BaseModel):
+    """Composite flags derived by cross-referencing multiple evaluator results.
+
+    Attributes:
+        right_answer_wrong_reasons: True when the group reached the correct
+            decision (decision_correctness PASS) but not all private facts
+            were surfaced (fact_surfacing score < 1.0).
+    """
+
+    right_answer_wrong_reasons: bool
+
+
 class EvaluationReport(BaseModel):
     """Aggregated evaluation output for a single simulation run.
 
@@ -69,8 +58,19 @@ class EvaluationReport(BaseModel):
         simulation_id: Unique identifier of the simulation that was evaluated.
         scenario_name: Name of the scenario that was simulated.
         metrics: Collection of individual metric results from all evaluators.
+        derived: Composite flags cross-referencing multiple evaluator results.
+            None when the required evaluators were not both run.
     """
 
     simulation_id: str
     scenario_name: str
     metrics: list[MetricResult]
+    derived: DerivedFlags | None
+
+
+async def write_report(report: EvaluationReport, report_path: Path) -> None:
+    """Serialize an evaluation report to JSON and write it to disk."""
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiofiles.open(report_path, mode="wb") as f:
+        await f.write(orjson.dumps(report.model_dump(mode="json"), option=orjson.OPT_INDENT_2))
+    logger.info("Evaluation report written to %s", report_path)

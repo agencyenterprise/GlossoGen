@@ -5,12 +5,14 @@ implementations must conform to.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
 from schmidt.models.event import TokenUsage
 from schmidt.models.tool_definition import ToolCallRequest, ToolSpec
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class LLMMessage(BaseModel):
@@ -37,8 +39,8 @@ class LLMResponse(BaseModel):
 class LLMProvider(ABC):
     """Abstract interface for LLM providers.
 
-    Concrete subclasses implement the ``generate`` method to call a specific
-    LLM API (e.g. Anthropic, OpenAI).
+    Concrete subclasses implement ``generate`` for free-form LLM calls and
+    ``generate_structured`` for calls that must return a validated Pydantic model.
     """
 
     @abstractmethod
@@ -57,5 +59,28 @@ class LLMProvider(ABC):
 
         Returns:
             The model's response including text, tool calls, and usage data.
+        """
+        ...
+
+    @abstractmethod
+    async def generate_structured(
+        self,
+        system_prompt: str,
+        messages: list[LLMMessage],
+        output_schema: type[T],
+    ) -> T:
+        """Send a conversation to the LLM and return a validated Pydantic model.
+
+        The provider converts the output_schema into a tool definition,
+        forces the model to call it, and validates the response against
+        the schema.
+
+        Args:
+            system_prompt: The system-level instruction for the model.
+            messages: The conversation history as a list of messages.
+            output_schema: The Pydantic model class defining the output shape.
+
+        Returns:
+            A validated instance of the output_schema.
         """
         ...

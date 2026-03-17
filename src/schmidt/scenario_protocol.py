@@ -1,7 +1,11 @@
 """Abstract base class that every simulation scenario must implement."""
 
+import argparse
 from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Self
 
+from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel
 from schmidt.models.simulation_state import SimulationState, TurnDecision
@@ -15,13 +19,25 @@ class SimulationScenario(ABC):
     injections, and tools that comprise a single simulation scenario.
     """
 
+    @classmethod
+    @abstractmethod
+    def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:
+        """Register scenario-specific CLI arguments on the given parser."""
+        ...
+
+    @classmethod
+    @abstractmethod
+    def create(cls, args: argparse.Namespace) -> Self:
+        """Parse scenario-specific CLI arguments and construct a scenario instance."""
+        ...
+
     @abstractmethod
     def name(self) -> str:
         """Return the unique identifier for this scenario."""
         ...
 
     @abstractmethod
-    def get_agents(self) -> list[AgentConfig]:
+    def get_agents(self, default_model: str) -> list[AgentConfig]:
         """Return the list of agent configurations participating in this scenario."""
         ...
 
@@ -59,4 +75,15 @@ class SimulationScenario(ABC):
     @abstractmethod
     def register_tools(self, registry: ToolRegistry) -> None:
         """Register scenario-specific tools with the provided tool registry."""
+        ...
+
+    @abstractmethod
+    async def run_evaluation(
+        self,
+        log_path: Path,
+        evaluator_names: list[str],
+        report_path: Path,
+        model: str,
+    ) -> EvaluationReport:
+        """Run evaluators against a simulation log and write the report."""
         ...

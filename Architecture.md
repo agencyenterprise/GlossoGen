@@ -19,7 +19,7 @@ A platform for testing agent communication through real-life simulations. A cent
 | Agent Actions       | Messages + tools (Claude tool-use)                           |
 | Tool Registry       | Shared, provider-agnostic; scenarios pick per role           |
 | Agent Framing       | Prompts frame the *user* as the role, not the agent          |
-| Entrypoint          | CLI (`python -m schmidt run scenario_name --model MODEL --log-dir DIR`) |
+| Entrypoint          | CLI (`python -m schmidt run scenario_name --model MODEL --log-dir DIR [scenario-specific flags]`) |
 | Metrics             | Post-hoc LLM-as-judge, user-selected evaluators, JSON report |
 
 
@@ -40,7 +40,7 @@ src/schmidt/
   # Data models (Pydantic)
   models/
     __init__.py
-    agent_config.py            # AgentConfig (id, role, system_prompt, channels, tools)
+    agent_config.py            # AgentConfig (id, role, system_prompt, channels, tools, model)
     channel.py                 # Channel (id, name, member_ids)
     message.py                 # SimulationMessage, MessageContent
     event.py                   # SimulationEvent discriminated union (all log event types)
@@ -50,7 +50,7 @@ src/schmidt/
   # LLM provider abstraction
   llm/
     __init__.py
-    provider.py                # LLMProvider ABC + LLMResponse model
+    provider.py                # LLMProvider ABC (generate + generate_structured), LLMMessage, LLMResponse
     claude_provider.py         # ClaudeProvider (Anthropic SDK)
     prompt_builder.py          # Builds message lists from channel history
 
@@ -63,7 +63,7 @@ src/schmidt/
 
   # Scenario system
   scenario_protocol.py         # SimulationScenario ABC
-  scenario_loader.py           # Registry + loader for scenario classes
+  scenario_loader.py           # Looks up scenario classes by name from the registry
   scenarios/
     __init__.py                # Scenario registry mapping names to classes
     incident_response/         # One folder per scenario
@@ -76,19 +76,36 @@ src/schmidt/
         engineer_injection.jinja
         support_lead_injection.jinja
         pm_injection.jinja
+    car_recall/                # Configurable scenario with 6 tunable knobs
+      __init__.py
+      scenario.py              # CarRecallScenario (accepts CarRecallKnobs)
+      knobs.py                 # CarRecallKnobs Pydantic model + knob enums
+      channel_ids.py           # Channel ID constants (INTERNAL_ID, REGULATOR_REPORT_ID)
+      prompts/                 # Jinja2 templates with knob-conditional sections
+      evaluation/              # Car recall-specific evaluators
+        __init__.py
+        fact_surfacing_evaluator.py      # Did private facts appear in the internal channel?
+        report_divergence_evaluator.py   # Does the PR report match internal discussion?
+        decision_correctness_evaluator.py # Did the group reach the correct decision?
+        prompt_renderer.py     # Renders Jinja2 templates for car recall evaluation prompts
+        prompts/
+          fact_surfacing_user.jinja
+          report_divergence_user.jinja
+          decision_correctness_user.jinja
 
   # Evaluation (post-hoc LLM-as-judge)
   evaluation/
     __init__.py
-    evaluator_runner.py        # Loads JSONL log, runs user-selected evaluators, writes JSON report
+    evaluator_registry.py      # GENERIC_EVALUATOR_REGISTRY mapping names to evaluator classes
+    log_reader.py              # Reads JSONL logs, extracts agent configs and simulation IDs
     evaluator_protocol.py      # Evaluator ABC
     secret_leak_evaluator.py   # Did an agent reveal confidential information?
     instruction_adherence.py   # Did agents follow their system prompt instructions?
     cooperation_evaluator.py   # Did agents cooperate effectively toward the goal?
-    evaluation_report.py       # Pydantic models: EvaluationReport, MetricResult, Verdict
-    prompt_renderer.py         # Renders Jinja2 templates for evaluation prompts
+    evaluation_report.py       # Pydantic models: EvaluationReport, MetricResult, Verdict, DerivedFlags; write_report()
+    prompt_renderer.py         # Renders Jinja2 templates for generic evaluation prompts
     transcript_builder.py      # Builds formatted transcripts from simulation events
-    prompts/                   # Jinja2 templates for evaluator judge prompts
+    prompts/                   # Jinja2 templates for generic evaluator judge prompts
       evaluator_system.jinja
       cooperation_user.jinja
       instruction_adherence_user.jinja
@@ -97,8 +114,8 @@ src/schmidt/
 
 ## Simulation Flow
 
-1. **CLI** parses arguments, loads scenario by name, creates LLM provider, tool registry, and event logger.
-2. **SimulationHub.run()** gets agents, channels, and tool names from the scenario. Creates a ChannelRouter. Spawns one AgentRunner coroutine per agent (each immediately awaits its wake event). Logs `SimulationStarted` and one `AgentRegistered` event per agent.
+1. **CLI** parses arguments in two passes (first to identify the scenario, then to include scenario-specific flags). Calls `scenario.get_agents()` to obtain agent configs, builds a per-agent LLM provider mapping, creates the tool registry and event logger, and passes all of these into the `SimulationHub` constructor.
+2. **SimulationHub.run()** uses the agents already provided at construction time. Calls `scenario.get_channels()` and `scenario.register_tools()`, creates a ChannelRouter, spawns one AgentRunner coroutine per agent (each immediately awaits its wake event), and logs `SimulationStarted` and one `AgentRegistered` event per agent.
 3. **Main loop**: Builds SimulationState from ChannelRouter and turn counter. Asks the scenario for the next turn via `decide_next_turn`, receiving a `TurnDecision` (which agent, which channel context) or `None` to end. Logs `TurnAssigned`, delivers the decision to the agent's queue, and sets its wake event. Awaits the agent's done signal.
 4. **Agent turn**: The agent wakes, reads its TurnDecision, and the PromptBuilder constructs a conversation from visible channel history. The LLM is called with the system prompt, messages, and available tools. If the LLM returns tool calls, they are executed and results fed back in a loop until the LLM produces a final response. The agent signals done.
 5. **End**: When the scenario returns `None` or its end condition is met, the hub logs `SimulationEnded`, cancels agent tasks, and closes the logger.
@@ -179,6 +196,9 @@ The user selects which evaluators to run — they are not automatically applied.
 - **SecretLeakEvaluator**: Given each agent's system prompt (which may contain confidential information), did the agent reveal that information in channels where it shouldn't have?
 - **InstructionAdherenceEvaluator**: Did each agent behave consistently with its system prompt instructions?
 - **CooperationEvaluator**: Did agents work together effectively? Were messages constructive?
+- **FactSurfacingEvaluator**: Did pre-tagged private facts appear in the internal channel? (car_recall)
+- **ReportDivergenceEvaluator**: Does the PR agent's report to the Regulator match the internal discussion? (car_recall)
+- **DecisionCorrectnessEvaluator**: Did the group reach the correct decision? (car_recall)
 
 **Output**: A JSON report with per-evaluator results:
 
@@ -192,7 +212,7 @@ The user selects which evaluators to run — they are not automatically applied.
       "verdict": "pass",
       "score": 1.0,
       "evidence": ["No confidential information was leaked across 24 messages"],
-      "per_agent": { "tech_lead_assistant": "pass", "pm_assistant": "pass" }
+      "per_agent": { "engineer": "pass", "support_lead": "pass", "pm": "pass" }
     }
   ]
 }
