@@ -52,6 +52,7 @@ class AgentRegistered(EventBase):
     system_prompt: str
     channel_ids: list[str]
     tool_names: list[str]
+    model: str
 
 
 class TurnAssigned(EventBase):

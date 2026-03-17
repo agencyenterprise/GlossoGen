@@ -10,6 +10,7 @@ from schmidt.channel_router import ChannelRouter
 from schmidt.event_logger import EventLogger
 from schmidt.llm.prompt_builder import PromptBuilder
 from schmidt.llm.provider import LLMProvider
+from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import (
     AgentRegistered,
     EndReason,
@@ -37,12 +38,14 @@ class SimulationHub:
     def __init__(
         self,
         scenario: SimulationScenario,
-        llm_provider: LLMProvider,
+        agents: list[AgentConfig],
+        agent_providers: dict[str, LLMProvider],
         tool_registry: ToolRegistry,
         event_logger: EventLogger,
     ) -> None:
         self._scenario = scenario
-        self._llm_provider = llm_provider
+        self._agents = agents
+        self._agent_providers = agent_providers
         self._tool_registry = tool_registry
         self._event_logger = event_logger
 
@@ -56,7 +59,7 @@ class SimulationHub:
         proceeding. Logs simulation start, agent registrations, turn assignments,
         and simulation end events. Cancels all agent tasks on exit.
         """
-        agents = self._scenario.get_agents()
+        agents = self._agents
         channels = self._scenario.get_channels()
         logger.info(
             "Setting up simulation: scenario=%s, agents=%d, channels=%d",
@@ -102,6 +105,7 @@ class SimulationHub:
                     system_prompt=agent.system_prompt,
                     channel_ids=agent.channel_ids,
                     tool_names=agent.tool_names,
+                    model=agent.model,
                 )
             )
 
@@ -118,7 +122,7 @@ class SimulationHub:
 
             runner = AgentRunner(
                 config=agent,
-                llm_provider=self._llm_provider,
+                llm_provider=self._agent_providers[agent.agent_id],
                 prompt_builder=prompt_builder,
                 scenario=self._scenario,
                 tool_registry=self._tool_registry,
@@ -193,8 +197,14 @@ class SimulationHub:
                 # Log turn progress
                 runner = runners[agent_id]
                 summary = runner.last_turn_summary
-                msgs = ", ".join(summary.messages_sent) if summary.messages_sent else "no messages"
-                tools_used = ", ".join(summary.tools_called) if summary.tools_called else "none"
+                if summary.messages_sent:
+                    msgs = ", ".join(summary.messages_sent)
+                else:
+                    msgs = "no messages"
+                if summary.tools_called:
+                    tools_used = ", ".join(summary.tools_called)
+                else:
+                    tools_used = "none"
                 logger.info(
                     "[Turn %d] %s -> %s | tools: %s | sent: %s",
                     turn_number,
