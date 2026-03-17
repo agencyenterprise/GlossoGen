@@ -164,4 +164,10 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-logs/
+/logs/
+/runs/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
