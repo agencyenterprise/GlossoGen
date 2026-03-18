@@ -95,6 +95,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                 RunSummary(
                     run_id=first_event.event_id,
                     scenario_name=first_event.scenario_name,
+                    scenario_description=first_event.scenario_description,
                     timestamp=first_event.timestamp,
                     total_turns=last_event.total_turns,
                     end_reason=last_event.reason,
@@ -103,4 +104,5 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                 )
             )
 
+    summaries.sort(key=lambda s: s.timestamp, reverse=True)
     return summaries

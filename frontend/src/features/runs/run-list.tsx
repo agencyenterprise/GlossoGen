@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle, Inbox, Loader2, XCircle } from "lucide-react";
+import { CheckCircle, HelpCircle, Inbox, Loader2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
 import type { components } from "@/types/api.gen";
 import { formatTime, humanize } from "./format";
+import { ScenarioDescriptionModal } from "./scenario-description-modal";
 
 type RunSummary = components["schemas"]["RunSummary"];
 
@@ -44,6 +46,8 @@ function groupByDay(runs: RunSummary[]): Array<{ label: string; runs: RunSummary
 }
 
 export function RunList() {
+  const [modalRun, setModalRun] = useState<RunSummary | null>(null);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["runs"],
     queryFn: async () => {
@@ -87,6 +91,14 @@ export function RunList() {
 
   return (
     <div className="space-y-6">
+      {modalRun !== null ? (
+        <ScenarioDescriptionModal
+          scenarioName={humanize(modalRun.scenario_name)}
+          description={modalRun.scenario_description}
+          onClose={() => setModalRun(null)}
+        />
+      ) : null}
+
       {groups.map(group => (
         <div key={group.label}>
           <h2 className="mb-2 text-sm font-medium text-muted-foreground">{group.label}</h2>
@@ -97,7 +109,19 @@ export function RunList() {
                 href={`/runs/${run.run_id}`}
                 className="flex items-center gap-6 px-4 py-2.5 text-sm transition-colors hover:bg-accent/50"
               >
-                <span className="w-40 font-medium">{humanize(run.scenario_name)}</span>
+                <span className="flex w-40 items-center gap-1.5 font-medium">
+                  {humanize(run.scenario_name)}
+                  <button
+                    aria-label="Scenario description"
+                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={e => {
+                      e.preventDefault();
+                      setModalRun(run);
+                    }}
+                  >
+                    <HelpCircle className="h-3.5 w-3.5" />
+                  </button>
+                </span>
                 <span className="w-20 text-muted-foreground">{formatTime(run.timestamp)}</span>
                 <span className="w-16 text-muted-foreground">{run.total_turns} turns</span>
                 <span className="w-36 text-muted-foreground">

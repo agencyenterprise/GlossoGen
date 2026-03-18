@@ -26,6 +26,7 @@ class RunSummary(BaseModel):
 
     run_id: str
     scenario_name: str
+    scenario_description: str
     timestamp: datetime
     total_turns: int
     end_reason: EndReason
@@ -83,6 +84,7 @@ class RunDetailResponse(BaseModel):
 
     run_id: str
     scenario_name: str
+    scenario_description: str
     timestamp: datetime
     total_turns: int
     end_reason: EndReason
