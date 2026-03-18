@@ -131,6 +131,16 @@ set -a && source .env && set +a && \
 
 Check progress by reading the stdout log file or the JSONL event log.
 
+### IMPORTANT: Monitoring Long-Running Processes
+
+When running simulations, evaluations, or any long-running background process, **always** follow this pattern:
+
+1. Launch the process in the background (with `run_in_background` or `&`)
+2. Immediately after launch, `sleep 30` then check the log file for progress (grep for turn count, last line, or completion marker)
+3. Report a brief status update to the user (e.g. "Turn 8/14, Round 2")
+4. Repeat: `sleep 30`, check, report — until the process completes
+5. Never use `while` loops or polling constructs — use sequential sleep/check/report cycles so the user sees updates between checks
+
 ## Running Evaluations
 
 After a simulation completes, score the log with LLM-as-judge evaluators. Point `--run-dir` at the specific run directory. Run as a background process like simulations.
