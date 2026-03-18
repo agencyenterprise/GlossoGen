@@ -13,6 +13,7 @@ private facts to surface and be integrated.
 
 import argparse
 import logging
+import random
 from pathlib import Path
 from typing import Self
 
@@ -123,8 +124,12 @@ class CarRecallScenario(SimulationScenario):
             self._max_rounds = 5
             self._day_map = LOW_PRESSURE_DAY_MAP
         self._current_round = 0
-        self._turn_index = 0
-        self._current_round_turns: list[TurnDecision] = []
+        self._discussion_agents: list[str] = []
+        self._discussion_channel: str = ""
+        self._rotation_index: int = -1
+        self._anyone_spoke_this_rotation: bool = False
+        self._regulator_queue: list[tuple[str, list[str]]] = []
+        self._discussion_started: bool = False
         self._jinja = Environment(
             loader=FileSystemLoader(PROMPTS_DIR),
             autoescape=False,
@@ -185,20 +190,22 @@ class CarRecallScenario(SimulationScenario):
     def _agent_defs(self) -> list[tuple[str, str, list[str], list[str]]]:
         """Build agent definition tuples based on knobs."""
         defs: list[tuple[str, str, list[str], list[str]]] = [
-            (ENGINEER_ID, "Engineer", [INTERNAL_ID], ["send_message"]),
-            (LEGAL_ID, "Legal", [INTERNAL_ID], ["send_message"]),
+            (ENGINEER_ID, "Engineer", [INTERNAL_ID], ["send_message", "pass_turn"]),
+            (LEGAL_ID, "Legal", [INTERNAL_ID], ["send_message", "pass_turn"]),
         ]
 
         if self._knobs.agent_count == AgentCount.FIVE:
-            defs.append((CFO_ID, "CFO", [INTERNAL_ID], ["send_message"]))
+            defs.append((CFO_ID, "CFO", [INTERNAL_ID], ["send_message", "pass_turn"]))
 
         pr_channels = [INTERNAL_ID]
         if self._knobs.agent_count == AgentCount.FIVE:
             pr_channels.append(REGULATOR_REPORT_ID)
-        defs.append((PR_ID, "PR", pr_channels, ["send_message"]))
+        defs.append((PR_ID, "PR", pr_channels, ["send_message", "pass_turn"]))
 
         if self._knobs.agent_count == AgentCount.FIVE:
-            defs.append((REGULATOR_ID, "Regulator", [REGULATOR_REPORT_ID], ["send_message"]))
+            defs.append(
+                (REGULATOR_ID, "Regulator", [REGULATOR_REPORT_ID], ["send_message", "pass_turn"])
+            )
 
         return defs
 
@@ -252,72 +259,120 @@ class CarRecallScenario(SimulationScenario):
         """Return the human-readable display name for an agent."""
         return AGENT_DISPLAY_NAMES.get(agent_id, agent_id)
 
-    async def decide_next_turn(self, state: SimulationState) -> TurnDecision | None:  # noqa: ARG002
+    async def decide_next_turn(self, state: SimulationState) -> TurnDecision | None:
         """Return the next turn decision, or None to end the simulation.
 
-        Each round starts with all internal agents speaking on the internal
-        channel, then any scheduled regulator-report turns. Returns None
-        when all rounds are completed.
+        Rotates agents in the current discussion (internal or regulator report)
+        until all agents pass in a full rotation. Then advances to the next
+        discussion phase or next round.
         """
-        if self._turn_index < len(self._current_round_turns):
-            decision = self._current_round_turns[self._turn_index]
-            self._turn_index += 1
-            return decision
+        if self._discussion_started:
+            self._record_turn_outcome(passed=state.last_turn_passed)
+            result = self._advance_rotation()
+            if result is not None:
+                return result
 
-        while self._current_round < self._max_rounds:
-            self._current_round += 1
-            self._current_round_turns = self._build_round_turns(round_number=self._current_round)
-            self._turn_index = 0
+        return self._start_next_discussion()
 
-            if not self._current_round_turns:
-                logger.info(
-                    "Round %d/%d has no turns, skipping",
-                    self._current_round,
-                    self._max_rounds,
-                )
-                continue
+    def _record_turn_outcome(self, passed: bool) -> None:
+        """Record whether the last agent spoke or passed."""
+        if not passed:
+            self._anyone_spoke_this_rotation = True
 
-            logger.info(
-                "Starting round %d/%d (day %d) with %d turns",
-                self._current_round,
-                self._max_rounds,
-                self._day_map[self._current_round],
-                len(self._current_round_turns),
-            )
-            decision = self._current_round_turns[self._turn_index]
-            self._turn_index += 1
-            return decision
+    def _advance_rotation(self) -> TurnDecision | None:
+        """Move to the next agent in the current rotation.
 
-        logger.info("All %d rounds completed", self._max_rounds)
-        return None
-
-    def _build_round_turns(self, round_number: int) -> list[TurnDecision]:
-        """Build the ordered list of turns for a given round.
-
-        Each round starts with all internal agents speaking in turn order,
-        followed by any regulator-report turns scheduled for that round's day.
+        Returns the next TurnDecision, or None if the discussion
+        ended (all agents passed in a full rotation).
         """
-        turns: list[TurnDecision] = []
+        self._rotation_index += 1
+        if self._rotation_index < len(self._discussion_agents):
+            return self._current_turn_decision()
 
-        for agent_id in self._internal_turn_order():
-            turns.append(
-                TurnDecision(
-                    agent_id=agent_id,
-                    channel_id=INTERNAL_ID,
-                    round_number=round_number,
-                )
+        # Full rotation completed
+        if not self._anyone_spoke_this_rotation:
+            logger.debug(
+                "All agents passed on channel %s, discussion complete",
+                self._discussion_channel,
             )
+            self._discussion_started = False
+            return None
 
-        for channel_id, agent_id in self._regulator_turns_for_round(round_number=round_number):
-            turns.append(
-                TurnDecision(
-                    agent_id=agent_id,
-                    channel_id=channel_id,
-                    round_number=round_number,
-                )
-            )
+        # Start a new rotation with shuffled order
+        self._shuffle_agents()
+        self._rotation_index = 0
+        self._anyone_spoke_this_rotation = False
+        return self._current_turn_decision()
 
-        return turns
+    def _shuffle_agents(self) -> None:
+        """Shuffle the discussion agent order for the next rotation.
+
+        The last agent in the previous rotation is excluded from the
+        first position to avoid back-to-back turns.
+        """
+        last_agent = self._discussion_agents[-1]
+        others = [a for a in self._discussion_agents if a != last_agent]
+        random.shuffle(others)
+        insert_index = random.randint(1, len(others))
+        others.insert(insert_index, last_agent)
+        self._discussion_agents = others
+
+    def _current_turn_decision(self) -> TurnDecision:
+        """Build a TurnDecision for the current rotation position."""
+        return TurnDecision(
+            agent_id=self._discussion_agents[self._rotation_index],
+            round_number=self._current_round,
+        )
+
+    def _start_next_discussion(self) -> TurnDecision | None:
+        """Start the next discussion phase: a regulator report from the queue, or
+        the internal discussion of the next round. Returns None when all rounds are done.
+        """
+        if self._regulator_queue:
+            channel_id, agents = self._regulator_queue.pop(0)
+            return self._begin_discussion(channel_id=channel_id, agents=agents)
+
+        self._current_round += 1
+        if self._current_round > self._max_rounds:
+            logger.info("All %d rounds completed", self._max_rounds)
+            return None
+
+        # Build regulator discussion queue for this round
+        self._regulator_queue = self._build_regulator_queue(round_number=self._current_round)
+
+        logger.info(
+            "Starting round %d/%d (day %d) — internal + %d regulator discussions",
+            self._current_round,
+            self._max_rounds,
+            self._day_map[self._current_round],
+            len(self._regulator_queue),
+        )
+
+        return self._begin_discussion(
+            channel_id=INTERNAL_ID,
+            agents=self._internal_turn_order(),
+        )
+
+    def _begin_discussion(self, channel_id: str, agents: list[str]) -> TurnDecision:
+        """Initialize a new rotation discussion on a channel."""
+        self._discussion_channel = channel_id
+        self._discussion_agents = agents
+        self._rotation_index = 0
+        self._anyone_spoke_this_rotation = False
+        self._discussion_started = True
+        return self._current_turn_decision()
+
+    def _build_regulator_queue(self, round_number: int) -> list[tuple[str, list[str]]]:
+        """Build the regulator report discussion queue for a round.
+
+        Returns a list of (channel_id, [agent_ids]) pairs for regulator
+        discussions scheduled this round.
+        """
+        raw_turns = self._regulator_turns_for_round(round_number=round_number)
+        if not raw_turns:
+            return []
+        # Regulator report is a two-agent discussion between PR and Regulator
+        return [(REGULATOR_REPORT_ID, [PR_ID, REGULATOR_ID])]
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the injection message for an agent at a given round, or None if empty."""

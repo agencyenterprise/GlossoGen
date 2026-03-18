@@ -5,21 +5,19 @@ import { X } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
+import type { DisplayEntry } from "./display-entry";
 import { EvidenceModal } from "./evidence-modal";
 import { formatTime, humanize } from "./format";
 import { ProseMarkdown } from "./prose-markdown";
 import { VerdictPill } from "./verdict-pill";
 
-type MessageDetail = components["schemas"]["MessageDetail"];
-
 interface DrawerTurnGroup {
   turnNumber: number;
-  channelId: string;
   timestamp: string;
-  entries: MessageDetail[];
+  entries: DisplayEntry[];
 }
 
-function groupByTurn(messages: MessageDetail[]): DrawerTurnGroup[] {
+function groupByTurn(messages: DisplayEntry[]): DrawerTurnGroup[] {
   const groups: DrawerTurnGroup[] = [];
   let current: DrawerTurnGroup | null = null;
 
@@ -32,7 +30,6 @@ function groupByTurn(messages: MessageDetail[]): DrawerTurnGroup[] {
       }
       current = {
         turnNumber: msg.turn_number,
-        channelId: msg.channel_id,
         timestamp: msg.timestamp,
         entries: [msg],
       };
@@ -51,7 +48,7 @@ type DrawerTab = "prompt" | "messages" | "verdicts";
 
 interface AgentDrawerProps {
   agent: AgentDetail;
-  messages: MessageDetail[];
+  messages: DisplayEntry[];
   agentColor: AgentColor;
   channelColorMap: Map<string, AgentColor>;
   onClose: () => void;
@@ -127,44 +124,22 @@ export function AgentDrawer({
         ) : null}
         {activeTab === "messages" ? (
           <div className="py-2">
-            {turnGroups.map(turn => {
-              const chColor = channelColorMap.get(turn.channelId);
-              const firstMessage = turn.entries.find(e => !e.is_reasoning);
-              return (
-                <div key={turn.turnNumber} className="flex gap-2.5 px-5 py-2">
-                  <div className="flex w-5 shrink-0 flex-col items-center justify-center">
-                    <span className="text-[10px] font-medium leading-none text-muted-foreground/50">
-                      {turn.turnNumber}
+            {turnGroups.map(turn => (
+              <div key={turn.turnNumber} className="flex gap-2.5 px-5 py-2">
+                <div className="flex w-5 shrink-0 flex-col items-center justify-center">
+                  <span className="text-[10px] font-medium leading-none text-muted-foreground/50">
+                    {turn.turnNumber}
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1">
+                    <span className="text-[10px] text-muted-foreground">
+                      {formatTime(turn.timestamp)}
                     </span>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-baseline gap-1.5">
-                      <button
-                        className={cn(
-                          "cursor-pointer rounded-full px-1.5 py-px text-[10px] font-medium leading-relaxed hover:underline",
-                          chColor?.bg,
-                          chColor?.fg
-                        )}
-                        onClick={() => onNavigateToChannel(turn.channelId)}
-                      >
-                        #{turn.channelId}
-                      </button>
-                      {firstMessage ? (
-                        <button
-                          className="cursor-pointer text-[10px] text-muted-foreground hover:underline"
-                          onClick={() =>
-                            onNavigateToMessage(firstMessage.message_id, firstMessage.channel_id)
-                          }
-                        >
-                          {formatTime(turn.timestamp)}
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground">
-                          {formatTime(turn.timestamp)}
-                        </span>
-                      )}
-                    </div>
-                    {turn.entries.map(entry => (
+                  {turn.entries.map(entry => {
+                    const entryChColor = channelColorMap.get(entry.channel_id);
+                    return (
                       <div
                         key={entry.message_id}
                         className={cn(entry.is_reasoning && "ml-4 opacity-50")}
@@ -173,14 +148,35 @@ export function AgentDrawer({
                           <span className="text-[10px] italic text-muted-foreground">
                             reasoning
                           </span>
-                        ) : null}
+                        ) : (
+                          <span className="mb-0.5 flex items-baseline gap-1.5">
+                            <button
+                              className={cn(
+                                "cursor-pointer rounded-full px-1.5 py-px text-[10px] font-medium leading-relaxed hover:underline",
+                                entryChColor?.bg,
+                                entryChColor?.fg
+                              )}
+                              onClick={() => onNavigateToChannel(entry.channel_id)}
+                            >
+                              #{entry.channel_id}
+                            </button>
+                            <button
+                              className="cursor-pointer text-[10px] text-muted-foreground hover:underline"
+                              onClick={() =>
+                                onNavigateToMessage(entry.message_id, entry.channel_id)
+                              }
+                            >
+                              jump
+                            </button>
+                          </span>
+                        )}
                         <ProseMarkdown>{entry.text}</ProseMarkdown>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         ) : null}
         {activeTab === "verdicts" && evalMetrics ? (

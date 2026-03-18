@@ -9,6 +9,7 @@ followed by scheduled private sidebar turns.
 
 import argparse
 import logging
+import random
 from pathlib import Path
 from typing import Self
 
@@ -137,8 +138,13 @@ class IncidentResponseScenario(SimulationScenario):
 
     def __init__(self) -> None:
         self._current_round = 0
-        self._turn_index = 0
-        self._current_round_turns: list[TurnDecision] = []
+        self._discussion_agents: list[str] = []
+        self._discussion_channel: str = ""
+        self._rotation_index: int = -1
+        self._anyone_spoke_this_rotation: bool = False
+        self._sidebar_queue: list[tuple[str, list[str]]] = []
+        self._discussion_started: bool = False
+        self._channel_members: dict[str, list[str]] = {}
         self._jinja = Environment(
             loader=FileSystemLoader(PROMPTS_DIR),
             autoescape=False,
@@ -198,7 +204,7 @@ class IncidentResponseScenario(SimulationScenario):
                         ),
                     ),
                     channel_ids=channel_ids,
-                    tool_names=["send_message", "propose_resolution"],
+                    tool_names=["send_message", "pass_turn", "propose_resolution"],
                     model=default_model,
                 )
             )
@@ -207,8 +213,10 @@ class IncidentResponseScenario(SimulationScenario):
     def get_channels(self) -> list[Channel]:
         """Return the four communication channels: one shared war
         room and three pairwise private channels.
+
+        Also caches channel membership for sidebar discussion scheduling.
         """
-        return [
+        channels = [
             Channel(
                 channel_id=WAR_ROOM_ID,
                 name="war-room",
@@ -230,6 +238,8 @@ class IncidentResponseScenario(SimulationScenario):
                 member_agent_ids=[SUPPORT_LEAD_ID, PM_ID],
             ),
         ]
+        self._channel_members = {ch.channel_id: ch.member_agent_ids for ch in channels}
+        return channels
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
         """Return the display name for a channel as seen by a specific agent.
@@ -244,69 +254,121 @@ class IncidentResponseScenario(SimulationScenario):
         """Return the human-readable display name for an agent. Falls back to the raw agent_id."""
         return AGENT_DISPLAY_NAMES.get(agent_id, agent_id)
 
-    async def decide_next_turn(self, state: SimulationState) -> TurnDecision | None:  # noqa: ARG002
+    async def decide_next_turn(self, state: SimulationState) -> TurnDecision | None:
         """Return the next turn decision, or None to end the simulation.
 
-        Iterates through pre-built turns for the current round. When all
-        turns in a round are exhausted, advances to the next round and
-        builds its turn list. Returns None when all rounds have been completed.
-
-        ``state`` is accepted to satisfy the SimulationScenario protocol but
-        is unused here because this scenario uses a fixed round schedule
-        rather than adaptive turn logic.
+        Rotates agents in the current discussion (war room or sidebar)
+        until all agents pass in a full rotation. Then advances to the
+        next sidebar or next round.
         """
-        if self._turn_index < len(self._current_round_turns):
-            decision = self._current_round_turns[self._turn_index]
-            self._turn_index += 1
-            return decision
+        if self._discussion_started:
+            self._record_turn_outcome(passed=state.last_turn_passed)
+            result = self._advance_rotation()
+            if result is not None:
+                return result
+
+        return self._start_next_discussion()
+
+    def _record_turn_outcome(self, passed: bool) -> None:
+        """Record whether the last agent spoke or passed."""
+        if not passed:
+            self._anyone_spoke_this_rotation = True
+
+    def _advance_rotation(self) -> TurnDecision | None:
+        """Move to the next agent in the current rotation.
+
+        Returns the next TurnDecision, or None if the discussion
+        ended (all agents passed in a full rotation).
+        """
+        self._rotation_index += 1
+        if self._rotation_index < len(self._discussion_agents):
+            return self._current_turn_decision()
+
+        # Full rotation completed
+        if not self._anyone_spoke_this_rotation:
+            logger.debug(
+                "All agents passed on channel %s, discussion complete",
+                self._discussion_channel,
+            )
+            self._discussion_started = False
+            return None
+
+        # Start a new rotation with shuffled order
+        self._shuffle_agents()
+        self._rotation_index = 0
+        self._anyone_spoke_this_rotation = False
+        return self._current_turn_decision()
+
+    def _shuffle_agents(self) -> None:
+        """Shuffle the discussion agent order for the next rotation.
+
+        The last agent in the previous rotation is excluded from the
+        first position to avoid back-to-back turns.
+        """
+        last_agent = self._discussion_agents[-1]
+        others = [a for a in self._discussion_agents if a != last_agent]
+        random.shuffle(others)
+        insert_index = random.randint(1, len(others))
+        others.insert(insert_index, last_agent)
+        self._discussion_agents = others
+
+    def _current_turn_decision(self) -> TurnDecision:
+        """Build a TurnDecision for the current rotation position."""
+        return TurnDecision(
+            agent_id=self._discussion_agents[self._rotation_index],
+            round_number=self._current_round,
+        )
+
+    def _start_next_discussion(self) -> TurnDecision | None:
+        """Start the next discussion phase: a sidebar from the queue, or
+        the war room of the next round. Returns None when all rounds are done.
+        """
+        if self._sidebar_queue:
+            channel_id, agents = self._sidebar_queue.pop(0)
+            return self._begin_discussion(channel_id=channel_id, agents=agents)
 
         self._current_round += 1
         if self._current_round > MAX_ROUNDS:
             logger.info("All %d rounds completed", MAX_ROUNDS)
             return None
 
-        self._current_round_turns = self._build_round_turns(round_number=self._current_round)
-        self._turn_index = 0
+        # Build sidebar queue for this round
+        self._sidebar_queue = self._build_sidebar_queue(round_number=self._current_round)
+
         logger.info(
-            "Starting round %d/%d with %d turns",
+            "Starting round %d/%d (war room + %d sidebars)",
             self._current_round,
             MAX_ROUNDS,
-            len(self._current_round_turns),
+            len(self._sidebar_queue),
         )
 
-        decision = self._current_round_turns[self._turn_index]
-        self._turn_index += 1
-        return decision
+        return self._begin_discussion(
+            channel_id=WAR_ROOM_ID,
+            agents=list(WAR_ROOM_ORDER),
+        )
 
-    def _build_round_turns(self, round_number: int) -> list[TurnDecision]:
-        """Build the ordered list of turns for a given round.
+    def _begin_discussion(self, channel_id: str, agents: list[str]) -> TurnDecision:
+        """Initialize a new rotation discussion on a channel."""
+        self._discussion_channel = channel_id
+        self._discussion_agents = agents
+        self._rotation_index = 0
+        self._anyone_spoke_this_rotation = False
+        self._discussion_started = True
+        return self._current_turn_decision()
 
-        Each round starts with all agents speaking in the war room (in
-        WAR_ROOM_ORDER), followed by any private sidebar turns scheduled
-        for that round in PRIVATE_SIDEBARS.
+    def _build_sidebar_queue(self, round_number: int) -> list[tuple[str, list[str]]]:
+        """Build the sidebar discussion queue for a round.
+
+        Each sidebar entry becomes a two-agent discussion where both
+        agents rotate until both pass.
         """
-        turns: list[TurnDecision] = []
-
-        for agent_id in WAR_ROOM_ORDER:
-            turns.append(
-                TurnDecision(
-                    agent_id=agent_id,
-                    channel_id=WAR_ROOM_ID,
-                    round_number=round_number,
-                )
-            )
-
         sidebars = PRIVATE_SIDEBARS.get(round_number, [])
-        for channel_id, agent_id in sidebars:
-            turns.append(
-                TurnDecision(
-                    agent_id=agent_id,
-                    channel_id=channel_id,
-                    round_number=round_number,
-                )
-            )
-
-        return turns
+        queue: list[tuple[str, list[str]]] = []
+        for channel_id, initiator_id in sidebars:
+            channel_members = self._channel_members[channel_id]
+            ordered = [initiator_id] + [a for a in channel_members if a != initiator_id]
+            queue.append((channel_id, ordered))
+        return queue
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the injection message for an agent at a given round, or None if empty.

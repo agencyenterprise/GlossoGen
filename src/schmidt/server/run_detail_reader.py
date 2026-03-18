@@ -19,9 +19,10 @@ from schmidt.models.event import (
 )
 from schmidt.server.response_models import (
     AgentDetail,
+    ChannelMessage,
     EvalMetricResponse,
     EvalReportResponse,
-    MessageDetail,
+    ReasoningEntry,
     RunDetailResponse,
 )
 
@@ -62,14 +63,14 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     timestamp = None
     channel_ids: list[str] = []
     agents: list[AgentDetail] = []
-    messages: list[MessageDetail] = []
+    messages: list[ChannelMessage] = []
+    reasoning: list[ReasoningEntry] = []
     total_turns = 0
     end_reason = None
 
     # Track the most recent TurnAssigned per agent
     agent_turn: dict[str, int] = {}
     agent_round: dict[str, int] = {}
-    agent_channel: dict[str, str] = {}
 
     for event in events:
         if isinstance(event, SimulationStarted):
@@ -94,27 +95,24 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         elif isinstance(event, TurnAssigned):
             agent_turn[event.agent_id] = event.turn_number
             agent_round[event.agent_id] = event.round_number
-            agent_channel[event.agent_id] = event.channel_id
 
         elif isinstance(event, LLMResponseReceived):
             if event.text is not None and event.text.strip():
-                messages.append(
-                    MessageDetail(
+                reasoning.append(
+                    ReasoningEntry(
                         message_id=event.event_id,
-                        channel_id=agent_channel.get(event.agent_id, ""),
                         sender_agent_id=event.agent_id,
                         text=event.text,
                         timestamp=event.timestamp,
                         turn_number=agent_turn.get(event.agent_id, 0),
                         round_number=agent_round.get(event.agent_id, 0),
-                        is_reasoning=True,
                     )
                 )
 
         elif isinstance(event, MessageSent):
             msg = event.message
             messages.append(
-                MessageDetail(
+                ChannelMessage(
                     message_id=msg.message_id,
                     channel_id=msg.channel_id,
                     sender_agent_id=msg.sender_agent_id,
@@ -122,7 +120,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     timestamp=msg.timestamp,
                     turn_number=agent_turn.get(msg.sender_agent_id, 0),
                     round_number=agent_round.get(msg.sender_agent_id, 0),
-                    is_reasoning=False,
                 )
             )
 
@@ -148,5 +145,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         channel_ids=channel_ids,
         agents=agents,
         messages=messages,
+        reasoning=reasoning,
         evaluation=evaluation,
     )
