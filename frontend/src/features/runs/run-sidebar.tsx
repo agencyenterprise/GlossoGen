@@ -1,26 +1,20 @@
-import { cn } from "@/shared/lib/cn";
-import { deriveInitials, type AgentColor } from "./agent-colors";
+"use client";
 
-interface Agent {
-  agent_id: string;
-  role_name: string;
-}
+import { cn } from "@/shared/lib/cn";
+import type { components } from "@/types/api.gen";
+import { deriveInitials, type AgentColor } from "./agent-colors";
+import { humanize } from "./format";
+
+type AgentDetail = components["schemas"]["AgentDetail"];
 
 interface RunSidebarProps {
   channelIds: string[];
-  agents: Agent[];
+  agents: AgentDetail[];
   selectedChannel: string | null;
   selectedAgent: string | null;
   agentColorMap: Map<string, AgentColor>;
   onSelectChannel: (channelId: string | null) => void;
   onSelectAgent: (agentId: string) => void;
-}
-
-function humanizeChannelId(channelId: string): string {
-  return channelId
-    .split("-")
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
 }
 
 export function RunSidebar({
@@ -56,7 +50,7 @@ export function RunSidebar({
             )}
             onClick={() => onSelectChannel(id)}
           >
-            <span className="opacity-50">#</span> {humanizeChannelId(id)}
+            <span className="opacity-50">#</span> {humanize(id)}
           </button>
         ))}
       </div>
@@ -80,7 +74,7 @@ export function RunSidebar({
             >
               <div
                 className={cn(
-                  "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[8px] font-semibold",
+                  "flex h-5 w-5 shrink-0 items-center justify-center rounded text-[8px] font-semibold",
                   color?.bg,
                   color?.fg
                 )}

@@ -5,6 +5,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 
+from schmidt.evaluation.evaluation_report import Verdict
 from schmidt.models.event import EndReason
 
 
@@ -61,8 +62,25 @@ class MessageDetail(BaseModel):
     round_number: int
 
 
+class EvalMetricResponse(BaseModel):
+    """Result of a single evaluator for the run detail endpoint."""
+
+    evaluator_name: str
+    verdict: Verdict
+    score: float
+    evidence: list[str]
+    per_agent: dict[str, Verdict]
+
+
+class EvalReportResponse(BaseModel):
+    """Evaluation report for the run detail endpoint."""
+
+    metrics: list[EvalMetricResponse]
+    right_answer_wrong_reasons: bool | None
+
+
 class RunDetailResponse(BaseModel):
-    """Full detail of a simulation run including agents and messages."""
+    """Full detail of a simulation run including agents, messages, and evaluation."""
 
     run_id: str
     scenario_name: str
@@ -72,3 +90,4 @@ class RunDetailResponse(BaseModel):
     channel_ids: list[str]
     agents: list[AgentDetail]
     messages: list[MessageDetail]
+    evaluation: EvalReportResponse | None

@@ -3,6 +3,10 @@
 import logging
 from pathlib import Path
 
+import aiofiles
+import orjson
+
+from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.evaluation.log_reader import load_events
 from schmidt.models.event import (
     AgentRegistered,
@@ -12,9 +16,46 @@ from schmidt.models.event import (
     SimulationStarted,
     TurnAssigned,
 )
-from schmidt.server.response_models import AgentDetail, MessageDetail, RunDetailResponse
+from schmidt.server.response_models import (
+    AgentDetail,
+    EvalMetricResponse,
+    EvalReportResponse,
+    MessageDetail,
+    RunDetailResponse,
+)
 
 logger = logging.getLogger(__name__)
+
+
+async def _load_evaluation_report(report_path: Path) -> EvalReportResponse | None:
+    """Load and parse an evaluation report JSON file, returning None if it does not exist."""
+    if not report_path.exists():
+        return None
+
+    async with aiofiles.open(report_path, mode="rb") as f:
+        raw = await f.read()
+
+    report = EvaluationReport.model_validate(orjson.loads(raw))
+
+    right_answer_wrong_reasons: bool | None = None
+    if report.derived is not None:
+        right_answer_wrong_reasons = report.derived.right_answer_wrong_reasons
+
+    metrics = [
+        EvalMetricResponse(
+            evaluator_name=m.evaluator_name,
+            verdict=m.verdict,
+            score=m.score,
+            evidence=m.evidence,
+            per_agent=m.per_agent,
+        )
+        for m in report.metrics
+    ]
+
+    return EvalReportResponse(
+        metrics=metrics,
+        right_answer_wrong_reasons=right_answer_wrong_reasons,
+    )
 
 
 async def load_run_detail(log_path: Path) -> RunDetailResponse:
@@ -80,6 +121,9 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     if end_reason is None:
         raise ValueError(f"No SimulationEnded event found in {log_path}")
 
+    report_path = log_path.with_name(f"{scenario_name}_report.json")
+    evaluation = await _load_evaluation_report(report_path=report_path)
+
     return RunDetailResponse(
         run_id=run_id,
         scenario_name=scenario_name,
@@ -89,4 +133,5 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         channel_ids=channel_ids,
         agents=agents,
         messages=messages,
+        evaluation=evaluation,
     )
