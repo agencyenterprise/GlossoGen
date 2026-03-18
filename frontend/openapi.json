@@ -140,6 +140,74 @@
         "title": "EndReason",
         "description": "Why the simulation ended."
       },
+      "EvalMetricResponse": {
+        "properties": {
+          "evaluator_name": {
+            "type": "string",
+            "title": "Evaluator Name"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "evidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "per_agent": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Verdict"
+            },
+            "type": "object",
+            "title": "Per Agent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluator_name",
+          "verdict",
+          "score",
+          "evidence",
+          "per_agent"
+        ],
+        "title": "EvalMetricResponse",
+        "description": "Result of a single evaluator for the run detail endpoint."
+      },
+      "EvalReportResponse": {
+        "properties": {
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/EvalMetricResponse"
+            },
+            "type": "array",
+            "title": "Metrics"
+          },
+          "right_answer_wrong_reasons": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right Answer Wrong Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metrics",
+          "right_answer_wrong_reasons"
+        ],
+        "title": "EvalReportResponse",
+        "description": "Evaluation report for the run detail endpoint."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -261,6 +329,16 @@
             },
             "type": "array",
             "title": "Messages"
+          },
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvalReportResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -272,10 +350,11 @@
           "end_reason",
           "channel_ids",
           "agents",
-          "messages"
+          "messages",
+          "evaluation"
         ],
         "title": "RunDetailResponse",
-        "description": "Full detail of a simulation run including agents and messages."
+        "description": "Full detail of a simulation run including agents, messages, and evaluation."
       },
       "RunListResponse": {
         "properties": {
@@ -377,6 +456,16 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "Verdict": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "partial"
+        ],
+        "title": "Verdict",
+        "description": "Three-valued outcome for a single evaluation metric."
       }
     }
   }

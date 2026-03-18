@@ -92,6 +92,33 @@ export interface components {
          * @enum {string}
          */
         EndReason: "scenario_complete" | "error";
+        /**
+         * EvalMetricResponse
+         * @description Result of a single evaluator for the run detail endpoint.
+         */
+        EvalMetricResponse: {
+            /** Evaluator Name */
+            evaluator_name: string;
+            verdict: components["schemas"]["Verdict"];
+            /** Score */
+            score: number;
+            /** Evidence */
+            evidence: string[];
+            /** Per Agent */
+            per_agent: {
+                [key: string]: components["schemas"]["Verdict"];
+            };
+        };
+        /**
+         * EvalReportResponse
+         * @description Evaluation report for the run detail endpoint.
+         */
+        EvalReportResponse: {
+            /** Metrics */
+            metrics: components["schemas"]["EvalMetricResponse"][];
+            /** Right Answer Wrong Reasons */
+            right_answer_wrong_reasons: boolean | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -135,7 +162,7 @@ export interface components {
         };
         /**
          * RunDetailResponse
-         * @description Full detail of a simulation run including agents and messages.
+         * @description Full detail of a simulation run including agents, messages, and evaluation.
          */
         RunDetailResponse: {
             /** Run Id */
@@ -156,6 +183,7 @@ export interface components {
             agents: components["schemas"]["AgentDetail"][];
             /** Messages */
             messages: components["schemas"]["MessageDetail"][];
+            evaluation: components["schemas"]["EvalReportResponse"] | null;
         };
         /**
          * RunListResponse
@@ -200,6 +228,12 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * Verdict
+         * @description Three-valued outcome for a single evaluation metric.
+         * @enum {string}
+         */
+        Verdict: "pass" | "fail" | "partial";
     };
     responses: never;
     parameters: never;

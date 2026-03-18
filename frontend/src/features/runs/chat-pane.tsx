@@ -1,65 +1,35 @@
-import { useEffect, useRef } from "react";
-import Markdown from "react-markdown";
+"use client";
+
+import { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/shared/lib/cn";
+import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
+import { formatTime, humanize } from "./format";
+import { ProseMarkdown } from "./prose-markdown";
 
-interface Agent {
-  agent_id: string;
-  role_name: string;
-}
-
-interface Message {
-  message_id: string;
-  channel_id: string;
-  sender_agent_id: string;
-  text: string;
-  timestamp: string;
-  turn_number: number;
-  round_number: number;
-}
+type AgentDetail = components["schemas"]["AgentDetail"];
+type MessageDetail = components["schemas"]["MessageDetail"];
 
 interface ChatPaneProps {
-  messages: Message[];
-  agents: Agent[];
-  channelIds: string[];
+  messages: MessageDetail[];
+  agents: AgentDetail[];
   selectedChannel: string | null;
   agentColorMap: Map<string, AgentColor>;
-  channelColorMap: Map<string, { bg: string; fg: string }>;
+  channelColorMap: Map<string, AgentColor>;
   onSelectAgent: (agentId: string) => void;
   highlightedMessageId: string | null;
-}
-
-function humanizeChannelId(channelId: string): string {
-  return channelId
-    .split("-")
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function getAgentByIdMap(agents: Agent[]): Map<string, Agent> {
-  const map = new Map<string, Agent>();
-  for (const a of agents) {
-    map.set(a.agent_id, a);
-  }
-  return map;
+  highlightNonce: number;
 }
 
 interface MessageGroup {
   roundNumber: number;
-  messages: Message[];
+  messages: MessageDetail[];
 }
 
-function groupByRound(messages: Message[]): MessageGroup[] {
+function groupByRound(messages: MessageDetail[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
   let currentRound = -1;
-  let currentMessages: Message[] = [];
+  let currentMessages: MessageDetail[] = [];
 
   for (const msg of messages) {
     if (msg.round_number !== currentRound) {
@@ -86,6 +56,7 @@ export function ChatPane({
   channelColorMap,
   onSelectAgent,
   highlightedMessageId,
+  highlightNonce,
 }: ChatPaneProps) {
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -103,22 +74,32 @@ export function ChatPane({
       el.classList.remove("animate-highlight");
     }, 1500);
     return () => clearTimeout(timeout);
-  }, [highlightedMessageId]);
+  }, [highlightedMessageId, highlightNonce]);
+
+  const agentMap = useMemo(() => {
+    const map = new Map<string, AgentDetail>();
+    for (const a of agents) {
+      map.set(a.agent_id, a);
+    }
+    return map;
+  }, [agents]);
 
   const filtered =
     selectedChannel === null ? messages : messages.filter(m => m.channel_id === selectedChannel);
 
-  const agentMap = getAgentByIdMap(agents);
   const groups = groupByRound(filtered);
   const showChannelBadge = selectedChannel === null;
 
-  const headerName = selectedChannel === null ? "all activity" : humanizeChannelId(selectedChannel);
+  let headerName = "all activity";
+  if (selectedChannel !== null) {
+    headerName = humanize(selectedChannel);
+  }
   const headerDesc =
     selectedChannel === null ? "all channels, global turn order" : `#${selectedChannel}`;
 
   return (
     <div className="flex flex-col overflow-hidden">
-      <div className="flex flex-shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
         <span className="text-sm text-muted-foreground">#</span>
         <span className="text-[13px] font-medium">{headerName}</span>
         <span className="text-xs text-muted-foreground">{headerDesc}</span>
@@ -147,6 +128,9 @@ export function ChatPane({
                     if (el) {
                       messageRefs.current.set(msg.message_id, el);
                     }
+                    return () => {
+                      messageRefs.current.delete(msg.message_id);
+                    };
                   }}
                   className="flex gap-2.5 px-4 py-1 transition-colors hover:bg-muted/50"
                 >
@@ -190,9 +174,9 @@ export function ChatPane({
                         {formatTime(msg.timestamp)}
                       </span>
                     </div>
-                    <div className="prose prose-xs max-w-none text-xs leading-relaxed text-muted-foreground [&_strong]:text-foreground [&_em]:text-muted-foreground [&_ul]:ml-4 [&_ul]:list-disc [&_ol]:ml-4 [&_ol]:list-decimal [&_p]:my-1 [&_li]:my-0.5 [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-medium [&_h1]:text-foreground [&_h2]:text-foreground [&_h3]:text-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]">
-                      <Markdown>{msg.text}</Markdown>
-                    </div>
+                    <ProseMarkdown className="[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]">
+                      {msg.text}
+                    </ProseMarkdown>
                   </div>
                 </div>
               );

@@ -1,33 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
+import { cn } from "@/shared/lib/cn";
 import { buildAgentColorMap, buildChannelColorMap } from "./agent-colors";
 import { AgentDrawer } from "./agent-drawer";
 import { ChatPane } from "./chat-pane";
+import { EvalPanel } from "./eval-panel";
+import { humanize } from "./format";
 import { RunSidebar } from "./run-sidebar";
-
-function humanizeSnakeCase(value: string): string {
-  return value
-    .split("_")
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
 
 export function RunDetail({ runId }: { runId: string }) {
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [highlightNonce, setHighlightNonce] = useState(0);
 
   function handleNavigateToMessage(messageId: string, channelId: string) {
-    setSelectedAgent(null);
-    setSelectedChannel(channelId);
-    setHighlightedMessageId(null);
-    // Use setTimeout so React flushes the channel switch before setting the highlight
-    setTimeout(() => setHighlightedMessageId(messageId), 50);
+    flushSync(() => {
+      setSelectedAgent(null);
+      setSelectedChannel(channelId);
+      setHighlightedMessageId(null);
+    });
+    setHighlightNonce(n => n + 1);
+    setHighlightedMessageId(messageId);
   }
 
   const { data, isLoading, error } = useQuery({
@@ -42,6 +42,15 @@ export function RunDetail({ runId }: { runId: string }) {
       return data;
     },
   });
+
+  const agentColorMap = useMemo(
+    () => (data ? buildAgentColorMap(data.agents.map(a => a.agent_id)) : new Map()),
+    [data]
+  );
+  const channelColorMap = useMemo(
+    () => (data ? buildChannelColorMap(data.channel_ids) : new Map()),
+    [data]
+  );
 
   if (isLoading) {
     return (
@@ -60,11 +69,10 @@ export function RunDetail({ runId }: { runId: string }) {
     );
   }
 
-  const agentColorMap = buildAgentColorMap(data.agents.map(a => a.agent_id));
-  const channelColorMap = buildChannelColorMap(data.channel_ids);
-  const maxRound = Math.max(...data.messages.map(m => m.round_number), 0);
-  const agentModel = data.agents[0]?.model ?? "unknown";
+  const maxRound = data.messages.reduce((max, m) => Math.max(max, m.round_number), 0);
+  const agentModel = data.agents[0]?.model || "unknown";
 
+  const hasEval = data.evaluation !== null && data.evaluation !== undefined;
   const activeAgent = data.agents.find(a => a.agent_id === selectedAgent);
   const activeAgentColor = selectedAgent ? agentColorMap.get(selectedAgent) : undefined;
 
@@ -80,14 +88,19 @@ export function RunDetail({ runId }: { runId: string }) {
 
       {/* Header */}
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-base font-medium">{humanizeSnakeCase(data.scenario_name)}</h1>
+        <h1 className="text-base font-medium">{humanize(data.scenario_name)}</h1>
         <span className="text-[13px] text-muted-foreground">
           {maxRound} rounds · {data.total_turns} turns · {data.agents.length} agents · {agentModel}
         </span>
       </div>
 
       {/* Shell */}
-      <div className="relative grid h-[calc(100vh-120px)] min-h-[500px] grid-cols-[192px_1fr] overflow-hidden rounded-xl border border-border bg-background">
+      <div
+        className={cn(
+          "relative grid h-[calc(100vh-120px)] min-h-[500px] overflow-hidden rounded-xl border border-border bg-background",
+          hasEval ? "grid-cols-[192px_1fr_280px]" : "grid-cols-[192px_1fr]"
+        )}
+      >
         <RunSidebar
           channelIds={data.channel_ids}
           agents={data.agents}
@@ -105,13 +118,16 @@ export function RunDetail({ runId }: { runId: string }) {
         <ChatPane
           messages={data.messages}
           agents={data.agents}
-          channelIds={data.channel_ids}
           selectedChannel={selectedChannel}
           agentColorMap={agentColorMap}
           channelColorMap={channelColorMap}
           onSelectAgent={setSelectedAgent}
           highlightedMessageId={highlightedMessageId}
+          highlightNonce={highlightNonce}
         />
+
+        {/* Eval panel */}
+        {hasEval ? <EvalPanel evaluation={data.evaluation!} /> : null}
 
         {/* Agent drawer */}
         {activeAgent && activeAgentColor ? (
@@ -126,6 +142,7 @@ export function RunDetail({ runId }: { runId: string }) {
               setSelectedAgent(null);
               setSelectedChannel(channelId);
             }}
+            evalMetrics={data.evaluation?.metrics ?? null}
           />
         ) : null}
       </div>
