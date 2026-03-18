@@ -38,6 +38,8 @@ interface AgentDrawerProps {
   agentColor: AgentColor;
   channelColorMap: Map<string, { bg: string; fg: string }>;
   onClose: () => void;
+  onNavigateToMessage: (messageId: string, channelId: string) => void;
+  onNavigateToChannel: (channelId: string) => void;
 }
 
 export function AgentDrawer({
@@ -46,6 +48,8 @@ export function AgentDrawer({
   agentColor,
   channelColorMap,
   onClose,
+  onNavigateToMessage,
+  onNavigateToChannel,
 }: AgentDrawerProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("prompt");
   const agentMessages = messages.filter(m => m.sender_agent_id === agent.agent_id);
@@ -121,18 +125,22 @@ export function AgentDrawer({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 flex items-baseline gap-1.5">
-                      <span
+                      <button
                         className={cn(
-                          "rounded-full px-1.5 py-px text-[10px] font-medium leading-relaxed",
+                          "cursor-pointer rounded-full px-1.5 py-px text-[10px] font-medium leading-relaxed hover:underline",
                           chColor?.bg,
                           chColor?.fg
                         )}
+                        onClick={() => onNavigateToChannel(msg.channel_id)}
                       >
                         #{msg.channel_id}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">
+                      </button>
+                      <button
+                        className="cursor-pointer text-[10px] text-muted-foreground hover:underline"
+                        onClick={() => onNavigateToMessage(msg.message_id, msg.channel_id)}
+                      >
                         {formatTime(msg.timestamp)}
-                      </span>
+                      </button>
                     </div>
                     <div className="prose prose-xs max-w-none text-xs leading-relaxed text-muted-foreground [&_strong]:text-foreground [&_ul]:ml-4 [&_ul]:list-disc [&_ol]:ml-4 [&_ol]:list-decimal [&_p]:my-1 [&_li]:my-0.5">
                       <Markdown>{msg.text}</Markdown>

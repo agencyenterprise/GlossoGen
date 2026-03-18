@@ -122,3 +122,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes msg-highlight {
+  0% {
+    background-color: oklch(0.9 0.05 250);
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-highlight {
+  animation: msg-highlight 1.5s ease-out;
+}
