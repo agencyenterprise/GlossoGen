@@ -107,7 +107,7 @@ src/schmidt/
     secret_leak_evaluator.py   # Did an agent reveal confidential information?
     instruction_adherence.py   # Did agents follow their system prompt instructions?
     cooperation_evaluator.py   # Did agents cooperate effectively toward the goal?
-    evaluation_report.py       # Pydantic models: EvaluationReport, MetricResult, Verdict, DerivedFlags; write_report()
+    evaluation_report.py       # Pydantic models: EvaluationReport, MetricResult, Verdict; write_report()
     prompt_renderer.py         # Renders Jinja2 templates for generic evaluation prompts
     transcript_builder.py      # Builds formatted transcripts from simulation events
     prompts/                   # Jinja2 templates for generic evaluator judge prompts

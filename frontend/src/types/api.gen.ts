@@ -116,8 +116,6 @@ export interface components {
         EvalReportResponse: {
             /** Metrics */
             metrics: components["schemas"]["EvalMetricResponse"][];
-            /** Right Answer Wrong Reasons */
-            right_answer_wrong_reasons: boolean | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {

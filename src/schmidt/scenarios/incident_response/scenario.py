@@ -381,7 +381,6 @@ class IncidentResponseScenario(SimulationScenario):
             simulation_id=simulation_id,
             scenario_name=self.name(),
             metrics=metrics,
-            derived=None,
         )
         await write_report(report=report, report_path=report_path)
         return report

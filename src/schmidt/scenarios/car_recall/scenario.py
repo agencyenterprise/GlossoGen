@@ -18,13 +18,7 @@ from typing import Self
 
 from jinja2 import Environment, FileSystemLoader
 
-from schmidt.evaluation.evaluation_report import (
-    DerivedFlags,
-    EvaluationReport,
-    MetricResult,
-    Verdict,
-    write_report,
-)
+from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult, write_report
 from schmidt.evaluation.evaluator_protocol import Evaluator
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
@@ -388,34 +382,10 @@ class CarRecallScenario(SimulationScenario):
             )
             metrics.append(result)
 
-        derived = self._compute_derived_flags(metrics=metrics)
         report = EvaluationReport(
             simulation_id=simulation_id,
             scenario_name=self.name(),
             metrics=metrics,
-            derived=derived,
         )
         await write_report(report=report, report_path=report_path)
         return report
-
-    def _compute_derived_flags(self, metrics: list[MetricResult]) -> DerivedFlags | None:
-        """Cross-reference decision correctness and fact surfacing results.
-
-        Returns a flag indicating whether the group reached the right answer
-        without fully surfacing all private facts.
-        """
-        decision_result: MetricResult | None = None
-        fact_result: MetricResult | None = None
-        for m in metrics:
-            if m.evaluator_name == "decision_correctness":
-                decision_result = m
-            elif m.evaluator_name == "fact_surfacing":
-                fact_result = m
-
-        if decision_result is None or fact_result is None:
-            return None
-
-        right_answer_wrong_reasons = (
-            decision_result.verdict == Verdict.PASS and fact_result.score < 1.0
-        )
-        return DerivedFlags(right_answer_wrong_reasons=right_answer_wrong_reasons)

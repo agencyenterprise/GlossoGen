@@ -37,10 +37,6 @@ async def _load_evaluation_report(report_path: Path) -> EvalReportResponse | Non
 
     report = EvaluationReport.model_validate(orjson.loads(raw))
 
-    right_answer_wrong_reasons: bool | None = None
-    if report.derived is not None:
-        right_answer_wrong_reasons = report.derived.right_answer_wrong_reasons
-
     metrics = [
         EvalMetricResponse(
             evaluator_name=m.evaluator_name,
@@ -52,10 +48,7 @@ async def _load_evaluation_report(report_path: Path) -> EvalReportResponse | Non
         for m in report.metrics
     ]
 
-    return EvalReportResponse(
-        metrics=metrics,
-        right_answer_wrong_reasons=right_answer_wrong_reasons,
-    )
+    return EvalReportResponse(metrics=metrics)
 
 
 async def load_run_detail(log_path: Path) -> RunDetailResponse:
