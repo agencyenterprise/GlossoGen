@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
@@ -10,8 +10,41 @@ import { formatTime, humanize } from "./format";
 import { ProseMarkdown } from "./prose-markdown";
 import { VerdictPill } from "./verdict-pill";
 
-type AgentDetail = components["schemas"]["AgentDetail"];
 type MessageDetail = components["schemas"]["MessageDetail"];
+
+interface DrawerTurnGroup {
+  turnNumber: number;
+  channelId: string;
+  timestamp: string;
+  entries: MessageDetail[];
+}
+
+function groupByTurn(messages: MessageDetail[]): DrawerTurnGroup[] {
+  const groups: DrawerTurnGroup[] = [];
+  let current: DrawerTurnGroup | null = null;
+
+  for (const msg of messages) {
+    if (current && msg.turn_number === current.turnNumber) {
+      current.entries.push(msg);
+    } else {
+      if (current) {
+        groups.push(current);
+      }
+      current = {
+        turnNumber: msg.turn_number,
+        channelId: msg.channel_id,
+        timestamp: msg.timestamp,
+        entries: [msg],
+      };
+    }
+  }
+  if (current) {
+    groups.push(current);
+  }
+  return groups;
+}
+
+type AgentDetail = components["schemas"]["AgentDetail"];
 type EvalMetricResponse = components["schemas"]["EvalMetricResponse"];
 
 type DrawerTab = "prompt" | "messages" | "verdicts";
@@ -40,6 +73,7 @@ export function AgentDrawer({
   const [activeTab, setActiveTab] = useState<DrawerTab>("prompt");
   const [expandedMetric, setExpandedMetric] = useState<EvalMetricResponse | null>(null);
   const agentMessages = messages.filter(m => m.sender_agent_id === agent.agent_id);
+  const turnGroups = useMemo(() => groupByTurn(agentMessages), [agentMessages]);
 
   return (
     <div className="absolute inset-y-0 right-0 z-10 flex w-[calc(100%-192px)] flex-col border-l border-border bg-background">
@@ -93,13 +127,14 @@ export function AgentDrawer({
         ) : null}
         {activeTab === "messages" ? (
           <div className="py-2">
-            {agentMessages.map(msg => {
-              const chColor = channelColorMap.get(msg.channel_id);
+            {turnGroups.map(turn => {
+              const chColor = channelColorMap.get(turn.channelId);
+              const firstMessage = turn.entries.find(e => !e.is_reasoning);
               return (
-                <div key={msg.message_id} className="flex gap-2.5 px-5 py-2">
+                <div key={turn.turnNumber} className="flex gap-2.5 px-5 py-2">
                   <div className="flex w-5 shrink-0 flex-col items-center justify-center">
                     <span className="text-[10px] font-medium leading-none text-muted-foreground/50">
-                      {msg.turn_number}
+                      {turn.turnNumber}
                     </span>
                   </div>
                   <div className="min-w-0 flex-1">
@@ -110,18 +145,38 @@ export function AgentDrawer({
                           chColor?.bg,
                           chColor?.fg
                         )}
-                        onClick={() => onNavigateToChannel(msg.channel_id)}
+                        onClick={() => onNavigateToChannel(turn.channelId)}
                       >
-                        #{msg.channel_id}
+                        #{turn.channelId}
                       </button>
-                      <button
-                        className="cursor-pointer text-[10px] text-muted-foreground hover:underline"
-                        onClick={() => onNavigateToMessage(msg.message_id, msg.channel_id)}
-                      >
-                        {formatTime(msg.timestamp)}
-                      </button>
+                      {firstMessage ? (
+                        <button
+                          className="cursor-pointer text-[10px] text-muted-foreground hover:underline"
+                          onClick={() =>
+                            onNavigateToMessage(firstMessage.message_id, firstMessage.channel_id)
+                          }
+                        >
+                          {formatTime(turn.timestamp)}
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatTime(turn.timestamp)}
+                        </span>
+                      )}
                     </div>
-                    <ProseMarkdown>{msg.text}</ProseMarkdown>
+                    {turn.entries.map(entry => (
+                      <div
+                        key={entry.message_id}
+                        className={cn(entry.is_reasoning && "ml-4 opacity-50")}
+                      >
+                        {entry.is_reasoning ? (
+                          <span className="text-[10px] italic text-muted-foreground">
+                            reasoning
+                          </span>
+                        ) : null}
+                        <ProseMarkdown>{entry.text}</ProseMarkdown>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );

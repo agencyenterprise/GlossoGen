@@ -260,6 +260,10 @@
           "round_number": {
             "type": "integer",
             "title": "Round Number"
+          },
+          "is_reasoning": {
+            "type": "boolean",
+            "title": "Is Reasoning"
           }
         },
         "type": "object",
@@ -270,10 +274,11 @@
           "text",
           "timestamp",
           "turn_number",
-          "round_number"
+          "round_number",
+          "is_reasoning"
         ],
         "title": "MessageDetail",
-        "description": "A single message with turn context for the run detail endpoint."
+        "description": "A single message or reasoning entry with turn context for the run detail endpoint."
       },
       "RunDetailResponse": {
         "properties": {

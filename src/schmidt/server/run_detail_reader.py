@@ -10,6 +10,7 @@ from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.evaluation.log_reader import load_events
 from schmidt.models.event import (
     AgentRegistered,
+    LLMResponseReceived,
     MessageSent,
     SimulationEnded,
     SimulationEvent,
@@ -68,6 +69,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     # Track the most recent TurnAssigned per agent
     agent_turn: dict[str, int] = {}
     agent_round: dict[str, int] = {}
+    agent_channel: dict[str, str] = {}
 
     for event in events:
         if isinstance(event, SimulationStarted):
@@ -92,6 +94,22 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         elif isinstance(event, TurnAssigned):
             agent_turn[event.agent_id] = event.turn_number
             agent_round[event.agent_id] = event.round_number
+            agent_channel[event.agent_id] = event.channel_id
+
+        elif isinstance(event, LLMResponseReceived):
+            if event.text is not None and event.text.strip():
+                messages.append(
+                    MessageDetail(
+                        message_id=event.event_id,
+                        channel_id=agent_channel.get(event.agent_id, ""),
+                        sender_agent_id=event.agent_id,
+                        text=event.text,
+                        timestamp=event.timestamp,
+                        turn_number=agent_turn.get(event.agent_id, 0),
+                        round_number=agent_round.get(event.agent_id, 0),
+                        is_reasoning=True,
+                    )
+                )
 
         elif isinstance(event, MessageSent):
             msg = event.message
@@ -104,6 +122,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     timestamp=msg.timestamp,
                     turn_number=agent_turn.get(msg.sender_agent_id, 0),
                     round_number=agent_round.get(msg.sender_agent_id, 0),
+                    is_reasoning=False,
                 )
             )
 

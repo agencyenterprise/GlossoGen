@@ -52,7 +52,7 @@ class AgentDetail(BaseModel):
 
 
 class MessageDetail(BaseModel):
-    """A single message with turn context for the run detail endpoint."""
+    """A single message or reasoning entry with turn context for the run detail endpoint."""
 
     message_id: str
     channel_id: str
@@ -61,6 +61,7 @@ class MessageDetail(BaseModel):
     timestamp: datetime
     turn_number: int
     round_number: int
+    is_reasoning: bool
 
 
 class EvalMetricResponse(BaseModel):

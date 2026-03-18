@@ -137,7 +137,7 @@ export interface components {
         HealthStatus: "ok";
         /**
          * MessageDetail
-         * @description A single message with turn context for the run detail endpoint.
+         * @description A single message or reasoning entry with turn context for the run detail endpoint.
          */
         MessageDetail: {
             /** Message Id */
@@ -157,6 +157,8 @@ export interface components {
             turn_number: number;
             /** Round Number */
             round_number: number;
+            /** Is Reasoning */
+            is_reasoning: boolean;
         };
         /**
          * RunDetailResponse
