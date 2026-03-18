@@ -14,8 +14,8 @@ const VERDICT_STYLES: Record<Verdict, { light: string; dark: string }> = {
 
 const FALLBACK = "bg-muted text-muted-foreground";
 
-export function VerdictPill({ verdict }: { verdict: Verdict | string }) {
-  const style = VERDICT_STYLES[verdict as Verdict];
+export function VerdictPill({ verdict }: { verdict: Verdict }) {
+  const style = VERDICT_STYLES[verdict];
   return (
     <span
       className={cn(

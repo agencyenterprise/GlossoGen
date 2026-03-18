@@ -84,10 +84,13 @@ export function ChatPane({
     return map;
   }, [agents]);
 
-  const filtered =
-    selectedChannel === null ? messages : messages.filter(m => m.channel_id === selectedChannel);
+  const filtered = useMemo(
+    () =>
+      selectedChannel === null ? messages : messages.filter(m => m.channel_id === selectedChannel),
+    [messages, selectedChannel]
+  );
 
-  const groups = groupByRound(filtered);
+  const groups = useMemo(() => groupByRound(filtered), [filtered]);
   const showChannelBadge = selectedChannel === null;
 
   let headerName = "all activity";
@@ -127,15 +130,15 @@ export function ChatPane({
                   ref={el => {
                     if (el) {
                       messageRefs.current.set(msg.message_id, el);
-                    }
-                    return () => {
+                    } else {
                       messageRefs.current.delete(msg.message_id);
-                    };
+                    }
                   }}
                   className="flex gap-2.5 px-4 py-1 transition-colors hover:bg-muted/50"
                 >
                   <div className="flex w-7 shrink-0 flex-col items-center">
                     <button
+                      aria-label={`Open agent ${agent?.role_name ?? msg.sender_agent_id}`}
                       className={cn(
                         "flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[10px] font-semibold transition-opacity hover:opacity-75",
                         color?.bg,

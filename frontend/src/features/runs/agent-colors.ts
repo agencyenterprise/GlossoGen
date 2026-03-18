@@ -30,11 +30,18 @@ export function getChannelPillColor(index: number): AgentColor {
 }
 
 export function deriveInitials(roleName: string): string {
-  const words = roleName.split(/\s+/);
+  const words = roleName
+    .trim()
+    .split(/\s+/)
+    .filter(w => w.length > 0);
   if (words.length >= 2) {
     return (words[0]![0]! + words[1]![0]!).toUpperCase();
   }
-  return (roleName.slice(0, 2) || "?").toUpperCase();
+  const twoChars = roleName.trim().slice(0, 2);
+  if (twoChars.length === 0) {
+    return "?";
+  }
+  return twoChars.toUpperCase();
 }
 
 export function buildAgentColorMap(agentIds: string[]): Map<string, AgentColor> {

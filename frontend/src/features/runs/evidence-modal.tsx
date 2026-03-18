@@ -55,8 +55,8 @@ export function EvidenceModal({
             Evidence
           </div>
           <ul className="space-y-3">
-            {metric.evidence.map((text, i) => (
-              <li key={`${i}-${text.slice(0, 32)}`}>
+            {metric.evidence.map(text => (
+              <li key={text}>
                 <ProseMarkdown>{text}</ProseMarkdown>
               </li>
             ))}
