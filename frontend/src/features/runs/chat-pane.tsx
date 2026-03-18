@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import Markdown from "react-markdown";
 import { cn } from "@/shared/lib/cn";
 import { deriveInitials, type AgentColor } from "./agent-colors";
@@ -25,6 +26,7 @@ interface ChatPaneProps {
   agentColorMap: Map<string, AgentColor>;
   channelColorMap: Map<string, { bg: string; fg: string }>;
   onSelectAgent: (agentId: string) => void;
+  highlightedMessageId: string | null;
 }
 
 function humanizeChannelId(channelId: string): string {
@@ -83,7 +85,26 @@ export function ChatPane({
   agentColorMap,
   channelColorMap,
   onSelectAgent,
+  highlightedMessageId,
 }: ChatPaneProps) {
+  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  useEffect(() => {
+    if (!highlightedMessageId) {
+      return undefined;
+    }
+    const el = messageRefs.current.get(highlightedMessageId);
+    if (!el) {
+      return undefined;
+    }
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("animate-highlight");
+    const timeout = setTimeout(() => {
+      el.classList.remove("animate-highlight");
+    }, 1500);
+    return () => clearTimeout(timeout);
+  }, [highlightedMessageId]);
+
   const filtered =
     selectedChannel === null ? messages : messages.filter(m => m.channel_id === selectedChannel);
 
@@ -122,6 +143,11 @@ export function ChatPane({
               return (
                 <div
                   key={msg.message_id}
+                  ref={el => {
+                    if (el) {
+                      messageRefs.current.set(msg.message_id, el);
+                    }
+                  }}
                   className="flex gap-2.5 px-4 py-1 transition-colors hover:bg-muted/50"
                 >
                   <div className="flex w-7 shrink-0 flex-col items-center">

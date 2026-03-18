@@ -20,6 +20,15 @@ function humanizeSnakeCase(value: string): string {
 export function RunDetail({ runId }: { runId: string }) {
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+
+  function handleNavigateToMessage(messageId: string, channelId: string) {
+    setSelectedAgent(null);
+    setSelectedChannel(channelId);
+    setHighlightedMessageId(null);
+    // Use setTimeout so React flushes the channel switch before setting the highlight
+    setTimeout(() => setHighlightedMessageId(messageId), 50);
+  }
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["run", runId],
@@ -101,6 +110,7 @@ export function RunDetail({ runId }: { runId: string }) {
           agentColorMap={agentColorMap}
           channelColorMap={channelColorMap}
           onSelectAgent={setSelectedAgent}
+          highlightedMessageId={highlightedMessageId}
         />
 
         {/* Agent drawer */}
@@ -111,6 +121,11 @@ export function RunDetail({ runId }: { runId: string }) {
             agentColor={activeAgentColor}
             channelColorMap={channelColorMap}
             onClose={() => setSelectedAgent(null)}
+            onNavigateToMessage={handleNavigateToMessage}
+            onNavigateToChannel={channelId => {
+              setSelectedAgent(null);
+              setSelectedChannel(channelId);
+            }}
           />
         ) : null}
       </div>
