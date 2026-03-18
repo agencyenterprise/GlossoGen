@@ -76,7 +76,6 @@ class EvalReportResponse(BaseModel):
     """Evaluation report for the run detail endpoint."""
 
     metrics: list[EvalMetricResponse]
-    right_answer_wrong_reasons: bool | None
 
 
 class RunDetailResponse(BaseModel):

@@ -187,23 +187,11 @@
             },
             "type": "array",
             "title": "Metrics"
-          },
-          "right_answer_wrong_reasons": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Right Answer Wrong Reasons"
           }
         },
         "type": "object",
         "required": [
-          "metrics",
-          "right_answer_wrong_reasons"
+          "metrics"
         ],
         "title": "EvalReportResponse",
         "description": "Evaluation report for the run detail endpoint."
