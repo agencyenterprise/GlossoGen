@@ -77,8 +77,13 @@ export function RunDetail({ runId }: { runId: string }) {
   }
 
   const maxRound = data.messages.reduce((max, m) => Math.max(max, m.round_number), 0);
-  const firstAgent = data.agents[0];
-  const agentModel = firstAgent !== undefined ? firstAgent.model : "unknown";
+  const uniqueModels = [...new Set(data.agents.map(a => a.model))];
+  const modelLabel =
+    uniqueModels.length === 1
+      ? uniqueModels[0]
+      : uniqueModels.length === 0
+        ? "unknown"
+        : `${uniqueModels.length} models`;
 
   const evaluation = data.evaluation;
   const activeAgent = data.agents.find(a => a.agent_id === selectedAgent);
@@ -107,7 +112,22 @@ export function RunDetail({ runId }: { runId: string }) {
           </button>
         </span>
         <span className="text-[13px] text-muted-foreground">
-          {maxRound} rounds · {data.total_turns} turns · {data.agents.length} agents · {agentModel}
+          {maxRound} rounds · {data.total_turns} turns · {data.agents.length} agents ·{" "}
+          {uniqueModels.length <= 1 ? (
+            modelLabel
+          ) : (
+            <span className="group relative cursor-default">
+              {modelLabel}
+              <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-border bg-background px-3 py-2 text-xs shadow-lg group-hover:block">
+                {data.agents.map(a => (
+                  <div key={a.agent_id} className="flex justify-between gap-4 py-0.5">
+                    <span className="text-muted-foreground">{humanize(a.agent_id)}</span>
+                    <span className="font-mono">{a.model}</span>
+                  </div>
+                ))}
+              </span>
+            </span>
+          )}
         </span>
       </div>
 

@@ -56,6 +56,7 @@ export function AgentDrawer({
         </div>
         <div>
           <div className="text-[15px] font-medium">{agent.role_name}</div>
+          <div className="text-[11px] text-muted-foreground">{agent.model}</div>
         </div>
         <button
           aria-label="Close"
