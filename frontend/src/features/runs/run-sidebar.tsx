@@ -1,10 +1,9 @@
 import { cn } from "@/shared/lib/cn";
-import type { AgentColor } from "./agent-colors";
+import { deriveInitials, type AgentColor } from "./agent-colors";
 
 interface Agent {
   agent_id: string;
   role_name: string;
-  initials: string;
 }
 
 interface RunSidebarProps {
@@ -86,7 +85,7 @@ export function RunSidebar({
                   color?.fg
                 )}
               >
-                {agent.initials}
+                {deriveInitials(agent.role_name)}
               </div>
               {agent.role_name}
             </button>

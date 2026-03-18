@@ -17,18 +17,6 @@ from schmidt.server.response_models import AgentDetail, MessageDetail, RunDetail
 logger = logging.getLogger(__name__)
 
 
-def _derive_initials(role_name: str) -> str:
-    """Derive two-letter uppercase initials from a role name.
-
-    Uses the first letter of each word for multi-word names,
-    or the first two letters for single-word names.
-    """
-    words = role_name.split()
-    if len(words) >= 2:
-        return (words[0][0] + words[1][0]).upper()
-    return role_name[:2].upper()
-
-
 async def load_run_detail(log_path: Path) -> RunDetailResponse:
     """Parse all events from a JSONL log and assemble a RunDetailResponse."""
     events: list[SimulationEvent] = await load_events(log_path=log_path)
@@ -58,7 +46,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 AgentDetail(
                     agent_id=event.agent_id,
                     role_name=event.role_name,
-                    initials=_derive_initials(role_name=event.role_name),
                     channel_ids=event.channel_ids,
                     tool_names=event.tool_names,
                     model=event.model,

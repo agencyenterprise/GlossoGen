@@ -4,7 +4,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import Markdown from "react-markdown";
 import { cn } from "@/shared/lib/cn";
-import type { AgentColor } from "./agent-colors";
+import { deriveInitials, type AgentColor } from "./agent-colors";
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", {
@@ -18,7 +18,7 @@ type DrawerTab = "prompt" | "messages";
 interface Agent {
   agent_id: string;
   role_name: string;
-  initials: string;
+
   system_prompt: string;
 }
 
@@ -61,7 +61,7 @@ export function AgentDrawer({
             agentColor.fg
           )}
         >
-          {agent.initials}
+          {deriveInitials(agent.role_name)}
         </div>
         <div>
           <div className="text-[15px] font-medium">{agent.role_name}</div>

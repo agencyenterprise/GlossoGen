@@ -1,11 +1,10 @@
 import Markdown from "react-markdown";
 import { cn } from "@/shared/lib/cn";
-import type { AgentColor } from "./agent-colors";
+import { deriveInitials, type AgentColor } from "./agent-colors";
 
 interface Agent {
   agent_id: string;
   role_name: string;
-  initials: string;
 }
 
 interface Message {
@@ -134,7 +133,7 @@ export function ChatPane({
                       )}
                       onClick={() => onSelectAgent(msg.sender_agent_id)}
                     >
-                      {agent?.initials ?? "??"}
+                      {agent ? deriveInitials(agent.role_name) : "??"}
                     </button>
                     <div className="flex flex-1 items-center">
                       <span className="text-[10px] font-medium leading-none text-muted-foreground/50">
