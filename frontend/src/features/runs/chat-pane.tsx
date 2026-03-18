@@ -21,31 +21,68 @@ interface ChatPaneProps {
   highlightNonce: number;
 }
 
-interface MessageGroup {
-  roundNumber: number;
-  messages: MessageDetail[];
+interface TurnGroup {
+  turnNumber: number;
+  agentId: string;
+  channelId: string;
+  timestamp: string;
+  entries: MessageDetail[];
 }
 
-function groupByRound(messages: MessageDetail[]): MessageGroup[] {
-  const groups: MessageGroup[] = [];
+interface RoundGroup {
+  roundNumber: number;
+  turns: TurnGroup[];
+}
+
+function groupByRoundAndTurn(messages: MessageDetail[]): RoundGroup[] {
+  const rounds: RoundGroup[] = [];
   let currentRound = -1;
-  let currentMessages: MessageDetail[] = [];
+  let currentTurns: TurnGroup[] = [];
+  let currentTurn: TurnGroup | null = null;
 
   for (const msg of messages) {
     if (msg.round_number !== currentRound) {
-      if (currentMessages.length > 0) {
-        groups.push({ roundNumber: currentRound, messages: currentMessages });
+      if (currentTurn) {
+        currentTurns.push(currentTurn);
+      }
+      if (currentTurns.length > 0) {
+        rounds.push({ roundNumber: currentRound, turns: currentTurns });
       }
       currentRound = msg.round_number;
-      currentMessages = [msg];
+      currentTurns = [];
+      currentTurn = {
+        turnNumber: msg.turn_number,
+        agentId: msg.sender_agent_id,
+        channelId: msg.channel_id,
+        timestamp: msg.timestamp,
+        entries: [msg],
+      };
+    } else if (
+      currentTurn &&
+      msg.turn_number === currentTurn.turnNumber &&
+      msg.sender_agent_id === currentTurn.agentId
+    ) {
+      currentTurn.entries.push(msg);
     } else {
-      currentMessages.push(msg);
+      if (currentTurn) {
+        currentTurns.push(currentTurn);
+      }
+      currentTurn = {
+        turnNumber: msg.turn_number,
+        agentId: msg.sender_agent_id,
+        channelId: msg.channel_id,
+        timestamp: msg.timestamp,
+        entries: [msg],
+      };
     }
   }
-  if (currentMessages.length > 0) {
-    groups.push({ roundNumber: currentRound, messages: currentMessages });
+  if (currentTurn) {
+    currentTurns.push(currentTurn);
   }
-  return groups;
+  if (currentTurns.length > 0) {
+    rounds.push({ roundNumber: currentRound, turns: currentTurns });
+  }
+  return rounds;
 }
 
 export function ChatPane({
@@ -90,7 +127,7 @@ export function ChatPane({
     [messages, selectedChannel]
   );
 
-  const groups = useMemo(() => groupByRound(filtered), [filtered]);
+  const rounds = useMemo(() => groupByRoundAndTurn(filtered), [filtered]);
   const showChannelBadge = selectedChannel === null;
 
   let headerName = "all activity";
@@ -109,48 +146,41 @@ export function ChatPane({
       </div>
 
       <div className="flex-1 overflow-y-auto px-0 py-1">
-        {groups.map(group => (
-          <div key={group.roundNumber}>
+        {rounds.map(round => (
+          <div key={round.roundNumber}>
             <div className="flex items-center gap-2.5 px-4 pb-1.5 pt-3.5">
               <div className="h-px flex-1 bg-border" />
               <span className="whitespace-nowrap text-[11px] text-muted-foreground">
-                Round {group.roundNumber}
+                Round {round.roundNumber}
               </span>
               <div className="h-px flex-1 bg-border" />
             </div>
 
-            {group.messages.map(msg => {
-              const agent = agentMap.get(msg.sender_agent_id);
-              const color = agentColorMap.get(msg.sender_agent_id);
-              const chColor = channelColorMap.get(msg.channel_id);
+            {round.turns.map(turn => {
+              const agent = agentMap.get(turn.agentId);
+              const color = agentColorMap.get(turn.agentId);
+              const chColor = channelColorMap.get(turn.channelId);
 
               return (
                 <div
-                  key={msg.message_id}
-                  ref={el => {
-                    if (el) {
-                      messageRefs.current.set(msg.message_id, el);
-                    } else {
-                      messageRefs.current.delete(msg.message_id);
-                    }
-                  }}
+                  key={`${turn.turnNumber}-${turn.agentId}`}
                   className="flex gap-2.5 px-4 py-1 transition-colors hover:bg-muted/50"
                 >
-                  <div className="flex w-7 shrink-0 flex-col items-center">
+                  <div className="flex w-7 shrink-0 flex-col items-start">
                     <button
-                      aria-label={`Open agent ${agent?.role_name ?? msg.sender_agent_id}`}
+                      aria-label={`Open agent ${agent?.role_name ?? turn.agentId}`}
                       className={cn(
                         "flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[10px] font-semibold transition-opacity hover:opacity-75",
                         color?.bg,
                         color?.fg
                       )}
-                      onClick={() => onSelectAgent(msg.sender_agent_id)}
+                      onClick={() => onSelectAgent(turn.agentId)}
                     >
                       {agent ? deriveInitials(agent.role_name) : "??"}
                     </button>
-                    <div className="flex flex-1 items-center">
+                    <div className="flex flex-1 items-center justify-center self-stretch">
                       <span className="text-[10px] font-medium leading-none text-muted-foreground/50">
-                        {msg.turn_number}
+                        {turn.turnNumber}
                       </span>
                     </div>
                   </div>
@@ -158,9 +188,9 @@ export function ChatPane({
                     <div className="mb-0.5 flex flex-wrap items-baseline gap-1.5">
                       <button
                         className="text-[13px] font-medium hover:underline"
-                        onClick={() => onSelectAgent(msg.sender_agent_id)}
+                        onClick={() => onSelectAgent(turn.agentId)}
                       >
-                        {agent?.role_name ?? msg.sender_agent_id}
+                        {agent?.role_name ?? turn.agentId}
                       </button>
                       {showChannelBadge ? (
                         <span
@@ -170,16 +200,35 @@ export function ChatPane({
                             chColor?.fg
                           )}
                         >
-                          #{msg.channel_id}
+                          #{turn.channelId}
                         </span>
                       ) : null}
                       <span className="text-[10px] text-muted-foreground">
-                        {formatTime(msg.timestamp)}
+                        {formatTime(turn.timestamp)}
                       </span>
                     </div>
-                    <ProseMarkdown className="[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]">
-                      {msg.text}
-                    </ProseMarkdown>
+                    {turn.entries.map(entry => (
+                      <div
+                        key={entry.message_id}
+                        ref={el => {
+                          if (el) {
+                            messageRefs.current.set(entry.message_id, el);
+                          } else {
+                            messageRefs.current.delete(entry.message_id);
+                          }
+                        }}
+                        className={cn(entry.is_reasoning && "ml-4 opacity-50")}
+                      >
+                        {entry.is_reasoning ? (
+                          <span className="text-[10px] italic text-muted-foreground">
+                            reasoning
+                          </span>
+                        ) : null}
+                        <ProseMarkdown className="[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]">
+                          {entry.text}
+                        </ProseMarkdown>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );
