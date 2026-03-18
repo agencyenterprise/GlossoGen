@@ -131,6 +131,51 @@
         "title": "AgentDetail",
         "description": "Full agent information for the run detail endpoint."
       },
+      "ChannelMessage": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "title": "Message Id"
+          },
+          "channel_id": {
+            "type": "string",
+            "title": "Channel Id"
+          },
+          "sender_agent_id": {
+            "type": "string",
+            "title": "Sender Agent Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "turn_number": {
+            "type": "integer",
+            "title": "Turn Number"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "channel_id",
+          "sender_agent_id",
+          "text",
+          "timestamp",
+          "turn_number",
+          "round_number"
+        ],
+        "title": "ChannelMessage",
+        "description": "A message sent by an agent to a channel."
+      },
       "EndReason": {
         "type": "string",
         "enum": [
@@ -230,15 +275,11 @@
         "title": "HealthStatus",
         "description": "Health check status values."
       },
-      "MessageDetail": {
+      "ReasoningEntry": {
         "properties": {
           "message_id": {
             "type": "string",
             "title": "Message Id"
-          },
-          "channel_id": {
-            "type": "string",
-            "title": "Channel Id"
           },
           "sender_agent_id": {
             "type": "string",
@@ -260,25 +301,19 @@
           "round_number": {
             "type": "integer",
             "title": "Round Number"
-          },
-          "is_reasoning": {
-            "type": "boolean",
-            "title": "Is Reasoning"
           }
         },
         "type": "object",
         "required": [
           "message_id",
-          "channel_id",
           "sender_agent_id",
           "text",
           "timestamp",
           "turn_number",
-          "round_number",
-          "is_reasoning"
+          "round_number"
         ],
-        "title": "MessageDetail",
-        "description": "A single message or reasoning entry with turn context for the run detail endpoint."
+        "title": "ReasoningEntry",
+        "description": "An LLM reasoning/thinking entry from an agent's turn."
       },
       "RunDetailResponse": {
         "properties": {
@@ -322,10 +357,17 @@
           },
           "messages": {
             "items": {
-              "$ref": "#/components/schemas/MessageDetail"
+              "$ref": "#/components/schemas/ChannelMessage"
             },
             "type": "array",
             "title": "Messages"
+          },
+          "reasoning": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningEntry"
+            },
+            "type": "array",
+            "title": "Reasoning"
           },
           "evaluation": {
             "anyOf": [
@@ -349,6 +391,7 @@
           "channel_ids",
           "agents",
           "messages",
+          "reasoning",
           "evaluation"
         ],
         "title": "RunDetailResponse",

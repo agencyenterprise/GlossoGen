@@ -62,7 +62,6 @@ class TurnAssigned(EventBase):
     event_type: Literal["turn_assigned"] = "turn_assigned"
     agent_id: str
     turn_number: int
-    channel_id: str
     round_number: int
 
 
@@ -114,6 +113,14 @@ class LLMResponseReceived(EventBase):
     usage: TokenUsage
 
 
+class TurnPassed(EventBase):
+    """Emitted when an agent calls pass_turn to decline speaking on their turn."""
+
+    event_type: Literal["turn_passed"] = "turn_passed"
+    agent_id: str
+    reason: str
+
+
 class EndReason(str, Enum):
     """Why the simulation ended."""
 
@@ -141,6 +148,7 @@ SimulationEvent = Annotated[
         ToolResultReturned,
         LLMRequestSent,
         LLMResponseReceived,
+        TurnPassed,
         SimulationEnded,
     ],
     Discriminator("event_type"),

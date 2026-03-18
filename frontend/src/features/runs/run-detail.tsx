@@ -10,6 +10,7 @@ import { cn } from "@/shared/lib/cn";
 import { buildAgentColorMap, buildChannelColorMap } from "./agent-colors";
 import { AgentDrawer } from "./agent-drawer";
 import { ChatPane } from "./chat-pane";
+import { mergeEntries } from "./display-entry";
 import { EvalPanel } from "./eval-panel";
 import { humanize } from "./format";
 import { RunSidebar } from "./run-sidebar";
@@ -59,6 +60,11 @@ export function RunDetail({ runId }: { runId: string }) {
     [data]
   );
 
+  const displayEntries = useMemo(
+    () => (data ? mergeEntries(data.messages, data.reasoning) : []),
+    [data]
+  );
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -76,7 +82,7 @@ export function RunDetail({ runId }: { runId: string }) {
     );
   }
 
-  const maxRound = data.messages.reduce((max, m) => Math.max(max, m.round_number), 0);
+  const maxRound = displayEntries.reduce((max, m) => Math.max(max, m.round_number), 0);
   const uniqueModels = [...new Set(data.agents.map(a => a.model))];
   const modelLabel =
     uniqueModels.length === 1
@@ -156,7 +162,7 @@ export function RunDetail({ runId }: { runId: string }) {
           onSelectAgent={setSelectedAgent}
         />
         <ChatPane
-          messages={data.messages}
+          messages={displayEntries}
           agents={data.agents}
           selectedChannel={selectedChannel}
           agentColorMap={agentColorMap}
@@ -173,7 +179,7 @@ export function RunDetail({ runId }: { runId: string }) {
         {activeAgent && activeAgentColor ? (
           <AgentDrawer
             agent={activeAgent}
-            messages={data.messages}
+            messages={displayEntries}
             agentColor={activeAgentColor}
             channelColorMap={channelColorMap}
             onClose={() => setSelectedAgent(null)}

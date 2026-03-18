@@ -4,14 +4,14 @@ import { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
+import type { DisplayEntry } from "./display-entry";
 import { formatTime, humanize } from "./format";
 import { ProseMarkdown } from "./prose-markdown";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
-type MessageDetail = components["schemas"]["MessageDetail"];
 
 interface ChatPaneProps {
-  messages: MessageDetail[];
+  messages: DisplayEntry[];
   agents: AgentDetail[];
   selectedChannel: string | null;
   agentColorMap: Map<string, AgentColor>;
@@ -24,9 +24,8 @@ interface ChatPaneProps {
 interface TurnGroup {
   turnNumber: number;
   agentId: string;
-  channelId: string;
   timestamp: string;
-  entries: MessageDetail[];
+  entries: DisplayEntry[];
 }
 
 interface RoundGroup {
@@ -34,7 +33,7 @@ interface RoundGroup {
   turns: TurnGroup[];
 }
 
-function groupByRoundAndTurn(messages: MessageDetail[]): RoundGroup[] {
+function groupByRoundAndTurn(messages: DisplayEntry[]): RoundGroup[] {
   const rounds: RoundGroup[] = [];
   let currentRound = -1;
   let currentTurns: TurnGroup[] = [];
@@ -53,7 +52,6 @@ function groupByRoundAndTurn(messages: MessageDetail[]): RoundGroup[] {
       currentTurn = {
         turnNumber: msg.turn_number,
         agentId: msg.sender_agent_id,
-        channelId: msg.channel_id,
         timestamp: msg.timestamp,
         entries: [msg],
       };
@@ -70,7 +68,6 @@ function groupByRoundAndTurn(messages: MessageDetail[]): RoundGroup[] {
       currentTurn = {
         turnNumber: msg.turn_number,
         agentId: msg.sender_agent_id,
-        channelId: msg.channel_id,
         timestamp: msg.timestamp,
         entries: [msg],
       };
@@ -123,7 +120,9 @@ export function ChatPane({
 
   const filtered = useMemo(
     () =>
-      selectedChannel === null ? messages : messages.filter(m => m.channel_id === selectedChannel),
+      selectedChannel === null
+        ? messages
+        : messages.filter(m => m.is_reasoning || m.channel_id === selectedChannel),
     [messages, selectedChannel]
   );
 
@@ -159,7 +158,6 @@ export function ChatPane({
             {round.turns.map(turn => {
               const agent = agentMap.get(turn.agentId);
               const color = agentColorMap.get(turn.agentId);
-              const chColor = channelColorMap.get(turn.channelId);
 
               return (
                 <div
@@ -192,43 +190,45 @@ export function ChatPane({
                       >
                         {agent?.role_name ?? turn.agentId}
                       </button>
-                      {showChannelBadge ? (
-                        <span
-                          className={cn(
-                            "rounded-full px-1.5 py-px text-[10px] font-medium leading-relaxed",
-                            chColor?.bg,
-                            chColor?.fg
-                          )}
-                        >
-                          #{turn.channelId}
-                        </span>
-                      ) : null}
                       <span className="text-[10px] text-muted-foreground">
                         {formatTime(turn.timestamp)}
                       </span>
                     </div>
-                    {turn.entries.map(entry => (
-                      <div
-                        key={entry.message_id}
-                        ref={el => {
-                          if (el) {
-                            messageRefs.current.set(entry.message_id, el);
-                          } else {
-                            messageRefs.current.delete(entry.message_id);
-                          }
-                        }}
-                        className={cn(entry.is_reasoning && "ml-4 opacity-50")}
-                      >
-                        {entry.is_reasoning ? (
-                          <span className="text-[10px] italic text-muted-foreground">
-                            reasoning
-                          </span>
-                        ) : null}
-                        <ProseMarkdown className="[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]">
-                          {entry.text}
-                        </ProseMarkdown>
-                      </div>
-                    ))}
+                    {turn.entries.map(entry => {
+                      const entryChColor = channelColorMap.get(entry.channel_id);
+                      return (
+                        <div
+                          key={entry.message_id}
+                          ref={el => {
+                            if (el) {
+                              messageRefs.current.set(entry.message_id, el);
+                            } else {
+                              messageRefs.current.delete(entry.message_id);
+                            }
+                          }}
+                          className={cn(entry.is_reasoning && "ml-4 opacity-50")}
+                        >
+                          {entry.is_reasoning ? (
+                            <span className="text-[10px] italic text-muted-foreground">
+                              reasoning
+                            </span>
+                          ) : showChannelBadge ? (
+                            <span
+                              className={cn(
+                                "mb-0.5 inline-block rounded-full px-1.5 py-px text-[10px] font-medium leading-relaxed",
+                                entryChColor?.bg,
+                                entryChColor?.fg
+                              )}
+                            >
+                              #{entry.channel_id}
+                            </span>
+                          ) : null}
+                          <ProseMarkdown className="[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]">
+                            {entry.text}
+                          </ProseMarkdown>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );

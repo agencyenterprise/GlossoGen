@@ -6,10 +6,9 @@ from schmidt.models.message import SimulationMessage
 
 
 class TurnDecision(BaseModel):
-    """Specifies which agent should act next, on which channel, and in which scenario round."""
+    """Specifies which agent should act next and in which scenario round."""
 
     agent_id: str
-    channel_id: str
     round_number: int
 
 
@@ -26,3 +25,4 @@ class SimulationState(BaseModel):
     turn_number: int
     messages_by_channel: dict[str, list[SimulationMessage]]
     active_agent_ids: list[str]
+    last_turn_passed: bool

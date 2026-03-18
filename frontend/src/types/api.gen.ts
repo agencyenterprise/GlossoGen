@@ -87,6 +87,29 @@ export interface components {
             system_prompt: string;
         };
         /**
+         * ChannelMessage
+         * @description A message sent by an agent to a channel.
+         */
+        ChannelMessage: {
+            /** Message Id */
+            message_id: string;
+            /** Channel Id */
+            channel_id: string;
+            /** Sender Agent Id */
+            sender_agent_id: string;
+            /** Text */
+            text: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Turn Number */
+            turn_number: number;
+            /** Round Number */
+            round_number: number;
+        };
+        /**
          * EndReason
          * @description Why the simulation ended.
          * @enum {string}
@@ -136,14 +159,12 @@ export interface components {
          */
         HealthStatus: "ok";
         /**
-         * MessageDetail
-         * @description A single message or reasoning entry with turn context for the run detail endpoint.
+         * ReasoningEntry
+         * @description An LLM reasoning/thinking entry from an agent's turn.
          */
-        MessageDetail: {
+        ReasoningEntry: {
             /** Message Id */
             message_id: string;
-            /** Channel Id */
-            channel_id: string;
             /** Sender Agent Id */
             sender_agent_id: string;
             /** Text */
@@ -157,8 +178,6 @@ export interface components {
             turn_number: number;
             /** Round Number */
             round_number: number;
-            /** Is Reasoning */
-            is_reasoning: boolean;
         };
         /**
          * RunDetailResponse
@@ -184,7 +203,9 @@ export interface components {
             /** Agents */
             agents: components["schemas"]["AgentDetail"][];
             /** Messages */
-            messages: components["schemas"]["MessageDetail"][];
+            messages: components["schemas"]["ChannelMessage"][];
+            /** Reasoning */
+            reasoning: components["schemas"]["ReasoningEntry"][];
             evaluation: components["schemas"]["EvalReportResponse"] | null;
         };
         /**

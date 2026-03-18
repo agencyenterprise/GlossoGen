@@ -20,6 +20,7 @@ from schmidt.models.event import (
 )
 from schmidt.models.simulation_state import SimulationState, TurnDecision
 from schmidt.scenario_protocol import SimulationScenario
+from schmidt.tools.builtin_pass_turn import PASS_TURN_SPEC, create_pass_turn_executor
 from schmidt.tools.builtin_send_message import SEND_MESSAGE_SPEC, create_send_message_executor
 from schmidt.tools.tool_executor import ToolExecutor
 from schmidt.tools.tool_registry import ToolRegistry
@@ -80,6 +81,10 @@ class SimulationHub:
             event_logger=self._event_logger,
         )
         self._tool_registry.register(spec=SEND_MESSAGE_SPEC, executor=send_executor)
+
+        # Register built-in pass_turn tool
+        pass_executor = create_pass_turn_executor(event_logger=self._event_logger)
+        self._tool_registry.register(spec=PASS_TURN_SPEC, executor=pass_executor)
 
         # Register scenario-specific tools
         self._scenario.register_tools(registry=self._tool_registry)
@@ -148,6 +153,7 @@ class SimulationHub:
         logger.info("Spawned %d agent tasks: %s", len(tasks), list(tasks.keys()))
 
         turn_number = 0
+        last_turn_passed = False
         end_reason = EndReason.SCENARIO_COMPLETE
         try:
             while True:
@@ -155,6 +161,7 @@ class SimulationHub:
                     turn_number=turn_number,
                     messages_by_channel=channel_router.get_all_messages(),
                     active_agent_ids=[a.agent_id for a in agents],
+                    last_turn_passed=last_turn_passed,
                 )
 
                 decision = await self._scenario.decide_next_turn(state=state)
@@ -169,7 +176,6 @@ class SimulationHub:
                     event=TurnAssigned(
                         agent_id=decision.agent_id,
                         turn_number=turn_number,
-                        channel_id=decision.channel_id,
                         round_number=decision.round_number,
                     )
                 )
@@ -195,9 +201,12 @@ class SimulationHub:
                     agent_id=agent_id,
                 )
 
-                # Log turn progress
+                # Record turn outcome for the next decide_next_turn call
                 runner = runners[agent_id]
                 summary = runner.last_turn_summary
+                last_turn_passed = summary.passed
+
+                # Log turn progress
                 if summary.messages_sent:
                     msgs = ", ".join(summary.messages_sent)
                 else:
@@ -207,10 +216,9 @@ class SimulationHub:
                 else:
                     tools_used = "none"
                 logger.info(
-                    "[Turn %d] %s -> %s | tools: %s | sent: %s",
+                    "[Turn %d] %s | tools: %s | sent: %s",
                     turn_number,
                     agent_id,
-                    decision.channel_id,
                     tools_used,
                     msgs,
                 )

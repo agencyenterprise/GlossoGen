@@ -28,6 +28,7 @@ class TurnSummary:
     def __init__(self) -> None:
         self.messages_sent: list[str] = []
         self.tools_called: list[str] = []
+        self.passed: bool = False
 
 
 class AgentRunner:
@@ -76,10 +77,9 @@ class AgentRunner:
             decision = await self._turn_queue.get()
 
             logger.debug(
-                "Agent %s woke for round %d on channel %s",
+                "Agent %s woke for round %d",
                 self._config.agent_id,
                 decision.round_number,
-                decision.channel_id,
             )
             await self._process_turn(decision=decision)
 
@@ -104,24 +104,18 @@ class AgentRunner:
                     decision.round_number,
                 )
 
-        target_channel_id = decision.channel_id
-        visible_channel_ids = list(self._config.channel_ids)
-
         messages = self._prompt_builder.build_messages(
             agent_id=self._config.agent_id,
-            visible_channel_ids=visible_channel_ids,
+            visible_channel_ids=list(self._config.channel_ids),
             injection=injection,
         )
 
         tools = self._tool_registry.get_specs(names=list(self._config.tool_names))
 
-        # Add turn context
-        target_display = self._scenario.get_channel_display_name(
-            channel_id=target_channel_id, agent_id=self._config.agent_id
-        )
         turn_context = (
-            f'It\'s your turn to contribute to the "{target_display}" channel. '
-            f"Send one focused message to channel_id: {target_channel_id}"
+            "It's your turn to speak. "
+            "You can send messages to any channel. "
+            "Call pass_turn if you have nothing to add."
         )
 
         if not messages or messages[0].role != "user":
@@ -144,16 +138,21 @@ class AgentRunner:
         """Call the LLM and execute returned tool calls in a loop,
         up to MAX_TOOL_CALLS_PER_TURN iterations.
 
-        Removes the send_message tool from subsequent iterations
-        after it has been used once.
+        Agents can send multiple messages per turn. Calling pass_turn
+        ends the tool loop immediately. After pass_turn is called,
+        send_message is no longer available (and vice versa).
         """
-        send_message_used = False
+        pass_turn_used = False
+        has_sent_message = False
 
         for iteration in range(MAX_TOOL_CALLS_PER_TURN):
-            # Remove send_message from tools after first use
-            active_tools = tools
-            if send_message_used:
-                active_tools = [t for t in tools if t.name != "send_message"]
+            active_tools = list(tools)
+            if pass_turn_used:
+                active_tools = [
+                    t for t in active_tools if t.name not in ("send_message", "pass_turn")
+                ]
+            elif has_sent_message:
+                active_tools = [t for t in active_tools if t.name != "pass_turn"]
 
             await self._event_logger.log(
                 event=LLMRequestSent(
@@ -215,10 +214,14 @@ class AgentRunner:
                 )
 
                 if call.tool_name == "send_message" and not result.is_error:
-                    send_message_used = True
+                    has_sent_message = True
                     channel_id = str(call.arguments.get("channel_id", ""))
                     text = str(call.arguments.get("text", ""))
                     self.last_turn_summary.messages_sent.append(f"[{channel_id}] {text[:80]}")
+
+                if call.tool_name == "pass_turn" and not result.is_error:
+                    pass_turn_used = True
+                    self.last_turn_summary.passed = True
 
                 self.last_turn_summary.tools_called.append(call.tool_name)
 
@@ -232,3 +235,7 @@ class AgentRunner:
 
             # Append all tool results as a single user message with structured content
             messages.append(LLMMessage(role="user", content=tool_results))
+
+            if pass_turn_used:
+                logger.debug("Agent %s passed turn, ending tool loop", self._config.agent_id)
+                break

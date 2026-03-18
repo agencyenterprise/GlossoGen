@@ -51,8 +51,8 @@ class AgentDetail(BaseModel):
     system_prompt: str
 
 
-class MessageDetail(BaseModel):
-    """A single message or reasoning entry with turn context for the run detail endpoint."""
+class ChannelMessage(BaseModel):
+    """A message sent by an agent to a channel."""
 
     message_id: str
     channel_id: str
@@ -61,7 +61,17 @@ class MessageDetail(BaseModel):
     timestamp: datetime
     turn_number: int
     round_number: int
-    is_reasoning: bool
+
+
+class ReasoningEntry(BaseModel):
+    """An LLM reasoning/thinking entry from an agent's turn."""
+
+    message_id: str
+    sender_agent_id: str
+    text: str
+    timestamp: datetime
+    turn_number: int
+    round_number: int
 
 
 class EvalMetricResponse(BaseModel):
@@ -91,5 +101,6 @@ class RunDetailResponse(BaseModel):
     end_reason: EndReason
     channel_ids: list[str]
     agents: list[AgentDetail]
-    messages: list[MessageDetail]
+    messages: list[ChannelMessage]
+    reasoning: list[ReasoningEntry]
     evaluation: EvalReportResponse | None
