@@ -24,6 +24,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run Detail
+         * @description Get full detail for a specific simulation run.
+         */
+        get: operations["get_run_detail_api_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -49,11 +69,59 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AgentDetail
+         * @description Full agent information for the run detail endpoint.
+         */
+        AgentDetail: {
+            /** Agent Id */
+            agent_id: string;
+            /** Role Name */
+            role_name: string;
+            /** Channel Ids */
+            channel_ids: string[];
+            /** Tool Names */
+            tool_names: string[];
+            /** Model */
+            model: string;
+            /** System Prompt */
+            system_prompt: string;
+        };
+        /**
          * EndReason
          * @description Why the simulation ended.
          * @enum {string}
          */
         EndReason: "scenario_complete" | "error";
+        /**
+         * EvalMetricResponse
+         * @description Result of a single evaluator for the run detail endpoint.
+         */
+        EvalMetricResponse: {
+            /** Evaluator Name */
+            evaluator_name: string;
+            verdict: components["schemas"]["Verdict"];
+            /** Score */
+            score: number;
+            /** Evidence */
+            evidence: string[];
+            /** Per Agent */
+            per_agent: {
+                [key: string]: components["schemas"]["Verdict"];
+            };
+        };
+        /**
+         * EvalReportResponse
+         * @description Evaluation report for the run detail endpoint.
+         */
+        EvalReportResponse: {
+            /** Metrics */
+            metrics: components["schemas"]["EvalMetricResponse"][];
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
         /**
          * HealthResponse
          * @description Response model for the health check endpoint.
@@ -67,6 +135,56 @@ export interface components {
          * @enum {string}
          */
         HealthStatus: "ok";
+        /**
+         * MessageDetail
+         * @description A single message with turn context for the run detail endpoint.
+         */
+        MessageDetail: {
+            /** Message Id */
+            message_id: string;
+            /** Channel Id */
+            channel_id: string;
+            /** Sender Agent Id */
+            sender_agent_id: string;
+            /** Text */
+            text: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Turn Number */
+            turn_number: number;
+            /** Round Number */
+            round_number: number;
+        };
+        /**
+         * RunDetailResponse
+         * @description Full detail of a simulation run including agents, messages, and evaluation.
+         */
+        RunDetailResponse: {
+            /** Run Id */
+            run_id: string;
+            /** Scenario Name */
+            scenario_name: string;
+            /** Scenario Description */
+            scenario_description: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Total Turns */
+            total_turns: number;
+            end_reason: components["schemas"]["EndReason"];
+            /** Channel Ids */
+            channel_ids: string[];
+            /** Agents */
+            agents: components["schemas"]["AgentDetail"][];
+            /** Messages */
+            messages: components["schemas"]["MessageDetail"][];
+            evaluation: components["schemas"]["EvalReportResponse"] | null;
+        };
         /**
          * RunListResponse
          * @description Response model for the list-all-runs endpoint.
@@ -84,6 +202,8 @@ export interface components {
             run_id: string;
             /** Scenario Name */
             scenario_name: string;
+            /** Scenario Description */
+            scenario_description: string;
             /**
              * Timestamp
              * Format: date-time
@@ -97,6 +217,25 @@ export interface components {
             /** Run Dir */
             run_dir: string;
         };
+        /** ValidationError */
+        ValidationError: {
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
+        };
+        /**
+         * Verdict
+         * @description Three-valued outcome for a single evaluation metric.
+         * @enum {string}
+         */
+        Verdict: "pass" | "fail" | "partial";
     };
     responses: never;
     parameters: never;
@@ -122,6 +261,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunListResponse"];
+                };
+            };
+        };
+    };
+    get_run_detail_api_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
