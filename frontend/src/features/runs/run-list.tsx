@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle, Inbox, Loader2, XCircle } from "lucide-react";
+import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
 
 function formatDayHeader(iso: string): string {
@@ -109,8 +110,9 @@ export function RunList() {
           <h2 className="mb-2 text-sm font-medium text-muted-foreground">{group.label}</h2>
           <div className="divide-y divide-border rounded-lg border border-border">
             {group.runs.map(run => (
-              <div
+              <Link
                 key={run.run_id}
+                href={`/runs/${run.run_id}`}
                 className="flex items-center gap-6 px-4 py-2.5 text-sm transition-colors hover:bg-accent/50"
               >
                 <span className="w-40 font-medium">{humanizeSnakeCase(run.scenario_name)}</span>
@@ -131,7 +133,7 @@ export function RunList() {
                     </span>
                   )}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
