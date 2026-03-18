@@ -37,6 +37,11 @@ class SimulationScenario(ABC):
         ...
 
     @abstractmethod
+    def scenario_description(self) -> str:
+        """Return a markdown description of what this scenario simulates."""
+        ...
+
+    @abstractmethod
     def get_agents(self, default_model: str) -> list[AgentConfig]:
         """Return the list of agent configurations participating in this scenario."""
         ...

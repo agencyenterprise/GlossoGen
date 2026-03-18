@@ -285,6 +285,10 @@
             "type": "string",
             "title": "Scenario Name"
           },
+          "scenario_description": {
+            "type": "string",
+            "title": "Scenario Description"
+          },
           "timestamp": {
             "type": "string",
             "format": "date-time",
@@ -333,6 +337,7 @@
         "required": [
           "run_id",
           "scenario_name",
+          "scenario_description",
           "timestamp",
           "total_turns",
           "end_reason",
@@ -371,6 +376,10 @@
             "type": "string",
             "title": "Scenario Name"
           },
+          "scenario_description": {
+            "type": "string",
+            "title": "Scenario Description"
+          },
           "timestamp": {
             "type": "string",
             "format": "date-time",
@@ -396,6 +405,7 @@
         "required": [
           "run_id",
           "scenario_name",
+          "scenario_description",
           "timestamp",
           "total_turns",
           "end_reason",

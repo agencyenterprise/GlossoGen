@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, XCircle } from "lucide-react";
+import { ArrowLeft, HelpCircle, Loader2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
@@ -13,12 +13,14 @@ import { ChatPane } from "./chat-pane";
 import { EvalPanel } from "./eval-panel";
 import { humanize } from "./format";
 import { RunSidebar } from "./run-sidebar";
+import { ScenarioDescriptionModal } from "./scenario-description-modal";
 
 export function RunDetail({ runId }: { runId: string }) {
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [highlightNonce, setHighlightNonce] = useState(0);
+  const [showDescription, setShowDescription] = useState(false);
 
   const handleSelectChannel = useCallback((ch: string | null) => {
     setSelectedChannel(ch);
@@ -94,11 +96,28 @@ export function RunDetail({ runId }: { runId: string }) {
 
       {/* Header */}
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-base font-medium">{humanize(data.scenario_name)}</h1>
+        <span className="flex items-center gap-1.5">
+          <h1 className="text-base font-medium">{humanize(data.scenario_name)}</h1>
+          <button
+            aria-label="Scenario description"
+            className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={() => setShowDescription(true)}
+          >
+            <HelpCircle className="h-4 w-4" />
+          </button>
+        </span>
         <span className="text-[13px] text-muted-foreground">
           {maxRound} rounds · {data.total_turns} turns · {data.agents.length} agents · {agentModel}
         </span>
       </div>
+
+      {showDescription ? (
+        <ScenarioDescriptionModal
+          scenarioName={humanize(data.scenario_name)}
+          description={data.scenario_description}
+          onClose={() => setShowDescription(false)}
+        />
+      ) : null}
 
       {/* Shell */}
       <div

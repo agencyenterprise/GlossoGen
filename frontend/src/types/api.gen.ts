@@ -167,6 +167,8 @@ export interface components {
             run_id: string;
             /** Scenario Name */
             scenario_name: string;
+            /** Scenario Description */
+            scenario_description: string;
             /**
              * Timestamp
              * Format: date-time
@@ -200,6 +202,8 @@ export interface components {
             run_id: string;
             /** Scenario Name */
             scenario_name: string;
+            /** Scenario Description */
+            scenario_description: string;
             /**
              * Timestamp
              * Format: date-time

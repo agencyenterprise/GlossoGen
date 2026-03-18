@@ -57,6 +57,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
 
     run_id = ""
     scenario_name = ""
+    scenario_description = ""
     timestamp = None
     channel_ids: list[str] = []
     agents: list[AgentDetail] = []
@@ -72,6 +73,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         if isinstance(event, SimulationStarted):
             run_id = event.event_id
             scenario_name = event.scenario_name
+            scenario_description = event.scenario_description
             timestamp = event.timestamp
             channel_ids = event.channel_ids
 
@@ -120,6 +122,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     return RunDetailResponse(
         run_id=run_id,
         scenario_name=scenario_name,
+        scenario_description=scenario_description,
         timestamp=timestamp,
         total_turns=total_turns,
         end_reason=end_reason,

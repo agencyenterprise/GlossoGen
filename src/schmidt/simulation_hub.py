@@ -92,6 +92,7 @@ class SimulationHub:
         await self._event_logger.log(
             event=SimulationStarted(
                 scenario_name=self._scenario.name(),
+                scenario_description=self._scenario.scenario_description(),
                 channel_ids=[ch.channel_id for ch in channels],
             )
         )
