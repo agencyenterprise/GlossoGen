@@ -31,6 +31,14 @@ export function getChannelPillColor(index: number): { bg: string; fg: string } {
   return CHANNEL_PILL_COLORS[index % CHANNEL_PILL_COLORS.length]!;
 }
 
+export function deriveInitials(roleName: string): string {
+  const words = roleName.split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0]![0]! + words[1]![0]!).toUpperCase();
+  }
+  return roleName.slice(0, 2).toUpperCase();
+}
+
 export function buildAgentColorMap(agentIds: string[]): Map<string, AgentColor> {
   const map = new Map<string, AgentColor>();
   agentIds.forEach((id, i) => {

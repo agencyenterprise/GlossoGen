@@ -96,10 +96,6 @@
             "type": "string",
             "title": "Role Name"
           },
-          "initials": {
-            "type": "string",
-            "title": "Initials"
-          },
           "channel_ids": {
             "items": {
               "type": "string"
@@ -127,7 +123,6 @@
         "required": [
           "agent_id",
           "role_name",
-          "initials",
           "channel_ids",
           "tool_names",
           "model",

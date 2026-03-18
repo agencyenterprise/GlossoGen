@@ -43,7 +43,6 @@ class AgentDetail(BaseModel):
 
     agent_id: str
     role_name: str
-    initials: str
     channel_ids: list[str]
     tool_names: list[str]
     model: str

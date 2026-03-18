@@ -77,8 +77,6 @@ export interface components {
             agent_id: string;
             /** Role Name */
             role_name: string;
-            /** Initials */
-            initials: string;
             /** Channel Ids */
             channel_ids: string[];
             /** Tool Names */
