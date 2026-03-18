@@ -39,18 +39,6 @@ class MetricResult(BaseModel):
     per_agent: dict[str, Verdict]
 
 
-class DerivedFlags(BaseModel):
-    """Composite flags derived by cross-referencing multiple evaluator results.
-
-    Attributes:
-        right_answer_wrong_reasons: True when the group reached the correct
-            decision (decision_correctness PASS) but not all private facts
-            were surfaced (fact_surfacing score < 1.0).
-    """
-
-    right_answer_wrong_reasons: bool
-
-
 class EvaluationReport(BaseModel):
     """Aggregated evaluation output for a single simulation run.
 
@@ -58,14 +46,11 @@ class EvaluationReport(BaseModel):
         simulation_id: Unique identifier of the simulation that was evaluated.
         scenario_name: Name of the scenario that was simulated.
         metrics: Collection of individual metric results from all evaluators.
-        derived: Composite flags cross-referencing multiple evaluator results.
-            None when the required evaluators were not both run.
     """
 
     simulation_id: str
     scenario_name: str
     metrics: list[MetricResult]
-    derived: DerivedFlags | None
 
 
 async def write_report(report: EvaluationReport, report_path: Path) -> None:

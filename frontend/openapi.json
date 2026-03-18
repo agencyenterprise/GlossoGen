@@ -24,6 +24,46 @@
         }
       }
     },
+    "/api/runs/{run_id}": {
+      "get": {
+        "summary": "Get Run Detail",
+        "description": "Get full detail for a specific simulation run.",
+        "operationId": "get_run_detail_api_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -46,6 +86,51 @@
   },
   "components": {
     "schemas": {
+      "AgentDetail": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "role_name": {
+            "type": "string",
+            "title": "Role Name"
+          },
+          "channel_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channel Ids"
+          },
+          "tool_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tool Names"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "role_name",
+          "channel_ids",
+          "tool_names",
+          "model",
+          "system_prompt"
+        ],
+        "title": "AgentDetail",
+        "description": "Full agent information for the run detail endpoint."
+      },
       "EndReason": {
         "type": "string",
         "enum": [
@@ -54,6 +139,75 @@
         ],
         "title": "EndReason",
         "description": "Why the simulation ended."
+      },
+      "EvalMetricResponse": {
+        "properties": {
+          "evaluator_name": {
+            "type": "string",
+            "title": "Evaluator Name"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "evidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "per_agent": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Verdict"
+            },
+            "type": "object",
+            "title": "Per Agent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluator_name",
+          "verdict",
+          "score",
+          "evidence",
+          "per_agent"
+        ],
+        "title": "EvalMetricResponse",
+        "description": "Result of a single evaluator for the run detail endpoint."
+      },
+      "EvalReportResponse": {
+        "properties": {
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/EvalMetricResponse"
+            },
+            "type": "array",
+            "title": "Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metrics"
+        ],
+        "title": "EvalReportResponse",
+        "description": "Evaluation report for the run detail endpoint."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
       },
       "HealthResponse": {
         "properties": {
@@ -75,6 +229,125 @@
         ],
         "title": "HealthStatus",
         "description": "Health check status values."
+      },
+      "MessageDetail": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "title": "Message Id"
+          },
+          "channel_id": {
+            "type": "string",
+            "title": "Channel Id"
+          },
+          "sender_agent_id": {
+            "type": "string",
+            "title": "Sender Agent Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "turn_number": {
+            "type": "integer",
+            "title": "Turn Number"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "channel_id",
+          "sender_agent_id",
+          "text",
+          "timestamp",
+          "turn_number",
+          "round_number"
+        ],
+        "title": "MessageDetail",
+        "description": "A single message with turn context for the run detail endpoint."
+      },
+      "RunDetailResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "scenario_name": {
+            "type": "string",
+            "title": "Scenario Name"
+          },
+          "scenario_description": {
+            "type": "string",
+            "title": "Scenario Description"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "total_turns": {
+            "type": "integer",
+            "title": "Total Turns"
+          },
+          "end_reason": {
+            "$ref": "#/components/schemas/EndReason"
+          },
+          "channel_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channel Ids"
+          },
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentDetail"
+            },
+            "type": "array",
+            "title": "Agents"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageDetail"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvalReportResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "scenario_name",
+          "scenario_description",
+          "timestamp",
+          "total_turns",
+          "end_reason",
+          "channel_ids",
+          "agents",
+          "messages",
+          "evaluation"
+        ],
+        "title": "RunDetailResponse",
+        "description": "Full detail of a simulation run including agents, messages, and evaluation."
       },
       "RunListResponse": {
         "properties": {
@@ -103,6 +376,10 @@
             "type": "string",
             "title": "Scenario Name"
           },
+          "scenario_description": {
+            "type": "string",
+            "title": "Scenario Description"
+          },
           "timestamp": {
             "type": "string",
             "format": "date-time",
@@ -128,6 +405,7 @@
         "required": [
           "run_id",
           "scenario_name",
+          "scenario_description",
           "timestamp",
           "total_turns",
           "end_reason",
@@ -136,6 +414,56 @@
         ],
         "title": "RunSummary",
         "description": "Summary of a single simulation run for the runs list endpoint."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Verdict": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "partial"
+        ],
+        "title": "Verdict",
+        "description": "Three-valued outcome for a single evaluation metric."
       }
     }
   }

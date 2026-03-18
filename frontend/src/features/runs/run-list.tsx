@@ -1,8 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle, Inbox, Loader2, XCircle } from "lucide-react";
+import { CheckCircle, HelpCircle, Inbox, Loader2, XCircle } from "lucide-react";
+import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
+import type { components } from "@/types/api.gen";
+import { formatTime, humanize } from "./format";
+import { ScenarioDescriptionModal } from "./scenario-description-modal";
+
+type RunSummary = components["schemas"]["RunSummary"];
 
 function formatDayHeader(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -13,41 +20,19 @@ function formatDayHeader(iso: string): string {
   });
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function dayKey(iso: string): string {
   return new Date(iso).toDateString();
 }
 
-function humanizeSnakeCase(value: string): string {
-  return value
-    .split("_")
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
+type EndReason = components["schemas"]["EndReason"];
 
-const END_REASON_LABELS: Record<string, string> = {
+const END_REASON_LABELS: Record<EndReason, string> = {
   scenario_complete: "Scenario Completed",
   error: "Error",
 };
 
-interface RunEntry {
-  run_id: string;
-  scenario_name: string;
-  timestamp: string;
-  total_turns: number;
-  end_reason: string;
-  has_evaluation: boolean;
-  run_dir: string;
-}
-
-function groupByDay(runs: RunEntry[]): Array<{ label: string; runs: RunEntry[] }> {
-  const groups = new Map<string, { label: string; runs: RunEntry[] }>();
+function groupByDay(runs: RunSummary[]): Array<{ label: string; runs: RunSummary[] }> {
+  const groups = new Map<string, { label: string; runs: RunSummary[] }>();
   for (const run of runs) {
     const key = dayKey(run.timestamp);
     const existing = groups.get(key);
@@ -61,6 +46,8 @@ function groupByDay(runs: RunEntry[]): Array<{ label: string; runs: RunEntry[] }
 }
 
 export function RunList() {
+  const [modalRun, setModalRun] = useState<RunSummary | null>(null);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["runs"],
     queryFn: async () => {
@@ -89,7 +76,7 @@ export function RunList() {
     );
   }
 
-  const runs = data?.runs ?? [];
+  const runs = data!.runs;
 
   if (runs.length === 0) {
     return (
@@ -104,16 +91,37 @@ export function RunList() {
 
   return (
     <div className="space-y-6">
+      {modalRun !== null ? (
+        <ScenarioDescriptionModal
+          scenarioName={humanize(modalRun.scenario_name)}
+          description={modalRun.scenario_description}
+          onClose={() => setModalRun(null)}
+        />
+      ) : null}
+
       {groups.map(group => (
         <div key={group.label}>
           <h2 className="mb-2 text-sm font-medium text-muted-foreground">{group.label}</h2>
           <div className="divide-y divide-border rounded-lg border border-border">
             {group.runs.map(run => (
-              <div
+              <Link
                 key={run.run_id}
+                href={`/runs/${run.run_id}`}
                 className="flex items-center gap-6 px-4 py-2.5 text-sm transition-colors hover:bg-accent/50"
               >
-                <span className="w-40 font-medium">{humanizeSnakeCase(run.scenario_name)}</span>
+                <span className="flex w-40 items-center gap-1.5 font-medium">
+                  {humanize(run.scenario_name)}
+                  <button
+                    aria-label="Scenario description"
+                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={e => {
+                      e.preventDefault();
+                      setModalRun(run);
+                    }}
+                  >
+                    <HelpCircle className="h-3.5 w-3.5" />
+                  </button>
+                </span>
                 <span className="w-20 text-muted-foreground">{formatTime(run.timestamp)}</span>
                 <span className="w-16 text-muted-foreground">{run.total_turns} turns</span>
                 <span className="w-36 text-muted-foreground">
@@ -121,7 +129,7 @@ export function RunList() {
                 </span>
                 <span className="ml-auto">
                   {run.has_evaluation ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
                       <CheckCircle className="h-3 w-3" />
                       Evaluated
                     </span>
@@ -131,7 +139,7 @@ export function RunList() {
                     </span>
                   )}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

@@ -38,6 +38,7 @@ class SimulationStarted(EventBase):
 
     event_type: Literal["simulation_started"] = "simulation_started"
     scenario_name: str
+    scenario_description: str
     channel_ids: list[str]
 
 
