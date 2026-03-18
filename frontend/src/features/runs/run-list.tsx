@@ -22,7 +22,9 @@ function dayKey(iso: string): string {
   return new Date(iso).toDateString();
 }
 
-const END_REASON_LABELS: Record<string, string> = {
+type EndReason = components["schemas"]["EndReason"];
+
+const END_REASON_LABELS: Record<EndReason, string> = {
   scenario_complete: "Scenario Completed",
   error: "Error",
 };
@@ -70,7 +72,7 @@ export function RunList() {
     );
   }
 
-  const runs = data?.runs ?? [];
+  const runs = data!.runs;
 
   if (runs.length === 0) {
     return (

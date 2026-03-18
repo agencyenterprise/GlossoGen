@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, XCircle } from "lucide-react";
@@ -19,6 +19,11 @@ export function RunDetail({ runId }: { runId: string }) {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [highlightNonce, setHighlightNonce] = useState(0);
+
+  const handleSelectChannel = useCallback((ch: string | null) => {
+    setSelectedChannel(ch);
+    setSelectedAgent(null);
+  }, []);
 
   function handleNavigateToMessage(messageId: string, channelId: string) {
     flushSync(() => {
@@ -70,9 +75,10 @@ export function RunDetail({ runId }: { runId: string }) {
   }
 
   const maxRound = data.messages.reduce((max, m) => Math.max(max, m.round_number), 0);
-  const agentModel = data.agents[0]?.model || "unknown";
+  const firstAgent = data.agents[0];
+  const agentModel = firstAgent !== undefined ? firstAgent.model : "unknown";
 
-  const hasEval = data.evaluation !== null && data.evaluation !== undefined;
+  const evaluation = data.evaluation;
   const activeAgent = data.agents.find(a => a.agent_id === selectedAgent);
   const activeAgentColor = selectedAgent ? agentColorMap.get(selectedAgent) : undefined;
 
@@ -98,7 +104,7 @@ export function RunDetail({ runId }: { runId: string }) {
       <div
         className={cn(
           "relative grid h-[calc(100vh-120px)] min-h-[500px] overflow-hidden rounded-xl border border-border bg-background",
-          hasEval ? "grid-cols-[192px_1fr_280px]" : "grid-cols-[192px_1fr]"
+          evaluation !== null ? "grid-cols-[192px_1fr_280px]" : "grid-cols-[192px_1fr]"
         )}
       >
         <RunSidebar
@@ -107,13 +113,8 @@ export function RunDetail({ runId }: { runId: string }) {
           selectedChannel={selectedChannel}
           selectedAgent={selectedAgent}
           agentColorMap={agentColorMap}
-          onSelectChannel={ch => {
-            setSelectedChannel(ch);
-            setSelectedAgent(null);
-          }}
-          onSelectAgent={agentId => {
-            setSelectedAgent(agentId);
-          }}
+          onSelectChannel={handleSelectChannel}
+          onSelectAgent={setSelectedAgent}
         />
         <ChatPane
           messages={data.messages}
@@ -127,7 +128,7 @@ export function RunDetail({ runId }: { runId: string }) {
         />
 
         {/* Eval panel */}
-        {hasEval ? <EvalPanel evaluation={data.evaluation!} /> : null}
+        {evaluation !== null ? <EvalPanel evaluation={evaluation} /> : null}
 
         {/* Agent drawer */}
         {activeAgent && activeAgentColor ? (
