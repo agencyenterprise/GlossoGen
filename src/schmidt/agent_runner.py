@@ -120,9 +120,8 @@ class AgentRunner:
             "Call pass_turn if you have nothing to add."
         )
 
-        if not messages or messages[0].role != "user":
-            messages.insert(0, LLMMessage(role="user", content=turn_context))
-        elif isinstance(messages[-1].content, str) and messages[-1].role == "user":
+        # Ensure conversation ends with a user message (required by Claude API)
+        if messages and messages[-1].role == "user" and isinstance(messages[-1].content, str):
             messages[-1] = LLMMessage(
                 role="user",
                 content=f"{messages[-1].content}\n\n{turn_context}",
