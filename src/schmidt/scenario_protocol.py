@@ -8,15 +8,15 @@ from typing import Self
 from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel
-from schmidt.models.simulation_state import SimulationState, TurnDecision
-from schmidt.tools.tool_registry import ToolRegistry
+from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 
 
 class SimulationScenario(ABC):
-    """Contract that a scenario plug-in must fulfil to be run by the simulation hub.
+    """Contract that a scenario plug-in must fulfil to run as an autonomous simulation.
 
-    Each concrete subclass defines the agents, channels, turn logic, prompt
-    injections, and tools that comprise a single simulation scenario.
+    Each concrete subclass defines the agents, channels, prompt injections,
+    tools, and timing parameters that comprise a single simulation scenario.
+    Turn order is not controlled by the scenario — agents act autonomously.
     """
 
     @classmethod
@@ -62,24 +62,11 @@ class SimulationScenario(ABC):
         ...
 
     @abstractmethod
-    async def decide_next_turn(self, state: SimulationState) -> TurnDecision | None:
-        """Determine which agent acts next given the current simulation state.
-
-        Returns None when the simulation should end.
-        """
-        ...
-
-    @abstractmethod
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return an injected prompt message for an agent at a given round.
 
         Returns None when no injection is scheduled for this round and agent.
         """
-        ...
-
-    @abstractmethod
-    def register_tools(self, registry: ToolRegistry) -> None:
-        """Register scenario-specific tools with the provided tool registry."""
         ...
 
     @abstractmethod
@@ -91,4 +78,31 @@ class SimulationScenario(ABC):
         model: str,
     ) -> EvaluationReport:
         """Run evaluators against a simulation log and write the report."""
+        ...
+
+    # --- Autonomous agent timing configuration ---
+
+    @abstractmethod
+    def get_round_count(self) -> int:
+        """Return the total number of rounds in this scenario."""
+        ...
+
+    @abstractmethod
+    def get_max_round_duration_seconds(self) -> float:
+        """Return the maximum wall-clock seconds a round may last before force-advancing."""
+        ...
+
+    @abstractmethod
+    def get_agent_reaction_delay_range(self, agent_id: str) -> tuple[float, float]:
+        """Return the (min, max) seconds an agent waits before reacting to a notification."""
+        ...
+
+    @abstractmethod
+    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+        """Return scenario-specific tools to register on the MCP server.
+
+        Each tool is exposed alongside the base communication tools
+        (check_messages, read_channel, send_message, etc.). Return an
+        empty list if the scenario has no custom tools.
+        """
         ...

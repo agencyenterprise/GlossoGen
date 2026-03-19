@@ -108,14 +108,18 @@ class FactSurfacingEvaluator(Evaluator):
         for fact_agent_id, fact_tag, fact_description in active_facts:
             judge_prompt = render_car_recall_prompt(
                 template_name="fact_surfacing_user.jinja",
-                fact_description=fact_description,
-                fact_tag=fact_tag,
-                agent_id=fact_agent_id,
-                transcript=internal_transcript,
+                template_variables={
+                    "fact_description": fact_description,
+                    "fact_tag": fact_tag,
+                    "agent_id": fact_agent_id,
+                    "transcript": internal_transcript,
+                },
             )
 
             result = await llm_provider.generate_structured(
-                system_prompt=render_evaluator_prompt(template_name="evaluator_system.jinja"),
+                system_prompt=render_evaluator_prompt(
+                    template_name="evaluator_system.jinja", template_variables={}
+                ),
                 messages=[LLMMessage(role="user", content=judge_prompt)],
                 output_schema=FactVerdictOutput,
             )

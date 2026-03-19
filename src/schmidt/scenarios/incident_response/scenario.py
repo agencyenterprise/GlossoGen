@@ -2,31 +2,35 @@
 
 Defines a three-agent scenario (Engineer, Support Lead, PM) that
 simulates an incident war room. Agents communicate through a shared
-war-room channel and pairwise private sidebar channels. Each round,
-agents rotate in a discussion until all pass or a configurable
-max-turns-per-round cap is reached, then move to scheduled sidebars.
+war-room channel and pairwise private sidebar channels. Agents act
+autonomously — the scenario defines channels, prompts, injections,
+and timing but does not control turn order.
 """
 
 import argparse
 import logging
-import random
 from pathlib import Path
-from typing import Self
+from typing import NamedTuple, Self
 
-from jinja2 import Environment, FileSystemLoader
-
-from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult, write_report
+from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
-from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
-from schmidt.llm.claude_provider import ClaudeProvider
+from schmidt.evaluation.run_evaluators import run_evaluators
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel, ChannelTemplateEntry
-from schmidt.models.simulation_state import SimulationState, TurnDecision
-from schmidt.models.tool_definition import ToolParameter, ToolSpec
+from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.tools.tool_registry import ToolRegistry
+from schmidt.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
+
+
+class AgentDef(NamedTuple):
+    """Lightweight definition of an agent before full AgentConfig construction."""
+
+    agent_id: str
+    role_name: str
+    channel_ids: list[str]
+
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -40,31 +44,8 @@ ENG_PM_ID = "eng-pm"
 SUPPORT_PM_ID = "support-pm"
 
 MAX_ROUNDS = 6
-
-PROPOSE_RESOLUTION_SPEC = ToolSpec(
-    name="propose_resolution",
-    description="Propose a resolution for the incident with a diagnosis and fix plan.",
-    parameters=[
-        ToolParameter(
-            name="diagnosis",
-            param_type="string",
-            description="The root cause diagnosis.",
-            required=True,
-        ),
-        ToolParameter(
-            name="fix_plan",
-            param_type="string",
-            description="The proposed fix plan.",
-            required=True,
-        ),
-        ToolParameter(
-            name="estimated_hours",
-            param_type="integer",
-            description="Estimated hours to implement the fix.",
-            required=True,
-        ),
-    ],
-)
+DEFAULT_REACTION_DELAY_MIN = 0.5
+DEFAULT_REACTION_DELAY_MAX = 3.0
 
 CHANNEL_DISPLAY_NAMES: dict[str, dict[str, str]] = {
     WAR_ROOM_ID: {
@@ -92,23 +73,11 @@ AGENT_DISPLAY_NAMES: dict[str, str] = {
     PM_ID: "PM",
 }
 
-WAR_ROOM_ORDER = [PM_ID, ENGINEER_ID, SUPPORT_LEAD_ID]
-
-PRIVATE_SIDEBARS: dict[int, list[tuple[str, str]]] = {
-    1: [],
-    2: [(ENG_PM_ID, ENGINEER_ID)],
-    3: [(SUPPORT_PM_ID, SUPPORT_LEAD_ID)],
-    4: [(ENG_PM_ID, PM_ID), (ENG_SUPPORT_ID, SUPPORT_LEAD_ID)],
-    5: [(ENG_PM_ID, ENGINEER_ID)],
-    6: [(ENG_PM_ID, PM_ID)],
-}
-
 AGENT_SYSTEM_TEMPLATES: dict[str, str] = {
     ENGINEER_ID: "engineer_system.jinja",
     SUPPORT_LEAD_ID: "support_lead_system.jinja",
     PM_ID: "pm_system.jinja",
 }
-
 
 AGENT_INJECTION_TEMPLATES: dict[str, str] = {
     ENGINEER_ID: "engineer_injection.jinja",
@@ -120,51 +89,29 @@ AGENT_INJECTION_TEMPLATES: dict[str, str] = {
 class IncidentResponseScenario(SimulationScenario):
     """Simulation scenario for a three-agent incident response war room.
 
-    Manages agent configuration, channel layout, turn ordering, prompt
-    rendering, and tool registration for the incident response simulation.
-    Each round starts a war-room discussion where agents rotate until all
-    pass or the max-turns-per-round cap is hit. Agent order is shuffled
-    between rotations. After the war room, scheduled sidebar discussions
-    follow the same rotation-until-all-pass pattern.
+    Defines agent configuration, channel layout, prompt rendering, and
+    tool registration. Agents act autonomously — the scenario provides
+    timing parameters and injections but does not control turn order.
     """
 
     @classmethod
     def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:
         """Register scenario-specific CLI arguments."""
         parser.add_argument(
-            "--max-turns-per-round",
-            type=int,
+            "--max-round-duration",
+            type=float,
             required=True,
-            help="Maximum number of agent turns allowed per round before forcing a transition",
+            help="Maximum seconds per round before force-advancing",
         )
 
     @classmethod
     def create(cls, args: argparse.Namespace) -> Self:
         """Construct the scenario from CLI arguments."""
-        return cls(max_turns_per_round=args.max_turns_per_round)
+        return cls(max_round_duration_seconds=args.max_round_duration)
 
-    def __init__(self, max_turns_per_round: int) -> None:
-        self._max_turns_per_round = max_turns_per_round
-        self._current_round = 0
-        self._discussion_agents: list[str] = []
-        self._discussion_channel: str = ""
-        self._rotation_index: int = -1
-        self._anyone_spoke_this_rotation: bool = False
-        self._sidebar_queue: list[tuple[str, list[str]]] = []
-        self._discussion_started: bool = False
-        self._first_rotation: bool = True
-        self._channel_members: dict[str, list[str]] = {}
-        self._turns_this_round: int = 0
-        self._jinja = Environment(
-            loader=FileSystemLoader(PROMPTS_DIR),
-            autoescape=False,
-            keep_trailing_newline=False,
-        )
-
-    def _render_template(self, template_name: str, **kwargs: object) -> str:
-        """Render a Jinja2 template from the scenario prompts directory."""
-        template = self._jinja.get_template(name=template_name)
-        return template.render(**kwargs).strip()
+    def __init__(self, max_round_duration_seconds: float) -> None:
+        self._max_round_duration_seconds = max_round_duration_seconds
+        self._renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
 
     def name(self) -> str:
         """Return the scenario identifier."""
@@ -172,14 +119,12 @@ class IncidentResponseScenario(SimulationScenario):
 
     def scenario_description(self) -> str:
         """Return a markdown description of the incident response scenario."""
-        return self._render_template(template_name="description.jinja")
+        return self._renderer.render(template_name="description.jinja", template_variables={})
 
     def _channel_template_data(
         self, agent_id: str, channel_ids: list[str]
     ) -> list[ChannelTemplateEntry]:
-        """Build a list of channel entries with display_name and
-        channel_id for use in Jinja2 system prompt templates.
-        """
+        """Build a list of channel entries for use in Jinja2 system prompt templates."""
         return [
             ChannelTemplateEntry(
                 display_name=self.get_channel_display_name(channel_id=cid, agent_id=agent_id),
@@ -189,44 +134,48 @@ class IncidentResponseScenario(SimulationScenario):
         ]
 
     def get_agents(self, default_model: str) -> list[AgentConfig]:
-        """Return agent configurations for the Engineer, Support
-        Lead, and PM.
-
-        Each agent is configured with a system prompt rendered from
-        its Jinja2 template, the channels it can participate in,
-        and its available tools.
-        """
-        agent_defs: list[tuple[str, str, list[str]]] = [
-            (ENGINEER_ID, "Engineer", [WAR_ROOM_ID, ENG_SUPPORT_ID, ENG_PM_ID]),
-            (SUPPORT_LEAD_ID, "Support Lead", [WAR_ROOM_ID, ENG_SUPPORT_ID, SUPPORT_PM_ID]),
-            (PM_ID, "PM", [WAR_ROOM_ID, ENG_PM_ID, SUPPORT_PM_ID]),
+        """Return agent configurations for the Engineer, Support Lead, and PM."""
+        agent_defs: list[AgentDef] = [
+            AgentDef(
+                agent_id=ENGINEER_ID,
+                role_name="Engineer",
+                channel_ids=[WAR_ROOM_ID, ENG_SUPPORT_ID, ENG_PM_ID],
+            ),
+            AgentDef(
+                agent_id=SUPPORT_LEAD_ID,
+                role_name="Support Lead",
+                channel_ids=[WAR_ROOM_ID, ENG_SUPPORT_ID, SUPPORT_PM_ID],
+            ),
+            AgentDef(
+                agent_id=PM_ID,
+                role_name="PM",
+                channel_ids=[WAR_ROOM_ID, ENG_PM_ID, SUPPORT_PM_ID],
+            ),
         ]
         agents: list[AgentConfig] = []
-        for agent_id, role_name, channel_ids in agent_defs:
+        for d in agent_defs:
             agents.append(
                 AgentConfig(
-                    agent_id=agent_id,
-                    role_name=role_name,
-                    system_prompt=self._render_template(
-                        template_name=AGENT_SYSTEM_TEMPLATES[agent_id],
-                        channels=self._channel_template_data(
-                            agent_id=agent_id, channel_ids=channel_ids
-                        ),
+                    agent_id=d.agent_id,
+                    role_name=d.role_name,
+                    system_prompt=self._renderer.render(
+                        template_name=AGENT_SYSTEM_TEMPLATES[d.agent_id],
+                        template_variables={
+                            "channels": self._channel_template_data(
+                                agent_id=d.agent_id, channel_ids=d.channel_ids
+                            ),
+                        },
                     ),
-                    channel_ids=channel_ids,
-                    tool_names=["send_message", "pass_turn", "propose_resolution"],
+                    channel_ids=d.channel_ids,
+                    tool_names=["propose_resolution"],
                     model=default_model,
                 )
             )
         return agents
 
     def get_channels(self) -> list[Channel]:
-        """Return the four communication channels: one shared war
-        room and three pairwise private channels.
-
-        Also caches channel membership for sidebar discussion scheduling.
-        """
-        channels = [
+        """Return the four communication channels."""
+        return [
             Channel(
                 channel_id=WAR_ROOM_ID,
                 name="war-room",
@@ -248,201 +197,31 @@ class IncidentResponseScenario(SimulationScenario):
                 member_agent_ids=[SUPPORT_LEAD_ID, PM_ID],
             ),
         ]
-        self._channel_members = {ch.channel_id: ch.member_agent_ids for ch in channels}
-        return channels
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
-        """Return the display name for a channel as seen by a specific agent.
-
-        Private channels are described from the agent's perspective
-        (e.g. "private conversation with the PM"). Falls back to the
-        raw channel_id if no mapping exists.
-        """
+        """Return the display name for a channel as seen by a specific agent."""
         return CHANNEL_DISPLAY_NAMES.get(channel_id, {}).get(agent_id, channel_id)
 
     def get_agent_display_name(self, agent_id: str) -> str:
-        """Return the human-readable display name for an agent. Falls back to the raw agent_id."""
+        """Return the human-readable display name for an agent."""
         return AGENT_DISPLAY_NAMES.get(agent_id, agent_id)
 
-    async def decide_next_turn(self, state: SimulationState) -> TurnDecision | None:
-        """Return the next turn decision, or None to end the simulation.
-
-        Rotates agents in the current discussion (war room or sidebar)
-        until all agents pass in a full rotation. Then advances to the
-        next sidebar or next round.
-        """
-        if self._discussion_started:
-            self._turns_this_round += 1
-            self._record_turn_outcome(passed=state.last_turn_passed)
-            result = self._advance_rotation()
-            if result is not None:
-                return result
-
-        return self._start_next_discussion()
-
-    def _record_turn_outcome(self, passed: bool) -> None:
-        """Record whether the last agent spoke or passed."""
-        last_agent = self._discussion_agents[self._rotation_index]
-        if passed:
-            logger.info("Agent %s passed on %s", last_agent, self._discussion_channel)
-        else:
-            self._anyone_spoke_this_rotation = True
-            logger.info("Agent %s spoke on %s", last_agent, self._discussion_channel)
-
-    def _advance_rotation(self) -> TurnDecision | None:
-        """Move to the next agent in the current rotation.
-
-        Returns the next TurnDecision, or None if the discussion
-        ended (all agents passed in a full rotation or the turn cap is reached).
-        """
-        # Check turn cap before continuing
-        if self._turns_this_round >= self._max_turns_per_round:
-            logger.info(
-                "Round %d reached max turns (%d), ending discussion on %s",
-                self._current_round,
-                self._max_turns_per_round,
-                self._discussion_channel,
-            )
-            self._discussion_started = False
-            return None
-
-        self._rotation_index += 1
-        if self._rotation_index < len(self._discussion_agents):
-            return self._current_turn_decision()
-
-        # Full rotation completed
-        if not self._anyone_spoke_this_rotation:
-            logger.info(
-                "All agents passed on %s, ending discussion",
-                self._discussion_channel,
-            )
-            self._discussion_started = False
-            return None
-
-        # Start a new rotation with shuffled order
-        self._shuffle_agents()
-        self._rotation_index = 0
-        self._anyone_spoke_this_rotation = False
-        self._first_rotation = False
-        logger.info("New rotation on %s: %s", self._discussion_channel, self._discussion_agents)
-        return self._current_turn_decision()
-
-    def _shuffle_agents(self) -> None:
-        """Shuffle the discussion agent order for the next rotation.
-
-        The last agent in the previous rotation is excluded from the
-        first position to avoid back-to-back turns.
-        """
-        last_agent = self._discussion_agents[-1]
-        others = [a for a in self._discussion_agents if a != last_agent]
-        random.shuffle(others)
-        insert_index = random.randint(1, len(others))
-        others.insert(insert_index, last_agent)
-        self._discussion_agents = others
-
-    def _current_turn_decision(self) -> TurnDecision:
-        """Build a TurnDecision for the current rotation position."""
-        return TurnDecision(
-            agent_id=self._discussion_agents[self._rotation_index],
-            round_number=self._current_round,
-            allow_pass=not self._first_rotation,
-        )
-
-    def _start_next_discussion(self) -> TurnDecision | None:
-        """Start the next discussion phase: a sidebar from the queue, or
-        the war room of the next round. Returns None when all rounds are done.
-        """
-        if self._sidebar_queue:
-            channel_id, agents = self._sidebar_queue.pop(0)
-            return self._begin_discussion(channel_id=channel_id, agents=agents)
-
-        self._current_round += 1
-        if self._current_round > MAX_ROUNDS:
-            logger.info("All %d rounds completed", MAX_ROUNDS)
-            return None
-
-        self._turns_this_round = 0
-
-        # Build sidebar queue for this round
-        self._sidebar_queue = self._build_sidebar_queue(round_number=self._current_round)
-
-        logger.info(
-            "Starting round %d/%d (war room + %d sidebars)",
-            self._current_round,
-            MAX_ROUNDS,
-            len(self._sidebar_queue),
-        )
-
-        return self._begin_discussion(
-            channel_id=WAR_ROOM_ID,
-            agents=list(WAR_ROOM_ORDER),
-        )
-
-    def _begin_discussion(self, channel_id: str, agents: list[str]) -> TurnDecision:
-        """Initialize a new rotation discussion on a channel."""
-        self._discussion_channel = channel_id
-        self._discussion_agents = agents
-        self._rotation_index = 0
-        self._anyone_spoke_this_rotation = False
-        self._first_rotation = True
-        self._discussion_started = True
-        logger.info("Starting discussion on %s with agents: %s", channel_id, agents)
-        return self._current_turn_decision()
-
-    def _build_sidebar_queue(self, round_number: int) -> list[tuple[str, list[str]]]:
-        """Build the sidebar discussion queue for a round.
-
-        Each sidebar entry becomes a two-agent discussion where both
-        agents rotate until both pass.
-        """
-        sidebars = PRIVATE_SIDEBARS.get(round_number, [])
-        queue: list[tuple[str, list[str]]] = []
-        for channel_id, initiator_id in sidebars:
-            channel_members = self._channel_members[channel_id]
-            ordered = [initiator_id] + [a for a in channel_members if a != initiator_id]
-            queue.append((channel_id, ordered))
-        if queue:
-            logger.info("Queued %d sidebar discussion(s) for round %d", len(queue), round_number)
-        return queue
-
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
-        """Return the injection message for an agent at a given round, or None if empty.
-
-        Renders the agent's injection Jinja2 template with the current
-        round number. Returns None if the agent has no injection template
-        or if the rendered result is empty.
-        """
+        """Return the injection message for an agent at a given round, or None."""
         template_name = AGENT_INJECTION_TEMPLATES.get(agent_id)
         if template_name is None:
             return None
 
-        rendered = self._render_template(template_name=template_name, round_number=round_number)
+        rendered = self._renderer.render(
+            template_name=template_name,
+            template_variables={"round_number": round_number},
+        )
         if not rendered:
             return None
         logger.debug(
             "Injection for agent %s at round %d: %d chars", agent_id, round_number, len(rendered)
         )
         return rendered
-
-    def register_tools(self, registry: ToolRegistry) -> None:
-        """Register scenario-specific tools with the tool registry.
-
-        Registers the ``propose_resolution`` tool, which allows agents
-        to submit a diagnosis, fix plan, and time estimate for the incident.
-        """
-
-        async def propose_resolution(
-            agent_id: str, diagnosis: str, fix_plan: str, estimated_hours: int
-        ) -> str:
-            return (
-                f"Resolution proposed by {agent_id}: "
-                f"Diagnosis: {diagnosis}. "
-                f"Fix: {fix_plan}. "
-                f"ETA: {estimated_hours}h"
-            )
-
-        registry.register(spec=PROPOSE_RESOLUTION_SPEC, executor=propose_resolution)
-        logger.debug("Registered scenario tool: propose_resolution")
 
     async def run_evaluation(
         self,
@@ -452,36 +231,50 @@ class IncidentResponseScenario(SimulationScenario):
         model: str,
     ) -> EvaluationReport:
         """Run evaluators and write a JSON report."""
-        events = await load_events(log_path=log_path)
-        agent_configs = extract_agent_configs(events=events)
-        simulation_id = extract_simulation_id(events=events)
-        provider = ClaudeProvider(model=model)
-
-        metrics: list[MetricResult] = []
-        for name in evaluator_names:
-            if name not in GENERIC_EVALUATOR_REGISTRY:
-                available = ", ".join(sorted(GENERIC_EVALUATOR_REGISTRY.keys()))
-                raise ValueError(f"Unknown evaluator: '{name}'. Available: {available}")
-            evaluator = GENERIC_EVALUATOR_REGISTRY[name]()
-            logger.info("Running evaluator: %s", name)
-            result = await evaluator.evaluate(
-                events=events,
-                agent_configs=agent_configs,
-                scenario=self,
-                llm_provider=provider,
-            )
-            logger.info(
-                "Evaluator %s finished: verdict=%s, score=%.2f",
-                name,
-                result.verdict,
-                result.score,
-            )
-            metrics.append(result)
-
-        report = EvaluationReport(
-            simulation_id=simulation_id,
-            scenario_name=self.name(),
-            metrics=metrics,
+        return await run_evaluators(
+            scenario=self,
+            log_path=log_path,
+            evaluator_names=evaluator_names,
+            report_path=report_path,
+            model=model,
+            evaluator_registry=dict(GENERIC_EVALUATOR_REGISTRY),
         )
-        await write_report(report=report, report_path=report_path)
-        return report
+
+    # --- Scenario-specific MCP tools ---
+
+    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+        """Return the propose_resolution tool for incident response."""
+
+        async def propose_resolution(diagnosis: str, fix_plan: str, estimated_hours: int) -> str:
+            """Propose a resolution for the incident with a diagnosis and fix plan."""
+            return (
+                "Resolution proposed. "
+                f"Diagnosis: {diagnosis}. "
+                f"Fix: {fix_plan}. "
+                f"ETA: {estimated_hours}h"
+            )
+
+        return [
+            ScenarioMcpTool(
+                name="propose_resolution",
+                description=(
+                    "Propose a resolution for the incident with a diagnosis, "
+                    "fix plan, and estimated hours to resolution."
+                ),
+                executor=propose_resolution,
+            ),
+        ]
+
+    # --- Autonomous agent timing configuration ---
+
+    def get_round_count(self) -> int:
+        """Return the total number of rounds."""
+        return MAX_ROUNDS
+
+    def get_max_round_duration_seconds(self) -> float:
+        """Return the maximum wall-clock seconds a round may last."""
+        return self._max_round_duration_seconds
+
+    def get_agent_reaction_delay_range(self, agent_id: str) -> tuple[float, float]:  # noqa: ARG002
+        """Return the (min, max) reaction delay for an agent."""
+        return (DEFAULT_REACTION_DELAY_MIN, DEFAULT_REACTION_DELAY_MAX)

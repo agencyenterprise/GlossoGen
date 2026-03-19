@@ -1,6 +1,6 @@
 # Schmidt-POC Architecture
 
-A platform for testing agent communication through real-life simulations. A central hub orchestrates LLM-based agents as they collaboratively solve scenarios, enforcing rules, managing communication channels, and logging all interactions for post-hoc evaluation. A web UI exposes simulation runs and evaluation results through a FastAPI backend and Next.js frontend.
+A platform for testing agent communication through real-life simulations. Autonomous LLM-based agents interact via MCP tools exposed by a central runtime, coordinating through communication channels while a game clock manages round progression and injection delivery. Agents are external processes (Claude Code instances launched via the Agent SDK) that connect to a shared MCP server. A web UI exposes simulation runs and evaluation results through a FastAPI backend and Next.js frontend.
 
 ## Design Decisions
 
@@ -8,18 +8,17 @@ A platform for testing agent communication through real-life simulations. A cent
 | Decision            | Choice                                                       |
 | ------------------- | ------------------------------------------------------------ |
 | LLM Backend         | Anthropic Claude (pluggable for future providers)            |
-| Transport           | In-process async (asyncio queues/events)                     |
+| Transport           | MCP over Streamable HTTP (agents are external processes)     |
 | Scenario Definition | Python classes                                               |
-| Turn Model          | Rotation until all pass, shuffled order between rotations, configurable max turns per round |
+| Agent Autonomy      | Agents decide when to speak; no central turn controller      |
+| Round Advancement   | Hybrid: all-agents-idle OR round timeout                     |
 | Channels            | Scenario-defined channels with membership lists              |
-| Agent Wake          | Coroutine await (asyncio.Event + Queue)                      |
-| Agent Memory        | Conversation history only                                    |
+| Agent Runtime       | Claude Code via Agent SDK (pluggable runner protocol)        |
+| Coordination        | Reaction delays + per-channel write locks                    |
+| Agent Framing       | Agents do not know they are in a simulation; MCP server named "comms", tools feel like Slack |
 | Observability       | Structured JSONL log (one file per run)                      |
 | Run Storage         | Filesystem: `runs/{scenario}/{unix_timestamp}/`              |
-| End Conditions      | Scenario-defined                                             |
-| Agent Actions       | Messages + tools (Claude tool-use)                           |
-| Tool Registry       | Shared, provider-agnostic; scenarios pick per role           |
-| Agent Framing       | Prompts frame the *user* as the role, not the agent          |
+| End Conditions      | Scenario-defined round count + max round duration            |
 | Entrypoint          | CLI (`python -m schmidt run|evaluate|serve`)                 |
 | Metrics             | Post-hoc LLM-as-judge, user-selected evaluators, JSON report |
 | Web Server          | FastAPI with structured Pydantic response models             |
@@ -28,202 +27,112 @@ A platform for testing agent communication through real-life simulations. A cent
 | Data Fetching       | TanStack React Query                                         |
 
 
-## File Structure
-
-```
-src/schmidt/
-  __init__.py
-  __main__.py                  # python -m schmidt entrypoint
-  cli.py                       # argparse CLI (run + evaluate + serve subcommands)
-  logging_format.py            # JsonLineFormatter for debug log output
-
-  # Core engine
-  simulation_hub.py            # SimulationHub: main orchestrator loop
-  agent_runner.py              # AgentRunner: per-agent coroutine lifecycle
-  channel_router.py            # ChannelRouter: message storage + membership validation
-  event_logger.py              # EventLogger: JSONL writer
-
-  # Data models (Pydantic)
-  models/
-    __init__.py
-    agent_config.py            # AgentConfig (id, role, system_prompt, channels, tools, model)
-    channel.py                 # Channel (id, name, member_ids)
-    message.py                 # SimulationMessage, MessageContent
-    event.py                   # SimulationEvent discriminated union (all log event types)
-    tool_definition.py         # ToolSpec, ToolParameter, ToolCallRequest, ToolCallResult
-    simulation_state.py        # SimulationState, TurnDecision
-
-  # LLM provider abstraction
-  llm/
-    __init__.py
-    provider.py                # LLMProvider ABC (generate + generate_structured), LLMMessage, LLMResponse
-    claude_provider.py         # ClaudeProvider (Anthropic SDK)
-    prompt_builder.py          # Builds message lists from channel history
-
-  # Tool system
-  tools/
-    __init__.py
-    tool_registry.py           # ToolRegistry: stores ToolSpecs + executor callables
-    tool_executor.py           # ToolExecutor: runs tools, handles errors
-    builtin_send_message.py    # Built-in send_message tool (every agent gets this)
-    builtin_pass_turn.py       # Built-in pass_turn tool (agent declines to speak)
-
-  # Scenario system
-  scenario_protocol.py         # SimulationScenario ABC
-  scenario_loader.py           # Looks up scenario classes by name from the registry
-  scenarios/
-    __init__.py                # Scenario registry mapping names to classes
-    incident_response/         # One folder per scenario
-      __init__.py              # Re-exports IncidentResponseScenario
-      scenario.py              # Scenario class (channels, turn logic, tools)
-      prompts/                 # Jinja2 templates for all prompt text
-        engineer_system.jinja
-        support_lead_system.jinja
-        pm_system.jinja
-        engineer_injection.jinja
-        support_lead_injection.jinja
-        pm_injection.jinja
-    car_recall/                # Configurable scenario with 6 tunable knobs
-      __init__.py
-      scenario.py              # CarRecallScenario (accepts CarRecallKnobs)
-      knobs.py                 # CarRecallKnobs Pydantic model + knob enums
-      channel_ids.py           # Channel ID constants (INTERNAL_ID, REGULATOR_REPORT_ID)
-      prompts/                 # Jinja2 templates with knob-conditional sections
-      evaluation/              # Car recall-specific evaluators
-        __init__.py
-        fact_surfacing_evaluator.py      # Did private facts appear in the internal channel?
-        report_divergence_evaluator.py   # Does the PR report match internal discussion?
-        decision_correctness_evaluator.py # Did the group reach the correct decision?
-        prompt_renderer.py     # Renders Jinja2 templates for car recall evaluation prompts
-        prompts/
-          fact_surfacing_user.jinja
-          report_divergence_user.jinja
-          decision_correctness_user.jinja
-
-  # Evaluation (post-hoc LLM-as-judge)
-  evaluation/
-    __init__.py
-    evaluator_registry.py      # GENERIC_EVALUATOR_REGISTRY mapping names to evaluator classes
-    log_reader.py              # Reads JSONL logs, extracts agent configs and simulation IDs
-    evaluator_protocol.py      # Evaluator ABC
-    secret_leak_evaluator.py   # Did an agent reveal confidential information?
-    instruction_adherence.py   # Did agents follow their system prompt instructions?
-    cooperation_evaluator.py   # Did agents cooperate effectively toward the goal?
-    evaluation_report.py       # Pydantic models: EvaluationReport, MetricResult, Verdict; write_report()
-    prompt_renderer.py         # Renders Jinja2 templates for generic evaluation prompts
-    transcript_builder.py      # Builds formatted transcripts from simulation events
-    prompts/                   # Jinja2 templates for generic evaluator judge prompts
-      evaluator_system.jinja
-      cooperation_user.jinja
-      instruction_adherence_user.jinja
-      secret_leak_user.jinja
-
-  # Web server (FastAPI)
-  server/
-    __init__.py
-    app.py                     # FastAPI app: lifespan, CORS, route registration
-    response_models.py         # Pydantic response models for all API endpoints
-    run_discovery.py           # Scans runs/ directory tree, parses JSONL first/last lines
-    run_detail_reader.py       # Loads JSONL log + debug log into RunDetailResponse
-    runs_router.py             # APIRouter: GET /api/runs, GET /api/runs/{id}, DELETE /api/runs/{id}
-
-frontend/                      # Next.js web application
-  package.json                 # Dependencies and scripts
-  tsconfig.json                # TypeScript strict config with @/* path alias
-  eslint.config.mjs            # ESLint flat config (no-explicit-any, restricted fetch, TS-only)
-  .prettierrc.js               # Prettier config
-  .prettierignore              # Excludes generated api.gen.ts from formatting
-  .stylelintrc.json            # Stylelint with Tailwind at-rules
-  postcss.config.mjs           # PostCSS with @tailwindcss/postcss
-  next.config.ts               # Next.js config (standalone output)
-  openapi.json                 # Generated OpenAPI schema from backend
-  src/
-    app/
-      globals.css              # Tailwind v4 imports, CSS custom properties, light/dark theme
-      layout.tsx               # Root layout (Geist fonts, QueryProvider)
-      page.tsx                 # Redirects to /runs
-      runs/
-        page.tsx               # Runs list page
-    features/
-      runs/
-        run-list.tsx           # Client component: fetches and displays simulation runs
-        run-detail.tsx         # Run detail page: merges messages + reasoning, manages panels
-        chat-pane.tsx          # Message timeline grouped by round/turn
-        agent-drawer.tsx       # Agent detail overlay (system prompt, messages, verdicts)
-        display-entry.ts       # DisplayEntry type and mergeEntries() for ChannelMessage + ReasoningEntry
-        log-panel.tsx          # Debug log viewer (monospace, color-coded by level)
-        eval-panel.tsx         # Evaluation results panel
-        run-sidebar.tsx        # Left sidebar: channels, agents, logs navigation
-    shared/
-      components/ui/           # Shared UI components
-      lib/
-        api-client.ts          # openapi-fetch typed client (all API calls go through this)
-        cn.ts                  # className utility (clsx + tailwind-merge)
-      providers/
-        query-provider.tsx     # TanStack React Query client provider
-    types/
-      api.gen.ts               # Auto-generated TypeScript types from OpenAPI schema
-
-scripts/
-  export_openapi.py            # Exports FastAPI OpenAPI schema to stdout as JSON
-```
 
 ## Simulation Flow
 
-1. **CLI** parses arguments in two passes (first to identify the scenario, then to include scenario-specific flags). Calls `scenario.get_agents()` to obtain agent configs, builds a per-agent LLM provider mapping, creates the tool registry and event logger, and passes all of these into the `SimulationHub` constructor.
-2. **SimulationHub.run()** uses the agents already provided at construction time. Calls `scenario.get_channels()` and `scenario.register_tools()`, creates a ChannelRouter, spawns one AgentRunner coroutine per agent (each immediately awaits its wake event), and logs `SimulationStarted` and one `AgentRegistered` event per agent.
-3. **Main loop**: Builds SimulationState from ChannelRouter, turn counter, and `last_turn_passed` (whether the previous agent sent any messages). Asks the scenario for the next turn via `decide_next_turn`, receiving a `TurnDecision` (which agent, which round, whether passing is allowed) or `None` to end. Logs `TurnAssigned`, delivers the decision to the agent's queue, and sets its wake event. Awaits the agent's done signal. After the agent finishes, checks whether any messages were sent — if not, `last_turn_passed` is set to `True`.
-4. **Agent turn**: The agent wakes, reads its TurnDecision, and the PromptBuilder constructs a conversation from visible channel history. If `allow_pass` is False (first rotation), the `pass_turn` tool is removed from available tools. The LLM is called with the system prompt, messages, and available tools. The agent can send multiple messages to any channel and call `pass_turn` to decline speaking. Tool calls are executed in a loop (max 10 iterations). After `pass_turn` is called, both `send_message` and `pass_turn` are removed and the loop ends. After any `send_message`, `pass_turn` is removed.
-5. **Rotation**: Scenarios implement `decide_next_turn` as a rotation loop. Agents take turns in order. When a full rotation completes: if nobody sent a message, the discussion ends; otherwise, the order is shuffled (last speaker excluded from first position) and a new rotation starts. A configurable `max_turns_per_round` cap forces the discussion to end after a set number of turns.
-5. **End**: When the scenario returns `None` or its end condition is met, the hub logs `SimulationEnded`, cancels agent tasks, and closes the logger.
+1. **CLI** parses arguments in two passes (first to identify the scenario, then to include scenario-specific flags). Builds the scenario, agent configs, event logger, and agent runner. Passes everything into the `AutonomousSupervisor`.
+2. **AutonomousSupervisor.run()** opens the event logger, builds per-agent `AgentSession` objects (with scenario-defined reaction delay ranges), creates the `SimulationRuntime` (FastMCP server), and wires a `GameClock`. Logs `SimulationStarted` and one `AgentRegistered` event per agent.
+3. **MCP server starts** on a configured port, exposing the `comms` MCP server. Agent runners are launched as concurrent asyncio tasks, each starting an external Claude Code process connected to the MCP server URL.
+4. **Game clock delivers round-1 injections** as `NewInfoNotification` messages pushed to agent session queues. Agents receive these via the `check_messages` MCP tool and begin interacting.
+5. **Agents act autonomously** by calling MCP tools: `check_messages` (blocks until a notification arrives), `read_channel` (fetches recent messages), `send_message` (posts to a channel), `list_channels` (discovers available channels), and `get_channel_members` (sees who is in a channel). There is no central turn controller.
+6. **Round advancement** uses a hybrid condition. The game clock polls at 500ms intervals and advances the round when either (a) all agents are idle (blocked on `check_messages` with empty queues) or (b) the round duration exceeds `max_round_duration_seconds` since the last message. When a round advances, the game clock delivers injections for the new round to the appropriate agents.
+7. **Termination** occurs when the game clock reaches `max_rounds`. The runtime broadcasts a `DoneNotification` to all agents, waits up to 30 seconds for agent tasks to finish, and logs `SimulationEnded` with total message count.
 
-## Run Storage
+## MCP Tools
 
-All simulation outputs use a standard directory layout:
+The `SimulationRuntime` registers five MCP tools on a FastMCP server named `comms`. Agents interact with the simulation exclusively through these tools.
 
-```
-runs/{scenario_name}/{unix_timestamp}/
-├── {scenario_name}.jsonl          # Event log (one JSON object per line)
-├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, visible in FE)
-├── {scenario_name}_report.json    # Evaluation report (written by evaluate command)
-```
+| Tool                 | Parameters                          | Behavior                                                                                                    |
+| -------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `check_messages`     | *(none)*                   | Blocks until a notification arrives in the agent's queue. Applies a random reaction delay before returning.  |
+| `read_channel`       | `channel_id`, `last_n`     | Returns the last N messages from a channel the agent belongs to. Validates membership.                      |
+| `send_message`       | `channel_id`, `text`       | Posts a message under a per-channel write lock, notifies other channel members, fires on-message callbacks.  |
+| `list_channels`      | *(none)*                   | Returns channels the agent belongs to with scenario-defined display names.                                  |
+| `get_channel_members`| `channel_id`               | Returns the members of a channel with display names. Validates membership.                                  |
 
-The CLI `run` command computes the output path automatically from `--runs-dir`, the scenario name, and the current unix timestamp. The `evaluate` command takes `--run-dir` pointing to a specific run directory and writes the report as a sibling to the JSONL file.
+Agent identity is resolved from the MCP connection URL query parameter (`?agent_id=engineer`), not from tool arguments. Agents cannot impersonate each other.
 
-The web server scans this directory tree to discover runs, reading the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total turns, end reason) without loading the full log.
+Agents see these as generic communication primitives (the MCP server is named `comms`), not simulation APIs.
 
-## Wake-Up Pattern
+## Agent Runners
 
-```
-Hub                          AgentRunner
- |                                |
- |-- put(TurnDecision) --------->| (queue)
- |-- wake_event.set() ---------->| await wake_event.wait()
- |                                |-- process turn (LLM + tools)
- |  await agent_done.wait() <----| agent_done.set()
- |                                |
-```
+Agent runners launch and manage external agent processes that connect to the MCP server. The `AgentRunner` ABC defines a single method: `start(agent_config, mcp_server_url)`. Each runner instance handles one agent.
 
-One agent is awake at a time. Extensible to parallel turns by setting multiple wake events and using `asyncio.gather` on done events.
+**ClaudeCodeRunner** is the primary implementation. It uses the Claude Agent SDK to launch a Claude Code instance with:
+- The agent's system prompt (from `AgentConfig`)
+- A single MCP server connection (`comms`) pointing to the runtime's HTTP endpoint
+- An allowed-tools list built from base MCP tools plus scenario-specific tools from `AgentConfig.tool_names`
+- A configurable `max_turns` limit (default: 200)
+- An initial prompt instructing the agent to start by checking for messages
+
+The runner streams agent activity via `query()` and exits when the agent finishes or receives a done notification via `check_messages`. The supervisor creates a new `ClaudeCodeRunner` per agent.
+
+## Game Clock
+
+The `GameClock` runs as an asyncio task and manages three responsibilities:
+
+1. **Round progression**: Polls at 500ms intervals, checking two advancement conditions:
+   - *All agents idle*: Every agent is blocked on `check_messages` with an empty notification queue.
+   - *Round timeout*: Time since the last message exceeds `max_round_duration_seconds`.
+2. **Injection delivery**: When a round advances, the clock calls `scenario.get_injection(round_number, agent_id)` for each agent and pushes `NewInfoNotification` to agents that have injections scheduled. Logs an `InjectionDelivered` event for each.
+3. **Termination**: When `current_round >= max_rounds` and an advancement trigger fires, the clock returns `RunStatus.SCENARIO_COMPLETE` to the supervisor.
+
+The game clock receives a callback from the runtime (via `add_on_message_callback`) that resets the quiet-period timer whenever a message is sent.
+
+## Agent Sessions
+
+Each agent has an `AgentSession` that tracks:
+
+- **Notification queue**: An `asyncio.Queue` of `ActivityNotification` objects (new messages, new info, done).
+- **Idle flag**: Set to `True` when the agent is blocked on `wait_for_notification()`, `False` when a notification arrives or is pushed.
+- **Reaction delay**: A `(min, max)` range (configured per-agent by the scenario). When `check_messages` returns, the runtime sleeps for a random duration in this range before delivering the notification.
+
+The idle flag is how the game clock determines whether all agents have finished processing.
+
+## Activity Notifications
+
+Three notification types flow through agent session queues:
+
+- **NewMessagesNotification**: One or more messages appeared in channels the agent belongs to. Contains a list of channel IDs.
+- **NewInfoNotification**: New information delivered from a scenario injection. Contains the injection text.
+- **DoneNotification**: The simulation has ended. Contains the termination reason.
+
+## Coordination Mechanisms
+
+Two mechanisms prevent message collisions and produce realistic timing:
+
+1. **Per-channel write locks**: Each channel has an `asyncio.Lock`. The `send_message` tool acquires the lock before appending a message and notifying other members. This serializes writes to the same channel.
+2. **Reaction delays**: After an agent receives a notification via `check_messages`, the runtime applies a random delay (sampled from the agent's configured range) before returning the result. This staggers agent responses and prevents simultaneous reactions.
 
 ## Channel and Message Routing
 
-The ChannelRouter is the single source of truth for message storage and delivery.
+The ChannelRouter stores messages and validates membership.
 
 - Scenarios define channels with membership lists (e.g., "planning-meeting" with all agents, "eng-private" with two agents).
 - The scenario provides per-agent display names for each channel via `get_channel_display_name(channel_id, agent_id)` (e.g., the engineer sees "private conversation with the PM" while the PM sees "private conversation with the engineer" for the same channel). Agents never see technical channel IDs.
-- The `send_message` tool validates agent membership before appending a message to a channel.
-- The PromptBuilder merges messages from all channels visible to an agent, sorted chronologically. The agent's own messages use the "assistant" role; all others use the "user" role.
+- The scenario provides per-agent display names via `get_agent_display_name(agent_id)`, used when rendering message history in `read_channel`.
+- The `send_message` MCP tool validates agent membership before appending a message to a channel.
 
-## Tool System
+## Scenario Protocol
 
-Three layers keep tools provider-agnostic:
+The `SimulationScenario` ABC defines the contract for scenario plug-ins:
 
-1. **ToolSpec**: A provider-independent definition with name, description, and typed parameters.
-2. **LLM Provider**: Translates ToolSpecs into the provider's native format (e.g., Anthropic's tool schema, OpenAI's function calling format).
-3. **ToolExecutor**: Runs the actual tool function and returns a ToolCallResult.
+- `add_cli_arguments(parser)` — register scenario-specific CLI arguments
+- `create(args)` — construct a scenario instance from parsed CLI arguments
+- `name()` — unique identifier for this scenario
+- `scenario_description()` — markdown description of the scenario
+- `get_agents(default_model)` — agent configs (id, role, system prompt, channels, tools, model)
+- `get_channels()` — communication channels with membership lists
+- `get_channel_display_name(channel_id, agent_id)` — per-agent channel display name
+- `get_agent_display_name(agent_id)` — human-readable agent name
+- `get_injection(round_number, agent_id)` — injection text for a given round and agent (or `None`)
+- `get_mcp_tools()` — scenario-specific MCP tools to register alongside base communication tools
+- `get_round_count()` — total number of rounds
+- `get_max_round_duration_seconds()` — max wall-clock seconds per round before force-advancing
+- `get_agent_reaction_delay_range(agent_id)` — `(min, max)` reaction delay in seconds
+- `run_evaluation(log_path, evaluator_names, report_path, model)` — run evaluators and write report
 
-Every agent gets two built-in tools: `send_message(channel_id, text)` for posting to channels and `pass_turn(reason)` for declining to speak. Scenarios select additional tools from the shared registry per agent role. The AgentRunner enforces a hard maximum of 10 tool calls per turn to prevent infinite loops. Agents can send multiple messages per turn to any channel they are a member of. After calling `pass_turn`, both `send_message` and `pass_turn` are removed to end the turn. After calling `send_message`, `pass_turn` is removed (cannot pass after speaking). On the first rotation of a discussion, `pass_turn` is not available (`allow_pass=False` in TurnDecision). The `generate()` method on LLMProvider accepts a `force_tool_use` parameter that sets `tool_choice: {"type": "any"}` in the API call when enabled.
+Scenarios do not control turn order. They define timing parameters that the game clock uses for round advancement and coordination.
 
 ## Agent Prompt Framing
 
@@ -239,22 +148,40 @@ The system prompt reads:
 
 This keeps agents grounded as genuine assistants (which they are), avoids roleplay artifacts, and makes secret-leak evaluation more meaningful — confidential information is shared as trusted context between user and assistant.
 
+Agents do not know they are in a simulation. The MCP server is named `comms` and the tools are named after generic communication primitives (`check_messages`, `read_channel`, `send_message`). From the agent's perspective, it is connected to a messaging system.
+
 ## Event Log
 
 Every simulation event is serialized as one JSON object per line in a JSONL file (one file per run).
 
 Event types (discriminated union on `event_type`):
 
-- `simulation_started` — scenario name, channel IDs
-- `agent_registered` — agent ID, role name, system prompt, channel IDs, tool names (one per agent)
-- `turn_assigned` — which agent, turn number, round number
+- `simulation_started` — scenario name, scenario description, channel IDs
+- `agent_registered` — agent ID, role name, system prompt, channel IDs, tool names, model
+- `agent_connected` — agent ID, role name, model (emitted when an autonomous agent connects)
+- `round_advanced` — new round number, trigger reason (`simulation_start`, `all_agents_idle`, `round_timeout`)
+- `injection_delivered` — agent ID, round number, injection text
 - `message_sent` — full SimulationMessage (channel, sender, content, timestamp)
-- `tool_called` — agent ID, tool name, arguments
-- `tool_result_returned` — agent ID, tool name, output, is_error
+- `tool_called` — agent ID, ToolCallRequest (name, arguments, call ID)
+- `tool_result_returned` — agent ID, ToolCallResult (call ID, output, is_error)
 - `llm_request_sent` — agent ID, system prompt, messages, tool names
 - `llm_response_received` — agent ID, text, tool calls, stop reason, token usage
-- `turn_passed` — agent ID, reason (emitted when agent calls pass_turn)
-- `simulation_ended` — reason, total turns
+- `simulation_ended` — reason (RunStatus enum), total_messages (int)
+
+## Run Storage
+
+All simulation outputs use a standard directory layout:
+
+```
+runs/{scenario_name}/{unix_timestamp}/
+├── {scenario_name}.jsonl          # Event log (one JSON object per line)
+├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, visible in FE)
+├── {scenario_name}_report.json    # Evaluation report (written by evaluate command)
+```
+
+The CLI `run` command computes the output path automatically from `--runs-dir`, the scenario name, and the current unix timestamp. The `evaluate` command takes `--run-dir` pointing to a specific run directory and writes the report as a sibling to the JSONL file.
+
+The web server scans this directory tree to discover runs, reading the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total messages, end reason) without loading the full log.
 
 ## Evaluation System
 

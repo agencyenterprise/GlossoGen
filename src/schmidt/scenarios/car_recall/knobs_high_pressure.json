@@ -4,6 +4,5 @@
   "regulator_pressure": "high",
   "agent_count": "five",
   "information_overlap": "low",
-  "max_turns_per_round": 10,
   "model_overrides": {}
 }

@@ -207,8 +207,8 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
-            /** Total Turns */
-            total_turns: number;
+            /** Total Messages */
+            total_messages: number;
             status: components["schemas"]["RunStatus"];
             /** Channel Ids */
             channel_ids: string[];
@@ -252,8 +252,8 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
-            /** Total Turns */
-            total_turns: number;
+            /** Total Messages */
+            total_messages: number;
             status: components["schemas"]["RunStatus"];
             /** Has Evaluation */
             has_evaluation: boolean;

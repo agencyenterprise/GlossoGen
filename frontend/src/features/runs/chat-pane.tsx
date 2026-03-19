@@ -155,13 +155,13 @@ export function ChatPane({
               <div className="h-px flex-1 bg-border" />
             </div>
 
-            {round.turns.map(turn => {
+            {round.turns.map((turn, turnIdx) => {
               const agent = agentMap.get(turn.agentId);
               const color = agentColorMap.get(turn.agentId);
 
               return (
                 <div
-                  key={`${turn.turnNumber}-${turn.agentId}`}
+                  key={`${round.roundNumber}-${turnIdx}-${turn.agentId}`}
                   className="flex gap-2.5 px-4 py-1 transition-colors hover:bg-muted/50"
                 >
                   <div className="flex w-7 shrink-0 flex-col items-start">

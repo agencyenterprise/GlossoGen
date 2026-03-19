@@ -56,13 +56,13 @@ class AgentRegistered(EventBase):
     model: str
 
 
-class TurnAssigned(EventBase):
-    """Emitted when a turn is assigned to an agent."""
+class AgentConnected(EventBase):
+    """Emitted when an autonomous agent connects to the simulation runtime."""
 
-    event_type: Literal["turn_assigned"] = "turn_assigned"
+    event_type: Literal["agent_connected"] = "agent_connected"
     agent_id: str
-    turn_number: int
-    round_number: int
+    role_name: str
+    model: str
 
 
 class MessageSent(EventBase):
@@ -113,12 +113,21 @@ class LLMResponseReceived(EventBase):
     usage: TokenUsage
 
 
-class TurnPassed(EventBase):
-    """Emitted when an agent calls pass_turn to decline speaking on their turn."""
+class RoundAdvanced(EventBase):
+    """Emitted when the game clock advances to a new round."""
 
-    event_type: Literal["turn_passed"] = "turn_passed"
+    event_type: Literal["round_advanced"] = "round_advanced"
+    new_round_number: int
+    trigger: str
+
+
+class InjectionDelivered(EventBase):
+    """Emitted when a scenario injection is delivered to an agent."""
+
+    event_type: Literal["injection_delivered"] = "injection_delivered"
     agent_id: str
-    reason: str
+    round_number: int
+    text: str
 
 
 class RunStatus(str, Enum):
@@ -131,25 +140,26 @@ class RunStatus(str, Enum):
 
 class SimulationEnded(EventBase):
     """Emitted once when the simulation finishes, recording the
-    termination reason and turn count.
+    termination reason and message count.
     """
 
     event_type: Literal["simulation_ended"] = "simulation_ended"
     reason: RunStatus
-    total_turns: int
+    total_messages: int
 
 
 SimulationEvent = Annotated[
     Union[
         SimulationStarted,
         AgentRegistered,
-        TurnAssigned,
+        AgentConnected,
         MessageSent,
         ToolCalled,
         ToolResultReturned,
         LLMRequestSent,
         LLMResponseReceived,
-        TurnPassed,
+        RoundAdvanced,
+        InjectionDelivered,
         SimulationEnded,
     ],
     Discriminator("event_type"),

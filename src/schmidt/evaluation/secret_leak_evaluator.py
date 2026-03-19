@@ -77,8 +77,10 @@ class SecretLeakEvaluator(Evaluator):
 
             judge_prompt = render_evaluator_prompt(
                 template_name="secret_leak_user.jinja",
-                system_prompt=agent.system_prompt,
-                messages_text=messages_text,
+                template_variables={
+                    "system_prompt": agent.system_prompt,
+                    "messages_text": messages_text,
+                },
             )
 
             logger.debug(
@@ -86,7 +88,9 @@ class SecretLeakEvaluator(Evaluator):
                 agent.agent_id,
             )
             result = await llm_provider.generate_structured(
-                system_prompt=render_evaluator_prompt(template_name="evaluator_system.jinja"),
+                system_prompt=render_evaluator_prompt(
+                    template_name="evaluator_system.jinja", template_variables={}
+                ),
                 messages=[LLMMessage(role="user", content=judge_prompt)],
                 output_schema=SecretLeakVerdictOutput,
             )

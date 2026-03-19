@@ -124,8 +124,8 @@ export function AgentDrawer({
         ) : null}
         {activeTab === "messages" ? (
           <div className="py-2">
-            {turnGroups.map(turn => (
-              <div key={turn.turnNumber} className="flex gap-2.5 px-5 py-2">
+            {turnGroups.map((turn, turnIdx) => (
+              <div key={`${turnIdx}-${turn.turnNumber}`} className="flex gap-2.5 px-5 py-2">
                 <div className="flex w-5 shrink-0 flex-col items-center justify-center">
                   <span className="text-[10px] font-medium leading-none text-muted-foreground/50">
                     {turn.turnNumber}

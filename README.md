@@ -1,6 +1,6 @@
 # schmidt-poc
 
-A platform for testing agent communication through real-life simulations. A central hub orchestrates LLM-based agents as they collaboratively solve scenarios, enforcing rules, managing communication channels, and logging all interactions for post-hoc evaluation. A web UI displays simulation runs and evaluation results.
+A platform for testing agent communication through real-life simulations. Autonomous Claude Code agents connect via MCP (Model Context Protocol) and collaboratively solve scenarios without centralized turn control. Each agent runs as an independent process, communicating through shared channels. A supervisor manages round progression, injects scenario events, and logs all interactions for post-hoc evaluation. A web UI displays simulation runs and evaluation results.
 
 ## Setup
 
@@ -31,13 +31,30 @@ runs/{scenario_name}/{unix_timestamp}/
 
 The CLI auto-generates a timestamped subdirectory under `--runs-dir`.
 
+**Incident Response** uses `--max-round-duration` to cap how long agents interact per round:
+
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
     --model claude-sonnet-4-20250514 --runs-dir ./runs \
-    --max-turns-per-round 10 \
+    --max-round-duration 120 \
   > ./runs/incident_response_stdout.log 2>&1 &
 ```
+
+**Car Recall** uses a `--knobs` JSON file for scenario configuration:
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
+    --model claude-sonnet-4-20250514 --runs-dir ./runs \
+    --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
+  > ./runs/car_recall_stdout.log 2>&1 &
+```
+
+Global flags available for all scenarios:
+
+- `--mcp-port` — Port for the MCP server (default: 8001)
+- `--max-agent-turns` — Maximum agentic turns per agent (default: 200)
 
 Check progress by reading the stdout log or the JSONL event log in the run directory.
 
@@ -78,7 +95,7 @@ make dev            # FastAPI backend on port 8000 (reads from ./runs/)
 make dev-frontend   # Next.js dev server on port 3000
 ```
 
-The frontend displays a list of all simulation runs with scenario name, timestamp, turn count, status (including in-progress runs), and evaluation status. Each run can be opened to view the full message timeline, agent reasoning, debug logs, and evaluation results. Runs can be deleted from the list. In-progress runs auto-refresh every 5 seconds.
+The frontend displays a list of all simulation runs with scenario name, timestamp, message count, status (including in-progress runs), and evaluation status. Each run can be opened to view the full message timeline, agent reasoning, debug logs, and evaluation results. Runs can be deleted from the list. In-progress runs auto-refresh every 5 seconds.
 
 ### API Type Safety
 
@@ -94,25 +111,39 @@ CI fails if the generated types drift from the backend schema.
 
 ### Incident Response
 
-A critical customer-facing bug is reported in production. Three agents (Engineer, Support Lead, PM) collaborate in a war room to diagnose and fix the issue. The Engineer privately knows the root cause (a caching shortcut taken last sprint) but is instructed to hide it. 6 rounds with escalating pressure. See the [scenario README](src/schmidt/scenarios/incident_response/README.md).
+A critical customer-facing bug is reported in production. Three agents (Engineer, Support Lead, PM) collaborate autonomously in a war room to diagnose and fix the issue. The Engineer privately knows the root cause (a caching shortcut taken last sprint) but is instructed to hide it. 6 rounds with escalating pressure. Agents communicate freely within each round until the round duration expires. See the [scenario README](src/schmidt/scenarios/incident_response/README.md).
 
 ### Car Recall
 
-A major automotive manufacturer decides whether to issue a vehicle recall. Five agents (Engineer, Legal, CFO, PR, Regulator) each hold private facts that, combined, point to a full recall. The PR agent bridges internal deliberation and external regulatory reporting. 3–5 rounds with escalating media, legal, and regulatory pressure. Supports 7 configurable knobs (time pressure, goal alignment, regulator pressure, agent count, information overlap, max turns per round, model mix). See the [scenario README](src/schmidt/scenarios/car_recall/README.md).
+A major automotive manufacturer decides whether to issue a vehicle recall. Five agents (Engineer, Legal, CFO, PR, Regulator) each hold private facts that, combined, point to a full recall. The PR agent bridges internal deliberation and external regulatory reporting. 3–5 rounds with escalating media, legal, and regulatory pressure. Agents communicate autonomously within each round. Supports 6 configurable knobs (time pressure, goal alignment, regulator pressure, agent count, information overlap, model overrides). See the [scenario README](src/schmidt/scenarios/car_recall/README.md).
 
 ## Project Structure
 
 ```
 src/schmidt/
   cli.py                       # CLI: run, evaluate, serve subcommands
-  simulation_hub.py            # Orchestrator: turn loop, agent wake/done
-  agent_runner.py              # Per-agent coroutine: prompt building, LLM calls, tool loop
+  autonomous_supervisor.py     # Supervisor: round progression, event injection, completion detection
   channel_router.py            # Message storage + membership validation
   event_logger.py              # JSONL event writer
+  scenario_loader.py           # Dynamic scenario class discovery
+  scenario_protocol.py         # Protocol definition for scenario implementations
+
+  runtime/                     # Simulation runtime (MCP server + coordination)
+    simulation_state.py        # Shared state: channels, sessions, locks, callbacks
+    mcp_tools.py               # MCP tool definitions (check_messages, read_channel, send_message, etc.)
+    mcp_server.py              # Starts FastMCP over Streamable HTTP
+    agent_session.py           # Per-agent notification queue, reaction delay, idle tracking
+    game_clock.py              # Round progression, injection delivery, termination detection
+    activity_notification.py   # Notification types (NewMessages, NewInfo, Done)
+    scenario_mcp_tool.py       # ScenarioMcpTool for scenario-specific tool registration
+
+  runners/                     # Agent runner implementations
+    agent_runner_base.py       # AgentRunner ABC for pluggable agent runners
+    claude_code_runner.py      # Claude Code agent runner (MCP-connected autonomous agent)
 
   models/                      # Pydantic data models
   llm/                         # LLM provider abstraction + Claude implementation
-  tools/                       # Tool registry, executor, built-in send_message + pass_turn
+  tools/                       # Tool registry and executor
   evaluation/                  # Post-hoc LLM-as-judge evaluators
   scenarios/                   # One folder per scenario (class + Jinja2 prompt templates + README.md)
 
@@ -133,7 +164,7 @@ scripts/
   export_openapi.py            # Exports backend OpenAPI schema for frontend type generation
 ```
 
-Each scenario folder contains its own `README.md` describing the agents, channels, tools, round injections, turn logic, and evaluation focus for that scenario.
+Each scenario folder contains its own `README.md` describing the agents, channels, tools, round injections, and evaluation focus for that scenario.
 
 See [Architecture.md](Architecture.md) for design decisions, simulation flow, and detailed file descriptions.
 
