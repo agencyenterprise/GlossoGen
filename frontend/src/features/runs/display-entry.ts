@@ -8,6 +8,7 @@ type ReasoningEntry = components["schemas"]["ReasoningEntry"];
 export interface DisplayEntry {
   message_id: string;
   channel_id: string;
+  channel_ids: string[];
   sender_agent_id: string;
   text: string;
   timestamp: string;
@@ -24,6 +25,7 @@ export function mergeEntries(
   const channelEntries: DisplayEntry[] = messages.map(m => ({
     message_id: m.message_id,
     channel_id: m.channel_id,
+    channel_ids: [m.channel_id],
     sender_agent_id: m.sender_agent_id,
     text: m.text,
     timestamp: m.timestamp,
@@ -35,6 +37,7 @@ export function mergeEntries(
   const reasoningEntries: DisplayEntry[] = reasoning.map(r => ({
     message_id: r.message_id,
     channel_id: "",
+    channel_ids: r.channel_ids,
     sender_agent_id: r.sender_agent_id,
     text: r.text,
     timestamp: r.timestamp,

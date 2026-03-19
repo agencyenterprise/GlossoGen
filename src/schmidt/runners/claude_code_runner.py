@@ -8,8 +8,15 @@ continue the loop.
 
 import logging
 
-from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ResultMessage, UserMessage, query
-from claude_agent_sdk.types import McpHttpServerConfig, TextBlock, ToolUseBlock
+from claude_agent_sdk import (
+    AssistantMessage,
+    ClaudeAgentOptions,
+    ResultMessage,
+    SystemMessage,
+    UserMessage,
+    query,
+)
+from claude_agent_sdk.types import McpHttpServerConfig, TextBlock, ThinkingBlock, ToolUseBlock
 
 from schmidt.event_logger import EventLogger
 from schmidt.models.agent_config import AgentConfig
@@ -144,7 +151,9 @@ class ClaudeCodeRunner(AgentRunner):
                         text_parts: list[str] = []
                         tool_calls: list[ToolCallRequest] = []
                         for block in message.content:
-                            if isinstance(block, TextBlock):
+                            if isinstance(block, ThinkingBlock):
+                                text_parts.append(block.thinking)
+                            elif isinstance(block, TextBlock):
                                 text_parts.append(block.text)
                             elif isinstance(block, ToolUseBlock):
                                 tool_calls.append(
@@ -190,6 +199,13 @@ class ClaudeCodeRunner(AgentRunner):
                         )
                         if "'done'" in content or '"done"' in content:
                             got_done = True
+                    elif isinstance(message, SystemMessage):
+                        logger.debug(
+                            "Agent %s system message: subtype=%s data=%s",
+                            agent_config.agent_id,
+                            message.subtype,
+                            message.data,
+                        )
                     else:
                         logger.debug(
                             "Agent %s activity: %s",

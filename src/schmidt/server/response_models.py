@@ -64,7 +64,12 @@ class ChannelMessage(BaseModel):
 
 
 class ReasoningEntry(BaseModel):
-    """An LLM reasoning/thinking entry from an agent's turn."""
+    """An LLM reasoning/thinking entry from an agent's turn.
+
+    ``channel_ids`` links this reasoning to the channels of the surrounding
+    send_message calls from the same agent, so the frontend can show only
+    reasoning relevant to the selected channel.
+    """
 
     message_id: str
     sender_agent_id: str
@@ -72,6 +77,7 @@ class ReasoningEntry(BaseModel):
     timestamp: datetime
     turn_number: int
     round_number: int
+    channel_ids: list[str]
 
 
 class DebugLogEntry(BaseModel):

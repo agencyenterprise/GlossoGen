@@ -173,6 +173,10 @@ export interface components {
         /**
          * ReasoningEntry
          * @description An LLM reasoning/thinking entry from an agent's turn.
+         *
+         *     ``channel_ids`` links this reasoning to the channels of the surrounding
+         *     send_message calls from the same agent, so the frontend can show only
+         *     reasoning relevant to the selected channel.
          */
         ReasoningEntry: {
             /** Message Id */
@@ -190,6 +194,8 @@ export interface components {
             turn_number: number;
             /** Round Number */
             round_number: number;
+            /** Channel Ids */
+            channel_ids: string[];
         };
         /**
          * RunDetailResponse
