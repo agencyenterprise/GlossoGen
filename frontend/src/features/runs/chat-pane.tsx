@@ -118,13 +118,12 @@ export function ChatPane({
     return map;
   }, [agents]);
 
-  const filtered = useMemo(
-    () =>
-      selectedChannel === null
-        ? messages
-        : messages.filter(m => m.is_reasoning || m.channel_id === selectedChannel),
-    [messages, selectedChannel]
-  );
+  const filtered = useMemo(() => {
+    if (selectedChannel === null) {
+      return messages;
+    }
+    return messages.filter(m => m.channel_ids.includes(selectedChannel));
+  }, [messages, selectedChannel]);
 
   const rounds = useMemo(() => groupByRoundAndTurn(filtered), [filtered]);
   const showChannelBadge = selectedChannel === null;
@@ -133,6 +132,20 @@ export function ChatPane({
   if (selectedChannel !== null) {
     headerName = humanize(selectedChannel);
   }
+
+  const headerMembers = useMemo(() => {
+    if (selectedChannel === null) {
+      return null;
+    }
+    const members = agents
+      .filter(a => a.channel_ids.includes(selectedChannel))
+      .map(a => a.role_name);
+    if (members.length === 0) {
+      return null;
+    }
+    return members.join(", ");
+  }, [selectedChannel, agents]);
+
   const headerDesc =
     selectedChannel === null ? "all channels, global turn order" : `#${selectedChannel}`;
 
@@ -142,6 +155,9 @@ export function ChatPane({
         <span className="text-sm text-muted-foreground">#</span>
         <span className="text-[13px] font-medium">{headerName}</span>
         <span className="text-xs text-muted-foreground">{headerDesc}</span>
+        {headerMembers ? (
+          <span className="ml-auto text-[11px] text-muted-foreground">{headerMembers}</span>
+        ) : null}
       </div>
 
       <div className="flex-1 overflow-y-auto px-0 py-1">

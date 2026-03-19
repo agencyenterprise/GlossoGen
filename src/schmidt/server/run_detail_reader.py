@@ -81,6 +81,46 @@ async def _load_debug_logs(debug_log_path: Path) -> list[DebugLogEntry]:
     return entries
 
 
+def _link_reasoning_to_channels(
+    reasoning: list[ReasoningEntry],
+    messages: list[ChannelMessage],
+) -> None:
+    """Associate each reasoning entry with the channels of surrounding send_message calls.
+
+    For each agent, walks their events in timestamp order and tags each reasoning
+    entry with the channel of the previous send and the next send. This lets the
+    frontend show only reasoning relevant to the selected channel.
+    """
+    agent_events: dict[str, list[ReasoningEntry | ChannelMessage]] = {}
+    for r in reasoning:
+        agent_events.setdefault(r.sender_agent_id, []).append(r)
+    for m in messages:
+        agent_events.setdefault(m.sender_agent_id, []).append(m)
+
+    for agent_id in agent_events:
+        items = sorted(agent_events[agent_id], key=lambda x: x.timestamp)
+
+        prev_channel = ""
+        pending_reasoning: list[ReasoningEntry] = []
+
+        for item in items:
+            if isinstance(item, ChannelMessage):
+                for r in pending_reasoning:
+                    channels = set()
+                    if prev_channel:
+                        channels.add(prev_channel)
+                    channels.add(item.channel_id)
+                    r.channel_ids = sorted(channels)
+                pending_reasoning = []
+                prev_channel = item.channel_id
+            elif isinstance(item, ReasoningEntry):
+                pending_reasoning.append(item)
+
+        for r in pending_reasoning:
+            if prev_channel:
+                r.channel_ids = [prev_channel]
+
+
 async def load_run_detail(log_path: Path) -> RunDetailResponse:
     """Parse all events from a JSONL log and assemble a RunDetailResponse."""
     events: list[SimulationEvent] = await load_events(log_path=log_path)
@@ -131,6 +171,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                         timestamp=event.timestamp,
                         turn_number=total_messages,
                         round_number=current_round,
+                        channel_ids=[],
                     )
                 )
 
@@ -151,6 +192,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
 
         elif isinstance(event, SimulationEnded):
             status = event.reason
+
+    _link_reasoning_to_channels(reasoning=reasoning, messages=messages)
 
     if timestamp is None:
         raise ValueError(f"No SimulationStarted event found in {log_path}")
