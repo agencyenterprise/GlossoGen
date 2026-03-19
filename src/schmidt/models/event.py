@@ -121,10 +121,11 @@ class TurnPassed(EventBase):
     reason: str
 
 
-class EndReason(str, Enum):
+class RunStatus(str, Enum):
     """Why the simulation ended."""
 
     SCENARIO_COMPLETE = "scenario_complete"
+    IN_PROGRESS = "in_progress"
     ERROR = "error"
 
 
@@ -134,7 +135,7 @@ class SimulationEnded(EventBase):
     """
 
     event_type: Literal["simulation_ended"] = "simulation_ended"
-    reason: EndReason
+    reason: RunStatus
     total_turns: int
 
 

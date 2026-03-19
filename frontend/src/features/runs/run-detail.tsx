@@ -13,6 +13,7 @@ import { ChatPane } from "./chat-pane";
 import { mergeEntries } from "./display-entry";
 import { EvalPanel } from "./eval-panel";
 import { humanize } from "./format";
+import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
 
@@ -22,16 +23,20 @@ export function RunDetail({ runId }: { runId: string }) {
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [highlightNonce, setHighlightNonce] = useState(0);
   const [showDescription, setShowDescription] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const handleSelectChannel = useCallback((ch: string | null) => {
     setSelectedChannel(ch);
     setSelectedAgent(null);
+    setShowLogs(false);
   }, []);
 
   function handleNavigateToMessage(messageId: string, channelId: string) {
     flushSync(() => {
       setSelectedAgent(null);
       setSelectedChannel(channelId);
+      setShowLogs(false);
       setHighlightedMessageId(null);
     });
     setHighlightNonce(n => n + 1);
@@ -48,6 +53,13 @@ export function RunDetail({ runId }: { runId: string }) {
         throw new Error("Failed to fetch run detail");
       }
       return data;
+    },
+    refetchInterval: query => {
+      const status = query.state.data?.status;
+      if (status === "in_progress" && autoRefresh) {
+        return 5000;
+      }
+      return false;
     },
   });
 
@@ -92,6 +104,8 @@ export function RunDetail({ runId }: { runId: string }) {
         : `${uniqueModels.length} models`;
 
   const evaluation = data.evaluation;
+  const hasLogs = data.debug_logs.length > 0;
+  const isInProgress = data.status === "in_progress";
   const activeAgent = data.agents.find(a => a.agent_id === selectedAgent);
   const activeAgentColor = selectedAgent ? agentColorMap.get(selectedAgent) : undefined;
 
@@ -145,6 +159,34 @@ export function RunDetail({ runId }: { runId: string }) {
         />
       ) : null}
 
+      {/* Auto-refresh banner */}
+      {isInProgress ? (
+        <div className="mb-2 flex items-center gap-2 rounded-lg border border-yellow-300/50 bg-yellow-50 px-3 py-1.5 text-xs text-yellow-800 dark:border-yellow-700/50 dark:bg-yellow-950/30 dark:text-yellow-300">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {autoRefresh ? (
+            <>
+              <span>Simulation in progress — refreshing every 5s</span>
+              <button
+                className="ml-auto rounded px-2 py-0.5 font-medium hover:bg-yellow-200/50 dark:hover:bg-yellow-800/30"
+                onClick={() => setAutoRefresh(false)}
+              >
+                Stop
+              </button>
+            </>
+          ) : (
+            <>
+              <span>Simulation in progress — auto-refresh paused</span>
+              <button
+                className="ml-auto rounded px-2 py-0.5 font-medium hover:bg-yellow-200/50 dark:hover:bg-yellow-800/30"
+                onClick={() => setAutoRefresh(true)}
+              >
+                Resume
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
+
       {/* Shell */}
       <div
         className={cn(
@@ -157,20 +199,32 @@ export function RunDetail({ runId }: { runId: string }) {
           agents={data.agents}
           selectedChannel={selectedChannel}
           selectedAgent={selectedAgent}
+          showLogs={showLogs}
+          hasLogs={hasLogs}
           agentColorMap={agentColorMap}
           onSelectChannel={handleSelectChannel}
           onSelectAgent={setSelectedAgent}
+          onSelectLogs={() => {
+            setShowLogs(true);
+            setSelectedAgent(null);
+          }}
         />
-        <ChatPane
-          messages={displayEntries}
-          agents={data.agents}
-          selectedChannel={selectedChannel}
-          agentColorMap={agentColorMap}
-          channelColorMap={channelColorMap}
-          onSelectAgent={setSelectedAgent}
-          highlightedMessageId={highlightedMessageId}
-          highlightNonce={highlightNonce}
-        />
+
+        {/* Main content: chat or logs */}
+        {showLogs ? (
+          <LogPanel logs={data.debug_logs} />
+        ) : (
+          <ChatPane
+            messages={displayEntries}
+            agents={data.agents}
+            selectedChannel={selectedChannel}
+            agentColorMap={agentColorMap}
+            channelColorMap={channelColorMap}
+            onSelectAgent={setSelectedAgent}
+            highlightedMessageId={highlightedMessageId}
+            highlightNonce={highlightNonce}
+          />
+        )}
 
         {/* Eval panel */}
         {evaluation !== null ? <EvalPanel evaluation={evaluation} /> : null}

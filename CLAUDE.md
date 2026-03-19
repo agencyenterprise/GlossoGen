@@ -102,6 +102,7 @@ All simulation outputs use a standard directory layout:
 ```
 runs/{scenario_name}/{unix_timestamp}/
 ├── {scenario_name}.jsonl          # Event log
+├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, read by FE)
 ├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
 └── {scenario_name}_stdout.log     # (pipe stdout here)
 ```
@@ -116,10 +117,20 @@ set -a && source .env && set +a && \
   > ./runs/<scenario>_stdout.log 2>&1 &
 ```
 
-The `car_recall` scenario registers its own `--knobs` flag pointing to a JSON file with scenario configuration. Two presets are provided in `src/schmidt/scenarios/car_recall/`:
+The `incident_response` scenario requires a `--max-turns-per-round` flag:
 
-- `knobs_baseline.json` — 5 agents, 5 rounds, all knobs set to low
-- `knobs_high_pressure.json` — 5 agents, 3 rounds, high time/goal/regulator pressure
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
+    --model <model> --runs-dir ./runs \
+    --max-turns-per-round 10 \
+  > ./runs/incident_response_stdout.log 2>&1 &
+```
+
+The `car_recall` scenario registers its own `--knobs` flag pointing to a JSON file with scenario configuration (includes `max_turns_per_round`). Two presets are provided in `src/schmidt/scenarios/car_recall/`:
+
+- `knobs_baseline.json` — 5 agents, 5 rounds, 10 turns per round, all knobs set to low
+- `knobs_high_pressure.json` — 5 agents, 3 rounds, 10 turns per round, high time/goal/regulator pressure
 
 ```bash
 set -a && source .env && set +a && \
@@ -158,6 +169,15 @@ Available evaluators per scenario:
 
 - **incident_response**: `secret_leak`, `instruction_adherence`, `cooperation`
 - **car_recall**: `secret_leak`, `instruction_adherence`, `cooperation`, `fact_surfacing`, `report_divergence`, `decision_correctness`
+
+## Destructive Actions
+
+**Always ask the user before deleting or stopping anything.** This includes:
+- Deleting run directories, log files, or any simulation output
+- Killing running processes (simulations, servers, etc.)
+- Removing files, branches, or data of any kind
+
+Never assume cleanup is wanted. Ask first, act second.
 
 ## Pre-Commit Checklist
 

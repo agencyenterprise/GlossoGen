@@ -111,6 +111,8 @@ class AgentRunner:
         )
 
         tools = self._tool_registry.get_specs(names=list(self._config.tool_names))
+        if not decision.allow_pass:
+            tools = [t for t in tools if t.name != "pass_turn"]
 
         turn_context = (
             "It's your turn to speak. "
@@ -167,6 +169,7 @@ class AgentRunner:
                 system_prompt=self._config.system_prompt,
                 messages=messages,
                 tools=active_tools,
+                force_tool_use=False,
             )
 
             await self._event_logger.log(

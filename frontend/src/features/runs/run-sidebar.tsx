@@ -12,9 +12,12 @@ interface RunSidebarProps {
   agents: AgentDetail[];
   selectedChannel: string | null;
   selectedAgent: string | null;
+  showLogs: boolean;
+  hasLogs: boolean;
   agentColorMap: Map<string, AgentColor>;
   onSelectChannel: (channelId: string | null) => void;
   onSelectAgent: (agentId: string) => void;
+  onSelectLogs: () => void;
 }
 
 export function RunSidebar({
@@ -22,9 +25,12 @@ export function RunSidebar({
   agents,
   selectedChannel,
   selectedAgent,
+  showLogs,
+  hasLogs,
   agentColorMap,
   onSelectChannel,
   onSelectAgent,
+  onSelectLogs,
 }: RunSidebarProps) {
   return (
     <div className="flex flex-col overflow-y-auto border-r border-border bg-muted/50 py-4">
@@ -35,7 +41,10 @@ export function RunSidebar({
         <button
           className={cn(
             "flex w-full items-center gap-2 px-3.5 py-1.5 text-[13px] transition-colors hover:bg-accent/50",
-            selectedChannel === null && !selectedAgent && "bg-accent font-medium text-foreground"
+            selectedChannel === null &&
+              !selectedAgent &&
+              !showLogs &&
+              "bg-accent font-medium text-foreground"
           )}
           onClick={() => onSelectChannel(null)}
         >
@@ -46,7 +55,10 @@ export function RunSidebar({
             key={id}
             className={cn(
               "flex w-full items-center gap-2 px-3.5 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent/50",
-              selectedChannel === id && !selectedAgent && "bg-accent font-medium text-foreground"
+              selectedChannel === id &&
+                !selectedAgent &&
+                !showLogs &&
+                "bg-accent font-medium text-foreground"
             )}
             onClick={() => onSelectChannel(id)}
           >
@@ -86,6 +98,23 @@ export function RunSidebar({
           );
         })}
       </div>
+
+      {hasLogs ? (
+        <>
+          <div className="mx-3.5 mb-4 mt-4 h-px bg-border" />
+          <div>
+            <button
+              className={cn(
+                "flex w-full items-center gap-2 px-3.5 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent/50",
+                showLogs && "bg-accent font-medium text-foreground"
+              )}
+              onClick={onSelectLogs}
+            >
+              <span className="opacity-50">{">"}_</span> Logs
+            </button>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

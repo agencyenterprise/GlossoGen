@@ -49,6 +49,7 @@ class LLMProvider(ABC):
         system_prompt: str,
         messages: list[LLMMessage],
         tools: list[ToolSpec],
+        force_tool_use: bool,
     ) -> LLMResponse:
         """Send a conversation to the LLM and return its response.
 
@@ -56,6 +57,7 @@ class LLMProvider(ABC):
             system_prompt: The system-level instruction for the model.
             messages: The conversation history as a list of messages.
             tools: Tool specifications the model may invoke.
+            force_tool_use: When True, the model must call at least one tool.
 
         Returns:
             The model's response including text, tool calls, and usage data.

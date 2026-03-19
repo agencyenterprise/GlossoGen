@@ -2,9 +2,9 @@
 
 Defines a three-agent scenario (Engineer, Support Lead, PM) that
 simulates an incident war room. Agents communicate through a shared
-war-room channel and pairwise private sidebar channels. The simulation
-runs for a fixed number of rounds, each consisting of war-room turns
-followed by scheduled private sidebar turns.
+war-room channel and pairwise private sidebar channels. Each round,
+agents rotate in a discussion until all pass or a configurable
+max-turns-per-round cap is reached, then move to scheduled sidebars.
 """
 
 import argparse
@@ -122,21 +122,29 @@ class IncidentResponseScenario(SimulationScenario):
 
     Manages agent configuration, channel layout, turn ordering, prompt
     rendering, and tool registration for the incident response simulation.
-    Turn scheduling follows a fixed round structure: each round has all
-    agents speak in the war room, then selected agents participate in
-    private sidebar channels according to a per-round schedule.
+    Each round starts a war-room discussion where agents rotate until all
+    pass or the max-turns-per-round cap is hit. Agent order is shuffled
+    between rotations. After the war room, scheduled sidebar discussions
+    follow the same rotation-until-all-pass pattern.
     """
 
     @classmethod
-    def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:  # noqa: ARG003
-        """No scenario-specific CLI arguments needed."""
+    def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:
+        """Register scenario-specific CLI arguments."""
+        parser.add_argument(
+            "--max-turns-per-round",
+            type=int,
+            required=True,
+            help="Maximum number of agent turns allowed per round before forcing a transition",
+        )
 
     @classmethod
-    def create(cls, args: argparse.Namespace) -> Self:  # noqa: ARG003
-        """Construct the scenario. No CLI arguments are used."""
-        return cls()
+    def create(cls, args: argparse.Namespace) -> Self:
+        """Construct the scenario from CLI arguments."""
+        return cls(max_turns_per_round=args.max_turns_per_round)
 
-    def __init__(self) -> None:
+    def __init__(self, max_turns_per_round: int) -> None:
+        self._max_turns_per_round = max_turns_per_round
         self._current_round = 0
         self._discussion_agents: list[str] = []
         self._discussion_channel: str = ""
@@ -144,7 +152,9 @@ class IncidentResponseScenario(SimulationScenario):
         self._anyone_spoke_this_rotation: bool = False
         self._sidebar_queue: list[tuple[str, list[str]]] = []
         self._discussion_started: bool = False
+        self._first_rotation: bool = True
         self._channel_members: dict[str, list[str]] = {}
+        self._turns_this_round: int = 0
         self._jinja = Environment(
             loader=FileSystemLoader(PROMPTS_DIR),
             autoescape=False,
@@ -262,6 +272,7 @@ class IncidentResponseScenario(SimulationScenario):
         next sidebar or next round.
         """
         if self._discussion_started:
+            self._turns_this_round += 1
             self._record_turn_outcome(passed=state.last_turn_passed)
             result = self._advance_rotation()
             if result is not None:
@@ -271,23 +282,38 @@ class IncidentResponseScenario(SimulationScenario):
 
     def _record_turn_outcome(self, passed: bool) -> None:
         """Record whether the last agent spoke or passed."""
-        if not passed:
+        last_agent = self._discussion_agents[self._rotation_index]
+        if passed:
+            logger.info("Agent %s passed on %s", last_agent, self._discussion_channel)
+        else:
             self._anyone_spoke_this_rotation = True
+            logger.info("Agent %s spoke on %s", last_agent, self._discussion_channel)
 
     def _advance_rotation(self) -> TurnDecision | None:
         """Move to the next agent in the current rotation.
 
         Returns the next TurnDecision, or None if the discussion
-        ended (all agents passed in a full rotation).
+        ended (all agents passed in a full rotation or the turn cap is reached).
         """
+        # Check turn cap before continuing
+        if self._turns_this_round >= self._max_turns_per_round:
+            logger.info(
+                "Round %d reached max turns (%d), ending discussion on %s",
+                self._current_round,
+                self._max_turns_per_round,
+                self._discussion_channel,
+            )
+            self._discussion_started = False
+            return None
+
         self._rotation_index += 1
         if self._rotation_index < len(self._discussion_agents):
             return self._current_turn_decision()
 
         # Full rotation completed
         if not self._anyone_spoke_this_rotation:
-            logger.debug(
-                "All agents passed on channel %s, discussion complete",
+            logger.info(
+                "All agents passed on %s, ending discussion",
                 self._discussion_channel,
             )
             self._discussion_started = False
@@ -297,6 +323,8 @@ class IncidentResponseScenario(SimulationScenario):
         self._shuffle_agents()
         self._rotation_index = 0
         self._anyone_spoke_this_rotation = False
+        self._first_rotation = False
+        logger.info("New rotation on %s: %s", self._discussion_channel, self._discussion_agents)
         return self._current_turn_decision()
 
     def _shuffle_agents(self) -> None:
@@ -317,6 +345,7 @@ class IncidentResponseScenario(SimulationScenario):
         return TurnDecision(
             agent_id=self._discussion_agents[self._rotation_index],
             round_number=self._current_round,
+            allow_pass=not self._first_rotation,
         )
 
     def _start_next_discussion(self) -> TurnDecision | None:
@@ -331,6 +360,8 @@ class IncidentResponseScenario(SimulationScenario):
         if self._current_round > MAX_ROUNDS:
             logger.info("All %d rounds completed", MAX_ROUNDS)
             return None
+
+        self._turns_this_round = 0
 
         # Build sidebar queue for this round
         self._sidebar_queue = self._build_sidebar_queue(round_number=self._current_round)
@@ -353,7 +384,9 @@ class IncidentResponseScenario(SimulationScenario):
         self._discussion_agents = agents
         self._rotation_index = 0
         self._anyone_spoke_this_rotation = False
+        self._first_rotation = True
         self._discussion_started = True
+        logger.info("Starting discussion on %s with agents: %s", channel_id, agents)
         return self._current_turn_decision()
 
     def _build_sidebar_queue(self, round_number: int) -> list[tuple[str, list[str]]]:
@@ -368,6 +401,8 @@ class IncidentResponseScenario(SimulationScenario):
             channel_members = self._channel_members[channel_id]
             ordered = [initiator_id] + [a for a in channel_members if a != initiator_id]
             queue.append((channel_id, ordered))
+        if queue:
+            logger.info("Queued %d sidebar discussion(s) for round %d", len(queue), round_number)
         return queue
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { CheckCircle, HelpCircle, Inbox, Loader2, XCircle } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle, HelpCircle, Inbox, Loader2, Trash2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
 import type { components } from "@/types/api.gen";
@@ -24,10 +24,11 @@ function dayKey(iso: string): string {
   return new Date(iso).toDateString();
 }
 
-type EndReason = components["schemas"]["EndReason"];
+type RunStatus = components["schemas"]["RunStatus"];
 
-const END_REASON_LABELS: Record<EndReason, string> = {
-  scenario_complete: "Scenario Completed",
+const STATUS_LABELS: Record<RunStatus, string> = {
+  scenario_complete: "Completed",
+  in_progress: "In Progress",
   error: "Error",
 };
 
@@ -47,6 +48,21 @@ function groupByDay(runs: RunSummary[]): Array<{ label: string; runs: RunSummary
 
 export function RunList() {
   const [modalRun, setModalRun] = useState<RunSummary | null>(null);
+  const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      const { error } = await api.DELETE("/api/runs/{run_id}", {
+        params: { path: { run_id: runId } },
+      });
+      if (error) {
+        throw new Error("Failed to delete run");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["runs"] });
+    },
+  });
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["runs"],
@@ -56,6 +72,13 @@ export function RunList() {
         throw new Error("Failed to fetch runs");
       }
       return data;
+    },
+    refetchInterval: query => {
+      const hasInProgress = query.state.data?.runs.some(r => r.status === "in_progress");
+      if (hasInProgress) {
+        return 5000;
+      }
+      return false;
     },
   });
 
@@ -125,7 +148,7 @@ export function RunList() {
                 <span className="w-20 text-muted-foreground">{formatTime(run.timestamp)}</span>
                 <span className="w-16 text-muted-foreground">{run.total_turns} turns</span>
                 <span className="w-36 text-muted-foreground">
-                  {END_REASON_LABELS[run.end_reason] ?? run.end_reason}
+                  {STATUS_LABELS[run.status] ?? run.status}
                 </span>
                 <span className="ml-auto">
                   {run.has_evaluation ? (
@@ -139,6 +162,16 @@ export function RunList() {
                     </span>
                   )}
                 </span>
+                <button
+                  aria-label="Delete run"
+                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  onClick={e => {
+                    e.preventDefault();
+                    deleteMutation.mutate(run.run_id);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </Link>
             ))}
           </div>

@@ -35,7 +35,9 @@ The `display_name` is per-agent — each agent sees the channel named relative t
 
 ## Tools
 
-**`send_message(channel_id: str, text: str)`** — built-in, all agents.
+**`send_message(channel_id: str, text: str)`** — built-in, all agents. Agents can send multiple messages per turn to any channel they are a member of.
+
+**`pass_turn(reason: str)`** — built-in, all agents. Declines to speak on the current turn. Not available on the first rotation of each discussion.
 
 **`propose_resolution(diagnosis: str, fix_plan: str, estimated_hours: int)`** — any agent can propose a resolution. The scenario logs it but does not end the simulation. Multiple proposals can be made. The PM is instructed to submit a formal proposal at round 4 when leadership demands one. Agents can submit updated proposals in later rounds as new information emerges.
 
@@ -81,27 +83,31 @@ Each round, agents receive a private message framed as their user giving them ne
 
 ## Turn Logic
 
-Hub-directed, round-robin within each round:
+Each round has two phases: a war room discussion followed by optional private sidebar discussions.
 
-1. Inject round info to all agents (per-agent private message)
-2. PM speaks first in the war room (as facilitator)
-3. Engineer speaks in the war room
-4. Support Lead speaks in the war room
-5. After war room round: curated private sidebar turns (scenario decides which agents get private channel turns per round)
+**War room discussion**: All agents rotate in order (PM → Engineer → Support Lead on the first rotation). On each turn, agents can send multiple messages to any channel or call `pass_turn` to decline (`pass_turn` is not available on the first rotation). When a full rotation completes with nobody sending a message, the discussion ends. Between rotations, the agent order is shuffled (the last agent in the previous rotation is excluded from the first position). A configurable `--max-turns-per-round` cap forces the discussion to end after a set number of turns.
+
+**Sidebar discussions**: After the war room, scheduled sidebar pairs rotate until both agents pass (or hit the turn cap). Both agents in the sidebar participate — the initiator speaks first.
 
 Private sidebar schedule:
-- Round 1: none (agents are still getting oriented)
-- Round 2: Engineer gets a private turn with PM
-- Round 3: Support Lead gets a private turn with PM
-- Round 4: PM gets a private turn with Engineer + Support Lead gets a private turn with Engineer
-- Round 5: Engineer gets a private turn with PM
-- Round 6: PM gets a private turn with Engineer
+- Round 1: none
+- Round 2: Engineer ↔ PM
+- Round 3: Support Lead ↔ PM
+- Round 4: PM ↔ Engineer, Support Lead ↔ Engineer
+- Round 5: Engineer ↔ PM
+- Round 6: PM ↔ Engineer
 
-6 rounds total. Each round = 3 war room turns + 0-2 private turns, 24 turns total.
+6 rounds total. The number of turns per round varies based on the discussion dynamics and the max turns cap.
 
 ## End Condition
 
-Simulation ends after round 6 completes. No early termination.
+Simulation ends after round 6 completes. Discussions within a round end when all agents pass in a full rotation or the `--max-turns-per-round` cap is reached.
+
+## CLI
+
+```bash
+python -m schmidt run incident_response --model <model> --runs-dir ./runs --max-turns-per-round 10
+```
 
 ## Evaluation Focus
 

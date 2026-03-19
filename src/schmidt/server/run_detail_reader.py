@@ -12,6 +12,7 @@ from schmidt.models.event import (
     AgentRegistered,
     LLMResponseReceived,
     MessageSent,
+    RunStatus,
     SimulationEnded,
     SimulationEvent,
     SimulationStarted,
@@ -20,6 +21,7 @@ from schmidt.models.event import (
 from schmidt.server.response_models import (
     AgentDetail,
     ChannelMessage,
+    DebugLogEntry,
     EvalMetricResponse,
     EvalReportResponse,
     ReasoningEntry,
@@ -53,6 +55,29 @@ async def _load_evaluation_report(report_path: Path) -> EvalReportResponse | Non
     return EvalReportResponse(metrics=metrics)
 
 
+async def _load_debug_logs(debug_log_path: Path) -> list[DebugLogEntry]:
+    """Load debug log entries from a JSONL file, returning an empty list if it does not exist."""
+    if not debug_log_path.exists():
+        return []
+
+    entries: list[DebugLogEntry] = []
+    async with aiofiles.open(debug_log_path, mode="rb") as f:
+        async for line in f:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            raw = orjson.loads(stripped)
+            entries.append(
+                DebugLogEntry(
+                    timestamp=raw["timestamp"],
+                    logger_name=raw["logger"],
+                    level=raw["level"],
+                    message=raw["message"],
+                )
+            )
+    return entries
+
+
 async def load_run_detail(log_path: Path) -> RunDetailResponse:
     """Parse all events from a JSONL log and assemble a RunDetailResponse."""
     events: list[SimulationEvent] = await load_events(log_path=log_path)
@@ -66,7 +91,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     messages: list[ChannelMessage] = []
     reasoning: list[ReasoningEntry] = []
     total_turns = 0
-    end_reason = None
+    status = None
 
     # Track the most recent TurnAssigned per agent
     agent_turn: dict[str, int] = {}
@@ -93,6 +118,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             )
 
         elif isinstance(event, TurnAssigned):
+            total_turns += 1
             agent_turn[event.agent_id] = event.turn_number
             agent_round[event.agent_id] = event.round_number
 
@@ -124,16 +150,18 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             )
 
         elif isinstance(event, SimulationEnded):
-            total_turns = event.total_turns
-            end_reason = event.reason
+            status = event.reason
 
     if timestamp is None:
         raise ValueError(f"No SimulationStarted event found in {log_path}")
-    if end_reason is None:
-        raise ValueError(f"No SimulationEnded event found in {log_path}")
+    if status is None:
+        status = RunStatus.IN_PROGRESS
 
     report_path = log_path.with_name(f"{scenario_name}_report.json")
     evaluation = await _load_evaluation_report(report_path=report_path)
+
+    debug_log_path = log_path.with_name(f"{scenario_name}_debug.jsonl")
+    debug_logs = await _load_debug_logs(debug_log_path=debug_log_path)
 
     return RunDetailResponse(
         run_id=run_id,
@@ -141,10 +169,11 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         scenario_description=scenario_description,
         timestamp=timestamp,
         total_turns=total_turns,
-        end_reason=end_reason,
+        status=status,
         channel_ids=channel_ids,
         agents=agents,
         messages=messages,
         reasoning=reasoning,
+        debug_logs=debug_logs,
         evaluation=evaluation,
     )

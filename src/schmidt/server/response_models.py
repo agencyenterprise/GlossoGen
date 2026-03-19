@@ -6,7 +6,7 @@ from enum import Enum
 from pydantic import BaseModel
 
 from schmidt.evaluation.evaluation_report import Verdict
-from schmidt.models.event import EndReason
+from schmidt.models.event import RunStatus
 
 
 class HealthStatus(str, Enum):
@@ -29,7 +29,7 @@ class RunSummary(BaseModel):
     scenario_description: str
     timestamp: datetime
     total_turns: int
-    end_reason: EndReason
+    status: RunStatus
     has_evaluation: bool
     run_dir: str
 
@@ -74,6 +74,15 @@ class ReasoningEntry(BaseModel):
     round_number: int
 
 
+class DebugLogEntry(BaseModel):
+    """A single debug log entry from the simulation run."""
+
+    timestamp: str
+    logger_name: str
+    level: str
+    message: str
+
+
 class EvalMetricResponse(BaseModel):
     """Result of a single evaluator for the run detail endpoint."""
 
@@ -98,9 +107,10 @@ class RunDetailResponse(BaseModel):
     scenario_description: str
     timestamp: datetime
     total_turns: int
-    end_reason: EndReason
+    status: RunStatus
     channel_ids: list[str]
     agents: list[AgentDetail]
     messages: list[ChannelMessage]
     reasoning: list[ReasoningEntry]
+    debug_logs: list[DebugLogEntry]
     evaluation: EvalReportResponse | None

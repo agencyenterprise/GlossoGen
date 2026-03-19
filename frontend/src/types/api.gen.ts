@@ -38,7 +38,11 @@ export interface paths {
         get: operations["get_run_detail_api_runs__run_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Run
+         * @description Delete a simulation run and all its files.
+         */
+        delete: operations["delete_run_api_runs__run_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -110,11 +114,19 @@ export interface components {
             round_number: number;
         };
         /**
-         * EndReason
-         * @description Why the simulation ended.
-         * @enum {string}
+         * DebugLogEntry
+         * @description A single debug log entry from the simulation run.
          */
-        EndReason: "scenario_complete" | "error";
+        DebugLogEntry: {
+            /** Timestamp */
+            timestamp: string;
+            /** Logger Name */
+            logger_name: string;
+            /** Level */
+            level: string;
+            /** Message */
+            message: string;
+        };
         /**
          * EvalMetricResponse
          * @description Result of a single evaluator for the run detail endpoint.
@@ -197,7 +209,7 @@ export interface components {
             timestamp: string;
             /** Total Turns */
             total_turns: number;
-            end_reason: components["schemas"]["EndReason"];
+            status: components["schemas"]["RunStatus"];
             /** Channel Ids */
             channel_ids: string[];
             /** Agents */
@@ -206,6 +218,8 @@ export interface components {
             messages: components["schemas"]["ChannelMessage"][];
             /** Reasoning */
             reasoning: components["schemas"]["ReasoningEntry"][];
+            /** Debug Logs */
+            debug_logs: components["schemas"]["DebugLogEntry"][];
             evaluation: components["schemas"]["EvalReportResponse"] | null;
         };
         /**
@@ -216,6 +230,12 @@ export interface components {
             /** Runs */
             runs: components["schemas"]["RunSummary"][];
         };
+        /**
+         * RunStatus
+         * @description Why the simulation ended.
+         * @enum {string}
+         */
+        RunStatus: "scenario_complete" | "in_progress" | "error";
         /**
          * RunSummary
          * @description Summary of a single simulation run for the runs list endpoint.
@@ -234,7 +254,7 @@ export interface components {
             timestamp: string;
             /** Total Turns */
             total_turns: number;
-            end_reason: components["schemas"]["EndReason"];
+            status: components["schemas"]["RunStatus"];
             /** Has Evaluation */
             has_evaluation: boolean;
             /** Run Dir */
@@ -307,6 +327,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RunDetailResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_run_api_runs__run_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

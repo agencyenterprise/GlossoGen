@@ -6,9 +6,11 @@ while (in 5-agent mode) the PR agent writes summary reports to the Regulator
 on a separate channel. The Regulator has no access to the internal discussion
 and can only respond to PR's reports.
 
-The simulation runs for 3 or 5 fixed rounds (days) depending on the time
-pressure knob. The correct decision — full recall — requires all three
-private facts to surface and be integrated.
+Each round starts an internal discussion where agents rotate until all pass
+or the max_turns_per_round knob is reached. Agent order is shuffled between
+rotations. On scheduled rounds, a regulator report discussion follows with
+the same rotation-until-all-pass model. The simulation runs for 3 or 5
+rounds depending on the time_pressure knob.
 """
 
 import argparse
@@ -130,6 +132,8 @@ class CarRecallScenario(SimulationScenario):
         self._anyone_spoke_this_rotation: bool = False
         self._regulator_queue: list[tuple[str, list[str]]] = []
         self._discussion_started: bool = False
+        self._first_rotation: bool = True
+        self._turns_this_round: int = 0
         self._jinja = Environment(
             loader=FileSystemLoader(PROMPTS_DIR),
             autoescape=False,
@@ -263,10 +267,11 @@ class CarRecallScenario(SimulationScenario):
         """Return the next turn decision, or None to end the simulation.
 
         Rotates agents in the current discussion (internal or regulator report)
-        until all agents pass in a full rotation. Then advances to the next
-        discussion phase or next round.
+        until all agents pass in a full rotation or the turn cap is reached.
+        Then advances to the next discussion phase or next round.
         """
         if self._discussion_started:
+            self._turns_this_round += 1
             self._record_turn_outcome(passed=state.last_turn_passed)
             result = self._advance_rotation()
             if result is not None:
@@ -276,23 +281,38 @@ class CarRecallScenario(SimulationScenario):
 
     def _record_turn_outcome(self, passed: bool) -> None:
         """Record whether the last agent spoke or passed."""
-        if not passed:
+        last_agent = self._discussion_agents[self._rotation_index]
+        if passed:
+            logger.info("Agent %s passed on %s", last_agent, self._discussion_channel)
+        else:
             self._anyone_spoke_this_rotation = True
+            logger.info("Agent %s spoke on %s", last_agent, self._discussion_channel)
 
     def _advance_rotation(self) -> TurnDecision | None:
         """Move to the next agent in the current rotation.
 
         Returns the next TurnDecision, or None if the discussion
-        ended (all agents passed in a full rotation).
+        ended (all agents passed in a full rotation or the turn cap is reached).
         """
+        # Check turn cap before continuing
+        if self._turns_this_round >= self._knobs.max_turns_per_round:
+            logger.info(
+                "Round %d reached max turns (%d), ending discussion on %s",
+                self._current_round,
+                self._knobs.max_turns_per_round,
+                self._discussion_channel,
+            )
+            self._discussion_started = False
+            return None
+
         self._rotation_index += 1
         if self._rotation_index < len(self._discussion_agents):
             return self._current_turn_decision()
 
         # Full rotation completed
         if not self._anyone_spoke_this_rotation:
-            logger.debug(
-                "All agents passed on channel %s, discussion complete",
+            logger.info(
+                "All agents passed on %s, ending discussion",
                 self._discussion_channel,
             )
             self._discussion_started = False
@@ -302,6 +322,8 @@ class CarRecallScenario(SimulationScenario):
         self._shuffle_agents()
         self._rotation_index = 0
         self._anyone_spoke_this_rotation = False
+        self._first_rotation = False
+        logger.info("New rotation on %s: %s", self._discussion_channel, self._discussion_agents)
         return self._current_turn_decision()
 
     def _shuffle_agents(self) -> None:
@@ -322,6 +344,7 @@ class CarRecallScenario(SimulationScenario):
         return TurnDecision(
             agent_id=self._discussion_agents[self._rotation_index],
             round_number=self._current_round,
+            allow_pass=not self._first_rotation,
         )
 
     def _start_next_discussion(self) -> TurnDecision | None:
@@ -336,6 +359,8 @@ class CarRecallScenario(SimulationScenario):
         if self._current_round > self._max_rounds:
             logger.info("All %d rounds completed", self._max_rounds)
             return None
+
+        self._turns_this_round = 0
 
         # Build regulator discussion queue for this round
         self._regulator_queue = self._build_regulator_queue(round_number=self._current_round)
@@ -359,7 +384,9 @@ class CarRecallScenario(SimulationScenario):
         self._discussion_agents = agents
         self._rotation_index = 0
         self._anyone_spoke_this_rotation = False
+        self._first_rotation = True
         self._discussion_started = True
+        logger.info("Starting discussion on %s with agents: %s", channel_id, agents)
         return self._current_turn_decision()
 
     def _build_regulator_queue(self, round_number: int) -> list[tuple[str, list[str]]]:
@@ -371,8 +398,9 @@ class CarRecallScenario(SimulationScenario):
         raw_turns = self._regulator_turns_for_round(round_number=round_number)
         if not raw_turns:
             return []
-        # Regulator report is a two-agent discussion between PR and Regulator
-        return [(REGULATOR_REPORT_ID, [PR_ID, REGULATOR_ID])]
+        queue = [(REGULATOR_REPORT_ID, [PR_ID, REGULATOR_ID])]
+        logger.info("Queued %d regulator discussion(s) for round %d", len(queue), round_number)
+        return queue
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the injection message for an agent at a given round, or None if empty."""

@@ -10,7 +10,7 @@ A platform for testing agent communication through real-life simulations. A cent
 | LLM Backend         | Anthropic Claude (pluggable for future providers)            |
 | Transport           | In-process async (asyncio queues/events)                     |
 | Scenario Definition | Python classes                                               |
-| Turn Model          | Hub-directed, scenario rules only                            |
+| Turn Model          | Rotation until all pass, shuffled order between rotations, configurable max turns per round |
 | Channels            | Scenario-defined channels with membership lists              |
 | Agent Wake          | Coroutine await (asyncio.Event + Queue)                      |
 | Agent Memory        | Conversation history only                                    |
@@ -35,6 +35,7 @@ src/schmidt/
   __init__.py
   __main__.py                  # python -m schmidt entrypoint
   cli.py                       # argparse CLI (run + evaluate + serve subcommands)
+  logging_format.py            # JsonLineFormatter for debug log output
 
   # Core engine
   simulation_hub.py            # SimulationHub: main orchestrator loop
@@ -65,6 +66,7 @@ src/schmidt/
     tool_registry.py           # ToolRegistry: stores ToolSpecs + executor callables
     tool_executor.py           # ToolExecutor: runs tools, handles errors
     builtin_send_message.py    # Built-in send_message tool (every agent gets this)
+    builtin_pass_turn.py       # Built-in pass_turn tool (agent declines to speak)
 
   # Scenario system
   scenario_protocol.py         # SimulationScenario ABC
@@ -122,7 +124,8 @@ src/schmidt/
     app.py                     # FastAPI app: lifespan, CORS, route registration
     response_models.py         # Pydantic response models for all API endpoints
     run_discovery.py           # Scans runs/ directory tree, parses JSONL first/last lines
-    runs_router.py             # APIRouter: GET /api/runs
+    run_detail_reader.py       # Loads JSONL log + debug log into RunDetailResponse
+    runs_router.py             # APIRouter: GET /api/runs, GET /api/runs/{id}, DELETE /api/runs/{id}
 
 frontend/                      # Next.js web application
   package.json                 # Dependencies and scripts
@@ -144,6 +147,13 @@ frontend/                      # Next.js web application
     features/
       runs/
         run-list.tsx           # Client component: fetches and displays simulation runs
+        run-detail.tsx         # Run detail page: merges messages + reasoning, manages panels
+        chat-pane.tsx          # Message timeline grouped by round/turn
+        agent-drawer.tsx       # Agent detail overlay (system prompt, messages, verdicts)
+        display-entry.ts       # DisplayEntry type and mergeEntries() for ChannelMessage + ReasoningEntry
+        log-panel.tsx          # Debug log viewer (monospace, color-coded by level)
+        eval-panel.tsx         # Evaluation results panel
+        run-sidebar.tsx        # Left sidebar: channels, agents, logs navigation
     shared/
       components/ui/           # Shared UI components
       lib/
@@ -162,8 +172,9 @@ scripts/
 
 1. **CLI** parses arguments in two passes (first to identify the scenario, then to include scenario-specific flags). Calls `scenario.get_agents()` to obtain agent configs, builds a per-agent LLM provider mapping, creates the tool registry and event logger, and passes all of these into the `SimulationHub` constructor.
 2. **SimulationHub.run()** uses the agents already provided at construction time. Calls `scenario.get_channels()` and `scenario.register_tools()`, creates a ChannelRouter, spawns one AgentRunner coroutine per agent (each immediately awaits its wake event), and logs `SimulationStarted` and one `AgentRegistered` event per agent.
-3. **Main loop**: Builds SimulationState from ChannelRouter and turn counter. Asks the scenario for the next turn via `decide_next_turn`, receiving a `TurnDecision` (which agent, which channel context) or `None` to end. Logs `TurnAssigned`, delivers the decision to the agent's queue, and sets its wake event. Awaits the agent's done signal.
-4. **Agent turn**: The agent wakes, reads its TurnDecision, and the PromptBuilder constructs a conversation from visible channel history. The LLM is called with the system prompt, messages, and available tools. If the LLM returns tool calls, they are executed and results fed back in a loop until the LLM produces a final response. The agent signals done.
+3. **Main loop**: Builds SimulationState from ChannelRouter, turn counter, and `last_turn_passed` (whether the previous agent sent any messages). Asks the scenario for the next turn via `decide_next_turn`, receiving a `TurnDecision` (which agent, which round, whether passing is allowed) or `None` to end. Logs `TurnAssigned`, delivers the decision to the agent's queue, and sets its wake event. Awaits the agent's done signal. After the agent finishes, checks whether any messages were sent — if not, `last_turn_passed` is set to `True`.
+4. **Agent turn**: The agent wakes, reads its TurnDecision, and the PromptBuilder constructs a conversation from visible channel history. If `allow_pass` is False (first rotation), the `pass_turn` tool is removed from available tools. The LLM is called with the system prompt, messages, and available tools. The agent can send multiple messages to any channel and call `pass_turn` to decline speaking. Tool calls are executed in a loop (max 10 iterations). After `pass_turn` is called, both `send_message` and `pass_turn` are removed and the loop ends. After any `send_message`, `pass_turn` is removed.
+5. **Rotation**: Scenarios implement `decide_next_turn` as a rotation loop. Agents take turns in order. When a full rotation completes: if nobody sent a message, the discussion ends; otherwise, the order is shuffled (last speaker excluded from first position) and a new rotation starts. A configurable `max_turns_per_round` cap forces the discussion to end after a set number of turns.
 5. **End**: When the scenario returns `None` or its end condition is met, the hub logs `SimulationEnded`, cancels agent tasks, and closes the logger.
 
 ## Run Storage
@@ -173,6 +184,7 @@ All simulation outputs use a standard directory layout:
 ```
 runs/{scenario_name}/{unix_timestamp}/
 ├── {scenario_name}.jsonl          # Event log (one JSON object per line)
+├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, visible in FE)
 ├── {scenario_name}_report.json    # Evaluation report (written by evaluate command)
 ```
 
@@ -211,7 +223,7 @@ Three layers keep tools provider-agnostic:
 2. **LLM Provider**: Translates ToolSpecs into the provider's native format (e.g., Anthropic's tool schema, OpenAI's function calling format).
 3. **ToolExecutor**: Runs the actual tool function and returns a ToolCallResult.
 
-Every agent gets the built-in `send_message(channel_id, text)` tool. Scenarios select additional tools from the shared registry per agent role. The AgentRunner enforces a hard maximum of 10 tool calls per turn to prevent infinite loops. After the first successful `send_message` call in a turn, the tool is removed from subsequent LLM calls within that turn to enforce one message per turn.
+Every agent gets two built-in tools: `send_message(channel_id, text)` for posting to channels and `pass_turn(reason)` for declining to speak. Scenarios select additional tools from the shared registry per agent role. The AgentRunner enforces a hard maximum of 10 tool calls per turn to prevent infinite loops. Agents can send multiple messages per turn to any channel they are a member of. After calling `pass_turn`, both `send_message` and `pass_turn` are removed to end the turn. After calling `send_message`, `pass_turn` is removed (cannot pass after speaking). On the first rotation of a discussion, `pass_turn` is not available (`allow_pass=False` in TurnDecision). The `generate()` method on LLMProvider accepts a `force_tool_use` parameter that sets `tool_choice: {"type": "any"}` in the API call when enabled.
 
 ## Agent Prompt Framing
 
@@ -235,12 +247,13 @@ Event types (discriminated union on `event_type`):
 
 - `simulation_started` — scenario name, channel IDs
 - `agent_registered` — agent ID, role name, system prompt, channel IDs, tool names (one per agent)
-- `turn_assigned` — which agent, turn number, channel ID, round number
+- `turn_assigned` — which agent, turn number, round number
 - `message_sent` — full SimulationMessage (channel, sender, content, timestamp)
 - `tool_called` — agent ID, tool name, arguments
 - `tool_result_returned` — agent ID, tool name, output, is_error
 - `llm_request_sent` — agent ID, system prompt, messages, tool names
 - `llm_response_received` — agent ID, text, tool calls, stop reason, token usage
+- `turn_passed` — agent ID, reason (emitted when agent calls pass_turn)
 - `simulation_ended` — reason, total turns
 
 ## Evaluation System
@@ -284,12 +297,6 @@ The evaluation system reuses the same LLM provider layer (ClaudeProvider) for ju
 
 A FastAPI backend exposes simulation data via REST endpoints. The frontend consumes these endpoints through a typed API client.
 
-### Endpoints
-
-| Method | Path           | Response Model     | Description                          |
-| ------ | -------------- | ------------------ | ------------------------------------ |
-| GET    | `/api/health`  | `HealthResponse`   | Health check with `HealthStatus` enum |
-| GET    | `/api/runs`    | `RunListResponse`  | List all discovered simulation runs  |
 
 ### Architecture
 
@@ -297,11 +304,12 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 - `SCHMIDT_RUNS_DIR` environment variable configures the runs root directory.
 - CORS is configured for `http://localhost:3000` (the frontend dev server).
 - Every endpoint declares a `response_model` and returns a Pydantic model instance. No dicts or strings are returned.
-- Status-like fields use enums (`HealthStatus`, `EndReason`, `Verdict`) instead of bare strings.
+- Status-like fields use enums (`HealthStatus`, `RunStatus`, `Verdict`) instead of bare strings. `RunStatus` includes `IN_PROGRESS` for runs that have not yet completed.
+- The run detail endpoint returns separate `messages` (ChannelMessage) and `reasoning` (ReasoningEntry) arrays, plus `debug_logs` (DebugLogEntry) parsed from the debug JSONL file.
 
 ### Frontend
 
 - **Stack**: Next.js 16 (App Router), React 19, TypeScript (strict mode), Tailwind CSS v4
-- **Data fetching**: TanStack React Query with openapi-fetch for type-safe API calls
+- **Data fetching**: TanStack React Query with openapi-fetch for type-safe API calls. In-progress runs auto-refresh every 5 seconds (configurable via a Stop/Resume button).
 - **Type generation**: `openapi-typescript` generates TypeScript types from the backend's OpenAPI schema. CI enforces that generated types stay in sync with the backend.
 - **Lint enforcement**: ESLint forbids raw `fetch()` — all API calls must go through the typed client at `@/shared/lib/api-client`. This ensures compile-time validation of request paths, parameters, and response types.
