@@ -13,13 +13,22 @@ from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import (
     AgentRegistered,
+    GroundTruthSnapshot,
+    RoundStateAdvanced,
     RunStatus,
     SimulationEnded,
     SimulationStarted,
+    StateObservationSent,
     TurnAssigned,
 )
 from schmidt.models.simulation_state import SimulationState, TurnDecision
 from schmidt.scenario_protocol import SimulationScenario
+from schmidt.simulation_state_protocol import SimulationStateProtocol
+from schmidt.tools.builtin_notebook import (
+    READ_NOTEBOOK_SPEC,
+    WRITE_NOTEBOOK_SPEC,
+    create_notebook_executors,
+)
 from schmidt.tools.builtin_pass_turn import PASS_TURN_SPEC, create_pass_turn_executor
 from schmidt.tools.builtin_send_message import SEND_MESSAGE_SPEC, create_send_message_executor
 from schmidt.tools.tool_executor import ToolExecutor
@@ -89,6 +98,19 @@ class SimulationHub:
         pass_executor = create_pass_turn_executor(event_logger=self._event_logger)
         self._tool_registry.register(spec=PASS_TURN_SPEC, executor=pass_executor)
 
+        # Register built-in notebook tools (agents opt in via tool_names)
+        round_tracker = [0]
+        notebook_executors = create_notebook_executors(
+            event_logger=self._event_logger,
+            round_number_getter=lambda: round_tracker[0],
+        )
+        self._tool_registry.register(
+            spec=WRITE_NOTEBOOK_SPEC, executor=notebook_executors.write_executor
+        )
+        self._tool_registry.register(
+            spec=READ_NOTEBOOK_SPEC, executor=notebook_executors.read_executor
+        )
+
         # Register scenario-specific tools
         self._scenario.register_tools(registry=self._tool_registry)
 
@@ -156,8 +178,10 @@ class SimulationHub:
         logger.info("Spawned %d agent tasks: %s", len(tasks), list(tasks.keys()))
 
         turn_number = 0
+        current_round = 0
         last_turn_passed = False
         run_status = RunStatus.SCENARIO_COMPLETE
+        is_stateful = isinstance(self._scenario, SimulationStateProtocol)
         try:
             while True:
                 state = SimulationState(
@@ -171,6 +195,16 @@ class SimulationHub:
                 if decision is None:
                     logger.info("Scenario signaled completion after %d turns", turn_number)
                     break
+
+                if decision.round_number > current_round:
+                    if is_stateful:
+                        await self._handle_round_transition(
+                            scenario=self._scenario,  # type: ignore[arg-type]
+                            agents=agents,
+                            round_number=decision.round_number,
+                        )
+                    current_round = decision.round_number
+                    round_tracker[0] = current_round
 
                 turn_number += 1
                 logger.debug("Dispatching turn %d to agent %s", turn_number, decision.agent_id)
@@ -246,6 +280,45 @@ class SimulationHub:
                     )
                 )
                 await self._event_logger.close()
+
+    async def _handle_round_transition(
+        self,
+        scenario: SimulationStateProtocol,
+        agents: list[AgentConfig],
+        round_number: int,
+    ) -> None:
+        """Advance world state between rounds for stateful scenarios.
+
+        Calls ``advance_round`` on the state protocol, logs the transition report
+        and ground truth snapshot, then logs a filtered observation for each agent.
+        """
+        logger.info("Advancing world state for round %d", round_number)
+
+        report = scenario.advance_round(round_number=round_number)
+        await self._event_logger.log(
+            event=RoundStateAdvanced(
+                round_number=round_number,
+                transition_report=report.model_dump(mode="json"),
+            )
+        )
+
+        ground_truth = scenario.get_ground_truth()
+        await self._event_logger.log(
+            event=GroundTruthSnapshot(
+                round_number=round_number,
+                state=ground_truth,
+            )
+        )
+
+        for agent in agents:
+            observation = scenario.get_agent_observation(agent_id=agent.agent_id)
+            await self._event_logger.log(
+                event=StateObservationSent(
+                    agent_id=agent.agent_id,
+                    round_number=round_number,
+                    observation=observation,
+                )
+            )
 
 
 async def _wait_for_agent(
