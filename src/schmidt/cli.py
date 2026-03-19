@@ -19,6 +19,7 @@ import uvicorn
 from schmidt.event_logger import EventLogger
 from schmidt.llm.claude_provider import ClaudeProvider
 from schmidt.llm.provider import LLMProvider
+from schmidt.logging_format import JsonLineFormatter
 from schmidt.models.agent_config import AgentConfig
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
@@ -172,12 +173,23 @@ async def _run_simulation(
         event_logger=event_logger,
     )
 
+    # Add JSON debug log file for frontend display
+    debug_log_path = run_dir / f"{scenario.name()}_debug.jsonl"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    json_handler = logging.FileHandler(debug_log_path)
+    json_handler.setFormatter(JsonLineFormatter())
+    logging.getLogger().addHandler(json_handler)
+
     logger.info("Running scenario: %s", scenario.name())
     logger.info("Model: %s", args.model)
     logger.info("Run directory: %s", run_dir)
     logger.info("Log: %s", log_path)
 
-    await hub.run()
+    try:
+        await hub.run()
+    finally:
+        logging.getLogger().removeHandler(json_handler)
+        json_handler.close()
 
     logger.info("Simulation complete. Run directory: %s", run_dir)
 

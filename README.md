@@ -23,6 +23,7 @@ All simulation outputs use a standard directory layout under `runs/`:
 ```
 runs/{scenario_name}/{unix_timestamp}/
 ├── {scenario_name}.jsonl          # Event log
+├── {scenario_name}_debug.jsonl    # Debug log (JSON lines, visible in FE Logs tab)
 ├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
 ```
 
@@ -34,6 +35,7 @@ The CLI auto-generates a timestamped subdirectory under `--runs-dir`.
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
     --model claude-sonnet-4-20250514 --runs-dir ./runs \
+    --max-turns-per-round 10 \
   > ./runs/incident_response_stdout.log 2>&1 &
 ```
 
@@ -76,7 +78,7 @@ make dev            # FastAPI backend on port 8000 (reads from ./runs/)
 make dev-frontend   # Next.js dev server on port 3000
 ```
 
-The frontend displays a list of all simulation runs with scenario name, timestamp, turn count, end reason, and evaluation status.
+The frontend displays a list of all simulation runs with scenario name, timestamp, turn count, status (including in-progress runs), and evaluation status. Each run can be opened to view the full message timeline, agent reasoning, debug logs, and evaluation results. Runs can be deleted from the list. In-progress runs auto-refresh every 5 seconds.
 
 ### API Type Safety
 
@@ -96,7 +98,7 @@ A critical customer-facing bug is reported in production. Three agents (Engineer
 
 ### Car Recall
 
-A major automotive manufacturer decides whether to issue a vehicle recall. Five agents (Engineer, Legal, CFO, PR, Regulator) each hold private facts that, combined, point to a full recall. The PR agent bridges internal deliberation and external regulatory reporting. 5 rounds with escalating media, legal, and regulatory pressure. Supports 6 configurable knobs (time pressure, goal alignment, regulator pressure, agent count, information overlap, model mix). See the [scenario README](src/schmidt/scenarios/car_recall/README.md).
+A major automotive manufacturer decides whether to issue a vehicle recall. Five agents (Engineer, Legal, CFO, PR, Regulator) each hold private facts that, combined, point to a full recall. The PR agent bridges internal deliberation and external regulatory reporting. 3–5 rounds with escalating media, legal, and regulatory pressure. Supports 7 configurable knobs (time pressure, goal alignment, regulator pressure, agent count, information overlap, max turns per round, model mix). See the [scenario README](src/schmidt/scenarios/car_recall/README.md).
 
 ## Project Structure
 
@@ -110,7 +112,7 @@ src/schmidt/
 
   models/                      # Pydantic data models
   llm/                         # LLM provider abstraction + Claude implementation
-  tools/                       # Tool registry, executor, built-in send_message
+  tools/                       # Tool registry, executor, built-in send_message + pass_turn
   evaluation/                  # Post-hoc LLM-as-judge evaluators
   scenarios/                   # One folder per scenario (class + Jinja2 prompt templates + README.md)
 
@@ -118,7 +120,7 @@ src/schmidt/
     app.py                     # Application setup, CORS, lifespan
     response_models.py         # Pydantic response models (all endpoints return structured models)
     run_discovery.py           # Scans runs/ directory for simulation logs
-    runs_router.py             # GET /api/runs endpoint
+    runs_router.py             # GET /api/runs, GET /api/runs/{id}, DELETE /api/runs/{id}
 
 frontend/                      # Next.js web application
   src/

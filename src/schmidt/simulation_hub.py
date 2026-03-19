@@ -13,7 +13,7 @@ from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import (
     AgentRegistered,
-    EndReason,
+    RunStatus,
     SimulationEnded,
     SimulationStarted,
     TurnAssigned,
@@ -54,11 +54,14 @@ class SimulationHub:
         """Execute the full simulation lifecycle.
 
         Sets up the channel router and prompt builder from the scenario.
-        Registers built-in and scenario-specific tools, creates an AgentRunner
-        per agent, then enters the turn loop. Each turn asks the scenario for the
-        next agent to act, wakes that agent, and waits for it to finish before
-        proceeding. Logs simulation start, agent registrations, turn assignments,
-        and simulation end events. Cancels all agent tasks on exit.
+        Registers built-in tools (send_message, pass_turn) and scenario-specific
+        tools, creates an AgentRunner per agent, then enters the turn loop.
+        Each turn asks the scenario for the next agent to act, wakes that agent,
+        and waits for it to finish. After each turn, reports whether the agent
+        sent any messages via ``last_turn_passed`` in SimulationState, enabling
+        the scenario to track rotation progress. Logs simulation start, agent
+        registrations, turn assignments, and simulation end events. Cancels all
+        agent tasks on exit.
         """
         agents = self._agents
         channels = self._scenario.get_channels()
@@ -154,7 +157,7 @@ class SimulationHub:
 
         turn_number = 0
         last_turn_passed = False
-        end_reason = EndReason.SCENARIO_COMPLETE
+        run_status = RunStatus.SCENARIO_COMPLETE
         try:
             while True:
                 state = SimulationState(
@@ -204,7 +207,7 @@ class SimulationHub:
                 # Record turn outcome for the next decide_next_turn call
                 runner = runners[agent_id]
                 summary = runner.last_turn_summary
-                last_turn_passed = summary.passed
+                last_turn_passed = len(summary.messages_sent) == 0
 
                 # Log turn progress
                 if summary.messages_sent:
@@ -225,7 +228,7 @@ class SimulationHub:
 
         except Exception:
             logger.exception("Simulation failed during turn loop")
-            end_reason = EndReason.ERROR
+            run_status = RunStatus.ERROR
             raise
 
         finally:
@@ -238,7 +241,7 @@ class SimulationHub:
             if self._event_logger.is_open:
                 await self._event_logger.log(
                     event=SimulationEnded(
-                        reason=end_reason,
+                        reason=run_status,
                         total_turns=turn_number,
                     )
                 )

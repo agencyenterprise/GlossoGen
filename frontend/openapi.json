@@ -62,6 +62,37 @@
             }
           }
         }
+      },
+      "delete": {
+        "summary": "Delete Run",
+        "description": "Delete a simulation run and all its files.",
+        "operationId": "delete_run_api_runs__run_id__delete",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/health": {
@@ -176,14 +207,34 @@
         "title": "ChannelMessage",
         "description": "A message sent by an agent to a channel."
       },
-      "EndReason": {
-        "type": "string",
-        "enum": [
-          "scenario_complete",
-          "error"
+      "DebugLogEntry": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "logger_name": {
+            "type": "string",
+            "title": "Logger Name"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "logger_name",
+          "level",
+          "message"
         ],
-        "title": "EndReason",
-        "description": "Why the simulation ended."
+        "title": "DebugLogEntry",
+        "description": "A single debug log entry from the simulation run."
       },
       "EvalMetricResponse": {
         "properties": {
@@ -338,8 +389,8 @@
             "type": "integer",
             "title": "Total Turns"
           },
-          "end_reason": {
-            "$ref": "#/components/schemas/EndReason"
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
           },
           "channel_ids": {
             "items": {
@@ -369,6 +420,13 @@
             "type": "array",
             "title": "Reasoning"
           },
+          "debug_logs": {
+            "items": {
+              "$ref": "#/components/schemas/DebugLogEntry"
+            },
+            "type": "array",
+            "title": "Debug Logs"
+          },
           "evaluation": {
             "anyOf": [
               {
@@ -387,11 +445,12 @@
           "scenario_description",
           "timestamp",
           "total_turns",
-          "end_reason",
+          "status",
           "channel_ids",
           "agents",
           "messages",
           "reasoning",
+          "debug_logs",
           "evaluation"
         ],
         "title": "RunDetailResponse",
@@ -413,6 +472,16 @@
         ],
         "title": "RunListResponse",
         "description": "Response model for the list-all-runs endpoint."
+      },
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "scenario_complete",
+          "in_progress",
+          "error"
+        ],
+        "title": "RunStatus",
+        "description": "Why the simulation ended."
       },
       "RunSummary": {
         "properties": {
@@ -437,8 +506,8 @@
             "type": "integer",
             "title": "Total Turns"
           },
-          "end_reason": {
-            "$ref": "#/components/schemas/EndReason"
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
           },
           "has_evaluation": {
             "type": "boolean",
@@ -456,7 +525,7 @@
           "scenario_description",
           "timestamp",
           "total_turns",
-          "end_reason",
+          "status",
           "has_evaluation",
           "run_dir"
         ],

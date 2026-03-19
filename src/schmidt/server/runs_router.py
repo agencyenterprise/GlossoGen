@@ -1,6 +1,7 @@
 """FastAPI router for simulation run endpoints."""
 
 import logging
+import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
@@ -37,3 +38,18 @@ async def get_run_detail(run_id: str, request: Request) -> RunDetailResponse:
     log_path = run_dir / f"{run_summary.scenario_name}.jsonl"
 
     return await load_run_detail(log_path=log_path)
+
+
+@router.delete("/runs/{run_id}", status_code=204)
+async def delete_run(run_id: str, request: Request) -> None:
+    """Delete a simulation run and all its files."""
+    runs_dir: Path = request.app.state.runs_dir
+    summaries = await discover_runs(runs_dir=runs_dir)
+
+    matching = [s for s in summaries if s.run_id == run_id]
+    if not matching:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    run_dir = Path(matching[0].run_dir)
+    shutil.rmtree(run_dir)
+    logger.info("Deleted run directory: %s", run_dir)

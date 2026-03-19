@@ -66,6 +66,7 @@ class ClaudeProvider(LLMProvider):
         system_prompt: str,
         messages: list[LLMMessage],
         tools: list[ToolSpec],
+        force_tool_use: bool,
     ) -> LLMResponse:
         """Send a message sequence to the Claude API and return the parsed response.
 
@@ -92,6 +93,8 @@ class ClaudeProvider(LLMProvider):
         }
         if anthropic_tools:
             kwargs["tools"] = anthropic_tools
+            if force_tool_use:
+                kwargs["tool_choice"] = {"type": "any"}
 
         logger.debug(
             "Calling Claude API: model=%s, messages=%d, tools=%d",

@@ -10,6 +10,7 @@ class TurnDecision(BaseModel):
 
     agent_id: str
     round_number: int
+    allow_pass: bool
 
 
 class SimulationState(BaseModel):
@@ -20,6 +21,7 @@ class SimulationState(BaseModel):
         turn_number: Number of turns completed so far (0 before the first turn).
         messages_by_channel: All messages exchanged on each channel up to this point.
         active_agent_ids: Agents still participating in the simulation.
+        last_turn_passed: True if the previous agent sent no messages, False otherwise.
     """
 
     turn_number: int

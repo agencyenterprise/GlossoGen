@@ -11,7 +11,13 @@ import aiofiles
 import orjson
 from pydantic import TypeAdapter
 
-from schmidt.models.event import SimulationEnded, SimulationEvent, SimulationStarted
+from schmidt.models.event import (
+    RunStatus,
+    SimulationEnded,
+    SimulationEvent,
+    SimulationStarted,
+    TurnAssigned,
+)
 from schmidt.server.response_models import RunSummary
 
 logger = logging.getLogger(__name__)
@@ -46,6 +52,19 @@ def _parse_event(raw_bytes: bytes) -> SimulationEvent:
     """Parse raw JSON bytes into a typed SimulationEvent."""
     raw = orjson.loads(raw_bytes)  # positional-only parameter
     return _EVENT_ADAPTER.validate_python(raw)  # positional-only parameter
+
+
+_TURN_ASSIGNED_MARKER = TurnAssigned.model_fields["event_type"].default.encode()
+
+
+async def _count_turns(file_path: Path) -> int:
+    """Count TurnAssigned events in a JSONL file by scanning for the event type marker."""
+    count = 0
+    async with aiofiles.open(file_path, mode="rb") as f:
+        async for line in f:
+            if _TURN_ASSIGNED_MARKER in line:
+                count += 1
+    return count
 
 
 async def discover_runs(runs_dir: Path) -> list[RunSummary]:
@@ -85,24 +104,35 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                 logger.warning("First event is not SimulationStarted in %s", jsonl_path)
                 continue
 
-            if not isinstance(last_event, SimulationEnded):
-                logger.warning("Last event is not SimulationEnded in %s", jsonl_path)
-                continue
-
             report_path = timestamp_dir / f"{scenario_name}_report.json"
 
-            summaries.append(
-                RunSummary(
-                    run_id=first_event.event_id,
-                    scenario_name=first_event.scenario_name,
-                    scenario_description=first_event.scenario_description,
-                    timestamp=first_event.timestamp,
-                    total_turns=last_event.total_turns,
-                    end_reason=last_event.reason,
-                    has_evaluation=report_path.exists(),
-                    run_dir=str(timestamp_dir),
+            if isinstance(last_event, SimulationEnded):
+                summaries.append(
+                    RunSummary(
+                        run_id=first_event.event_id,
+                        scenario_name=first_event.scenario_name,
+                        scenario_description=first_event.scenario_description,
+                        timestamp=first_event.timestamp,
+                        total_turns=last_event.total_turns,
+                        status=last_event.reason,
+                        has_evaluation=report_path.exists(),
+                        run_dir=str(timestamp_dir),
+                    )
                 )
-            )
+            else:
+                turn_count = await _count_turns(file_path=jsonl_path)
+                summaries.append(
+                    RunSummary(
+                        run_id=first_event.event_id,
+                        scenario_name=first_event.scenario_name,
+                        scenario_description=first_event.scenario_description,
+                        timestamp=first_event.timestamp,
+                        total_turns=turn_count,
+                        status=RunStatus.IN_PROGRESS,
+                        has_evaluation=False,
+                        run_dir=str(timestamp_dir),
+                    )
+                )
 
     summaries.sort(key=lambda s: s.timestamp, reverse=True)
     return summaries
