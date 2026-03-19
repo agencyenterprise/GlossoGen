@@ -21,9 +21,22 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 
 - `src/` — application source code
 - `src/schmidt/scenarios/<scenario_name>/` — one folder per scenario, containing:
-  - `README.md` — scenario documentation (agents, channels, tools, round injections, turn logic, evaluation focus)
-  - `scenario.py` — scenario class definition (channels, turn logic, tools, injections)
+  - `README.md` — scenario documentation (agents, channels, tools, round injections, agent coordination, evaluation focus)
+  - `scenario.py` — scenario class definition (channels, timing config, tools, injections)
   - `prompts/` — Jinja2 templates for all agent system prompts and injection messages
+- `src/schmidt/runtime/` — simulation runtime (MCP server + coordination):
+  - `simulation_state.py` — shared state: channels, sessions, locks, callbacks
+  - `mcp_tools.py` — MCP tool definitions (check_messages, read_channel, send_message, etc.)
+  - `mcp_server.py` — starts FastMCP over Streamable HTTP as an asyncio task
+  - `game_clock.py` — round progression, injection delivery, termination detection
+  - `agent_session.py` — per-agent notification queue, reaction delay, idle tracking
+  - `activity_notification.py` — notification types (NewMessages, NewInfo, Done)
+  - `scenario_mcp_tool.py` — ScenarioMcpTool NamedTuple for scenario-specific tool registration
+- `src/schmidt/runners/` — agent runner implementations:
+  - `agent_runner_base.py` — abstract base class defining the interface for agent runners
+  - `claude_code_runner.py` — runner that executes agents via Claude Code with MCP tools; captures agent reasoning text (`TextBlock`) and emits `LLMResponseReceived` events to the event log
+- `src/schmidt/template_renderer.py` — shared Jinja2 `TemplateRenderer` used by scenarios and evaluators
+- `src/schmidt/autonomous_supervisor.py` — monitors agent activity and triggers round advancement
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST
 - `linter/` — custom linting scripts
 - `frontend/` — Next.js web application
@@ -101,11 +114,15 @@ All simulation outputs use a standard directory layout:
 
 ```
 runs/{scenario_name}/{unix_timestamp}/
-├── {scenario_name}.jsonl          # Event log
+├── {scenario_name}.jsonl          # Event log (messages, reasoning, round transitions)
 ├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, read by FE)
 ├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
 └── {scenario_name}_stdout.log     # (pipe stdout here)
 ```
+
+### Agent Reasoning in the Event Log
+
+The JSONL event log contains `llm_response_received` events with agent reasoning text — the text the agent produces between tool calls. The `ClaudeCodeRunner` captures `TextBlock` content from `AssistantMessage` responses and emits these as events. The frontend displays reasoning entries inline in the chat timeline with reduced opacity and a "reasoning" label.
 
 ## Running Simulations
 
@@ -117,20 +134,20 @@ set -a && source .env && set +a && \
   > ./runs/<scenario>_stdout.log 2>&1 &
 ```
 
-The `incident_response` scenario requires a `--max-turns-per-round` flag:
+The `incident_response` scenario requires a `--max-round-duration` flag:
 
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
     --model <model> --runs-dir ./runs \
-    --max-turns-per-round 10 \
+    --max-round-duration 300 \
   > ./runs/incident_response_stdout.log 2>&1 &
 ```
 
-The `car_recall` scenario registers its own `--knobs` flag pointing to a JSON file with scenario configuration (includes `max_turns_per_round`). Two presets are provided in `src/schmidt/scenarios/car_recall/`:
+The `car_recall` scenario requires a `--knobs` flag pointing to a JSON file with scenario configuration. Two presets are provided in `src/schmidt/scenarios/car_recall/`:
 
-- `knobs_baseline.json` — 5 agents, 5 rounds, 10 turns per round, all knobs set to low
-- `knobs_high_pressure.json` — 5 agents, 3 rounds, 10 turns per round, high time/goal/regulator pressure
+- `knobs_baseline.json` — 5 agents, 5 rounds, all knobs set to low
+- `knobs_high_pressure.json` — 5 agents, 3 rounds, high time/goal/regulator pressure
 
 ```bash
 set -a && source .env && set +a && \
@@ -147,8 +164,8 @@ Check progress by reading the stdout log file or the JSONL event log.
 When running simulations, evaluations, or any long-running background process, **always** follow this pattern:
 
 1. Launch the process in the background (with `run_in_background` or `&`)
-2. Immediately after launch, `sleep 30` then check the log file for progress (grep for turn count, last line, or completion marker)
-3. Report a brief status update to the user (e.g. "Turn 8/14, Round 2")
+2. Immediately after launch, `sleep 30` then check the log file for progress (grep for round number, last line, or completion marker)
+3. Report a brief status update to the user (e.g. "Round 3/6, agents active")
 4. Repeat: `sleep 30`, check, report — until the process completes
 5. Never use `while` loops or polling constructs — use sequential sleep/check/report cycles so the user sees updates between checks
 

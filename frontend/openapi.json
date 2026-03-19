@@ -385,9 +385,9 @@
             "format": "date-time",
             "title": "Timestamp"
           },
-          "total_turns": {
+          "total_messages": {
             "type": "integer",
-            "title": "Total Turns"
+            "title": "Total Messages"
           },
           "status": {
             "$ref": "#/components/schemas/RunStatus"
@@ -444,7 +444,7 @@
           "scenario_name",
           "scenario_description",
           "timestamp",
-          "total_turns",
+          "total_messages",
           "status",
           "channel_ids",
           "agents",
@@ -502,9 +502,9 @@
             "format": "date-time",
             "title": "Timestamp"
           },
-          "total_turns": {
+          "total_messages": {
             "type": "integer",
-            "title": "Total Turns"
+            "title": "Total Messages"
           },
           "status": {
             "$ref": "#/components/schemas/RunStatus"
@@ -524,7 +524,7 @@
           "scenario_name",
           "scenario_description",
           "timestamp",
-          "total_turns",
+          "total_messages",
           "status",
           "has_evaluation",
           "run_dir"

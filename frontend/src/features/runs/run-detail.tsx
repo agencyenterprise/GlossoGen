@@ -132,7 +132,7 @@ export function RunDetail({ runId }: { runId: string }) {
           </button>
         </span>
         <span className="text-[13px] text-muted-foreground">
-          {maxRound} rounds · {data.total_turns} turns · {data.agents.length} agents ·{" "}
+          {maxRound} rounds · {data.total_messages} messages · {data.agents.length} agents ·{" "}
           {uniqueModels.length <= 1 ? (
             modelLabel
           ) : (

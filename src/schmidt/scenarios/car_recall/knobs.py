@@ -82,7 +82,6 @@ class CarRecallKnobs(BaseModel):
     regulator_pressure: RegulatorPressure
     agent_count: AgentCount
     information_overlap: InformationOverlap
-    max_turns_per_round: int
     model_overrides: dict[str, str]
 
     @model_validator(mode="after")

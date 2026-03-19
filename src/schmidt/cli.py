@@ -2,7 +2,7 @@
 
 Defines the ``schmidt`` CLI with three subcommands:
 
-* ``run``      -- load and execute a simulation scenario
+* ``run``      -- load and execute a simulation scenario with autonomous agents
 * ``evaluate`` -- score a previously-generated simulation log
 * ``serve``    -- start the FastAPI web server
 """
@@ -16,18 +16,18 @@ from pathlib import Path
 
 import uvicorn
 
+from schmidt.autonomous_supervisor import AutonomousSupervisor
 from schmidt.event_logger import EventLogger
-from schmidt.llm.claude_provider import ClaudeProvider
-from schmidt.llm.provider import LLMProvider
 from schmidt.logging_format import JsonLineFormatter
-from schmidt.models.agent_config import AgentConfig
+from schmidt.runners.claude_code_runner import ClaudeCodeRunner
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios import SCENARIO_REGISTRY
-from schmidt.simulation_hub import SimulationHub
-from schmidt.tools.tool_registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_MCP_PORT = 8001
+DEFAULT_MAX_AGENT_TURNS = 200
 
 
 def _build_parsers() -> tuple[
@@ -57,6 +57,18 @@ def _build_parsers() -> tuple[
         help="Root directory for runs (output goes to runs-dir/scenario/timestamp/)",
     )
     run_parser.add_argument("--model", type=str, required=True, help="Claude model to use")
+    run_parser.add_argument(
+        "--mcp-port",
+        type=int,
+        default=DEFAULT_MCP_PORT,
+        help=f"Port for the MCP server (default: {DEFAULT_MCP_PORT})",
+    )
+    run_parser.add_argument(
+        "--max-agent-turns",
+        type=int,
+        default=DEFAULT_MAX_AGENT_TURNS,
+        help=f"Maximum agentic turns per agent (default: {DEFAULT_MAX_AGENT_TURNS})",
+    )
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a simulation log")
     evaluate_parser.add_argument(
@@ -119,25 +131,6 @@ def main() -> None:
         asyncio.run(_run_evaluation(args=args, scenario=scenario))
 
 
-def _build_agent_providers(
-    agents: list[AgentConfig],
-) -> dict[str, LLMProvider]:
-    """Build a per-agent LLM provider mapping.
-
-    Providers are deduped so agents sharing the same model share the same
-    ``ClaudeProvider`` instance.
-    """
-    providers_by_model: dict[str, ClaudeProvider] = {}
-    agent_providers: dict[str, LLMProvider] = {}
-
-    for agent in agents:
-        if agent.model not in providers_by_model:
-            providers_by_model[agent.model] = ClaudeProvider(model=agent.model)
-        agent_providers[agent.agent_id] = providers_by_model[agent.model]
-
-    return agent_providers
-
-
 def _compute_run_dir(runs_dir: Path, scenario_name: str) -> Path:
     """Compute the output directory for a new simulation run.
 
@@ -152,28 +145,25 @@ async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
 ) -> None:
-    """Wire up the simulation components and execute the simulation.
-
-    Writes a JSONL event log to ``{runs_dir}/{scenario_name}/{timestamp}/{scenario_name}.jsonl``.
-    """
+    """Wire up the autonomous supervisor and execute the simulation."""
     runs_dir = Path(args.runs_dir)
     run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
     agents = scenario.get_agents(default_model=args.model)
-    agent_providers = _build_agent_providers(agents=agents)
-    registry = ToolRegistry()
 
     log_path = run_dir / f"{scenario.name()}.jsonl"
     event_logger = EventLogger(log_path=log_path)
 
-    hub = SimulationHub(
+    max_turns = args.max_agent_turns
+
+    supervisor = AutonomousSupervisor(
         scenario=scenario,
-        agents=agents,
-        agent_providers=agent_providers,
-        tool_registry=registry,
+        agent_configs=agents,
         event_logger=event_logger,
+        mcp_server_port=args.mcp_port,
+        runner_factory=lambda: ClaudeCodeRunner(max_turns=max_turns),
     )
 
-    # Add JSON debug log file for frontend display
+    # Add JSON debug log file for frontend display.
     debug_log_path = run_dir / f"{scenario.name()}_debug.jsonl"
     run_dir.mkdir(parents=True, exist_ok=True)
     json_handler = logging.FileHandler(debug_log_path)
@@ -182,11 +172,12 @@ async def _run_simulation(
 
     logger.info("Running scenario: %s", scenario.name())
     logger.info("Model: %s", args.model)
+    logger.info("MCP port: %d, max agent turns: %d", args.mcp_port, max_turns)
     logger.info("Run directory: %s", run_dir)
     logger.info("Log: %s", log_path)
 
     try:
-        await hub.run()
+        await supervisor.run()
     finally:
         logging.getLogger().removeHandler(json_handler)
         json_handler.close()
@@ -204,6 +195,7 @@ async def _run_evaluation(
     log_path = run_dir / f"{args.scenario_name}.jsonl"
     report_path = run_dir / f"{args.scenario_name}_report.json"
 
+    logger.info("Evaluating %s with evaluators: %s", args.scenario_name, args.evaluators)
     await scenario.run_evaluation(
         log_path=log_path,
         evaluator_names=evaluator_names,
@@ -216,6 +208,7 @@ async def _run_evaluation(
 
 def _run_serve(args: argparse.Namespace) -> None:
     """Start the FastAPI web server."""
+    logger.info("Starting web server on port %d, runs dir: %s", args.port, args.runs_dir)
     os.environ["SCHMIDT_RUNS_DIR"] = args.runs_dir
     uvicorn.run(
         app="schmidt.server.app:app",

@@ -28,7 +28,7 @@ class RunSummary(BaseModel):
     scenario_name: str
     scenario_description: str
     timestamp: datetime
-    total_turns: int
+    total_messages: int
     status: RunStatus
     has_evaluation: bool
     run_dir: str
@@ -106,7 +106,7 @@ class RunDetailResponse(BaseModel):
     scenario_name: str
     scenario_description: str
     timestamp: datetime
-    total_turns: int
+    total_messages: int
     status: RunStatus
     channel_ids: list[str]
     agents: list[AgentDetail]

@@ -12,11 +12,11 @@ from schmidt.models.event import (
     AgentRegistered,
     LLMResponseReceived,
     MessageSent,
+    RoundAdvanced,
     RunStatus,
     SimulationEnded,
     SimulationEvent,
     SimulationStarted,
-    TurnAssigned,
 )
 from schmidt.server.response_models import (
     AgentDetail,
@@ -66,15 +66,18 @@ async def _load_debug_logs(debug_log_path: Path) -> list[DebugLogEntry]:
             stripped = line.strip()
             if not stripped:
                 continue
-            raw = orjson.loads(stripped)
-            entries.append(
-                DebugLogEntry(
-                    timestamp=raw["timestamp"],
-                    logger_name=raw["logger"],
-                    level=raw["level"],
-                    message=raw["message"],
+            try:
+                raw = orjson.loads(stripped)
+                entries.append(
+                    DebugLogEntry(
+                        timestamp=raw["timestamp"],
+                        logger_name=raw["logger"],
+                        level=raw["level"],
+                        message=raw["message"],
+                    )
                 )
-            )
+            except (KeyError, orjson.JSONDecodeError):
+                logger.exception("Skipping malformed debug log entry in %s", debug_log_path)
     return entries
 
 
@@ -90,12 +93,10 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     agents: list[AgentDetail] = []
     messages: list[ChannelMessage] = []
     reasoning: list[ReasoningEntry] = []
-    total_turns = 0
+    total_messages = 0
     status = None
 
-    # Track the most recent TurnAssigned per agent
-    agent_turn: dict[str, int] = {}
-    agent_round: dict[str, int] = {}
+    current_round = 0
 
     for event in events:
         if isinstance(event, SimulationStarted):
@@ -117,10 +118,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 )
             )
 
-        elif isinstance(event, TurnAssigned):
-            total_turns += 1
-            agent_turn[event.agent_id] = event.turn_number
-            agent_round[event.agent_id] = event.round_number
+        elif isinstance(event, RoundAdvanced):
+            current_round = event.new_round_number
 
         elif isinstance(event, LLMResponseReceived):
             if event.text is not None and event.text.strip():
@@ -130,8 +129,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                         sender_agent_id=event.agent_id,
                         text=event.text,
                         timestamp=event.timestamp,
-                        turn_number=agent_turn.get(event.agent_id, 0),
-                        round_number=agent_round.get(event.agent_id, 0),
+                        turn_number=total_messages,
+                        round_number=current_round,
                     )
                 )
 
@@ -144,10 +143,11 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     sender_agent_id=msg.sender_agent_id,
                     text=msg.text,
                     timestamp=msg.timestamp,
-                    turn_number=agent_turn.get(msg.sender_agent_id, 0),
-                    round_number=agent_round.get(msg.sender_agent_id, 0),
+                    turn_number=total_messages,
+                    round_number=current_round,
                 )
             )
+            total_messages += 1
 
         elif isinstance(event, SimulationEnded):
             status = event.reason
@@ -168,7 +168,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         scenario_name=scenario_name,
         scenario_description=scenario_description,
         timestamp=timestamp,
-        total_turns=total_turns,
+        total_messages=total_messages,
         status=status,
         channel_ids=channel_ids,
         agents=agents,
