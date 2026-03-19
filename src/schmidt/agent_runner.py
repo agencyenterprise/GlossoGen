@@ -10,7 +10,13 @@ from schmidt.event_logger import EventLogger
 from schmidt.llm.prompt_builder import PromptBuilder
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import LLMRequestSent, LLMResponseReceived, ToolCalled, ToolResultReturned
+from schmidt.models.event import (
+    LLMRequestSent,
+    LLMResponseReceived,
+    ReasoningCaptured,
+    ToolCalled,
+    ToolResultReturned,
+)
 from schmidt.models.simulation_state import TurnDecision
 from schmidt.models.tool_definition import ToolSpec
 from schmidt.scenario_protocol import SimulationScenario
@@ -110,6 +116,12 @@ class AgentRunner:
             injection=injection,
         )
 
+        if self._scenario.enable_reasoning_capture() and injection is not None:
+            await self._capture_reasoning(
+                messages=messages,
+                round_number=decision.round_number,
+            )
+
         tools = self._tool_registry.get_specs(names=list(self._config.tool_names))
         if not decision.allow_pass:
             tools = [t for t in tools if t.name != "pass_turn"]
@@ -130,6 +142,49 @@ class AgentRunner:
             messages.append(LLMMessage(role="user", content=turn_context))
 
         await self._llm_tool_loop(messages=messages, tools=tools)
+
+    async def _capture_reasoning(
+        self,
+        messages: list[LLMMessage],
+        round_number: int,
+    ) -> None:
+        """Elicit private reasoning from the agent and log it.
+
+        Makes a separate LLM call with a reasoning prompt appended to the current
+        message history. The response is logged as a ``ReasoningCaptured`` event
+        but NOT added to the agent's conversation history.
+        """
+        reasoning_prompt = (
+            "Before deciding your action this round, briefly reason through your "
+            "situation: what do you know, what are your concerns, and what are you "
+            "planning to do?"
+        )
+
+        reasoning_messages = list(messages)
+        reasoning_messages.append(LLMMessage(role="user", content=reasoning_prompt))
+
+        response = await self._llm_provider.generate(
+            system_prompt=self._config.system_prompt,
+            messages=reasoning_messages,
+            tools=[],
+            force_tool_use=False,
+        )
+
+        reasoning_text = response.text if response.text else ""
+        if reasoning_text:
+            await self._event_logger.log(
+                event=ReasoningCaptured(
+                    agent_id=self._config.agent_id,
+                    round_number=round_number,
+                    reasoning_text=reasoning_text,
+                )
+            )
+            logger.debug(
+                "Captured reasoning for agent %s (round %d, %d chars)",
+                self._config.agent_id,
+                round_number,
+                len(reasoning_text),
+            )
 
     async def _llm_tool_loop(
         self,

@@ -77,6 +77,17 @@ class SimulationScenario(ABC):
         """
         ...
 
+    def enable_reasoning_capture(self) -> bool:
+        """Return True to elicit private reasoning from agents before each action phase.
+
+        When enabled, the AgentRunner makes a separate LLM call to capture the
+        agent's reasoning, logged as a ``ReasoningCaptured`` event. The reasoning
+        is not added to the agent's conversation history.
+
+        Defaults to False. Override in subclasses that need interpretability data.
+        """
+        return False
+
     @abstractmethod
     def register_tools(self, registry: ToolRegistry) -> None:
         """Register scenario-specific tools with the provided tool registry."""
