@@ -29,25 +29,34 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT_SUFFIX = (
     "\n\n---\n"
     "COMMUNICATION PROTOCOL:\n"
-    "You are in a live team session. Follow this exact protocol:\n"
+    "You are in a live team session. Other participants can send messages at any time, "
+    "even while you are composing yours.\n\n"
+    "Follow this exact protocol:\n"
     "1. Call check_messages() to receive events\n"
-    "2. When you receive new_info or new_messages, call list_channels() to see your channels, "
-    "then call send_message(channel_id, text) to share your thoughts with the team\n"
-    "3. Call check_messages() again\n"
-    "4. Repeat until check_messages returns type=done\n\n"
+    "2. When you receive new_info or new_messages, call read_channel(channel_id, last_n) "
+    "to see the messages\n"
+    "3. Call send_message(channel_id, text, force) to reply. Set force=false\n"
+    "4. If send_message returns status='conflict', new messages arrived while you were "
+    "composing your reply. The response includes those messages. Read them, then decide:\n"
+    "   - Revise your message and call send_message again with force=false\n"
+    "   - If your original message is still relevant, re-send it with force=true\n"
+    "5. Call check_messages() again and repeat until it returns type=done\n\n"
     "RULES:\n"
     "- Text you write outside of send_message() is NOT visible to anyone\n"
     "- You MUST use send_message() to communicate — there is no other way\n"
     "- NEVER stop or end your turn without calling check_messages() first\n"
     "- After receiving information, ALWAYS call send_message() "
-    "before calling check_messages() again"
+    "before calling check_messages() again\n"
+    "- When you get a conflict on send_message, ALWAYS review the new messages "
+    "before deciding whether to revise or force-send"
 )
 
 INITIAL_PROMPT = "Start by calling check_messages() to see if there is anything new."
 
 CONTINUE_PROMPT = (
     "Call check_messages() to wait for the next event. "
-    "When you get new info, use send_message() to share your response with the team."
+    "When you get new info, read the channel and use send_message(channel_id, text, force=false) "
+    "to share your response with the team."
 )
 
 BASE_MCP_TOOLS = [

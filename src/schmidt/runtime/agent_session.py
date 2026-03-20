@@ -1,8 +1,8 @@
 """Per-agent session state tracked by the simulation runtime.
 
 Each agent connected to the runtime gets an ``AgentSession`` that holds its
-notification queue, reaction delay configuration, idle-tracking flag, and
-termination state.
+notification queue, reaction delay configuration, idle-tracking flag,
+per-channel read position, and termination state.
 """
 
 import asyncio
@@ -27,6 +27,7 @@ class AgentSession:
         self.reaction_delay_min = reaction_delay_min
         self.reaction_delay_max = reaction_delay_max
         self._queue: asyncio.Queue[ActivityNotification] = asyncio.Queue()
+        self._last_seen_counts: dict[str, int] = {}
         self.is_idle = False
         self._terminated = False
         self._done_reason = ""
@@ -34,6 +35,17 @@ class AgentSession:
     def sample_reaction_delay(self) -> float:
         """Return a random delay in seconds drawn from the agent's configured range."""
         return random.uniform(self.reaction_delay_min, self.reaction_delay_max)
+
+    def record_channel_read(self, channel_id: str, message_count: int) -> None:
+        """Record that this agent has seen all messages up to the given count."""
+        self._last_seen_counts[channel_id] = message_count
+
+    def get_last_seen_count(self, channel_id: str) -> int:
+        """Return the message count at the time of the agent's last read_channel call.
+
+        Returns 0 if the agent has never read this channel.
+        """
+        return self._last_seen_counts.get(channel_id, 0)
 
     def has_pending_notifications(self) -> bool:
         """Return True if there are unprocessed notifications in the queue."""

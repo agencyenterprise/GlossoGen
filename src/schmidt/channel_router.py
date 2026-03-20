@@ -24,6 +24,10 @@ class ChannelRouter:
         """Return a copy of the message history for the given channel."""
         return list(self._messages[channel_id])
 
+    def get_message_count(self, channel_id: str) -> int:
+        """Return the number of messages in the given channel."""
+        return len(self._messages[channel_id])
+
     def get_agent_channel_ids(self, agent_id: str) -> list[str]:
         """Return the channel IDs for all channels the given agent belongs to."""
         return [ch.channel_id for ch in self._channels.values() if agent_id in ch.member_agent_ids]
