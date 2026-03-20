@@ -8,7 +8,7 @@ continue the loop.
 
 import logging
 
-from claude_agent_sdk import (
+from claude_agent_sdk import (  # pyright: ignore[reportMissingImports]
     AssistantMessage,
     ClaudeAgentOptions,
     ResultMessage,
@@ -16,7 +16,12 @@ from claude_agent_sdk import (
     UserMessage,
     query,
 )
-from claude_agent_sdk.types import McpHttpServerConfig, TextBlock, ThinkingBlock, ToolUseBlock
+from claude_agent_sdk.types import (  # pyright: ignore[reportMissingImports]
+    McpHttpServerConfig,
+    TextBlock,
+    ThinkingBlock,
+    ToolUseBlock,
+)
 
 from schmidt.event_logger import EventLogger
 from schmidt.models.agent_config import AgentConfig

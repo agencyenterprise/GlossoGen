@@ -16,7 +16,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "mcp>=1.0.0",
-    "claude-agent-sdk>=0.1.0",
+    "claude-agent-sdk>=0.1.0; sys_platform == 'darwin'",
 ]
 
 [dependency-groups]
@@ -29,6 +29,12 @@ dev = [
     "vulture>=2.14",
     "pytest>=8.0.0",
     "types-aiofiles>=25.1.0.20251011",
+]
+
+[tool.uv]
+required-environments = [
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
 [tool.setuptools.packages.find]
@@ -47,6 +53,10 @@ python_version = "3.12"
 strict = true
 mypy_path = "src"
 explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = "claude_agent_sdk.*"
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100
