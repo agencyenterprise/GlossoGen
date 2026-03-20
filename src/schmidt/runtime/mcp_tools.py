@@ -14,6 +14,7 @@ from uuid import uuid4
 from mcp.server.fastmcp import Context, FastMCP
 
 from schmidt.models.event import MessageSent
+from schmidt.models.mcp_responses import ChannelMessage, SendMessageResult
 from schmidt.models.message import SimulationMessage
 from schmidt.runtime.activity_notification import NewMessagesNotification
 from schmidt.runtime.agent_session import AgentSession
@@ -61,25 +62,57 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         description="Check if there are any new messages or updates for you.",
     )
     async def check_messages(ctx: ToolContext) -> dict[str, Any]:
-        """Block until there is activity for the agent, then return it."""
+        """Block until there is activity for the agent, then return it.
+
+        For NewMessagesNotifications, filters out channels the agent has
+        already read (last_seen >= actual count). If all channels in a
+        notification are stale, the notification is discarded and the agent
+        continues waiting for the next one.
+        """
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
-        notification = await session.wait_for_notification()
-        delay = session.sample_reaction_delay()
-        logger.info(
-            "Agent %s received %s, applying %.2fs reaction delay",
-            session.agent_id,
-            notification.type.value,
-            delay,
-        )
-        await asyncio.sleep(delay)
-        return notification.model_dump()
+        while True:
+            notification = await session.wait_for_notification()
+            if isinstance(notification, NewMessagesNotification):
+                fresh_channels = [
+                    ch
+                    for ch in notification.channels
+                    if runtime.channel_router.get_message_count(channel_id=ch)
+                    > session.get_last_seen_count(channel_id=ch)
+                ]
+                if not fresh_channels:
+                    logger.debug(
+                        "Agent %s skipping stale notification (all channels already read)",
+                        session.agent_id,
+                    )
+                    continue
+                notification = NewMessagesNotification(channels=fresh_channels)
+                for ch in fresh_channels:
+                    session.record_channel_read(
+                        channel_id=ch,
+                        message_count=runtime.channel_router.get_message_count(
+                            channel_id=ch,
+                        ),
+                    )
+            delay = session.sample_reaction_delay()
+            logger.info(
+                "Agent %s received %s, applying %.2fs reaction delay",
+                session.agent_id,
+                notification.type.value,
+                delay,
+            )
+            await asyncio.sleep(delay)
+            return notification.model_dump()
 
     @mcp.tool(
         name="read_channel",
         description="Read the last N messages from a channel.",
     )
     async def read_channel(ctx: ToolContext, channel_id: str, last_n: int) -> list[dict[str, Any]]:
-        """Return recent messages from a channel the agent belongs to."""
+        """Return recent messages and advance the agent's read position.
+
+        Updates last_seen so that messages visible at read time are not
+        flagged as new in subsequent send_message conflict checks.
+        """
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
         agent_id = session.agent_id
         if not runtime.channel_router.validate_membership(
@@ -88,6 +121,10 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         ):
             raise ValueError(f"You are not a member of channel '{channel_id}'")
         history = runtime.channel_router.get_history(channel_id=channel_id)
+        session.record_channel_read(
+            channel_id=channel_id,
+            message_count=len(history),
+        )
         recent = history[-last_n:]
         display_name_fn = runtime.scenario.get_agent_display_name
         return [
@@ -101,10 +138,17 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
 
     @mcp.tool(
         name="send_message",
-        description="Send a message to a channel.",
+        description=(
+            "Send a message to a channel. "
+            "If new messages arrived since your last read_channel call, "
+            "the send is held and the new messages are returned so you can decide what to do. "
+            "Set force=true to send regardless of new messages."
+        ),
     )
-    async def send_message(ctx: ToolContext, channel_id: str, text: str) -> str:
-        """Post a message to a channel and notify other members."""
+    async def send_message(
+        ctx: ToolContext, channel_id: str, text: str, force: bool
+    ) -> dict[str, Any]:
+        """Post a message with optimistic concurrency control."""
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
         agent_id = session.agent_id
         if not runtime.channel_router.validate_membership(
@@ -113,7 +157,43 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         ):
             raise ValueError(f"You are not a member of channel '{channel_id}'")
 
+        display_name_fn = runtime.scenario.get_agent_display_name
+
         async with runtime.get_channel_lock(channel_id=channel_id):
+            actual_count = runtime.channel_router.get_message_count(
+                channel_id=channel_id,
+            )
+            last_seen = session.get_last_seen_count(channel_id=channel_id)
+
+            if not force and actual_count > last_seen:
+                history = runtime.channel_router.get_history(channel_id=channel_id)
+                unseen = history[last_seen:]
+                new_messages = [
+                    ChannelMessage(
+                        sender=display_name_fn(agent_id=msg.sender_agent_id),
+                        text=msg.text,
+                        timestamp=msg.timestamp.isoformat(),
+                    )
+                    for msg in unseen
+                ]
+                logger.info(
+                    "Agent %s send_message conflict on channel %s: "
+                    "last_seen=%d actual=%d (%d new)",
+                    agent_id,
+                    channel_id,
+                    last_seen,
+                    actual_count,
+                    len(unseen),
+                )
+                return SendMessageResult(
+                    status="conflict",
+                    detail=(
+                        f"{len(unseen)} new message(s) arrived since your last read. "
+                        "Review them and either revise your message or re-send with force=true."
+                    ),
+                    new_messages=new_messages,
+                ).model_dump()
+
             message = SimulationMessage(
                 message_id=str(uuid4()),
                 channel_id=channel_id,
@@ -123,6 +203,11 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
             )
             runtime.channel_router.append_message(message=message)
             await runtime.event_logger.log(event=MessageSent(message=message))
+
+            session.record_channel_read(
+                channel_id=channel_id,
+                message_count=actual_count + 1,
+            )
 
             member_ids = runtime.channel_router.get_channel_member_ids(
                 channel_id=channel_id,
@@ -139,7 +224,11 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
             runtime.fire_on_message_callbacks()
 
         logger.info("Agent %s sent %d chars to channel %s", agent_id, len(text), channel_id)
-        return f"Message sent to channel '{channel_id}'"
+        return SendMessageResult(
+            status="sent",
+            detail=f"Message sent to channel '{channel_id}'",
+            new_messages=[],
+        ).model_dump()
 
     @mcp.tool(
         name="list_channels",
