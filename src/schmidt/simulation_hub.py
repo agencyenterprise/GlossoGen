@@ -102,6 +102,7 @@ class SimulationHub:
                 scenario_name=self._scenario.name(),
                 scenario_description=self._scenario.scenario_description(),
                 channel_ids=[ch.channel_id for ch in channels],
+                scenario_config=self._scenario.get_scenario_config(),
             )
         )
 

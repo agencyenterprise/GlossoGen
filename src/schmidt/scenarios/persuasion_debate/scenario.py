@@ -129,6 +129,10 @@ class PersuasionDebateScenario(SimulationScenario):
         """Return the scenario identifier."""
         return "persuasion_debate"
 
+    def get_scenario_config(self) -> dict[str, object]:
+        """Return persuasion debate knobs as a config dict."""
+        return self._knobs.model_dump()
+
     def scenario_description(self) -> str:
         """Return a markdown description of the scenario."""
         return self._render_template(template_name="description.jinja")

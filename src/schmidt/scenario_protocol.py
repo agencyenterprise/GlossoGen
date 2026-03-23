@@ -61,6 +61,14 @@ class SimulationScenario(ABC):
         """Return the human-readable display name for an agent."""
         ...
 
+    def get_scenario_config(self) -> dict[str, object]:
+        """Return scenario configuration as a JSON-serializable dict for logging and display.
+
+        Subclasses override this to expose their knobs. The default returns
+        an empty dict, so scenarios without configuration need no changes.
+        """
+        return {}
+
     @abstractmethod
     async def decide_next_turn(self, state: SimulationState) -> TurnDecision | None:
         """Determine which agent acts next given the current simulation state.

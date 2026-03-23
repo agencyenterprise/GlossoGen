@@ -151,6 +151,25 @@ export function RunDetail({ runId }: { runId: string }) {
         </span>
       </div>
 
+      {/* Scenario config */}
+      {data.scenario_config && Object.keys(data.scenario_config).length > 0 ? (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {Object.entries(data.scenario_config).map(([key, value]) => {
+            const display =
+              typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
+            return (
+              <span
+                key={key}
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px]"
+              >
+                <span className="text-muted-foreground">{humanize(key)}</span>
+                <span className="font-medium">{display}</span>
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
+
       {showDescription ? (
         <ScenarioDescriptionModal
           scenarioName={humanize(data.scenario_name)}

@@ -380,6 +380,11 @@
             "type": "string",
             "title": "Scenario Description"
           },
+          "scenario_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scenario Config"
+          },
           "timestamp": {
             "type": "string",
             "format": "date-time",
@@ -443,6 +448,7 @@
           "run_id",
           "scenario_name",
           "scenario_description",
+          "scenario_config",
           "timestamp",
           "total_turns",
           "status",
@@ -497,6 +503,11 @@
             "type": "string",
             "title": "Scenario Description"
           },
+          "scenario_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scenario Config"
+          },
           "timestamp": {
             "type": "string",
             "format": "date-time",
@@ -523,6 +534,7 @@
           "run_id",
           "scenario_name",
           "scenario_description",
+          "scenario_config",
           "timestamp",
           "total_turns",
           "status",

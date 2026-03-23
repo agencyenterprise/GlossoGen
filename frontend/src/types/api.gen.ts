@@ -202,6 +202,10 @@ export interface components {
             scenario_name: string;
             /** Scenario Description */
             scenario_description: string;
+            /** Scenario Config */
+            scenario_config: {
+                [key: string]: unknown;
+            };
             /**
              * Timestamp
              * Format: date-time
@@ -247,6 +251,10 @@ export interface components {
             scenario_name: string;
             /** Scenario Description */
             scenario_description: string;
+            /** Scenario Config */
+            scenario_config: {
+                [key: string]: unknown;
+            };
             /**
              * Timestamp
              * Format: date-time
