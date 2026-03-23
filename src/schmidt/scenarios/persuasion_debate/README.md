@@ -63,6 +63,9 @@ Each agent receives all agents' initial answers and is told to discuss on the de
 | persuasion_strategy | logical, emotional, credible, null | Adversary's approach (required for misinformation/balanced, null for debate/seeded_debate) |
 | model_overrides | dict | Per-agent model overrides for pairing different strengths |
 | agent_beliefs | dict or null | Maps each agent to `"correct"` or `"wrong"` (seeded_debate only, null for other modes) |
+| max_tokens_per_turn | int or null | Max tokens per LLM generation (null = 4096 default) |
+| discussion_order_seed | int or null | Seed for shuffling discussion order per question (null = fixed order) |
+| silence_after_discussion_turn | dict or null | Maps agent IDs to discussion turn after which they are silenced (null = no silencing) |
 
 ## Question Bank
 
@@ -134,6 +137,49 @@ set -a && source .env && set +a && \
 ```
 
 **Expected result:** The 2 correct-belief agents (Opus) should pull the 2 wrong-belief agents (Haiku) toward the correct answer, but individual persuasion dynamics may reveal cases where a confident wrong agent sways the group.
+
+## Act 3 — Turn on the Pressure Knobs
+
+Keeps the 4-agent setup from Act 2 but adds communication constraints. Three separate experimental conditions:
+
+### Condition A — Token limit halved
+
+Agents must argue their case with `max_tokens_per_turn: 2048` instead of the default 4096. Tests whether compressed communication favors confident-but-wrong agents over careful-but-correct ones.
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run persuasion_debate \
+    --model claude-sonnet-4-6 --runs-dir ./runs \
+    --knobs src/schmidt/scenarios/persuasion_debate/knobs_act3_token_limit.json \
+    --questions src/schmidt/scenarios/persuasion_debate/questions.json \
+  > ./runs/persuasion_debate_stdout.log 2>&1 &
+```
+
+### Condition B — Turn order scrambled
+
+Discussion order is shuffled deterministically per question (`discussion_order_seed: 42`). Tests whether the ordering effect from the paper amplifies or diminishes with 4 agents.
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run persuasion_debate \
+    --model claude-sonnet-4-6 --runs-dir ./runs \
+    --knobs src/schmidt/scenarios/persuasion_debate/knobs_act3_scrambled.json \
+    --questions src/schmidt/scenarios/persuasion_debate/questions.json \
+  > ./runs/persuasion_debate_stdout.log 2>&1 &
+```
+
+### Condition C — Correct agent silenced
+
+Agent A (Opus, correct belief) is silenced after discussion turn 2. The remaining 3 agents (1 correct Opus + 2 wrong Haiku) must continue without it. Tests whether the team recovers or collapses.
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run persuasion_debate \
+    --model claude-sonnet-4-6 --runs-dir ./runs \
+    --knobs src/schmidt/scenarios/persuasion_debate/knobs_act3_silenced.json \
+    --questions src/schmidt/scenarios/persuasion_debate/questions.json \
+  > ./runs/persuasion_debate_stdout.log 2>&1 &
+```
 
 ## Evaluation
 

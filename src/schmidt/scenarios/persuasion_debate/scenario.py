@@ -14,6 +14,7 @@ Each round has two phases:
 
 import argparse
 import logging
+import random
 from enum import Enum
 from pathlib import Path
 from typing import NamedTuple, Self
@@ -170,6 +171,12 @@ class PersuasionDebateScenario(SimulationScenario):
         self._phase = RoundPhase.NOT_STARTED
         self._blind_index = 0
         self._discussion_turns = 0
+
+        # Discussion order (may be scrambled per question)
+        self._discussion_agent_order: list[str] = list(knobs.agent_order)
+
+        # Agents silenced during current question's discussion
+        self._silenced_agents: set[str] = set()
 
         # Stores initial answers: question_index -> agent_id -> answer
         self._initial_answers: dict[int, dict[str, str]] = {}
@@ -446,6 +453,57 @@ class PersuasionDebateScenario(SimulationScenario):
 
     # --- Turn state machine ---
 
+    def _resolve_max_tokens(self) -> int:
+        """Return the max_tokens value for the current turn."""
+        if self._knobs.max_tokens_per_turn is not None:
+            return self._knobs.max_tokens_per_turn
+        return 4096
+
+    def _prepare_discussion_order(self, question_index: int) -> None:
+        """Set the discussion agent order for a question.
+
+        If discussion_order_seed is configured, shuffles deterministically
+        using seed + question_index. Otherwise uses the fixed agent_order.
+        """
+        self._discussion_agent_order = list(self._knobs.agent_order)
+        if self._knobs.discussion_order_seed is not None:
+            rng = random.Random(self._knobs.discussion_order_seed + question_index)
+            rng.shuffle(self._discussion_agent_order)
+            logger.info(
+                "Discussion order for question %d shuffled to: %s",
+                question_index + 1,
+                self._discussion_agent_order,
+            )
+
+    def _update_silenced_agents(self) -> None:
+        """Check if any agents should be silenced based on discussion turn count."""
+        if self._knobs.silence_after_discussion_turn is None:
+            return
+        for agent_id, threshold in self._knobs.silence_after_discussion_turn.items():
+            if self._discussion_turns >= threshold and agent_id not in self._silenced_agents:
+                self._silenced_agents.add(agent_id)
+                logger.info(
+                    "Agent %s silenced after discussion turn %d (threshold=%d)",
+                    agent_id,
+                    self._discussion_turns,
+                    threshold,
+                )
+
+    def _next_active_discussion_agent(self) -> str | None:
+        """Return the next non-silenced agent in the discussion round-robin.
+
+        Returns None if all remaining agents are silenced.
+        """
+        order = self._discussion_agent_order
+        agent_count = len(order)
+        for offset in range(agent_count):
+            candidate = order[(self._discussion_turns + offset) % agent_count]
+            if candidate not in self._silenced_agents:
+                # Advance _discussion_turns to this position
+                self._discussion_turns += offset
+                return candidate
+        return None
+
     async def decide_next_turn(self, state: SimulationState) -> TurnDecision | None:
         """Determine which agent acts next.
 
@@ -453,11 +511,12 @@ class PersuasionDebateScenario(SimulationScenario):
         1. BLIND: each agent answers independently (no send_message),
            cycling through all agents via _blind_index.
         2. DISCUSSION: agents round-robin on the debate channel for
-           max_turns_per_round turns.
+           max_turns_per_round turns, respecting scrambling and silencing.
 
         Returns None when all questions are complete.
         """
         _ = state
+        max_tokens = self._resolve_max_tokens()
 
         if self._phase == RoundPhase.NOT_STARTED:
             return self._start_next_question()
@@ -470,19 +529,24 @@ class PersuasionDebateScenario(SimulationScenario):
                     agent_id=ordered[self._blind_index],
                     round_number=self._blind_round_number(question_index=self._current_question),
                     excluded_tool_names=BLIND_EXCLUDED,
+                    max_tokens=max_tokens,
                 )
             # All agents have answered — transition to discussion
             self._phase = RoundPhase.DISCUSSION
             self._discussion_turns = 0
+            self._silenced_agents = set()
+            self._prepare_discussion_order(question_index=self._current_question)
             logger.info(
                 "Starting discussion for question %d/%d",
                 self._current_question + 1,
                 self._knobs.round_count,
             )
+            first_agent = self._discussion_agent_order[0]
             return TurnDecision(
-                agent_id=ordered[0],
+                agent_id=first_agent,
                 round_number=self._discussion_round_number(question_index=self._current_question),
                 excluded_tool_names=DISCUSS_EXCLUDED,
+                max_tokens=max_tokens,
             )
 
         # DISCUSSION phase — advance or end
@@ -495,12 +559,20 @@ class PersuasionDebateScenario(SimulationScenario):
             )
             return self._start_next_question()
 
-        ordered = self._ordered_agent_ids()
-        next_agent = ordered[self._discussion_turns % len(ordered)]
+        self._update_silenced_agents()
+        next_agent = self._next_active_discussion_agent()
+        if next_agent is None:
+            logger.info(
+                "All agents silenced for question %d, ending discussion",
+                self._current_question + 1,
+            )
+            return self._start_next_question()
+
         return TurnDecision(
             agent_id=next_agent,
             round_number=self._discussion_round_number(question_index=self._current_question),
             excluded_tool_names=DISCUSS_EXCLUDED,
+            max_tokens=max_tokens,
         )
 
     def _start_next_question(self) -> TurnDecision | None:
@@ -526,6 +598,7 @@ class PersuasionDebateScenario(SimulationScenario):
             agent_id=ordered[0],
             round_number=self._blind_round_number(question_index=self._current_question),
             excluded_tool_names=BLIND_EXCLUDED,
+            max_tokens=self._resolve_max_tokens(),
         )
 
     # --- Tools ---

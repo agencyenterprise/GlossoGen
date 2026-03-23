@@ -67,6 +67,7 @@ class ClaudeProvider(LLMProvider):
         messages: list[LLMMessage],
         tools: list[ToolSpec],
         force_tool_use: bool,
+        max_tokens: int,
     ) -> LLMResponse:
         """Send a message sequence to the Claude API and return the parsed response.
 
@@ -87,7 +88,7 @@ class ClaudeProvider(LLMProvider):
 
         kwargs: dict[str, Any] = {
             "model": self._model,
-            "max_tokens": 4096,
+            "max_tokens": max_tokens,
             "system": system_with_cache,
             "messages": anthropic_messages,
         }

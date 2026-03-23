@@ -353,6 +353,7 @@ class IncidentResponseScenario(SimulationScenario):
             agent_id=self._discussion_agents[self._rotation_index],
             round_number=self._current_round,
             excluded_tool_names=excluded,
+            max_tokens=4096,
         )
 
     def _start_next_discussion(self) -> TurnDecision | None:

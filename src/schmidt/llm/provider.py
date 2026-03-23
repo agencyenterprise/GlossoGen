@@ -50,6 +50,7 @@ class LLMProvider(ABC):
         messages: list[LLMMessage],
         tools: list[ToolSpec],
         force_tool_use: bool,
+        max_tokens: int,
     ) -> LLMResponse:
         """Send a conversation to the LLM and return its response.
 
@@ -58,6 +59,7 @@ class LLMProvider(ABC):
             messages: The conversation history as a list of messages.
             tools: Tool specifications the model may invoke.
             force_tool_use: When True, the model must call at least one tool.
+            max_tokens: Maximum number of tokens the model may generate.
 
         Returns:
             The model's response including text, tool calls, and usage data.

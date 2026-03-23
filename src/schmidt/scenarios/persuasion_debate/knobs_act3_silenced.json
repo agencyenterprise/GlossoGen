@@ -18,5 +18,7 @@
   },
   "max_tokens_per_turn": null,
   "discussion_order_seed": null,
-  "silence_after_discussion_turn": null
+  "silence_after_discussion_turn": {
+    "agent_a": 2
+  }
 }

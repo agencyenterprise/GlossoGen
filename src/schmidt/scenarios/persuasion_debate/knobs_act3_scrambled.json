@@ -17,6 +17,6 @@
     "agent_d": "wrong"
   },
   "max_tokens_per_turn": null,
-  "discussion_order_seed": null,
+  "discussion_order_seed": 42,
   "silence_after_discussion_turn": null
 }
