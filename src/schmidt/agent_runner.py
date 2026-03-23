@@ -111,8 +111,9 @@ class AgentRunner:
         )
 
         tools = self._tool_registry.get_specs(names=list(self._config.tool_names))
-        if not decision.allow_pass:
-            tools = [t for t in tools if t.name != "pass_turn"]
+        if decision.excluded_tool_names:
+            excluded = set(decision.excluded_tool_names)
+            tools = [t for t in tools if t.name not in excluded]
 
         turn_context = (
             "It's your turn to speak. "
