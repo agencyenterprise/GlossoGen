@@ -1,21 +1,22 @@
 """Persuasion debate simulation scenario.
 
-Implements three evaluation modes from the PBT paper (Stengel-Eskin et al., 2025):
-misinformation resistance, balanced persuasion, and multi-agent debate. Two agents
-discuss trivia questions on a shared channel with explicit turn-based control.
+Implements four evaluation modes from the PBT paper (Stengel-Eskin et al., 2025):
+misinformation resistance, balanced persuasion, open debate, and seeded debate.
+Supports 2+ agents discussing trivia questions on a shared channel with explicit
+turn-based control.
 
 Each round has two phases:
-1. Blind phase: both agents answer independently via submit_initial_answer
+1. Blind phase: all agents answer independently via submit_initial_answer
    without seeing each other's responses.
-2. Discussion phase: agents see both initial answers and discuss on the
-   shared debate channel until consensus or max turns.
+2. Discussion phase: agents see all initial answers and discuss on the
+   shared debate channel until max turns.
 """
 
 import argparse
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import Self
+from typing import NamedTuple, Self
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -29,9 +30,13 @@ from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.models.simulation_state import SimulationState, TurnDecision
 from schmidt.models.tool_definition import ToolParameter, ToolSpec
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.persuasion_debate.agent_ids import AGENT_A_ID, AGENT_B_ID, DEBATE_CHANNEL_ID
+from schmidt.scenarios.persuasion_debate.agent_ids import AGENT_A_ID, DEBATE_CHANNEL_ID
 from schmidt.scenarios.persuasion_debate.evaluation import EVALUATOR_REGISTRY
-from schmidt.scenarios.persuasion_debate.knobs import AgentOrder, DebateMode, PersuasionDebateKnobs
+from schmidt.scenarios.persuasion_debate.knobs import (
+    BeliefAssignment,
+    DebateMode,
+    PersuasionDebateKnobs,
+)
 from schmidt.scenarios.persuasion_debate.question_bank import Question, QuestionBank
 from schmidt.tools.tool_registry import ToolRegistry
 
@@ -65,11 +70,6 @@ SUBMIT_FINAL_ANSWER_SPEC = ToolSpec(
     ],
 )
 
-AGENT_DISPLAY_NAMES: dict[str, str] = {
-    AGENT_A_ID: "Agent A",
-    AGENT_B_ID: "Agent B",
-}
-
 BLIND_EXCLUDED: list[str] = ["send_message", "submit_final_answer"]
 DISCUSS_EXCLUDED: list[str] = ["submit_initial_answer"]
 
@@ -91,25 +91,39 @@ SYSTEM_TEMPLATES: dict[DebateMode, dict[str, str]] = {
 }
 
 
+class PartnerAnswer(NamedTuple):
+    """An other agent's display name and initial answer for the discussion injection."""
+
+    display_name: str
+    answer: str
+
+
 class RoundPhase(str, Enum):
     """Tracks which phase of a round the scenario is in.
 
     NOT_STARTED: no question has been started yet (initial state).
-    BLIND_FIRST: waiting for first agent to finish blind answer.
-    BLIND_SECOND: waiting for second agent to finish blind answer.
+    BLIND: agents are answering independently, tracked by _blind_index.
     DISCUSSION: agents alternate on the debate channel.
     """
 
     NOT_STARTED = "not_started"
-    BLIND_FIRST = "blind_first"
-    BLIND_SECOND = "blind_second"
+    BLIND = "blind"
     DISCUSSION = "discussion"
 
 
-class PersuasionDebateScenario(SimulationScenario):
-    """Two-agent persuasion debate scenario with three evaluation modes.
+def _display_name_for_agent(agent_id: str) -> str:
+    """Generate a display name from an agent ID.
 
-    Each round has a blind phase (both agents answer independently via
+    Maps agent_a -> 'Agent A', agent_c -> 'Agent C', etc.
+    """
+    suffix = agent_id.rsplit("_", maxsplit=1)[-1].upper()
+    return f"Agent {suffix}"
+
+
+class PersuasionDebateScenario(SimulationScenario):
+    """Multi-agent persuasion debate scenario with four evaluation modes.
+
+    Each round has a blind phase (all agents answer independently via
     submit_initial_answer) followed by a discussion phase on the shared
     channel. The blind phase prevents anchoring bias from sequential answers.
     """
@@ -154,6 +168,7 @@ class PersuasionDebateScenario(SimulationScenario):
         # Turn state machine
         self._current_question = -1
         self._phase = RoundPhase.NOT_STARTED
+        self._blind_index = 0
         self._discussion_turns = 0
 
         # Stores initial answers: question_index -> agent_id -> answer
@@ -186,32 +201,31 @@ class PersuasionDebateScenario(SimulationScenario):
 
     def get_agent_display_name(self, agent_id: str) -> str:
         """Return the human-readable display name for an agent."""
-        return AGENT_DISPLAY_NAMES.get(agent_id, agent_id)
+        return _display_name_for_agent(agent_id=agent_id)
 
     def _ordered_agent_ids(self) -> list[str]:
         """Return agent IDs in the configured order."""
-        if self._knobs.agent_order == AgentOrder.A_FIRST:
-            return [AGENT_A_ID, AGENT_B_ID]
-        return [AGENT_B_ID, AGENT_A_ID]
+        return self._knobs.agent_order
 
     def _agent_role(self, agent_id: str, question_index: int) -> str:
         """Return the role for an agent in a given question based on mode.
 
-        In misinformation mode: Agent A is always target, Agent B is adversary.
-        In balanced mode: roles alternate by question (even questions swap).
-        In debate / seeded_debate mode: both are debaters.
+        In misinformation mode: first agent in order is target, rest are adversaries.
+        In balanced mode: roles alternate by question.
+        In debate / seeded_debate mode: all are debaters.
         """
         if self._knobs.mode in (DebateMode.DEBATE, DebateMode.SEEDED_DEBATE):
             return "debater"
 
+        ordered = self._ordered_agent_ids()
         if self._knobs.mode == DebateMode.MISINFORMATION:
-            if agent_id == AGENT_A_ID:
+            if agent_id == ordered[0]:
                 return "target"
             return "adversary"
 
         # Balanced mode: alternate roles every other question
         swap = question_index % 2 == 1
-        if agent_id == AGENT_A_ID:
+        if agent_id == ordered[0]:
             if swap:
                 return "adversary"
             return "target"
@@ -224,13 +238,13 @@ class PersuasionDebateScenario(SimulationScenario):
         if self._knobs.mode in (DebateMode.DEBATE, DebateMode.SEEDED_DEBATE):
             return SYSTEM_TEMPLATES[self._knobs.mode]["debater"]
 
+        ordered = self._ordered_agent_ids()
         if self._knobs.mode == DebateMode.MISINFORMATION:
-            if agent_id == AGENT_A_ID:
+            if agent_id == ordered[0]:
                 return SYSTEM_TEMPLATES[self._knobs.mode]["target"]
             return SYSTEM_TEMPLATES[self._knobs.mode]["adversary"]
 
-        # Balanced mode: Agent A starts as target (template assigned at creation)
-        ordered = self._ordered_agent_ids()
+        # Balanced mode: first agent starts as target
         if agent_id == ordered[0]:
             return SYSTEM_TEMPLATES[self._knobs.mode]["target"]
         return SYSTEM_TEMPLATES[self._knobs.mode]["adversary"]
@@ -247,9 +261,9 @@ class PersuasionDebateScenario(SimulationScenario):
         ]
 
     def get_agents(self, default_model: str) -> list[AgentConfig]:
-        """Return agent configurations for agent_a and agent_b."""
+        """Return agent configurations for all agents in agent_order."""
         agents: list[AgentConfig] = []
-        for agent_id in [AGENT_A_ID, AGENT_B_ID]:
+        for agent_id in self._knobs.agent_order:
             model = self._knobs.model_overrides.get(agent_id, default_model)
             template_name = self._get_system_template(agent_id=agent_id)
 
@@ -265,7 +279,7 @@ class PersuasionDebateScenario(SimulationScenario):
             agents.append(
                 AgentConfig(
                     agent_id=agent_id,
-                    role_name=AGENT_DISPLAY_NAMES[agent_id],
+                    role_name=_display_name_for_agent(agent_id=agent_id),
                     system_prompt=self._render_template(
                         template_name=template_name,
                         **template_vars,
@@ -287,7 +301,7 @@ class PersuasionDebateScenario(SimulationScenario):
             Channel(
                 channel_id=DEBATE_CHANNEL_ID,
                 name="debate",
-                member_agent_ids=[AGENT_A_ID, AGENT_B_ID],
+                member_agent_ids=list(self._knobs.agent_order),
             ),
         ]
 
@@ -318,7 +332,7 @@ class PersuasionDebateScenario(SimulationScenario):
         """Return the injection for an agent at the given internal round number.
 
         Odd round numbers are blind phase injections (question + independent answer).
-        Even round numbers are discussion phase injections (both initial answers).
+        Even round numbers are discussion phase injections (all initial answers).
         """
         is_blind_phase = round_number % 2 == 1
         if is_blind_phase:
@@ -362,11 +376,18 @@ class PersuasionDebateScenario(SimulationScenario):
         assigned_answer: str | None = None
 
         if self._knobs.mode == DebateMode.SEEDED_DEBATE:
-            # Seeded debate: Agent A always gets correct, Agent B always gets wrong
-            if agent_id == AGENT_A_ID:
-                seeded_answer = question.reference_answer
+            if self._knobs.agent_beliefs is not None:
+                belief = self._knobs.agent_beliefs[agent_id]
+                if belief == BeliefAssignment.CORRECT:
+                    seeded_answer = question.reference_answer
+                else:
+                    seeded_answer = question.wrong_answer
             else:
-                seeded_answer = question.wrong_answer
+                # Legacy 2-agent fallback: first agent gets correct, second gets wrong
+                if agent_id == AGENT_A_ID:
+                    seeded_answer = question.reference_answer
+                else:
+                    seeded_answer = question.wrong_answer
         elif role == "target":
             # In balanced mode, target sometimes starts with the wrong answer
             if self._knobs.mode == DebateMode.BALANCED and question_index % 2 == 1:
@@ -400,10 +421,18 @@ class PersuasionDebateScenario(SimulationScenario):
         """Render the discussion phase injection for an agent."""
         answers = self._initial_answers.get(question_index, {})
         ordered = self._ordered_agent_ids()
-        partner_id = ordered[1] if agent_id == ordered[0] else ordered[0]
 
         own_answer = answers.get(agent_id, "No answer submitted")
-        partner_answer = answers.get(partner_id, "No answer submitted")
+        other_answers: list[PartnerAnswer] = []
+        for other_id in ordered:
+            if other_id == agent_id:
+                continue
+            other_answers.append(
+                PartnerAnswer(
+                    display_name=_display_name_for_agent(agent_id=other_id),
+                    answer=answers.get(other_id, "No answer submitted"),
+                )
+            )
 
         return self._render_template(
             template_name="discussion_injection.jinja",
@@ -411,7 +440,7 @@ class PersuasionDebateScenario(SimulationScenario):
             total_rounds=self._knobs.round_count,
             question=question,
             own_initial_answer=own_answer,
-            partner_initial_answer=partner_answer,
+            other_answers=other_answers,
             role=role,
         )
 
@@ -421,9 +450,9 @@ class PersuasionDebateScenario(SimulationScenario):
         """Determine which agent acts next.
 
         Each question proceeds through phases:
-        1. BLIND_FIRST: first agent answers independently (no send_message)
-        2. BLIND_SECOND: second agent answers independently (no send_message)
-        3. DISCUSSION: agents alternate on the debate channel for
+        1. BLIND: each agent answers independently (no send_message),
+           cycling through all agents via _blind_index.
+        2. DISCUSSION: agents round-robin on the debate channel for
            max_turns_per_round turns.
 
         Returns None when all questions are complete.
@@ -433,19 +462,18 @@ class PersuasionDebateScenario(SimulationScenario):
         if self._phase == RoundPhase.NOT_STARTED:
             return self._start_next_question()
 
-        if self._phase == RoundPhase.BLIND_FIRST:
-            self._phase = RoundPhase.BLIND_SECOND
+        if self._phase == RoundPhase.BLIND:
+            self._blind_index += 1
             ordered = self._ordered_agent_ids()
-            return TurnDecision(
-                agent_id=ordered[1],
-                round_number=self._blind_round_number(question_index=self._current_question),
-                excluded_tool_names=BLIND_EXCLUDED,
-            )
-
-        if self._phase == RoundPhase.BLIND_SECOND:
+            if self._blind_index < len(ordered):
+                return TurnDecision(
+                    agent_id=ordered[self._blind_index],
+                    round_number=self._blind_round_number(question_index=self._current_question),
+                    excluded_tool_names=BLIND_EXCLUDED,
+                )
+            # All agents have answered — transition to discussion
             self._phase = RoundPhase.DISCUSSION
             self._discussion_turns = 0
-            ordered = self._ordered_agent_ids()
             logger.info(
                 "Starting discussion for question %d/%d",
                 self._current_question + 1,
@@ -485,7 +513,8 @@ class PersuasionDebateScenario(SimulationScenario):
             logger.info("All %d questions completed", self._knobs.round_count)
             return None
 
-        self._phase = RoundPhase.BLIND_FIRST
+        self._phase = RoundPhase.BLIND
+        self._blind_index = 0
         ordered = self._ordered_agent_ids()
         logger.info(
             "Starting question %d/%d (blind phase): %s goes first",

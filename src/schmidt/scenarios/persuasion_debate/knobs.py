@@ -1,7 +1,7 @@
 """Configuration knobs for the persuasion debate scenario.
 
-Defines the tunable parameters: debate mode, agent order, persuasion strategy,
-round count, turn limits, and per-agent model overrides.
+Defines the tunable parameters: debate mode, agent ordering, belief assignments,
+persuasion strategy, round count, turn limits, and per-agent model overrides.
 """
 
 from enum import Enum
@@ -9,31 +9,22 @@ from typing import Self
 
 from pydantic import BaseModel, model_validator
 
+from schmidt.scenarios.persuasion_debate.agent_ids import ALL_AGENT_IDS
+
 
 class DebateMode(str, Enum):
     """Controls the type of persuasion evaluation.
 
     MISINFORMATION: adversary tries to flip target's correct answer to incorrect.
     BALANCED: 50% negative persuasion + 50% positive persuasion tests.
-    DEBATE: two models of different strengths debate genuinely (no seeded answers).
-    SEEDED_DEBATE: open-ended debate with seeded answers (Agent A=correct, B=wrong).
+    DEBATE: open-ended debate with no seeded answers.
+    SEEDED_DEBATE: open-ended debate with seeded answers per agent_beliefs.
     """
 
     MISINFORMATION = "misinformation"
     BALANCED = "balanced"
     DEBATE = "debate"
     SEEDED_DEBATE = "seeded_debate"
-
-
-class AgentOrder(str, Enum):
-    """Controls which agent answers first each round.
-
-    A_FIRST means agent_a states their answer before agent_b sees it.
-    B_FIRST means agent_b states their answer before agent_a sees it.
-    """
-
-    A_FIRST = "a_first"
-    B_FIRST = "b_first"
 
 
 class PersuasionStrategy(str, Enum):
@@ -49,29 +40,58 @@ class PersuasionStrategy(str, Enum):
     CREDIBLE = "credible"
 
 
-VALID_AGENT_IDS = {"agent_a", "agent_b"}
+class BeliefAssignment(str, Enum):
+    """Controls which answer an agent is seeded with in seeded_debate mode.
+
+    CORRECT: agent receives the reference (correct) answer.
+    WRONG: agent receives the wrong (plausible but incorrect) answer.
+    """
+
+    CORRECT = "correct"
+    WRONG = "wrong"
 
 
 class PersuasionDebateKnobs(BaseModel):
     """Configuration knobs for the persuasion debate scenario."""
 
     mode: DebateMode
-    agent_order: AgentOrder
+    agent_order: list[str]
     round_count: int
     max_turns_per_round: int
     persuasion_strategy: PersuasionStrategy | None
     model_overrides: dict[str, str]
+    agent_beliefs: dict[str, BeliefAssignment] | None
 
     @model_validator(mode="after")
     def validate_knob_combinations(self) -> Self:
-        """Validate model override keys and persuasion strategy requirements."""
-        unknown = set(self.model_overrides.keys()) - VALID_AGENT_IDS
-        if unknown:
+        """Validate agent ordering, model overrides, beliefs, and strategy requirements."""
+        order_set = set(self.agent_order)
+        if len(order_set) != len(self.agent_order):
+            raise ValueError("agent_order contains duplicate agent IDs")
+
+        unknown_order = order_set - ALL_AGENT_IDS
+        if unknown_order:
             raise ValueError(
-                f"model_overrides contains unknown agent IDs: {unknown}. "
-                f"Valid IDs: {sorted(VALID_AGENT_IDS)}"
+                f"agent_order contains unknown agent IDs: {unknown_order}. "
+                f"Valid IDs: {sorted(ALL_AGENT_IDS)}"
             )
+
+        unknown_overrides = set(self.model_overrides.keys()) - order_set
+        if unknown_overrides:
+            raise ValueError(
+                f"model_overrides references agents not in agent_order: {unknown_overrides}"
+            )
+
         needs_strategy = {DebateMode.MISINFORMATION, DebateMode.BALANCED}
         if self.mode in needs_strategy and self.persuasion_strategy is None:
             raise ValueError(f"persuasion_strategy is required for mode '{self.mode.value}'")
+
+        if self.agent_beliefs is not None:
+            beliefs_keys = set(self.agent_beliefs.keys())
+            if beliefs_keys != order_set:
+                raise ValueError(
+                    f"agent_beliefs keys {sorted(beliefs_keys)} must match "
+                    f"agent_order {self.agent_order}"
+                )
+
         return self

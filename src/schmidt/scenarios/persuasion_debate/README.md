@@ -1,6 +1,6 @@
 # Persuasion Debate
 
-Two agents debate trivia questions to study how LLMs handle persuasion. Based on the Persuasion-Balanced Training (PBT) paper by Stengel-Eskin et al. (2025).
+Agents debate trivia questions to study how LLMs handle persuasion. Based on the Persuasion-Balanced Training (PBT) paper by Stengel-Eskin et al. (2025). Supports 2+ agents.
 
 ## Modes
 
@@ -21,15 +21,14 @@ Open-ended debate with seeded answers. Agent A receives the correct answer, Agen
 Each question (round) has two phases, matching the paper's methodology:
 
 ### 1. Blind Phase (independent answers)
-Both agents answer the question independently via `submit_initial_answer` without seeing each other's responses. This prevents anchoring bias where the second agent simply adopts the first agent's answer.
+All agents answer the question independently via `submit_initial_answer` without seeing each other's responses. This prevents anchoring bias where later agents simply adopt earlier agents' answers.
 
 ### 2. Discussion Phase
-Both agents see each other's initial answers and discuss on the shared debate channel. Agents alternate for `max_turns_per_round` turns.
+All agents see each other's initial answers and discuss on the shared debate channel. Agents round-robin for `max_turns_per_round` turns.
 
 ## Agents
 
-- **Agent A** — In misinformation mode, always the target (receives the correct answer). Speaking order is controlled by `agent_order`.
-- **Agent B** — In misinformation mode, always the adversary (argues for the wrong answer). Speaking order is controlled by `agent_order`.
+- **Agent A–D** — Up to 4 agents. In misinformation mode, the first agent in `agent_order` is the target, the rest are adversaries. In seeded_debate mode, each agent's belief (correct/wrong) is set by `agent_beliefs`. Speaking order is controlled by `agent_order`.
 
 ## Channels
 
@@ -51,18 +50,19 @@ Each agent receives the question text. Injection content varies by mode:
 - **Debater**: receives only the question (no seeded answer, answers from knowledge)
 
 ### Discussion Phase Injection
-Both agents receive both initial answers and are told to discuss on the debate channel.
+Each agent receives all agents' initial answers and is told to discuss on the debate channel.
 
 ## Knobs
 
 | Knob | Values | Description |
 |------|--------|-------------|
 | mode | misinformation, balanced, debate, seeded_debate | Evaluation mode |
-| agent_order | a_first, b_first | Which agent answers first in each phase |
+| agent_order | list of agent IDs | Ordered list of participating agents (e.g. `["agent_a", "agent_b"]`) |
 | round_count | int | Number of questions (rounds) |
 | max_turns_per_round | int | Maximum discussion turns per question |
 | persuasion_strategy | logical, emotional, credible, null | Adversary's approach (required for misinformation/balanced, null for debate/seeded_debate) |
 | model_overrides | dict | Per-agent model overrides for pairing different strengths |
+| agent_beliefs | dict or null | Maps each agent to `"correct"` or `"wrong"` (seeded_debate only, null for other modes) |
 
 ## Question Bank
 
@@ -119,6 +119,21 @@ set -a && source .env && set +a && \
 ```
 
 **Expected result:** In Condition B, the weak model going first anchors the discussion, dragging the strong model's accuracy down compared to Condition A.
+
+## Act 2 — Scale It (4 agents, same question)
+
+Extends Act 1 to 4 agents: 2 with the correct answer (Opus), 2 with the wrong answer (Haiku). All agents use the standard open-ended prompt and discuss naturally. Tests whether the majority view wins or the most persuasive agent wins regardless of correctness.
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run persuasion_debate \
+    --model claude-sonnet-4-6 --runs-dir ./runs \
+    --knobs src/schmidt/scenarios/persuasion_debate/knobs_act2.json \
+    --questions src/schmidt/scenarios/persuasion_debate/questions.json \
+  > ./runs/persuasion_debate_stdout.log 2>&1 &
+```
+
+**Expected result:** The 2 correct-belief agents (Opus) should pull the 2 wrong-belief agents (Haiku) toward the correct answer, but individual persuasion dynamics may reveal cases where a confident wrong agent sways the group.
 
 ## Evaluation
 
