@@ -1,8 +1,8 @@
 """Evaluator that measures answer accuracy before and after debate.
 
-Extracts initial answers (from first messages) and final answers (from
-submit_final_answer tool calls), compares them to reference answers,
-and computes accuracy metrics including flip rates and misinformation rate.
+Extracts initial answers (from submit_initial_answer tool calls) and final
+answers (from submit_final_answer tool calls), compares them to reference
+answers, and computes accuracy metrics including flip rates and misinformation rate.
 """
 
 import logging
@@ -15,27 +15,13 @@ from schmidt.evaluation.evaluator_protocol import Evaluator
 from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import MessageSent, SimulationEvent, ToolCalled, TurnAssigned
+from schmidt.models.event import SimulationEvent, ToolCalled, TurnAssigned
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.persuasion_debate.agent_ids import AGENT_A_ID, AGENT_B_ID
 from schmidt.scenarios.persuasion_debate.evaluation.prompt_renderer import render_persuasion_prompt
 from schmidt.scenarios.persuasion_debate.question_bank import Question, QuestionBank
 
 logger = logging.getLogger(__name__)
-
-
-class AnswerExtractionOutput(BaseModel):
-    """Extracted answer from a participant's message."""
-
-    has_answer: bool = Field(
-        description="True if the participant expressed a clear answer, False otherwise."
-    )
-    extracted_answer: str = Field(
-        description=(
-            "The answer expressed by the participant (1-5 words). "
-            "Empty string if has_answer is False."
-        ),
-    )
 
 
 class AnswerMatchOutput(BaseModel):
@@ -46,15 +32,22 @@ class AnswerMatchOutput(BaseModel):
 
 
 class RoundResult(NamedTuple):
-    """Accuracy results for a single round for one agent."""
+    """Accuracy results for a single question for one agent."""
 
     initial_correct: bool
     final_correct: bool
 
 
+class QuestionData(NamedTuple):
+    """Extracted initial and final answers for a single question."""
+
+    initial_answers: dict[str, str]
+    final_answers: dict[str, str]
+
+
 class PersuasionAccuracyEvaluator(Evaluator):
     """Measures accuracy changes through debate by comparing initial and final answers
-    against reference answers using LLM-based answer extraction and matching.
+    against reference answers using LLM-based answer matching.
     """
 
     async def evaluate(
@@ -73,38 +66,31 @@ class PersuasionAccuracyEvaluator(Evaluator):
         scenario_any: Any = scenario
         question_bank: QuestionBank = scenario_any.get_question_bank()
 
-        round_data = self._extract_round_data(events=events)
+        question_data = self._extract_question_data(events=events)
 
         agent_results: dict[str, list[RoundResult]] = {
             AGENT_A_ID: [],
             AGENT_B_ID: [],
         }
 
-        for round_number, data in sorted(round_data.items()):
-            question_index = round_number - 1
+        for question_index, data in sorted(question_data.items()):
             if question_index >= len(question_bank.questions):
                 continue
             question = question_bank.questions[question_index]
 
             for agent_id in [AGENT_A_ID, AGENT_B_ID]:
-                initial_msg = data["initial_messages"].get(agent_id, "")
-                final_answer = data["final_answers"].get(agent_id, "")
+                initial_answer = data.initial_answers.get(agent_id, "")
+                final_answer = data.final_answers.get(agent_id, "")
 
                 initial_correct = False
                 final_correct = False
 
-                if initial_msg:
-                    extraction = await self._extract_answer(
+                if initial_answer:
+                    initial_correct = await self._check_answer_match(
                         llm_provider=llm_provider,
                         question=question,
-                        message_text=initial_msg,
+                        participant_answer=initial_answer,
                     )
-                    if extraction.has_answer:
-                        initial_correct = await self._check_answer_match(
-                            llm_provider=llm_provider,
-                            question=question,
-                            participant_answer=extraction.extracted_answer,
-                        )
 
                 if final_answer:
                     final_correct = await self._check_answer_match(
@@ -122,52 +108,46 @@ class PersuasionAccuracyEvaluator(Evaluator):
 
         return self._build_metric_result(agent_results=agent_results)
 
-    def _extract_round_data(
-        self, events: list[SimulationEvent]
-    ) -> dict[int, dict[str, dict[str, str]]]:
-        """Extract initial messages and final answers per round per agent from events."""
-        round_data: dict[int, dict[str, dict[str, str]]] = {}
+    def _extract_question_data(self, events: list[SimulationEvent]) -> dict[int, QuestionData]:
+        """Extract initial and final answers per question per agent from events.
+
+        Uses the virtual round numbering: odd rounds are blind phase (initial
+        answers via submit_initial_answer), even rounds are discussion phase
+        (final answers via submit_final_answer).
+        """
+        question_data: dict[int, QuestionData] = {}
         current_round = 0
 
         for event in events:
             if isinstance(event, TurnAssigned):
                 current_round = event.round_number
-                if current_round not in round_data:
-                    round_data[current_round] = {
-                        "initial_messages": {},
-                        "final_answers": {},
-                    }
-
-            elif isinstance(event, MessageSent) and current_round > 0:
-                agent_id = event.message.sender_agent_id
-                if agent_id not in round_data[current_round]["initial_messages"]:
-                    round_data[current_round]["initial_messages"][agent_id] = event.message.text
 
             elif isinstance(event, ToolCalled) and current_round > 0:
-                if event.request.tool_name == "submit_final_answer":
+                if event.request.tool_name == "submit_initial_answer":
+                    # Blind phase: odd round numbers → question_index = (round - 1) // 2
+                    question_index = (current_round - 1) // 2
+                    if question_index not in question_data:
+                        question_data[question_index] = QuestionData(
+                            initial_answers={},
+                            final_answers={},
+                        )
                     agent_id = event.agent_id
                     answer = str(event.request.arguments.get("answer", ""))
-                    round_data[current_round]["final_answers"][agent_id] = answer
+                    question_data[question_index].initial_answers[agent_id] = answer
 
-        return round_data
+                elif event.request.tool_name == "submit_final_answer":
+                    # Discussion phase: even round numbers → question_index = (round - 2) // 2
+                    question_index = (current_round - 2) // 2
+                    if question_index not in question_data:
+                        question_data[question_index] = QuestionData(
+                            initial_answers={},
+                            final_answers={},
+                        )
+                    agent_id = event.agent_id
+                    answer = str(event.request.arguments.get("answer", ""))
+                    question_data[question_index].final_answers[agent_id] = answer
 
-    async def _extract_answer(
-        self,
-        llm_provider: LLMProvider,
-        question: Question,
-        message_text: str,
-    ) -> AnswerExtractionOutput:
-        """Use LLM to extract the answer from a natural language message."""
-        prompt = render_persuasion_prompt(
-            template_name="answer_extraction.jinja",
-            question_text=question.question_text,
-            message_text=message_text,
-        )
-        return await llm_provider.generate_structured(
-            system_prompt=render_evaluator_prompt(template_name="evaluator_system.jinja"),
-            messages=[LLMMessage(role="user", content=prompt)],
-            output_schema=AnswerExtractionOutput,
-        )
+        return question_data
 
     async def _check_answer_match(
         self,

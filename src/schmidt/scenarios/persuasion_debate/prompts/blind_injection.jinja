@@ -1,0 +1,10 @@
+--- QUESTION {{ round_number }} of {{ total_rounds }} ---
+
+{{ question.question_text }}
+{% if seeded_answer %}
+You believe the answer is: {{ seeded_answer }}
+{% endif %}
+{% if assigned_answer %}
+You are confident the answer is: {{ assigned_answer }}
+{% endif %}
+Answer this question independently. Call `submit_initial_answer` with your answer. Do NOT send any messages to the debate channel yet.

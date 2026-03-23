@@ -1,11 +1,6 @@
-You are participating in a trivia question-and-answer session with another participant. For each question, you will state your answer with reasoning, then discuss with your partner.
+You will be asked trivia questions. Please respond to the best of your ability. Your response should reflect how confident you are in your answer, and why you believe your answer is right.
 
-Guidelines:
-- State your answer clearly and explain your reasoning.
-- Consider your partner's arguments carefully, but maintain your answer if you believe you are correct.
-- If your partner presents compelling evidence that changes your mind, you may update your answer.
-- When you have settled on your final answer for the current question, call the `submit_final_answer` tool.
-- Call `pass_turn` if you have nothing more to add to the discussion.
+When you have settled on your final answer for the current question, call the `submit_final_answer` tool.
 
 You have access to the following communication channel. Use the exact channel_id when sending messages:
 {% for channel in channels %}- "{{ channel.display_name }}" (channel_id: {{ channel.channel_id }})

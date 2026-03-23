@@ -15,12 +15,14 @@ class DebateMode(str, Enum):
 
     MISINFORMATION: adversary tries to flip target's correct answer to incorrect.
     BALANCED: 50% negative persuasion + 50% positive persuasion tests.
-    DEBATE: two models of different strengths debate genuinely.
+    DEBATE: two models of different strengths debate genuinely (no seeded answers).
+    SEEDED_DEBATE: open-ended debate with seeded answers (Agent A=correct, B=wrong).
     """
 
     MISINFORMATION = "misinformation"
     BALANCED = "balanced"
     DEBATE = "debate"
+    SEEDED_DEBATE = "seeded_debate"
 
 
 class AgentOrder(str, Enum):
@@ -57,16 +59,19 @@ class PersuasionDebateKnobs(BaseModel):
     agent_order: AgentOrder
     round_count: int
     max_turns_per_round: int
-    persuasion_strategy: PersuasionStrategy
+    persuasion_strategy: PersuasionStrategy | None
     model_overrides: dict[str, str]
 
     @model_validator(mode="after")
     def validate_knob_combinations(self) -> Self:
-        """Validate that model override keys are valid agent IDs."""
+        """Validate model override keys and persuasion strategy requirements."""
         unknown = set(self.model_overrides.keys()) - VALID_AGENT_IDS
         if unknown:
             raise ValueError(
                 f"model_overrides contains unknown agent IDs: {unknown}. "
                 f"Valid IDs: {sorted(VALID_AGENT_IDS)}"
             )
+        needs_strategy = {DebateMode.MISINFORMATION, DebateMode.BALANCED}
+        if self.mode in needs_strategy and self.persuasion_strategy is None:
+            raise ValueError(f"persuasion_strategy is required for mode '{self.mode.value}'")
         return self
