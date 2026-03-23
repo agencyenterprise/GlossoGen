@@ -11,14 +11,14 @@ import argparse
 import logging
 import random
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 from jinja2 import Environment, FileSystemLoader
 
 from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult, write_report
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
-from schmidt.llm.claude_provider import ClaudeProvider
+from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.models.simulation_state import SimulationState, TurnDecision
@@ -214,7 +214,7 @@ class IncidentResponseScenario(SimulationScenario):
                         ),
                     ),
                     channel_ids=channel_ids,
-                    tool_names=["send_message", "pass_turn", "propose_resolution"],
+                    tool_names=["send_message", "pass_turn", "think", "propose_resolution"],
                     model=default_model,
                 )
             )
@@ -424,6 +424,41 @@ class IncidentResponseScenario(SimulationScenario):
         )
         return rendered
 
+    def get_checkpoint(self) -> dict[str, Any]:
+        """Serialize the scenario's turn-scheduling state for resume."""
+        return {
+            "current_round": self._current_round,
+            "discussion_agents": list(self._discussion_agents),
+            "discussion_channel": self._discussion_channel,
+            "rotation_index": self._rotation_index,
+            "anyone_spoke_this_rotation": self._anyone_spoke_this_rotation,
+            "sidebar_queue": [
+                {"channel_id": ch, "agents": agents} for ch, agents in self._sidebar_queue
+            ],
+            "discussion_started": self._discussion_started,
+            "first_rotation": self._first_rotation,
+            "turns_this_round": self._turns_this_round,
+        }
+
+    def restore_from_checkpoint(self, checkpoint: dict[str, Any]) -> None:
+        """Restore the scenario's turn-scheduling state from a checkpoint."""
+        self._current_round = checkpoint["current_round"]
+        self._discussion_agents = checkpoint["discussion_agents"]
+        self._discussion_channel = checkpoint["discussion_channel"]
+        self._rotation_index = checkpoint["rotation_index"]
+        self._anyone_spoke_this_rotation = checkpoint["anyone_spoke_this_rotation"]
+        self._sidebar_queue = [
+            (item["channel_id"], item["agents"]) for item in checkpoint["sidebar_queue"]
+        ]
+        self._discussion_started = checkpoint["discussion_started"]
+        self._first_rotation = checkpoint["first_rotation"]
+        self._turns_this_round = checkpoint["turns_this_round"]
+        logger.info(
+            "Restored scenario state: round=%d, discussion_started=%s",
+            self._current_round,
+            self._discussion_started,
+        )
+
     def register_tools(self, registry: ToolRegistry) -> None:
         """Register scenario-specific tools with the tool registry.
 
@@ -450,12 +485,13 @@ class IncidentResponseScenario(SimulationScenario):
         evaluator_names: list[str],
         report_path: Path,
         model: str,
+        reasoning_effort: str | None,
     ) -> EvaluationReport:
         """Run evaluators and write a JSON report."""
         events = await load_events(log_path=log_path)
         agent_configs = extract_agent_configs(events=events)
         simulation_id = extract_simulation_id(events=events)
-        provider = ClaudeProvider(model=model)
+        provider = create_provider(model=model, reasoning_effort=reasoning_effort)
 
         metrics: list[MetricResult] = []
         for name in evaluator_names:

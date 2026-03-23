@@ -16,9 +16,11 @@ from pathlib import Path
 
 import uvicorn
 
+from schmidt.checkpoint_loader import ResumeState, build_resume_state
+from schmidt.evaluation.log_reader import load_events
 from schmidt.event_logger import EventLogger
-from schmidt.llm.claude_provider import ClaudeProvider
 from schmidt.llm.provider import LLMProvider
+from schmidt.llm.provider_factory import create_provider
 from schmidt.logging_format import JsonLineFormatter
 from schmidt.models.agent_config import AgentConfig
 from schmidt.scenario_loader import get_scenario_class
@@ -56,7 +58,18 @@ def _build_parsers() -> tuple[
         required=True,
         help="Root directory for runs (output goes to runs-dir/scenario/timestamp/)",
     )
-    run_parser.add_argument("--model", type=str, required=True, help="Claude model to use")
+    run_parser.add_argument("--model", type=str, required=True, help="LLM model to use")
+    run_parser.add_argument(
+        "--reasoning-effort",
+        type=str,
+        choices=["low", "medium", "high"],
+        help="Reasoning effort level for OpenAI reasoning models (low/medium/high)",
+    )
+    run_parser.add_argument(
+        "--resume",
+        type=str,
+        help="Path to an existing run directory to resume from (e.g. runs/car_recall/1742234567)",
+    )
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a simulation log")
     evaluate_parser.add_argument(
@@ -74,7 +87,13 @@ def _build_parsers() -> tuple[
     evaluate_parser.add_argument(
         "--evaluators", type=str, required=True, help="Comma-separated evaluator names"
     )
-    evaluate_parser.add_argument("--model", type=str, required=True, help="Claude model to use")
+    evaluate_parser.add_argument("--model", type=str, required=True, help="LLM model to use")
+    evaluate_parser.add_argument(
+        "--reasoning-effort",
+        type=str,
+        choices=["low", "medium", "high"],
+        help="Reasoning effort level for OpenAI reasoning models (low/medium/high)",
+    )
 
     serve_parser = subparsers.add_parser("serve", help="Start the web server")
     serve_parser.add_argument(
@@ -121,18 +140,22 @@ def main() -> None:
 
 def _build_agent_providers(
     agents: list[AgentConfig],
+    reasoning_effort: str | None,
 ) -> dict[str, LLMProvider]:
     """Build a per-agent LLM provider mapping.
 
     Providers are deduped so agents sharing the same model share the same
-    ``ClaudeProvider`` instance.
+    provider instance. Routes to the appropriate provider (OpenAI or Claude)
+    based on model name.
     """
-    providers_by_model: dict[str, ClaudeProvider] = {}
+    providers_by_model: dict[str, LLMProvider] = {}
     agent_providers: dict[str, LLMProvider] = {}
 
     for agent in agents:
         if agent.model not in providers_by_model:
-            providers_by_model[agent.model] = ClaudeProvider(model=agent.model)
+            providers_by_model[agent.model] = create_provider(
+                model=agent.model, reasoning_effort=reasoning_effort
+            )
         agent_providers[agent.agent_id] = providers_by_model[agent.model]
 
     return agent_providers
@@ -155,15 +178,36 @@ async def _run_simulation(
     """Wire up the simulation components and execute the simulation.
 
     Writes a JSONL event log to ``{runs_dir}/{scenario_name}/{timestamp}/{scenario_name}.jsonl``.
+    When ``--resume`` is specified, loads the checkpoint from the existing run
+    directory and continues from where it left off.
     """
-    runs_dir = Path(args.runs_dir)
-    run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
+    resume_dir: str | None = getattr(args, "resume", None)
+    resuming = resume_dir is not None
+
+    if resume_dir is not None:
+        run_dir = Path(resume_dir)
+    else:
+        runs_dir = Path(args.runs_dir)
+        run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
+
     agents = scenario.get_agents(default_model=args.model)
-    agent_providers = _build_agent_providers(agents=agents)
+    reasoning_effort = getattr(args, "reasoning_effort", None)
+    agent_providers = _build_agent_providers(agents=agents, reasoning_effort=reasoning_effort)
     registry = ToolRegistry()
 
     log_path = run_dir / f"{scenario.name()}.jsonl"
     event_logger = EventLogger(log_path=log_path)
+
+    resume_state: ResumeState | None = None
+    if resuming:
+        logger.info("Loading checkpoint from %s", log_path)
+        events = await load_events(log_path=log_path)
+        resume_state = build_resume_state(events=events)
+        logger.info(
+            "Checkpoint loaded: resuming from turn %d, round %d",
+            resume_state.turn_number,
+            resume_state.round_number,
+        )
 
     hub = SimulationHub(
         scenario=scenario,
@@ -171,6 +215,7 @@ async def _run_simulation(
         agent_providers=agent_providers,
         tool_registry=registry,
         event_logger=event_logger,
+        resume_state=resume_state,
     )
 
     # Add JSON debug log file for frontend display
@@ -184,6 +229,8 @@ async def _run_simulation(
     logger.info("Model: %s", args.model)
     logger.info("Run directory: %s", run_dir)
     logger.info("Log: %s", log_path)
+    if resuming:
+        logger.info("RESUMING from checkpoint in %s", run_dir)
 
     try:
         await hub.run()
@@ -204,11 +251,13 @@ async def _run_evaluation(
     log_path = run_dir / f"{args.scenario_name}.jsonl"
     report_path = run_dir / f"{args.scenario_name}_report.json"
 
+    reasoning_effort = getattr(args, "reasoning_effort", None)
     await scenario.run_evaluation(
         log_path=log_path,
         evaluator_names=evaluator_names,
         report_path=report_path,
         model=args.model,
+        reasoning_effort=reasoning_effort,
     )
 
     logger.info("Evaluation complete. Report written to %s", report_path)

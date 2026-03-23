@@ -50,9 +50,25 @@ def create_send_message_executor(
         """Send a message to a channel on behalf of an agent.
 
         Raises ValueError if the agent is not a member of the specified channel.
+        Attempts to normalize channel IDs that start with '#' by stripping the prefix.
         """
         if not channel_router.validate_membership(agent_id=agent_id, channel_id=channel_id):
-            raise ValueError(f"Agent '{agent_id}' is not a member of channel '{channel_id}'")
+            if channel_id.startswith("#"):
+                stripped = channel_id[1:]
+                if channel_router.validate_membership(agent_id=agent_id, channel_id=stripped):
+                    logger.debug(
+                        "Normalized channel_id '%s' to '%s' for agent %s",
+                        channel_id,
+                        stripped,
+                        agent_id,
+                    )
+                    channel_id = stripped
+                else:
+                    raise ValueError(
+                        f"Agent '{agent_id}' is not a member of channel '{channel_id}'"
+                    )
+            else:
+                raise ValueError(f"Agent '{agent_id}' is not a member of channel '{channel_id}'")
 
         message = SimulationMessage(
             message_id=str(uuid4()),

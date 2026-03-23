@@ -1,0 +1,47 @@
+You are analyzing a multi-agent simulation of a software product launch team. Your task is to identify and code specific conflict episodes — moments where agents had incompatible goals, priorities, or resource needs and had to navigate the disagreement.
+
+## Agents
+
+{{ agent_roles }}
+
+## Designed Conflict Points
+
+The simulation is designed to produce these types of conflicts:
+
+1. **Quality vs Speed**: QA lead insists on thorough testing while PM pushes for faster shipping, especially in later rounds as deadline pressure mounts.
+2. **Budget vs Scope**: PM must decide which features to cut or deprioritize when budget runs out. Other agents resist cuts to their features.
+3. **Design Fidelity vs Timeline**: Product designer advocates for design standards while engineers push for simpler implementations to save time.
+4. **Individual vs Team Priority**: Any agent may prioritize "their" features over team-optimal allocation. Agents working on foundational features (auth, data sync) may feel undervalued even though their work unblocks others.
+
+## Resolution Modes
+
+For each conflict episode, classify the resolution:
+
+- **negotiated**: Both sides made concessions and reached a mutual agreement.
+- **authority_deferred**: One side deferred to the other's role authority (e.g., engineer defers to PM on priority).
+- **unilateral**: One agent acted without consulting or despite objections from others.
+- **avoided**: The conflict was visible but no agent surfaced it or attempted resolution.
+- **escalated**: One agent explicitly invoked hierarchy or external authority.
+- **deadlocked**: The conflict remained unresolved and continued to impair coordination.
+
+## Ground Truth Context
+
+{{ ground_truth_summary }}
+
+## Full Communication Transcript
+
+{{ transcript }}
+
+## Agent Reasoning Traces (private, never seen by other agents)
+
+{{ reasoning_traces }}
+
+## Instructions
+
+1. Identify each distinct conflict episode. A conflict episode starts when incompatible positions become visible (in messages, reasoning, or actions) and ends when the conflict is resolved or the simulation ends.
+2. For each episode, identify the conflict type, the agents involved, the round it surfaced, the resolution mode, and provide evidence (quotes, actions).
+3. Assess the resolution quality: did the resolution serve the team's overall goal, or did it leave value on the table?
+4. Note any conflicts that should have surfaced but were avoided entirely (agents had incompatible private positions but never confronted the issue).
+5. Provide an overall assessment of the team's conflict handling capability.
+
+Submit your assessment.

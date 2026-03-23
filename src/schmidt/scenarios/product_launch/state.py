@@ -345,6 +345,22 @@ class ProductLaunchState:
             },
         )
 
+    def restore_from_checkpoint(self, world_state: dict[str, Any]) -> None:
+        """Restore the full world state from a checkpoint dict.
+
+        The ``world_state`` dict has the same shape as ``get_ground_truth()`` output.
+        """
+        self._current_round = world_state["round"]
+        self._features = [Feature.model_validate(f) for f in world_state["features"]]
+        self._budget = BudgetTracker.model_validate(world_state["budget"])
+        self._self_reports = dict(world_state.get("self_reports", {}))
+        logger.info(
+            "Restored world state: round=%d, features=%d, budget_remaining=%.0f",
+            self._current_round,
+            len(self._features),
+            self._budget.remaining_ru(),
+        )
+
     def _find_feature(self, feature_id: str) -> Feature | None:
         """Look up a feature by ID."""
         for f in self._features:

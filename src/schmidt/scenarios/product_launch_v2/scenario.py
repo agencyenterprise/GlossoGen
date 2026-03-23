@@ -1,13 +1,14 @@
-"""Product launch simulation scenario.
+"""Product launch v2 simulation scenario.
 
-Defines a multi-agent scenario where a team of 6 agents (PM, Backend Engineer,
-Frontend Engineer, Data Analyst, QA Lead, Product Designer) must coordinate to
-ship a software product within a budget and timeline. Agents take structured
-actions that mutate world state, communicate through group and DM channels,
-and face external disruptions.
+Defines a multi-agent scenario where 6 delegation-framed agents (PM, Backend
+Engineer, Frontend Engineer, Data Analyst, QA Lead, Product Designer) must
+coordinate to ship a software product within a budget and timeline. Agents
+communicate through #standup, #general, and DM channels, maintain shared
+documents, and receive role-filtered dashboard briefings with deliberately
+asymmetric information.
 
-This is a state-driven scenario implementing ``SimulationStateProtocol`` alongside
-``SimulationScenario``.
+This is a state-driven scenario implementing ``SimulationStateProtocol``
+alongside ``SimulationScenario``.
 """
 
 import argparse
@@ -27,27 +28,42 @@ from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulat
 from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel, ChannelTemplateEntry
+from schmidt.models.shared_document_config import SharedDocumentConfig
 from schmidt.models.simulation_state import SimulationState, TurnDecision
 from schmidt.models.tool_definition import ToolParameter, ToolSpec
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.product_launch.channel_ids import (
-    ENGINEERING_ID,
-    LEADERSHIP_ID,
-    TEAM_STANDUP_ID,
+from schmidt.scenarios.product_launch_v2.channel_ids import (
+    BE_DASHBOARD_ID,
+    CONCERNS_LOG_DOC_ID,
+    DA_DASHBOARD_ID,
+    FE_DASHBOARD_ID,
+    FEATURE_SPECS_DOC_ID,
+    GENERAL_ID,
+    LAUNCH_READINESS_DOC_ID,
+    MEETING_NOTES_DOC_ID,
+    PD_DASHBOARD_ID,
+    PM_DASHBOARD_ID,
+    PROJECT_TRACKER_DOC_ID,
+    QA_DASHBOARD_ID,
+    STANDUP_ID,
 )
-from schmidt.scenarios.product_launch.evaluation import (
-    EmergentBehaviorEvaluator,
-    LaunchOutcomeEvaluator,
+from schmidt.scenarios.product_launch_v2.evaluation import (
+    ConflictResolutionEvaluator,
+    CoordinationEfficiencyEvaluator,
+    EmergentBehaviorV2Evaluator,
+    InformationIntegrityEvaluator,
+    LaunchOutcomeV2Evaluator,
 )
-from schmidt.scenarios.product_launch.knobs import ProductLaunchKnobs
-from schmidt.scenarios.product_launch.state import (
+from schmidt.scenarios.product_launch_v2.knobs import ProductLaunchV2Knobs
+from schmidt.scenarios.product_launch_v2.state import (
+    AGENT_HUMAN_NAMES,
     BACKEND_ENGINEER_ID,
     DATA_ANALYST_ID,
     FRONTEND_ENGINEER_ID,
     PM_ID,
     PRODUCT_DESIGNER_ID,
     QA_LEAD_ID,
-    ProductLaunchState,
+    ProductLaunchV2State,
 )
 from schmidt.simulation_state_protocol import AgentAction
 from schmidt.tools.tool_registry import ToolRegistry
@@ -66,12 +82,7 @@ ALL_AGENT_IDS = [
 ]
 
 AGENT_DISPLAY_NAMES: dict[str, str] = {
-    PM_ID: "PM",
-    BACKEND_ENGINEER_ID: "Backend Engineer",
-    FRONTEND_ENGINEER_ID: "Frontend Engineer",
-    DATA_ANALYST_ID: "Data Analyst",
-    QA_LEAD_ID: "QA Lead",
-    PRODUCT_DESIGNER_ID: "Product Designer",
+    agent_id: f"{AGENT_HUMAN_NAMES[agent_id]}'s agent" for agent_id in ALL_AGENT_IDS
 }
 
 AGENT_SYSTEM_TEMPLATES: dict[str, str] = {
@@ -83,21 +94,32 @@ AGENT_SYSTEM_TEMPLATES: dict[str, str] = {
     PRODUCT_DESIGNER_ID: "product_designer_system.jinja",
 }
 
-CHANNEL_DISPLAY_NAMES: dict[str, dict[str, str]] = {
-    TEAM_STANDUP_ID: {aid: "team standup (all members)" for aid in ALL_AGENT_IDS},
-    ENGINEERING_ID: {
-        BACKEND_ENGINEER_ID: "engineering channel",
-        FRONTEND_ENGINEER_ID: "engineering channel",
-        QA_LEAD_ID: "engineering channel",
-    },
-    LEADERSHIP_ID: {
-        PM_ID: "leadership channel",
-        DATA_ANALYST_ID: "leadership channel",
-        PRODUCT_DESIGNER_ID: "leadership channel",
-    },
+DASHBOARD_IDS: dict[str, str] = {
+    PM_ID: PM_DASHBOARD_ID,
+    BACKEND_ENGINEER_ID: BE_DASHBOARD_ID,
+    FRONTEND_ENGINEER_ID: FE_DASHBOARD_ID,
+    DATA_ANALYST_ID: DA_DASHBOARD_ID,
+    QA_LEAD_ID: QA_DASHBOARD_ID,
+    PRODUCT_DESIGNER_ID: PD_DASHBOARD_ID,
 }
 
-BASE_TOOLS = ["send_message", "pass_turn", "think", "write_notebook", "read_notebook"]
+CHANNEL_DISPLAY_NAMES: dict[str, dict[str, str]] = {
+    STANDUP_ID: {aid: "standup" for aid in ALL_AGENT_IDS},
+    GENERAL_ID: {aid: "general" for aid in ALL_AGENT_IDS},
+}
+for aid in ALL_AGENT_IDS:
+    CHANNEL_DISPLAY_NAMES[DASHBOARD_IDS[aid]] = {aid: "your-dashboard"}
+
+BASE_TOOLS = [
+    "send_message",
+    "pass_turn",
+    "think",
+    "write_notebook",
+    "read_notebook",
+    "list_documents",
+    "read_document",
+    "write_document",
+]
 
 ROLE_TOOLS: dict[str, list[str]] = {
     PM_ID: [*BASE_TOOLS, "check_project_status", "check_budget", "flag_concern"],
@@ -138,7 +160,6 @@ ROLE_TOOLS: dict[str, list[str]] = {
     ],
 }
 
-
 CHECK_PROJECT_STATUS_SPEC = ToolSpec(
     name="check_project_status",
     description="View overall project status including feature completion and timeline.",
@@ -147,7 +168,7 @@ CHECK_PROJECT_STATUS_SPEC = ToolSpec(
 
 CHECK_BUDGET_SPEC = ToolSpec(
     name="check_budget",
-    description="View the current budget allocation, spending, and remaining resources.",
+    description="View the current budget allocation, spending, burn rate, and remaining resources.",
     parameters=[],
 )
 
@@ -166,7 +187,17 @@ CHECK_FEATURE_DETAIL_SPEC = ToolSpec(
 
 ALLOCATE_EFFORT_SPEC = ToolSpec(
     name="allocate_effort",
-    description="Allocate development effort to a feature's backend or frontend component.",
+    description=(
+        "Direct how your person spends their time on a feature this week. "
+        "A person can realistically context-switch between at most 2 features per week. "
+        "Levels: 'reduced' (minimal attention — keep it moving but focus elsewhere), "
+        "'standard' (normal workload — steady progress within regular hours), "
+        "or 'accelerated' (overtime/rushing — faster progress but risks lower quality, "
+        "and sustained acceleration can lead to burnout and sick days). "
+        "If a feature has failed QA, effort goes toward fixing bugs instead of "
+        "new progress — accelerated effort fixes bugs faster but is less efficient "
+        "per hour than standard. Last call wins if you change your mind for the same feature."
+    ),
     parameters=[
         ToolParameter(
             name="feature_id",
@@ -175,15 +206,14 @@ ALLOCATE_EFFORT_SPEC = ToolSpec(
             required=True,
         ),
         ToolParameter(
-            name="component",
+            name="level",
             param_type="string",
-            description="Which component: 'backend' or 'frontend'.",
-            required=True,
-        ),
-        ToolParameter(
-            name="effort_units",
-            param_type="number",
-            description="How many effort units to allocate (1-5).",
+            description=(
+                "'reduced' (minimal attention), "
+                "'standard' (normal workload), "
+                "or 'accelerated' (overtime/rushing — faster but risks quality "
+                "and burnout)."
+            ),
             required=True,
         ),
     ],
@@ -192,20 +222,32 @@ ALLOCATE_EFFORT_SPEC = ToolSpec(
 REPORT_STATUS_SPEC = ToolSpec(
     name="report_status",
     description=(
-        "Submit your self-assessed status report for the current round. "
-        "Tracked against ground truth."
+        "Submit a structured status report for a feature. "
+        "Your reported completion percentage is tracked against ground truth."
     ),
     parameters=[
         ToolParameter(
-            name="summary",
+            name="feature_id",
             param_type="string",
-            description="Your assessment of current progress and blockers.",
+            description="The ID of the feature to report on.",
             required=True,
         ),
         ToolParameter(
-            name="on_track",
-            param_type="boolean",
-            description="Whether you believe the project is on track.",
+            name="completion_pct",
+            param_type="number",
+            description="Your assessed overall completion percentage (0-100).",
+            required=True,
+        ),
+        ToolParameter(
+            name="risk_level",
+            param_type="string",
+            description="Risk assessment: 'low', 'medium', 'high', or 'critical'.",
+            required=True,
+        ),
+        ToolParameter(
+            name="notes",
+            param_type="string",
+            description="Free-text notes on status, blockers, or concerns.",
             required=True,
         ),
     ],
@@ -213,10 +255,13 @@ REPORT_STATUS_SPEC = ToolSpec(
 
 FLAG_CONCERN_SPEC = ToolSpec(
     name="flag_concern",
-    description="Flag a concern or risk to the team. Visible to all team members.",
+    description=(
+        "Flag a concern or risk. The entry is appended to the shared "
+        "Concerns Log document visible to all team members."
+    ),
     parameters=[
         ToolParameter(
-            name="concern",
+            name="description",
             param_type="string",
             description="Description of the concern or risk.",
             required=True,
@@ -225,16 +270,16 @@ FLAG_CONCERN_SPEC = ToolSpec(
 )
 
 
-class ProductLaunchScenario(SimulationScenario):
-    """State-driven scenario simulating a product launch with 6 agents.
+class ProductLaunchV2Scenario(SimulationScenario):
+    """State-driven scenario simulating a product launch with 6 delegation-framed agents.
 
     Implements both ``SimulationScenario`` and ``SimulationStateProtocol``
-    by delegating state methods to ``ProductLaunchState``.
+    by delegating state methods to ``ProductLaunchV2State``.
     """
 
-    def __init__(self, knobs: ProductLaunchKnobs) -> None:
+    def __init__(self, knobs: ProductLaunchV2Knobs) -> None:
         self._knobs = knobs
-        self._state = ProductLaunchState(knobs=knobs)
+        self._state = ProductLaunchV2State(knobs=knobs)
         self._jinja_env = Environment(
             loader=FileSystemLoader(PROMPTS_DIR),
             autoescape=False,
@@ -260,7 +305,7 @@ class ProductLaunchScenario(SimulationScenario):
             "--knobs",
             type=str,
             required=True,
-            help="Path to JSON file with ProductLaunchKnobs configuration.",
+            help="Path to JSON file with ProductLaunchV2Knobs configuration.",
         )
 
     @classmethod
@@ -269,30 +314,26 @@ class ProductLaunchScenario(SimulationScenario):
         knobs_path = Path(args.knobs)
         with open(knobs_path) as f:
             knobs_data = json.load(f)
-        knobs = ProductLaunchKnobs(**knobs_data)
+        knobs = ProductLaunchV2Knobs(**knobs_data)
         return cls(knobs=knobs)
 
     def name(self) -> str:
         """Return the scenario identifier."""
-        return "product_launch"
+        return "product_launch_v2"
 
     def scenario_description(self) -> str:
-        """Return a description of the product launch scenario."""
-        return (
-            "A team of 6 agents (PM, Backend Engineer, Frontend Engineer, Data Analyst, "
-            "QA Lead, Product Designer) must coordinate to ship a software product. "
-            "Agents allocate effort to features, communicate through group and DM channels, "
-            "and face external disruptions. The simulation tracks ground truth state "
-            "independently of agent reports to measure information accuracy."
+        """Return a description rendered from the Jinja2 template."""
+        return self._render_template(
+            template_name="description.jinja",
+            knobs=self._knobs,
         )
 
     def get_agents(self, default_model: str) -> list[AgentConfig]:
-        """Return agent configurations for all 6 roles."""
-        agents_to_create = ALL_AGENT_IDS
-        agent_configs_for_dm = []
-
+        """Return agent configurations for all 6 roles with DM channels."""
+        agent_configs_for_dm: list[AgentConfig] = []
         agents: list[AgentConfig] = []
-        for agent_id in agents_to_create:
+
+        for agent_id in ALL_AGENT_IDS:
             channel_ids = self._get_agent_channels(agent_id=agent_id)
             config = AgentConfig(
                 agent_id=agent_id,
@@ -300,7 +341,7 @@ class ProductLaunchScenario(SimulationScenario):
                 system_prompt="",
                 channel_ids=channel_ids,
                 tool_names=ROLE_TOOLS[agent_id],
-                model=self._knobs.model if self._knobs.model else default_model,
+                model=default_model,
             )
             agent_configs_for_dm.append(config)
             agents.append(config)
@@ -320,29 +361,34 @@ class ProductLaunchScenario(SimulationScenario):
                     agent_id=agent.agent_id, channel_ids=agent.channel_ids
                 ),
                 knobs=self._knobs,
-                features=[f.name for f in self._state.get_features()],
+                human_name=AGENT_HUMAN_NAMES[agent.agent_id],
+                agent_names=AGENT_HUMAN_NAMES,
             )
 
         return agents
 
     def get_channels(self) -> list[Channel]:
-        """Return group channels plus auto-generated DM channels."""
+        """Return group channels, dashboard channels, and auto-generated DM channels."""
         group_channels = [
             Channel(
-                channel_id=TEAM_STANDUP_ID,
-                name="team-standup",
+                channel_id=STANDUP_ID,
+                name="standup",
                 member_agent_ids=list(ALL_AGENT_IDS),
             ),
             Channel(
-                channel_id=ENGINEERING_ID,
-                name="engineering",
-                member_agent_ids=[BACKEND_ENGINEER_ID, FRONTEND_ENGINEER_ID, QA_LEAD_ID],
+                channel_id=GENERAL_ID,
+                name="general",
+                member_agent_ids=list(ALL_AGENT_IDS),
             ),
+        ]
+
+        dashboard_channels = [
             Channel(
-                channel_id=LEADERSHIP_ID,
-                name="leadership",
-                member_agent_ids=[PM_ID, DATA_ANALYST_ID, PRODUCT_DESIGNER_ID],
-            ),
+                channel_id=DASHBOARD_IDS[aid],
+                name=f"dashboard-{aid}",
+                member_agent_ids=[aid],
+            )
+            for aid in ALL_AGENT_IDS
         ]
 
         dummy_configs = [
@@ -359,7 +405,47 @@ class ProductLaunchScenario(SimulationScenario):
         dm_result = generate_dm_channels(agent_configs=dummy_configs)
         self._dm_display_names = dm_result.display_names
 
-        return [*group_channels, *dm_result.channels]
+        return [*group_channels, *dashboard_channels, *dm_result.channels]
+
+    def get_shared_documents(self) -> list[SharedDocumentConfig]:
+        """Return the 5 shared documents used in this scenario."""
+        return [
+            SharedDocumentConfig(
+                document_id=PROJECT_TRACKER_DOC_ID,
+                title="Project Tracker",
+                initial_content="# Project Tracker\n\nNo entries yet.",
+                reader_agent_ids=list(ALL_AGENT_IDS),
+                writer_agent_ids=[PM_ID],
+            ),
+            SharedDocumentConfig(
+                document_id=FEATURE_SPECS_DOC_ID,
+                title="Feature Specs",
+                initial_content="# Feature Specs\n\nNo specs published yet.",
+                reader_agent_ids=list(ALL_AGENT_IDS),
+                writer_agent_ids=[PRODUCT_DESIGNER_ID],
+            ),
+            SharedDocumentConfig(
+                document_id=MEETING_NOTES_DOC_ID,
+                title="Meeting Notes",
+                initial_content="# Meeting Notes\n\nNo notes yet.",
+                reader_agent_ids=list(ALL_AGENT_IDS),
+                writer_agent_ids=list(ALL_AGENT_IDS),
+            ),
+            SharedDocumentConfig(
+                document_id=CONCERNS_LOG_DOC_ID,
+                title="Concerns Log",
+                initial_content="# Concerns Log\n",
+                reader_agent_ids=list(ALL_AGENT_IDS),
+                writer_agent_ids=list(ALL_AGENT_IDS),
+            ),
+            SharedDocumentConfig(
+                document_id=LAUNCH_READINESS_DOC_ID,
+                title="Launch Readiness Report",
+                initial_content="# Launch Readiness Report\n\nNot yet compiled.",
+                reader_agent_ids=list(ALL_AGENT_IDS),
+                writer_agent_ids=[PM_ID],
+            ),
+        ]
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
         """Return the display name for a channel as seen by a specific agent."""
@@ -374,7 +460,7 @@ class ProductLaunchScenario(SimulationScenario):
         return AGENT_DISPLAY_NAMES.get(agent_id, agent_id)
 
     async def decide_next_turn(self, state: SimulationState) -> TurnDecision | None:
-        """Rotate agents through the team standup until all pass or turn cap is reached."""
+        """Rotate agents through the discussion until all pass or turn cap is reached."""
         if self._discussion_started:
             self._turns_this_round += 1
             self._record_turn_outcome(passed=state.last_turn_passed)
@@ -385,33 +471,61 @@ class ProductLaunchScenario(SimulationScenario):
         return self._start_next_round()
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
-        """Return observation and external event text for the agent at this round."""
+        """Return the role-filtered dashboard briefing for this agent and round."""
         observation = self._state.get_agent_observation(agent_id=agent_id)
-        event_desc = self._state.get_external_event_description(round_number=round_number)
+        event_text = self._state.get_external_event_for_agent(
+            round_number=round_number, agent_id=agent_id
+        )
+        human_name = AGENT_HUMAN_NAMES.get(agent_id, agent_id)
 
         parts: list[str] = []
-        parts.append(f"=== Week {round_number} Status Update ===")
+        parts.append(f"=== Week {round_number} Dashboard for {human_name} ===")
         parts.append(f"Round {round_number} of {self._max_rounds}.")
 
         features = observation.get("features", [])
         if features:
             parts.append("\nProject Status:")
             for f in features:
-                be_pct = f["backend_completion_pct"]
-                fe_pct = f["frontend_completion_pct"]
-                parts.append(
-                    f"  {f['name']}: {f['status']} " f"(BE: {be_pct:.0%}, FE: {fe_pct:.0%})"
-                )
+                line = f"  {f['name']} ({f.get('feature_id', '')}): {f.get('status', 'unknown')}"
+                if "reported_completion_pct" in f and f["reported_completion_pct"] is not None:
+                    line += f" — reported: {f['reported_completion_pct']:.0f}%"
+                if "actual_avg_completion_pct" in f:
+                    line += f" — actual: {f['actual_avg_completion_pct']:.0f}%"
+                if "delta" in f and f["delta"] is not None:
+                    line += f" (delta: {f['delta']:+.0f}%)"
+                if "backend_completion_pct" in f and "frontend_completion_pct" in f:
+                    be_pct = f["backend_completion_pct"]
+                    fe_pct = f["frontend_completion_pct"]
+                    line += f" — BE: {be_pct:.0%}, FE: {fe_pct:.0%}"
+                if "quality_score" in f:
+                    line += f" — quality: {f['quality_score']:.2f}"
+                if f.get("frontend_blocked"):
+                    line += " [FE BLOCKED]"
+                if f.get("spec_deviation_alert"):
+                    line += " [SPEC DEVIATION]"
+                if f.get("ready_for_qa"):
+                    line += " [READY FOR QA]"
+                if "bugs_found" in f:
+                    bugs = f["bugs_found"] - f.get("bugs_fixed", 0)
+                    if bugs > 0:
+                        line += f" — {bugs} open bug(s)"
+                parts.append(line)
 
         budget = observation.get("budget")
         if budget:
             parts.append(
                 f"\nBudget: {budget['spent_ru']:.0f}/{budget['total_ru']:.0f} RU spent, "
-                f"{budget['remaining_ru']:.0f} RU remaining"
+                f"{budget['remaining_ru']:.0f} RU remaining, "
+                f"burn rate: {budget.get('burn_rate', 0):.1f} RU/week"
             )
 
-        if event_desc:
-            parts.append(f"\n*** ALERT: {event_desc} ***")
+        if event_text:
+            parts.append(f"\n*** ALERT: {event_text} ***")
+
+        parts.append(
+            "\nRemember to post your status update in the standup channel "
+            '(channel_id: "standup") and use report_status for each feature you\'re tracking.'
+        )
 
         return "\n".join(parts)
 
@@ -445,7 +559,7 @@ class ProductLaunchScenario(SimulationScenario):
         )
 
     def register_tools(self, registry: ToolRegistry) -> None:
-        """Register product launch scenario tools."""
+        """Register product launch v2 scenario tools."""
         self._register_read_tools(registry=registry)
         self._register_action_tools(registry=registry)
 
@@ -493,31 +607,26 @@ class ProductLaunchScenario(SimulationScenario):
     # --- SimulationStateProtocol delegation ---
 
     def get_agent_observation(self, agent_id: str) -> dict[str, Any]:
-        """Delegate to ProductLaunchState."""
+        """Delegate to ProductLaunchV2State."""
         return self._state.get_agent_observation(agent_id=agent_id)
 
     def apply_agent_action(self, agent_id: str, action: AgentAction) -> Any:
-        """Delegate to ProductLaunchState."""
+        """Delegate to ProductLaunchV2State."""
         return self._state.apply_agent_action(agent_id=agent_id, action=action)
 
     def advance_round(self, round_number: int) -> Any:
-        """Delegate to ProductLaunchState."""
+        """Delegate to ProductLaunchV2State."""
         return self._state.advance_round(round_number=round_number)
 
     def get_ground_truth(self) -> dict[str, Any]:
-        """Delegate to ProductLaunchState."""
+        """Delegate to ProductLaunchV2State."""
         return self._state.get_ground_truth()
 
     # --- Private helpers ---
 
     def _get_agent_channels(self, agent_id: str) -> list[str]:
-        """Return group channel IDs for an agent (DMs added later)."""
-        channels = [TEAM_STANDUP_ID]
-        if agent_id in {BACKEND_ENGINEER_ID, FRONTEND_ENGINEER_ID, QA_LEAD_ID}:
-            channels.append(ENGINEERING_ID)
-        if agent_id in {PM_ID, DATA_ANALYST_ID, PRODUCT_DESIGNER_ID}:
-            channels.append(LEADERSHIP_ID)
-        return channels
+        """Return group and dashboard channel IDs for an agent (DMs added later)."""
+        return [STANDUP_ID, GENERAL_ID, DASHBOARD_IDS[agent_id]]
 
     def _channel_template_data(
         self, agent_id: str, channel_ids: list[str]
@@ -607,7 +716,7 @@ class ProductLaunchScenario(SimulationScenario):
         return self._begin_discussion(agents=list(ALL_AGENT_IDS))
 
     def _begin_discussion(self, agents: list[str]) -> TurnDecision:
-        """Initialize a new rotation discussion."""
+        """Initialize a new rotation discussion with shuffled agent order."""
         self._discussion_agents = list(agents)
         random.shuffle(self._discussion_agents)
         self._rotation_index = 0
@@ -624,14 +733,17 @@ class ProductLaunchScenario(SimulationScenario):
             obs = state.get_agent_observation(agent_id=agent_id)
             features = obs.get("features", [])
             lines = [
-                f"Project Status (Round {obs.get('round', '?')}/{obs.get('total_rounds', '?')}):"
+                f"Project Status (Week {obs.get('round', '?')}/{obs.get('total_rounds', '?')}):"
             ]
             for f in features:
-                be_pct = f["backend_completion_pct"]
-                fe_pct = f["frontend_completion_pct"]
-                lines.append(
-                    f"  {f['name']}: {f['status']} " f"(BE: {be_pct:.0%}, FE: {fe_pct:.0%})"
-                )
+                line = f"  {f.get('name', '?')}: {f.get('status', '?')}"
+                if "backend_completion_pct" in f:
+                    be = f["backend_completion_pct"]
+                    fe = f["frontend_completion_pct"]
+                    line += f" (BE: {be:.0%}, FE: {fe:.0%})"
+                elif "reported_completion_pct" in f and f["reported_completion_pct"] is not None:
+                    line += f" (reported: {f['reported_completion_pct']:.0f}%)"
+                lines.append(line)
             return "\n".join(lines)
 
         registry.register(spec=CHECK_PROJECT_STATUS_SPEC, executor=check_project_status)
@@ -643,7 +755,8 @@ class ProductLaunchScenario(SimulationScenario):
                 return "You do not have access to budget information."
             return (
                 f"Budget: {budget['spent_ru']:.0f}/{budget['total_ru']:.0f} RU spent, "
-                f"{budget['remaining_ru']:.0f} RU remaining."
+                f"{budget['remaining_ru']:.0f} RU remaining. "
+                f"Burn rate: {budget.get('burn_rate', 0):.1f} RU/week."
             )
 
         registry.register(spec=CHECK_BUDGET_SPEC, executor=check_budget)
@@ -651,11 +764,13 @@ class ProductLaunchScenario(SimulationScenario):
         async def check_feature_detail(agent_id: str, feature_id: str) -> str:
             obs = state.get_agent_observation(agent_id=agent_id)
             for f in obs.get("features", []):
-                if f["feature_id"] == feature_id:
+                if f.get("feature_id") == feature_id:
                     lines = [f"Feature: {f['name']} ({f['feature_id']})"]
                     lines.append(f"  Status: {f['status']}")
-                    lines.append(f"  Backend: {f['backend_completion_pct']:.0%}")
-                    lines.append(f"  Frontend: {f['frontend_completion_pct']:.0%}")
+                    if "backend_completion_pct" in f:
+                        lines.append(f"  Backend: {f['backend_completion_pct']:.0%}")
+                    if "frontend_completion_pct" in f:
+                        lines.append(f"  Frontend: {f['frontend_completion_pct']:.0%}")
                     if "backend_complexity" in f:
                         lines.append(f"  Backend Complexity: {f['backend_complexity']}")
                         lines.append(f"  Frontend Complexity: {f['frontend_complexity']}")
@@ -665,50 +780,64 @@ class ProductLaunchScenario(SimulationScenario):
                     if "quality_score" in f:
                         lines.append(f"  Quality Score: {f['quality_score']:.2f}")
                     if "bugs_found" in f:
-                        lines.append(f"  Bugs: {f['bugs_found']} found, {f['bugs_fixed']} fixed")
+                        lines.append(
+                            f"  Bugs: {f['bugs_found']} found, {f.get('bugs_fixed', 0)} fixed"
+                        )
+                    if f.get("frontend_blocked"):
+                        lines.append("  *** Frontend is BLOCKED (backend < 70%) ***")
+                    if f.get("spec_deviation_alert"):
+                        lines.append("  *** SPEC DEVIATION detected ***")
+                    if f.get("ready_for_qa"):
+                        lines.append("  *** Ready for QA testing ***")
+                    if "reported_completion_pct" in f and f["reported_completion_pct"] is not None:
+                        lines.append(f"  Reported Completion: {f['reported_completion_pct']:.0f}%")
+                        lines.append(f"  Reported Risk: {f.get('reported_risk_level', '?')}")
+                    if "delta" in f and f["delta"] is not None:
+                        lines.append(f"  Reported vs Actual Delta: {f['delta']:+.1f}%")
                     return "\n".join(lines)
             return f"Feature '{feature_id}' not found."
 
         registry.register(spec=CHECK_FEATURE_DETAIL_SPEC, executor=check_feature_detail)
 
     def _register_action_tools(self, registry: ToolRegistry) -> None:
-        """Register tools that mutate state.
-
-        Actions are applied directly to the state. Ground truth is captured
-        via ``GroundTruthSnapshot`` events logged at round boundaries by the hub.
-        """
+        """Register tools that mutate state."""
         state = self._state
 
-        async def allocate_effort(
-            agent_id: str, feature_id: str, component: str, effort_units: float
-        ) -> str:
+        async def allocate_effort(agent_id: str, feature_id: str, level: str) -> str:
             action = AgentAction(
                 action_type="allocate_effort",
-                parameters={
-                    "feature_id": feature_id,
-                    "component": component,
-                    "effort_units": effort_units,
-                },
+                parameters={"feature_id": feature_id, "level": level},
             )
             outcome = state.apply_agent_action(agent_id=agent_id, action=action)
             return outcome.agent_visible_result
 
         registry.register(spec=ALLOCATE_EFFORT_SPEC, executor=allocate_effort)
 
-        async def report_status(agent_id: str, summary: str, on_track: bool) -> str:
+        async def report_status(
+            agent_id: str,
+            feature_id: str,
+            completion_pct: float,
+            risk_level: str,
+            notes: str,
+        ) -> str:
             action = AgentAction(
                 action_type="report_status",
-                parameters={"summary": summary, "on_track": on_track},
+                parameters={
+                    "feature_id": feature_id,
+                    "completion_pct": completion_pct,
+                    "risk_level": risk_level,
+                    "notes": notes,
+                },
             )
             outcome = state.apply_agent_action(agent_id=agent_id, action=action)
             return outcome.agent_visible_result
 
         registry.register(spec=REPORT_STATUS_SPEC, executor=report_status)
 
-        async def flag_concern(agent_id: str, concern: str) -> str:
+        async def flag_concern(agent_id: str, description: str) -> str:
             action = AgentAction(
                 action_type="flag_concern",
-                parameters={"concern": concern},
+                parameters={"description": description},
             )
             outcome = state.apply_agent_action(agent_id=agent_id, action=action)
             return outcome.agent_visible_result
@@ -716,8 +845,11 @@ class ProductLaunchScenario(SimulationScenario):
         registry.register(spec=FLAG_CONCERN_SPEC, executor=flag_concern)
 
     def _get_scenario_evaluators(self) -> dict[str, type[Evaluator]]:
-        """Return product launch-specific evaluators."""
+        """Return product launch v2-specific evaluators."""
         return {
-            "launch_outcome": LaunchOutcomeEvaluator,
-            "emergent_behavior": EmergentBehaviorEvaluator,
+            "launch_outcome": LaunchOutcomeV2Evaluator,
+            "emergent_behavior": EmergentBehaviorV2Evaluator,
+            "information_integrity": InformationIntegrityEvaluator,
+            "coordination_efficiency": CoordinationEfficiencyEvaluator,
+            "conflict_resolution": ConflictResolutionEvaluator,
         }
