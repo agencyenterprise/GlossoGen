@@ -1,0 +1,8 @@
+{
+  "mode": "debate",
+  "agent_order": "b_first",
+  "round_count": 10,
+  "max_turns_per_round": 8,
+  "persuasion_strategy": "logical",
+  "model_overrides": {}
+}
