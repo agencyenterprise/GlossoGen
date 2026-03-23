@@ -106,9 +106,8 @@ class PersuasionAccuracyEvaluator(Evaluator):
     def _extract_question_data(self, events: list[SimulationEvent]) -> dict[int, QuestionData]:
         """Extract initial and final answers per question per agent from events.
 
-        Uses the virtual round numbering: odd rounds are blind phase (initial
-        answers via submit_initial_answer), even rounds are discussion phase
-        (final answers via submit_final_answer).
+        Uses 3-phase round numbering: blind=3*q+1, discussion=3*q+2, final=3*q+3.
+        Question index is derived as (round_number - 1) // 3 for all phases.
         """
         question_data: dict[int, QuestionData] = {}
         current_round = 0
@@ -118,9 +117,9 @@ class PersuasionAccuracyEvaluator(Evaluator):
                 current_round = event.round_number
 
             elif isinstance(event, ToolCalled) and current_round > 0:
+                question_index = (current_round - 1) // 3
+
                 if event.request.tool_name == "submit_initial_answer":
-                    # Blind phase: odd round numbers → question_index = (round - 1) // 2
-                    question_index = (current_round - 1) // 2
                     if question_index not in question_data:
                         question_data[question_index] = QuestionData(
                             initial_answers={},
@@ -131,8 +130,6 @@ class PersuasionAccuracyEvaluator(Evaluator):
                     question_data[question_index].initial_answers[agent_id] = answer
 
                 elif event.request.tool_name == "submit_final_answer":
-                    # Discussion phase: even round numbers → question_index = (round - 2) // 2
-                    question_index = (current_round - 2) // 2
                     if question_index not in question_data:
                         question_data[question_index] = QuestionData(
                             initial_answers={},

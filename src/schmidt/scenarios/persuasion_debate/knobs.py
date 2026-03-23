@@ -89,6 +89,9 @@ class PersuasionDebateKnobs(BaseModel):
         if self.mode in needs_strategy and self.persuasion_strategy is None:
             raise ValueError(f"persuasion_strategy is required for mode '{self.mode.value}'")
 
+        if self.mode == DebateMode.SEEDED_DEBATE and self.agent_beliefs is None:
+            raise ValueError("agent_beliefs is required for seeded_debate mode")
+
         if self.agent_beliefs is not None:
             beliefs_keys = set(self.agent_beliefs.keys())
             if beliefs_keys != order_set:
