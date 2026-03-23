@@ -13,11 +13,13 @@ class TurnDecision(BaseModel):
         round_number: Scenario round this turn belongs to.
         excluded_tool_names: Tool names to hide from the agent for this turn.
             Include "pass_turn" to force the agent to speak.
+        max_tokens: Maximum tokens the LLM may generate for this turn.
     """
 
     agent_id: str
     round_number: int
     excluded_tool_names: list[str]
+    max_tokens: int
 
 
 class SimulationState(BaseModel):

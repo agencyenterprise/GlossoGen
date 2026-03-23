@@ -16,7 +16,7 @@
     "agent_c": "correct",
     "agent_d": "wrong"
   },
-  "max_tokens_per_turn": null,
+  "max_tokens_per_turn": 2048,
   "discussion_order_seed": null,
   "silence_after_discussion_turn": null
 }
