@@ -1,4 +1,6 @@
-You are evaluating the persuasion dynamics in a trivia debate between two participants.
+You are evaluating the persuasion dynamics in a trivia debate between participants.
+
+Participants: {{ agent_ids | join(', ') }}
 
 Question: {{ question_text }}
 Correct answer: {{ reference_answer }}

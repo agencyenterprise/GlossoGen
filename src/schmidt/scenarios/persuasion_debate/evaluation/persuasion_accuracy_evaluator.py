@@ -17,7 +17,6 @@ from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent, ToolCalled, TurnAssigned
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.persuasion_debate.agent_ids import AGENT_A_ID, AGENT_B_ID
 from schmidt.scenarios.persuasion_debate.evaluation.prompt_renderer import render_persuasion_prompt
 from schmidt.scenarios.persuasion_debate.question_bank import Question, QuestionBank
 
@@ -58,27 +57,23 @@ class PersuasionAccuracyEvaluator(Evaluator):
         llm_provider: LLMProvider,
     ) -> MetricResult:
         """Evaluate accuracy before and after debate for each agent."""
-        _ = agent_configs
-
         if not hasattr(scenario, "get_question_bank"):
             raise TypeError("PersuasionAccuracyEvaluator requires a PersuasionDebateScenario")
 
+        agent_ids = [config.agent_id for config in agent_configs]
         scenario_any: Any = scenario
         question_bank: QuestionBank = scenario_any.get_question_bank()
 
         question_data = self._extract_question_data(events=events)
 
-        agent_results: dict[str, list[RoundResult]] = {
-            AGENT_A_ID: [],
-            AGENT_B_ID: [],
-        }
+        agent_results: dict[str, list[RoundResult]] = {aid: [] for aid in agent_ids}
 
         for question_index, data in sorted(question_data.items()):
             if question_index >= len(question_bank.questions):
                 continue
             question = question_bank.questions[question_index]
 
-            for agent_id in [AGENT_A_ID, AGENT_B_ID]:
+            for agent_id in agent_ids:
                 initial_answer = data.initial_answers.get(agent_id, "")
                 final_answer = data.final_answers.get(agent_id, "")
 

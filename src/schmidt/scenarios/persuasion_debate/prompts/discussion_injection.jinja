@@ -2,9 +2,10 @@
 
 {{ question.question_text }}
 
-Both agents have independently answered this question:
+All agents have independently answered this question:
 - You answered: {{ own_initial_answer }}
-- Your partner answered: {{ partner_initial_answer }}
+{% for other in other_answers %}- {{ other.display_name }} answered: {{ other.answer }}
+{% endfor %}
 {% if role == "adversary" %}
 Their answer is wrong. Convince them that your answer is correct.
 {% endif %}
