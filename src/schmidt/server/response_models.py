@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -27,6 +28,7 @@ class RunSummary(BaseModel):
     run_id: str
     scenario_name: str
     scenario_description: str
+    scenario_config: dict[str, Any]
     timestamp: datetime
     total_turns: int
     status: RunStatus
@@ -105,6 +107,7 @@ class RunDetailResponse(BaseModel):
     run_id: str
     scenario_name: str
     scenario_description: str
+    scenario_config: dict[str, Any]
     timestamp: datetime
     total_turns: int
     status: RunStatus
