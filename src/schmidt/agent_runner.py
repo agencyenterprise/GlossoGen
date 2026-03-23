@@ -111,8 +111,9 @@ class AgentRunner:
         )
 
         tools = self._tool_registry.get_specs(names=list(self._config.tool_names))
-        if not decision.allow_pass:
-            tools = [t for t in tools if t.name != "pass_turn"]
+        if decision.excluded_tool_names:
+            excluded = set(decision.excluded_tool_names)
+            tools = [t for t in tools if t.name not in excluded]
 
         turn_context = (
             "It's your turn to speak. "
@@ -129,12 +130,13 @@ class AgentRunner:
         else:
             messages.append(LLMMessage(role="user", content=turn_context))
 
-        await self._llm_tool_loop(messages=messages, tools=tools)
+        await self._llm_tool_loop(messages=messages, tools=tools, max_tokens=decision.max_tokens)
 
     async def _llm_tool_loop(
         self,
         messages: list[LLMMessage],
         tools: list[ToolSpec],
+        max_tokens: int,
     ) -> None:
         """Call the LLM and execute returned tool calls in a loop,
         up to MAX_TOOL_CALLS_PER_TURN iterations.
@@ -169,6 +171,7 @@ class AgentRunner:
                 messages=messages,
                 tools=active_tools,
                 force_tool_use=False,
+                max_tokens=max_tokens,
             )
 
             await self._event_logger.log(

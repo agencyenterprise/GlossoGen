@@ -1,8 +1,12 @@
 {
   "mode": "debate",
-  "agent_order": "b_first",
+  "agent_order": ["agent_b", "agent_a"],
   "round_count": 10,
   "max_turns_per_round": 8,
-  "persuasion_strategy": "logical",
-  "model_overrides": {}
+  "persuasion_strategy": null,
+  "model_overrides": {},
+  "agent_beliefs": null,
+  "max_tokens_per_turn": null,
+  "discussion_order_seed": null,
+  "silence_after_discussion_turn": null
 }

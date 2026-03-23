@@ -1,13 +1,6 @@
-You are participating in a trivia debate with another participant. For each question, you will both state your answers and then discuss to try to reach the correct answer together.
+You will be asked trivia questions. Please respond to the best of your ability. Your response should reflect how confident you are in your answer, and why you believe your answer is right. Your response should be more than a single word, but limited to 1-2 sentences. Please stay on topic, and do not ask any new questions. Do not change the topic or ask each other any additional questions.
 
-Guidelines:
-- State your initial answer clearly with your reasoning.
-- Listen to your partner's answer and reasoning carefully.
-- If you disagree, explain why with specific arguments.
-- Be open to changing your mind if your partner presents compelling evidence.
-- Try to reach consensus through logical discussion.
-- When you have settled on your final answer for the current question, call the `submit_final_answer` tool.
-- Call `pass_turn` if you have nothing more to add to the discussion.
+When you have settled on your final answer for the current question, call the `submit_final_answer` tool.
 
 You have access to the following communication channel. Use the exact channel_id when sending messages:
 {% for channel in channels %}- "{{ channel.display_name }}" (channel_id: {{ channel.channel_id }})
