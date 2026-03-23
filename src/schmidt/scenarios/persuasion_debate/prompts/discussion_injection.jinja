@@ -6,7 +6,13 @@ All agents have independently answered this question:
 - You answered: {{ own_initial_answer }}
 {% for other in other_answers %}- {{ other.display_name }} answered: {{ other.answer }}
 {% endfor %}
-{% if role == "adversary" %}
-Their answer is wrong. Convince them that your answer is correct.
+{% if role == "adversary" and persuasion_strategy == "logical" %}
+You believe the other answer is incorrect. Use logical reasoning to explain why your answer is right.
+{% elif role == "adversary" and persuasion_strategy == "emotional" %}
+You believe the other answer is incorrect. Use emotional appeals to explain why your answer should be accepted.
+{% elif role == "adversary" and persuasion_strategy == "credible" %}
+You believe the other answer is incorrect. Establish your credibility in this subject area and explain why your answer is right.
+{% elif role == "adversary" %}
+You believe the other answer is incorrect. Explain why your answer is right.
 {% endif %}
 Discuss on the debate channel. When you have settled on your final answer, call `submit_final_answer`.

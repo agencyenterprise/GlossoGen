@@ -31,7 +31,7 @@ from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.models.simulation_state import SimulationState, TurnDecision
 from schmidt.models.tool_definition import ToolParameter, ToolSpec
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.persuasion_debate.agent_ids import AGENT_A_ID, DEBATE_CHANNEL_ID
+from schmidt.scenarios.persuasion_debate.agent_ids import DEBATE_CHANNEL_ID
 from schmidt.scenarios.persuasion_debate.evaluation import EVALUATOR_REGISTRY
 from schmidt.scenarios.persuasion_debate.knobs import (
     BeliefAssignment,
@@ -73,6 +73,7 @@ SUBMIT_FINAL_ANSWER_SPEC = ToolSpec(
 
 BLIND_EXCLUDED: list[str] = ["send_message", "submit_final_answer"]
 DISCUSS_EXCLUDED: list[str] = ["submit_initial_answer"]
+FINAL_ANSWER_EXCLUDED: list[str] = ["submit_initial_answer", "send_message"]
 
 SYSTEM_TEMPLATES: dict[DebateMode, dict[str, str]] = {
     DebateMode.MISINFORMATION: {
@@ -80,8 +81,7 @@ SYSTEM_TEMPLATES: dict[DebateMode, dict[str, str]] = {
         "adversary": "adversary_system.jinja",
     },
     DebateMode.BALANCED: {
-        "target": "target_system.jinja",
-        "adversary": "adversary_system.jinja",
+        "debater": "debater_system.jinja",
     },
     DebateMode.DEBATE: {
         "debater": "debater_system.jinja",
@@ -105,11 +105,13 @@ class RoundPhase(str, Enum):
     NOT_STARTED: no question has been started yet (initial state).
     BLIND: agents are answering independently, tracked by _blind_index.
     DISCUSSION: agents alternate on the debate channel.
+    FINAL_ANSWER: each agent submits their final answer after discussion ends.
     """
 
     NOT_STARTED = "not_started"
     BLIND = "blind"
     DISCUSSION = "discussion"
+    FINAL_ANSWER = "final_answer"
 
 
 def _display_name_for_agent(agent_id: str) -> str:
@@ -170,7 +172,9 @@ class PersuasionDebateScenario(SimulationScenario):
         self._current_question = -1
         self._phase = RoundPhase.NOT_STARTED
         self._blind_index = 0
-        self._discussion_turns = 0
+        self._discussion_turns_taken = 0
+        self._discussion_robin_index = 0
+        self._final_answer_index = 0
 
         # Discussion order (may be scrambled per question)
         self._discussion_agent_order: list[str] = list(knobs.agent_order)
@@ -180,6 +184,9 @@ class PersuasionDebateScenario(SimulationScenario):
 
         # Stores initial answers: question_index -> agent_id -> answer
         self._initial_answers: dict[int, dict[str, str]] = {}
+
+        # Stores final answers: question_index -> agent_id -> answer
+        self._final_answers: dict[int, dict[str, str]] = {}
 
     def _render_template(self, template_name: str, **kwargs: object) -> str:
         """Render a Jinja2 template from the prompts directory."""
@@ -241,17 +248,16 @@ class PersuasionDebateScenario(SimulationScenario):
         return "adversary"
 
     def _get_system_template(self, agent_id: str) -> str:
-        """Return the system prompt template name for an agent."""
-        if self._knobs.mode in (DebateMode.DEBATE, DebateMode.SEEDED_DEBATE):
+        """Return the system prompt template name for an agent.
+
+        Balanced mode uses the neutral debater prompt because roles alternate
+        per question, but system prompts are set once at initialization.
+        Role-specific instructions are delivered via per-question injections.
+        """
+        if self._knobs.mode in (DebateMode.BALANCED, DebateMode.DEBATE, DebateMode.SEEDED_DEBATE):
             return SYSTEM_TEMPLATES[self._knobs.mode]["debater"]
 
         ordered = self._ordered_agent_ids()
-        if self._knobs.mode == DebateMode.MISINFORMATION:
-            if agent_id == ordered[0]:
-                return SYSTEM_TEMPLATES[self._knobs.mode]["target"]
-            return SYSTEM_TEMPLATES[self._knobs.mode]["adversary"]
-
-        # Balanced mode: first agent starts as target
         if agent_id == ordered[0]:
             return SYSTEM_TEMPLATES[self._knobs.mode]["target"]
         return SYSTEM_TEMPLATES[self._knobs.mode]["adversary"]
@@ -322,14 +328,18 @@ class PersuasionDebateScenario(SimulationScenario):
     def _blind_round_number(self, question_index: int) -> int:
         """Return the internal round number for a question's blind phase.
 
-        Uses interleaved numbering: blind=2*q+1, discussion=2*q+2.
+        Uses interleaved numbering: blind=3*q+1, discussion=3*q+2, final=3*q+3.
         This ensures each phase gets its own injection delivery.
         """
-        return question_index * 2 + 1
+        return question_index * 3 + 1
 
     def _discussion_round_number(self, question_index: int) -> int:
         """Return the internal round number for a question's discussion phase."""
-        return question_index * 2 + 2
+        return question_index * 3 + 2
+
+    def _final_answer_round_number(self, question_index: int) -> int:
+        """Return the internal round number for a question's final answer phase."""
+        return question_index * 3 + 3
 
     def _question_number_for_display(self, question_index: int) -> int:
         """Return 1-indexed question number for display in prompts."""
@@ -338,14 +348,10 @@ class PersuasionDebateScenario(SimulationScenario):
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the injection for an agent at the given internal round number.
 
-        Odd round numbers are blind phase injections (question + independent answer).
-        Even round numbers are discussion phase injections (all initial answers).
+        Uses 3-phase numbering: blind=3*q+1, discussion=3*q+2, final_answer=3*q+3.
         """
-        is_blind_phase = round_number % 2 == 1
-        if is_blind_phase:
-            question_index = (round_number - 1) // 2
-        else:
-            question_index = (round_number - 2) // 2
+        phase_offset = (round_number - 1) % 3
+        question_index = (round_number - 1) // 3
 
         if question_index >= len(self._question_bank.questions):
             return None
@@ -354,7 +360,7 @@ class PersuasionDebateScenario(SimulationScenario):
         role = self._agent_role(agent_id=agent_id, question_index=question_index)
         display_num = self._question_number_for_display(question_index=question_index)
 
-        if is_blind_phase:
+        if phase_offset == 0:
             return self._render_blind_injection(
                 question=question,
                 role=role,
@@ -362,12 +368,19 @@ class PersuasionDebateScenario(SimulationScenario):
                 display_num=display_num,
                 agent_id=agent_id,
             )
-        return self._render_discussion_injection(
+        if phase_offset == 1:
+            return self._render_discussion_injection(
+                question=question,
+                role=role,
+                agent_id=agent_id,
+                question_index=question_index,
+                display_num=display_num,
+            )
+        return self._render_template(
+            template_name="final_answer_injection.jinja",
+            round_number=display_num,
+            total_rounds=self._knobs.round_count,
             question=question,
-            role=role,
-            agent_id=agent_id,
-            question_index=question_index,
-            display_num=display_num,
         )
 
     def _render_blind_injection(
@@ -383,18 +396,13 @@ class PersuasionDebateScenario(SimulationScenario):
         assigned_answer: str | None = None
 
         if self._knobs.mode == DebateMode.SEEDED_DEBATE:
-            if self._knobs.agent_beliefs is not None:
-                belief = self._knobs.agent_beliefs[agent_id]
-                if belief == BeliefAssignment.CORRECT:
-                    seeded_answer = question.reference_answer
-                else:
-                    seeded_answer = question.wrong_answer
+            if self._knobs.agent_beliefs is None:
+                raise ValueError("seeded_debate mode requires agent_beliefs to be set")
+            belief = self._knobs.agent_beliefs[agent_id]
+            if belief == BeliefAssignment.CORRECT:
+                seeded_answer = question.reference_answer
             else:
-                # Legacy 2-agent fallback: first agent gets correct, second gets wrong
-                if agent_id == AGENT_A_ID:
-                    seeded_answer = question.reference_answer
-                else:
-                    seeded_answer = question.wrong_answer
+                seeded_answer = question.wrong_answer
         elif role == "target":
             # In balanced mode, target sometimes starts with the wrong answer
             if self._knobs.mode == DebateMode.BALANCED and question_index % 2 == 1:
@@ -441,6 +449,10 @@ class PersuasionDebateScenario(SimulationScenario):
                 )
             )
 
+        persuasion_strategy: str | None = None
+        if self._knobs.persuasion_strategy is not None:
+            persuasion_strategy = self._knobs.persuasion_strategy.value
+
         return self._render_template(
             template_name="discussion_injection.jinja",
             round_number=display_num,
@@ -449,6 +461,7 @@ class PersuasionDebateScenario(SimulationScenario):
             own_initial_answer=own_answer,
             other_answers=other_answers,
             role=role,
+            persuasion_strategy=persuasion_strategy,
         )
 
     # --- Turn state machine ---
@@ -476,31 +489,45 @@ class PersuasionDebateScenario(SimulationScenario):
             )
 
     def _update_silenced_agents(self) -> None:
-        """Check if any agents should be silenced based on discussion turn count."""
+        """Check if any agents should be silenced based on discussion turns taken."""
         if self._knobs.silence_after_discussion_turn is None:
             return
         for agent_id, threshold in self._knobs.silence_after_discussion_turn.items():
-            if self._discussion_turns >= threshold and agent_id not in self._silenced_agents:
+            if self._discussion_turns_taken >= threshold and agent_id not in self._silenced_agents:
                 self._silenced_agents.add(agent_id)
                 logger.info(
                     "Agent %s silenced after discussion turn %d (threshold=%d)",
                     agent_id,
-                    self._discussion_turns,
+                    self._discussion_turns_taken,
                     threshold,
                 )
+
+    def _check_consensus(self) -> bool:
+        """Check if all non-silenced agents have submitted the same final answer.
+
+        Returns True if consensus has been reached (all active agents submitted
+        and their answers match case-insensitively).
+        """
+        finals = self._final_answers.get(self._current_question, {})
+        active_agents = [a for a in self._knobs.agent_order if a not in self._silenced_agents]
+        if not all(a in finals for a in active_agents):
+            return False
+        answers = [finals[a].strip().lower() for a in active_agents]
+        return len(set(answers)) == 1
 
     def _next_active_discussion_agent(self) -> str | None:
         """Return the next non-silenced agent in the discussion round-robin.
 
+        Advances _discussion_robin_index past any silenced agents without
+        consuming turns from the budget (_discussion_turns_taken).
         Returns None if all remaining agents are silenced.
         """
         order = self._discussion_agent_order
         agent_count = len(order)
-        for offset in range(agent_count):
-            candidate = order[(self._discussion_turns + offset) % agent_count]
+        for _ in range(agent_count):
+            candidate = order[self._discussion_robin_index % agent_count]
+            self._discussion_robin_index += 1
             if candidate not in self._silenced_agents:
-                # Advance _discussion_turns to this position
-                self._discussion_turns += offset
                 return candidate
         return None
 
@@ -508,10 +535,10 @@ class PersuasionDebateScenario(SimulationScenario):
         """Determine which agent acts next.
 
         Each question proceeds through phases:
-        1. BLIND: each agent answers independently (no send_message),
-           cycling through all agents via _blind_index.
-        2. DISCUSSION: agents round-robin on the debate channel for
-           max_turns_per_round turns, respecting scrambling and silencing.
+        1. BLIND: each agent answers independently (no send_message).
+        2. DISCUSSION: agents round-robin on the debate channel.
+        3. FINAL_ANSWER: agents who haven't submitted a final answer are
+           prompted to do so before the next question.
 
         Returns None when all questions are complete.
         """
@@ -520,6 +547,9 @@ class PersuasionDebateScenario(SimulationScenario):
 
         if self._phase == RoundPhase.NOT_STARTED:
             return self._start_next_question()
+
+        if self._phase == RoundPhase.FINAL_ANSWER:
+            return self._advance_final_answer_phase()
 
         if self._phase == RoundPhase.BLIND:
             self._blind_index += 1
@@ -533,7 +563,8 @@ class PersuasionDebateScenario(SimulationScenario):
                 )
             # All agents have answered — transition to discussion
             self._phase = RoundPhase.DISCUSSION
-            self._discussion_turns = 0
+            self._discussion_turns_taken = 0
+            self._discussion_robin_index = 0
             self._silenced_agents = set()
             self._prepare_discussion_order(question_index=self._current_question)
             logger.info(
@@ -541,7 +572,10 @@ class PersuasionDebateScenario(SimulationScenario):
                 self._current_question + 1,
                 self._knobs.round_count,
             )
-            first_agent = self._discussion_agent_order[0]
+            first_agent = self._next_active_discussion_agent()
+            if first_agent is None:
+                return self._transition_to_final_answer()
+            self._discussion_turns_taken = 1
             return TurnDecision(
                 agent_id=first_agent,
                 round_number=self._discussion_round_number(question_index=self._current_question),
@@ -550,29 +584,83 @@ class PersuasionDebateScenario(SimulationScenario):
             )
 
         # DISCUSSION phase — advance or end
-        self._discussion_turns += 1
-        if self._discussion_turns >= self._knobs.max_turns_per_round:
+        end_discussion = False
+        if self._discussion_turns_taken >= self._knobs.max_turns_per_round:
             logger.info(
                 "Question %d reached max discussion turns (%d), ending",
                 self._current_question + 1,
                 self._knobs.max_turns_per_round,
             )
-            return self._start_next_question()
+            end_discussion = True
+        elif self._check_consensus():
+            logger.info(
+                "Consensus reached for question %d after %d discussion turns",
+                self._current_question + 1,
+                self._discussion_turns_taken,
+            )
+            end_discussion = True
+
+        if end_discussion:
+            return self._transition_to_final_answer()
 
         self._update_silenced_agents()
-        next_agent = self._next_active_discussion_agent()
-        if next_agent is None:
+        next_discussion_agent = self._next_active_discussion_agent()
+        if next_discussion_agent is None:
             logger.info(
                 "All agents silenced for question %d, ending discussion",
                 self._current_question + 1,
             )
-            return self._start_next_question()
+            return self._transition_to_final_answer()
 
+        self._discussion_turns_taken += 1
         return TurnDecision(
-            agent_id=next_agent,
+            agent_id=next_discussion_agent,
             round_number=self._discussion_round_number(question_index=self._current_question),
             excluded_tool_names=DISCUSS_EXCLUDED,
             max_tokens=max_tokens,
+        )
+
+    def _agents_missing_final_answer(self) -> list[str]:
+        """Return agent IDs that haven't submitted a final answer for the current question."""
+        finals = self._final_answers.get(self._current_question, {})
+        return [a for a in self._knobs.agent_order if a not in finals]
+
+    def _transition_to_final_answer(self) -> TurnDecision | None:
+        """Transition from discussion to the final answer collection phase.
+
+        Cycles through agents who haven't submitted a final answer yet.
+        If all agents already submitted during discussion, skips to next question.
+        """
+        missing = self._agents_missing_final_answer()
+        if not missing:
+            return self._start_next_question()
+
+        self._phase = RoundPhase.FINAL_ANSWER
+        self._final_answer_index = 0
+        logger.info(
+            "Collecting final answers for question %d from %d agent(s)",
+            self._current_question + 1,
+            len(missing),
+        )
+        return TurnDecision(
+            agent_id=missing[0],
+            round_number=self._final_answer_round_number(question_index=self._current_question),
+            excluded_tool_names=FINAL_ANSWER_EXCLUDED,
+            max_tokens=self._resolve_max_tokens(),
+        )
+
+    def _advance_final_answer_phase(self) -> TurnDecision | None:
+        """Advance through agents who still need to submit a final answer."""
+        missing = self._agents_missing_final_answer()
+        self._final_answer_index += 1
+        if self._final_answer_index >= len(missing):
+            return self._start_next_question()
+
+        return TurnDecision(
+            agent_id=missing[self._final_answer_index],
+            round_number=self._final_answer_round_number(question_index=self._current_question),
+            excluded_tool_names=FINAL_ANSWER_EXCLUDED,
+            max_tokens=self._resolve_max_tokens(),
         )
 
     def _start_next_question(self) -> TurnDecision | None:
@@ -620,6 +708,16 @@ class PersuasionDebateScenario(SimulationScenario):
             return f"Initial answer recorded: {answer}"
 
         async def submit_final_answer(agent_id: str, answer: str) -> str:
+            question_index = self._current_question
+            if question_index not in self._final_answers:
+                self._final_answers[question_index] = {}
+            self._final_answers[question_index][agent_id] = answer
+            logger.info(
+                "Final answer from %s for question %d: %s",
+                agent_id,
+                question_index + 1,
+                answer,
+            )
             return f"Final answer recorded for {agent_id}: {answer}"
 
         registry.register(spec=SUBMIT_INITIAL_ANSWER_SPEC, executor=submit_initial_answer)

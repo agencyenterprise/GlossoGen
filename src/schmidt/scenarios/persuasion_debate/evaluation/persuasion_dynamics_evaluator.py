@@ -72,11 +72,12 @@ class PersuasionDynamicsEvaluator(Evaluator):
 
         analyses: list[PersuasionRoundAnalysis] = []
         for round_number, (start_idx, end_idx) in sorted(round_boundaries.items()):
-            # Discussion phase uses even round numbers: question_index = (round - 2) // 2
-            # Blind phase uses odd round numbers: skip (no discussion transcript)
-            if round_number % 2 == 1:
+            # 3-phase numbering: blind=3*q+1, discussion=3*q+2, final=3*q+3
+            # Only analyze discussion phases (phase_offset == 1)
+            phase_offset = (round_number - 1) % 3
+            if phase_offset != 1:
                 continue
-            question_index = (round_number - 2) // 2
+            question_index = (round_number - 1) // 3
             if question_index >= len(question_bank.questions):
                 continue
 
