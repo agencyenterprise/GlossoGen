@@ -1,10 +1,11 @@
 """Evaluator that uses an LLM judge to analyze persuasion dynamics.
 
 For each round, assesses who persuaded whom, whether the persuasion
-was positive (toward correct answer) or negative, and argument quality.
+was positive (toward correct answer) or negative, and argument quality per agent.
 """
 
 import logging
+from collections import defaultdict
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -24,11 +25,18 @@ from schmidt.scenarios.persuasion_debate.question_bank import QuestionBank
 logger = logging.getLogger(__name__)
 
 
+class AgentArgumentQuality(BaseModel):
+    """Argument quality assessment for a single agent."""
+
+    agent_id: str = Field(description="The agent's identifier.")
+    quality: float = Field(description="Quality of this agent's arguments on a 0-1 scale.")
+
+
 class PersuasionRoundAnalysis(BaseModel):
     """LLM judge analysis of persuasion dynamics for a single round."""
 
     persuader_agent: str = Field(
-        description="Which agent did more persuading (agent_a or agent_b, or 'neither')."
+        description="Which agent did more persuading (an agent ID, or 'neither')."
     )
     persuasion_direction: Literal["positive", "negative", "neutral"] = Field(
         description=(
@@ -37,11 +45,8 @@ class PersuasionRoundAnalysis(BaseModel):
             "neutral: no meaningful persuasion occurred."
         )
     )
-    argument_quality_agent_a: float = Field(
-        description="Quality of Agent A's arguments on a 0-1 scale."
-    )
-    argument_quality_agent_b: float = Field(
-        description="Quality of Agent B's arguments on a 0-1 scale."
+    argument_qualities: list[AgentArgumentQuality] = Field(
+        description="Argument quality assessment for each participating agent."
     )
     explanation: str = Field(description="Reasoning for the analysis.")
 
@@ -57,18 +62,22 @@ class PersuasionDynamicsEvaluator(Evaluator):
         llm_provider: LLMProvider,
     ) -> MetricResult:
         """Evaluate persuasion dynamics across all rounds."""
-        _ = agent_configs
-
         if not hasattr(scenario, "get_question_bank"):
             raise TypeError("PersuasionDynamicsEvaluator requires a PersuasionDebateScenario")
 
+        agent_ids = [config.agent_id for config in agent_configs]
         scenario_any: Any = scenario
         question_bank: QuestionBank = scenario_any.get_question_bank()
         round_boundaries = self._find_round_boundaries(events=events)
 
         analyses: list[PersuasionRoundAnalysis] = []
         for round_number, (start_idx, end_idx) in sorted(round_boundaries.items()):
-            question_index = round_number - 1
+            # 3-phase numbering: blind=3*q+1, discussion=3*q+2, final=3*q+3
+            # Only analyze discussion phases (phase_offset == 1)
+            phase_offset = (round_number - 1) % 3
+            if phase_offset != 1:
+                continue
+            question_index = (round_number - 1) // 3
             if question_index >= len(question_bank.questions):
                 continue
 
@@ -88,6 +97,7 @@ class PersuasionDynamicsEvaluator(Evaluator):
                 question_text=question.question_text,
                 reference_answer=question.reference_answer,
                 transcript=transcript,
+                agent_ids=agent_ids,
             )
             analyses.append(analysis)
 
@@ -118,6 +128,7 @@ class PersuasionDynamicsEvaluator(Evaluator):
         question_text: str,
         reference_answer: str,
         transcript: str,
+        agent_ids: list[str],
     ) -> PersuasionRoundAnalysis:
         """Use LLM judge to analyze persuasion dynamics for one round."""
         prompt = render_persuasion_prompt(
@@ -125,6 +136,7 @@ class PersuasionDynamicsEvaluator(Evaluator):
             question_text=question_text,
             reference_answer=reference_answer,
             transcript=transcript,
+            agent_ids=agent_ids,
         )
         return await llm_provider.generate_structured(
             system_prompt=render_evaluator_prompt(template_name="evaluator_system.jinja"),
@@ -147,8 +159,13 @@ class PersuasionDynamicsEvaluator(Evaluator):
         negative_count = sum(1 for a in analyses if a.persuasion_direction == "negative")
         neutral_count = sum(1 for a in analyses if a.persuasion_direction == "neutral")
 
-        avg_quality_a = sum(a.argument_quality_agent_a for a in analyses) / len(analyses)
-        avg_quality_b = sum(a.argument_quality_agent_b for a in analyses) / len(analyses)
+        # Aggregate quality scores per agent across rounds
+        quality_totals: dict[str, float] = defaultdict(float)
+        quality_counts: dict[str, int] = defaultdict(int)
+        for analysis in analyses:
+            for aq in analysis.argument_qualities:
+                quality_totals[aq.agent_id] += aq.quality
+                quality_counts[aq.agent_id] += 1
 
         evidence: list[str] = [
             f"Rounds analyzed: {len(analyses)}",
@@ -157,8 +174,14 @@ class PersuasionDynamicsEvaluator(Evaluator):
                 f"Negative: {negative_count}, "
                 f"Neutral: {neutral_count}"
             ),
-            (f"Avg quality - A: {avg_quality_a:.2f}, " f"B: {avg_quality_b:.2f}"),
         ]
+
+        quality_parts: list[str] = []
+        for agent_id in sorted(quality_totals.keys()):
+            avg = quality_totals[agent_id] / quality_counts[agent_id]
+            quality_parts.append(f"{agent_id}: {avg:.2f}")
+        if quality_parts:
+            evidence.append(f"Avg quality - {', '.join(quality_parts)}")
 
         for i, analysis in enumerate(analyses):
             direction = analysis.persuasion_direction

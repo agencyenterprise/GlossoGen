@@ -346,10 +346,14 @@ class IncidentResponseScenario(SimulationScenario):
 
     def _current_turn_decision(self) -> TurnDecision:
         """Build a TurnDecision for the current rotation position."""
+        excluded: list[str] = []
+        if self._first_rotation:
+            excluded = ["pass_turn"]
         return TurnDecision(
             agent_id=self._discussion_agents[self._rotation_index],
             round_number=self._current_round,
-            allow_pass=not self._first_rotation,
+            excluded_tool_names=excluded,
+            max_tokens=4096,
         )
 
     def _start_next_discussion(self) -> TurnDecision | None:
