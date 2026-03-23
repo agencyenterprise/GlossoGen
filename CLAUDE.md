@@ -20,10 +20,22 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 ## Project Structure
 
 - `src/` — application source code
+- `src/schmidt/scenario_protocol.py` — `SimulationScenario` ABC that every scenario implements
+- `src/schmidt/simulation_state_protocol.py` — `SimulationStateProtocol` for stateful scenarios with mutable world state
+- `src/schmidt/simulation_hub.py` — orchestrator that runs the turn loop, handles round transitions, and registers built-in tools
+- `src/schmidt/agent_runner.py` — per-agent coroutine lifecycle (LLM calls, tool execution, reasoning capture)
+- `src/schmidt/channel_generation.py` — `generate_dm_channels()` utility for auto-generating pairwise DM channels
+- `src/schmidt/tools/` — tool system (registry, executor, built-in tools)
+  - `builtin_send_message.py` / `builtin_pass_turn.py` — core tools every agent gets
+  - `builtin_notebook.py` — private per-agent notebook (`write_notebook`, `read_notebook`)
+  - `builtin_shared_documents.py` — shared document workspace (`list_documents`, `read_document`, `write_document`)
+  - `stateful_tool.py` — `StatefulToolExecutor` helper for scenario tools that mutate world state
 - `src/schmidt/scenarios/<scenario_name>/` — one folder per scenario, containing:
   - `README.md` — scenario documentation (agents, channels, tools, round injections, turn logic, evaluation focus)
   - `scenario.py` — scenario class definition (channels, turn logic, tools, injections)
   - `prompts/` — Jinja2 templates for all agent system prompts and injection messages
+  - `evaluation/` — scenario-specific evaluators (optional)
+- `src/schmidt/evaluation/` — generic evaluators and evaluation infrastructure
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST
 - `linter/` — custom linting scripts
 - `frontend/` — Next.js web application
@@ -140,7 +152,35 @@ set -a && source .env && set +a && \
   > ./runs/car_recall_stdout.log 2>&1 &
 ```
 
+The `product_launch` scenario also uses `--knobs`. Two presets are provided in `src/schmidt/scenarios/product_launch/`:
+
+- `knobs_baseline.json` — 6 agents, 8 features, 12 rounds, 10 turns per round, 15% budget deficit, medium events
+- `knobs_high_pressure.json` — 6 agents, 10 features, 8 rounds, 10 turns per round, 25% budget deficit, high event intensity
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
+    --model <model> --runs-dir ./runs \
+    --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
+  > ./runs/product_launch_stdout.log 2>&1 &
+```
+
 Check progress by reading the stdout log file or the JSONL event log.
+
+### Resuming Failed Simulations
+
+If a simulation errors midway through, resume from the last checkpoint using the `--resume` flag pointing at the existing run directory. The simulation will pick up from the exact turn where it left off, preserving all channel messages, notebook entries, and shared document contents.
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
+    --model <model> --runs-dir ./runs \
+    --resume ./runs/<scenario>/<timestamp> \
+    <scenario-specific flags like --knobs or --max-turns-per-round> \
+  > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
+```
+
+The `--resume` flag requires the same scenario-specific flags as the original run (e.g. `--knobs` for car_recall/product_launch, `--max-turns-per-round` for incident_response). The `--runs-dir` flag is still required but ignored when resuming.
 
 ### IMPORTANT: Monitoring Long-Running Processes
 
@@ -167,8 +207,11 @@ set -a && source .env && set +a && \
 
 Available evaluators per scenario:
 
-- **incident_response**: `secret_leak`, `instruction_adherence`, `cooperation`
-- **car_recall**: `secret_leak`, `instruction_adherence`, `cooperation`, `fact_surfacing`, `report_divergence`, `decision_correctness`
+Generic evaluators (available to all scenarios): `secret_leak`, `instruction_adherence`, `cooperation`, `communication_pattern`, `report_accuracy`
+
+- **incident_response**: generic evaluators
+- **car_recall**: generic evaluators + `fact_surfacing`, `report_divergence`, `decision_correctness`
+- **product_launch**: generic evaluators + `launch_outcome`, `emergent_behavior`
 
 ## Destructive Actions
 

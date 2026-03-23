@@ -165,6 +165,16 @@ class NotebookEntryWritten(EventBase):
     entry_text: str
 
 
+class SharedDocumentEdited(EventBase):
+    """Emitted when an agent writes to a shared document."""
+
+    event_type: Literal["shared_document_edited"] = "shared_document_edited"
+    agent_id: str
+    round_number: int
+    document_id: str
+    content: str
+
+
 class ReasoningCaptured(EventBase):
     """Emitted when an agent's private reasoning is elicited before their action phase."""
 
@@ -180,6 +190,22 @@ class RunStatus(str, Enum):
     SCENARIO_COMPLETE = "scenario_complete"
     IN_PROGRESS = "in_progress"
     ERROR = "error"
+
+
+class CheckpointSaved(EventBase):
+    """Emitted at each turn boundary to capture the full scenario state for resume.
+
+    Contains the turn/round counters, the scenario's serialized turn-scheduling
+    state, and (for stateful scenarios) the world state. Used by the ``--resume``
+    CLI flag to reconstruct a simulation after an error.
+    """
+
+    event_type: Literal["checkpoint_saved"] = "checkpoint_saved"
+    turn_number: int
+    round_number: int
+    last_turn_passed: bool
+    scenario_state: dict[str, Any]
+    last_injected_rounds: dict[str, int]
 
 
 class SimulationEnded(EventBase):
@@ -208,7 +234,9 @@ SimulationEvent = Annotated[
         RoundStateAdvanced,
         GroundTruthSnapshot,
         NotebookEntryWritten,
+        SharedDocumentEdited,
         ReasoningCaptured,
+        CheckpointSaved,
         SimulationEnded,
     ],
     Discriminator("event_type"),

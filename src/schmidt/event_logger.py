@@ -33,6 +33,17 @@ class EventLogger:
         self._file = await aiofiles.open(self._log_path, mode="wb")
         logger.info("Event log opened: %s", self._log_path)
 
+    async def open_for_append(self) -> None:
+        """Open the log file in append mode for resuming a simulation.
+
+        Does not truncate the existing content. Raises ``FileNotFoundError``
+        if the log file does not exist.
+        """
+        if not self._log_path.exists():
+            raise FileNotFoundError(f"Cannot resume: log file not found at {self._log_path}")
+        self._file = await aiofiles.open(self._log_path, mode="ab")
+        logger.info("Event log opened for append (resume): %s", self._log_path)
+
     async def log(self, event: SimulationEvent) -> None:
         """Serialize ``event`` to JSON, write it as a single line, and flush.
 
