@@ -170,6 +170,10 @@ class IncidentResponseScenario(SimulationScenario):
         """Return the scenario identifier."""
         return "incident_response"
 
+    def get_scenario_config(self) -> dict[str, object]:
+        """Return incident response config."""
+        return {"max_turns_per_round": self._max_turns_per_round}
+
     def scenario_description(self) -> str:
         """Return a markdown description of the incident response scenario."""
         return self._render_template(template_name="description.jinja")

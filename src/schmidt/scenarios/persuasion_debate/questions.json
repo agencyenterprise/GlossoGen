@@ -1,0 +1,704 @@
+{
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_text": "Who was the man behind The Chipmunks?",
+      "reference_answer": "David Seville",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q2",
+      "question_text": "What star sign is Jamie Lee Curtis?",
+      "reference_answer": "Scorpio",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q3",
+      "question_text": "Which Lloyd Webber musical premiered in the US on 10th December 1993?",
+      "reference_answer": "Sunset Boulevard",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q4",
+      "question_text": "Who was the next British Prime Minister after Arthur Balfour?",
+      "reference_answer": "Campbell-Bannerman",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q5",
+      "question_text": "Who had a 70s No 1 hit with Kiss You All Over?",
+      "reference_answer": "Exile",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q6",
+      "question_text": "What claimed the life of singer Kathleen Ferrier?",
+      "reference_answer": "Cancer",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q7",
+      "question_text": "Rita Coolidge sang the title song for which Bond film?",
+      "reference_answer": "Octopussy",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q8",
+      "question_text": "To the nearest million what is the population of Australia?",
+      "reference_answer": "18 million",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q9",
+      "question_text": "What was the last US state to reintroduce alcohol after prohibition?",
+      "reference_answer": "Utah",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q10",
+      "question_text": "Which actress was voted Miss Greenwich Village in 1942?",
+      "reference_answer": "Lauren Bacall",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q11",
+      "question_text": "What is the Japanese share index called?",
+      "reference_answer": "Nikkei",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q12",
+      "question_text": "What was the name of Michael Jackson's autobiography written in 1988?",
+      "reference_answer": "Moonwalk",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q13",
+      "question_text": "In which decade did stereo records first go on sale?",
+      "reference_answer": "1930s",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q14",
+      "question_text": "What was golfing great Ben Hogan's famous reply when he was asked how to improve one's game?",
+      "reference_answer": "Hit the ball closer to the hole",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q15",
+      "question_text": "In what year's Olympics were electric timing devices and a public-address system used for the first time?",
+      "reference_answer": "In 1912, in Stockholm",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q16",
+      "question_text": "Why is the site of a boxing match called a ring when it's square?",
+      "reference_answer": "Boxing rings were originally circular",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q17",
+      "question_text": "In the very first Boston Marathon, 15 runners competed. How many finished?",
+      "reference_answer": "$85,000",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q18",
+      "question_text": "\"How many different animal shapes are there in the \"\"Animal Crackers\"\" cookie zoo?\"",
+      "reference_answer": "Eighteen--two bears (one walking, one seated), a bison, camel, cougar, elephant, giraffe, gorilla, hippopotamus, hyena , kangaroo, lion, monkey, rhinoceros, seal, sheep, tier, and zebra",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q19",
+      "question_text": "Which volcano in Tanzania is the highest mountain in Africa?",
+      "reference_answer": "Kilimanjaro",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q20",
+      "question_text": "The flag of Libya is a plain rectangle of which color?",
+      "reference_answer": "Green",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q21",
+      "question_text": "Of which African country is Niamey the capital?",
+      "reference_answer": "Niger",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q22",
+      "question_text": "Who was the director of the CIA from 1976-81?",
+      "reference_answer": "George Bush",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q23",
+      "question_text": "Which musical featured the song The Street Where You Live?",
+      "reference_answer": "My Fair Lady",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q24",
+      "question_text": "\"Who was the target of the failed \"\"Bomb Plot\"\" of 1944?\"",
+      "reference_answer": "Hitler",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q25",
+      "question_text": "Who had an 80s No 1 hit with Hold On To The Nights?",
+      "reference_answer": "Richard Marx",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q26",
+      "question_text": "Who directed the classic 30s western Stagecoach?",
+      "reference_answer": "John Ford",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q27",
+      "question_text": "Dave Gilmore and Roger Waters were in which rock group?",
+      "reference_answer": "Pink Floyd",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q28",
+      "question_text": "Which highway was Revisited in a classic 60s album by Bob Dylan?",
+      "reference_answer": "61",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q29",
+      "question_text": "Which was the only eastern bloc country to participate in the 1984 LA Olympics?",
+      "reference_answer": "Rumania",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q30",
+      "question_text": "Which 90s sci fi series with James Belushi was based on Bruce Wagner's comic strip of the same name?",
+      "reference_answer": "Wild Palms",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q31",
+      "question_text": "If I Were A Rich Man Was a big hit from which stage show?",
+      "reference_answer": "Fiddler on the Roof",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q32",
+      "question_text": "Men Against the Sea and Pitcairn's Island were two sequels to what famous novel?",
+      "reference_answer": "Mutiny On The Bounty",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q33",
+      "question_text": "What is the only novel to top the best-seller lists for two consecutive years?",
+      "reference_answer": "Jonathan Livingston Seagull",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q34",
+      "question_text": "To whom did Helen Keller dedicate her autobiography, The Story of My Life?",
+      "reference_answer": "To inventor Alexander Graham Bell, who helped direct her education and considered himself, first and foremost, a teacher of the deaf",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q35",
+      "question_text": "\"Complete this Biblical quotation: \"\"It is easier for a camel to go through the eye of a needle, than...\"",
+      "reference_answer": "...for a rich man to enter into the kingdom of God. The words are those of Jesus, from Matthew 19:24",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q36",
+      "question_text": "What was Truman Capote's last name before he was adopted by his stepfather?",
+      "reference_answer": "Persons",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q37",
+      "question_text": "What book knocked Henry Kissinger's White house Years out of first place on the best-seller list in November 1979?",
+      "reference_answer": "Aunt Erma's Cope Book, by Erma Bombeck",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q38",
+      "question_text": "In Lewis Carroll's poem The Hunting of the Snark, what did the elusive, troublesome snark turn into to fool hunters?",
+      "reference_answer": "A boojum",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q39",
+      "question_text": "In what state was playwright Tennessee Williams born?",
+      "reference_answer": "In Mississippi, as Thomas Lanier Williams. He took the name Tennessee after his father's home state",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q40",
+      "question_text": "Who was the only Englishman to become Pope?",
+      "reference_answer": "Nicholas Breakspear, who was Adrian IV from 1154 to 1159",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q41",
+      "question_text": "In the Bible, who did the sun and moon stand still before?",
+      "reference_answer": "Joshua",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q42",
+      "question_text": "What Michelle Pfeiffer movie got a boost from the Coolio song Gangsta's Paradise?",
+      "reference_answer": "Dangerous Minds",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q43",
+      "question_text": "In the Bible, who saw the handwriting on the wall?",
+      "reference_answer": "The Babylonian king Belshazzar (Daniel 5:1-5)",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q44",
+      "question_text": "What comic strip character was named after heavyweight boxing champion James J. Jeffries?",
+      "reference_answer": "Jeff, of Mutt and Jeff",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q45",
+      "question_text": "What was President Gerald Ford's middle name?",
+      "reference_answer": "Rudolph",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q46",
+      "question_text": "Who recorded the When Harry Met Sally soundtrack?",
+      "reference_answer": "Harry Connick Jnr",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q47",
+      "question_text": "Art Garfunkel trained for which profession although he didn't qualify?",
+      "reference_answer": "Architect",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q48",
+      "question_text": "Who was the last inmate of Spandau jail in Berlin?",
+      "reference_answer": "Rudolf Hess",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q49",
+      "question_text": "What was Eddie Murphy's first movie?",
+      "reference_answer": "48 Hours",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q50",
+      "question_text": "In the 80s who wrote the novel Empire of The Sun?",
+      "reference_answer": "J. G. Ballard",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q51",
+      "question_text": "Kagoshima international airport is in which country?",
+      "reference_answer": "Japan",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q52",
+      "question_text": "In which sport could the Pacers take on the Pistons?",
+      "reference_answer": "A: Basketball",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q53",
+      "question_text": "Kim Carnes' nine weeks at No 1 with Bette Davis Eyes was interrupted for one week by which song?",
+      "reference_answer": "Stars on 45 medley",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q54",
+      "question_text": "Where in Canada is the Lion's Gate bridge?",
+      "reference_answer": "Vancouver",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q55",
+      "question_text": "What was Walter Matthau's first movie?",
+      "reference_answer": "The Kentuckian",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q56",
+      "question_text": "Otis Barton was a pioneer in exploring where?",
+      "reference_answer": "Underwater",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q57",
+      "question_text": "Where in England was actor Nigel Hawthorne born?",
+      "reference_answer": "Coventry",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q58",
+      "question_text": "What would Kevin Scale have been called if it had adopted the originator's first name?",
+      "reference_answer": "William Scale",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q59",
+      "question_text": "What mythological beast has the head of a man, the body of a lion, and the tail and feet of a dragon?",
+      "reference_answer": "A manticore",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q60",
+      "question_text": "In Greek mythology, who were Arges, Brontes and Steropes?",
+      "reference_answer": "Cyclopes",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q61",
+      "question_text": "In Greek mythology, what were the names of Oedipus's parents?",
+      "reference_answer": "Laius, King of Thebes, and his queen, Jocasta",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q62",
+      "question_text": "Which musician founded the Red Hot Peppers?",
+      "reference_answer": "Jelly Roll Morton",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q63",
+      "question_text": "Where did the Shinning Path terrorists operate?",
+      "reference_answer": "Peru",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q64",
+      "question_text": "How old was Jimi Hendrix when he died?",
+      "reference_answer": "27",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q65",
+      "question_text": "Which Brit broke the land speed record in 1990 in Thrust 2?",
+      "reference_answer": "Richard Noble",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q66",
+      "question_text": "In which state was Gene Vincent born?",
+      "reference_answer": "Virginia",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q67",
+      "question_text": "How was the European Recovery Program in the 1940s more commonly known?",
+      "reference_answer": "Marshall Plan",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q68",
+      "question_text": "Brandon Lee died during the making of which movie?",
+      "reference_answer": "The Crow",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q69",
+      "question_text": "Who had a 70s No 1 hit with Let's Do It Again?",
+      "reference_answer": "The Staple Singers",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q70",
+      "question_text": "Who had a Too Legit To Quit Tour?",
+      "reference_answer": "MC Hammer",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q71",
+      "question_text": "\"According to Rudyard Kipling what were the \"\"two imposters\"\" to meet and treat the same day?\"",
+      "reference_answer": "Triumph and Disaster",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q72",
+      "question_text": "Who is the most successful UK solo artist in the USA?",
+      "reference_answer": "Elton John",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q73",
+      "question_text": "Where was horse racing's Breeder's Cup held in 1987?",
+      "reference_answer": "Hollywood Park L.A",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q74",
+      "question_text": "Which country does the airline TAAG come from?",
+      "reference_answer": "Angola",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q75",
+      "question_text": "Which US No 1 single came from Diana Ross's platinum album Diana?",
+      "reference_answer": "Upside Down",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q76",
+      "question_text": "River Phoenix died during the making of which movie?",
+      "reference_answer": "Dark Blood",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q77",
+      "question_text": "Which artist David was born in Bradford UK?",
+      "reference_answer": "Hockney",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q78",
+      "question_text": "What is Mel Gibson's middle name?",
+      "reference_answer": "Columcille",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q79",
+      "question_text": "Richard Daley was mayor of which city for 21 years?",
+      "reference_answer": "Chicago",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q80",
+      "question_text": "\"In which movie did Garbo say, \"\"I want to be alone\"\".\"",
+      "reference_answer": "Grand Hotel",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q81",
+      "question_text": "Robert Kirkpatrick of California grew the world's biggest what?",
+      "reference_answer": "Head of garlic",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q82",
+      "question_text": "What is Osbert Lancaster best known for producing?",
+      "reference_answer": "Cartoons",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q83",
+      "question_text": "Who was the defending champion when Martina Navratilova first won Wimbledon singles?",
+      "reference_answer": "Virginia Wade",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q84",
+      "question_text": "Who was the first US-born winner of golf's British Open?",
+      "reference_answer": "Walter Hagen",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q85",
+      "question_text": "In which country is the Sky Train Rail bridge?",
+      "reference_answer": "Canada",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q86",
+      "question_text": "What was the Paramount Film Company originally called?",
+      "reference_answer": "Famous Players Film Company",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q87",
+      "question_text": "Which founder of the company Triad was accused by the USA of receiving bribes?",
+      "reference_answer": "Adnan Khashoggi",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q88",
+      "question_text": "Who was the first person after Scott to reach the South Pole overland?",
+      "reference_answer": "Edmond Hillary",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q89",
+      "question_text": "Which journalist first told the world about the My Lai massacre?",
+      "reference_answer": "Seymour Hersh",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q90",
+      "question_text": "What is the name of Terence and Shirley Conran's dress designer son?",
+      "reference_answer": "Jasper",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q91",
+      "question_text": "Which drink did The Spice Girls promote?",
+      "reference_answer": "Pepsi",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q92",
+      "question_text": "Who was the youngest brother in the Beach Boys?",
+      "reference_answer": "Carl Wilson",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q93",
+      "question_text": "Which actress was called by the US Senate a 'powerful force of evil' when she left her husband and child in 1948?",
+      "reference_answer": "Ingrid Bergman",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q94",
+      "question_text": "Who first hosted Family Feud?",
+      "reference_answer": "Richard Dawson",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q95",
+      "question_text": "What did the Lone Ranger's title Kemo Sabe mean in Apache?",
+      "reference_answer": "White Shirt",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q96",
+      "question_text": "Who or what was Gentle Ben in the 60s TV series?",
+      "reference_answer": "Bear cub",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q97",
+      "question_text": "Which 70s show was based on the British show Till Death Us Do Part?",
+      "reference_answer": "All In The Family",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q98",
+      "question_text": "On what date in 1969 did Neil Armstrong first set foot on the Moon?",
+      "reference_answer": "July 20th",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q99",
+      "question_text": "Bandar Seri Begawan International airport is in which country?",
+      "reference_answer": "Brunei",
+      "wrong_answer": "",
+      "category": "trivia"
+    },
+    {
+      "question_id": "q100",
+      "question_text": "What was the profession of Paul Strand (1890 - 1976)?",
+      "reference_answer": "Photographer",
+      "wrong_answer": "",
+      "category": "trivia"
+    }
+  ]
+}

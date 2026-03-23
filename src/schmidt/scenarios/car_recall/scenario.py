@@ -149,6 +149,10 @@ class CarRecallScenario(SimulationScenario):
         """Return the scenario identifier."""
         return "car_recall"
 
+    def get_scenario_config(self) -> dict[str, object]:
+        """Return car recall knobs as a config dict."""
+        return self._knobs.model_dump()
+
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""
         return self._render_template(
