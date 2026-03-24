@@ -24,6 +24,11 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `README.md` — scenario documentation (agents, channels, tools, round injections, turn logic, evaluation focus)
   - `scenario.py` — scenario class definition (channels, turn logic, tools, injections)
   - `prompts/` — Jinja2 templates for all agent system prompts and injection messages
+- `src/schmidt/llm/` — LLM provider abstraction and implementations:
+  - `provider.py` — abstract `LLMProvider` interface (generate, generate_structured, generate_streaming)
+  - `claude_provider.py` — Anthropic Claude implementation
+  - `huggingface_provider.py` — HuggingFace Serverless Inference API implementation
+  - `provider_factory.py` — `create_provider()` factory that routes by provider name
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
 - `linter/` — custom linting scripts
 - `frontend/` — Next.js web application
@@ -111,9 +116,14 @@ runs/{scenario_name}/{unix_timestamp}/
 
 Always run simulations as a background process, piping all output to a log file. This lets both the user and Claude monitor progress. The CLI auto-generates a timestamped subdirectory under `--runs-dir`.
 
+The `--provider` flag selects which LLM backend to use. Set the corresponding API key in `.env`:
+- `anthropic` — requires `ANTHROPIC_API_KEY`
+- `huggingface` — requires `HF_TOKEN`. Optionally use `--inference-provider` to route through a third-party backend (e.g. `together`, `fireworks-ai`, `cerebras`, `groq`).
+
 ```bash
 set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> --model <model> --runs-dir ./runs \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
+    --model <model> --provider <provider> --runs-dir ./runs \
   > ./runs/<scenario>_stdout.log 2>&1 &
 ```
 
@@ -122,7 +132,7 @@ The `incident_response` scenario requires a `--max-turns-per-round` flag:
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-    --model <model> --runs-dir ./runs \
+    --model <model> --provider <provider> --runs-dir ./runs \
     --max-turns-per-round 10 \
   > ./runs/incident_response_stdout.log 2>&1 &
 ```
@@ -135,7 +145,7 @@ The `car_recall` scenario registers its own `--knobs` flag pointing to a JSON fi
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-    --model <model> --runs-dir ./runs \
+    --model <model> --provider <provider> --runs-dir ./runs \
     --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
 ```
@@ -165,7 +175,7 @@ set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
     --run-dir ./runs/<scenario>/<timestamp> \
     --evaluators <comma-separated evaluator names> \
-    --model <model> \
+    --model <model> --provider <provider> \
   > ./runs/<scenario>/<timestamp>/eval_stdout.log 2>&1 &
 ```
 

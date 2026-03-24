@@ -10,10 +10,14 @@ make install
 
 This installs both the Python server dependencies (`uv sync`) and the frontend dependencies (`npm ci`).
 
-Requires an `ANTHROPIC_API_KEY` environment variable. Create a `.env` file in the project root:
+Requires an LLM provider API key. Create a `.env` file in the project root with the key for your chosen provider:
 
 ```bash
+# Anthropic (for --provider anthropic)
 ANTHROPIC_API_KEY=sk-ant-...
+
+# HuggingFace (for --provider huggingface)
+HF_TOKEN=hf_...
 ```
 
 ## Run Output Directory Structure
@@ -29,12 +33,28 @@ runs/{scenario_name}/{unix_timestamp}/
 
 ## Running a Simulation
 
-The CLI auto-generates a timestamped subdirectory under `--runs-dir`.
+The CLI auto-generates a timestamped subdirectory under `--runs-dir`. The `--provider` flag selects which LLM backend to use (`anthropic` or `huggingface`).
 
 ```bash
+# Using Anthropic
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-    --model claude-sonnet-4-20250514 --runs-dir ./runs \
+    --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
+    --max-turns-per-round 10 \
+  > ./runs/incident_response_stdout.log 2>&1 &
+
+# Using HuggingFace (serverless)
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
+    --model meta-llama/Llama-3.1-70B-Instruct --provider huggingface --runs-dir ./runs \
+    --max-turns-per-round 10 \
+  > ./runs/incident_response_stdout.log 2>&1 &
+
+# Using HuggingFace with a third-party inference provider (e.g. Together AI)
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
+    --model meta-llama/Llama-3.1-70B-Instruct --provider huggingface \
+    --inference-provider together --runs-dir ./runs \
     --max-turns-per-round 10 \
   > ./runs/incident_response_stdout.log 2>&1 &
 ```
@@ -50,7 +70,7 @@ set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate incident_response \
     --run-dir ./runs/incident_response/1742234567 \
     --evaluators secret_leak,instruction_adherence,cooperation \
-    --model claude-sonnet-4-20250514
+    --model claude-sonnet-4-20250514 --provider anthropic
 ```
 
 Each scenario defines its own evaluators. Available evaluators by scenario:
@@ -82,7 +102,7 @@ The frontend displays a list of all simulation runs with scenario name, timestam
 
 ### Live Token Streaming
 
-Every `schmidt run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` discovery file to the run directory. When `schmidt serve` detects a live simulation (via `stream.json`), it proxies the simulation's SSE stream — including token-by-token text deltas from the Claude streaming API — to connected frontends. The frontend shows text appearing character-by-character as agents generate responses. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing.
+Every `schmidt run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` discovery file to the run directory. When `schmidt serve` detects a live simulation (via `stream.json`), it proxies the simulation's SSE stream — including token-by-token text deltas from the LLM streaming API — to connected frontends. The frontend shows text appearing character-by-character as agents generate responses. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing.
 
 ### API Type Safety
 
@@ -118,7 +138,7 @@ src/schmidt/
   stream_manifest.py           # Discovery file (stream.json) for locating live simulation servers
 
   models/                      # Pydantic data models
-  llm/                         # LLM provider abstraction + Claude implementation (incl. streaming)
+  llm/                         # LLM provider abstraction + Anthropic/HuggingFace implementations
   tools/                       # Tool registry, executor, built-in send_message + pass_turn
   evaluation/                  # Post-hoc LLM-as-judge evaluators
   scenarios/                   # One folder per scenario (class + Jinja2 prompt templates + README.md)
