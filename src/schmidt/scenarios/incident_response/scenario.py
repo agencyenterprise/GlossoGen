@@ -18,7 +18,7 @@ from jinja2 import Environment, FileSystemLoader
 from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult, write_report
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
-from schmidt.llm.claude_provider import ClaudeProvider
+from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.models.simulation_state import SimulationState, TurnDecision
@@ -458,12 +458,16 @@ class IncidentResponseScenario(SimulationScenario):
         evaluator_names: list[str],
         report_path: Path,
         model: str,
+        provider_name: str,
+        inference_provider: str | None,
     ) -> EvaluationReport:
         """Run evaluators and write a JSON report."""
         events = await load_events(log_path=log_path)
         agent_configs = extract_agent_configs(events=events)
         simulation_id = extract_simulation_id(events=events)
-        provider = ClaudeProvider(model=model)
+        provider = create_provider(
+            provider_name=provider_name, model=model, inference_provider=inference_provider
+        )
 
         metrics: list[MetricResult] = []
         for name in evaluator_names:

@@ -18,8 +18,8 @@ import uvicorn
 
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
-from schmidt.llm.claude_provider import ClaudeProvider
 from schmidt.llm.provider import LLMProvider
+from schmidt.llm.provider_factory import VALID_PROVIDERS, create_provider
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.models.agent_config import AgentConfig
 from schmidt.scenario_loader import get_scenario_class
@@ -61,7 +61,19 @@ def _build_parsers() -> tuple[
         required=True,
         help="Root directory for runs (output goes to runs-dir/scenario/timestamp/)",
     )
-    run_parser.add_argument("--model", type=str, required=True, help="Claude model to use")
+    run_parser.add_argument("--model", type=str, required=True, help="LLM model identifier")
+    run_parser.add_argument(
+        "--provider",
+        type=str,
+        required=True,
+        choices=list(VALID_PROVIDERS),
+        help="LLM provider to use",
+    )
+    run_parser.add_argument(
+        "--inference-provider",
+        type=str,
+        help="HuggingFace inference provider backend (e.g. together, fireworks-ai, cerebras)",
+    )
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a simulation log")
     evaluate_parser.add_argument(
@@ -79,7 +91,19 @@ def _build_parsers() -> tuple[
     evaluate_parser.add_argument(
         "--evaluators", type=str, required=True, help="Comma-separated evaluator names"
     )
-    evaluate_parser.add_argument("--model", type=str, required=True, help="Claude model to use")
+    evaluate_parser.add_argument("--model", type=str, required=True, help="LLM model identifier")
+    evaluate_parser.add_argument(
+        "--provider",
+        type=str,
+        required=True,
+        choices=list(VALID_PROVIDERS),
+        help="LLM provider to use",
+    )
+    evaluate_parser.add_argument(
+        "--inference-provider",
+        type=str,
+        help="HuggingFace inference provider backend (e.g. together, fireworks-ai, cerebras)",
+    )
 
     serve_parser = subparsers.add_parser("serve", help="Start the web server")
     serve_parser.add_argument(
@@ -126,18 +150,24 @@ def main() -> None:
 
 def _build_agent_providers(
     agents: list[AgentConfig],
+    provider_name: str,
+    inference_provider: str | None,
 ) -> dict[str, LLMProvider]:
     """Build a per-agent LLM provider mapping.
 
     Providers are deduped so agents sharing the same model share the same
-    ``ClaudeProvider`` instance.
+    provider instance.
     """
-    providers_by_model: dict[str, ClaudeProvider] = {}
+    providers_by_model: dict[str, LLMProvider] = {}
     agent_providers: dict[str, LLMProvider] = {}
 
     for agent in agents:
         if agent.model not in providers_by_model:
-            providers_by_model[agent.model] = ClaudeProvider(model=agent.model)
+            providers_by_model[agent.model] = create_provider(
+                provider_name=provider_name,
+                model=agent.model,
+                inference_provider=inference_provider,
+            )
         agent_providers[agent.agent_id] = providers_by_model[agent.model]
 
     return agent_providers
@@ -165,7 +195,11 @@ async def _run_simulation(
     runs_dir = Path(args.runs_dir)
     run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
     agents = scenario.get_agents(default_model=args.model)
-    agent_providers = _build_agent_providers(agents=agents)
+    agent_providers = _build_agent_providers(
+        agents=agents,
+        provider_name=args.provider,
+        inference_provider=args.inference_provider,
+    )
     registry = ToolRegistry()
 
     log_path = run_dir / f"{scenario.name()}.jsonl"
@@ -234,6 +268,8 @@ async def _run_evaluation(
         evaluator_names=evaluator_names,
         report_path=report_path,
         model=args.model,
+        provider_name=args.provider,
+        inference_provider=args.inference_provider,
     )
 
     logger.info("Evaluation complete. Report written to %s", report_path)
