@@ -17,6 +17,7 @@ from schmidt.models.event import (
     SimulationEvent,
 )
 from schmidt.models.message import SimulationMessage
+from schmidt.tools.notebook_store import NotebookEntry
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class ResumeState(NamedTuple):
     scenario_checkpoint: dict[str, Any]
     last_injected_rounds: dict[str, int]
     messages_by_channel: dict[str, list[SimulationMessage]]
-    notebook_entries: dict[str, list[dict[str, Any]]]
+    notebook_entries: dict[str, list[NotebookEntry]]
     shared_document_contents: dict[str, str]
 
 
@@ -43,7 +44,7 @@ def build_resume_state(events: list[SimulationEvent]) -> ResumeState:
     checkpoint_ts = checkpoint.timestamp
 
     messages_by_channel: dict[str, list[SimulationMessage]] = {}
-    notebook_entries: dict[str, list[dict[str, Any]]] = {}
+    notebook_entries: dict[str, list[NotebookEntry]] = {}
     shared_document_contents: dict[str, str] = {}
 
     for event in events:
@@ -60,10 +61,11 @@ def build_resume_state(events: list[SimulationEvent]) -> ResumeState:
             if event.agent_id not in notebook_entries:
                 notebook_entries[event.agent_id] = []
             notebook_entries[event.agent_id].append(
-                {
-                    "round_number": event.round_number,
-                    "entry_text": event.entry_text,
-                }
+                NotebookEntry(
+                    round_number=event.round_number,
+                    timestamp=event.timestamp,
+                    text=event.entry_text,
+                )
             )
 
         elif isinstance(event, SharedDocumentEdited):

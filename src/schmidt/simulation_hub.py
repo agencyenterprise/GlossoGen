@@ -9,14 +9,13 @@ internal state is restored from the last ``CheckpointSaved`` event.
 
 import asyncio
 import logging
-import types
 from collections.abc import Callable
-from datetime import UTC, datetime
 from typing import Any
 
 from schmidt.agent_runner import AgentRunner
 from schmidt.channel_router import ChannelRouter
 from schmidt.checkpoint_loader import ResumeState
+from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.llm.prompt_builder import PromptBuilder
 from schmidt.llm.provider import LLMProvider
@@ -38,7 +37,6 @@ from schmidt.simulation_state_protocol import SimulationStateProtocol
 from schmidt.tools.builtin_notebook import (
     READ_NOTEBOOK_SPEC,
     WRITE_NOTEBOOK_SPEC,
-    NotebookEntry,
     create_notebook_executors,
 )
 from schmidt.tools.builtin_pass_turn import PASS_TURN_SPEC, create_pass_turn_executor
@@ -50,6 +48,8 @@ from schmidt.tools.builtin_shared_documents import (
     create_shared_document_executors,
 )
 from schmidt.tools.builtin_think import THINK_SPEC, create_think_executor
+from schmidt.tools.document_store import DocumentStore
+from schmidt.tools.notebook_store import NotebookStore
 from schmidt.tools.tool_executor import ToolExecutor
 from schmidt.tools.tool_registry import ToolRegistry
 
@@ -73,6 +73,7 @@ class SimulationHub:
         tool_registry: ToolRegistry,
         event_logger: EventLogger,
         resume_state: ResumeState | None,
+        event_bus: EventBus,
     ) -> None:
         self._scenario = scenario
         self._agents = agents
@@ -80,6 +81,7 @@ class SimulationHub:
         self._tool_registry = tool_registry
         self._event_logger = event_logger
         self._resume_state = resume_state
+        self._event_bus = event_bus
 
     async def run(self) -> None:
         """Execute the full simulation lifecycle.
@@ -135,10 +137,12 @@ class SimulationHub:
         )
         self._tool_registry.register(spec=THINK_SPEC, executor=think_executor)
 
-        # Register built-in notebook tools (agents opt in via tool_names)
+        # Create notebook store and register tools
+        notebook_store = NotebookStore()
         notebook_executors = create_notebook_executors(
             event_logger=self._event_logger,
             round_number_getter=lambda: round_tracker[0],
+            store=notebook_store,
         )
         self._tool_registry.register(
             spec=WRITE_NOTEBOOK_SPEC, executor=notebook_executors.write_executor
@@ -147,12 +151,13 @@ class SimulationHub:
             spec=READ_NOTEBOOK_SPEC, executor=notebook_executors.read_executor
         )
 
-        # Register built-in shared document tools (when scenario defines documents)
+        # Create document store and register tools (when scenario defines documents)
         shared_doc_configs = self._scenario.get_shared_documents()
-        doc_executors = None
+        document_store: DocumentStore | None = None
         if shared_doc_configs:
+            document_store = DocumentStore(configs=shared_doc_configs)
             doc_executors = create_shared_document_executors(
-                configs=shared_doc_configs,
+                store=document_store,
                 event_logger=self._event_logger,
                 round_number_getter=lambda: round_tracker[0],
             )
@@ -195,47 +200,42 @@ class SimulationHub:
                 channel_router=channel_router,
                 messages_by_channel=rs.messages_by_channel,
             )
-            _restore_notebook_entries(
-                notebook_executors=notebook_executors,
-                notebook_entries=rs.notebook_entries,
-            )
-            if doc_executors is not None:
-                _restore_shared_documents(
-                    doc_executors=doc_executors,
-                    shared_document_contents=rs.shared_document_contents,
-                )
+            notebook_store.restore(entries_by_agent=rs.notebook_entries)
+            if document_store is not None:
+                document_store.restore(contents=rs.shared_document_contents)
 
             logger.info(
                 "Resumed from checkpoint: turn=%d, round=%d",
                 turn_number,
                 current_round,
             )
+
         else:
             turn_number = 0
             current_round = 0
             last_turn_passed = False
 
-            # Log simulation start
+        # Log simulation start and agent registrations (always, including on resume)
+        await self._event_logger.log(
+            event=SimulationStarted(
+                scenario_name=self._scenario.name(),
+                scenario_description=self._scenario.scenario_description(),
+                channel_ids=[ch.channel_id for ch in channels],
+                scenario_config=self._scenario.get_scenario_config(),
+            )
+        )
+
+        for agent in agents:
             await self._event_logger.log(
-                event=SimulationStarted(
-                    scenario_name=self._scenario.name(),
-                    scenario_description=self._scenario.scenario_description(),
-                    channel_ids=[ch.channel_id for ch in channels],
+                event=AgentRegistered(
+                    agent_id=agent.agent_id,
+                    role_name=agent.role_name,
+                    system_prompt=agent.system_prompt,
+                    channel_ids=agent.channel_ids,
+                    tool_names=agent.tool_names,
+                    model=agent.model,
                 )
             )
-
-            # Log agent registrations
-            for agent in agents:
-                await self._event_logger.log(
-                    event=AgentRegistered(
-                        agent_id=agent.agent_id,
-                        role_name=agent.role_name,
-                        system_prompt=agent.system_prompt,
-                        channel_ids=agent.channel_ids,
-                        tool_names=agent.tool_names,
-                        model=agent.model,
-                    )
-                )
 
         # Create per-agent async primitives and runners
         runners: dict[str, AgentRunner] = {}
@@ -259,6 +259,7 @@ class SimulationHub:
                 wake_event=wake,
                 turn_queue=queue,
                 done_event=done,
+                event_bus=self._event_bus,
             )
 
             runners[agent.agent_id] = runner
@@ -310,20 +311,20 @@ class SimulationHub:
                 turn_number += 1
                 logger.debug("Dispatching turn %d to agent %s", turn_number, decision.agent_id)
 
-                # Save checkpoint before dispatching so we can resume on failure
-                await self._save_checkpoint(
-                    turn_number=turn_number,
-                    round_number=current_round,
-                    last_turn_passed=last_turn_passed,
-                    runners=runners,
-                )
-
                 await self._event_logger.log(
                     event=TurnAssigned(
                         agent_id=decision.agent_id,
                         turn_number=turn_number,
                         round_number=decision.round_number,
                     )
+                )
+
+                # Save checkpoint after TurnAssigned so the log is consistent on resume
+                await self._save_checkpoint(
+                    turn_number=turn_number,
+                    round_number=current_round,
+                    last_turn_passed=last_turn_passed,
+                    runners=runners,
                 )
 
                 # Check if agent task is still alive
@@ -510,67 +511,3 @@ def _restore_channel_messages(
             channel_router.append_message(message=msg)
             total += 1
     logger.info("Restored %d channel messages across %d channels", total, len(messages_by_channel))
-
-
-def _restore_notebook_entries(
-    notebook_executors: Any,
-    notebook_entries: dict[str, list[dict[str, Any]]],
-) -> None:
-    """Replay saved notebook entries into the in-memory notebook store.
-
-    Accesses the notebook executor's closure-captured store directly via
-    the write_executor, reconstructing entries without re-logging events.
-    """
-    write_fn = notebook_executors.write_executor
-
-    store_ref = _get_closure_var(func=write_fn, var_name="store")
-    if store_ref is None:
-        logger.warning("Could not access notebook store for resume; notebooks will be empty")
-        return
-
-    total = 0
-    for agent_id, entries in notebook_entries.items():
-        if agent_id not in store_ref:
-            store_ref[agent_id] = []
-        for entry_dict in entries:
-            store_ref[agent_id].append(
-                NotebookEntry(
-                    round_number=entry_dict["round_number"],
-                    timestamp=datetime.now(tz=UTC),
-                    text=entry_dict["entry_text"],
-                )
-            )
-            total += 1
-    logger.info("Restored %d notebook entries for %d agents", total, len(notebook_entries))
-
-
-def _restore_shared_documents(
-    doc_executors: Any,
-    shared_document_contents: dict[str, str],
-) -> None:
-    """Restore shared document contents from checkpoint data."""
-    store_ref = _get_closure_var(func=doc_executors.read_executor, var_name="store")
-    if store_ref is None:
-        logger.warning("Could not access document store for resume; documents will be empty")
-        return
-
-    for doc_id, content in shared_document_contents.items():
-        store_ref[doc_id] = content
-    logger.info("Restored %d shared document(s)", len(shared_document_contents))
-
-
-def _get_closure_var(func: object, var_name: str) -> Any:
-    """Extract a named variable from a function's closure.
-
-    Returns None if the variable cannot be found.
-    """
-    if not isinstance(func, types.FunctionType):
-        return None
-    closure = func.__closure__
-    if closure is None:
-        return None
-    code = func.__code__
-    for i, name in enumerate(code.co_freevars):
-        if name == var_name:
-            return closure[i].cell_contents
-    return None

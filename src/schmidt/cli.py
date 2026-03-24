@@ -2,7 +2,7 @@
 
 Defines the ``schmidt`` CLI with three subcommands:
 
-* ``run``      -- load and execute a simulation scenario
+* ``run``      -- load and execute a simulation scenario (with embedded streaming server)
 * ``evaluate`` -- score a previously-generated simulation log
 * ``serve``    -- start the FastAPI web server
 """
@@ -18,18 +18,22 @@ import uvicorn
 
 from schmidt.checkpoint_loader import ResumeState, build_resume_state
 from schmidt.evaluation.log_reader import load_events
+from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.llm.provider import LLMProvider
-from schmidt.llm.provider_factory import create_provider
-from schmidt.logging_format import JsonLineFormatter
+from schmidt.llm.provider_factory import VALID_PROVIDERS, create_provider
+from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.models.agent_config import AgentConfig
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.simulation_hub import SimulationHub
+from schmidt.simulation_server import start_simulation_server, stop_simulation_server
 from schmidt.tools.tool_registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+EVENT_BUS_MAX_QUEUE_SIZE = 1000
 
 
 def _build_parsers() -> tuple[
@@ -47,8 +51,9 @@ def _build_parsers() -> tuple[
     parser = argparse.ArgumentParser(prog="schmidt")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    run_parser = subparsers.add_parser("run", help="Run a simulation scenario")
     scenario_names = sorted(SCENARIO_REGISTRY.keys())
+
+    run_parser = subparsers.add_parser("run", help="Run a simulation scenario")
     run_parser.add_argument(
         "scenario_name", type=str, choices=scenario_names, help="Name of the scenario to run"
     )
@@ -58,7 +63,19 @@ def _build_parsers() -> tuple[
         required=True,
         help="Root directory for runs (output goes to runs-dir/scenario/timestamp/)",
     )
-    run_parser.add_argument("--model", type=str, required=True, help="LLM model to use")
+    run_parser.add_argument("--model", type=str, required=True, help="LLM model identifier")
+    run_parser.add_argument(
+        "--provider",
+        type=str,
+        required=True,
+        choices=list(VALID_PROVIDERS),
+        help="LLM provider to use",
+    )
+    run_parser.add_argument(
+        "--inference-provider",
+        type=str,
+        help="HuggingFace inference provider backend (e.g. together, fireworks-ai, cerebras)",
+    )
     run_parser.add_argument(
         "--reasoning-effort",
         type=str,
@@ -87,7 +104,19 @@ def _build_parsers() -> tuple[
     evaluate_parser.add_argument(
         "--evaluators", type=str, required=True, help="Comma-separated evaluator names"
     )
-    evaluate_parser.add_argument("--model", type=str, required=True, help="LLM model to use")
+    evaluate_parser.add_argument("--model", type=str, required=True, help="LLM model identifier")
+    evaluate_parser.add_argument(
+        "--provider",
+        type=str,
+        required=True,
+        choices=list(VALID_PROVIDERS),
+        help="LLM provider to use",
+    )
+    evaluate_parser.add_argument(
+        "--inference-provider",
+        type=str,
+        help="HuggingFace inference provider backend (e.g. together, fireworks-ai, cerebras)",
+    )
     evaluate_parser.add_argument(
         "--reasoning-effort",
         type=str,
@@ -140,13 +169,14 @@ def main() -> None:
 
 def _build_agent_providers(
     agents: list[AgentConfig],
+    provider_name: str,
+    inference_provider: str | None,
     reasoning_effort: str | None,
 ) -> dict[str, LLMProvider]:
     """Build a per-agent LLM provider mapping.
 
     Providers are deduped so agents sharing the same model share the same
-    provider instance. Routes to the appropriate provider (OpenAI or Claude)
-    based on model name.
+    provider instance.
     """
     providers_by_model: dict[str, LLMProvider] = {}
     agent_providers: dict[str, LLMProvider] = {}
@@ -154,7 +184,10 @@ def _build_agent_providers(
     for agent in agents:
         if agent.model not in providers_by_model:
             providers_by_model[agent.model] = create_provider(
-                model=agent.model, reasoning_effort=reasoning_effort
+                provider_name=provider_name,
+                model=agent.model,
+                inference_provider=inference_provider,
+                reasoning_effort=reasoning_effort,
             )
         agent_providers[agent.agent_id] = providers_by_model[agent.model]
 
@@ -175,9 +208,10 @@ async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
 ) -> None:
-    """Wire up the simulation components and execute the simulation.
+    """Wire up the simulation components, start the streaming server, and execute.
 
-    Writes a JSONL event log to ``{runs_dir}/{scenario_name}/{timestamp}/{scenario_name}.jsonl``.
+    Starts an embedded mini-server on an ephemeral port that streams events
+    via SSE. Writes a ``stream.json`` manifest for discovery by ``schmidt serve``.
     When ``--resume`` is specified, loads the checkpoint from the existing run
     directory and continues from where it left off.
     """
@@ -191,12 +225,17 @@ async def _run_simulation(
         run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
 
     agents = scenario.get_agents(default_model=args.model)
-    reasoning_effort = getattr(args, "reasoning_effort", None)
-    agent_providers = _build_agent_providers(agents=agents, reasoning_effort=reasoning_effort)
+    agent_providers = _build_agent_providers(
+        agents=agents,
+        provider_name=args.provider,
+        inference_provider=args.inference_provider,
+        reasoning_effort=getattr(args, "reasoning_effort", None),
+    )
     registry = ToolRegistry()
 
     log_path = run_dir / f"{scenario.name()}.jsonl"
-    event_logger = EventLogger(log_path=log_path)
+    event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
+    event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
 
     resume_state: ResumeState | None = None
     if resuming:
@@ -216,6 +255,7 @@ async def _run_simulation(
         tool_registry=registry,
         event_logger=event_logger,
         resume_state=resume_state,
+        event_bus=event_bus,
     )
 
     # Add JSON debug log file for frontend display
@@ -225,6 +265,13 @@ async def _run_simulation(
     json_handler.setFormatter(JsonLineFormatter())
     logging.getLogger().addHandler(json_handler)
 
+    # Stream debug logs to the EventBus for real-time frontend display
+    bus_log_handler = EventBusLogHandler(event_bus=event_bus)
+    logging.getLogger().addHandler(bus_log_handler)
+
+    # Generate a run_id for the stream manifest (matches the SimulationStarted event_id)
+    run_id = f"{scenario.name()}_{run_dir.name}"
+
     logger.info("Running scenario: %s", scenario.name())
     logger.info("Model: %s", args.model)
     logger.info("Run directory: %s", run_dir)
@@ -232,11 +279,21 @@ async def _run_simulation(
     if resuming:
         logger.info("RESUMING from checkpoint in %s", run_dir)
 
+    # Start the embedded streaming server
+    server, port = await start_simulation_server(
+        event_bus=event_bus,
+        run_dir=run_dir,
+        run_id=run_id,
+    )
+    logger.info("Streaming server started on port %d", port)
+
     try:
         await hub.run()
     finally:
         logging.getLogger().removeHandler(json_handler)
         json_handler.close()
+        logging.getLogger().removeHandler(bus_log_handler)
+        await stop_simulation_server(server=server, run_dir=run_dir)
 
     logger.info("Simulation complete. Run directory: %s", run_dir)
 
@@ -251,13 +308,14 @@ async def _run_evaluation(
     log_path = run_dir / f"{args.scenario_name}.jsonl"
     report_path = run_dir / f"{args.scenario_name}_report.json"
 
-    reasoning_effort = getattr(args, "reasoning_effort", None)
     await scenario.run_evaluation(
         log_path=log_path,
         evaluator_names=evaluator_names,
         report_path=report_path,
         model=args.model,
-        reasoning_effort=reasoning_effort,
+        provider_name=args.provider,
+        inference_provider=args.inference_provider,
+        reasoning_effort=getattr(args, "reasoning_effort", None),
     )
 
     logger.info("Evaluation complete. Report written to %s", report_path)

@@ -95,6 +95,89 @@
         }
       }
     },
+    "/api/runs/{run_id}/events": {
+      "get": {
+        "summary": "Stream Run Events",
+        "description": "Stream simulation events as Server-Sent Events.\n\nOnly available for live simulations (detected via stream.json manifest).\nProxies SSE from the simulation's embedded server. Returns 404 if the\nrun is not found, and 409 if the simulation is not currently running.\n\nThe SSE ``data`` field of each frame contains a JSON object conforming to\none of the SSEEvent union members, discriminated by the ``event_type`` field.",
+        "operationId": "stream_run_events_api_runs__run_id__events_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE event stream. Each SSE frame has an `event` field matching the event_type discriminator and a `data` field containing the JSON payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SSESimulationStarted"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SSEAgentRegistered"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SSETurnAssigned"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SSEMessageSent"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SSELLMResponseReceived"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SSESimulationEnded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SSETokenDelta"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SSEMessagePreview"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SSEDebugLog"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "event_type",
+                    "mapping": {
+                      "simulation_started": "#/components/schemas/SSESimulationStarted",
+                      "agent_registered": "#/components/schemas/SSEAgentRegistered",
+                      "turn_assigned": "#/components/schemas/SSETurnAssigned",
+                      "message_sent": "#/components/schemas/SSEMessageSent",
+                      "llm_response_received": "#/components/schemas/SSELLMResponseReceived",
+                      "simulation_ended": "#/components/schemas/SSESimulationEnded",
+                      "token_delta": "#/components/schemas/SSETokenDelta",
+                      "message_preview": "#/components/schemas/SSEMessagePreview",
+                      "debug_log": "#/components/schemas/SSEDebugLog"
+                    }
+                  },
+                  "title": "Response 200 Stream Run Events Api Runs  Run Id  Events Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -380,6 +463,11 @@
             "type": "string",
             "title": "Scenario Description"
           },
+          "scenario_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scenario Config"
+          },
           "timestamp": {
             "type": "string",
             "format": "date-time",
@@ -443,6 +531,7 @@
           "run_id",
           "scenario_name",
           "scenario_description",
+          "scenario_config",
           "timestamp",
           "total_turns",
           "status",
@@ -497,6 +586,11 @@
             "type": "string",
             "title": "Scenario Description"
           },
+          "scenario_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scenario Config"
+          },
           "timestamp": {
             "type": "string",
             "format": "date-time",
@@ -523,6 +617,7 @@
           "run_id",
           "scenario_name",
           "scenario_description",
+          "scenario_config",
           "timestamp",
           "total_turns",
           "status",
@@ -531,6 +626,402 @@
         ],
         "title": "RunSummary",
         "description": "Summary of a single simulation run for the runs list endpoint."
+      },
+      "SSEAgentRegistered": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "agent_registered",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "role_name": {
+            "type": "string",
+            "title": "Role Name"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt"
+          },
+          "channel_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channel Ids"
+          },
+          "tool_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tool Names"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "agent_id",
+          "role_name",
+          "system_prompt",
+          "channel_ids",
+          "tool_names",
+          "model"
+        ],
+        "title": "SSEAgentRegistered",
+        "description": "SSE event emitted when an agent joins the simulation."
+      },
+      "SSEDebugLog": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "debug_log",
+            "title": "Event Type"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "logger_name": {
+            "type": "string",
+            "title": "Logger Name"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "timestamp",
+          "logger_name",
+          "level",
+          "message"
+        ],
+        "title": "SSEDebugLog",
+        "description": "SSE event for a real-time debug log entry from the simulation process."
+      },
+      "SSELLMResponseReceived": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "llm_response_received",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "agent_id",
+          "text"
+        ],
+        "title": "SSELLMResponseReceived",
+        "description": "SSE event emitted when the LLM returns a response (reasoning text)."
+      },
+      "SSEMessagePreview": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "message_preview",
+            "title": "Event Type"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "channel_id": {
+            "type": "string",
+            "title": "Channel Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "is_final": {
+            "type": "boolean",
+            "title": "Is Final"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "agent_id",
+          "channel_id",
+          "text",
+          "is_final"
+        ],
+        "title": "SSEMessagePreview",
+        "description": "SSE event for in-progress send_message text preview.\n\nTransient \u2014 not persisted to JSONL. The complete message arrives in a\nsubsequent SSEMessageSent event."
+      },
+      "SSEMessageSent": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "message_sent",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "message": {
+            "$ref": "#/components/schemas/SSESimulationMessagePayload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "message"
+        ],
+        "title": "SSEMessageSent",
+        "description": "SSE event emitted when an agent sends a message to a channel."
+      },
+      "SSESimulationEnded": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "simulation_ended",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "total_turns": {
+            "type": "integer",
+            "title": "Total Turns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "reason",
+          "total_turns"
+        ],
+        "title": "SSESimulationEnded",
+        "description": "SSE event emitted once when the simulation finishes."
+      },
+      "SSESimulationMessagePayload": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "title": "Message Id"
+          },
+          "channel_id": {
+            "type": "string",
+            "title": "Channel Id"
+          },
+          "sender_agent_id": {
+            "type": "string",
+            "title": "Sender Agent Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "channel_id",
+          "sender_agent_id",
+          "text",
+          "timestamp"
+        ],
+        "title": "SSESimulationMessagePayload",
+        "description": "Nested message payload inside an SSE message_sent event."
+      },
+      "SSESimulationStarted": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "simulation_started",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "scenario_name": {
+            "type": "string",
+            "title": "Scenario Name"
+          },
+          "scenario_description": {
+            "type": "string",
+            "title": "Scenario Description"
+          },
+          "channel_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channel Ids"
+          },
+          "scenario_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scenario Config"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "scenario_name",
+          "scenario_description",
+          "channel_ids",
+          "scenario_config"
+        ],
+        "title": "SSESimulationStarted",
+        "description": "SSE event emitted once when a simulation begins."
+      },
+      "SSETokenDelta": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "token_delta",
+            "title": "Event Type"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "is_final": {
+            "type": "boolean",
+            "title": "Is Final"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "agent_id",
+          "text",
+          "is_final"
+        ],
+        "title": "SSETokenDelta",
+        "description": "SSE event emitted token-by-token during LLM response streaming.\n\nTransient \u2014 not persisted to JSONL. The complete text arrives in a\nsubsequent SSELLMResponseReceived event."
+      },
+      "SSETurnAssigned": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "turn_assigned",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "turn_number": {
+            "type": "integer",
+            "title": "Turn Number"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "agent_id",
+          "turn_number",
+          "round_number"
+        ],
+        "title": "SSETurnAssigned",
+        "description": "SSE event emitted when a turn is assigned to an agent."
       },
       "ValidationError": {
         "properties": {

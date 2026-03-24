@@ -6,14 +6,17 @@ import asyncio
 import logging
 from typing import Any
 
+from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.llm.prompt_builder import PromptBuilder
-from schmidt.llm.provider import LLMMessage, LLMProvider
+from schmidt.llm.provider import LLMMessage, LLMProvider, LLMResponse
+from schmidt.llm.tool_arg_extractor import SendMessageTextExtractor
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import LLMRequestSent, LLMResponseReceived, ToolCalled, ToolResultReturned
 from schmidt.models.simulation_state import TurnDecision
 from schmidt.models.tool_definition import ToolSpec
 from schmidt.scenario_protocol import SimulationScenario
+from schmidt.server.streaming_event import MessagePreview, TokenDelta
 from schmidt.tools.tool_executor import ToolExecutor
 from schmidt.tools.tool_registry import ToolRegistry
 
@@ -36,7 +39,9 @@ class AgentRunner:
 
     Waits for wake signals, retrieves turn decisions from the queue,
     builds prompts with channel context and injections, calls the LLM,
-    and executes any tool calls returned by the LLM in a loop.
+    and executes any tool calls returned by the LLM in a loop. Uses the
+    streaming LLM API and publishes TokenDelta events to the EventBus
+    for real-time token delivery.
     """
 
     def __init__(
@@ -51,6 +56,7 @@ class AgentRunner:
         wake_event: asyncio.Event,
         turn_queue: asyncio.Queue[TurnDecision],
         done_event: asyncio.Event,
+        event_bus: EventBus,
     ) -> None:
         self._config = config
         self._llm_provider = llm_provider
@@ -62,6 +68,7 @@ class AgentRunner:
         self._wake_event = wake_event
         self._turn_queue = turn_queue
         self._done_event = done_event
+        self._event_bus = event_bus
         self._last_injected_round = 0
         self.last_turn_summary: TurnSummary = TurnSummary()
 
@@ -120,8 +127,9 @@ class AgentRunner:
         )
 
         tools = self._tool_registry.get_specs(names=list(self._config.tool_names))
-        if not decision.allow_pass:
-            tools = [t for t in tools if t.name != "pass_turn"]
+        if decision.excluded_tool_names:
+            excluded = set(decision.excluded_tool_names)
+            tools = [t for t in tools if t.name not in excluded]
 
         turn_context = (
             "It's your turn to speak. "
@@ -138,19 +146,129 @@ class AgentRunner:
         else:
             messages.append(LLMMessage(role="user", content=turn_context))
 
-        await self._llm_tool_loop(messages=messages, tools=tools)
+        await self._llm_tool_loop(messages=messages, tools=tools, max_tokens=decision.max_tokens)
+
+    async def _call_llm(
+        self,
+        messages: list[LLMMessage],
+        tools: list[ToolSpec],
+        max_tokens: int,
+    ) -> LLMResponse:
+        """Call the LLM with streaming, publishing token and message preview events."""
+        agent_id = self._config.agent_id
+        bus = self._event_bus
+        extractors: dict[int, SendMessageTextExtractor] = {}
+
+        async def on_token(text: str) -> None:
+            delta = TokenDelta(
+                agent_id=agent_id,
+                text=text,
+                is_final=False,
+            )
+            bus.publish(event=delta.model_dump(mode="json"))
+
+        # Buffer message preview text per block and flush periodically so the
+        # frontend receives events spread across multiple animation frames
+        # instead of a single burst.
+        preview_buffers: dict[int, str] = {}
+        last_preview_time = 0.0
+        preview_flush_interval = 0.03  # 30ms — roughly 2 animation frames
+
+        def _flush_preview(block_index: int) -> None:
+            nonlocal last_preview_time
+            text = preview_buffers.pop(block_index, "")
+            if not text:
+                return
+            extractor = extractors.get(block_index)
+            if extractor is None:
+                return
+            channel_id = extractor.channel_id
+            if channel_id is None:
+                return
+            preview = MessagePreview(
+                agent_id=agent_id,
+                channel_id=channel_id,
+                text=text,
+                is_final=False,
+            )
+            bus.publish(event=preview.model_dump(mode="json"))
+            last_preview_time = asyncio.get_running_loop().time()
+
+        async def on_tool_arg_delta(
+            block_index: int,
+            tool_name: str,
+            _arg_chunk: str,
+            accumulated_json: str,
+        ) -> None:
+            nonlocal last_preview_time
+            if tool_name != "send_message":
+                return
+            if block_index not in extractors:
+                extractors[block_index] = SendMessageTextExtractor()
+            result = extractors[block_index].feed(accumulated_json=accumulated_json)
+            if not result.new_text or result.channel_id is None:
+                return
+
+            preview_buffers[block_index] = preview_buffers.get(block_index, "") + result.new_text
+
+            now = asyncio.get_running_loop().time()
+            elapsed = now - last_preview_time
+            if elapsed >= preview_flush_interval:
+                _flush_preview(block_index=block_index)
+            else:
+                # Yield and flush after the interval elapses
+                await asyncio.sleep(preview_flush_interval - elapsed)
+                _flush_preview(block_index=block_index)
+
+        response = await self._llm_provider.generate_streaming(
+            system_prompt=self._config.system_prompt,
+            messages=messages,
+            tools=tools,
+            force_tool_use=False,
+            max_tokens=max_tokens,
+            on_token=on_token,
+            on_tool_arg_delta=on_tool_arg_delta,
+        )
+
+        # Flush any remaining buffered preview text
+        for block_index in list(preview_buffers.keys()):
+            _flush_preview(block_index=block_index)
+
+        # Clear any active message previews before tool execution
+        for extractor in extractors.values():
+            channel_id = extractor.channel_id
+            if channel_id is not None:
+                final_preview = MessagePreview(
+                    agent_id=agent_id,
+                    channel_id=channel_id,
+                    text="",
+                    is_final=True,
+                )
+                bus.publish(event=final_preview.model_dump(mode="json"))
+
+        # Signal that text streaming is complete for this LLM call
+        final_delta = TokenDelta(
+            agent_id=agent_id,
+            text="",
+            is_final=True,
+        )
+        bus.publish(event=final_delta.model_dump(mode="json"))
+
+        return response
 
     async def _llm_tool_loop(
         self,
         messages: list[LLMMessage],
         tools: list[ToolSpec],
+        max_tokens: int,
     ) -> None:
         """Call the LLM and execute returned tool calls in a loop,
         up to MAX_TOOL_CALLS_PER_TURN iterations.
 
-        Agents can send multiple messages per turn. Calling pass_turn
-        ends the tool loop immediately. After pass_turn is called,
-        send_message is no longer available (and vice versa).
+        Agents can send multiple messages per turn. After pass_turn is
+        called, both send_message and pass_turn are removed from available
+        tools. After send_message is called, pass_turn is removed but
+        send_message remains available for additional messages.
         """
         pass_turn_used = False
         has_sent_message = False
@@ -173,11 +291,10 @@ class AgentRunner:
                 )
             )
 
-            response = await self._llm_provider.generate(
-                system_prompt=self._config.system_prompt,
+            response = await self._call_llm(
                 messages=messages,
                 tools=active_tools,
-                force_tool_use=False,
+                max_tokens=max_tokens,
             )
 
             await self._event_logger.log(

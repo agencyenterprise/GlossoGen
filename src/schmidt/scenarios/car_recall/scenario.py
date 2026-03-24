@@ -149,6 +149,10 @@ class CarRecallScenario(SimulationScenario):
         """Return the scenario identifier."""
         return "car_recall"
 
+    def get_scenario_config(self) -> dict[str, object]:
+        """Return car recall knobs as a config dict."""
+        return self._knobs.model_dump()
+
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""
         return self._render_template(
@@ -346,10 +350,14 @@ class CarRecallScenario(SimulationScenario):
 
     def _current_turn_decision(self) -> TurnDecision:
         """Build a TurnDecision for the current rotation position."""
+        excluded: list[str] = []
+        if self._first_rotation:
+            excluded = ["pass_turn"]
         return TurnDecision(
             agent_id=self._discussion_agents[self._rotation_index],
             round_number=self._current_round,
-            allow_pass=not self._first_rotation,
+            excluded_tool_names=excluded,
+            max_tokens=4096,
         )
 
     def _start_next_discussion(self) -> TurnDecision | None:
@@ -482,13 +490,20 @@ class CarRecallScenario(SimulationScenario):
         evaluator_names: list[str],
         report_path: Path,
         model: str,
+        provider_name: str,
+        inference_provider: str | None,
         reasoning_effort: str | None,
     ) -> EvaluationReport:
         """Run evaluators, compute derived flags, and write a JSON report."""
         events = await load_events(log_path=log_path)
         agent_configs = extract_agent_configs(events=events)
         simulation_id = extract_simulation_id(events=events)
-        provider = create_provider(model=model, reasoning_effort=reasoning_effort)
+        provider = create_provider(
+            provider_name=provider_name,
+            model=model,
+            inference_provider=inference_provider,
+            reasoning_effort=reasoning_effort,
+        )
 
         registry: dict[str, type[Evaluator]] = {}
         registry.update(GENERIC_EVALUATOR_REGISTRY)
