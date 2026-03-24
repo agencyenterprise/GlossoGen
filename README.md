@@ -69,7 +69,7 @@ Output is a JSON report with per-evaluator verdicts, scores, evidence, and per-a
 
 ## Web UI
 
-A FastAPI backend + Next.js frontend for browsing simulation runs.
+A FastAPI backend + Next.js frontend for browsing simulation runs. The frontend streams events in real time via Server-Sent Events (SSE) for in-progress runs.
 
 ### Starting the Servers
 
@@ -78,7 +78,11 @@ make dev            # FastAPI backend on port 8000 (reads from ./runs/)
 make dev-frontend   # Next.js dev server on port 3000
 ```
 
-The frontend displays a list of all simulation runs with scenario name, timestamp, turn count, status (including in-progress runs), and evaluation status. Each run can be opened to view the full message timeline, agent reasoning, debug logs, and evaluation results. Runs can be deleted from the list. In-progress runs auto-refresh every 5 seconds.
+The frontend displays a list of all simulation runs with scenario name, timestamp, turn count, status (including in-progress runs), and evaluation status. Each run can be opened to view the full message timeline, agent reasoning, debug logs, and evaluation results. Runs can be deleted from the list. In-progress runs stream events via SSE (messages appear instantly as agents produce them).
+
+### Live Token Streaming
+
+Every `schmidt run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` discovery file to the run directory. When `schmidt serve` detects a live simulation (via `stream.json`), it proxies the simulation's SSE stream — including token-by-token text deltas from the Claude streaming API — to connected frontends. The frontend shows text appearing character-by-character as agents generate responses. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing.
 
 ### API Type Safety
 
@@ -105,28 +109,34 @@ A major automotive manufacturer decides whether to issue a vehicle recall. Five 
 ```
 src/schmidt/
   cli.py                       # CLI: run, evaluate, serve subcommands
-  simulation_hub.py            # Orchestrator: turn loop, agent wake/done
-  agent_runner.py              # Per-agent coroutine: prompt building, LLM calls, tool loop
+  simulation_hub.py            # Orchestrator: turn loop, agent wake/done, event bus publishing
+  agent_runner.py              # Per-agent coroutine: prompt building, LLM streaming, tool loop
   channel_router.py            # Message storage + membership validation
   event_logger.py              # JSONL event writer
+  event_bus.py                 # In-process pub/sub for simulation event fan-out
+  simulation_server.py         # Embedded mini-server exposing SSE endpoint per simulation
+  stream_manifest.py           # Discovery file (stream.json) for locating live simulation servers
 
   models/                      # Pydantic data models
-  llm/                         # LLM provider abstraction + Claude implementation
+  llm/                         # LLM provider abstraction + Claude implementation (incl. streaming)
   tools/                       # Tool registry, executor, built-in send_message + pass_turn
   evaluation/                  # Post-hoc LLM-as-judge evaluators
   scenarios/                   # One folder per scenario (class + Jinja2 prompt templates + README.md)
 
-  server/                      # FastAPI web server
+  server/                      # FastAPI web server (schmidt serve)
     app.py                     # Application setup, CORS, lifespan
     response_models.py         # Pydantic response models (all endpoints return structured models)
     run_discovery.py           # Scans runs/ directory for simulation logs
-    runs_router.py             # GET /api/runs, GET /api/runs/{id}, DELETE /api/runs/{id}
+    runs_router.py             # REST endpoints + SSE proxy (discovers live simulations via stream.json)
+    event_stream.py            # Async JSONL file tailer for completed runs
+    streaming_event.py         # Transient TokenDelta model (SSE-only, not persisted to JSONL)
 
 frontend/                      # Next.js web application
   src/
     app/                       # App Router pages (runs list)
     features/                  # Feature modules (runs)
     shared/                    # Shared components, providers, utilities
+      lib/use-event-stream.ts  # SSE hook for real-time event and token streaming
     types/api.gen.ts           # Auto-generated TypeScript types from OpenAPI schema
 
 scripts/

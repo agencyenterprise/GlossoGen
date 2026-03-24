@@ -7,6 +7,7 @@ from collections.abc import Callable
 
 from schmidt.agent_runner import AgentRunner
 from schmidt.channel_router import ChannelRouter
+from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.llm.prompt_builder import PromptBuilder
 from schmidt.llm.provider import LLMProvider
@@ -43,12 +44,14 @@ class SimulationHub:
         agent_providers: dict[str, LLMProvider],
         tool_registry: ToolRegistry,
         event_logger: EventLogger,
+        event_bus: EventBus,
     ) -> None:
         self._scenario = scenario
         self._agents = agents
         self._agent_providers = agent_providers
         self._tool_registry = tool_registry
         self._event_logger = event_logger
+        self._event_bus = event_bus
 
     async def run(self) -> None:
         """Execute the full simulation lifecycle.
@@ -141,6 +144,7 @@ class SimulationHub:
                 wake_event=wake,
                 turn_queue=queue,
                 done_event=done,
+                event_bus=self._event_bus,
             )
 
             runners[agent.agent_id] = runner

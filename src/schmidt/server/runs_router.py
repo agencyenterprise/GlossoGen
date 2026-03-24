@@ -1,14 +1,18 @@
-"""FastAPI router for simulation run endpoints."""
+"""FastAPI router for simulation run endpoints, including SSE event streaming."""
 
 import logging
 import shutil
+from collections.abc import AsyncGenerator
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
+from starlette.responses import StreamingResponse
 
-from schmidt.server.response_models import RunDetailResponse, RunListResponse
+from schmidt.server.response_models import RunDetailResponse, RunListResponse, SSEEvent
 from schmidt.server.run_detail_reader import load_run_detail
 from schmidt.server.run_discovery import discover_runs
+from schmidt.stream_manifest import read_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -53,3 +57,86 @@ async def delete_run(run_id: str, request: Request) -> None:
     run_dir = Path(matching[0].run_dir)
     shutil.rmtree(run_dir)
     logger.info("Deleted run directory: %s", run_dir)
+
+
+async def _proxy_simulation_sse(
+    host: str,
+    port: int,
+) -> AsyncGenerator[bytes, None]:
+    """Proxy SSE events from a running simulation's embedded server.
+
+    Connects to the simulation's SSE endpoint via httpx and re-emits
+    each chunk as raw bytes.
+    """
+    url = f"http://{host}:{port}/events"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            async with client.stream(
+                method="GET",
+                url=url,
+                timeout=None,
+            ) as response:
+                async for chunk in response.aiter_bytes():
+                    yield chunk
+    except httpx.ConnectError:
+        logger.exception(
+            "Failed to connect to simulation server at %s:%d",
+            host,
+            port,
+        )
+    except httpx.HTTPError:
+        logger.exception(
+            "HTTP error proxying simulation SSE from %s:%d",
+            host,
+            port,
+        )
+
+
+@router.get(
+    "/runs/{run_id}/events",
+    responses={
+        200: {
+            "description": "SSE event stream. Each SSE frame has an `event` field matching "
+            "the event_type discriminator and a `data` field containing the JSON payload.",
+            "model": SSEEvent,
+        },
+    },
+)
+async def stream_run_events(run_id: str, request: Request) -> StreamingResponse:
+    """Stream simulation events as Server-Sent Events.
+
+    Only available for live simulations (detected via stream.json manifest).
+    Proxies SSE from the simulation's embedded server. Returns 404 if the
+    run is not found, and 409 if the simulation is not currently running.
+
+    The SSE ``data`` field of each frame contains a JSON object conforming to
+    one of the SSEEvent union members, discriminated by the ``event_type`` field.
+    """
+    runs_dir: Path = request.app.state.runs_dir
+    summaries = await discover_runs(runs_dir=runs_dir)
+    matching = [s for s in summaries if s.run_id == run_id]
+    if not matching:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    run_dir = Path(matching[0].run_dir)
+    manifest = read_manifest(run_dir=run_dir)
+    if manifest is None:
+        raise HTTPException(status_code=409, detail="Simulation is not running")
+
+    logger.debug(
+        "Proxying SSE from simulation server at %s:%d for run %s",
+        manifest.host,
+        manifest.port,
+        run_id,
+    )
+
+    return StreamingResponse(
+        content=_proxy_simulation_sse(host=manifest.host, port=manifest.port),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

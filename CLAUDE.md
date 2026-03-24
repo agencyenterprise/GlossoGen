@@ -24,7 +24,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `README.md` — scenario documentation (agents, channels, tools, round injections, turn logic, evaluation focus)
   - `scenario.py` — scenario class definition (channels, turn logic, tools, injections)
   - `prompts/` — Jinja2 templates for all agent system prompts and injection messages
-- `src/schmidt/server/` — FastAPI web server exposing simulation data via REST
+- `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
 - `linter/` — custom linting scripts
 - `frontend/` — Next.js web application
   - `frontend/src/app/` — Next.js App Router pages
@@ -141,6 +141,10 @@ set -a && source .env && set +a && \
 ```
 
 Check progress by reading the stdout log file or the JSONL event log.
+
+### Live Streaming
+
+Every `schmidt run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` manifest to the run directory. The `schmidt serve` process discovers this file and proxies the simulation's SSE stream (including token-level deltas from the Claude streaming API) to connected frontends. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing for the completed run.
 
 ### IMPORTANT: Monitoring Long-Running Processes
 
