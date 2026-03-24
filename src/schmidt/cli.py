@@ -17,17 +17,20 @@ from pathlib import Path
 import uvicorn
 
 from schmidt.autonomous_supervisor import AutonomousSupervisor
+from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
-from schmidt.logging_format import JsonLineFormatter
+from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.runners.claude_code_runner import ClaudeCodeRunner
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios import SCENARIO_REGISTRY
+from schmidt.simulation_server import start_simulation_server, stop_simulation_server
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MCP_PORT = 8001
 DEFAULT_MAX_AGENT_TURNS = 200
+EVENT_BUS_MAX_QUEUE_SIZE = 1000
 
 
 def _build_parsers() -> tuple[
@@ -145,13 +148,14 @@ async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
 ) -> None:
-    """Wire up the autonomous supervisor and execute the simulation."""
+    """Wire up the autonomous supervisor, start the streaming server, and execute."""
     runs_dir = Path(args.runs_dir)
     run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
     agents = scenario.get_agents(default_model=args.model)
 
     log_path = run_dir / f"{scenario.name()}.jsonl"
-    event_logger = EventLogger(log_path=log_path)
+    event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
+    event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
 
     max_turns = args.max_agent_turns
 
@@ -160,15 +164,23 @@ async def _run_simulation(
         agent_configs=agents,
         event_logger=event_logger,
         mcp_server_port=args.mcp_port,
-        runner_factory=lambda: ClaudeCodeRunner(max_turns=max_turns),
+        runner_factory=lambda: ClaudeCodeRunner(
+            max_turns=max_turns,
+            event_bus=event_bus,
+        ),
     )
 
-    # Add JSON debug log file for frontend display.
+    # Add JSON debug log file and EventBus log handler for frontend display.
     debug_log_path = run_dir / f"{scenario.name()}_debug.jsonl"
     run_dir.mkdir(parents=True, exist_ok=True)
     json_handler = logging.FileHandler(debug_log_path)
     json_handler.setFormatter(JsonLineFormatter())
     logging.getLogger().addHandler(json_handler)
+
+    bus_log_handler = EventBusLogHandler(event_bus=event_bus)
+    logging.getLogger().addHandler(bus_log_handler)
+
+    run_id = f"{scenario.name()}_{run_dir.name}"
 
     logger.info("Running scenario: %s", scenario.name())
     logger.info("Model: %s", args.model)
@@ -176,11 +188,21 @@ async def _run_simulation(
     logger.info("Run directory: %s", run_dir)
     logger.info("Log: %s", log_path)
 
+    # Start the embedded streaming server
+    server, port = await start_simulation_server(
+        event_bus=event_bus,
+        run_dir=run_dir,
+        run_id=run_id,
+    )
+    logger.info("Streaming server started on port %d", port)
+
     try:
         await supervisor.run()
     finally:
         logging.getLogger().removeHandler(json_handler)
         json_handler.close()
+        logging.getLogger().removeHandler(bus_log_handler)
+        await stop_simulation_server(server=server, run_dir=run_dir)
 
     logger.info("Simulation complete. Run directory: %s", run_dir)
 
