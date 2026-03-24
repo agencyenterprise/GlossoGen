@@ -14,8 +14,8 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from schmidt.llm.claude_provider import ClaudeProvider
-from schmidt.llm.provider import LLMMessage
+from schmidt.llm.provider import LLMMessage, LLMProvider
+from schmidt.llm.provider_factory import VALID_PROVIDERS, create_provider
 from schmidt.scenarios.persuasion_debate.question_bank import QuestionBank
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ class WrongAnswerOutput(BaseModel):
 
 
 async def generate_wrong_answer(
-    provider: ClaudeProvider,
+    provider: LLMProvider,
     question_text: str,
     reference_answer: str,
 ) -> str:
@@ -55,9 +55,13 @@ async def generate_wrong_answer(
     return result.wrong_answer
 
 
-async def run(model: str, questions_path: Path) -> None:
+async def run(
+    model: str, provider_name: str, inference_provider: str | None, questions_path: Path
+) -> None:
     """Generate wrong answers for all questions missing them."""
-    provider = ClaudeProvider(model=model)
+    provider = create_provider(
+        provider_name=provider_name, model=model, inference_provider=inference_provider
+    )
     question_bank = QuestionBank.load_from_file(path=questions_path)
 
     updated_count = 0
@@ -97,7 +101,19 @@ def main() -> None:
         "--model",
         type=str,
         required=True,
-        help="Claude model to use for generation",
+        help="LLM model identifier",
+    )
+    parser.add_argument(
+        "--provider",
+        type=str,
+        required=True,
+        choices=list(VALID_PROVIDERS),
+        help="LLM provider to use",
+    )
+    parser.add_argument(
+        "--inference-provider",
+        type=str,
+        help="HuggingFace inference provider backend (e.g. together, fireworks-ai, cerebras)",
     )
     parser.add_argument(
         "--questions",
@@ -106,7 +122,14 @@ def main() -> None:
         help="Path to questions.json",
     )
     args = parser.parse_args()
-    asyncio.run(run(model=args.model, questions_path=Path(args.questions)))
+    asyncio.run(
+        run(
+            model=args.model,
+            provider_name=args.provider,
+            inference_provider=args.inference_provider,
+            questions_path=Path(args.questions),
+        )
+    )
 
 
 if __name__ == "__main__":

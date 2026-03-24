@@ -17,6 +17,7 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
     "datasets>=3.0.0",
     "httpx>=0.28.1",
+    "huggingface_hub>=0.25.0",
 ]
 
 [dependency-groups]

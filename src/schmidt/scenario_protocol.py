@@ -97,6 +97,8 @@ class SimulationScenario(ABC):
         evaluator_names: list[str],
         report_path: Path,
         model: str,
+        provider_name: str,
+        inference_provider: str | None,
     ) -> EvaluationReport:
         """Run evaluators against a simulation log and write the report."""
         ...
