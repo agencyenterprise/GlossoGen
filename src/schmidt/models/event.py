@@ -122,12 +122,91 @@ class TurnPassed(EventBase):
     reason: str
 
 
+class StateObservationSent(EventBase):
+    """Emitted when a filtered state observation is delivered to an agent."""
+
+    event_type: Literal["state_observation_sent"] = "state_observation_sent"
+    agent_id: str
+    round_number: int
+    observation: dict[str, Any]
+
+
+class AgentActionApplied(EventBase):
+    """Emitted when an agent's structured action is applied to the world state."""
+
+    event_type: Literal["agent_action_applied"] = "agent_action_applied"
+    agent_id: str
+    action_type: str
+    parameters: dict[str, Any]
+    outcome: dict[str, Any]
+
+
+class RoundStateAdvanced(EventBase):
+    """Emitted when the world state is advanced between rounds."""
+
+    event_type: Literal["round_state_advanced"] = "round_state_advanced"
+    round_number: int
+    transition_report: dict[str, Any]
+
+
+class GroundTruthSnapshot(EventBase):
+    """Emitted after a round transition to capture the full unfiltered world state."""
+
+    event_type: Literal["ground_truth_snapshot"] = "ground_truth_snapshot"
+    round_number: int
+    state: dict[str, Any]
+
+
+class NotebookEntryWritten(EventBase):
+    """Emitted when an agent writes an entry to their private notebook."""
+
+    event_type: Literal["notebook_entry_written"] = "notebook_entry_written"
+    agent_id: str
+    round_number: int
+    entry_text: str
+
+
+class SharedDocumentEdited(EventBase):
+    """Emitted when an agent writes to a shared document."""
+
+    event_type: Literal["shared_document_edited"] = "shared_document_edited"
+    agent_id: str
+    round_number: int
+    document_id: str
+    content: str
+
+
+class ReasoningCaptured(EventBase):
+    """Emitted when an agent's private reasoning is elicited before their action phase."""
+
+    event_type: Literal["reasoning_captured"] = "reasoning_captured"
+    agent_id: str
+    round_number: int
+    reasoning_text: str
+
+
 class RunStatus(str, Enum):
     """Why the simulation ended."""
 
     SCENARIO_COMPLETE = "scenario_complete"
     IN_PROGRESS = "in_progress"
     ERROR = "error"
+
+
+class CheckpointSaved(EventBase):
+    """Emitted at each turn boundary to capture the full scenario state for resume.
+
+    Contains the turn/round counters, the scenario's serialized turn-scheduling
+    state, and (for stateful scenarios) the world state. Used by the ``--resume``
+    CLI flag to reconstruct a simulation after an error.
+    """
+
+    event_type: Literal["checkpoint_saved"] = "checkpoint_saved"
+    turn_number: int
+    round_number: int
+    last_turn_passed: bool
+    scenario_state: dict[str, Any]
+    last_injected_rounds: dict[str, int]
 
 
 class SimulationEnded(EventBase):
@@ -151,6 +230,14 @@ SimulationEvent = Annotated[
         LLMRequestSent,
         LLMResponseReceived,
         TurnPassed,
+        StateObservationSent,
+        AgentActionApplied,
+        RoundStateAdvanced,
+        GroundTruthSnapshot,
+        NotebookEntryWritten,
+        SharedDocumentEdited,
+        ReasoningCaptured,
+        CheckpointSaved,
         SimulationEnded,
     ],
     Discriminator("event_type"),

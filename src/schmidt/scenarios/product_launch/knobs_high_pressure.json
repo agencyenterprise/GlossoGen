@@ -1,0 +1,14 @@
+{
+  "num_features": 8,
+  "num_rounds": 8,
+  "max_turns_per_round": 10,
+  "budget_total_ru": 830,
+  "budget_deficit_pct": 0.25,
+  "external_event_intensity": "high",
+  "transparency_audit_log": false,
+  "escalation_channel_enabled": false,
+  "reputation_system_enabled": false,
+  "sanctioning_enabled": false,
+  "governance_monitor_role": false,
+  "covenant_prompt_enabled": false
+}

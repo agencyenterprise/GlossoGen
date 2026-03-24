@@ -3,11 +3,12 @@
 import argparse
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel
+from schmidt.models.shared_document_config import SharedDocumentConfig
 from schmidt.models.simulation_state import SimulationState, TurnDecision
 from schmidt.tools.tool_registry import ToolRegistry
 
@@ -85,6 +86,37 @@ class SimulationScenario(ABC):
         """
         ...
 
+    def get_shared_documents(self) -> list[SharedDocumentConfig]:
+        """Return shared document definitions for this scenario.
+
+        Shared documents are persistent artifacts visible to multiple agents.
+        Each document specifies reader and writer access per agent. The hub
+        registers ``list_documents``, ``read_document``, and ``write_document``
+        tools when this returns a non-empty list.
+
+        Defaults to an empty list. Override in subclasses that use shared docs.
+        """
+        return []
+
+    @abstractmethod
+    def get_checkpoint(self) -> dict[str, Any]:
+        """Serialize the scenario's internal turn-scheduling and world state.
+
+        Called at each turn boundary so the simulation can be resumed after an
+        error. Stateful scenarios should include their world state alongside
+        the turn-scheduling fields. The returned dict must be JSON-serializable.
+        """
+        ...
+
+    @abstractmethod
+    def restore_from_checkpoint(self, checkpoint: dict[str, Any]) -> None:
+        """Restore the scenario's internal state from a previously saved checkpoint.
+
+        Called during resume before the turn loop restarts. The ``checkpoint``
+        dict is the same structure returned by ``get_checkpoint()``.
+        """
+        ...
+
     @abstractmethod
     def register_tools(self, registry: ToolRegistry) -> None:
         """Register scenario-specific tools with the provided tool registry."""
@@ -99,6 +131,7 @@ class SimulationScenario(ABC):
         model: str,
         provider_name: str,
         inference_provider: str | None,
+        reasoning_effort: str | None,
     ) -> EvaluationReport:
         """Run evaluators against a simulation log and write the report."""
         ...

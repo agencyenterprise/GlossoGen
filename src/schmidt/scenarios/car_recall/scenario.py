@@ -17,7 +17,7 @@ import argparse
 import logging
 import random
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -198,21 +198,26 @@ class CarRecallScenario(SimulationScenario):
     def _agent_defs(self) -> list[tuple[str, str, list[str], list[str]]]:
         """Build agent definition tuples based on knobs."""
         defs: list[tuple[str, str, list[str], list[str]]] = [
-            (ENGINEER_ID, "Engineer", [INTERNAL_ID], ["send_message", "pass_turn"]),
-            (LEGAL_ID, "Legal", [INTERNAL_ID], ["send_message", "pass_turn"]),
+            (ENGINEER_ID, "Engineer", [INTERNAL_ID], ["send_message", "pass_turn", "think"]),
+            (LEGAL_ID, "Legal", [INTERNAL_ID], ["send_message", "pass_turn", "think"]),
         ]
 
         if self._knobs.agent_count == AgentCount.FIVE:
-            defs.append((CFO_ID, "CFO", [INTERNAL_ID], ["send_message", "pass_turn"]))
+            defs.append((CFO_ID, "CFO", [INTERNAL_ID], ["send_message", "pass_turn", "think"]))
 
         pr_channels = [INTERNAL_ID]
         if self._knobs.agent_count == AgentCount.FIVE:
             pr_channels.append(REGULATOR_REPORT_ID)
-        defs.append((PR_ID, "PR", pr_channels, ["send_message", "pass_turn"]))
+        defs.append((PR_ID, "PR", pr_channels, ["send_message", "pass_turn", "think"]))
 
         if self._knobs.agent_count == AgentCount.FIVE:
             defs.append(
-                (REGULATOR_ID, "Regulator", [REGULATOR_REPORT_ID], ["send_message", "pass_turn"])
+                (
+                    REGULATOR_ID,
+                    "Regulator",
+                    [REGULATOR_REPORT_ID],
+                    ["send_message", "pass_turn", "think"],
+                )
             )
 
         return defs
@@ -433,6 +438,41 @@ class CarRecallScenario(SimulationScenario):
         )
         return rendered
 
+    def get_checkpoint(self) -> dict[str, Any]:
+        """Serialize the scenario's turn-scheduling state for resume."""
+        return {
+            "current_round": self._current_round,
+            "discussion_agents": list(self._discussion_agents),
+            "discussion_channel": self._discussion_channel,
+            "rotation_index": self._rotation_index,
+            "anyone_spoke_this_rotation": self._anyone_spoke_this_rotation,
+            "regulator_queue": [
+                {"channel_id": ch, "agents": agents} for ch, agents in self._regulator_queue
+            ],
+            "discussion_started": self._discussion_started,
+            "first_rotation": self._first_rotation,
+            "turns_this_round": self._turns_this_round,
+        }
+
+    def restore_from_checkpoint(self, checkpoint: dict[str, Any]) -> None:
+        """Restore the scenario's turn-scheduling state from a checkpoint."""
+        self._current_round = checkpoint["current_round"]
+        self._discussion_agents = checkpoint["discussion_agents"]
+        self._discussion_channel = checkpoint["discussion_channel"]
+        self._rotation_index = checkpoint["rotation_index"]
+        self._anyone_spoke_this_rotation = checkpoint["anyone_spoke_this_rotation"]
+        self._regulator_queue = [
+            (item["channel_id"], item["agents"]) for item in checkpoint["regulator_queue"]
+        ]
+        self._discussion_started = checkpoint["discussion_started"]
+        self._first_rotation = checkpoint["first_rotation"]
+        self._turns_this_round = checkpoint["turns_this_round"]
+        logger.info(
+            "Restored scenario state: round=%d, discussion_started=%s",
+            self._current_round,
+            self._discussion_started,
+        )
+
     def register_tools(self, registry: ToolRegistry) -> None:  # noqa: ARG002
         """No scenario-specific tools are registered for the car recall scenario."""
 
@@ -452,13 +492,17 @@ class CarRecallScenario(SimulationScenario):
         model: str,
         provider_name: str,
         inference_provider: str | None,
+        reasoning_effort: str | None,
     ) -> EvaluationReport:
         """Run evaluators, compute derived flags, and write a JSON report."""
         events = await load_events(log_path=log_path)
         agent_configs = extract_agent_configs(events=events)
         simulation_id = extract_simulation_id(events=events)
         provider = create_provider(
-            provider_name=provider_name, model=model, inference_provider=inference_provider
+            provider_name=provider_name,
+            model=model,
+            inference_provider=inference_provider,
+            reasoning_effort=reasoning_effort,
         )
 
         registry: dict[str, type[Evaluator]] = {}
