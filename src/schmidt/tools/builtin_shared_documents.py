@@ -1,9 +1,9 @@
 """Built-in shared document tools for collaborative multi-agent artifact editing.
 
 Provides ``list_documents``, ``read_document``, and ``write_document`` tools.
-Documents are defined by the scenario via ``get_shared_documents()`` and live
-in an in-memory store for the duration of the simulation. Each document has
-per-agent read/write access control; writers implicitly have read access.
+Documents are defined by the scenario via ``get_shared_documents()`` and managed
+by a ``DocumentStore`` instance passed in from the simulation hub. Each document
+has per-agent read/write access control; writers implicitly have read access.
 """
 
 import logging
@@ -12,8 +12,8 @@ from typing import NamedTuple
 
 from schmidt.event_logger import EventLogger
 from schmidt.models.event import SharedDocumentEdited
-from schmidt.models.shared_document_config import SharedDocumentConfig
 from schmidt.models.tool_definition import ToolParameter, ToolSpec
+from schmidt.tools.document_store import DocumentStore
 
 logger = logging.getLogger(__name__)
 
@@ -76,35 +76,23 @@ class SharedDocumentExecutors(NamedTuple):
 
 
 def create_shared_document_executors(
-    configs: list[SharedDocumentConfig],
+    store: DocumentStore,
     event_logger: EventLogger,
     round_number_getter: Callable[[], int],
 ) -> SharedDocumentExecutors:
-    """Return list/read/write executor functions sharing an in-memory document store.
+    """Return list/read/write executor functions backed by the given DocumentStore.
 
-    Initializes each document from its ``SharedDocumentConfig``, populating the store
-    with ``initial_content``. Access control is enforced per-call based on the
-    agent ID and the document's reader/writer lists.
+    Access control is enforced per-call based on the agent ID and the
+    document's reader/writer lists from the store's config.
     """
-    store: dict[str, str] = {}
-    configs_by_id: dict[str, SharedDocumentConfig] = {}
-    for cfg in configs:
-        store[cfg.document_id] = cfg.initial_content
-        configs_by_id[cfg.document_id] = cfg
-
-    def _can_read(agent_id: str, cfg: SharedDocumentConfig) -> bool:
-        return agent_id in cfg.reader_agent_ids or agent_id in cfg.writer_agent_ids
-
-    def _can_write(agent_id: str, cfg: SharedDocumentConfig) -> bool:
-        return agent_id in cfg.writer_agent_ids
 
     async def list_documents(agent_id: str) -> str:
         """List documents the calling agent has access to."""
         lines: list[str] = []
-        for doc_id, cfg in configs_by_id.items():
-            if not _can_read(agent_id, cfg):
+        for doc_id, cfg in store.get_all_configs().items():
+            if not store.can_read(agent_id=agent_id, document_id=doc_id):
                 continue
-            if _can_write(agent_id, cfg):
+            if store.can_write(agent_id=agent_id, document_id=doc_id):
                 access = "read/write"
             else:
                 access = "read-only"
@@ -116,13 +104,13 @@ def create_shared_document_executors(
 
     async def read_document(agent_id: str, document_id: str) -> str:
         """Return the current content of a shared document."""
-        cfg = configs_by_id.get(document_id)
+        cfg = store.get_config(document_id=document_id)
         if cfg is None:
             return f"Error: document '{document_id}' does not exist."
-        if not _can_read(agent_id, cfg):
+        if not store.can_read(agent_id=agent_id, document_id=document_id):
             return f"Error: you do not have read access to '{document_id}'."
 
-        content = store[document_id]
+        content = store.read(document_id=document_id)
         if not content:
             return f"Document '{cfg.title}' is empty."
         return content
@@ -133,13 +121,13 @@ def create_shared_document_executors(
         content: str,
     ) -> str:
         """Replace the content of a shared document."""
-        cfg = configs_by_id.get(document_id)
+        cfg = store.get_config(document_id=document_id)
         if cfg is None:
             return f"Error: document '{document_id}' does not exist."
-        if not _can_write(agent_id, cfg):
+        if not store.can_write(agent_id=agent_id, document_id=document_id):
             return f"Error: you do not have write access to '{document_id}'."
 
-        store[document_id] = content
+        store.write(document_id=document_id, content=content)
         current_round = round_number_getter()
 
         await event_logger.log(

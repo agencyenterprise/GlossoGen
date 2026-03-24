@@ -7,7 +7,7 @@ A platform for testing agent communication through real-life simulations. A cent
 
 | Decision            | Choice                                                       |
 | ------------------- | ------------------------------------------------------------ |
-| LLM Backend         | Anthropic Claude (pluggable for future providers)            |
+| LLM Backend         | Pluggable: Anthropic Claude, OpenAI, HuggingFace             |
 | Transport           | In-process async (asyncio queues/events)                     |
 | Scenario Definition | Python classes                                               |
 | Turn Model          | Rotation until all pass, shuffled order between rotations, configurable max turns per round |
@@ -42,7 +42,11 @@ src/schmidt/
   agent_runner.py              # AgentRunner: per-agent coroutine lifecycle (incl. reasoning capture)
   channel_router.py            # ChannelRouter: message storage + membership validation
   channel_generation.py        # generate_dm_channels(): auto-generates pairwise DM channels
+  checkpoint_loader.py         # ResumeState: reconstructs simulation state from JSONL for --resume
   event_logger.py              # EventLogger: JSONL writer
+  event_bus.py                 # In-process pub/sub for simulation event fan-out (SSE streaming)
+  simulation_server.py         # Embedded mini-server exposing SSE endpoint per simulation
+  stream_manifest.py           # Discovery file (stream.json) for locating live simulation servers
   simulation_state_protocol.py # SimulationStateProtocol, AgentAction, ActionOutcome, RoundTransitionReport
 
   # Data models (Pydantic)
@@ -59,8 +63,11 @@ src/schmidt/
   # LLM provider abstraction
   llm/
     __init__.py
-    provider.py                # LLMProvider ABC (generate + generate_structured), LLMMessage, LLMResponse
+    provider.py                # LLMProvider ABC (generate + generate_structured + generate_streaming)
+    provider_factory.py        # create_provider() factory routing by provider name
     claude_provider.py         # ClaudeProvider (Anthropic SDK)
+    openai_provider.py         # OpenAIProvider (OpenAI Responses API)
+    huggingface_provider.py    # HuggingFaceProvider (HF Serverless Inference API)
     prompt_builder.py          # Builds message lists from channel history
 
   # Tool system
@@ -70,8 +77,11 @@ src/schmidt/
     tool_executor.py           # ToolExecutor: runs tools, handles errors
     builtin_send_message.py    # Built-in send_message tool (every agent gets this)
     builtin_pass_turn.py       # Built-in pass_turn tool (agent declines to speak)
+    builtin_think.py           # Built-in think tool for private reasoning capture
     builtin_notebook.py        # Built-in private notebook (write_notebook, read_notebook)
     builtin_shared_documents.py # Built-in shared docs (list_documents, read_document, write_document)
+    notebook_store.py          # NotebookStore: in-memory storage, supports bulk restore on resume
+    document_store.py          # DocumentStore: in-memory storage with access control, supports restore
     stateful_tool.py           # StatefulToolExecutor: helper for tools that mutate world state
 
   # Scenario system
@@ -119,10 +129,24 @@ src/schmidt/
       prompts/                 # Jinja2 templates for 6 agent roles + 4 external event injections
       evaluation/              # Product launch-specific evaluators
         __init__.py
-        launch_outcome_evaluator.py    # Pure computation: feature completion, QA, budget compliance
-        emergent_behavior_evaluator.py # LLM-as-judge: coalition formation, deception, leadership
+        launch_outcome_evaluator.py        # Pure computation: feature completion, QA, budget compliance
+        emergent_behavior_evaluator.py     # LLM-as-judge: coalition formation, deception, leadership
+        information_integrity_evaluator.py # LLM-as-judge: reporting accuracy vs strategic misrepresentation
+        coordination_efficiency_evaluator.py # LLM-as-judge: cross-role coordination quality
+        conflict_resolution_evaluator.py   # LLM-as-judge: handling disagreements and competing priorities
+        report_accuracy_evaluator.py       # LLM-as-judge: agent self-reports vs ground truth snapshots
         prompts/
           emergent_behavior_user.jinja
+          conflict_resolution_user.jinja
+          report_accuracy_user.jinja
+    persuasion_debate/         # Multi-agent trivia debate with 4 evaluation modes
+      __init__.py
+      scenario.py              # PersuasionDebateScenario (blind + discussion phases)
+      prompts/                 # Jinja2 templates for debater/adversary/target roles + injections
+      evaluation/              # Persuasion-specific evaluators
+        __init__.py
+        persuasion_accuracy_evaluator.py   # Did agents converge on correct answers?
+        persuasion_dynamics_evaluator.py   # LLM-as-judge: persuasion patterns and resistance
 
   # Evaluation (post-hoc LLM-as-judge + pure computation)
   evaluation/
@@ -134,7 +158,6 @@ src/schmidt/
     instruction_adherence.py   # Did agents follow their system prompt instructions?
     cooperation_evaluator.py   # Did agents cooperate effectively toward the goal?
     communication_pattern_evaluator.py  # Pure computation: message counts, DM ratios, coalition detection
-    report_accuracy_evaluator.py        # LLM-as-judge: agent self-reports vs ground truth
     evaluation_report.py       # Pydantic models: EvaluationReport, MetricResult, Verdict; write_report()
     prompt_renderer.py         # Renders Jinja2 templates for generic evaluation prompts
     transcript_builder.py      # Builds formatted transcripts from simulation events
@@ -143,7 +166,6 @@ src/schmidt/
       cooperation_user.jinja
       instruction_adherence_user.jinja
       secret_leak_user.jinja
-      report_accuracy_user.jinja
 
   # Web server (FastAPI)
   server/
@@ -199,10 +221,31 @@ scripts/
 
 1. **CLI** parses arguments in two passes (first to identify the scenario, then to include scenario-specific flags). Calls `scenario.get_agents()` to obtain agent configs, builds a per-agent LLM provider mapping, creates the tool registry and event logger, and passes all of these into the `SimulationHub` constructor.
 2. **SimulationHub.run()** uses the agents already provided at construction time. Calls `scenario.get_channels()` and `scenario.register_tools()`, creates a ChannelRouter, spawns one AgentRunner coroutine per agent (each immediately awaits its wake event), and logs `SimulationStarted` and one `AgentRegistered` event per agent. Registers built-in tools: `send_message`, `pass_turn`, `write_notebook`, `read_notebook`, and (when the scenario defines shared documents) `list_documents`, `read_document`, `write_document`.
-3. **Main loop**: Builds SimulationState from ChannelRouter, turn counter, and `last_turn_passed` (whether the previous agent sent any messages). Asks the scenario for the next turn via `decide_next_turn`, receiving a `TurnDecision` (which agent, which round, whether passing is allowed) or `None` to end. On round transitions for stateful scenarios (those implementing `SimulationStateProtocol`), the hub calls `advance_round`, logs `RoundStateAdvanced` and `GroundTruthSnapshot` events, and delivers a `StateObservationSent` to each agent. Logs `TurnAssigned`, delivers the decision to the agent's queue, and sets its wake event. Awaits the agent's done signal. After the agent finishes, checks whether any messages were sent — if not, `last_turn_passed` is set to `True`.
-4. **Agent turn**: The agent wakes, reads its TurnDecision, and the PromptBuilder constructs a conversation from visible channel history. If `allow_pass` is False (first rotation), the `pass_turn` tool is removed from available tools. When `enable_reasoning_capture()` is True and an injection is present, the AgentRunner makes a separate LLM call to elicit private reasoning (logged as `ReasoningCaptured`, not added to conversation history). The LLM is called with the system prompt, messages, and available tools. The agent can send multiple messages to any channel and call `pass_turn` to decline speaking. Tool calls are executed in a loop (max 10 iterations). After `pass_turn` is called, both `send_message` and `pass_turn` are removed and the loop ends. After any `send_message`, `pass_turn` is removed.
+3. **Main loop**: Builds SimulationState from ChannelRouter, turn counter, and `last_turn_passed` (whether the previous agent sent any messages). Asks the scenario for the next turn via `decide_next_turn`, receiving a `TurnDecision` (which agent, which round, which tools to exclude, max tokens) or `None` to end. On round transitions for stateful scenarios (those implementing `SimulationStateProtocol`), the hub calls `advance_round`, logs `RoundStateAdvanced` and `GroundTruthSnapshot` events, and delivers a `StateObservationSent` to each agent. Logs `TurnAssigned`, saves a `CheckpointSaved` event (for resume support), delivers the decision to the agent's queue, and sets its wake event. Awaits the agent's done signal. After the agent finishes, checks whether any messages were sent — if not, `last_turn_passed` is set to `True`.
+4. **Agent turn**: The agent wakes, reads its TurnDecision, and the PromptBuilder constructs a conversation from visible channel history. Tools listed in `TurnDecision.excluded_tool_names` are hidden from the agent for this turn (e.g., `pass_turn` is excluded on the first rotation to force agents to speak). When `enable_reasoning_capture()` is True and an injection is present, the AgentRunner makes a separate LLM call to elicit private reasoning (logged as `ReasoningCaptured`, not added to conversation history). The LLM is called with the system prompt, messages, and available tools via `generate_streaming`, which streams text deltas and tool argument fragments in real time. The agent can send multiple messages to any channel and call `pass_turn` to decline speaking. Tool calls are executed in a loop (max 10 iterations). After `pass_turn` is called, both `send_message` and `pass_turn` are removed and the loop ends. After any `send_message`, `pass_turn` is removed.
 5. **Rotation**: Scenarios implement `decide_next_turn` as a rotation loop. Agents take turns in order. When a full rotation completes: if nobody sent a message, the discussion ends; otherwise, the order is shuffled (last speaker excluded from first position) and a new rotation starts. A configurable `max_turns_per_round` cap forces the discussion to end after a set number of turns.
 6. **End**: When the scenario returns `None` or its end condition is met, the hub logs `SimulationEnded`, cancels agent tasks, and closes the logger.
+
+## Checkpoint and Resume
+
+The simulation saves a `CheckpointSaved` event to the JSONL log after each `TurnAssigned`. The checkpoint captures the turn/round counters, the scenario's serialized state (via `get_checkpoint()`), and per-agent injection tracking.
+
+If a simulation crashes or is killed, the `--resume` CLI flag restores it:
+
+1. `checkpoint_loader.build_resume_state()` reads the JSONL log, finds the last `CheckpointSaved`, and reconstructs all state up to that point: channel messages (from `MessageSent` events), notebook entries (from `NotebookEntryWritten` with original timestamps preserved), and shared document contents (from `SharedDocumentEdited`).
+2. The hub creates `NotebookStore` and `DocumentStore` instances and calls `.restore()` on each with the reconstructed data. Channel messages are replayed into the `ChannelRouter` via its public `append_message` API.
+3. The scenario's internal state is restored via `restore_from_checkpoint()`.
+4. The turn loop resumes from the saved position.
+
+The `--resume` flag requires the same scenario-specific flags as the original run. `SimulationStarted` and `AgentRegistered` events are re-logged on resume so the tail of the log is self-contained.
+
+Not all scenarios support resume. Scenarios that implement `get_checkpoint()` and `restore_from_checkpoint()` (car_recall, incident_response, product_launch) support it. Scenarios that raise `NotImplementedError` (persuasion_debate) do not.
+
+## Live Streaming
+
+Every `schmidt run` starts an embedded streaming server on an ephemeral port via `simulation_server.py`. The server exposes an SSE endpoint fed by the `EventBus`, which fans out simulation events (including token-level text deltas from `generate_streaming`) to connected clients.
+
+A `stream.json` manifest file is written to the run directory for discovery. When `schmidt serve` detects a live simulation via this file, it proxies the SSE stream to connected frontends. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing for the completed run.
 
 ## Run Storage
 
@@ -252,7 +295,7 @@ Three layers keep tools provider-agnostic:
 
 Every agent gets two core built-in tools: `send_message(channel_id, text)` for posting to channels and `pass_turn(reason)` for declining to speak. Two additional built-in tools are always registered: `write_notebook(entry)` and `read_notebook()` provide each agent with a private, persistent scratchpad across rounds (invisible to other agents). When a scenario returns shared document configs from `get_shared_documents()`, three more tools are registered: `list_documents()`, `read_document(document_id)`, and `write_document(document_id, content)` — these enforce per-agent read/write access control defined by the scenario. Agents opt in to notebook and shared document tools via their `tool_names` list.
 
-Scenarios select additional tools from the shared registry per agent role. The AgentRunner enforces a hard maximum of 10 tool calls per turn to prevent infinite loops. Agents can send multiple messages per turn to any channel they are a member of. After calling `pass_turn`, both `send_message` and `pass_turn` are removed to end the turn. After calling `send_message`, `pass_turn` is removed (cannot pass after speaking). On the first rotation of a discussion, `pass_turn` is not available (`allow_pass=False` in TurnDecision). The `generate()` method on LLMProvider accepts a `force_tool_use` parameter that sets `tool_choice: {"type": "any"}` in the API call when enabled.
+Scenarios select additional tools from the shared registry per agent role. The AgentRunner enforces a hard maximum of 10 tool calls per turn to prevent infinite loops. Agents can send multiple messages per turn to any channel they are a member of. After calling `pass_turn`, both `send_message` and `pass_turn` are removed to end the turn. After calling `send_message`, `pass_turn` is removed (cannot pass after speaking). On the first rotation of a discussion, `pass_turn` is excluded via `TurnDecision.excluded_tool_names` to force agents to speak. The `generate()` method on LLMProvider accepts a `force_tool_use` parameter that sets `tool_choice: {"type": "any"}` in the API call when enabled.
 
 For stateful scenarios, `StatefulToolExecutor` provides a helper that wraps the validate-apply-log-respond cycle for tools that mutate world state via `SimulationStateProtocol.apply_agent_action()`.
 
@@ -305,6 +348,7 @@ Event types (discriminated union on `event_type`):
 - `notebook_entry_written` — agent ID, round number, entry text
 - `shared_document_edited` — agent ID, round number, document ID, content
 - `reasoning_captured` — agent ID, round number, private reasoning text
+- `checkpoint_saved` — turn number, round number, scenario state, per-agent injection tracking
 - `simulation_ended` — reason, total turns
 
 ## Evaluation System
@@ -321,15 +365,12 @@ The user selects which evaluators to run — they are not automatically applied.
 - **InstructionAdherenceEvaluator**: Did each agent behave consistently with its system prompt instructions?
 - **CooperationEvaluator**: Did agents work together effectively? Were messages constructive?
 - **CommunicationPatternEvaluator**: Pure computation — message counts per agent/channel/round, DM-to-public ratios, coalition detection, information flow graph.
-- **ReportAccuracyEvaluator**: LLM-as-judge — compares agent self-reports against ground truth snapshots.
 
 **Scenario-specific evaluators:**
 
-- **FactSurfacingEvaluator**: Did pre-tagged private facts appear in the internal channel? (car_recall)
-- **ReportDivergenceEvaluator**: Does the PR agent's report to the Regulator match the internal discussion? (car_recall)
-- **DecisionCorrectnessEvaluator**: Did the group reach the correct decision? (car_recall)
-- **LaunchOutcomeEvaluator**: Pure computation — feature completion, QA pass rate, budget compliance. (product_launch)
-- **EmergentBehaviorEvaluator**: LLM-as-judge — detects coalition formation, deception, leadership patterns. (product_launch)
+- **car_recall**: FactSurfacingEvaluator (private facts surfaced?), ReportDivergenceEvaluator (PR report vs internal discussion), DecisionCorrectnessEvaluator (correct decision reached?)
+- **product_launch**: LaunchOutcomeEvaluator (pure computation: features, QA, budget), EmergentBehaviorEvaluator (coalition formation, deception), InformationIntegrityEvaluator (reporting accuracy), CoordinationEfficiencyEvaluator (cross-role coordination), ConflictResolutionEvaluator (disagreement handling), ReportAccuracyEvaluator (self-reports vs ground truth)
+- **persuasion_debate**: PersuasionAccuracyEvaluator (answer convergence), PersuasionDynamicsEvaluator (persuasion patterns)
 
 **Output**: A JSON report with per-evaluator results:
 
@@ -349,7 +390,7 @@ The user selects which evaluators to run — they are not automatically applied.
 }
 ```
 
-The evaluation system reuses the same LLM provider layer (ClaudeProvider) for judge calls.
+The evaluation system reuses the same LLM provider layer for judge calls, configurable via `--provider` and `--model`.
 
 ## Web Server
 

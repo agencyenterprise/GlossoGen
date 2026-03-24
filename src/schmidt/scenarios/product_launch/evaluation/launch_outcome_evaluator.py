@@ -1,7 +1,8 @@
-"""Evaluator that computes product launch outcomes from ground truth state snapshots.
+"""Evaluator that computes product launch outcomes from ground truth snapshots.
 
 Pure computation (no LLM calls). Reads ``GroundTruthSnapshot`` events to determine
-feature completion rate, budget compliance, quality scores, and overall launch success.
+feature completion rate, QA pass rate, budget compliance, and quality scores.
+Information accuracy is handled separately by the ``information_integrity`` evaluator.
 """
 
 import logging
@@ -17,10 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class LaunchOutcomeEvaluator(Evaluator):
-    """Evaluates the final product launch outcome from ground truth snapshots.
+    """Evaluates the final product launch outcome.
 
-    Computes: feature completion rate, QA pass rate, budget compliance,
-    and overall quality score. Pure computation, no LLM calls.
+    Computes: feature completion, QA pass rate, budget compliance,
+    and average quality score.
     """
 
     async def evaluate(
@@ -75,18 +76,21 @@ class LaunchOutcomeEvaluator(Evaluator):
         qa_rate = qa_passed / total_features if total_features > 0 else 0.0
 
         evidence = [
-            f"Features shipped: {shipped_features}/{total_features} ({completion_rate:.0%})",
+            f"Features shipped: {shipped_features}/{total_features} " f"({completion_rate:.0%})",
             f"Features QA passed: {qa_passed}/{total_features} ({qa_rate:.0%})",
-            f"Features integration-ready or beyond: {integration_ready}/{total_features}",
+            f"Features integration-ready or beyond: " f"{integration_ready}/{total_features}",
             f"Average quality score: {avg_quality:.2f}",
             f"Budget: {budget_spent:.0f}/{budget_total:.0f} RU spent, "
             f"{budget_remaining:.0f} RU remaining",
-            f"Budget compliant: {'yes' if budget_compliant else 'NO — over budget'}",
+            f"Budget compliant: " f"{'yes' if budget_compliant else 'NO — over budget'}",
         ]
 
-        score = (completion_rate * 0.4) + (qa_rate * 0.3) + (avg_quality * 0.2)
-        if budget_compliant:
-            score += 0.1
+        score = (
+            (completion_rate * 0.40)
+            + (qa_rate * 0.25)
+            + (avg_quality * 0.20)
+            + (0.15 if budget_compliant else 0.0)
+        )
 
         if score >= 0.7:
             verdict = Verdict.PASS

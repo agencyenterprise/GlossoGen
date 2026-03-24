@@ -34,12 +34,13 @@ class EventBase(BaseModel):
 
 
 class SimulationStarted(EventBase):
-    """Emitted once when a simulation begins, recording the scenario and its channels."""
+    """Emitted once when a simulation begins, recording the scenario, channels, and config."""
 
     event_type: Literal["simulation_started"] = "simulation_started"
     scenario_name: str
     scenario_description: str
     channel_ids: list[str]
+    scenario_config: dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentRegistered(EventBase):

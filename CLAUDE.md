@@ -36,7 +36,13 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `prompts/` — Jinja2 templates for all agent system prompts and injection messages
   - `evaluation/` — scenario-specific evaluators (optional)
 - `src/schmidt/evaluation/` — generic evaluators and evaluation infrastructure
-- `src/schmidt/server/` — FastAPI web server exposing simulation data via REST
+- `src/schmidt/llm/` — LLM provider abstraction and implementations:
+  - `provider.py` — abstract `LLMProvider` interface (generate, generate_structured, generate_streaming)
+  - `claude_provider.py` — Anthropic Claude implementation
+  - `openai_provider.py` — OpenAI Responses API implementation
+  - `huggingface_provider.py` — HuggingFace Serverless Inference API implementation
+  - `provider_factory.py` — `create_provider()` factory that routes by provider name
+- `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
 - `linter/` — custom linting scripts
 - `frontend/` — Next.js web application
   - `frontend/src/app/` — Next.js App Router pages
@@ -123,9 +129,15 @@ runs/{scenario_name}/{unix_timestamp}/
 
 Always run simulations as a background process, piping all output to a log file. This lets both the user and Claude monitor progress. The CLI auto-generates a timestamped subdirectory under `--runs-dir`.
 
+The `--provider` flag selects which LLM backend to use. Set the corresponding API key in `.env`:
+- `anthropic` — requires `ANTHROPIC_API_KEY`
+- `openai` — requires `OPENAI_API_KEY`. Optionally use `--reasoning-effort` (low/medium/high) for reasoning models (o1, o3, o4).
+- `huggingface` — requires `HF_TOKEN`. Optionally use `--inference-provider` to route through a third-party backend (e.g. `together`, `fireworks-ai`, `cerebras`, `groq`).
+
 ```bash
 set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> --model <model> --runs-dir ./runs \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
+    --model <model> --provider <provider> --runs-dir ./runs \
   > ./runs/<scenario>_stdout.log 2>&1 &
 ```
 
@@ -134,7 +146,7 @@ The `incident_response` scenario requires a `--max-turns-per-round` flag:
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-    --model <model> --runs-dir ./runs \
+    --model <model> --provider <provider> --runs-dir ./runs \
     --max-turns-per-round 10 \
   > ./runs/incident_response_stdout.log 2>&1 &
 ```
@@ -147,7 +159,7 @@ The `car_recall` scenario registers its own `--knobs` flag pointing to a JSON fi
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-    --model <model> --runs-dir ./runs \
+    --model <model> --provider <provider> --runs-dir ./runs \
     --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
 ```
@@ -160,21 +172,25 @@ The `product_launch` scenario also uses `--knobs`. Two presets are provided in `
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
-    --model <model> --runs-dir ./runs \
+    --model <model> --provider <provider> --runs-dir ./runs \
     --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
   > ./runs/product_launch_stdout.log 2>&1 &
 ```
 
 Check progress by reading the stdout log file or the JSONL event log.
 
+### Live Streaming
+
+Every `schmidt run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` manifest to the run directory. The `schmidt serve` process discovers this file and proxies the simulation's SSE stream (including token-level deltas from the Claude streaming API) to connected frontends. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing for the completed run.
+
 ### Resuming Failed Simulations
 
-If a simulation errors midway through, resume from the last checkpoint using the `--resume` flag pointing at the existing run directory. The simulation will pick up from the exact turn where it left off, preserving all channel messages, notebook entries, and shared document contents.
+If a simulation errors midway through, resume from the last checkpoint using the `--resume` flag pointing at the existing run directory. The simulation picks up from the exact turn where it left off, preserving all channel messages, notebook entries, and shared document contents.
 
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
-    --model <model> --runs-dir ./runs \
+    --model <model> --provider <provider> --runs-dir ./runs \
     --resume ./runs/<scenario>/<timestamp> \
     <scenario-specific flags like --knobs or --max-turns-per-round> \
   > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
@@ -201,17 +217,18 @@ set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
     --run-dir ./runs/<scenario>/<timestamp> \
     --evaluators <comma-separated evaluator names> \
-    --model <model> \
+    --model <model> --provider <provider> \
   > ./runs/<scenario>/<timestamp>/eval_stdout.log 2>&1 &
 ```
 
 Available evaluators per scenario:
 
-Generic evaluators (available to all scenarios): `secret_leak`, `instruction_adherence`, `cooperation`, `communication_pattern`, `report_accuracy`
+Generic evaluators (available to all scenarios): `secret_leak`, `instruction_adherence`, `cooperation`, `communication_pattern`
 
 - **incident_response**: generic evaluators
 - **car_recall**: generic evaluators + `fact_surfacing`, `report_divergence`, `decision_correctness`
-- **product_launch**: generic evaluators + `launch_outcome`, `emergent_behavior`
+- **product_launch**: generic evaluators + `launch_outcome`, `emergent_behavior`, `information_integrity`, `coordination_efficiency`, `conflict_resolution`, `report_accuracy`
+- **persuasion_debate**: generic evaluators + `persuasion_accuracy`, `persuasion_dynamics`
 
 ## Destructive Actions
 

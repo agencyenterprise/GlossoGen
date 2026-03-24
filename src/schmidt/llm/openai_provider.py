@@ -3,9 +3,18 @@
 import json
 import logging
 import os
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import openai
+from openai.types.responses import (
+    ResponseCompletedEvent,
+    ResponseFunctionCallArgumentsDeltaEvent,
+    ResponseFunctionCallArgumentsDoneEvent,
+    ResponseFunctionToolCall,
+    ResponseOutputItemAddedEvent,
+    ResponseTextDeltaEvent,
+)
 from pydantic import BaseModel
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
@@ -73,6 +82,7 @@ class OpenAIProvider(LLMProvider):
         messages: list[LLMMessage],
         tools: list[ToolSpec],
         force_tool_use: bool,
+        max_tokens: int,
     ) -> LLMResponse:
         """Send a message sequence to the OpenAI Responses API and return the parsed response.
 
@@ -85,6 +95,7 @@ class OpenAIProvider(LLMProvider):
             "model": self._model,
             "instructions": system_prompt,
             "input": input_items,
+            "max_output_tokens": max_tokens,
             "store": False,
         }
 
@@ -148,6 +159,95 @@ class OpenAIProvider(LLMProvider):
                 return output_schema.model_validate(arguments)
 
         raise ValueError(f"LLM response did not contain a {tool_name} function call")
+
+    async def generate_streaming(
+        self,
+        system_prompt: str,
+        messages: list[LLMMessage],
+        tools: list[ToolSpec],
+        force_tool_use: bool,
+        max_tokens: int,
+        on_token: Callable[[str], Awaitable[None]],
+        on_tool_arg_delta: Callable[[int, str, str, str], Awaitable[None]],
+    ) -> LLMResponse:
+        """Stream a response from the OpenAI Responses API with token-level callbacks.
+
+        Iterates over server-sent events, calling ``on_token`` for each text delta
+        and ``on_tool_arg_delta`` for each function-call argument fragment.
+        """
+        input_items = _build_responses_input(messages=messages)
+
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "instructions": system_prompt,
+            "input": input_items,
+            "max_output_tokens": max_tokens,
+            "stream": True,
+            "store": False,
+        }
+
+        if self._reasoning_effort is not None:
+            kwargs["reasoning"] = {"effort": self._reasoning_effort}
+
+        if tools:
+            kwargs["tools"] = [_convert_tool_spec_to_responses(spec=spec) for spec in tools]
+            if force_tool_use:
+                kwargs["tool_choice"] = "required"
+
+        logger.debug(
+            "Calling OpenAI Responses API (streaming): model=%s, input_items=%d, tools=%d",
+            self._model,
+            len(input_items),
+            len(tools),
+        )
+
+        text_parts: list[str] = []
+        completed_response: Any = None
+
+        # Track in-progress tool calls for real-time on_tool_arg_delta callbacks.
+        # Keys are output_index; values track accumulated JSON and the function name.
+        tool_arg_builders: dict[int, dict[str, str]] = {}
+
+        stream = await self._client.responses.create(**kwargs)
+        async for event in stream:
+            if isinstance(event, ResponseTextDeltaEvent):
+                text_parts.append(event.delta)
+                await on_token(event.delta)
+
+            elif isinstance(event, ResponseOutputItemAddedEvent):
+                if isinstance(event.item, ResponseFunctionToolCall):
+                    tool_arg_builders[event.output_index] = {
+                        "name": event.item.name,
+                        "arguments_json": "",
+                    }
+
+            elif isinstance(event, ResponseFunctionCallArgumentsDeltaEvent):
+                idx = event.output_index
+                if idx not in tool_arg_builders:
+                    tool_arg_builders[idx] = {"name": "", "arguments_json": ""}
+                builder = tool_arg_builders[idx]
+                builder["arguments_json"] += event.delta
+                await on_tool_arg_delta(
+                    idx,
+                    builder["name"],
+                    event.delta,
+                    builder["arguments_json"],
+                )
+
+            elif isinstance(event, ResponseFunctionCallArgumentsDoneEvent):
+                idx = event.output_index
+                if idx in tool_arg_builders:
+                    tool_arg_builders[idx]["name"] = event.name
+
+            elif isinstance(event, ResponseCompletedEvent):
+                completed_response = event.response
+
+        # Build final LLMResponse from the completed response object, which
+        # is the authoritative source for tool call names and arguments.
+        if completed_response is None:
+            raise RuntimeError("OpenAI streaming ended without a response.completed event")
+
+        return _parse_responses_output(response=completed_response)
 
 
 def _parse_responses_output(response: Any) -> LLMResponse:
