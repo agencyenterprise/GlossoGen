@@ -48,6 +48,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Run Events
+         * @description Stream simulation events as Server-Sent Events.
+         *
+         *     Only available for live simulations (detected via stream.json manifest).
+         *     Proxies SSE from the simulation's embedded server. Returns 404 if the
+         *     run is not found, and 409 if the simulation is not currently running.
+         *
+         *     The SSE ``data`` field of each frame contains a JSON object conforming to
+         *     one of the SSEEvent union members, discriminated by the ``event_type`` field.
+         */
+        get: operations["stream_run_events_api_runs__run_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -268,6 +295,230 @@ export interface components {
             /** Run Dir */
             run_dir: string;
         };
+        /**
+         * SSEAgentRegistered
+         * @description SSE event emitted when an agent joins the simulation.
+         */
+        SSEAgentRegistered: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "agent_registered";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Role Name */
+            role_name: string;
+            /** System Prompt */
+            system_prompt: string;
+            /** Channel Ids */
+            channel_ids: string[];
+            /** Tool Names */
+            tool_names: string[];
+            /** Model */
+            model: string;
+        };
+        /**
+         * SSEDebugLog
+         * @description SSE event for a real-time debug log entry from the simulation process.
+         */
+        SSEDebugLog: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "debug_log";
+            /** Timestamp */
+            timestamp: string;
+            /** Logger Name */
+            logger_name: string;
+            /** Level */
+            level: string;
+            /** Message */
+            message: string;
+        };
+        /**
+         * SSELLMResponseReceived
+         * @description SSE event emitted when the LLM returns a response (reasoning text).
+         */
+        SSELLMResponseReceived: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "llm_response_received";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Text */
+            text: string | null;
+        };
+        /**
+         * SSEMessagePreview
+         * @description SSE event for in-progress send_message text preview.
+         *
+         *     Transient — not persisted to JSONL. The complete message arrives in a
+         *     subsequent SSEMessageSent event.
+         */
+        SSEMessagePreview: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "message_preview";
+            /** Agent Id */
+            agent_id: string;
+            /** Channel Id */
+            channel_id: string;
+            /** Text */
+            text: string;
+            /** Is Final */
+            is_final: boolean;
+        };
+        /**
+         * SSEMessageSent
+         * @description SSE event emitted when an agent sends a message to a channel.
+         */
+        SSEMessageSent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "message_sent";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            message: components["schemas"]["SSESimulationMessagePayload"];
+        };
+        /**
+         * SSESimulationEnded
+         * @description SSE event emitted once when the simulation finishes.
+         */
+        SSESimulationEnded: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "simulation_ended";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            reason: components["schemas"]["RunStatus"];
+            /** Total Turns */
+            total_turns: number;
+        };
+        /**
+         * SSESimulationMessagePayload
+         * @description Nested message payload inside an SSE message_sent event.
+         */
+        SSESimulationMessagePayload: {
+            /** Message Id */
+            message_id: string;
+            /** Channel Id */
+            channel_id: string;
+            /** Sender Agent Id */
+            sender_agent_id: string;
+            /** Text */
+            text: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+        };
+        /**
+         * SSESimulationStarted
+         * @description SSE event emitted once when a simulation begins.
+         */
+        SSESimulationStarted: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "simulation_started";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Scenario Name */
+            scenario_name: string;
+            /** Scenario Description */
+            scenario_description: string;
+            /** Channel Ids */
+            channel_ids: string[];
+            /** Scenario Config */
+            scenario_config: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * SSETokenDelta
+         * @description SSE event emitted token-by-token during LLM response streaming.
+         *
+         *     Transient — not persisted to JSONL. The complete text arrives in a
+         *     subsequent SSELLMResponseReceived event.
+         */
+        SSETokenDelta: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "token_delta";
+            /** Agent Id */
+            agent_id: string;
+            /** Text */
+            text: string;
+            /** Is Final */
+            is_final: boolean;
+        };
+        /**
+         * SSETurnAssigned
+         * @description SSE event emitted when a turn is assigned to an agent.
+         */
+        SSETurnAssigned: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "turn_assigned";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Turn Number */
+            turn_number: number;
+            /** Round Number */
+            round_number: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -364,6 +615,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_run_events_api_runs__run_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description SSE event stream. Each SSE frame has an `event` field matching the event_type discriminator and a `data` field containing the JSON payload. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSETurnAssigned"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
+                };
             };
             /** @description Validation Error */
             422: {

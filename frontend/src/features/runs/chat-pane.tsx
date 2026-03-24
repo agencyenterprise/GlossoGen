@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
@@ -19,6 +20,8 @@ interface ChatPaneProps {
   onSelectAgent: (agentId: string) => void;
   highlightedMessageId: string | null;
   highlightNonce: number;
+  /** Agent ID currently streaming a response (Level 2 token streaming). */
+  streamingAgentId: string | null;
 }
 
 interface TurnGroup {
@@ -82,6 +85,9 @@ function groupByRoundAndTurn(messages: DisplayEntry[]): RoundGroup[] {
   return rounds;
 }
 
+/** Threshold in pixels for considering the user "at the bottom" of the scroll area. */
+const SCROLL_BOTTOM_THRESHOLD = 80;
+
 export function ChatPane({
   messages,
   agents,
@@ -91,8 +97,62 @@ export function ChatPane({
   onSelectAgent,
   highlightedMessageId,
   highlightNonce,
+  streamingAgentId,
 }: ChatPaneProps) {
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const prevScrollHeightRef = useRef(0);
+
+  // Scroll to bottom on initial render so the user sees the latest messages
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+        prevScrollHeightRef.current = el.scrollHeight;
+      });
+    }
+  }, []);
+
+  // Track scroll position to determine if user is at the bottom.
+  // Uses the previous scrollHeight to avoid a race where new content
+  // pushes the user past the threshold before this handler fires.
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_BOTTOM_THRESHOLD;
+    isAtBottomRef.current = atBottom;
+    setIsAtBottom(atBottom);
+    prevScrollHeightRef.current = el.scrollHeight;
+  }, []);
+
+  // Auto-scroll when the DOM content grows and the user was at the bottom.
+  // A MutationObserver catches all content changes (new messages, growing
+  // partial text, etc.) and scrolls before the browser fires onScroll,
+  // preventing the "fell behind" race condition with large messages.
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return undefined;
+
+    const observer = new MutationObserver(() => {
+      if (!isAtBottomRef.current) return;
+      if (el.scrollHeight <= prevScrollHeightRef.current) return;
+      prevScrollHeightRef.current = el.scrollHeight;
+      el.scrollTop = el.scrollHeight;
+    });
+
+    observer.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
+  }, []);
 
   useEffect(() => {
     if (!highlightedMessageId) {
@@ -137,16 +197,26 @@ export function ChatPane({
     selectedChannel === null ? "all channels, global turn order" : `#${selectedChannel}`;
 
   return (
-    <div className="flex flex-col overflow-hidden">
+    <div className="relative flex flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
         <span className="text-sm text-muted-foreground">#</span>
         <span className="text-[13px] font-medium">{headerName}</span>
         <span className="text-xs text-muted-foreground">{headerDesc}</span>
+        {streamingAgentId ? (
+          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+            {agentMap.get(streamingAgentId)?.role_name ?? streamingAgentId} is typing...
+          </span>
+        ) : null}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-0 py-1">
-        {rounds.map(round => (
-          <div key={round.roundNumber}>
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-0 py-1"
+        onScroll={handleScroll}
+      >
+        {rounds.map((round, roundIdx) => (
+          <div key={`round-${roundIdx}-${round.roundNumber}`}>
             <div className="flex items-center gap-2.5 px-4 pb-1.5 pt-3.5">
               <div className="h-px flex-1 bg-border" />
               <span className="whitespace-nowrap text-[11px] text-muted-foreground">
@@ -155,13 +225,13 @@ export function ChatPane({
               <div className="h-px flex-1 bg-border" />
             </div>
 
-            {round.turns.map(turn => {
+            {round.turns.map((turn, turnIdx) => {
               const agent = agentMap.get(turn.agentId);
               const color = agentColorMap.get(turn.agentId);
 
               return (
                 <div
-                  key={`${turn.turnNumber}-${turn.agentId}`}
+                  key={`${roundIdx}-${turnIdx}-${turn.turnNumber}-${turn.agentId}`}
                   className="flex gap-2.5 px-4 py-1 transition-colors hover:bg-muted/50"
                 >
                   <div className="flex w-7 shrink-0 flex-col items-start">
@@ -210,7 +280,7 @@ export function ChatPane({
                         >
                           {entry.is_reasoning ? (
                             <span className="text-[10px] italic text-muted-foreground">
-                              reasoning
+                              {entry.is_partial ? "streaming..." : "reasoning"}
                             </span>
                           ) : showChannelBadge ? (
                             <span
@@ -226,6 +296,9 @@ export function ChatPane({
                           <ProseMarkdown className="[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]">
                             {entry.text}
                           </ProseMarkdown>
+                          {entry.is_partial ? (
+                            <span className="inline-block h-3 w-1.5 animate-pulse bg-foreground/60" />
+                          ) : null}
                         </div>
                       );
                     })}
@@ -235,6 +308,21 @@ export function ChatPane({
             })}
           </div>
         ))}
+      </div>
+
+      {/* Auto-scroll status bar */}
+      <div className="flex shrink-0 items-center justify-center border-t border-border px-4 py-1.5">
+        {isAtBottom ? (
+          <span className="text-[11px] text-muted-foreground">Auto-scroll enabled</span>
+        ) : (
+          <button
+            className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-0.5 text-[11px] font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+            onClick={scrollToBottom}
+          >
+            <ChevronDown className="h-3 w-3" />
+            Scroll to bottom
+          </button>
+        )}
       </div>
     </div>
   );

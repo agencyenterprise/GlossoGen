@@ -2,7 +2,7 @@
 
 Defines the ``schmidt`` CLI with three subcommands:
 
-* ``run``      -- load and execute a simulation scenario
+* ``run``      -- load and execute a simulation scenario (with embedded streaming server)
 * ``evaluate`` -- score a previously-generated simulation log
 * ``serve``    -- start the FastAPI web server
 """
@@ -16,18 +16,22 @@ from pathlib import Path
 
 import uvicorn
 
+from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.llm.claude_provider import ClaudeProvider
 from schmidt.llm.provider import LLMProvider
-from schmidt.logging_format import JsonLineFormatter
+from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.models.agent_config import AgentConfig
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.simulation_hub import SimulationHub
+from schmidt.simulation_server import start_simulation_server, stop_simulation_server
 from schmidt.tools.tool_registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+EVENT_BUS_MAX_QUEUE_SIZE = 1000
 
 
 def _build_parsers() -> tuple[
@@ -45,8 +49,9 @@ def _build_parsers() -> tuple[
     parser = argparse.ArgumentParser(prog="schmidt")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    run_parser = subparsers.add_parser("run", help="Run a simulation scenario")
     scenario_names = sorted(SCENARIO_REGISTRY.keys())
+
+    run_parser = subparsers.add_parser("run", help="Run a simulation scenario")
     run_parser.add_argument(
         "scenario_name", type=str, choices=scenario_names, help="Name of the scenario to run"
     )
@@ -152,9 +157,10 @@ async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
 ) -> None:
-    """Wire up the simulation components and execute the simulation.
+    """Wire up the simulation components, start the streaming server, and execute.
 
-    Writes a JSONL event log to ``{runs_dir}/{scenario_name}/{timestamp}/{scenario_name}.jsonl``.
+    Starts an embedded mini-server on an ephemeral port that streams events
+    via SSE. Writes a ``stream.json`` manifest for discovery by ``schmidt serve``.
     """
     runs_dir = Path(args.runs_dir)
     run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
@@ -163,7 +169,8 @@ async def _run_simulation(
     registry = ToolRegistry()
 
     log_path = run_dir / f"{scenario.name()}.jsonl"
-    event_logger = EventLogger(log_path=log_path)
+    event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
+    event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
 
     hub = SimulationHub(
         scenario=scenario,
@@ -171,6 +178,7 @@ async def _run_simulation(
         agent_providers=agent_providers,
         tool_registry=registry,
         event_logger=event_logger,
+        event_bus=event_bus,
     )
 
     # Add JSON debug log file for frontend display
@@ -180,16 +188,33 @@ async def _run_simulation(
     json_handler.setFormatter(JsonLineFormatter())
     logging.getLogger().addHandler(json_handler)
 
+    # Stream debug logs to the EventBus for real-time frontend display
+    bus_log_handler = EventBusLogHandler(event_bus=event_bus)
+    logging.getLogger().addHandler(bus_log_handler)
+
+    # Generate a run_id for the stream manifest (matches the SimulationStarted event_id)
+    run_id = f"{scenario.name()}_{run_dir.name}"
+
     logger.info("Running scenario: %s", scenario.name())
     logger.info("Model: %s", args.model)
     logger.info("Run directory: %s", run_dir)
     logger.info("Log: %s", log_path)
+
+    # Start the embedded streaming server
+    server, port = await start_simulation_server(
+        event_bus=event_bus,
+        run_dir=run_dir,
+        run_id=run_id,
+    )
+    logger.info("Streaming server started on port %d", port)
 
     try:
         await hub.run()
     finally:
         logging.getLogger().removeHandler(json_handler)
         json_handler.close()
+        logging.getLogger().removeHandler(bus_log_handler)
+        await stop_simulation_server(server=server, run_dir=run_dir)
 
     logger.info("Simulation complete. Run directory: %s", run_dir)
 

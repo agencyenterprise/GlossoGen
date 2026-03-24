@@ -14,6 +14,8 @@ export interface DisplayEntry {
   turn_number: number;
   round_number: number;
   is_reasoning: boolean;
+  /** True when this entry represents in-progress streaming text. */
+  is_partial: boolean;
 }
 
 /** Merge channel messages and reasoning entries into a single sorted array. */
@@ -30,6 +32,7 @@ export function mergeEntries(
     turn_number: m.turn_number,
     round_number: m.round_number,
     is_reasoning: false,
+    is_partial: false,
   }));
 
   const reasoningEntries: DisplayEntry[] = reasoning.map(r => ({
@@ -41,6 +44,7 @@ export function mergeEntries(
     turn_number: r.turn_number,
     round_number: r.round_number,
     is_reasoning: true,
+    is_partial: false,
   }));
 
   return [...channelEntries, ...reasoningEntries].sort((a, b) =>
