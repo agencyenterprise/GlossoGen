@@ -17,6 +17,8 @@ type SSELLMResponseReceived = components["schemas"]["SSELLMResponseReceived"];
 type SSESimulationEnded = components["schemas"]["SSESimulationEnded"];
 type SSETokenDelta = components["schemas"]["SSETokenDelta"];
 type SSEMessagePreview = components["schemas"]["SSEMessagePreview"];
+type SSEDebugLog = components["schemas"]["SSEDebugLog"];
+type DebugLogEntry = components["schemas"]["DebugLogEntry"];
 
 /** Partial message being composed by an agent. */
 export interface PartialMessage {
@@ -43,6 +45,8 @@ export interface EventStreamState {
   agentTurns: Map<string, number>;
   /** Map of agent_id -> current round number (from turn_assigned events). */
   agentRounds: Map<string, number>;
+  /** Debug log entries received via SSE. */
+  debugLogs: DebugLogEntry[];
 }
 
 /**
@@ -72,6 +76,7 @@ export function useEventStream(
   const [partialMessages, setPartialMessages] = useState<Map<string, PartialMessage>>(new Map());
   const [agentTurns, setAgentTurns] = useState<Map<string, number>>(new Map());
   const [agentRounds, setAgentRounds] = useState<Map<string, number>>(new Map());
+  const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
 
   // Refs mirror the state for synchronous access inside event listeners.
   // Seeded from REST data so SSE messages arriving before any turn_assigned
@@ -133,6 +138,7 @@ export function useEventStream(
     setPartialMessages(new Map());
     setAgentTurns(new Map());
     setAgentRounds(new Map());
+    setDebugLogs([]);
     agentTurnRef.current = new Map();
     agentRoundRef.current = new Map();
     pendingDeltasRef.current = new Map();
@@ -312,6 +318,17 @@ export function useEventStream(
       }
     });
 
+    eventSource.addEventListener("debug_log", (e: MessageEvent) => {
+      const data: SSEDebugLog = JSON.parse(e.data);
+      const entry: DebugLogEntry = {
+        timestamp: data.timestamp,
+        logger_name: data.logger_name,
+        level: data.level,
+        message: data.message,
+      };
+      setDebugLogs(prev => [...prev, entry]);
+    });
+
     return () => {
       eventSource.close();
       resetState();
@@ -331,5 +348,6 @@ export function useEventStream(
     partialMessages,
     agentTurns,
     agentRounds,
+    debugLogs,
   };
 }

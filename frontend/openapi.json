@@ -98,7 +98,7 @@
     "/api/runs/{run_id}/events": {
       "get": {
         "summary": "Stream Run Events",
-        "description": "Stream simulation events as Server-Sent Events.\n\nFor live simulations (detected via stream.json), proxies SSE from the\nsimulation's embedded server. For completed runs, tails the JSONL file.\nUses the Last-Event-ID header for reconnection.\n\nThe SSE `data` field of each frame contains a JSON object conforming to\none of the SSEEvent union members, discriminated by the `event_type` field.",
+        "description": "Stream simulation events as Server-Sent Events.\n\nOnly available for live simulations (detected via stream.json manifest).\nProxies SSE from the simulation's embedded server. Returns 404 if the\nrun is not found, and 409 if the simulation is not currently running.\n\nThe SSE ``data`` field of each frame contains a JSON object conforming to\none of the SSEEvent union members, discriminated by the ``event_type`` field.",
         "operationId": "stream_run_events_api_runs__run_id__events_get",
         "parameters": [
           {
@@ -141,6 +141,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/SSEMessagePreview"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SSEDebugLog"
                     }
                   ],
                   "discriminator": {
@@ -153,7 +156,8 @@
                       "llm_response_received": "#/components/schemas/SSELLMResponseReceived",
                       "simulation_ended": "#/components/schemas/SSESimulationEnded",
                       "token_delta": "#/components/schemas/SSETokenDelta",
-                      "message_preview": "#/components/schemas/SSEMessagePreview"
+                      "message_preview": "#/components/schemas/SSEMessagePreview",
+                      "debug_log": "#/components/schemas/SSEDebugLog"
                     }
                   },
                   "title": "Response 200 Stream Run Events Api Runs  Run Id  Events Get"
@@ -684,6 +688,41 @@
         ],
         "title": "SSEAgentRegistered",
         "description": "SSE event emitted when an agent joins the simulation."
+      },
+      "SSEDebugLog": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "debug_log",
+            "title": "Event Type"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "logger_name": {
+            "type": "string",
+            "title": "Logger Name"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "timestamp",
+          "logger_name",
+          "level",
+          "message"
+        ],
+        "title": "SSEDebugLog",
+        "description": "SSE event for a real-time debug log entry from the simulation process."
       },
       "SSELLMResponseReceived": {
         "properties": {
