@@ -19,6 +19,7 @@ from schmidt.models.event import (
     TurnAssigned,
 )
 from schmidt.server.response_models import RunSummary
+from schmidt.stream_manifest import delete_manifest, read_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,13 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                 )
             else:
                 turn_count = await _count_turns(file_path=jsonl_path)
+                manifest = read_manifest(run_dir=timestamp_dir)
+                if manifest is not None:
+                    status = RunStatus.IN_PROGRESS
+                else:
+                    # No live process — clean up stale manifest if present
+                    delete_manifest(run_dir=timestamp_dir)
+                    status = RunStatus.ERROR
                 summaries.append(
                     RunSummary(
                         run_id=first_event.event_id,
@@ -130,7 +138,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         scenario_config=first_event.scenario_config,
                         timestamp=first_event.timestamp,
                         total_turns=turn_count,
-                        status=RunStatus.IN_PROGRESS,
+                        status=status,
                         has_evaluation=False,
                         run_dir=str(timestamp_dir),
                     )
