@@ -17,7 +17,7 @@ import logging
 import random
 from enum import Enum
 from pathlib import Path
-from typing import NamedTuple, Self
+from typing import Any, NamedTuple, Self
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -724,6 +724,45 @@ class PersuasionDebateScenario(SimulationScenario):
         registry.register(spec=SUBMIT_FINAL_ANSWER_SPEC, executor=submit_final_answer)
         logger.debug("Registered scenario tools: submit_initial_answer, submit_final_answer")
 
+    # --- Checkpoint / Resume ---
+
+    def get_checkpoint(self) -> dict[str, Any]:
+        """Serialize the scenario's turn-scheduling and answer state for resume."""
+        return {
+            "current_question": self._current_question,
+            "phase": self._phase.value,
+            "blind_index": self._blind_index,
+            "discussion_turns_taken": self._discussion_turns_taken,
+            "discussion_robin_index": self._discussion_robin_index,
+            "final_answer_index": self._final_answer_index,
+            "discussion_agent_order": list(self._discussion_agent_order),
+            "silenced_agents": sorted(self._silenced_agents),
+            "initial_answers": {str(q): answers for q, answers in self._initial_answers.items()},
+            "final_answers": {str(q): answers for q, answers in self._final_answers.items()},
+        }
+
+    def restore_from_checkpoint(self, checkpoint: dict[str, Any]) -> None:
+        """Restore the scenario's turn-scheduling and answer state from a checkpoint."""
+        self._current_question = checkpoint["current_question"]
+        self._phase = RoundPhase(checkpoint["phase"])
+        self._blind_index = checkpoint["blind_index"]
+        self._discussion_turns_taken = checkpoint["discussion_turns_taken"]
+        self._discussion_robin_index = checkpoint["discussion_robin_index"]
+        self._final_answer_index = checkpoint["final_answer_index"]
+        self._discussion_agent_order = checkpoint["discussion_agent_order"]
+        self._silenced_agents = set(checkpoint["silenced_agents"])
+        self._initial_answers = {
+            int(q): answers for q, answers in checkpoint["initial_answers"].items()
+        }
+        self._final_answers = {
+            int(q): answers for q, answers in checkpoint["final_answers"].items()
+        }
+        logger.info(
+            "Restored scenario state: question=%d, phase=%s",
+            self._current_question,
+            self._phase.value,
+        )
+
     # --- Evaluation ---
 
     async def run_evaluation(
@@ -734,13 +773,17 @@ class PersuasionDebateScenario(SimulationScenario):
         model: str,
         provider_name: str,
         inference_provider: str | None,
+        reasoning_effort: str | None,
     ) -> EvaluationReport:
         """Run evaluators and write a JSON report."""
         events = await load_events(log_path=log_path)
         agent_configs = extract_agent_configs(events=events)
         simulation_id = extract_simulation_id(events=events)
         provider = create_provider(
-            provider_name=provider_name, model=model, inference_provider=inference_provider
+            provider_name=provider_name,
+            model=model,
+            inference_provider=inference_provider,
+            reasoning_effort=reasoning_effort,
         )
 
         scenario_evaluator_registry = self._get_evaluators()

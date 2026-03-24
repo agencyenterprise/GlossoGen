@@ -16,6 +16,8 @@ from pathlib import Path
 
 import uvicorn
 
+from schmidt.checkpoint_loader import ResumeState, build_resume_state
+from schmidt.evaluation.log_reader import load_events
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.llm.provider import LLMProvider
@@ -74,6 +76,17 @@ def _build_parsers() -> tuple[
         type=str,
         help="HuggingFace inference provider backend (e.g. together, fireworks-ai, cerebras)",
     )
+    run_parser.add_argument(
+        "--reasoning-effort",
+        type=str,
+        choices=["low", "medium", "high"],
+        help="Reasoning effort level for OpenAI reasoning models (low/medium/high)",
+    )
+    run_parser.add_argument(
+        "--resume",
+        type=str,
+        help="Path to an existing run directory to resume from (e.g. runs/car_recall/1742234567)",
+    )
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a simulation log")
     evaluate_parser.add_argument(
@@ -103,6 +116,12 @@ def _build_parsers() -> tuple[
         "--inference-provider",
         type=str,
         help="HuggingFace inference provider backend (e.g. together, fireworks-ai, cerebras)",
+    )
+    evaluate_parser.add_argument(
+        "--reasoning-effort",
+        type=str,
+        choices=["low", "medium", "high"],
+        help="Reasoning effort level for OpenAI reasoning models (low/medium/high)",
     )
 
     serve_parser = subparsers.add_parser("serve", help="Start the web server")
@@ -152,6 +171,7 @@ def _build_agent_providers(
     agents: list[AgentConfig],
     provider_name: str,
     inference_provider: str | None,
+    reasoning_effort: str | None,
 ) -> dict[str, LLMProvider]:
     """Build a per-agent LLM provider mapping.
 
@@ -167,6 +187,7 @@ def _build_agent_providers(
                 provider_name=provider_name,
                 model=agent.model,
                 inference_provider=inference_provider,
+                reasoning_effort=reasoning_effort,
             )
         agent_providers[agent.agent_id] = providers_by_model[agent.model]
 
@@ -191,14 +212,24 @@ async def _run_simulation(
 
     Starts an embedded mini-server on an ephemeral port that streams events
     via SSE. Writes a ``stream.json`` manifest for discovery by ``schmidt serve``.
+    When ``--resume`` is specified, loads the checkpoint from the existing run
+    directory and continues from where it left off.
     """
-    runs_dir = Path(args.runs_dir)
-    run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
+    resume_dir: str | None = getattr(args, "resume", None)
+    resuming = resume_dir is not None
+
+    if resume_dir is not None:
+        run_dir = Path(resume_dir)
+    else:
+        runs_dir = Path(args.runs_dir)
+        run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
+
     agents = scenario.get_agents(default_model=args.model)
     agent_providers = _build_agent_providers(
         agents=agents,
         provider_name=args.provider,
         inference_provider=args.inference_provider,
+        reasoning_effort=getattr(args, "reasoning_effort", None),
     )
     registry = ToolRegistry()
 
@@ -206,12 +237,24 @@ async def _run_simulation(
     event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
     event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
 
+    resume_state: ResumeState | None = None
+    if resuming:
+        logger.info("Loading checkpoint from %s", log_path)
+        events = await load_events(log_path=log_path)
+        resume_state = build_resume_state(events=events)
+        logger.info(
+            "Checkpoint loaded: resuming from turn %d, round %d",
+            resume_state.turn_number,
+            resume_state.round_number,
+        )
+
     hub = SimulationHub(
         scenario=scenario,
         agents=agents,
         agent_providers=agent_providers,
         tool_registry=registry,
         event_logger=event_logger,
+        resume_state=resume_state,
         event_bus=event_bus,
     )
 
@@ -233,6 +276,8 @@ async def _run_simulation(
     logger.info("Model: %s", args.model)
     logger.info("Run directory: %s", run_dir)
     logger.info("Log: %s", log_path)
+    if resuming:
+        logger.info("RESUMING from checkpoint in %s", run_dir)
 
     # Start the embedded streaming server
     server, port = await start_simulation_server(
@@ -270,6 +315,7 @@ async def _run_evaluation(
         model=args.model,
         provider_name=args.provider,
         inference_provider=args.inference_provider,
+        reasoning_effort=getattr(args, "reasoning_effort", None),
     )
 
     logger.info("Evaluation complete. Report written to %s", report_path)

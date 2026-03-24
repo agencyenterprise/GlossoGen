@@ -60,7 +60,10 @@ async def run(
 ) -> None:
     """Generate wrong answers for all questions missing them."""
     provider = create_provider(
-        provider_name=provider_name, model=model, inference_provider=inference_provider
+        provider_name=provider_name,
+        model=model,
+        inference_provider=inference_provider,
+        reasoning_effort=None,
     )
     question_bank = QuestionBank.load_from_file(path=questions_path)
 

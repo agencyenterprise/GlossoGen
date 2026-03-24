@@ -72,6 +72,15 @@ class AgentRunner:
         self._last_injected_round = 0
         self.last_turn_summary: TurnSummary = TurnSummary()
 
+    @property
+    def last_injected_round(self) -> int:
+        """The last round number for which this agent received an injection."""
+        return self._last_injected_round
+
+    def set_last_injected_round(self, round_number: int) -> None:
+        """Restore the last injected round number during resume."""
+        self._last_injected_round = round_number
+
     async def run(self) -> None:
         """Run the agent loop indefinitely, waiting for wake signals
         and processing one turn per signal.

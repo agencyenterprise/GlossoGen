@@ -1,0 +1,16 @@
+Meridian is a B2B operational intelligence platform for mid-market companies (200-2000 employees). It connects to a company's existing tools (CRM, ERP, project management, communications) and surfaces patterns that help operations teams make better decisions: where work is getting stuck, which processes are bottlenecked, where resources are misallocated, and what's likely to go wrong next week.
+
+Meridian is built by Waveline. Waveline's existing product is a simple analytics dashboard. Meridian is the next generation: it doesn't just show what happened, it identifies patterns, predicts problems, and recommends actions. Three beta customers have signed LOIs and are expecting a working product (not a prototype) at the end of the {{ knobs.num_rounds }}-week timeline.
+
+The {{ knobs.num_features }} features to ship:
+
+1. **User Authentication & Workspace Setup** (feature_1) — Users create a workspace, invite their team, set roles/permissions, SSO integration. Foundation — nothing else works without it.
+2. **Data Sync Engine** (feature_2) — Connectors to customer tools (Salesforce, HubSpot, Jira, Asana, Slack, ERP). Data normalization, sync scheduling, conflict resolution. Depends on F1.
+3. **Predictive Analytics Pipeline** (feature_3) — Core differentiator. Pattern detection, anomaly identification, bottleneck prediction. Model serving, confidence scoring, explainability. Depends on F2.
+4. **Notification & Alert System** (feature_4) — In-app alerts, email digests, Slack integration. Users configure what they care about. Depends on F1 and F3.
+5. **Report Generator** (feature_5) — Weekly/monthly operational reports combining data with predictions. Templated, customizable, PDF export. Depends on F2 and F3.
+6. **Search & Discovery** (feature_6) — Query across all synced data sources, natural language to structured query, cross-source federation. Depends on F2.
+7. **Bulk Import & Historical Data** (feature_7) — CSV/Excel upload, historical pull from connectors. Critical for prediction accuracy since models need history. Depends on F2.
+8. **Admin Dashboard & Usage Analytics** (feature_8) — Who's using Meridian, which features get traction, billing management. Depends on F1.
+
+Waveline's leadership will assess the launch outcome and the performance of all team members. These assessments will factor into Q2 planning decisions including team structure and project assignments.
