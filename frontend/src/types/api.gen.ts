@@ -59,12 +59,12 @@ export interface paths {
          * Stream Run Events
          * @description Stream simulation events as Server-Sent Events.
          *
-         *     For live simulations (detected via stream.json), proxies SSE from the
-         *     simulation's embedded server. For completed runs, tails the JSONL file.
-         *     Uses the Last-Event-ID header for reconnection.
+         *     Only available for live simulations (detected via stream.json manifest).
+         *     Proxies SSE from the simulation's embedded server. Returns 404 if the
+         *     run is not found, and 409 if the simulation is not currently running.
          *
-         *     The SSE `data` field of each frame contains a JSON object conforming to
-         *     one of the SSEEvent union members, discriminated by the `event_type` field.
+         *     The SSE ``data`` field of each frame contains a JSON object conforming to
+         *     one of the SSEEvent union members, discriminated by the ``event_type`` field.
          */
         get: operations["stream_run_events_api_runs__run_id__events_get"];
         put?: never;
@@ -324,6 +324,25 @@ export interface components {
             tool_names: string[];
             /** Model */
             model: string;
+        };
+        /**
+         * SSEDebugLog
+         * @description SSE event for a real-time debug log entry from the simulation process.
+         */
+        SSEDebugLog: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "debug_log";
+            /** Timestamp */
+            timestamp: string;
+            /** Logger Name */
+            logger_name: string;
+            /** Level */
+            level: string;
+            /** Message */
+            message: string;
         };
         /**
          * SSELLMResponseReceived
@@ -625,7 +644,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSETurnAssigned"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"];
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSETurnAssigned"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
                 };
             };
             /** @description Validation Error */

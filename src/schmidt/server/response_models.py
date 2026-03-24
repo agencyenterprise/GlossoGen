@@ -229,6 +229,16 @@ class SSEMessagePreview(BaseModel):
     is_final: bool
 
 
+class SSEDebugLog(BaseModel):
+    """SSE event for a real-time debug log entry from the simulation process."""
+
+    event_type: Literal["debug_log"]
+    timestamp: str
+    logger_name: str
+    level: str
+    message: str
+
+
 SSEEvent = Annotated[
     Union[
         SSESimulationStarted,
@@ -239,6 +249,7 @@ SSEEvent = Annotated[
         SSESimulationEnded,
         SSETokenDelta,
         SSEMessagePreview,
+        SSEDebugLog,
     ],
     Discriminator("event_type"),
 ]

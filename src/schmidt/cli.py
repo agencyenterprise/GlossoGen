@@ -20,7 +20,7 @@ from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.llm.claude_provider import ClaudeProvider
 from schmidt.llm.provider import LLMProvider
-from schmidt.logging_format import JsonLineFormatter
+from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.models.agent_config import AgentConfig
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
@@ -188,6 +188,10 @@ async def _run_simulation(
     json_handler.setFormatter(JsonLineFormatter())
     logging.getLogger().addHandler(json_handler)
 
+    # Stream debug logs to the EventBus for real-time frontend display
+    bus_log_handler = EventBusLogHandler(event_bus=event_bus)
+    logging.getLogger().addHandler(bus_log_handler)
+
     # Generate a run_id for the stream manifest (matches the SimulationStarted event_id)
     run_id = f"{scenario.name()}_{run_dir.name}"
 
@@ -209,6 +213,7 @@ async def _run_simulation(
     finally:
         logging.getLogger().removeHandler(json_handler)
         json_handler.close()
+        logging.getLogger().removeHandler(bus_log_handler)
         await stop_simulation_server(server=server, run_dir=run_dir)
 
     logger.info("Simulation complete. Run directory: %s", run_dir)

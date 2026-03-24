@@ -211,6 +211,14 @@ export function RunDetail({ runId }: { runId: string }) {
   );
   const channelColorMap = useMemo(() => buildChannelColorMap(allChannelIds), [allChannelIds]);
 
+  const allDebugLogs = useMemo(() => {
+    const restLogs = restData?.debug_logs ?? [];
+    if (sse.debugLogs.length === 0) return restLogs;
+    const seen = new Set(restLogs.map(l => `${l.timestamp}|${l.message}`));
+    const newLogs = sse.debugLogs.filter(l => !seen.has(`${l.timestamp}|${l.message}`));
+    return [...restLogs, ...newLogs];
+  }, [restData?.debug_logs, sse.debugLogs]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -240,7 +248,7 @@ export function RunDetail({ runId }: { runId: string }) {
   }
 
   const evaluation = restData.evaluation;
-  const hasLogs = restData.debug_logs.length > 0;
+  const hasLogs = allDebugLogs.length > 0;
   const activeAgent = allAgents.find(a => a.agent_id === selectedAgent);
   const activeAgentColor = selectedAgent ? agentColorMap.get(selectedAgent) : undefined;
 
@@ -353,7 +361,7 @@ export function RunDetail({ runId }: { runId: string }) {
 
         {/* Main content: chat or logs */}
         {showLogs ? (
-          <LogPanel logs={restData.debug_logs} />
+          <LogPanel logs={allDebugLogs} />
         ) : (
           <ChatPane
             messages={allDisplayEntries}

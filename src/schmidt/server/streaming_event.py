@@ -1,8 +1,7 @@
-"""Transient event types for real-time token streaming.
+"""Transient event types for real-time SSE streaming.
 
-These events are pushed via the in-process EventBus and SSE but are NOT persisted
-to the JSONL event log. The complete text is captured by the standard
-LLMResponseReceived and MessageSent events.
+These events are pushed via the EventBus and SSE but are NOT persisted
+to the simulation JSONL event log.
 """
 
 from typing import Literal
@@ -37,3 +36,18 @@ class MessagePreview(BaseModel):
     channel_id: str
     text: str
     is_final: bool
+
+
+class DebugLogEmitted(BaseModel):
+    """A debug log record from the simulation process.
+
+    Published to the EventBus by a custom logging handler so the frontend
+    can display logs in real time. The same data is also written to the
+    debug JSONL file for completed-run access via REST.
+    """
+
+    event_type: Literal["debug_log"] = "debug_log"
+    timestamp: str
+    logger_name: str
+    level: str
+    message: str
