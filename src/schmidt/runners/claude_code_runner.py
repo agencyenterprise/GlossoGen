@@ -3,15 +3,19 @@
 Launches a Claude Code instance that connects to the simulation runtime's
 MCP server and participates autonomously in the scenario. Each cycle, the
 agent calls check_messages, acts on the result, and is re-prompted to
-continue the loop.
+continue the loop. Publishes token-level streaming events to the EventBus
+for real-time frontend display.
 """
 
+import asyncio
 import logging
+from typing import Any
 
 from claude_agent_sdk import (  # pyright: ignore[reportMissingImports]
     AssistantMessage,
     ClaudeAgentOptions,
     ResultMessage,
+    StreamEvent,
     SystemMessage,
     UserMessage,
     query,
@@ -23,11 +27,14 @@ from claude_agent_sdk.types import (  # pyright: ignore[reportMissingImports]
     ToolUseBlock,
 )
 
+from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
+from schmidt.llm.tool_arg_extractor import SendMessageTextExtractor
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import LLMResponseReceived, TokenUsage
 from schmidt.models.tool_definition import ToolCallRequest
 from schmidt.runners.agent_runner_base import AgentRunner
+from schmidt.server.streaming_event import MessagePreview, TokenDelta
 
 logger = logging.getLogger(__name__)
 
@@ -72,17 +79,21 @@ BASE_MCP_TOOLS = [
     "mcp__comms__get_channel_members",
 ]
 
+PREVIEW_FLUSH_INTERVAL = 0.03  # 30ms — roughly 2 animation frames
+
 
 class ClaudeCodeRunner(AgentRunner):
     """Runs a single Claude Code instance as an autonomous agent via the Agent SDK.
 
     Uses a loop of ``query()`` calls with ``continue_conversation=True`` to
     keep the agent in a persistent check_messages loop. Each iteration
-    re-prompts the agent to call check_messages again.
+    re-prompts the agent to call check_messages again. Publishes ``TokenDelta``
+    and ``MessagePreview`` events to the EventBus for real-time streaming.
     """
 
-    def __init__(self, max_turns: int) -> None:
+    def __init__(self, max_turns: int, event_bus: EventBus) -> None:
         self._max_turns = max_turns
+        self._event_bus = event_bus
 
     async def start(
         self,
@@ -127,6 +138,8 @@ class ClaudeCodeRunner(AgentRunner):
         session_id: str | None = None
         total_cost = 0.0
         total_turns = 0
+        agent_id = agent_config.agent_id
+        bus = self._event_bus
 
         try:
             while True:
@@ -144,22 +157,50 @@ class ClaudeCodeRunner(AgentRunner):
                         resume=session_id,
                     )
 
+                # Track tool_use blocks for message preview extraction
+                tool_use_builders: dict[int, dict[str, Any]] = {}
+                extractors: dict[int, SendMessageTextExtractor] = {}
+                preview_buffers: dict[int, str] = {}
+                last_preview_time = 0.0
+
                 got_done = False
                 async for message in query(
                     prompt=prompt,
                     options=options,
                 ):
-                    if isinstance(message, ResultMessage):
+                    if isinstance(message, StreamEvent):
+                        self._handle_stream_event(
+                            agent_id=agent_id,
+                            stream_event=message,
+                            tool_use_builders=tool_use_builders,
+                            extractors=extractors,
+                            preview_buffers=preview_buffers,
+                            last_preview_time=last_preview_time,
+                        )
+                    elif isinstance(message, ResultMessage):
                         session_id = message.session_id
                         total_cost += message.total_cost_usd or 0.0
                         total_turns += message.num_turns
                         logger.info(
                             "Agent %s cycle result: session=%s, turns=%d, stop=%s, cost=$%.4f",
-                            agent_config.agent_id,
+                            agent_id,
                             session_id,
                             message.num_turns,
                             message.stop_reason,
                             message.total_cost_usd,
+                        )
+                        # Clear streaming state at end of cycle
+                        self._flush_all_previews(
+                            agent_id=agent_id,
+                            extractors=extractors,
+                            preview_buffers=preview_buffers,
+                        )
+                        bus.publish(
+                            event=TokenDelta(
+                                agent_id=agent_id,
+                                text="",
+                                is_final=True,
+                            ).model_dump(mode="json")
                         )
                     elif isinstance(message, AssistantMessage):
                         text_parts: list[str] = []
@@ -179,7 +220,7 @@ class ClaudeCodeRunner(AgentRunner):
                                 )
                                 logger.info(
                                     "Agent %s tool call: %s(%s)",
-                                    agent_config.agent_id,
+                                    agent_id,
                                     block.name,
                                     block.input,
                                 )
@@ -187,12 +228,12 @@ class ClaudeCodeRunner(AgentRunner):
                             joined_text = "\n".join(text_parts)
                             logger.info(
                                 "Agent %s reasoning: %.200s",
-                                agent_config.agent_id,
+                                agent_id,
                                 joined_text,
                             )
                             await event_logger.log(
                                 LLMResponseReceived(
-                                    agent_id=agent_config.agent_id,
+                                    agent_id=agent_id,
                                     text=joined_text,
                                     tool_calls=tool_calls,
                                     stop_reason="end_turn",
@@ -208,7 +249,7 @@ class ClaudeCodeRunner(AgentRunner):
                         content = str(message.content)
                         logger.info(
                             "Agent %s user message: %.200s",
-                            agent_config.agent_id,
+                            agent_id,
                             content,
                         )
                         if "'done'" in content or '"done"' in content:
@@ -216,32 +257,147 @@ class ClaudeCodeRunner(AgentRunner):
                     elif isinstance(message, SystemMessage):
                         logger.debug(
                             "Agent %s system message: subtype=%s data=%s",
-                            agent_config.agent_id,
+                            agent_id,
                             message.subtype,
                             message.data,
                         )
                     else:
                         logger.debug(
                             "Agent %s activity: %s",
-                            agent_config.agent_id,
+                            agent_id,
                             type(message).__name__,
                         )
 
                 if got_done:
                     logger.info(
                         "Agent %s received done notification, stopping",
-                        agent_config.agent_id,
+                        agent_id,
                     )
                     break
 
                 prompt = CONTINUE_PROMPT
         except Exception:
-            logger.exception("Agent %s SDK query failed", agent_config.agent_id)
+            logger.exception("Agent %s SDK query failed", agent_id)
             raise
 
         logger.info(
             "Agent %s finished. Total turns: %d, total cost: $%.4f",
-            agent_config.agent_id,
+            agent_id,
             total_turns,
             total_cost,
         )
+
+    def _handle_stream_event(
+        self,
+        agent_id: str,
+        stream_event: StreamEvent,
+        tool_use_builders: dict[int, dict[str, Any]],
+        extractors: dict[int, SendMessageTextExtractor],
+        preview_buffers: dict[int, str],
+        last_preview_time: float,
+    ) -> None:
+        """Process a raw Anthropic API streaming event for token and message preview delivery."""
+        event = stream_event.event
+        event_type = event.get("type", "")
+
+        if event_type == "content_block_start":
+            block = event.get("content_block", {})
+            index = event.get("index", 0)
+            if block.get("type") == "tool_use":
+                tool_use_builders[index] = {
+                    "id": block.get("id", ""),
+                    "name": block.get("name", ""),
+                    "input_json": "",
+                }
+
+        elif event_type == "content_block_delta":
+            index = event.get("index", 0)
+            delta = event.get("delta", {})
+            delta_type = delta.get("type", "")
+
+            if delta_type == "text_delta":
+                text = delta.get("text", "")
+                if text:
+                    token = TokenDelta(
+                        agent_id=agent_id,
+                        text=text,
+                        is_final=False,
+                    )
+                    self._event_bus.publish(event=token.model_dump(mode="json"))
+
+            elif delta_type == "input_json_delta":
+                builder = tool_use_builders.get(index)
+                if builder is not None:
+                    partial_json = delta.get("partial_json", "")
+                    builder["input_json"] += partial_json
+
+                    if builder["name"] == "mcp__comms__send_message":
+                        if index not in extractors:
+                            extractors[index] = SendMessageTextExtractor()
+                        result = extractors[index].feed(
+                            accumulated_json=builder["input_json"],
+                        )
+                        if result.new_text and result.channel_id is not None:
+                            preview_buffers[index] = (
+                                preview_buffers.get(index, "") + result.new_text
+                            )
+                            now = asyncio.get_event_loop().time()
+                            elapsed = now - last_preview_time
+                            if elapsed >= PREVIEW_FLUSH_INTERVAL:
+                                self._flush_preview(
+                                    agent_id=agent_id,
+                                    block_index=index,
+                                    extractors=extractors,
+                                    preview_buffers=preview_buffers,
+                                )
+
+    def _flush_preview(
+        self,
+        agent_id: str,
+        block_index: int,
+        extractors: dict[int, SendMessageTextExtractor],
+        preview_buffers: dict[int, str],
+    ) -> None:
+        """Flush buffered message preview text for a single tool_use block."""
+        text = preview_buffers.pop(block_index, "")
+        if not text:
+            return
+        extractor = extractors.get(block_index)
+        if extractor is None:
+            return
+        channel_id = extractor.channel_id
+        if channel_id is None:
+            return
+        preview = MessagePreview(
+            agent_id=agent_id,
+            channel_id=channel_id,
+            text=text,
+            is_final=False,
+        )
+        self._event_bus.publish(event=preview.model_dump(mode="json"))
+
+    def _flush_all_previews(
+        self,
+        agent_id: str,
+        extractors: dict[int, SendMessageTextExtractor],
+        preview_buffers: dict[int, str],
+    ) -> None:
+        """Flush remaining preview text and send is_final for all active previews."""
+        for block_index in list(preview_buffers.keys()):
+            self._flush_preview(
+                agent_id=agent_id,
+                block_index=block_index,
+                extractors=extractors,
+                preview_buffers=preview_buffers,
+            )
+        for extractor in extractors.values():
+            channel_id = extractor.channel_id
+            if channel_id is not None:
+                final = MessagePreview(
+                    agent_id=agent_id,
+                    channel_id=channel_id,
+                    text="",
+                    is_final=True,
+                )
+                self._event_bus.publish(event=final.model_dump(mode="json"))
+        extractors.clear()
