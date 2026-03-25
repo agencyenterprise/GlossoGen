@@ -7,6 +7,7 @@ context (HTTP query parameter), not from tool arguments.
 
 import asyncio
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, TypeAlias
 from uuid import uuid4
@@ -272,10 +273,41 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
             for mid in member_ids
         ]
 
-    # Register scenario-specific tools.
+    # Register scenario-specific tools. Tools with requires_agent_id=True
+    # get a wrapper that resolves agent_id from the MCP HTTP connection context.
     for scenario_tool in runtime.scenario.get_mcp_tools():
-        mcp.tool(
-            name=scenario_tool.name,
-            description=scenario_tool.description,
-        )(scenario_tool.executor)
+        if scenario_tool.requires_agent_id:
+            wrapped = _make_agent_injected_executor(
+                executor=scenario_tool.executor,
+                runtime=runtime,
+            )
+            mcp.tool(
+                name=scenario_tool.name,
+                description=scenario_tool.description,
+            )(wrapped)
+        else:
+            mcp.tool(
+                name=scenario_tool.name,
+                description=scenario_tool.description,
+            )(scenario_tool.executor)
         logger.info("Registered scenario MCP tool: %s", scenario_tool.name)
+
+
+def _make_agent_injected_executor(
+    executor: Callable[..., Any],
+    runtime: SimulationRuntime,
+) -> Callable[..., Any]:
+    """Create a wrapper that resolves agent_id from MCP context before calling the executor.
+
+    The returned function accepts ``ctx: ToolContext`` (injected by FastMCP)
+    plus keyword arguments, resolves agent_id from the HTTP connection, and
+    delegates to the original executor with agent_id as the first argument.
+    """
+
+    async def wrapped(ctx: ToolContext, **kwargs: Any) -> str:
+        """Resolve agent_id from MCP context and delegate to the scenario tool executor."""
+        session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
+        result: str = await executor(session.agent_id, **kwargs)
+        return result
+
+    return wrapped

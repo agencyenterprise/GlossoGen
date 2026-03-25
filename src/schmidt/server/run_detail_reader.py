@@ -12,11 +12,13 @@ from schmidt.models.event import (
     AgentRegistered,
     LLMResponseReceived,
     MessageSent,
+    ReasoningCaptured,
     RoundAdvanced,
     RunStatus,
     SimulationEnded,
     SimulationEvent,
     SimulationStarted,
+    TurnAssigned,
 )
 from schmidt.server.response_models import (
     AgentDetail,
@@ -27,6 +29,7 @@ from schmidt.server.response_models import (
     ReasoningEntry,
     RunDetailResponse,
 )
+from schmidt.stream_manifest import delete_manifest, read_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +131,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     run_id = ""
     scenario_name = ""
     scenario_description = ""
+    scenario_config: dict[str, object] = {}
     timestamp = None
     channel_ids: list[str] = []
     agents: list[AgentDetail] = []
@@ -143,6 +147,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             run_id = event.event_id
             scenario_name = event.scenario_name
             scenario_description = event.scenario_description
+            scenario_config = event.scenario_config
             timestamp = event.timestamp
             channel_ids = event.channel_ids
 
@@ -160,6 +165,22 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
 
         elif isinstance(event, RoundAdvanced):
             current_round = event.new_round_number
+
+        elif isinstance(event, TurnAssigned):
+            current_round = event.round_number
+
+        elif isinstance(event, ReasoningCaptured):
+            reasoning.append(
+                ReasoningEntry(
+                    message_id=event.event_id,
+                    sender_agent_id=event.agent_id,
+                    text=event.reasoning_text,
+                    timestamp=event.timestamp,
+                    turn_number=total_messages,
+                    round_number=current_round,
+                    channel_ids=[],
+                )
+            )
 
         elif isinstance(event, LLMResponseReceived):
             if event.text is not None and event.text.strip():
@@ -198,7 +219,13 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     if timestamp is None:
         raise ValueError(f"No SimulationStarted event found in {log_path}")
     if status is None:
-        status = RunStatus.IN_PROGRESS
+        run_dir = log_path.parent
+        manifest = read_manifest(run_dir=run_dir)
+        if manifest is not None:
+            status = RunStatus.IN_PROGRESS
+        else:
+            delete_manifest(run_dir=run_dir)
+            status = RunStatus.ERROR
 
     report_path = log_path.with_name(f"{scenario_name}_report.json")
     evaluation = await _load_evaluation_report(report_path=report_path)
@@ -210,6 +237,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         run_id=run_id,
         scenario_name=scenario_name,
         scenario_description=scenario_description,
+        scenario_config=scenario_config,
         timestamp=timestamp,
         total_messages=total_messages,
         status=status,

@@ -97,7 +97,7 @@ class AutonomousSupervisor:
     ) -> None:
         """Wait until the MCP server is accepting connections or detect startup failure."""
         max_attempts = 10
-        for attempt in range(max_attempts):
+        for _attempt in range(max_attempts):
             if mcp_task.done():
                 if mcp_task.cancelled():
                     raise RuntimeError("MCP server task was cancelled during startup")

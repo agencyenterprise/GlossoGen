@@ -21,29 +21,29 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 
 - `src/` — application source code
 - `src/schmidt/scenarios/<scenario_name>/` — one folder per scenario, containing:
-  - `README.md` — scenario documentation (agents, channels, tools, round injections, agent coordination, evaluation focus)
-  - `scenario.py` — scenario class definition (channels, timing config, tools, injections)
-  - `prompts/` — Jinja2 templates for all agent system prompts and injection messages
-- `src/schmidt/runtime/` — simulation runtime (MCP server + coordination):
+  - `README.md` — scenario documentation
+  - `scenario.py` — scenario class (channels, timing, tools, injections, turn logic)
+  - `prompts/` — Jinja2 templates for agent system prompts and injection messages
+  - `evaluation/` — scenario-specific evaluators (optional)
+- `src/schmidt/runtime/` — autonomous mode runtime (MCP server + coordination):
   - `simulation_state.py` — shared state: channels, sessions, locks, callbacks
   - `mcp_tools.py` — MCP tool definitions (check_messages, read_channel, send_message, etc.)
-  - `mcp_server.py` — starts FastMCP over Streamable HTTP as an asyncio task
+  - `mcp_server.py` — starts FastMCP over Streamable HTTP
   - `game_clock.py` — round progression, injection delivery, termination detection
   - `agent_session.py` — per-agent notification queue, reaction delay, idle tracking
-  - `activity_notification.py` — notification types (NewMessages, NewInfo, Done)
-  - `scenario_mcp_tool.py` — ScenarioMcpTool NamedTuple for scenario-specific tool registration
-- `src/schmidt/runners/` — agent runner implementations:
-  - `agent_runner_base.py` — abstract base class defining the interface for agent runners
-  - `claude_code_runner.py` — runner that executes agents via Claude Code with MCP tools; captures agent reasoning text (`TextBlock`) and emits `LLMResponseReceived` events to the event log
-- `src/schmidt/template_renderer.py` — shared Jinja2 `TemplateRenderer` used by scenarios and evaluators
-- `src/schmidt/autonomous_supervisor.py` — monitors agent activity and triggers round advancement
-- `src/schmidt/server/` — FastAPI web server exposing simulation data via REST
+  - `scenario_mcp_tool.py` — ScenarioMcpTool for scenario-specific tool registration
+- `src/schmidt/runners/` — autonomous mode agent runners:
+  - `agent_runner_base.py` — abstract base class for agent runners
+  - `claude_code_runner.py` — Claude Code agent runner via Agent SDK
+- `src/schmidt/autonomous_supervisor.py` — autonomous mode orchestrator
+- `src/schmidt/simulation_hub.py` — orchestrated mode turn-based orchestrator
+- `src/schmidt/agent_runner.py` — orchestrated mode per-agent turn execution
+- `src/schmidt/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
+- `src/schmidt/tools/` — orchestrated mode tool registry, executor, stores (notebook, document), built-in tools
+- `src/schmidt/evaluation/` — generic evaluators and evaluation infrastructure
+- `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
 - `linter/` — custom linting scripts
 - `frontend/` — Next.js web application
-  - `frontend/src/app/` — Next.js App Router pages
-  - `frontend/src/features/` — feature-based modules (runs, etc.)
-  - `frontend/src/shared/` — shared components, hooks, providers, and utilities
-  - `frontend/src/types/api.gen.ts` — auto-generated TypeScript types from the backend OpenAPI schema
 
 ### Prompt Templates
 
@@ -55,7 +55,7 @@ All prompts (agent system prompts, round injections) use Jinja2 templates stored
 
 - **Strict API schemas.** Never return raw dicts. Always define a Pydantic response model. Use enums for status-like fields.
 - **Non-optional when always set.** If a field is always populated, declare it as required, not `Optional`.
-- **Web server responses must be structured Pydantic models.** Every FastAPI endpoint must declare a `response_model` and return an instance of that model. Never return plain dicts, strings, or untyped JSON. Use enums instead of bare strings for any field with a fixed set of values (status codes, categories, verdicts, etc.).
+- **Web server responses must be structured Pydantic models.** Every FastAPI endpoint must declare a `response_model` and return an instance of that model. Never return plain dicts, strings, or untyped JSON.
 
 ### File & Module Organization
 
@@ -69,21 +69,21 @@ All prompts (agent system prompts, round injections) use Jinja2 templates stored
 - **No default parameter values.** All callers must pass all arguments explicitly. Refactor callers instead of adding defaults.
 - **Prefer async.** When both sync and async options exist (database, HTTP, file I/O), use the async variant.
 - **No `TYPE_CHECKING` or `from __future__ import annotations`.** Use direct imports. If there's a circular import, fix the cycle by restructuring.
-- **No string type annotations.** Never use quotes around type hints (e.g., `"asyncio.Queue[X]"`). All types must be referenced directly.
+- **No string type annotations.** Never use quotes around type hints.
 - **No inline ternary expressions.** Use `if`/`else` blocks instead of `x if condition else y`.
 - **Remove dead code aggressively.** Unused fields, stale imports, commented-out code — delete them.
-- **Always use `logger.exception` in except blocks.** Every `except` clause that handles an error must call `logger.exception(...)` so the full stacktrace is visible in logs. Never silently swallow exceptions or use `logger.error` without the traceback.
+- **Always use `logger.exception` in except blocks.** Every `except` clause that handles an error must call `logger.exception(...)` so the full stacktrace is visible in logs.
 
 ### LLM Output Parsing
 
-- **Always use output schemas to enforce structured LLM responses.** Never parse free text from LLM responses. Define a Pydantic model for the desired output shape, pass it to `generate_structured()`, and use the validated instance directly. Each caller defines its own output model tailored to its specific semantics.
+- **Always use output schemas to enforce structured LLM responses.** Never parse free text from LLM responses. Define a Pydantic model for the desired output shape, pass it to `generate_structured()`, and use the validated instance directly.
 
 ### Docstrings
 
-- **Every module needs a module-level docstring** describing what it defines (classes, protocols, functions).
+- **Every module needs a module-level docstring** describing what it defines.
 - **Every public class and important function needs a docstring.**
-- **Be factual only.** Describe what the code does, not assumptions about why. Never use subjective language like "makes things easier", "improves performance", "for convenience", "simplifies". State behavior, not benefits.
-- **Be concise.** One to three sentences for most docstrings. Avoid restating type hints or parameter names that are already self-documenting.
+- **Be factual only.** Describe what the code does, not assumptions about why. Never use subjective language.
+- **Be concise.** One to three sentences for most docstrings.
 
 ## Frontend
 
@@ -91,7 +91,7 @@ Stack: Next.js 16, React 19, TypeScript (strict), Tailwind CSS v4, TanStack Reac
 
 ### API Client & Type Safety
 
-All API calls must use the generated typed client from `@/shared/lib/api-client`. Raw `fetch()` is forbidden — this is enforced by an ESLint rule. The typed client provides compile-time validation of request paths, parameters, and response types.
+All API calls must use the generated typed client from `@/shared/lib/api-client`. Raw `fetch()` is forbidden — enforced by ESLint.
 
 To regenerate types after changing backend endpoints:
 
@@ -120,41 +120,72 @@ runs/{scenario_name}/{unix_timestamp}/
 └── {scenario_name}_stdout.log     # (pipe stdout here)
 ```
 
-### Agent Reasoning in the Event Log
-
-The JSONL event log contains `llm_response_received` events with agent reasoning text — the text the agent produces between tool calls. The `ClaudeCodeRunner` captures `TextBlock` content from `AssistantMessage` responses and emits these as events. The frontend displays reasoning entries inline in the chat timeline with reduced opacity and a "reasoning" label.
-
 ## Running Simulations
 
-Always run simulations as a background process, piping all output to a log file. This lets both the user and Claude monitor progress. The CLI auto-generates a timestamped subdirectory under `--runs-dir`.
+Two execution modes are available, selected via the `--mode` flag:
+
+- **`autonomous`** — Agents run as independent Claude Code processes connected via MCP. A game clock manages round progression. No centralized turn control.
+- **`orchestrated`** — A central hub assigns turns sequentially via direct LLM API calls. Supports multiple providers and checkpoint/resume.
+
+Always run simulations as a background process, piping all output to a log file.
+
+### Autonomous Mode
 
 ```bash
 set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> --model <model> --runs-dir ./runs \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
+    --mode autonomous --model <model> --runs-dir ./runs \
+    <scenario-specific flags> \
   > ./runs/<scenario>_stdout.log 2>&1 &
 ```
 
-The `incident_response` scenario requires a `--max-round-duration` flag:
+Autonomous-mode flags: `--mcp-port` (default: 8001), `--max-agent-turns` (default: 200).
+
+The `incident_response` scenario requires `--max-round-duration`:
 
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-    --model <model> --runs-dir ./runs \
-    --max-round-duration 300 \
+    --mode autonomous --model claude-sonnet-4-20250514 --runs-dir ./runs \
+    --max-round-duration 120 \
   > ./runs/incident_response_stdout.log 2>&1 &
 ```
 
-The `car_recall` scenario requires a `--knobs` flag pointing to a JSON file with scenario configuration. Two presets are provided in `src/schmidt/scenarios/car_recall/`:
+### Orchestrated Mode
 
-- `knobs_baseline.json` — 5 agents, 5 rounds, all knobs set to low
-- `knobs_high_pressure.json` — 5 agents, 3 rounds, high time/goal/regulator pressure
+Requires `--provider` to select the LLM backend.
+
+The `--provider` flag selects which LLM backend to use. Set the corresponding API key in `.env`:
+- `anthropic` — requires `ANTHROPIC_API_KEY`
+- `openai` — requires `OPENAI_API_KEY`. Optionally use `--reasoning-effort` (low/medium/high) for reasoning models.
+- `huggingface` — requires `HF_TOKEN`. Optionally use `--inference-provider` to route through a third-party backend.
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
+    --mode orchestrated --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
+    --max-turns-per-round 10 \
+  > ./runs/incident_response_stdout.log 2>&1 &
+```
+
+The `car_recall` scenario uses a `--knobs` flag:
 
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-    --model <model> --runs-dir ./runs \
+    --mode orchestrated --model <model> --provider <provider> --runs-dir ./runs \
     --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
+```
+
+The `product_launch` scenario also uses `--knobs`:
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
+    --mode orchestrated --model <model> --provider <provider> --runs-dir ./runs \
+    --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
+  > ./runs/product_launch_stdout.log 2>&1 &
 ```
 
 Check progress by reading the stdout log file or the JSONL event log.
@@ -164,28 +195,32 @@ Check progress by reading the stdout log file or the JSONL event log.
 When running simulations, evaluations, or any long-running background process, **always** follow this pattern:
 
 1. Launch the process in the background (with `run_in_background` or `&`)
-2. Immediately after launch, `sleep 30` then check the log file for progress (grep for round number, last line, or completion marker)
-3. Report a brief status update to the user (e.g. "Round 3/6, agents active")
+2. Immediately after launch, `sleep 30` then check the log file for progress
+3. Report a brief status update to the user
 4. Repeat: `sleep 30`, check, report — until the process completes
-5. Never use `while` loops or polling constructs — use sequential sleep/check/report cycles so the user sees updates between checks
+5. Never use `while` loops or polling constructs — use sequential sleep/check/report cycles
 
 ## Running Evaluations
 
-After a simulation completes, score the log with LLM-as-judge evaluators. Point `--run-dir` at the specific run directory. Run as a background process like simulations.
+After a simulation completes, score the log with LLM-as-judge evaluators. Evaluation uses `--provider` to select the LLM judge.
 
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
     --run-dir ./runs/<scenario>/<timestamp> \
     --evaluators <comma-separated evaluator names> \
-    --model <model> \
+    --model <model> --provider <provider> \
   > ./runs/<scenario>/<timestamp>/eval_stdout.log 2>&1 &
 ```
 
 Available evaluators per scenario:
 
-- **incident_response**: `secret_leak`, `instruction_adherence`, `cooperation`
-- **car_recall**: `secret_leak`, `instruction_adherence`, `cooperation`, `fact_surfacing`, `report_divergence`, `decision_correctness`
+Generic evaluators (available to all): `secret_leak`, `instruction_adherence`, `cooperation`, `communication_pattern`
+
+- **incident_response**: generic evaluators only
+- **car_recall**: generic + `fact_surfacing`, `report_divergence`, `decision_correctness`
+- **product_launch**: generic + `launch_outcome`, `emergent_behavior`, `information_integrity`, `coordination_efficiency`, `conflict_resolution`, `report_accuracy`
+- **persuasion_debate**: generic + `persuasion_accuracy`, `persuasion_dynamics`
 
 ## Destructive Actions
 

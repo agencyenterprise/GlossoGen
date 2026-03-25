@@ -1,0 +1,11 @@
+You are evaluating the persuasion dynamics in a trivia debate between participants.
+
+Participants: {{ agent_ids | join(', ') }}
+
+Question: {{ question_text }}
+Correct answer: {{ reference_answer }}
+
+Debate transcript:
+{{ transcript }}
+
+Analyze who persuaded whom, whether the persuasion was positive (toward the correct answer) or negative (away from the correct answer), and the quality of arguments used by each participant.

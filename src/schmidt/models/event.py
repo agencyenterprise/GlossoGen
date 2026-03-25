@@ -34,12 +34,13 @@ class EventBase(BaseModel):
 
 
 class SimulationStarted(EventBase):
-    """Emitted once when a simulation begins, recording the scenario and its channels."""
+    """Emitted once when a simulation begins, recording the scenario, channels, and config."""
 
     event_type: Literal["simulation_started"] = "simulation_started"
     scenario_name: str
     scenario_description: str
     channel_ids: list[str]
+    scenario_config: dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentRegistered(EventBase):
@@ -63,6 +64,15 @@ class AgentConnected(EventBase):
     agent_id: str
     role_name: str
     model: str
+
+
+class TurnAssigned(EventBase):
+    """Emitted when a turn is assigned to an agent in orchestrated mode."""
+
+    event_type: Literal["turn_assigned"] = "turn_assigned"
+    agent_id: str
+    turn_number: int
+    round_number: int
 
 
 class MessageSent(EventBase):
@@ -114,7 +124,7 @@ class LLMResponseReceived(EventBase):
 
 
 class RoundAdvanced(EventBase):
-    """Emitted when the game clock advances to a new round."""
+    """Emitted when the game clock advances to a new round in autonomous mode."""
 
     event_type: Literal["round_advanced"] = "round_advanced"
     new_round_number: int
@@ -130,6 +140,77 @@ class InjectionDelivered(EventBase):
     text: str
 
 
+class TurnPassed(EventBase):
+    """Emitted when an agent calls pass_turn to decline speaking on their turn."""
+
+    event_type: Literal["turn_passed"] = "turn_passed"
+    agent_id: str
+    reason: str
+
+
+class StateObservationSent(EventBase):
+    """Emitted when a filtered state observation is delivered to an agent."""
+
+    event_type: Literal["state_observation_sent"] = "state_observation_sent"
+    agent_id: str
+    round_number: int
+    observation: dict[str, Any]
+
+
+class AgentActionApplied(EventBase):
+    """Emitted when an agent's structured action is applied to the world state."""
+
+    event_type: Literal["agent_action_applied"] = "agent_action_applied"
+    agent_id: str
+    action_type: str
+    parameters: dict[str, Any]
+    outcome: dict[str, Any]
+
+
+class RoundStateAdvanced(EventBase):
+    """Emitted when the world state is advanced between rounds."""
+
+    event_type: Literal["round_state_advanced"] = "round_state_advanced"
+    round_number: int
+    transition_report: dict[str, Any]
+
+
+class GroundTruthSnapshot(EventBase):
+    """Emitted after a round transition to capture the full unfiltered world state."""
+
+    event_type: Literal["ground_truth_snapshot"] = "ground_truth_snapshot"
+    round_number: int
+    state: dict[str, Any]
+
+
+class NotebookEntryWritten(EventBase):
+    """Emitted when an agent writes an entry to their private notebook."""
+
+    event_type: Literal["notebook_entry_written"] = "notebook_entry_written"
+    agent_id: str
+    round_number: int
+    entry_text: str
+
+
+class SharedDocumentEdited(EventBase):
+    """Emitted when an agent writes to a shared document."""
+
+    event_type: Literal["shared_document_edited"] = "shared_document_edited"
+    agent_id: str
+    round_number: int
+    document_id: str
+    content: str
+
+
+class ReasoningCaptured(EventBase):
+    """Emitted when an agent's private reasoning is elicited before their action phase."""
+
+    event_type: Literal["reasoning_captured"] = "reasoning_captured"
+    agent_id: str
+    round_number: int
+    reasoning_text: str
+
+
 class RunStatus(str, Enum):
     """Why the simulation ended."""
 
@@ -138,14 +219,31 @@ class RunStatus(str, Enum):
     ERROR = "error"
 
 
+class CheckpointSaved(EventBase):
+    """Emitted at each turn boundary to capture the full scenario state for resume.
+
+    Contains the turn/round counters, the scenario's serialized turn-scheduling
+    state, and (for stateful scenarios) the world state. Used by the ``--resume``
+    CLI flag to reconstruct a simulation after an error.
+    """
+
+    event_type: Literal["checkpoint_saved"] = "checkpoint_saved"
+    turn_number: int
+    round_number: int
+    last_turn_passed: bool
+    scenario_state: dict[str, Any]
+    last_injected_rounds: dict[str, int]
+
+
 class SimulationEnded(EventBase):
     """Emitted once when the simulation finishes, recording the
-    termination reason and message count.
+    termination reason, message count, and turn count.
     """
 
     event_type: Literal["simulation_ended"] = "simulation_ended"
     reason: RunStatus
     total_messages: int
+    total_turns: int = 0
 
 
 SimulationEvent = Annotated[
@@ -153,6 +251,7 @@ SimulationEvent = Annotated[
         SimulationStarted,
         AgentRegistered,
         AgentConnected,
+        TurnAssigned,
         MessageSent,
         ToolCalled,
         ToolResultReturned,
@@ -160,6 +259,15 @@ SimulationEvent = Annotated[
         LLMResponseReceived,
         RoundAdvanced,
         InjectionDelivered,
+        TurnPassed,
+        StateObservationSent,
+        AgentActionApplied,
+        RoundStateAdvanced,
+        GroundTruthSnapshot,
+        NotebookEntryWritten,
+        SharedDocumentEdited,
+        ReasoningCaptured,
+        CheckpointSaved,
         SimulationEnded,
     ],
     Discriminator("event_type"),

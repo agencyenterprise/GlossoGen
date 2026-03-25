@@ -77,6 +77,10 @@ export function useEventStream(
     knownIdsRef.current = knownEventIds;
   }, [knownEventIds]);
 
+  // Refs for values accessed inside event listener closures
+  const totalMessagesRef = useRef(0);
+  const currentRoundRef = useRef(0);
+
   // Buffer for batching token deltas via requestAnimationFrame
   const pendingDeltasRef = useRef<Map<string, string>>(new Map());
   const rafIdRef = useRef<number | null>(null);
@@ -157,6 +161,14 @@ export function useEventStream(
     eventSource.addEventListener("round_advanced", (e: MessageEvent) => {
       const data: SSERoundAdvanced = JSON.parse(e.data);
       if (knownIdsRef.current.has(data.event_id)) return;
+      currentRoundRef.current = data.round_number;
+      setCurrentRound(data.round_number);
+    });
+
+    eventSource.addEventListener("turn_assigned", (e: MessageEvent) => {
+      const data = JSON.parse(e.data);
+      if (knownIdsRef.current.has(data.event_id)) return;
+      currentRoundRef.current = data.round_number;
       setCurrentRound(data.round_number);
     });
 
@@ -170,10 +182,11 @@ export function useEventStream(
         sender_agent_id: msg.sender_agent_id,
         text: msg.text,
         timestamp: msg.timestamp,
-        turn_number: 0,
-        round_number: 0,
+        turn_number: totalMessagesRef.current,
+        round_number: currentRoundRef.current,
       };
       setMessages(prev => [...prev, channelMessage]);
+      totalMessagesRef.current += 1;
       setTotalMessages(prev => prev + 1);
 
       // Clear partial text and message preview for this agent
@@ -204,8 +217,8 @@ export function useEventStream(
           sender_agent_id: data.agent_id,
           text: data.text,
           timestamp: data.timestamp,
-          turn_number: 0,
-          round_number: 0,
+          turn_number: totalMessagesRef.current,
+          round_number: currentRoundRef.current,
           channel_ids: [],
         };
         setReasoning(prev => [...prev, entry]);

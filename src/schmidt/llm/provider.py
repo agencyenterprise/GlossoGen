@@ -5,6 +5,7 @@ implementations must conform to.
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
 
 from pydantic import BaseModel
@@ -39,8 +40,10 @@ class LLMResponse(BaseModel):
 class LLMProvider(ABC):
     """Abstract interface for LLM providers.
 
-    Concrete subclasses implement ``generate`` for free-form LLM calls and
-    ``generate_structured`` for calls that must return a validated Pydantic model.
+    Concrete subclasses implement ``generate`` for free-form LLM calls,
+    ``generate_streaming`` for streaming responses with token and tool-arg
+    callbacks, and ``generate_structured`` for calls that must return a
+    validated Pydantic model.
     """
 
     @abstractmethod
@@ -50,6 +53,7 @@ class LLMProvider(ABC):
         messages: list[LLMMessage],
         tools: list[ToolSpec],
         force_tool_use: bool,
+        max_tokens: int,
     ) -> LLMResponse:
         """Send a conversation to the LLM and return its response.
 
@@ -58,6 +62,7 @@ class LLMProvider(ABC):
             messages: The conversation history as a list of messages.
             tools: Tool specifications the model may invoke.
             force_tool_use: When True, the model must call at least one tool.
+            max_tokens: Maximum number of tokens the model may generate.
 
         Returns:
             The model's response including text, tool calls, and usage data.
@@ -84,5 +89,37 @@ class LLMProvider(ABC):
 
         Returns:
             A validated instance of the output_schema.
+        """
+        ...
+
+    @abstractmethod
+    async def generate_streaming(
+        self,
+        system_prompt: str,
+        messages: list[LLMMessage],
+        tools: list[ToolSpec],
+        force_tool_use: bool,
+        max_tokens: int,
+        on_token: Callable[[str], Awaitable[None]],
+        on_tool_arg_delta: Callable[[int, str, str, str], Awaitable[None]],
+    ) -> LLMResponse:
+        """Send a conversation to the LLM with token-level streaming.
+
+        Behaves identically to ``generate`` but calls ``on_token`` with each
+        text chunk as it arrives from the provider, and ``on_tool_arg_delta``
+        for each tool argument JSON fragment.
+
+        Args:
+            system_prompt: The system-level instruction for the model.
+            messages: The conversation history as a list of messages.
+            tools: Tool specifications the model may invoke.
+            force_tool_use: When True, the model must call at least one tool.
+            max_tokens: Maximum number of tokens the model may generate.
+            on_token: Async callback invoked with each text delta as it arrives.
+            on_tool_arg_delta: Async callback invoked with (block_index, tool_name,
+                arg_chunk, accumulated_json) for each tool argument JSON fragment.
+
+        Returns:
+            The model's complete response including text, tool calls, and usage.
         """
         ...

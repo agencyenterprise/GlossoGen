@@ -8,7 +8,6 @@ from subscriber queues to stream events over SSE to external consumers.
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -65,25 +64,7 @@ class EventBus:
             self._subscribers.remove(queue)
             logger.debug("Subscriber removed, %d subscribers remaining", len(self._subscribers))
 
-    async def subscribe(self) -> AsyncGenerator[dict[str, object], None]:
-        """Yield events as they are published.
-
-        Creates a dedicated queue for this subscriber and removes it on exit.
-        """
-        queue = self.create_subscriber_queue()
-        try:
-            while True:
-                event = await queue.get()
-                yield event
-        finally:
-            self.remove_subscriber_queue(queue=queue)
-
     def next_event_seq(self) -> int:
         """Return a monotonically increasing sequence number for SSE frame IDs."""
         self._event_seq += 1
         return self._event_seq
-
-    @property
-    def subscriber_count(self) -> int:
-        """Number of currently active subscribers."""
-        return len(self._subscribers)

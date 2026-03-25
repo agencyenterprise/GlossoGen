@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Literal, Union
+from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, Discriminator
 
@@ -28,6 +28,7 @@ class RunSummary(BaseModel):
     run_id: str
     scenario_name: str
     scenario_description: str
+    scenario_config: dict[str, Any]
     timestamp: datetime
     total_messages: int
     status: RunStatus
@@ -112,6 +113,7 @@ class RunDetailResponse(BaseModel):
     run_id: str
     scenario_name: str
     scenario_description: str
+    scenario_config: dict[str, Any]
     timestamp: datetime
     total_messages: int
     status: RunStatus
@@ -148,6 +150,7 @@ class SSESimulationStarted(BaseModel):
     scenario_name: str
     scenario_description: str
     channel_ids: list[str]
+    scenario_config: dict[str, Any]
 
 
 class SSEAgentRegistered(BaseModel):
@@ -171,6 +174,17 @@ class SSEAgentConnected(BaseModel):
     event_id: str
     timestamp: datetime
     agent_id: str
+
+
+class SSETurnAssigned(BaseModel):
+    """SSE event emitted when a turn is assigned to an agent."""
+
+    event_type: Literal["turn_assigned"]
+    event_id: str
+    timestamp: datetime
+    agent_id: str
+    turn_number: int
+    round_number: int
 
 
 class SSEMessageSent(BaseModel):
@@ -221,10 +235,15 @@ class SSESimulationEnded(BaseModel):
     timestamp: datetime
     reason: RunStatus
     total_messages: int
+    total_turns: int
 
 
 class SSETokenDelta(BaseModel):
-    """SSE event emitted token-by-token during LLM response streaming."""
+    """SSE event emitted token-by-token during LLM response streaming.
+
+    Transient — not persisted to JSONL. The complete text arrives in a
+    subsequent SSELLMResponseReceived event.
+    """
 
     event_type: Literal["token_delta"]
     agent_id: str
@@ -233,7 +252,11 @@ class SSETokenDelta(BaseModel):
 
 
 class SSEMessagePreview(BaseModel):
-    """SSE event for in-progress send_message text preview."""
+    """SSE event for in-progress send_message text preview.
+
+    Transient — not persisted to JSONL. The complete message arrives in a
+    subsequent SSEMessageSent event.
+    """
 
     event_type: Literal["message_preview"]
     agent_id: str
@@ -257,6 +280,7 @@ SSEEvent = Annotated[
         SSESimulationStarted,
         SSEAgentRegistered,
         SSEAgentConnected,
+        SSETurnAssigned,
         SSEMessageSent,
         SSELLMResponseReceived,
         SSERoundAdvanced,

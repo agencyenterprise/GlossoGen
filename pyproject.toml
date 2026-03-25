@@ -17,6 +17,10 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
     "mcp>=1.0.0",
     "claude-agent-sdk>=0.1.0; sys_platform == 'darwin'",
+    "openai>=2.29.0",
+    "datasets>=3.0.0",
+    "httpx>=0.28.1",
+    "huggingface_hub>=0.25.0",
 ]
 
 [dependency-groups]
@@ -71,6 +75,7 @@ typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"
 extraPaths = ["src"]
+ignore = ["vulture_whitelist.py"]
 
 [tool.vulture]
 min_confidence = 80
