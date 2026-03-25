@@ -64,7 +64,8 @@ export function useEventStream(
   enabled: boolean,
   knownEventIds: Set<string>,
   initialAgentTurns: Map<string, number>,
-  initialAgentRounds: Map<string, number>
+  initialAgentRounds: Map<string, number>,
+  initialMessageCount: number
 ): EventStreamState {
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [reasoning, setReasoning] = useState<ReasoningEntry[]>([]);
@@ -86,13 +87,17 @@ export function useEventStream(
   // still get correct turn/round numbers.
   const agentTurnRef = useRef<Map<string, number>>(new Map());
   const agentRoundRef = useRef<Map<string, number>>(new Map());
+  // Global message counter — fallback turn_number for autonomous mode
+  // (where no turn_assigned events exist).
+  const messageCounterRef = useRef(0);
   const knownIdsRef = useRef(knownEventIds);
   useEffect(() => {
     knownIdsRef.current = knownEventIds;
   }, [knownEventIds]);
 
-  // Seed turn/round refs and state from REST data
+  // Seed turn/round refs and message counter from REST data
   useEffect(() => {
+    messageCounterRef.current = initialMessageCount;
     if (initialAgentTurns.size > 0) {
       for (const [id, turn] of initialAgentTurns) {
         agentTurnRef.current.set(id, turn);
@@ -105,7 +110,7 @@ export function useEventStream(
       }
       setAgentRounds(new Map(agentRoundRef.current));
     }
-  }, [initialAgentTurns, initialAgentRounds]);
+  }, [initialAgentTurns, initialAgentRounds, initialMessageCount]);
 
   // Buffer for batching token deltas via requestAnimationFrame
   const pendingDeltasRef = useRef<Map<string, string>>(new Map());
@@ -145,6 +150,7 @@ export function useEventStream(
     setDebugLogs([]);
     agentTurnRef.current = new Map();
     agentRoundRef.current = new Map();
+    messageCounterRef.current = 0;
     pendingDeltasRef.current = new Map();
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
@@ -221,13 +227,16 @@ export function useEventStream(
         agentRoundRef.current.set(msg.sender_agent_id, 1);
       }
 
+      // Increment global counter (used as fallback turn_number in autonomous mode)
+      messageCounterRef.current += 1;
+
       const channelMessage: ChannelMessage = {
         message_id: msg.message_id,
         channel_id: msg.channel_id,
         sender_agent_id: msg.sender_agent_id,
         text: msg.text,
         timestamp: msg.timestamp,
-        turn_number: agentTurnRef.current.get(msg.sender_agent_id) ?? 0,
+        turn_number: agentTurnRef.current.get(msg.sender_agent_id) ?? messageCounterRef.current,
         round_number: agentRoundRef.current.get(msg.sender_agent_id) ?? 0,
       };
       setMessages(prev => [...prev, channelMessage]);
@@ -256,12 +265,13 @@ export function useEventStream(
       const data: SSELLMResponseReceived = JSON.parse(e.data);
       if (knownIdsRef.current.has(data.event_id)) return;
       if (data.text != null && data.text.trim() !== "") {
+        messageCounterRef.current += 1;
         const entry: ReasoningEntry = {
           message_id: data.event_id,
           sender_agent_id: data.agent_id,
           text: data.text,
           timestamp: data.timestamp,
-          turn_number: agentTurnRef.current.get(data.agent_id) ?? 0,
+          turn_number: agentTurnRef.current.get(data.agent_id) ?? messageCounterRef.current,
           round_number: agentRoundRef.current.get(data.agent_id) ?? 0,
           channel_ids: [],
         };

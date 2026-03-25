@@ -104,12 +104,14 @@ export function RunDetail({ runId }: { runId: string }) {
 
   // SSE streaming for in-progress runs
   const sseEnabled = restData?.status === "in_progress";
+  const initialMessageCount = restData?.messages.length ?? 0;
   const sse = useEventStream(
     runId,
     sseEnabled,
     knownEventIds,
     initialAgentTurns,
-    initialAgentRounds
+    initialAgentRounds,
+    initialMessageCount
   );
 
   // When SSE reports simulation ended, refetch REST for evaluation + debug logs
