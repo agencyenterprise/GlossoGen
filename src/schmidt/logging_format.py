@@ -6,6 +6,7 @@ frontend can display them in real time via SSE.
 """
 
 import logging
+import traceback
 from datetime import UTC, datetime
 
 import orjson
@@ -18,12 +19,16 @@ class JsonLineFormatter(logging.Formatter):
     """Formats log records as single-line JSON objects."""
 
     def format(self, record: logging.LogRecord) -> str:
-        """Serialize a log record to a JSON line."""
+        """Serialize a log record to a JSON line, including exception tracebacks."""
+        message = record.getMessage()
+        if record.exc_info and record.exc_info[1] is not None:
+            tb_lines = traceback.format_exception(*record.exc_info)
+            message = message + "\n" + "".join(tb_lines).rstrip()
         entry = {
             "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "logger": record.name,
             "level": record.levelname,
-            "message": record.getMessage(),
+            "message": message,
         }
         return orjson.dumps(entry).decode("utf-8")
 

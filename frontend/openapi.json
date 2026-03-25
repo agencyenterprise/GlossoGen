@@ -128,6 +128,9 @@
                       "$ref": "#/components/schemas/SSEAgentConnected"
                     },
                     {
+                      "$ref": "#/components/schemas/SSETurnAssigned"
+                    },
+                    {
                       "$ref": "#/components/schemas/SSEMessageSent"
                     },
                     {
@@ -158,6 +161,7 @@
                       "simulation_started": "#/components/schemas/SSESimulationStarted",
                       "agent_registered": "#/components/schemas/SSEAgentRegistered",
                       "agent_connected": "#/components/schemas/SSEAgentConnected",
+                      "turn_assigned": "#/components/schemas/SSETurnAssigned",
                       "message_sent": "#/components/schemas/SSEMessageSent",
                       "llm_response_received": "#/components/schemas/SSELLMResponseReceived",
                       "round_advanced": "#/components/schemas/SSERoundAdvanced",
@@ -479,6 +483,11 @@
             "type": "string",
             "title": "Scenario Description"
           },
+          "scenario_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scenario Config"
+          },
           "timestamp": {
             "type": "string",
             "format": "date-time",
@@ -542,6 +551,7 @@
           "run_id",
           "scenario_name",
           "scenario_description",
+          "scenario_config",
           "timestamp",
           "total_messages",
           "status",
@@ -596,6 +606,11 @@
             "type": "string",
             "title": "Scenario Description"
           },
+          "scenario_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scenario Config"
+          },
           "timestamp": {
             "type": "string",
             "format": "date-time",
@@ -622,6 +637,7 @@
           "run_id",
           "scenario_name",
           "scenario_description",
+          "scenario_config",
           "timestamp",
           "total_messages",
           "status",
@@ -876,7 +892,7 @@
           "is_final"
         ],
         "title": "SSEMessagePreview",
-        "description": "SSE event for in-progress send_message text preview."
+        "description": "SSE event for in-progress send_message text preview.\n\nTransient \u2014 not persisted to JSONL. The complete message arrives in a\nsubsequent SSEMessageSent event."
       },
       "SSEMessageSent": {
         "properties": {
@@ -966,6 +982,10 @@
           "total_messages": {
             "type": "integer",
             "title": "Total Messages"
+          },
+          "total_turns": {
+            "type": "integer",
+            "title": "Total Turns"
           }
         },
         "type": "object",
@@ -974,7 +994,8 @@
           "event_id",
           "timestamp",
           "reason",
-          "total_messages"
+          "total_messages",
+          "total_turns"
         ],
         "title": "SSESimulationEnded",
         "description": "SSE event emitted once when the simulation finishes."
@@ -1044,6 +1065,11 @@
             },
             "type": "array",
             "title": "Channel Ids"
+          },
+          "scenario_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scenario Config"
           }
         },
         "type": "object",
@@ -1053,7 +1079,8 @@
           "timestamp",
           "scenario_name",
           "scenario_description",
-          "channel_ids"
+          "channel_ids",
+          "scenario_config"
         ],
         "title": "SSESimulationStarted",
         "description": "SSE event emitted once when a simulation begins."
@@ -1086,7 +1113,48 @@
           "is_final"
         ],
         "title": "SSETokenDelta",
-        "description": "SSE event emitted token-by-token during LLM response streaming."
+        "description": "SSE event emitted token-by-token during LLM response streaming.\n\nTransient \u2014 not persisted to JSONL. The complete text arrives in a\nsubsequent SSELLMResponseReceived event."
+      },
+      "SSETurnAssigned": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "turn_assigned",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "turn_number": {
+            "type": "integer",
+            "title": "Turn Number"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "agent_id",
+          "turn_number",
+          "round_number"
+        ],
+        "title": "SSETurnAssigned",
+        "description": "SSE event emitted when a turn is assigned to an agent."
       },
       "ValidationError": {
         "properties": {

@@ -2,7 +2,7 @@
 
 Defines the ``schmidt`` CLI with three subcommands:
 
-* ``run``      -- load and execute a simulation scenario with autonomous agents
+* ``run``      -- load and execute a simulation scenario in autonomous or orchestrated mode
 * ``evaluate`` -- score a previously-generated simulation log
 * ``serve``    -- start the FastAPI web server
 """
@@ -13,24 +13,30 @@ import logging
 import os
 import time
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 
 from schmidt.autonomous_supervisor import AutonomousSupervisor
+from schmidt.checkpoint_loader import ResumeState, build_resume_state
+from schmidt.evaluation.log_reader import load_events
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
+from schmidt.llm.provider_factory import create_provider
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.runners.claude_code_runner import ClaudeCodeRunner
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios import SCENARIO_REGISTRY
+from schmidt.simulation_hub import SimulationHub
 from schmidt.simulation_server import start_simulation_server, stop_simulation_server
+from schmidt.tools.tool_registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
+EVENT_BUS_MAX_QUEUE_SIZE = 1000
 DEFAULT_MCP_PORT = 8001
 DEFAULT_MAX_AGENT_TURNS = 200
-EVENT_BUS_MAX_QUEUE_SIZE = 1000
 
 
 def _build_parsers() -> tuple[
@@ -48,8 +54,9 @@ def _build_parsers() -> tuple[
     parser = argparse.ArgumentParser(prog="schmidt")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    run_parser = subparsers.add_parser("run", help="Run a simulation scenario")
     scenario_names = sorted(SCENARIO_REGISTRY.keys())
+
+    run_parser = subparsers.add_parser("run", help="Run a simulation scenario")
     run_parser.add_argument(
         "scenario_name", type=str, choices=scenario_names, help="Name of the scenario to run"
     )
@@ -59,18 +66,50 @@ def _build_parsers() -> tuple[
         required=True,
         help="Root directory for runs (output goes to runs-dir/scenario/timestamp/)",
     )
-    run_parser.add_argument("--model", type=str, required=True, help="Claude model to use")
+    run_parser.add_argument("--model", type=str, required=True, help="LLM model identifier")
+    run_parser.add_argument(
+        "--mode",
+        type=str,
+        required=True,
+        choices=["autonomous", "orchestrated"],
+        help="Execution mode: autonomous (MCP-based) or orchestrated (turn-based)",
+    )
+
+    # Autonomous mode flags
     run_parser.add_argument(
         "--mcp-port",
         type=int,
         default=DEFAULT_MCP_PORT,
-        help=f"Port for the MCP server (default: {DEFAULT_MCP_PORT})",
+        help=f"Port for the MCP server (autonomous mode, default: {DEFAULT_MCP_PORT})",
     )
     run_parser.add_argument(
         "--max-agent-turns",
         type=int,
         default=DEFAULT_MAX_AGENT_TURNS,
-        help=f"Maximum agentic turns per agent (default: {DEFAULT_MAX_AGENT_TURNS})",
+        help=f"Max agentic turns per agent (autonomous, default: {DEFAULT_MAX_AGENT_TURNS})",
+    )
+
+    # Orchestrated mode flags
+    run_parser.add_argument(
+        "--provider",
+        type=str,
+        help="LLM provider to use (required for orchestrated mode and evaluation)",
+    )
+    run_parser.add_argument(
+        "--inference-provider",
+        type=str,
+        help="HuggingFace inference provider backend (e.g. together, fireworks-ai, cerebras)",
+    )
+    run_parser.add_argument(
+        "--reasoning-effort",
+        type=str,
+        choices=["low", "medium", "high"],
+        help="Reasoning effort level for OpenAI reasoning models (low/medium/high)",
+    )
+    run_parser.add_argument(
+        "--resume",
+        type=str,
+        help="Path to an existing run directory to resume from (orchestrated mode only)",
     )
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a simulation log")
@@ -89,7 +128,24 @@ def _build_parsers() -> tuple[
     evaluate_parser.add_argument(
         "--evaluators", type=str, required=True, help="Comma-separated evaluator names"
     )
-    evaluate_parser.add_argument("--model", type=str, required=True, help="Claude model to use")
+    evaluate_parser.add_argument("--model", type=str, required=True, help="LLM model identifier")
+    evaluate_parser.add_argument(
+        "--provider",
+        type=str,
+        required=True,
+        help="LLM provider to use",
+    )
+    evaluate_parser.add_argument(
+        "--inference-provider",
+        type=str,
+        help="HuggingFace inference provider backend (e.g. together, fireworks-ai, cerebras)",
+    )
+    evaluate_parser.add_argument(
+        "--reasoning-effort",
+        type=str,
+        choices=["low", "medium", "high"],
+        help="Reasoning effort level for OpenAI reasoning models (low/medium/high)",
+    )
 
     serve_parser = subparsers.add_parser("serve", help="Start the web server")
     serve_parser.add_argument(
@@ -144,11 +200,55 @@ def _compute_run_dir(runs_dir: Path, scenario_name: str) -> Path:
     return runs_dir / scenario_name / str(unix_ts)
 
 
+def _setup_logging(
+    run_dir: Path,
+    scenario_name: str,
+    event_bus: EventBus,
+) -> tuple[logging.FileHandler, EventBusLogHandler]:
+    """Set up JSON debug log file and EventBus log handler for frontend display.
+
+    Returns the two handlers so they can be removed during teardown.
+    """
+    debug_log_path = run_dir / f"{scenario_name}_debug.jsonl"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    json_handler = logging.FileHandler(debug_log_path)
+    json_handler.setFormatter(JsonLineFormatter())
+    logging.getLogger().addHandler(json_handler)
+
+    bus_log_handler = EventBusLogHandler(event_bus=event_bus)
+    logging.getLogger().addHandler(bus_log_handler)
+
+    return json_handler, bus_log_handler
+
+
+def _teardown_logging(
+    json_handler: logging.FileHandler,
+    bus_log_handler: EventBusLogHandler,
+) -> None:
+    """Remove and close log handlers added during setup."""
+    logging.getLogger().removeHandler(json_handler)
+    json_handler.close()
+    logging.getLogger().removeHandler(bus_log_handler)
+
+
 async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
 ) -> None:
+    """Dispatch to the autonomous or orchestrated simulation runner based on --mode."""
+    mode = args.mode
+    if mode == "autonomous":
+        await _run_autonomous(args=args, scenario=scenario)
+    else:
+        await _run_orchestrated(args=args, scenario=scenario)
+
+
+async def _run_autonomous(
+    args: argparse.Namespace,
+    scenario: SimulationScenario,
+) -> None:
     """Wire up the autonomous supervisor, start the streaming server, and execute."""
+
     runs_dir = Path(args.runs_dir)
     run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
     agents = scenario.get_agents(default_model=args.model)
@@ -170,25 +270,20 @@ async def _run_simulation(
         ),
     )
 
-    # Add JSON debug log file and EventBus log handler for frontend display.
-    debug_log_path = run_dir / f"{scenario.name()}_debug.jsonl"
-    run_dir.mkdir(parents=True, exist_ok=True)
-    json_handler = logging.FileHandler(debug_log_path)
-    json_handler.setFormatter(JsonLineFormatter())
-    logging.getLogger().addHandler(json_handler)
-
-    bus_log_handler = EventBusLogHandler(event_bus=event_bus)
-    logging.getLogger().addHandler(bus_log_handler)
+    json_handler, bus_log_handler = _setup_logging(
+        run_dir=run_dir,
+        scenario_name=scenario.name(),
+        event_bus=event_bus,
+    )
 
     run_id = f"{scenario.name()}_{run_dir.name}"
 
-    logger.info("Running scenario: %s", scenario.name())
+    logger.info("Running scenario: %s (autonomous mode)", scenario.name())
     logger.info("Model: %s", args.model)
     logger.info("MCP port: %d, max agent turns: %d", args.mcp_port, max_turns)
     logger.info("Run directory: %s", run_dir)
     logger.info("Log: %s", log_path)
 
-    # Start the embedded streaming server
     server, port = await start_simulation_server(
         event_bus=event_bus,
         run_dir=run_dir,
@@ -199,12 +294,121 @@ async def _run_simulation(
     try:
         await supervisor.run()
     finally:
-        logging.getLogger().removeHandler(json_handler)
-        json_handler.close()
-        logging.getLogger().removeHandler(bus_log_handler)
+        _teardown_logging(json_handler=json_handler, bus_log_handler=bus_log_handler)
         await stop_simulation_server(server=server, run_dir=run_dir)
 
     logger.info("Simulation complete. Run directory: %s", run_dir)
+
+
+async def _run_orchestrated(
+    args: argparse.Namespace,
+    scenario: SimulationScenario,
+) -> None:
+    """Wire up the orchestrated simulation hub, start the streaming server, and execute."""
+
+    if not args.provider:
+        raise SystemExit("--provider is required for orchestrated mode")
+
+    resume_dir: str | None = getattr(args, "resume", None)
+    resuming = resume_dir is not None
+
+    if resume_dir is not None:
+        run_dir = Path(resume_dir)
+    else:
+        runs_dir = Path(args.runs_dir)
+        run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
+
+    agents = scenario.get_agents(default_model=args.model)
+    agent_providers = _build_agent_providers(
+        agents=agents,
+        provider_name=args.provider,
+        inference_provider=args.inference_provider,
+        reasoning_effort=getattr(args, "reasoning_effort", None),
+    )
+    registry = ToolRegistry()
+
+    log_path = run_dir / f"{scenario.name()}.jsonl"
+    event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
+    event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
+
+    resume_state: ResumeState | None = None
+    if resuming:
+        logger.info("Loading checkpoint from %s", log_path)
+        events = await load_events(log_path=log_path)
+        resume_state = build_resume_state(events=events)
+        logger.info(
+            "Checkpoint loaded: resuming from turn %d, round %d",
+            resume_state.turn_number,
+            resume_state.round_number,
+        )
+
+    hub = SimulationHub(
+        scenario=scenario,
+        agents=agents,
+        agent_providers=agent_providers,
+        tool_registry=registry,
+        event_logger=event_logger,
+        resume_state=resume_state,
+        event_bus=event_bus,
+    )
+
+    json_handler, bus_log_handler = _setup_logging(
+        run_dir=run_dir,
+        scenario_name=scenario.name(),
+        event_bus=event_bus,
+    )
+
+    run_id = f"{scenario.name()}_{run_dir.name}"
+
+    logger.info("Running scenario: %s (orchestrated mode)", scenario.name())
+    logger.info("Model: %s", args.model)
+    logger.info("Run directory: %s", run_dir)
+    logger.info("Log: %s", log_path)
+    if resuming:
+        logger.info("RESUMING from checkpoint in %s", run_dir)
+
+    server, port = await start_simulation_server(
+        event_bus=event_bus,
+        run_dir=run_dir,
+        run_id=run_id,
+    )
+    logger.info("Streaming server started on port %d", port)
+
+    try:
+        await hub.run()
+    finally:
+        _teardown_logging(json_handler=json_handler, bus_log_handler=bus_log_handler)
+        await stop_simulation_server(server=server, run_dir=run_dir)
+
+    logger.info("Simulation complete. Run directory: %s", run_dir)
+
+
+def _build_agent_providers(
+    agents: list[Any],
+    provider_name: str,
+    inference_provider: str | None,
+    reasoning_effort: str | None,
+) -> dict[str, Any]:
+    """Build a per-agent LLM provider mapping.
+
+    Providers are deduped so agents sharing the same model share the same
+    provider instance.
+    """
+
+    providers_by_model: dict[str, Any] = {}
+    agent_providers: dict[str, Any] = {}
+
+    for agent in agents:
+        if agent.model not in providers_by_model:
+            providers_by_model[agent.model] = create_provider(
+                provider_name=provider_name,
+                model=agent.model,
+                inference_provider=inference_provider,
+                reasoning_effort=reasoning_effort,
+            )
+        agent_providers[agent.agent_id] = providers_by_model[agent.model]
+
+    return agent_providers
 
 
 async def _run_evaluation(
@@ -223,6 +427,9 @@ async def _run_evaluation(
         evaluator_names=evaluator_names,
         report_path=report_path,
         model=args.model,
+        provider_name=args.provider,
+        inference_provider=args.inference_provider,
+        reasoning_effort=getattr(args, "reasoning_effort", None),
     )
 
     logger.info("Evaluation complete. Report written to %s", report_path)

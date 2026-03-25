@@ -1,13 +1,18 @@
 # Schmidt-POC Architecture
 
-A platform for testing agent communication through real-life simulations. Autonomous LLM-based agents interact via MCP tools exposed by a central runtime, coordinating through communication channels while a game clock manages round progression and injection delivery. Agents are external processes (Claude Code instances launched via the Agent SDK) that connect to a shared MCP server. A web UI exposes simulation runs and evaluation results through a FastAPI backend and Next.js frontend.
+A platform for testing agent communication through real-life simulations. Two execution modes are supported:
+
+- **Autonomous mode** — LLM-based agents interact via MCP tools exposed by a central runtime. Agents are external processes (Claude Code instances launched via the Agent SDK) that connect to a shared MCP server. A game clock manages round progression and injection delivery. No centralized turn control.
+- **Orchestrated mode** — A central SimulationHub assigns turns sequentially, calling LLM providers directly (Anthropic, OpenAI, HuggingFace). Supports checkpoint/resume for crash recovery.
+
+A web UI exposes simulation runs and evaluation results through a FastAPI backend and Next.js frontend. Both modes produce the same JSONL event log format and are displayed identically in the frontend.
 
 ## Design Decisions
 
 
 | Decision            | Choice                                                       |
 | ------------------- | ------------------------------------------------------------ |
-| LLM Backend         | Anthropic Claude (pluggable for future providers)            |
+| LLM Backend         | Autonomous: Claude Code (Agent SDK). Orchestrated: Anthropic, OpenAI, HuggingFace |
 | Transport           | MCP over Streamable HTTP (agents are external processes)     |
 | Scenario Definition | Python classes                                               |
 | Agent Autonomy      | Agents decide when to speak; no central turn controller      |
@@ -113,26 +118,42 @@ The ChannelRouter stores messages and validates membership.
 - The scenario provides per-agent display names via `get_agent_display_name(agent_id)`, used when rendering message history in `read_channel`.
 - The `send_message` MCP tool validates agent membership before appending a message to a channel.
 
+## Orchestrated Mode
+
+In orchestrated mode, the `SimulationHub` assigns turns sequentially using direct LLM API calls. This mode supports multiple providers (Anthropic, OpenAI, HuggingFace) and checkpoint/resume for crash recovery.
+
+1. **CLI** dispatches to `_run_orchestrated`, which builds per-agent LLM providers via `create_provider()`, creates a `ToolRegistry`, and passes everything to `SimulationHub`.
+2. **SimulationHub.run()** registers built-in tools (`send_message`, `pass_turn`, `think`, `write_notebook`, `read_notebook`, shared document tools), then calls `scenario.register_tools()` for scenario-specific tools. Spawns one `AgentRunner` coroutine per agent.
+3. **Turn loop**: Calls `scenario.decide_next_turn(state)` to get a `TurnDecision` (agent_id, round_number, excluded_tool_names, max_tokens). Wakes the target agent, waits for completion.
+4. **Agent turn**: The `AgentRunner` builds a prompt from channel history via `PromptBuilder`, calls `generate_streaming()` on the LLM provider, executes tool calls in a loop (max 10), and logs all events.
+5. **Round transitions**: For stateful scenarios (implementing `SimulationStateProtocol`), the hub calls `advance_round()`, logs `RoundStateAdvanced` and `GroundTruthSnapshot`, and delivers `StateObservationSent` to each agent.
+6. **Checkpoint/resume**: A `CheckpointSaved` event is written after each `TurnAssigned`. On resume (`--resume`), channel messages, notebook entries, shared documents, and scenario state are reconstructed from the JSONL log.
+
 ## Scenario Protocol
 
-The `SimulationScenario` ABC defines the contract for scenario plug-ins:
+The `SimulationScenario` ABC defines a unified contract for scenario plug-ins. Shared methods are abstract; mode-specific methods have default implementations that raise `NotImplementedError`.
 
+**Shared methods (required by all scenarios):**
 - `add_cli_arguments(parser)` — register scenario-specific CLI arguments
 - `create(args)` — construct a scenario instance from parsed CLI arguments
-- `name()` — unique identifier for this scenario
-- `scenario_description()` — markdown description of the scenario
-- `get_agents(default_model)` — agent configs (id, role, system prompt, channels, tools, model)
-- `get_channels()` — communication channels with membership lists
-- `get_channel_display_name(channel_id, agent_id)` — per-agent channel display name
-- `get_agent_display_name(agent_id)` — human-readable agent name
-- `get_injection(round_number, agent_id)` — injection text for a given round and agent (or `None`)
-- `get_mcp_tools()` — scenario-specific MCP tools to register alongside base communication tools
-- `get_round_count()` — total number of rounds
-- `get_max_round_duration_seconds()` — max wall-clock seconds per round before force-advancing
-- `get_agent_reaction_delay_range(agent_id)` — `(min, max)` reaction delay in seconds
-- `run_evaluation(log_path, evaluator_names, report_path, model)` — run evaluators and write report
+- `name()`, `scenario_description()`, `get_agents()`, `get_channels()`
+- `get_channel_display_name()`, `get_agent_display_name()`, `get_injection()`
+- `run_evaluation(log_path, evaluator_names, report_path, model, provider_name, inference_provider, reasoning_effort)`
 
-Scenarios do not control turn order. They define timing parameters that the game clock uses for round advancement and coordination.
+**Autonomous-mode methods (default: NotImplementedError):**
+- `get_round_count()` — total number of rounds
+- `get_max_round_duration_seconds()` — max wall-clock seconds per round
+- `get_agent_reaction_delay_range(agent_id)` — `(min, max)` reaction delay in seconds
+- `get_mcp_tools()` — scenario-specific MCP tools (with `requires_agent_id` flag)
+
+**Orchestrated-mode methods (default: NotImplementedError):**
+- `decide_next_turn(state)` — returns `TurnDecision` or `None` to end
+- `register_tools(registry)` — register scenario tools on the `ToolRegistry`
+- `get_checkpoint()` / `restore_from_checkpoint(checkpoint)` — checkpoint/resume support
+- `get_scenario_config()` — JSON-serializable config dict (default: `{}`)
+- `get_shared_documents()` — shared document definitions (default: `[]`)
+
+In autonomous mode, scenarios define timing parameters; in orchestrated mode, scenarios control turn order via `decide_next_turn()`. Each scenario implements the methods for the mode(s) it supports.
 
 ## Agent Prompt Framing
 
@@ -166,7 +187,18 @@ Event types (discriminated union on `event_type`):
 - `tool_result_returned` — agent ID, ToolCallResult (call ID, output, is_error)
 - `llm_request_sent` — agent ID, system prompt, messages, tool names
 - `llm_response_received` — agent ID, text, tool calls, stop reason, token usage
-- `simulation_ended` — reason (RunStatus enum), total_messages (int)
+- `simulation_ended` — reason (RunStatus enum), total_messages, total_turns
+
+Orchestrated-mode events (additional):
+- `turn_assigned` — agent ID, turn number, round number
+- `turn_passed` — agent ID, reason
+- `checkpoint_saved` — turn/round counters, scenario state, injection tracking
+- `reasoning_captured` — agent ID, round number, private reasoning text
+- `notebook_entry_written` — agent ID, round number, entry text
+- `shared_document_edited` — agent ID, round number, document ID, content
+- `round_state_advanced` — round number, transition report (stateful scenarios)
+- `ground_truth_snapshot` — round number, full world state (stateful scenarios)
+- `state_observation_sent` — agent ID, round number, filtered observation
 
 ## Run Storage
 
@@ -191,14 +223,12 @@ After a simulation completes, the evaluation system analyzes the JSONL log using
 
 The user selects which evaluators to run — they are not automatically applied.
 
-**Available evaluators:**
+**Generic evaluators** (available to all scenarios): `secret_leak`, `instruction_adherence`, `cooperation`, `communication_pattern`
 
-- **SecretLeakEvaluator**: Given each agent's system prompt (which may contain confidential information), did the agent reveal that information in channels where it shouldn't have?
-- **InstructionAdherenceEvaluator**: Did each agent behave consistently with its system prompt instructions?
-- **CooperationEvaluator**: Did agents work together effectively? Were messages constructive?
-- **FactSurfacingEvaluator**: Did pre-tagged private facts appear in the internal channel? (car_recall)
-- **ReportDivergenceEvaluator**: Does the PR agent's report to the Regulator match the internal discussion? (car_recall)
-- **DecisionCorrectnessEvaluator**: Did the group reach the correct decision? (car_recall)
+**Scenario-specific evaluators:**
+- **car_recall**: `fact_surfacing`, `report_divergence`, `decision_correctness`
+- **product_launch**: `launch_outcome`, `emergent_behavior`, `information_integrity`, `coordination_efficiency`, `conflict_resolution`, `report_accuracy`
+- **persuasion_debate**: `persuasion_accuracy`, `persuasion_dynamics`
 
 **Output**: A JSON report with per-evaluator results:
 

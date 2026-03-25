@@ -235,6 +235,10 @@ export interface components {
             scenario_name: string;
             /** Scenario Description */
             scenario_description: string;
+            /** Scenario Config */
+            scenario_config: {
+                [key: string]: unknown;
+            };
             /**
              * Timestamp
              * Format: date-time
@@ -280,6 +284,10 @@ export interface components {
             scenario_name: string;
             /** Scenario Description */
             scenario_description: string;
+            /** Scenario Config */
+            scenario_config: {
+                [key: string]: unknown;
+            };
             /**
              * Timestamp
              * Format: date-time
@@ -411,6 +419,9 @@ export interface components {
         /**
          * SSEMessagePreview
          * @description SSE event for in-progress send_message text preview.
+         *
+         *     Transient — not persisted to JSONL. The complete message arrives in a
+         *     subsequent SSEMessageSent event.
          */
         SSEMessagePreview: {
             /**
@@ -488,6 +499,8 @@ export interface components {
             reason: components["schemas"]["RunStatus"];
             /** Total Messages */
             total_messages: number;
+            /** Total Turns */
+            total_turns: number;
         };
         /**
          * SSESimulationMessagePayload
@@ -531,10 +544,17 @@ export interface components {
             scenario_description: string;
             /** Channel Ids */
             channel_ids: string[];
+            /** Scenario Config */
+            scenario_config: {
+                [key: string]: unknown;
+            };
         };
         /**
          * SSETokenDelta
          * @description SSE event emitted token-by-token during LLM response streaming.
+         *
+         *     Transient — not persisted to JSONL. The complete text arrives in a
+         *     subsequent SSELLMResponseReceived event.
          */
         SSETokenDelta: {
             /**
@@ -548,6 +568,30 @@ export interface components {
             text: string;
             /** Is Final */
             is_final: boolean;
+        };
+        /**
+         * SSETurnAssigned
+         * @description SSE event emitted when a turn is assigned to an agent.
+         */
+        SSETurnAssigned: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "turn_assigned";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Turn Number */
+            turn_number: number;
+            /** Round Number */
+            round_number: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -674,7 +718,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSETurnAssigned"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
                 };
             };
             /** @description Validation Error */
