@@ -105,7 +105,7 @@ export function ChatPane({
   const [isAtBottom, setIsAtBottom] = useState(true);
   const prevScrollHeightRef = useRef(0);
 
-  // Scroll to bottom on initial render
+  // Scroll to bottom on initial render so the user sees the latest messages
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (el) {
@@ -116,6 +116,9 @@ export function ChatPane({
     }
   }, []);
 
+  // Track scroll position to determine if user is at the bottom.
+  // When the user scrolls up to read history we stop auto-scrolling;
+  // once they scroll back down past the threshold we resume.
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
@@ -125,7 +128,9 @@ export function ChatPane({
     prevScrollHeightRef.current = el.scrollHeight;
   }, []);
 
-  // Auto-scroll when the DOM content grows and the user was at the bottom.
+  // A MutationObserver catches all content changes (new messages, partial
+  // streaming text, reasoning expansion) and scrolls to the bottom when the
+  // user was already there. This avoids tracking individual state updates.
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return undefined;
@@ -176,7 +181,7 @@ export function ChatPane({
     if (selectedChannel === null) {
       return messages;
     }
-    return messages.filter(m => m.channel_ids.includes(selectedChannel));
+    return messages.filter(m => m.is_reasoning || m.channel_ids.includes(selectedChannel));
   }, [messages, selectedChannel]);
 
   const rounds = useMemo(() => groupByRoundAndTurn(filtered), [filtered]);

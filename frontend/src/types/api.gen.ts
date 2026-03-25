@@ -246,6 +246,8 @@ export interface components {
             timestamp: string;
             /** Total Messages */
             total_messages: number;
+            /** Total Turns */
+            total_turns: number;
             status: components["schemas"]["RunStatus"];
             /** Channel Ids */
             channel_ids: string[];

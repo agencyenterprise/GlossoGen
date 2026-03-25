@@ -116,6 +116,7 @@ class RunDetailResponse(BaseModel):
     scenario_config: dict[str, Any]
     timestamp: datetime
     total_messages: int
+    total_turns: int
     status: RunStatus
     channel_ids: list[str]
     agents: list[AgentDetail]

@@ -46,7 +46,7 @@ export function RunDetail({ runId }: { runId: string }) {
     setHighlightedMessageId(messageId);
   }
 
-  // Initial REST fetch — one-time load (+ refetch on SSE completion)
+  // Initial REST fetch — no polling, just a one-time load (+ refetch on SSE completion)
   const {
     data: restData,
     isLoading,
@@ -77,9 +77,40 @@ export function RunDetail({ runId }: { runId: string }) {
     return ids;
   }, [restData]);
 
+  // Derive latest turn/round per agent from REST data to seed the SSE hook
+  const initialAgentTurns = useMemo(() => {
+    if (!restData) return new Map<string, number>();
+    const map = new Map<string, number>();
+    for (const m of restData.messages) {
+      const prev = map.get(m.sender_agent_id) ?? 0;
+      if (m.turn_number > prev) {
+        map.set(m.sender_agent_id, m.turn_number);
+      }
+    }
+    return map;
+  }, [restData]);
+
+  const initialAgentRounds = useMemo(() => {
+    if (!restData) return new Map<string, number>();
+    const map = new Map<string, number>();
+    for (const m of restData.messages) {
+      const prev = map.get(m.sender_agent_id) ?? 0;
+      if (m.round_number > prev) {
+        map.set(m.sender_agent_id, m.round_number);
+      }
+    }
+    return map;
+  }, [restData]);
+
   // SSE streaming for in-progress runs
   const sseEnabled = restData?.status === "in_progress";
-  const sse = useEventStream(runId, sseEnabled === true, knownEventIds);
+  const sse = useEventStream(
+    runId,
+    sseEnabled,
+    knownEventIds,
+    initialAgentTurns,
+    initialAgentRounds
+  );
 
   // When SSE reports simulation ended, refetch REST for evaluation + debug logs
   const sseStatus = sse.status;
@@ -90,11 +121,11 @@ export function RunDetail({ runId }: { runId: string }) {
     }
   }, [hasSimEnded, queryClient, runId]);
 
-  // Determine effective status
+  // Determine effective status: SSE overrides REST when streaming
   const effectiveStatus = sseStatus ?? restData?.status ?? null;
   const isInProgress = effectiveStatus === "in_progress";
 
-  // Merge REST + SSE agents
+  // Merge REST + SSE agents (SSE agents are deduplicated by agent_id)
   const allAgents = useMemo(() => {
     if (!restData) return sse.agents;
     const restAgents = restData.agents;
@@ -112,11 +143,12 @@ export function RunDetail({ runId }: { runId: string }) {
     return [...set];
   }, [restData, sse.channelIds]);
 
-  // Merge REST + SSE messages and reasoning
+  // Merge REST + SSE messages and reasoning, deduplicating by message_id
   const displayEntries = useMemo(() => {
     const restMessages = restData?.messages ?? [];
     const restReasoning = restData?.reasoning ?? [];
 
+    // Dedup messages by message_id (REST and SSE may overlap)
     const seenMessageIds = new Set(restMessages.map(m => m.message_id));
     const newMessages = sse.messages.filter(m => !seenMessageIds.has(m.message_id));
 
@@ -130,6 +162,7 @@ export function RunDetail({ runId }: { runId: string }) {
   const partialEntries: DisplayEntry[] = useMemo(() => {
     const entries: DisplayEntry[] = [];
 
+    // Reasoning text streaming
     if (sse.streamingAgentId) {
       const text = sse.partialText.get(sse.streamingAgentId);
       if (text) {
@@ -140,14 +173,15 @@ export function RunDetail({ runId }: { runId: string }) {
           sender_agent_id: sse.streamingAgentId,
           text,
           timestamp: new Date().toISOString(),
-          turn_number: 0,
-          round_number: sse.currentRound,
+          turn_number: sse.agentTurns.get(sse.streamingAgentId) ?? 0,
+          round_number: sse.agentRounds.get(sse.streamingAgentId) ?? 0,
           is_reasoning: true,
           is_partial: true,
         });
       }
     }
 
+    // Message preview streaming (send_message tool calls)
     for (const [agentId, pm] of sse.partialMessages) {
       entries.push({
         message_id: `partial-msg-${agentId}`,
@@ -156,21 +190,22 @@ export function RunDetail({ runId }: { runId: string }) {
         sender_agent_id: agentId,
         text: pm.text,
         timestamp: new Date().toISOString(),
-        turn_number: 0,
-        round_number: sse.currentRound,
+        turn_number: sse.agentTurns.get(agentId) ?? 0,
+        round_number: sse.agentRounds.get(agentId) ?? 0,
         is_reasoning: false,
         is_partial: true,
       });
     }
 
     return entries;
-  }, [sse.streamingAgentId, sse.partialText, sse.partialMessages, sse.currentRound]);
+  }, [sse.streamingAgentId, sse.partialText, sse.partialMessages, sse.agentTurns, sse.agentRounds]);
 
   const allDisplayEntries = useMemo(
     () => [...displayEntries, ...partialEntries],
     [displayEntries, partialEntries]
   );
 
+  const totalTurns = sse.totalTurns > 0 ? sse.totalTurns : (restData?.total_turns ?? 0);
   const totalMessages = sse.totalMessages > 0 ? sse.totalMessages : (restData?.total_messages ?? 0);
 
   const agentColorMap = useMemo(
@@ -243,7 +278,8 @@ export function RunDetail({ runId }: { runId: string }) {
           </button>
         </span>
         <span className="text-[13px] text-muted-foreground">
-          {maxRound} rounds · {totalMessages} messages · {allAgents.length} agents ·{" "}
+          {maxRound} rounds · {totalMessages} messages · {totalTurns} turns · {allAgents.length}{" "}
+          agents ·{" "}
           {uniqueModels.length <= 1 ? (
             modelLabel
           ) : (
@@ -261,6 +297,25 @@ export function RunDetail({ runId }: { runId: string }) {
           )}
         </span>
       </div>
+
+      {/* Scenario config */}
+      {restData.scenario_config && Object.keys(restData.scenario_config).length > 0 ? (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {Object.entries(restData.scenario_config).map(([key, value]) => {
+            const display =
+              typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
+            return (
+              <span
+                key={key}
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px]"
+              >
+                <span className="text-muted-foreground">{humanize(key)}</span>
+                <span className="font-medium">{display}</span>
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
 
       {showDescription ? (
         <ScenarioDescriptionModal
