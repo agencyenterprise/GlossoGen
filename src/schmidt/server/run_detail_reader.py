@@ -138,6 +138,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     messages: list[ChannelMessage] = []
     reasoning: list[ReasoningEntry] = []
     total_messages = 0
+    total_turns = 0
     status = None
 
     current_round = 0
@@ -168,6 +169,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
 
         elif isinstance(event, TurnAssigned):
             current_round = event.round_number
+            total_turns = event.turn_number
 
         elif isinstance(event, ReasoningCaptured):
             reasoning.append(
@@ -240,6 +242,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         scenario_config=scenario_config,
         timestamp=timestamp,
         total_messages=total_messages,
+        total_turns=total_turns,
         status=status,
         channel_ids=channel_ids,
         agents=agents,

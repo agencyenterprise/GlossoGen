@@ -497,6 +497,10 @@
             "type": "integer",
             "title": "Total Messages"
           },
+          "total_turns": {
+            "type": "integer",
+            "title": "Total Turns"
+          },
           "status": {
             "$ref": "#/components/schemas/RunStatus"
           },
@@ -554,6 +558,7 @@
           "scenario_config",
           "timestamp",
           "total_messages",
+          "total_turns",
           "status",
           "channel_ids",
           "agents",

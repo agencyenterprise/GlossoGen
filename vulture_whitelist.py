@@ -1,3 +1,4 @@
+budget_total_ru  # unused variable (src/schmidt/scenarios/product_launch/knobs.py:21) — used in Jinja templates
 violations  # unused variable (src/schmidt/evaluation/instruction_adherence.py:36)
 leaked_information  # unused variable (src/schmidt/evaluation/secret_leak_evaluator.py:38)
 _.generate  # unused method (src/schmidt/llm/claude_provider.py:65)

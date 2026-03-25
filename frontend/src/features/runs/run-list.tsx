@@ -130,48 +130,69 @@ export function RunList() {
               <Link
                 key={run.run_id}
                 href={`/runs/${run.run_id}`}
-                className="flex items-center gap-6 px-4 py-2.5 text-sm transition-colors hover:bg-accent/50"
+                className="block px-4 py-2.5 text-sm transition-colors hover:bg-accent/50"
               >
-                <span className="flex w-40 items-center gap-1.5 font-medium">
-                  {humanize(run.scenario_name)}
+                <div className="flex items-center gap-6">
+                  <span className="flex w-40 items-center gap-1.5 font-medium">
+                    {humanize(run.scenario_name)}
+                    <button
+                      aria-label="Scenario description"
+                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      onClick={e => {
+                        e.preventDefault();
+                        setModalRun(run);
+                      }}
+                    >
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                  <span className="w-20 text-muted-foreground">{formatTime(run.timestamp)}</span>
+                  <span className="w-16 text-muted-foreground">{run.total_messages} messages</span>
+                  <span className="w-36 text-muted-foreground">
+                    {STATUS_LABELS[run.status] ?? run.status}
+                  </span>
+                  <span className="ml-auto">
+                    {run.has_evaluation ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                        <CheckCircle className="h-3 w-3" />
+                        Evaluated
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                        No evaluation
+                      </span>
+                    )}
+                  </span>
                   <button
-                    aria-label="Scenario description"
-                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label="Delete run"
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                     onClick={e => {
                       e.preventDefault();
-                      setModalRun(run);
+                      deleteMutation.mutate(run.run_id);
                     }}
                   >
-                    <HelpCircle className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
-                </span>
-                <span className="w-20 text-muted-foreground">{formatTime(run.timestamp)}</span>
-                <span className="w-16 text-muted-foreground">{run.total_messages} messages</span>
-                <span className="w-36 text-muted-foreground">
-                  {STATUS_LABELS[run.status] ?? run.status}
-                </span>
-                <span className="ml-auto">
-                  {run.has_evaluation ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                      <CheckCircle className="h-3 w-3" />
-                      Evaluated
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      No evaluation
-                    </span>
-                  )}
-                </span>
-                <button
-                  aria-label="Delete run"
-                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  onClick={e => {
-                    e.preventDefault();
-                    deleteMutation.mutate(run.run_id);
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </div>
+                {run.scenario_config && Object.keys(run.scenario_config).length > 0 ? (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {Object.entries(run.scenario_config).map(([key, value]) => {
+                      const display =
+                        typeof value === "object" && value !== null
+                          ? JSON.stringify(value)
+                          : String(value);
+                      return (
+                        <span
+                          key={key}
+                          className="inline-flex items-center gap-0.5 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px]"
+                        >
+                          <span className="text-muted-foreground">{humanize(key)}</span>
+                          <span className="font-medium">{display}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </Link>
             ))}
           </div>

@@ -16,7 +16,9 @@ from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel
 from schmidt.models.shared_document_config import SharedDocumentConfig
+from schmidt.models.simulation_state import SimulationState, TurnDecision
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
+from schmidt.tools.tool_registry import ToolRegistry
 
 
 class SimulationScenario(ABC):
@@ -147,18 +149,16 @@ class SimulationScenario(ABC):
     # implementations raise NotImplementedError for scenarios that only
     # support autonomous mode.
 
-    def decide_next_turn(self, state: Any) -> Any:
+    async def decide_next_turn(self, state: SimulationState) -> TurnDecision | None:
         """Determine which agent acts next given the current simulation state.
 
-        Returns None when the simulation should end. Uses ``Any`` for
-        ``SimulationState`` and ``TurnDecision`` to avoid importing
-        orchestrated-mode models at the protocol level.
+        Returns None when the simulation should end.
         """
         raise NotImplementedError(
             "decide_next_turn is only available in orchestrated mode scenarios"
         )
 
-    def register_tools(self, registry: Any) -> None:
+    def register_tools(self, registry: ToolRegistry) -> None:
         """Register scenario-specific tools with the provided tool registry."""
         raise NotImplementedError("register_tools is only available in orchestrated mode scenarios")
 

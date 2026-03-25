@@ -18,5 +18,6 @@ class ProductLaunchKnobs(BaseModel):
     num_features: int
     num_rounds: int
     max_turns_per_round: int
+    budget_total_ru: int
     budget_deficit_pct: float
     external_event_intensity: str
