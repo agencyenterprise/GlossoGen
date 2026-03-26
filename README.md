@@ -92,6 +92,21 @@ Orchestrated-mode flags:
 
 Check progress by reading the stdout log or the JSONL event log in the run directory.
 
+### Resuming a Failed Simulation
+
+If a simulation crashes or is killed, resume from the last checkpoint (orchestrated mode only):
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
+    --mode orchestrated --model <model> --provider <provider> --runs-dir ./runs \
+    --resume ./runs/<scenario>/<timestamp> \
+    <scenario-specific flags> \
+  > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
+```
+
+The simulation picks up from the exact turn where it left off, preserving channel messages, notebook entries, and shared document contents. The `--resume` flag requires the same scenario-specific flags as the original run (e.g. `--knobs` for product_launch, `--max-turns-per-round` for incident_response).
+
 ## Run Output Directory Structure
 
 All simulation outputs use a standard directory layout under `runs/`:
@@ -137,6 +152,10 @@ make dev-frontend   # Next.js dev server on port 3000
 ```
 
 The frontend displays a list of all simulation runs with scenario name, timestamp, message count, status (including in-progress runs), and evaluation status. Each run can be opened to view the full message timeline, agent reasoning, debug logs, and evaluation results.
+
+### Live Token Streaming
+
+Every `schmidt run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` discovery file to the run directory. When `schmidt serve` detects a live simulation (via `stream.json`), it proxies the simulation's SSE stream — including token-by-token text deltas from the LLM streaming API — to connected frontends. The frontend shows text appearing character-by-character as agents generate responses. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing.
 
 ### API Type Safety
 
