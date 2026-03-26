@@ -165,13 +165,24 @@ export function useEventStream(
 
     const url = `${API_URL}/api/runs/${encodeURIComponent(runId)}/events`;
     const eventSource = new EventSource(url);
+    let hasConnected = false;
+    let errorCount = 0;
 
     eventSource.onopen = () => {
+      hasConnected = true;
+      errorCount = 0;
       setIsConnected(true);
     };
 
     eventSource.onerror = () => {
       setIsConnected(false);
+      errorCount += 1;
+      // If the SSE endpoint rejects the connection repeatedly (e.g. simulation
+      // already ended and stream.json was cleaned up), close the EventSource
+      // so the parent component falls back to the REST status.
+      if (!hasConnected && errorCount >= 3) {
+        eventSource.close();
+      }
     };
 
     eventSource.addEventListener("simulation_started", (e: MessageEvent) => {

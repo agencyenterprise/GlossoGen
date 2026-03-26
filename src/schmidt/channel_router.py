@@ -62,6 +62,21 @@ class ChannelRouter:
         """
         return self._channels[channel_id].member_agent_ids
 
+    def restore_messages(self, messages_by_channel: dict[str, list[SimulationMessage]]) -> None:
+        """Bulk-load messages into channels without logging events.
+
+        Used during resume to pre-populate channel history from a prior run.
+        Skips messages for channels that do not exist in the router.
+        """
+        for channel_id, messages in messages_by_channel.items():
+            if channel_id not in self._messages:
+                logger.warning("Skipping restore for unknown channel: %s", channel_id)
+                continue
+            for msg in messages:
+                self._messages[channel_id].append(msg)
+        total = sum(len(msgs) for msgs in messages_by_channel.values())
+        logger.info("Restored %d messages across %d channels", total, len(messages_by_channel))
+
     def get_all_messages(self) -> dict[str, list[SimulationMessage]]:
         """Return a copy of all message histories, keyed by channel ID."""
         return {k: list(v) for k, v in self._messages.items()}

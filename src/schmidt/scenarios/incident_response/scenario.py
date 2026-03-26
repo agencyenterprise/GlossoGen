@@ -158,6 +158,14 @@ class IncidentResponseScenario(SimulationScenario):
             max_turns_per_round=max_turns_per_round,
         )
 
+    @classmethod
+    def create_from_config(cls, config: dict[str, Any]) -> Self:
+        """Reconstruct the scenario from a serialized config dict."""
+        return cls(
+            max_round_duration_seconds=config.get("max_round_duration_seconds"),
+            max_turns_per_round=config.get("max_turns_per_round"),
+        )
+
     def __init__(
         self,
         max_round_duration_seconds: float | None,

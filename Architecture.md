@@ -136,6 +136,7 @@ The `SimulationScenario` ABC defines a unified contract for scenario plug-ins. S
 **Shared methods (required by all scenarios):**
 - `add_cli_arguments(parser)` — register scenario-specific CLI arguments
 - `create(args)` — construct a scenario instance from parsed CLI arguments
+- `create_from_config(config)` — reconstruct a scenario from its serialized config dict (used by fork system)
 - `name()`, `scenario_description()`, `get_agents()`, `get_channels()`
 - `get_channel_display_name()`, `get_agent_display_name()`, `get_injection()`
 - `run_evaluation(log_path, evaluator_names, report_path, model, provider_name, inference_provider, reasoning_effort)`
@@ -177,7 +178,7 @@ Every simulation event is serialized as one JSON object per line in a JSONL file
 
 Event types (discriminated union on `event_type`):
 
-- `simulation_started` — scenario name, scenario description, channel IDs
+- `simulation_started` — run ID, scenario name, scenario description, channel IDs, scenario config
 - `agent_registered` — agent ID, role name, system prompt, channel IDs, tool names, model
 - `agent_connected` — agent ID, role name, model (emitted when an autonomous agent connects)
 - `round_advanced` — new round number, trigger reason (`simulation_start`, `all_agents_idle`, `round_timeout`)
@@ -209,11 +210,37 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── {scenario_name}.jsonl          # Event log (one JSON object per line)
 ├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, visible in FE)
 ├── {scenario_name}_report.json    # Evaluation report (written by evaluate command)
+└── fork_manifest.json             # (forked runs only) provenance tracking
 ```
 
 The CLI `run` command computes the output path automatically from `--runs-dir`, the scenario name, and the current unix timestamp. The `evaluate` command takes `--run-dir` pointing to a specific run directory and writes the report as a sibling to the JSONL file.
 
-The web server scans this directory tree to discover runs, reading the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total messages, end reason) without loading the full log.
+The web server scans this directory tree to discover runs, reading the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total messages, end reason) without loading the full log. Forked runs are identified by the presence of `fork_manifest.json`.
+
+## Fork System (Message-Level Rewind)
+
+The fork system allows rewinding a completed simulation to any message, editing it, and re-running from that point. Forking creates a new run directory — the original is preserved.
+
+### Fork Flow
+
+1. **Frontend**: User hovers over a message in the run detail view, clicks the edit button, modifies the text, and clicks the play button. The frontend calls `POST /api/runs/{run_id}/fork` with the target message ID, text edits, model, and provider.
+2. **Fork router** (`server/fork_router.py`): Loads events from the source JSONL, creates a new run directory, and calls `write_fork_log` to write a truncated+edited copy of the event log. Writes `fork_manifest.json` for provenance. Launches `schmidt run --resume <new_dir>` as a background subprocess.
+3. **Fork writer** (`fork_writer.py`): Copies events from the source log up to the target message's timestamp. Replaces message text for edited messages. Assigns a new `run_id` to the `SimulationStarted` event so the fork has a unique identity.
+4. **Resume**: The CLI loads the forked JSONL via `build_rewind_state`, which extracts round number, channel messages, injection tracking, and per-agent conversation transcripts. Passes the `RewindState` to `AutonomousSupervisor`.
+5. **Supervisor resume**: Pre-populates the channel router with historical messages, sets agent read positions, starts the game clock from the correct round, and pushes wake-up notifications to all agents.
+6. **Conversation context**: Each agent receives a rich conversation transcript as its initial prompt (built by `conversation_reconstructor.py`). The transcript includes channel messages, scenario injections, and round transitions — but not the agent's prior reasoning, so it re-derives its thinking naturally. The edited message appears silently in the transcript as if it was always there.
+7. **Agents continue**: Fresh Claude Code sessions start with full context of the prior conversation and respond naturally to the (edited) state of the world.
+
+### Key Modules
+
+- `message_rewind.py` — `RewindState` NamedTuple and `build_rewind_state()` to reconstruct state at any message
+- `fork_writer.py` — `write_fork_log()` to create the truncated+edited JSONL
+- `conversation_reconstructor.py` — `build_agent_context()` to build per-agent conversation transcripts
+- `server/fork_router.py` — `POST /api/runs/{run_id}/fork` API endpoint
+
+### Provenance
+
+Forked runs store a `fork_manifest.json` containing `source_run_id` and `target_message_id`. The run discovery and detail endpoints expose this as `fork_source` on the response models. The frontend shows a "Fork" badge in the run list and a lineage link in the run detail header.
 
 ## Evaluation System
 
@@ -270,3 +297,4 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 - **Data fetching**: TanStack React Query with openapi-fetch for type-safe API calls. In-progress runs auto-refresh every 5 seconds (configurable via a Stop/Resume button).
 - **Type generation**: `openapi-typescript` generates TypeScript types from the backend's OpenAPI schema. CI enforces that generated types stay in sync with the backend.
 - **Lint enforcement**: ESLint forbids raw `fetch()` — all API calls must go through the typed client at `@/shared/lib/api-client`. This ensures compile-time validation of request paths, parameters, and response types.
+- **Fork UI**: Completed runs show per-message edit buttons (on hover). Editing a message and clicking play opens a modal to select model/provider, then calls the fork API and navigates to the new run. Forked runs display a lineage badge linking to the source. Fork state is managed by the `useFork` hook (`use-fork.ts`).

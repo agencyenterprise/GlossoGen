@@ -35,13 +35,17 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/runners/` — autonomous mode agent runners:
   - `agent_runner_base.py` — abstract base class for agent runners
   - `claude_code_runner.py` — Claude Code agent runner via Agent SDK
-- `src/schmidt/autonomous_supervisor.py` — autonomous mode orchestrator
+- `src/schmidt/autonomous_supervisor.py` — autonomous mode orchestrator (supports resume via `RewindState`)
+- `src/schmidt/message_rewind.py` — reconstructs simulation state at any message for fork/resume
+- `src/schmidt/fork_writer.py` — writes truncated+edited JSONL for forked runs
+- `src/schmidt/conversation_reconstructor.py` — builds per-agent conversation transcript from events
 - `src/schmidt/simulation_hub.py` — orchestrated mode turn-based orchestrator
 - `src/schmidt/agent_runner.py` — orchestrated mode per-agent turn execution
 - `src/schmidt/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
 - `src/schmidt/tools/` — orchestrated mode tool registry, executor, stores (notebook, document), built-in tools
 - `src/schmidt/evaluation/` — generic evaluators and evaluation infrastructure
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
+  - `fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
 - `linter/` — custom linting scripts
 - `frontend/` — Next.js web application
 
@@ -117,7 +121,8 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── {scenario_name}.jsonl          # Event log (messages, reasoning, round transitions)
 ├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, read by FE)
 ├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
-└── {scenario_name}_stdout.log     # (pipe stdout here)
+├── {scenario_name}_stdout.log     # (pipe stdout here)
+└── fork_manifest.json             # (forked runs only) provenance: source_run_id, target_message_id
 ```
 
 ## Running Simulations
@@ -196,7 +201,7 @@ Every `schmidt run` starts an embedded streaming server on an ephemeral port and
 
 ### Resuming Failed Simulations
 
-If a simulation errors midway through, resume from the last checkpoint using the `--resume` flag pointing at the existing run directory. The simulation picks up from the exact turn where it left off, preserving all channel messages, notebook entries, and shared document contents. Only available in orchestrated mode.
+If a simulation errors midway through, resume from the last checkpoint using the `--resume` flag pointing at the existing run directory. Available in both orchestrated and autonomous modes.
 
 ```bash
 set -a && source .env && set +a && \
@@ -208,6 +213,20 @@ set -a && source .env && set +a && \
 ```
 
 The `--resume` flag requires the same scenario-specific flags as the original run (e.g. `--knobs` for car_recall/product_launch, `--max-turns-per-round` for incident_response). The `--runs-dir` flag is still required but ignored when resuming.
+
+### Forking Runs (Message-Level Rewind)
+
+The web UI supports forking a completed simulation from any message. In the run detail view, hover over a message to reveal an edit button. Edit the message text, then click the play button to fork. A new simulation starts with the channel history up to that message (with the edit applied), and agents continue from there.
+
+Forking works by:
+1. Truncating the source JSONL at the target message, applying the text edit
+2. Writing the truncated log to a new run directory with a `fork_manifest.json` for provenance
+3. Launching `schmidt run --resume <new_dir>` as a background subprocess
+4. Reconstructing a conversation transcript from the event log and injecting it as each agent's initial prompt, so agents have full context of what happened before the fork point
+
+Agents receive the conversation history (channel messages, scenario injections, round transitions) as their first prompt. They do not receive their prior reasoning — only externally visible state — so they re-derive their thinking naturally in response to the edited message.
+
+The fork API endpoint is `POST /api/runs/{run_id}/fork`. Forked runs appear in the run list with a "Fork" badge and show a lineage link in the run detail header.
 
 ### IMPORTANT: Monitoring Long-Running Processes
 

@@ -40,6 +40,14 @@ class AgentSession:
         """Record that this agent has seen all messages up to the given count."""
         self._last_seen_counts[channel_id] = message_count
 
+    def set_last_seen_count(self, channel_id: str, count: int) -> None:
+        """Set the read position for a channel.
+
+        Used during resume to mark all pre-loaded messages as already seen,
+        preventing the agent from receiving spurious new-message notifications.
+        """
+        self._last_seen_counts[channel_id] = count
+
     def get_last_seen_count(self, channel_id: str) -> int:
         """Return the message count at the time of the agent's last read_channel call.
 

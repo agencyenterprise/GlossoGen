@@ -165,6 +165,19 @@ class PersuasionDebateScenario(SimulationScenario):
             max_round_duration_seconds=max_round_duration,
         )
 
+    @classmethod
+    def create_from_config(cls, config: dict[str, Any]) -> Self:
+        """Reconstruct the scenario from a serialized config dict."""
+        question_bank_data = config.pop("question_bank")
+        question_bank = QuestionBank.model_validate(question_bank_data)
+        max_round_duration = config.pop("max_round_duration_seconds", None)
+        knobs = PersuasionDebateKnobs.model_validate(config)
+        return cls(
+            knobs=knobs,
+            question_bank=question_bank,
+            max_round_duration_seconds=max_round_duration,
+        )
+
     def __init__(
         self,
         knobs: PersuasionDebateKnobs,
@@ -215,8 +228,9 @@ class PersuasionDebateScenario(SimulationScenario):
         return "persuasion_debate"
 
     def get_scenario_config(self) -> dict[str, object]:
-        """Return persuasion debate knobs as a config dict."""
+        """Return persuasion debate knobs and question bank as a config dict."""
         config: dict[str, object] = self._knobs.model_dump()
+        config["question_bank"] = self._question_bank.model_dump()
         if self._max_round_duration_seconds is not None:
             config["max_round_duration_seconds"] = self._max_round_duration_seconds
         return config
