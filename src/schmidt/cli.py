@@ -2,7 +2,7 @@
 
 Defines the ``schmidt`` CLI with three subcommands:
 
-* ``run``      -- load and execute a simulation scenario (with embedded streaming server)
+* ``run``      -- load and execute a simulation scenario in autonomous or orchestrated mode
 * ``evaluate`` -- score a previously-generated simulation log
 * ``serve``    -- start the FastAPI web server
 """
@@ -13,17 +13,18 @@ import logging
 import os
 import time
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 
+from schmidt.autonomous_supervisor import AutonomousSupervisor
 from schmidt.checkpoint_loader import ResumeState, build_resume_state
 from schmidt.evaluation.log_reader import load_events
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
-from schmidt.llm.provider import LLMProvider
-from schmidt.llm.provider_factory import VALID_PROVIDERS, create_provider
+from schmidt.llm.provider_factory import create_provider
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
-from schmidt.models.agent_config import AgentConfig
+from schmidt.runners.claude_code_runner import ClaudeCodeRunner
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios import SCENARIO_REGISTRY
@@ -34,6 +35,8 @@ from schmidt.tools.tool_registry import ToolRegistry
 logger = logging.getLogger(__name__)
 
 EVENT_BUS_MAX_QUEUE_SIZE = 1000
+DEFAULT_MCP_PORT = 8001
+DEFAULT_MAX_AGENT_TURNS = 200
 
 
 def _build_parsers() -> tuple[
@@ -65,11 +68,32 @@ def _build_parsers() -> tuple[
     )
     run_parser.add_argument("--model", type=str, required=True, help="LLM model identifier")
     run_parser.add_argument(
-        "--provider",
+        "--mode",
         type=str,
         required=True,
-        choices=list(VALID_PROVIDERS),
-        help="LLM provider to use",
+        choices=["autonomous", "orchestrated"],
+        help="Execution mode: autonomous (MCP-based) or orchestrated (turn-based)",
+    )
+
+    # Autonomous mode flags
+    run_parser.add_argument(
+        "--mcp-port",
+        type=int,
+        default=DEFAULT_MCP_PORT,
+        help=f"Port for the MCP server (autonomous mode, default: {DEFAULT_MCP_PORT})",
+    )
+    run_parser.add_argument(
+        "--max-agent-turns",
+        type=int,
+        default=DEFAULT_MAX_AGENT_TURNS,
+        help=f"Max agentic turns per agent (autonomous, default: {DEFAULT_MAX_AGENT_TURNS})",
+    )
+
+    # Orchestrated mode flags
+    run_parser.add_argument(
+        "--provider",
+        type=str,
+        help="LLM provider to use (required for orchestrated mode and evaluation)",
     )
     run_parser.add_argument(
         "--inference-provider",
@@ -85,7 +109,7 @@ def _build_parsers() -> tuple[
     run_parser.add_argument(
         "--resume",
         type=str,
-        help="Path to an existing run directory to resume from (e.g. runs/car_recall/1742234567)",
+        help="Path to an existing run directory to resume from (orchestrated mode only)",
     )
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a simulation log")
@@ -109,7 +133,6 @@ def _build_parsers() -> tuple[
         "--provider",
         type=str,
         required=True,
-        choices=list(VALID_PROVIDERS),
         help="LLM provider to use",
     )
     evaluate_parser.add_argument(
@@ -167,33 +190,6 @@ def main() -> None:
         asyncio.run(_run_evaluation(args=args, scenario=scenario))
 
 
-def _build_agent_providers(
-    agents: list[AgentConfig],
-    provider_name: str,
-    inference_provider: str | None,
-    reasoning_effort: str | None,
-) -> dict[str, LLMProvider]:
-    """Build a per-agent LLM provider mapping.
-
-    Providers are deduped so agents sharing the same model share the same
-    provider instance.
-    """
-    providers_by_model: dict[str, LLMProvider] = {}
-    agent_providers: dict[str, LLMProvider] = {}
-
-    for agent in agents:
-        if agent.model not in providers_by_model:
-            providers_by_model[agent.model] = create_provider(
-                provider_name=provider_name,
-                model=agent.model,
-                inference_provider=inference_provider,
-                reasoning_effort=reasoning_effort,
-            )
-        agent_providers[agent.agent_id] = providers_by_model[agent.model]
-
-    return agent_providers
-
-
 def _compute_run_dir(runs_dir: Path, scenario_name: str) -> Path:
     """Compute the output directory for a new simulation run.
 
@@ -204,17 +200,115 @@ def _compute_run_dir(runs_dir: Path, scenario_name: str) -> Path:
     return runs_dir / scenario_name / str(unix_ts)
 
 
+def _setup_logging(
+    run_dir: Path,
+    scenario_name: str,
+    event_bus: EventBus,
+) -> tuple[logging.FileHandler, EventBusLogHandler]:
+    """Set up JSON debug log file and EventBus log handler for frontend display.
+
+    Returns the two handlers so they can be removed during teardown.
+    """
+    debug_log_path = run_dir / f"{scenario_name}_debug.jsonl"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    json_handler = logging.FileHandler(debug_log_path)
+    json_handler.setFormatter(JsonLineFormatter())
+    logging.getLogger().addHandler(json_handler)
+
+    bus_log_handler = EventBusLogHandler(event_bus=event_bus)
+    logging.getLogger().addHandler(bus_log_handler)
+
+    return json_handler, bus_log_handler
+
+
+def _teardown_logging(
+    json_handler: logging.FileHandler,
+    bus_log_handler: EventBusLogHandler,
+) -> None:
+    """Remove and close log handlers added during setup."""
+    logging.getLogger().removeHandler(json_handler)
+    json_handler.close()
+    logging.getLogger().removeHandler(bus_log_handler)
+
+
 async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
 ) -> None:
-    """Wire up the simulation components, start the streaming server, and execute.
+    """Dispatch to the autonomous or orchestrated simulation runner based on --mode."""
+    mode = args.mode
+    if mode == "autonomous":
+        await _run_autonomous(args=args, scenario=scenario)
+    else:
+        await _run_orchestrated(args=args, scenario=scenario)
 
-    Starts an embedded mini-server on an ephemeral port that streams events
-    via SSE. Writes a ``stream.json`` manifest for discovery by ``schmidt serve``.
-    When ``--resume`` is specified, loads the checkpoint from the existing run
-    directory and continues from where it left off.
-    """
+
+async def _run_autonomous(
+    args: argparse.Namespace,
+    scenario: SimulationScenario,
+) -> None:
+    """Wire up the autonomous supervisor, start the streaming server, and execute."""
+
+    runs_dir = Path(args.runs_dir)
+    run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
+    agents = scenario.get_agents(default_model=args.model)
+
+    log_path = run_dir / f"{scenario.name()}.jsonl"
+    event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
+    event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
+
+    max_turns = args.max_agent_turns
+
+    supervisor = AutonomousSupervisor(
+        scenario=scenario,
+        agent_configs=agents,
+        event_logger=event_logger,
+        mcp_server_port=args.mcp_port,
+        runner_factory=lambda: ClaudeCodeRunner(
+            max_turns=max_turns,
+            event_bus=event_bus,
+        ),
+    )
+
+    json_handler, bus_log_handler = _setup_logging(
+        run_dir=run_dir,
+        scenario_name=scenario.name(),
+        event_bus=event_bus,
+    )
+
+    run_id = f"{scenario.name()}_{run_dir.name}"
+
+    logger.info("Running scenario: %s (autonomous mode)", scenario.name())
+    logger.info("Model: %s", args.model)
+    logger.info("MCP port: %d, max agent turns: %d", args.mcp_port, max_turns)
+    logger.info("Run directory: %s", run_dir)
+    logger.info("Log: %s", log_path)
+
+    server, port = await start_simulation_server(
+        event_bus=event_bus,
+        run_dir=run_dir,
+        run_id=run_id,
+    )
+    logger.info("Streaming server started on port %d", port)
+
+    try:
+        await supervisor.run()
+    finally:
+        _teardown_logging(json_handler=json_handler, bus_log_handler=bus_log_handler)
+        await stop_simulation_server(server=server, run_dir=run_dir)
+
+    logger.info("Simulation complete. Run directory: %s", run_dir)
+
+
+async def _run_orchestrated(
+    args: argparse.Namespace,
+    scenario: SimulationScenario,
+) -> None:
+    """Wire up the orchestrated simulation hub, start the streaming server, and execute."""
+
+    if not args.provider:
+        raise SystemExit("--provider is required for orchestrated mode")
+
     resume_dir: str | None = getattr(args, "resume", None)
     resuming = resume_dir is not None
 
@@ -258,28 +352,21 @@ async def _run_simulation(
         event_bus=event_bus,
     )
 
-    # Add JSON debug log file for frontend display
-    debug_log_path = run_dir / f"{scenario.name()}_debug.jsonl"
-    run_dir.mkdir(parents=True, exist_ok=True)
-    json_handler = logging.FileHandler(debug_log_path)
-    json_handler.setFormatter(JsonLineFormatter())
-    logging.getLogger().addHandler(json_handler)
+    json_handler, bus_log_handler = _setup_logging(
+        run_dir=run_dir,
+        scenario_name=scenario.name(),
+        event_bus=event_bus,
+    )
 
-    # Stream debug logs to the EventBus for real-time frontend display
-    bus_log_handler = EventBusLogHandler(event_bus=event_bus)
-    logging.getLogger().addHandler(bus_log_handler)
-
-    # Generate a run_id for the stream manifest (matches the SimulationStarted event_id)
     run_id = f"{scenario.name()}_{run_dir.name}"
 
-    logger.info("Running scenario: %s", scenario.name())
+    logger.info("Running scenario: %s (orchestrated mode)", scenario.name())
     logger.info("Model: %s", args.model)
     logger.info("Run directory: %s", run_dir)
     logger.info("Log: %s", log_path)
     if resuming:
         logger.info("RESUMING from checkpoint in %s", run_dir)
 
-    # Start the embedded streaming server
     server, port = await start_simulation_server(
         event_bus=event_bus,
         run_dir=run_dir,
@@ -290,12 +377,38 @@ async def _run_simulation(
     try:
         await hub.run()
     finally:
-        logging.getLogger().removeHandler(json_handler)
-        json_handler.close()
-        logging.getLogger().removeHandler(bus_log_handler)
+        _teardown_logging(json_handler=json_handler, bus_log_handler=bus_log_handler)
         await stop_simulation_server(server=server, run_dir=run_dir)
 
     logger.info("Simulation complete. Run directory: %s", run_dir)
+
+
+def _build_agent_providers(
+    agents: list[Any],
+    provider_name: str,
+    inference_provider: str | None,
+    reasoning_effort: str | None,
+) -> dict[str, Any]:
+    """Build a per-agent LLM provider mapping.
+
+    Providers are deduped so agents sharing the same model share the same
+    provider instance.
+    """
+
+    providers_by_model: dict[str, Any] = {}
+    agent_providers: dict[str, Any] = {}
+
+    for agent in agents:
+        if agent.model not in providers_by_model:
+            providers_by_model[agent.model] = create_provider(
+                provider_name=provider_name,
+                model=agent.model,
+                inference_provider=inference_provider,
+                reasoning_effort=reasoning_effort,
+            )
+        agent_providers[agent.agent_id] = providers_by_model[agent.model]
+
+    return agent_providers
 
 
 async def _run_evaluation(
@@ -308,6 +421,7 @@ async def _run_evaluation(
     log_path = run_dir / f"{args.scenario_name}.jsonl"
     report_path = run_dir / f"{args.scenario_name}_report.json"
 
+    logger.info("Evaluating %s with evaluators: %s", args.scenario_name, args.evaluators)
     await scenario.run_evaluation(
         log_path=log_path,
         evaluator_names=evaluator_names,
@@ -323,6 +437,7 @@ async def _run_evaluation(
 
 def _run_serve(args: argparse.Namespace) -> None:
     """Start the FastAPI web server."""
+    logger.info("Starting web server on port %d, runs dir: %s", args.port, args.runs_dir)
     os.environ["SCHMIDT_RUNS_DIR"] = args.runs_dir
     uvicorn.run(
         app="schmidt.server.app:app",

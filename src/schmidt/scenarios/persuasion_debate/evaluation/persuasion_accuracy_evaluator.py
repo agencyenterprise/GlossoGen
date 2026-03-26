@@ -155,7 +155,9 @@ class PersuasionAccuracyEvaluator(Evaluator):
             participant_answer=participant_answer,
         )
         result = await llm_provider.generate_structured(
-            system_prompt=render_evaluator_prompt(template_name="evaluator_system.jinja"),
+            system_prompt=render_evaluator_prompt(
+                template_name="evaluator_system.jinja", template_variables={}
+            ),
             messages=[LLMMessage(role="user", content=prompt)],
             output_schema=AnswerMatchOutput,
         )

@@ -125,6 +125,9 @@
                       "$ref": "#/components/schemas/SSEAgentRegistered"
                     },
                     {
+                      "$ref": "#/components/schemas/SSEAgentConnected"
+                    },
+                    {
                       "$ref": "#/components/schemas/SSETurnAssigned"
                     },
                     {
@@ -132,6 +135,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/SSELLMResponseReceived"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SSERoundAdvanced"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SSEInjectionDelivered"
                     },
                     {
                       "$ref": "#/components/schemas/SSESimulationEnded"
@@ -151,9 +160,12 @@
                     "mapping": {
                       "simulation_started": "#/components/schemas/SSESimulationStarted",
                       "agent_registered": "#/components/schemas/SSEAgentRegistered",
+                      "agent_connected": "#/components/schemas/SSEAgentConnected",
                       "turn_assigned": "#/components/schemas/SSETurnAssigned",
                       "message_sent": "#/components/schemas/SSEMessageSent",
                       "llm_response_received": "#/components/schemas/SSELLMResponseReceived",
+                      "round_advanced": "#/components/schemas/SSERoundAdvanced",
+                      "injection_delivered": "#/components/schemas/SSEInjectionDelivered",
                       "simulation_ended": "#/components/schemas/SSESimulationEnded",
                       "token_delta": "#/components/schemas/SSETokenDelta",
                       "message_preview": "#/components/schemas/SSEMessagePreview",
@@ -435,6 +447,13 @@
           "round_number": {
             "type": "integer",
             "title": "Round Number"
+          },
+          "channel_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channel Ids"
           }
         },
         "type": "object",
@@ -444,10 +463,11 @@
           "text",
           "timestamp",
           "turn_number",
-          "round_number"
+          "round_number",
+          "channel_ids"
         ],
         "title": "ReasoningEntry",
-        "description": "An LLM reasoning/thinking entry from an agent's turn."
+        "description": "An LLM reasoning/thinking entry from an agent's turn.\n\n``channel_ids`` links this reasoning to the channels of the surrounding\nsend_message calls from the same agent, so the frontend can show only\nreasoning relevant to the selected channel."
       },
       "RunDetailResponse": {
         "properties": {
@@ -472,6 +492,10 @@
             "type": "string",
             "format": "date-time",
             "title": "Timestamp"
+          },
+          "total_messages": {
+            "type": "integer",
+            "title": "Total Messages"
           },
           "total_turns": {
             "type": "integer",
@@ -533,6 +557,7 @@
           "scenario_description",
           "scenario_config",
           "timestamp",
+          "total_messages",
           "total_turns",
           "status",
           "channel_ids",
@@ -596,9 +621,9 @@
             "format": "date-time",
             "title": "Timestamp"
           },
-          "total_turns": {
+          "total_messages": {
             "type": "integer",
-            "title": "Total Turns"
+            "title": "Total Messages"
           },
           "status": {
             "$ref": "#/components/schemas/RunStatus"
@@ -619,13 +644,44 @@
           "scenario_description",
           "scenario_config",
           "timestamp",
-          "total_turns",
+          "total_messages",
           "status",
           "has_evaluation",
           "run_dir"
         ],
         "title": "RunSummary",
         "description": "Summary of a single simulation run for the runs list endpoint."
+      },
+      "SSEAgentConnected": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "agent_connected",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "agent_id"
+        ],
+        "title": "SSEAgentConnected",
+        "description": "SSE event emitted when an agent connects to the MCP server."
       },
       "SSEAgentRegistered": {
         "properties": {
@@ -723,6 +779,47 @@
         ],
         "title": "SSEDebugLog",
         "description": "SSE event for a real-time debug log entry from the simulation process."
+      },
+      "SSEInjectionDelivered": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "injection_delivered",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "injection_text": {
+            "type": "string",
+            "title": "Injection Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "agent_id",
+          "round_number",
+          "injection_text"
+        ],
+        "title": "SSEInjectionDelivered",
+        "description": "SSE event emitted when a scenario injection is pushed to an agent."
       },
       "SSELLMResponseReceived": {
         "properties": {
@@ -832,6 +929,42 @@
         "title": "SSEMessageSent",
         "description": "SSE event emitted when an agent sends a message to a channel."
       },
+      "SSERoundAdvanced": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "round_advanced",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "trigger": {
+            "type": "string",
+            "title": "Trigger"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "round_number",
+          "trigger"
+        ],
+        "title": "SSERoundAdvanced",
+        "description": "SSE event emitted when the game clock advances to a new round."
+      },
       "SSESimulationEnded": {
         "properties": {
           "event_type": {
@@ -851,6 +984,10 @@
           "reason": {
             "$ref": "#/components/schemas/RunStatus"
           },
+          "total_messages": {
+            "type": "integer",
+            "title": "Total Messages"
+          },
           "total_turns": {
             "type": "integer",
             "title": "Total Turns"
@@ -862,6 +999,7 @@
           "event_id",
           "timestamp",
           "reason",
+          "total_messages",
           "total_turns"
         ],
         "title": "SSESimulationEnded",

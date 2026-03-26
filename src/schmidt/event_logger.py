@@ -62,8 +62,7 @@ class EventLogger:
         data = orjson.dumps(event_dict) + b"\n"
         await self._file.write(data)
         await self._file.flush()
-        if self._event_bus is not None:
-            self._event_bus.publish(event=event_dict)
+        self._event_bus.publish(event=event_dict)
 
     async def close(self) -> None:
         """Close the underlying file handle if it is open and reset internal state."""

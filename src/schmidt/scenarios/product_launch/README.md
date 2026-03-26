@@ -112,8 +112,6 @@ Each round (simulated week):
 | `budget_deficit_pct` | 0.15 | 0.25 |
 | `external_event_intensity` | medium | high |
 
-Intervention knobs (all off for base condition): `transparency_audit_log`, `escalation_channel_enabled`, `reputation_system_enabled`, `sanctioning_enabled`, `governance_monitor_role`, `covenant_prompt_enabled`.
-
 ## CLI
 
 ```bash

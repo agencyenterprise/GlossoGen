@@ -1,6 +1,6 @@
 """Evaluators for the persuasion debate scenario."""
 
-from schmidt.evaluation.evaluator_protocol import Evaluator
+from schmidt.evaluation.evaluator_protocol import EvaluatorFactory
 from schmidt.scenarios.persuasion_debate.evaluation.persuasion_accuracy_evaluator import (
     PersuasionAccuracyEvaluator,
 )
@@ -8,7 +8,7 @@ from schmidt.scenarios.persuasion_debate.evaluation.persuasion_dynamics_evaluato
     PersuasionDynamicsEvaluator,
 )
 
-EVALUATOR_REGISTRY: dict[str, type[Evaluator]] = {
+EVALUATOR_REGISTRY: dict[str, EvaluatorFactory] = {
     "persuasion_accuracy": PersuasionAccuracyEvaluator,
     "persuasion_dynamics": PersuasionDynamicsEvaluator,
 }

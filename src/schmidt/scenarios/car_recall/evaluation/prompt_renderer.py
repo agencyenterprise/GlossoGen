@@ -2,17 +2,13 @@
 
 from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader
+from schmidt.template_renderer import TemplateRenderer
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
-_JINJA_ENV = Environment(
-    loader=FileSystemLoader(_PROMPTS_DIR),
-    autoescape=False,
-    keep_trailing_newline=False,
-)
+
+_RENDERER = TemplateRenderer(prompts_dir=_PROMPTS_DIR)
 
 
-def render_car_recall_prompt(template_name: str, **kwargs: object) -> str:
+def render_car_recall_prompt(template_name: str, template_variables: dict[str, object]) -> str:
     """Render a named template from the car recall evaluation prompts directory."""
-    template = _JINJA_ENV.get_template(name=template_name)
-    return template.render(**kwargs).strip()
+    return _RENDERER.render(template_name=template_name, template_variables=template_variables)

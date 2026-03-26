@@ -30,7 +30,7 @@ class RunSummary(BaseModel):
     scenario_description: str
     scenario_config: dict[str, Any]
     timestamp: datetime
-    total_turns: int
+    total_messages: int
     status: RunStatus
     has_evaluation: bool
     run_dir: str
@@ -66,7 +66,12 @@ class ChannelMessage(BaseModel):
 
 
 class ReasoningEntry(BaseModel):
-    """An LLM reasoning/thinking entry from an agent's turn."""
+    """An LLM reasoning/thinking entry from an agent's turn.
+
+    ``channel_ids`` links this reasoning to the channels of the surrounding
+    send_message calls from the same agent, so the frontend can show only
+    reasoning relevant to the selected channel.
+    """
 
     message_id: str
     sender_agent_id: str
@@ -74,6 +79,7 @@ class ReasoningEntry(BaseModel):
     timestamp: datetime
     turn_number: int
     round_number: int
+    channel_ids: list[str]
 
 
 class DebugLogEntry(BaseModel):
@@ -109,6 +115,7 @@ class RunDetailResponse(BaseModel):
     scenario_description: str
     scenario_config: dict[str, Any]
     timestamp: datetime
+    total_messages: int
     total_turns: int
     status: RunStatus
     channel_ids: list[str]
@@ -120,9 +127,8 @@ class RunDetailResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# SSE event schemas — typed models for the events streamed via
-# GET /api/runs/{run_id}/events. These mirror the backend SimulationEvent
-# models but are tailored for frontend consumption.
+# SSE event schemas — typed models for events streamed via
+# GET /api/runs/{run_id}/events.
 # ---------------------------------------------------------------------------
 
 
@@ -162,6 +168,15 @@ class SSEAgentRegistered(BaseModel):
     model: str
 
 
+class SSEAgentConnected(BaseModel):
+    """SSE event emitted when an agent connects to the MCP server."""
+
+    event_type: Literal["agent_connected"]
+    event_id: str
+    timestamp: datetime
+    agent_id: str
+
+
 class SSETurnAssigned(BaseModel):
     """SSE event emitted when a turn is assigned to an agent."""
 
@@ -192,6 +207,27 @@ class SSELLMResponseReceived(BaseModel):
     text: str | None
 
 
+class SSERoundAdvanced(BaseModel):
+    """SSE event emitted when the game clock advances to a new round."""
+
+    event_type: Literal["round_advanced"]
+    event_id: str
+    timestamp: datetime
+    round_number: int
+    trigger: str
+
+
+class SSEInjectionDelivered(BaseModel):
+    """SSE event emitted when a scenario injection is pushed to an agent."""
+
+    event_type: Literal["injection_delivered"]
+    event_id: str
+    timestamp: datetime
+    agent_id: str
+    round_number: int
+    injection_text: str
+
+
 class SSESimulationEnded(BaseModel):
     """SSE event emitted once when the simulation finishes."""
 
@@ -199,6 +235,7 @@ class SSESimulationEnded(BaseModel):
     event_id: str
     timestamp: datetime
     reason: RunStatus
+    total_messages: int
     total_turns: int
 
 
@@ -243,9 +280,12 @@ SSEEvent = Annotated[
     Union[
         SSESimulationStarted,
         SSEAgentRegistered,
+        SSEAgentConnected,
         SSETurnAssigned,
         SSEMessageSent,
         SSELLMResponseReceived,
+        SSERoundAdvanced,
+        SSEInjectionDelivered,
         SSESimulationEnded,
         SSETokenDelta,
         SSEMessagePreview,

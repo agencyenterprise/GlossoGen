@@ -12,6 +12,8 @@ from schmidt.models.event import (
     AgentRegistered,
     LLMResponseReceived,
     MessageSent,
+    ReasoningCaptured,
+    RoundAdvanced,
     RunStatus,
     SimulationEnded,
     SimulationEvent,
@@ -27,6 +29,7 @@ from schmidt.server.response_models import (
     ReasoningEntry,
     RunDetailResponse,
 )
+from schmidt.stream_manifest import delete_manifest, read_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -66,16 +69,59 @@ async def _load_debug_logs(debug_log_path: Path) -> list[DebugLogEntry]:
             stripped = line.strip()
             if not stripped:
                 continue
-            raw = orjson.loads(stripped)
-            entries.append(
-                DebugLogEntry(
-                    timestamp=raw["timestamp"],
-                    logger_name=raw["logger"],
-                    level=raw["level"],
-                    message=raw["message"],
+            try:
+                raw = orjson.loads(stripped)
+                entries.append(
+                    DebugLogEntry(
+                        timestamp=raw["timestamp"],
+                        logger_name=raw["logger"],
+                        level=raw["level"],
+                        message=raw["message"],
+                    )
                 )
-            )
+            except (KeyError, orjson.JSONDecodeError):
+                logger.exception("Skipping malformed debug log entry in %s", debug_log_path)
     return entries
+
+
+def _link_reasoning_to_channels(
+    reasoning: list[ReasoningEntry],
+    messages: list[ChannelMessage],
+) -> None:
+    """Associate each reasoning entry with the channels of surrounding send_message calls.
+
+    For each agent, walks their events in timestamp order and tags each reasoning
+    entry with the channel of the previous send and the next send. This lets the
+    frontend show only reasoning relevant to the selected channel.
+    """
+    agent_events: dict[str, list[ReasoningEntry | ChannelMessage]] = {}
+    for r in reasoning:
+        agent_events.setdefault(r.sender_agent_id, []).append(r)
+    for m in messages:
+        agent_events.setdefault(m.sender_agent_id, []).append(m)
+
+    for agent_id in agent_events:
+        items = sorted(agent_events[agent_id], key=lambda x: x.timestamp)
+
+        prev_channel = ""
+        pending_reasoning: list[ReasoningEntry] = []
+
+        for item in items:
+            if isinstance(item, ChannelMessage):
+                for r in pending_reasoning:
+                    channels = set()
+                    if prev_channel:
+                        channels.add(prev_channel)
+                    channels.add(item.channel_id)
+                    r.channel_ids = sorted(channels)
+                pending_reasoning = []
+                prev_channel = item.channel_id
+            elif isinstance(item, ReasoningEntry):
+                pending_reasoning.append(item)
+
+        for r in pending_reasoning:
+            if prev_channel:
+                r.channel_ids = [prev_channel]
 
 
 async def load_run_detail(log_path: Path) -> RunDetailResponse:
@@ -91,10 +137,13 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     agents: list[AgentDetail] = []
     messages: list[ChannelMessage] = []
     reasoning: list[ReasoningEntry] = []
+    total_messages = 0
     total_turns = 0
     status = None
 
-    # Track the most recent TurnAssigned per agent
+    current_round = 0
+    # Per-agent turn/round from TurnAssigned (orchestrated mode).
+    # In autonomous mode these stay empty and we fall back to global counters.
     agent_turn: dict[str, int] = {}
     agent_round: dict[str, int] = {}
 
@@ -119,25 +168,46 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 )
             )
 
+        elif isinstance(event, RoundAdvanced):
+            current_round = event.new_round_number
+
         elif isinstance(event, TurnAssigned):
-            total_turns += 1
+            total_turns = event.turn_number
             agent_turn[event.agent_id] = event.turn_number
             agent_round[event.agent_id] = event.round_number
+            current_round = event.round_number
+
+        elif isinstance(event, ReasoningCaptured):
+            total_messages += 1
+            reasoning.append(
+                ReasoningEntry(
+                    message_id=event.event_id,
+                    sender_agent_id=event.agent_id,
+                    text=event.reasoning_text,
+                    timestamp=event.timestamp,
+                    turn_number=agent_turn.get(event.agent_id, total_messages),
+                    round_number=agent_round.get(event.agent_id, current_round),
+                    channel_ids=[],
+                )
+            )
 
         elif isinstance(event, LLMResponseReceived):
             if event.text is not None and event.text.strip():
+                total_messages += 1
                 reasoning.append(
                     ReasoningEntry(
                         message_id=event.event_id,
                         sender_agent_id=event.agent_id,
                         text=event.text,
                         timestamp=event.timestamp,
-                        turn_number=agent_turn.get(event.agent_id, 0),
-                        round_number=agent_round.get(event.agent_id, 0),
+                        turn_number=agent_turn.get(event.agent_id, total_messages),
+                        round_number=agent_round.get(event.agent_id, current_round),
+                        channel_ids=[],
                     )
                 )
 
         elif isinstance(event, MessageSent):
+            total_messages += 1
             msg = event.message
             messages.append(
                 ChannelMessage(
@@ -146,18 +216,26 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     sender_agent_id=msg.sender_agent_id,
                     text=msg.text,
                     timestamp=msg.timestamp,
-                    turn_number=agent_turn.get(msg.sender_agent_id, 0),
-                    round_number=agent_round.get(msg.sender_agent_id, 0),
+                    turn_number=agent_turn.get(msg.sender_agent_id, total_messages),
+                    round_number=agent_round.get(msg.sender_agent_id, current_round),
                 )
             )
 
         elif isinstance(event, SimulationEnded):
             status = event.reason
 
+    _link_reasoning_to_channels(reasoning=reasoning, messages=messages)
+
     if timestamp is None:
         raise ValueError(f"No SimulationStarted event found in {log_path}")
     if status is None:
-        status = RunStatus.IN_PROGRESS
+        run_dir = log_path.parent
+        manifest = read_manifest(run_dir=run_dir)
+        if manifest is not None:
+            status = RunStatus.IN_PROGRESS
+        else:
+            delete_manifest(run_dir=run_dir)
+            status = RunStatus.ERROR
 
     report_path = log_path.with_name(f"{scenario_name}_report.json")
     evaluation = await _load_evaluation_report(report_path=report_path)
@@ -171,6 +249,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         scenario_description=scenario_description,
         scenario_config=scenario_config,
         timestamp=timestamp,
+        total_messages=total_messages,
         total_turns=total_turns,
         status=status,
         channel_ids=channel_ids,

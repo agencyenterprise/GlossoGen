@@ -1,6 +1,7 @@
-"""Abstract base class defining the interface that all evaluators must implement."""
+"""Abstract base class and factory type alias for simulation evaluators."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 
 from schmidt.evaluation.evaluation_report import MetricResult
 from schmidt.llm.provider import LLMProvider
@@ -37,3 +38,7 @@ class Evaluator(ABC):
             A ``MetricResult`` containing the computed score and associated metadata.
         """
         ...
+
+
+EvaluatorFactory = Callable[[], Evaluator]
+"""A zero-argument callable that produces an ``Evaluator`` instance."""

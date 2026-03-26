@@ -147,7 +147,7 @@ export function RunList() {
                     </button>
                   </span>
                   <span className="w-20 text-muted-foreground">{formatTime(run.timestamp)}</span>
-                  <span className="w-16 text-muted-foreground">{run.total_turns} turns</span>
+                  <span className="w-16 text-muted-foreground">{run.total_messages} messages</span>
                   <span className="w-36 text-muted-foreground">
                     {STATUS_LABELS[run.status] ?? run.status}
                   </span>

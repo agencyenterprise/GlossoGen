@@ -7,8 +7,10 @@ true. Produces per-agent, per-round accuracy scores.
 
 import json
 import logging
+from pathlib import Path
 from typing import Literal
 
+from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, Field
 
 from schmidt.evaluation.evaluation_report import MetricResult, Verdict
@@ -19,6 +21,13 @@ from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import GroundTruthSnapshot, SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
+
+_SCENARIO_PROMPTS_DIR = Path(__file__).parent / "prompts"
+_SCENARIO_JINJA_ENV = Environment(
+    loader=FileSystemLoader(_SCENARIO_PROMPTS_DIR),
+    autoescape=False,
+    keep_trailing_newline=False,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -115,15 +124,17 @@ class ReportAccuracyEvaluator(Evaluator):
 
         all_transcripts = "\n\n".join(agent_transcripts)
 
-        judge_prompt = render_evaluator_prompt(
-            template_name="report_accuracy_user.jinja",
+        template = _SCENARIO_JINJA_ENV.get_template(name="report_accuracy_user.jinja")
+        judge_prompt = template.render(
             ground_truth=ground_truth_text,
             agent_transcripts=all_transcripts,
             agent_roles="\n".join(f"- {ac.agent_id} ({ac.role_name})" for ac in agent_configs),
         )
 
         result = await llm_provider.generate_structured(
-            system_prompt=render_evaluator_prompt(template_name="evaluator_system.jinja"),
+            system_prompt=render_evaluator_prompt(
+                template_name="evaluator_system.jinja", template_variables={}
+            ),
             messages=[LLMMessage(role="user", content=judge_prompt)],
             output_schema=ReportAccuracyVerdictOutput,
         )

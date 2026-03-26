@@ -383,9 +383,11 @@ class SimulationHub:
             await asyncio.gather(*tasks.values(), return_exceptions=True)
 
             if self._event_logger.is_open:
+                total_msg = sum(len(msgs) for msgs in channel_router.get_all_messages().values())
                 await self._event_logger.log(
                     event=SimulationEnded(
                         reason=run_status,
+                        total_messages=total_msg,
                         total_turns=turn_number,
                     )
                 )

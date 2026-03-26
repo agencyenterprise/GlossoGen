@@ -50,7 +50,6 @@ EFFORT_UNITS_BY_LEVEL: dict[EffortLevel, float] = {
 }
 
 EFFORT_TO_PROGRESS_BASE = 0.12
-QUALITY_DECAY_FACTOR = 0.05
 
 
 class BurnoutEvent(NamedTuple):
@@ -247,34 +246,6 @@ def run_qa_on_feature(feature: Feature) -> str:
         return f"QA passed for {feature.name}. No bugs found."
     feature.status = FeatureStatus.QA_FAILED
     return f"QA found {num_bugs} bug(s) in {feature.name}. Needs fixing."
-
-
-def fix_bugs_on_feature(
-    feature: Feature,
-    effort_units: float,
-    budget: BudgetTracker,
-    round_number: int,
-) -> str:
-    """Apply effort to fix bugs found during QA."""
-    if feature.qa.bugs_found <= feature.qa.bugs_fixed:
-        return f"No outstanding bugs to fix on {feature.name}."
-
-    remaining_bugs = feature.qa.bugs_found - feature.qa.bugs_fixed
-    fixes = min(remaining_bugs, int(effort_units))
-    feature.qa.bugs_fixed += fixes
-
-    budget.record_spend(
-        round_number=round_number,
-        amount=effort_units,
-        category="bug_fixing",
-    )
-
-    if feature.qa.bugs_fixed >= feature.qa.bugs_found:
-        feature.qa.passed = True
-        feature.status = FeatureStatus.QA_PASSED
-        return f"Fixed {fixes} bug(s) on {feature.name}. All bugs resolved — QA passed."
-    still_remaining = feature.qa.bugs_found - feature.qa.bugs_fixed
-    return f"Fixed {fixes} bug(s) on {feature.name}. {still_remaining} bug(s) remaining."
 
 
 EXTERNAL_EVENTS: dict[str, dict[str, Any]] = {
