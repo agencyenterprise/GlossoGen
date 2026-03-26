@@ -20,8 +20,6 @@ from schmidt.scenarios.persuasion_debate.question_bank import QuestionBank
 
 logger = logging.getLogger(__name__)
 
-QUESTIONS_PATH = Path(__file__).parent / "questions.json"
-
 SYSTEM_PROMPT = (
     "You are a trivia question analyst. Given a trivia question and its correct answer, "
     "generate a single wrong answer that is plausible enough to fool someone who is unsure. "

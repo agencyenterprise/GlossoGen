@@ -262,7 +262,6 @@ class HuggingFaceProvider(LLMProvider):
             token=hf_token, model=model, provider=inference_provider  # type: ignore[arg-type]
         )
         self._model = model
-        self._inference_provider = inference_provider
         logger.info(
             "HuggingFaceProvider initialized with model=%s, inference_provider=%s",
             model,

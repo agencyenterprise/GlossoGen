@@ -15,6 +15,7 @@ import argparse
 import json
 import logging
 import random
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any, Self
 
@@ -22,7 +23,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from schmidt.channel_generation import generate_dm_channels
 from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult, write_report
-from schmidt.evaluation.evaluator_protocol import Evaluator
+from schmidt.evaluation.evaluator_protocol import EvaluatorFactory
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
 from schmidt.llm.provider_factory import create_provider
@@ -31,6 +32,7 @@ from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.models.shared_document_config import SharedDocumentConfig
 from schmidt.models.simulation_state import SimulationState, TurnDecision
 from schmidt.models.tool_definition import ToolParameter, ToolSpec
+from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.product_launch.channel_ids import (
     BE_DASHBOARD_ID,
@@ -74,6 +76,10 @@ from schmidt.tools.tool_registry import ToolRegistry
 logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+DEFAULT_MAX_ROUND_DURATION_SECONDS = 300.0
+DEFAULT_REACTION_DELAY_MIN = 0.5
+DEFAULT_REACTION_DELAY_MAX = 3.0
 
 ALL_AGENT_IDS = [
     PM_ID,
@@ -280,8 +286,13 @@ class ProductLaunchScenario(SimulationScenario):
     by delegating state methods to ``ProductLaunchState``.
     """
 
-    def __init__(self, knobs: ProductLaunchKnobs) -> None:
+    def __init__(
+        self,
+        knobs: ProductLaunchKnobs,
+        max_round_duration_seconds: float | None,
+    ) -> None:
         self._knobs = knobs
+        self._max_round_duration_seconds = max_round_duration_seconds
         self._state = ProductLaunchState(knobs=knobs)
         self._jinja_env = Environment(
             loader=FileSystemLoader(PROMPTS_DIR),
@@ -303,12 +314,17 @@ class ProductLaunchScenario(SimulationScenario):
 
     @classmethod
     def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        """Register the --knobs argument pointing to a JSON config file."""
+        """Register the --knobs and --max-round-duration arguments."""
         parser.add_argument(
             "--knobs",
             type=str,
             required=True,
             help="Path to JSON file with ProductLaunchKnobs configuration.",
+        )
+        parser.add_argument(
+            "--max-round-duration",
+            type=float,
+            help="Maximum seconds per round before force-advancing (autonomous mode)",
         )
 
     @classmethod
@@ -318,7 +334,8 @@ class ProductLaunchScenario(SimulationScenario):
         with open(knobs_path) as f:
             knobs_data = json.load(f)
         knobs = ProductLaunchKnobs(**knobs_data)
-        return cls(knobs=knobs)
+        max_round_duration: float | None = getattr(args, "max_round_duration", None)
+        return cls(knobs=knobs, max_round_duration_seconds=max_round_duration)
 
     def name(self) -> str:
         """Return the scenario identifier."""
@@ -566,6 +583,71 @@ class ProductLaunchScenario(SimulationScenario):
         self._register_read_tools(registry=registry)
         self._register_action_tools(registry=registry)
 
+    # --- Autonomous mode: MCP tools ---
+
+    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+        """Return scenario-specific tools for MCP registration in autonomous mode.
+
+        Each tool executor accepts ``agent_id`` as its first parameter; the MCP
+        registration layer injects it from the HTTP connection context so the
+        LLM never sees it.
+        """
+        state = self._state
+        return [
+            ScenarioMcpTool(
+                name="check_project_status",
+                description=CHECK_PROJECT_STATUS_SPEC.description,
+                executor=_mcp_check_project_status(state=state),
+                requires_agent_id=True,
+            ),
+            ScenarioMcpTool(
+                name="check_budget",
+                description=CHECK_BUDGET_SPEC.description,
+                executor=_mcp_check_budget(state=state),
+                requires_agent_id=True,
+            ),
+            ScenarioMcpTool(
+                name="check_feature_detail",
+                description=CHECK_FEATURE_DETAIL_SPEC.description,
+                executor=_mcp_check_feature_detail(state=state),
+                requires_agent_id=True,
+            ),
+            ScenarioMcpTool(
+                name="allocate_effort",
+                description=ALLOCATE_EFFORT_SPEC.description,
+                executor=_mcp_allocate_effort(state=state),
+                requires_agent_id=True,
+            ),
+            ScenarioMcpTool(
+                name="report_status",
+                description=REPORT_STATUS_SPEC.description,
+                executor=_mcp_report_status(state=state),
+                requires_agent_id=True,
+            ),
+            ScenarioMcpTool(
+                name="flag_concern",
+                description=FLAG_CONCERN_SPEC.description,
+                executor=_mcp_flag_concern(state=state),
+                requires_agent_id=True,
+            ),
+        ]
+
+    # --- Autonomous mode: timing configuration ---
+
+    def get_round_count(self) -> int:
+        """Return the total number of rounds from the knobs."""
+        return self._knobs.num_rounds
+
+    def get_max_round_duration_seconds(self) -> float:
+        """Return the maximum wall-clock seconds a round may last."""
+        if self._max_round_duration_seconds is not None:
+            return self._max_round_duration_seconds
+        return DEFAULT_MAX_ROUND_DURATION_SECONDS
+
+    def get_agent_reaction_delay_range(self, agent_id: str) -> tuple[float, float]:  # noqa: ARG002
+        """Return the (min, max) reaction delay in seconds for an agent."""
+        return (DEFAULT_REACTION_DELAY_MIN, DEFAULT_REACTION_DELAY_MAX)
+
     async def run_evaluation(
         self,
         log_path: Path,
@@ -587,7 +669,7 @@ class ProductLaunchScenario(SimulationScenario):
             reasoning_effort=reasoning_effort,
         )
 
-        registry: dict[str, type[Evaluator]] = {}
+        registry: dict[str, EvaluatorFactory] = {}
         registry.update(GENERIC_EVALUATOR_REGISTRY)
         registry.update(self._get_scenario_evaluators())
 
@@ -858,7 +940,7 @@ class ProductLaunchScenario(SimulationScenario):
 
         registry.register(spec=FLAG_CONCERN_SPEC, executor=flag_concern)
 
-    def _get_scenario_evaluators(self) -> dict[str, type[Evaluator]]:
+    def _get_scenario_evaluators(self) -> dict[str, EvaluatorFactory]:
         """Return product launch scenario-specific evaluators."""
         return {
             "launch_outcome": LaunchOutcomeEvaluator,
@@ -868,3 +950,161 @@ class ProductLaunchScenario(SimulationScenario):
             "conflict_resolution": ConflictResolutionEvaluator,
             "report_accuracy": ReportAccuracyEvaluator,
         }
+
+
+# --- MCP tool executor factories ---
+# Each factory returns an async function that accepts ``agent_id`` as its
+# first parameter. The MCP registration layer wraps these so agent_id is
+# injected from the HTTP connection context.
+
+
+def _mcp_check_project_status(
+    state: ProductLaunchState,
+) -> Callable[..., Awaitable[str]]:
+    """Build the check_project_status MCP tool executor."""
+
+    async def executor(agent_id: str) -> str:
+        """Return role-filtered project status for the calling agent."""
+        obs = state.get_agent_observation(agent_id=agent_id)
+        features = obs.get("features", [])
+        lines = [f"Project Status (Week {obs.get('round', '?')}/{obs.get('total_rounds', '?')}):"]
+        for f in features:
+            line = f"  {f.get('name', '?')}: {f.get('status', '?')}"
+            if "backend_completion_pct" in f:
+                be = f["backend_completion_pct"]
+                fe = f["frontend_completion_pct"]
+                line += f" (BE: {be:.0%}, FE: {fe:.0%})"
+            elif "reported_completion_pct" in f and f["reported_completion_pct"] is not None:
+                line += f" (reported: {f['reported_completion_pct']:.0f}%)"
+            lines.append(line)
+        return "\n".join(lines)
+
+    return executor
+
+
+def _mcp_check_budget(
+    state: ProductLaunchState,
+) -> Callable[..., Awaitable[str]]:
+    """Build the check_budget MCP tool executor."""
+
+    async def executor(agent_id: str) -> str:
+        """Return budget information for the calling agent."""
+        obs = state.get_agent_observation(agent_id=agent_id)
+        budget = obs.get("budget")
+        if budget is None:
+            return "You do not have access to budget information."
+        return (
+            f"Budget: {budget['spent_ru']:.0f}/{budget['total_ru']:.0f} RU spent, "
+            f"{budget['remaining_ru']:.0f} RU remaining. "
+            f"Burn rate: {budget.get('burn_rate', 0):.1f} RU/week."
+        )
+
+    return executor
+
+
+def _mcp_check_feature_detail(
+    state: ProductLaunchState,
+) -> Callable[..., Awaitable[str]]:
+    """Build the check_feature_detail MCP tool executor."""
+
+    async def executor(agent_id: str, feature_id: str) -> str:
+        """Return detailed status for a specific feature."""
+        obs = state.get_agent_observation(agent_id=agent_id)
+        for f in obs.get("features", []):
+            if f.get("feature_id") == feature_id:
+                lines = [f"Feature: {f['name']} ({f['feature_id']})"]
+                lines.append(f"  Status: {f['status']}")
+                if "backend_completion_pct" in f:
+                    lines.append(f"  Backend: {f['backend_completion_pct']:.0%}")
+                if "frontend_completion_pct" in f:
+                    lines.append(f"  Frontend: {f['frontend_completion_pct']:.0%}")
+                if "backend_complexity" in f:
+                    lines.append(f"  Backend Complexity: {f['backend_complexity']}")
+                    lines.append(f"  Frontend Complexity: {f['frontend_complexity']}")
+                if "integration_dependencies" in f:
+                    deps = f["integration_dependencies"]
+                    if deps:
+                        lines.append(f"  Dependencies: {', '.join(deps)}")
+                    else:
+                        lines.append("  Dependencies: none")
+                if "quality_score" in f:
+                    lines.append(f"  Quality Score: {f['quality_score']:.2f}")
+                if "bugs_found" in f:
+                    lines.append(f"  Bugs: {f['bugs_found']} found, {f.get('bugs_fixed', 0)} fixed")
+                if f.get("frontend_blocked"):
+                    lines.append("  *** Frontend is BLOCKED (backend < 70%) ***")
+                if f.get("spec_deviation_alert"):
+                    lines.append("  *** SPEC DEVIATION detected ***")
+                if f.get("ready_for_qa"):
+                    lines.append("  *** Ready for QA testing ***")
+                if "reported_completion_pct" in f and f["reported_completion_pct"] is not None:
+                    lines.append(f"  Reported Completion: {f['reported_completion_pct']:.0f}%")
+                    lines.append(f"  Reported Risk: {f.get('reported_risk_level', '?')}")
+                if "delta" in f and f["delta"] is not None:
+                    lines.append(f"  Reported vs Actual Delta: {f['delta']:+.1f}%")
+                return "\n".join(lines)
+        return f"Feature '{feature_id}' not found."
+
+    return executor
+
+
+def _mcp_allocate_effort(
+    state: ProductLaunchState,
+) -> Callable[..., Awaitable[str]]:
+    """Build the allocate_effort MCP tool executor."""
+
+    async def executor(agent_id: str, feature_id: str, level: str) -> str:
+        """Allocate effort on a feature for the calling agent."""
+        action = AgentAction(
+            action_type="allocate_effort",
+            parameters={"feature_id": feature_id, "level": level},
+        )
+        outcome = state.apply_agent_action(agent_id=agent_id, action=action)
+        return outcome.agent_visible_result
+
+    return executor
+
+
+def _mcp_report_status(
+    state: ProductLaunchState,
+) -> Callable[..., Awaitable[str]]:
+    """Build the report_status MCP tool executor."""
+
+    async def executor(
+        agent_id: str,
+        feature_id: str,
+        completion_pct: float,
+        risk_level: str,
+        notes: str,
+    ) -> str:
+        """Submit a structured status report for a feature."""
+        action = AgentAction(
+            action_type="report_status",
+            parameters={
+                "feature_id": feature_id,
+                "completion_pct": completion_pct,
+                "risk_level": risk_level,
+                "notes": notes,
+            },
+        )
+        outcome = state.apply_agent_action(agent_id=agent_id, action=action)
+        return outcome.agent_visible_result
+
+    return executor
+
+
+def _mcp_flag_concern(
+    state: ProductLaunchState,
+) -> Callable[..., Awaitable[str]]:
+    """Build the flag_concern MCP tool executor."""
+
+    async def executor(agent_id: str, description: str) -> str:
+        """Flag a concern or risk, appending it to the shared Concerns Log."""
+        action = AgentAction(
+            action_type="flag_concern",
+            parameters={"description": description},
+        )
+        outcome = state.apply_agent_action(agent_id=agent_id, action=action)
+        return outcome.agent_visible_result
+
+    return executor

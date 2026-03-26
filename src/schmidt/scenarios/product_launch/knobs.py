@@ -21,10 +21,3 @@ class ProductLaunchKnobs(BaseModel):
     budget_total_ru: int
     budget_deficit_pct: float
     external_event_intensity: str
-
-    transparency_audit_log: bool
-    escalation_channel_enabled: bool
-    reputation_system_enabled: bool
-    sanctioning_enabled: bool
-    governance_monitor_role: bool
-    covenant_prompt_enabled: bool

@@ -18,18 +18,11 @@ from schmidt.scenario_protocol import SimulationScenario
 logger = logging.getLogger(__name__)
 
 
-def _classify_channels(
+def _get_dm_channels(
     scenario: SimulationScenario,
-) -> tuple[set[str], set[str]]:
+) -> set[str]:
     """Partition channel IDs into DM (2-member) and group (3+ member) sets."""
-    dm_channels: set[str] = set()
-    group_channels: set[str] = set()
-    for channel in scenario.get_channels():
-        if len(channel.member_agent_ids) <= 2:
-            dm_channels.add(channel.channel_id)
-        else:
-            group_channels.add(channel.channel_id)
-    return dm_channels, group_channels
+    return {ch.channel_id for ch in scenario.get_channels() if len(ch.member_agent_ids) <= 2}
 
 
 def _build_round_map(events: list[SimulationEvent]) -> dict[int, int]:
@@ -77,7 +70,7 @@ class CommunicationPatternEvaluator(Evaluator):
         """Analyze message patterns and produce communication structure metrics."""
         logger.info("CommunicationPatternEvaluator: analyzing %d events", len(events))
 
-        dm_channels, group_channels = _classify_channels(scenario=scenario)
+        dm_channels = _get_dm_channels(scenario=scenario)
         round_map = _build_round_map(events=events)
 
         # Per-agent-per-channel-per-round message counts

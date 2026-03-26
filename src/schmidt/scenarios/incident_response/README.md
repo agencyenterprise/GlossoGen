@@ -35,15 +35,21 @@ The `display_name` is per-agent — each agent sees the channel named relative t
 
 ## Tools
 
-**`send_message(channel_id: str, text: str)`** — built-in, all agents. Agents can send multiple messages per turn to any channel they are a member of.
+**`send_message(channel_id: str, text: str)`** — MCP tool, all agents. Sends a message to a channel the agent is a member of.
 
-**`pass_turn(reason: str)`** — built-in, all agents. Declines to speak on the current turn. Not available on the first rotation of each discussion.
+**`read_channel(channel_id: str, last_n: int)`** — MCP tool, all agents. Returns the last N messages from a channel.
 
-**`propose_resolution(diagnosis: str, fix_plan: str, estimated_hours: int)`** — any agent can propose a resolution. The scenario logs it but does not end the simulation. Multiple proposals can be made. The PM is instructed to submit a formal proposal at round 4 when leadership demands one. Agents can submit updated proposals in later rounds as new information emerges.
+**`check_messages()`** — MCP tool, all agents. Blocks until new activity occurs on any channel the agent belongs to, then returns the new messages. Agents call this when waiting for others to respond.
+
+**`list_channels()`** — MCP tool, all agents. Returns all channels the agent is a member of, with display names.
+
+**`get_channel_members(channel_id: str)`** — MCP tool, all agents. Returns the list of members in a channel.
+
+**`propose_resolution(diagnosis: str, fix_plan: str, estimated_hours: int)`** — any agent can propose a resolution. Returns a confirmation string but does not end the simulation. Multiple proposals can be made. The PM is instructed to submit a formal proposal at round 4 when leadership demands one. Agents can submit updated proposals in later rounds as new information emerges.
 
 ## Round Injections
 
-Each round, agents receive a private message framed as their user giving them new information. Delivered before the agent's turn as an additional user message.
+Each round, agents receive a private message framed as their user giving them new information. Delivered at the start of the round before agents begin communicating.
 
 ### Round 1 — Initial Report
 
@@ -81,32 +87,26 @@ Each round, agents receive a private message framed as their user giving them ne
 - **Support Lead**: "Update: we're at 500+ tickets. The automated refund system is struggling. A tech journalist reached out asking about the outage. Comms team is drafting a public statement based on the resolution proposal. If the diagnosis is wrong, the public statement will be wrong too."
 - **PM**: "Update: the engineering VP asked for a final incident summary. He wants to know: what's the root cause, who's accountable, what's the fix, and what process changes will prevent this. This will go to the C-suite. Submit a final `propose_resolution` if your diagnosis has changed."
 
-## Turn Logic
+## Agent Coordination
 
-Each round has two phases: a war room discussion followed by optional private sidebar discussions.
+Agents act autonomously within each round. There is no fixed speaking order — each agent decides independently when to send messages and when to wait.
 
-**War room discussion**: All agents rotate in order (PM → Engineer → Support Lead on the first rotation). On each turn, agents can send multiple messages to any channel or call `pass_turn` to decline (`pass_turn` is not available on the first rotation). When a full rotation completes with nobody sending a message, the discussion ends. Between rotations, the agent order is shuffled (the last agent in the previous rotation is excluded from the first position). A configurable `--max-turns-per-round` cap forces the discussion to end after a set number of turns.
+**Blocking on activity**: Agents call `check_messages` to block until new channel activity occurs. This prevents busy-waiting and naturally staggers responses — agents wake up and react when another agent posts a message.
 
-**Sidebar discussions**: After the war room, scheduled sidebar pairs rotate until both agents pass (or hit the turn cap). Both agents in the sidebar participate — the initiator speaks first.
+**Per-channel locks**: Each channel has a write lock so that only one agent sends a message at a time, preventing message interleaving within a single channel.
 
-Private sidebar schedule:
-- Round 1: none
-- Round 2: Engineer ↔ PM
-- Round 3: Support Lead ↔ PM
-- Round 4: PM ↔ Engineer, Support Lead ↔ Engineer
-- Round 5: Engineer ↔ PM
-- Round 6: PM ↔ Engineer
+**Round structure**: Each round begins with injection messages delivered to each agent. Agents then communicate freely across all channels they belong to (war room and private sidebars). A round ends when all agents are idle (blocked on `check_messages` with no pending activity) or when the `--max-round-duration` timeout is reached.
 
-6 rounds total. The number of turns per round varies based on the discussion dynamics and the max turns cap.
+6 rounds total. The amount of communication per round varies based on agent behavior and the round duration timeout.
 
 ## End Condition
 
-Simulation ends after round 6 completes. Discussions within a round end when all agents pass in a full rotation or the `--max-turns-per-round` cap is reached.
+Simulation ends after round 6 completes (all agents idle and no more rounds remain) or when the `--max-round-duration` timeout triggers on the final round.
 
 ## CLI
 
 ```bash
-python -m schmidt run incident_response --model <model> --runs-dir ./runs --max-turns-per-round 10
+python -m schmidt run incident_response --model <model> --runs-dir ./runs --max-round-duration 300
 ```
 
 ## Evaluation Focus

@@ -24,6 +24,10 @@ class ChannelRouter:
         """Return a copy of the message history for the given channel."""
         return list(self._messages[channel_id])
 
+    def get_message_count(self, channel_id: str) -> int:
+        """Return the number of messages in the given channel."""
+        return len(self._messages[channel_id])
+
     def get_agent_channel_ids(self, agent_id: str) -> list[str]:
         """Return the channel IDs for all channels the given agent belongs to."""
         return [ch.channel_id for ch in self._channels.values() if agent_id in ch.member_agent_ids]
@@ -50,6 +54,13 @@ class ChannelRouter:
         if message.channel_id not in self._messages:
             raise ValueError(f"Unknown channel: {message.channel_id}")
         self._messages[message.channel_id].append(message)
+
+    def get_channel_member_ids(self, channel_id: str) -> list[str]:
+        """Return the member agent IDs for the given channel.
+
+        Raises KeyError if the channel does not exist.
+        """
+        return self._channels[channel_id].member_agent_ids
 
     def get_all_messages(self) -> dict[str, list[SimulationMessage]]:
         """Return a copy of all message histories, keyed by channel ID."""

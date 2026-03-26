@@ -200,6 +200,10 @@ export interface components {
         /**
          * ReasoningEntry
          * @description An LLM reasoning/thinking entry from an agent's turn.
+         *
+         *     ``channel_ids`` links this reasoning to the channels of the surrounding
+         *     send_message calls from the same agent, so the frontend can show only
+         *     reasoning relevant to the selected channel.
          */
         ReasoningEntry: {
             /** Message Id */
@@ -217,6 +221,8 @@ export interface components {
             turn_number: number;
             /** Round Number */
             round_number: number;
+            /** Channel Ids */
+            channel_ids: string[];
         };
         /**
          * RunDetailResponse
@@ -238,6 +244,8 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
+            /** Total Messages */
+            total_messages: number;
             /** Total Turns */
             total_turns: number;
             status: components["schemas"]["RunStatus"];
@@ -287,13 +295,33 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
-            /** Total Turns */
-            total_turns: number;
+            /** Total Messages */
+            total_messages: number;
             status: components["schemas"]["RunStatus"];
             /** Has Evaluation */
             has_evaluation: boolean;
             /** Run Dir */
             run_dir: string;
+        };
+        /**
+         * SSEAgentConnected
+         * @description SSE event emitted when an agent connects to the MCP server.
+         */
+        SSEAgentConnected: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "agent_connected";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Agent Id */
+            agent_id: string;
         };
         /**
          * SSEAgentRegistered
@@ -343,6 +371,30 @@ export interface components {
             level: string;
             /** Message */
             message: string;
+        };
+        /**
+         * SSEInjectionDelivered
+         * @description SSE event emitted when a scenario injection is pushed to an agent.
+         */
+        SSEInjectionDelivered: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "injection_delivered";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Round Number */
+            round_number: number;
+            /** Injection Text */
+            injection_text: string;
         };
         /**
          * SSELLMResponseReceived
@@ -408,6 +460,28 @@ export interface components {
             message: components["schemas"]["SSESimulationMessagePayload"];
         };
         /**
+         * SSERoundAdvanced
+         * @description SSE event emitted when the game clock advances to a new round.
+         */
+        SSERoundAdvanced: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "round_advanced";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Round Number */
+            round_number: number;
+            /** Trigger */
+            trigger: string;
+        };
+        /**
          * SSESimulationEnded
          * @description SSE event emitted once when the simulation finishes.
          */
@@ -425,6 +499,8 @@ export interface components {
              */
             timestamp: string;
             reason: components["schemas"]["RunStatus"];
+            /** Total Messages */
+            total_messages: number;
             /** Total Turns */
             total_turns: number;
         };
@@ -644,7 +720,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSETurnAssigned"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSETurnAssigned"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
                 };
             };
             /** @description Validation Error */

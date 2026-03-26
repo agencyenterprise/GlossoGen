@@ -29,13 +29,10 @@ class ActionOutcome(BaseModel):
     Attributes:
         success: Whether the action was applied successfully.
         agent_visible_result: Description returned to the acting agent.
-        ground_truth_delta: Full details of what changed, logged for evaluation
-            but never shown to any agent.
     """
 
     success: bool
     agent_visible_result: str
-    ground_truth_delta: dict[str, Any]
 
 
 class RoundTransitionReport(BaseModel):

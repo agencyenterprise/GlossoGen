@@ -20,7 +20,7 @@ interface ChatPaneProps {
   onSelectAgent: (agentId: string) => void;
   highlightedMessageId: string | null;
   highlightNonce: number;
-  /** Agent ID currently streaming a response (Level 2 token streaming). */
+  /** Agent ID currently streaming a response. */
   streamingAgentId: string | null;
 }
 
@@ -117,8 +117,8 @@ export function ChatPane({
   }, []);
 
   // Track scroll position to determine if user is at the bottom.
-  // Uses the previous scrollHeight to avoid a race where new content
-  // pushes the user past the threshold before this handler fires.
+  // When the user scrolls up to read history we stop auto-scrolling;
+  // once they scroll back down past the threshold we resume.
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
@@ -128,10 +128,9 @@ export function ChatPane({
     prevScrollHeightRef.current = el.scrollHeight;
   }, []);
 
-  // Auto-scroll when the DOM content grows and the user was at the bottom.
-  // A MutationObserver catches all content changes (new messages, growing
-  // partial text, etc.) and scrolls before the browser fires onScroll,
-  // preventing the "fell behind" race condition with large messages.
+  // A MutationObserver catches all content changes (new messages, partial
+  // streaming text, reasoning expansion) and scrolls to the bottom when the
+  // user was already there. This avoids tracking individual state updates.
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return undefined;
@@ -178,13 +177,12 @@ export function ChatPane({
     return map;
   }, [agents]);
 
-  const filtered = useMemo(
-    () =>
-      selectedChannel === null
-        ? messages
-        : messages.filter(m => m.is_reasoning || m.channel_id === selectedChannel),
-    [messages, selectedChannel]
-  );
+  const filtered = useMemo(() => {
+    if (selectedChannel === null) {
+      return messages;
+    }
+    return messages.filter(m => m.is_reasoning || m.channel_ids.includes(selectedChannel));
+  }, [messages, selectedChannel]);
 
   const rounds = useMemo(() => groupByRoundAndTurn(filtered), [filtered]);
   const showChannelBadge = selectedChannel === null;
@@ -193,6 +191,20 @@ export function ChatPane({
   if (selectedChannel !== null) {
     headerName = humanize(selectedChannel);
   }
+
+  const headerMembers = useMemo(() => {
+    if (selectedChannel === null) {
+      return null;
+    }
+    const members = agents
+      .filter(a => a.channel_ids.includes(selectedChannel))
+      .map(a => a.role_name);
+    if (members.length === 0) {
+      return null;
+    }
+    return members.join(", ");
+  }, [selectedChannel, agents]);
+
   const headerDesc =
     selectedChannel === null ? "all channels, global turn order" : `#${selectedChannel}`;
 
@@ -202,6 +214,9 @@ export function ChatPane({
         <span className="text-sm text-muted-foreground">#</span>
         <span className="text-[13px] font-medium">{headerName}</span>
         <span className="text-xs text-muted-foreground">{headerDesc}</span>
+        {headerMembers ? (
+          <span className="ml-auto text-[11px] text-muted-foreground">{headerMembers}</span>
+        ) : null}
         {streamingAgentId ? (
           <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground">
             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />

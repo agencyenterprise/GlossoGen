@@ -7,7 +7,6 @@ reported and actual, and technical roles see their own domain metrics.
 """
 
 import logging
-from enum import Enum
 from typing import Any, NamedTuple
 
 from schmidt.scenarios.product_launch.budget_model import BudgetTracker
@@ -106,15 +105,6 @@ ROLE_CAN_SEE_BUDGET = {PM_ID, DATA_ANALYST_ID}
 MAX_EFFORT_ALLOCATIONS_PER_ROUND = 2
 
 
-class RiskLevel(str, Enum):
-    """Risk assessment for a feature status report."""
-
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
 class StatusReport(NamedTuple):
     """A single agent-submitted status report for a feature in a round."""
 
@@ -173,18 +163,6 @@ class ProductLaunchState:
         self._concerns: list[dict[str, Any]] = []
         self._pending_burnouts: list[BurnoutEvent] = []
 
-    def get_features(self) -> list[Feature]:
-        """Return the feature list for use by scenario tools."""
-        return self._features
-
-    def get_budget(self) -> BudgetTracker:
-        """Return the budget tracker for use by scenario tools."""
-        return self._budget
-
-    def get_status_reports(self) -> list[StatusReport]:
-        """Return all submitted status reports."""
-        return list(self._status_reports)
-
     def get_agent_observation(self, agent_id: str) -> dict[str, Any]:
         """Return the state visible to a specific agent based on their role.
 
@@ -238,7 +216,6 @@ class ProductLaunchState:
         return ActionOutcome(
             success=False,
             agent_visible_result=f"Unknown action type: {action_type}",
-            ground_truth_delta={},
         )
 
     def advance_round(self, round_number: int) -> RoundTransitionReport:
@@ -345,20 +322,6 @@ class ProductLaunchState:
             ],
         }
 
-    def get_external_event_description(self, round_number: int) -> str | None:
-        """Return a human-readable description of the external event for this round."""
-        event_key = get_external_event_for_round(
-            round_number=round_number,
-            num_rounds=self._knobs.num_rounds,
-            intensity=self._knobs.external_event_intensity,
-        )
-        if event_key is None:
-            return None
-        event_info = EXTERNAL_EVENTS.get(event_key)
-        if event_info is None:
-            return None
-        return f"{event_info['description']} {event_info['effect']}"
-
     def get_external_event_for_agent(self, round_number: int, agent_id: str) -> str | None:
         """Return external event text if this agent should see it, else None."""
         event_key = get_external_event_for_round(
@@ -392,7 +355,6 @@ class ProductLaunchState:
                     f"Invalid effort level '{level_str}'. "
                     f"Use 'reduced', 'standard', or 'accelerated'."
                 ),
-                ground_truth_delta={},
             )
 
         feature = self._find_feature(feature_id=feature_id)
@@ -400,7 +362,6 @@ class ProductLaunchState:
             return ActionOutcome(
                 success=False,
                 agent_visible_result=f"Feature '{feature_id}' not found.",
-                ground_truth_delta={},
             )
 
         if agent_id not in self._pending_allocations:
@@ -415,7 +376,6 @@ class ProductLaunchState:
                     f"features per week. Already working on: "
                     f"{', '.join(agent_allocs.keys())}."
                 ),
-                ground_truth_delta={},
             )
 
         agent_allocs[feature_id] = level
@@ -426,11 +386,6 @@ class ProductLaunchState:
                 f"{feature.name}: {level.value} priority set for this week. "
                 f"Work will proceed accordingly."
             ),
-            ground_truth_delta={
-                "agent_id": agent_id,
-                "feature_id": feature_id,
-                "level": level.value,
-            },
         )
 
     def _handle_report_status(self, agent_id: str, params: dict[str, Any]) -> ActionOutcome:
@@ -445,7 +400,6 @@ class ProductLaunchState:
             return ActionOutcome(
                 success=False,
                 agent_visible_result=f"Feature '{feature_id}' not found.",
-                ground_truth_delta={},
             )
 
         report = StatusReport(
@@ -458,26 +412,14 @@ class ProductLaunchState:
         )
         self._status_reports.append(report)
 
-        actual_pct = (feature.backend_completion_pct + feature.frontend_completion_pct) / 2.0
-        delta = completion_pct - (actual_pct * 100)
-
         return ActionOutcome(
             success=True,
             agent_visible_result=f"Status report for {feature.name} recorded.",
-            ground_truth_delta={
-                "agent_id": agent_id,
-                "feature_id": feature_id,
-                "reported_completion_pct": completion_pct,
-                "actual_avg_completion_pct": round(actual_pct * 100, 1),
-                "delta": round(delta, 1),
-                "risk_level": risk_level,
-            },
         )
 
     def _handle_flag_concern(self, agent_id: str, params: dict[str, Any]) -> ActionOutcome:
         """Record a flagged concern."""
         description = str(params.get("description", ""))
-        human_name = AGENT_HUMAN_NAMES.get(agent_id, agent_id)
         concern = {
             "agent_id": agent_id,
             "round": self._current_round,
@@ -490,12 +432,6 @@ class ProductLaunchState:
             agent_visible_result=(
                 f"Concern flagged and appended to the Concerns Log: {description}"
             ),
-            ground_truth_delta={
-                "agent_id": agent_id,
-                "human_name": human_name,
-                "concern": description,
-                "round": self._current_round,
-            },
         )
 
     # --- Private: observation builders ---

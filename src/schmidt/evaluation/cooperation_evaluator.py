@@ -82,13 +82,17 @@ class CooperationEvaluator(Evaluator):
 
         judge_prompt = render_evaluator_prompt(
             template_name="cooperation_user.jinja",
-            agent_roles=agent_roles,
-            all_messages_text=all_messages_text,
+            template_variables={
+                "agent_roles": agent_roles,
+                "all_messages_text": all_messages_text,
+            },
         )
 
         logger.debug("CooperationEvaluator: sending transcript to LLM judge")
         result = await llm_provider.generate_structured(
-            system_prompt=render_evaluator_prompt(template_name="evaluator_system.jinja"),
+            system_prompt=render_evaluator_prompt(
+                template_name="evaluator_system.jinja", template_variables={}
+            ),
             messages=[LLMMessage(role="user", content=judge_prompt)],
             output_schema=CooperationVerdictOutput,
         )

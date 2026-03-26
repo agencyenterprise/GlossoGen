@@ -104,12 +104,14 @@ export function RunDetail({ runId }: { runId: string }) {
 
   // SSE streaming for in-progress runs
   const sseEnabled = restData?.status === "in_progress";
+  const initialMessageCount = restData?.messages.length ?? 0;
   const sse = useEventStream(
     runId,
     sseEnabled,
     knownEventIds,
     initialAgentTurns,
-    initialAgentRounds
+    initialAgentRounds,
+    initialMessageCount
   );
 
   // When SSE reports simulation ended, refetch REST for evaluation + debug logs
@@ -169,6 +171,7 @@ export function RunDetail({ runId }: { runId: string }) {
         entries.push({
           message_id: `partial-reasoning-${sse.streamingAgentId}`,
           channel_id: "",
+          channel_ids: [],
           sender_agent_id: sse.streamingAgentId,
           text,
           timestamp: new Date().toISOString(),
@@ -185,6 +188,7 @@ export function RunDetail({ runId }: { runId: string }) {
       entries.push({
         message_id: `partial-msg-${agentId}`,
         channel_id: pm.channelId,
+        channel_ids: [pm.channelId],
         sender_agent_id: agentId,
         text: pm.text,
         timestamp: new Date().toISOString(),
@@ -204,6 +208,7 @@ export function RunDetail({ runId }: { runId: string }) {
   );
 
   const totalTurns = sse.totalTurns > 0 ? sse.totalTurns : (restData?.total_turns ?? 0);
+  const totalMessages = sse.totalMessages > 0 ? sse.totalMessages : (restData?.total_messages ?? 0);
 
   const agentColorMap = useMemo(
     () => buildAgentColorMap(allAgents.map(a => a.agent_id)),
@@ -275,7 +280,8 @@ export function RunDetail({ runId }: { runId: string }) {
           </button>
         </span>
         <span className="text-[13px] text-muted-foreground">
-          {maxRound} rounds · {totalTurns} turns · {allAgents.length} agents ·{" "}
+          {maxRound} rounds · {totalMessages} messages · {totalTurns} turns · {allAgents.length}{" "}
+          agents ·{" "}
           {uniqueModels.length <= 1 ? (
             modelLabel
           ) : (

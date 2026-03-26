@@ -11,13 +11,7 @@ import aiofiles
 import orjson
 from pydantic import TypeAdapter
 
-from schmidt.models.event import (
-    RunStatus,
-    SimulationEnded,
-    SimulationEvent,
-    SimulationStarted,
-    TurnAssigned,
-)
+from schmidt.models.event import RunStatus, SimulationEnded, SimulationEvent, SimulationStarted
 from schmidt.server.response_models import RunSummary
 from schmidt.stream_manifest import delete_manifest, read_manifest
 
@@ -55,15 +49,16 @@ def _parse_event(raw_bytes: bytes) -> SimulationEvent:
     return _EVENT_ADAPTER.validate_python(raw)  # positional-only parameter
 
 
-_TURN_ASSIGNED_MARKER = TurnAssigned.model_fields["event_type"].default.encode()
-
-
-async def _count_turns(file_path: Path) -> int:
-    """Count TurnAssigned events in a JSONL file by scanning for the event type marker."""
+async def _count_messages(file_path: Path) -> int:
+    """Count MessageSent events in a JSONL file by parsing each line's event_type field."""
     count = 0
     async with aiofiles.open(file_path, mode="rb") as f:
         async for line in f:
-            if _TURN_ASSIGNED_MARKER in line:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            raw = orjson.loads(stripped)
+            if raw.get("event_type") == "message_sent":
                 count += 1
     return count
 
@@ -115,19 +110,18 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         scenario_description=first_event.scenario_description,
                         scenario_config=first_event.scenario_config,
                         timestamp=first_event.timestamp,
-                        total_turns=last_event.total_turns,
+                        total_messages=last_event.total_messages,
                         status=last_event.reason,
                         has_evaluation=report_path.exists(),
                         run_dir=str(timestamp_dir),
                     )
                 )
             else:
-                turn_count = await _count_turns(file_path=jsonl_path)
+                message_count = await _count_messages(file_path=jsonl_path)
                 manifest = read_manifest(run_dir=timestamp_dir)
                 if manifest is not None:
                     status = RunStatus.IN_PROGRESS
                 else:
-                    # No live process — clean up stale manifest if present
                     delete_manifest(run_dir=timestamp_dir)
                     status = RunStatus.ERROR
                 summaries.append(
@@ -137,7 +131,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         scenario_description=first_event.scenario_description,
                         scenario_config=first_event.scenario_config,
                         timestamp=first_event.timestamp,
-                        total_turns=turn_count,
+                        total_messages=message_count,
                         status=status,
                         has_evaluation=False,
                         run_dir=str(timestamp_dir),

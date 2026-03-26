@@ -22,7 +22,7 @@ from typing import Any, NamedTuple, Self
 from jinja2 import Environment, FileSystemLoader
 
 from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult, write_report
-from schmidt.evaluation.evaluator_protocol import Evaluator
+from schmidt.evaluation.evaluator_protocol import EvaluatorFactory
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
 from schmidt.llm.provider_factory import create_provider
@@ -30,6 +30,7 @@ from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.models.simulation_state import SimulationState, TurnDecision
 from schmidt.models.tool_definition import ToolParameter, ToolSpec
+from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.persuasion_debate.agent_ids import DEBATE_CHANNEL_ID
 from schmidt.scenarios.persuasion_debate.evaluation import EVALUATOR_REGISTRY
@@ -133,7 +134,7 @@ class PersuasionDebateScenario(SimulationScenario):
 
     @classmethod
     def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        """Register --knobs and --questions CLI arguments."""
+        """Register --knobs, --questions, and --max-round-duration CLI arguments."""
         parser.add_argument(
             "--knobs",
             type=str,
@@ -146,15 +147,30 @@ class PersuasionDebateScenario(SimulationScenario):
             required=True,
             help="Path to a JSON file with trivia questions",
         )
+        parser.add_argument(
+            "--max-round-duration",
+            type=float,
+            help="Maximum seconds per round before force-advancing (autonomous mode)",
+        )
 
     @classmethod
     def create(cls, args: argparse.Namespace) -> Self:
         """Construct the scenario from CLI arguments."""
         knobs = PersuasionDebateKnobs.model_validate_json(Path(args.knobs).read_text())
         question_bank = QuestionBank.load_from_file(path=Path(args.questions))
-        return cls(knobs=knobs, question_bank=question_bank)
+        max_round_duration = getattr(args, "max_round_duration", None)
+        return cls(
+            knobs=knobs,
+            question_bank=question_bank,
+            max_round_duration_seconds=max_round_duration,
+        )
 
-    def __init__(self, knobs: PersuasionDebateKnobs, question_bank: QuestionBank) -> None:
+    def __init__(
+        self,
+        knobs: PersuasionDebateKnobs,
+        question_bank: QuestionBank,
+        max_round_duration_seconds: float | None,
+    ) -> None:
         if len(question_bank.questions) < knobs.round_count:
             raise ValueError(
                 f"Question bank has {len(question_bank.questions)} questions "
@@ -162,6 +178,7 @@ class PersuasionDebateScenario(SimulationScenario):
             )
         self._knobs = knobs
         self._question_bank = question_bank
+        self._max_round_duration_seconds = max_round_duration_seconds
         self._jinja = Environment(
             loader=FileSystemLoader(PROMPTS_DIR),
             autoescape=False,
@@ -199,7 +216,10 @@ class PersuasionDebateScenario(SimulationScenario):
 
     def get_scenario_config(self) -> dict[str, object]:
         """Return persuasion debate knobs as a config dict."""
-        return self._knobs.model_dump()
+        config: dict[str, object] = self._knobs.model_dump()
+        if self._max_round_duration_seconds is not None:
+            config["max_round_duration_seconds"] = self._max_round_duration_seconds
+        return config
 
     def scenario_description(self) -> str:
         """Return a markdown description of the scenario."""
@@ -208,10 +228,6 @@ class PersuasionDebateScenario(SimulationScenario):
     def get_question_bank(self) -> QuestionBank:
         """Return the question bank for use by evaluators."""
         return self._question_bank
-
-    def get_knobs(self) -> PersuasionDebateKnobs:
-        """Return the scenario knobs for use by evaluators."""
-        return self._knobs
 
     def get_agent_display_name(self, agent_id: str) -> str:
         """Return the human-readable display name for an agent."""
@@ -787,7 +803,7 @@ class PersuasionDebateScenario(SimulationScenario):
         )
 
         scenario_evaluator_registry = self._get_evaluators()
-        all_evaluators: dict[str, type[Evaluator]] = dict(GENERIC_EVALUATOR_REGISTRY)
+        all_evaluators: dict[str, EvaluatorFactory] = dict(GENERIC_EVALUATOR_REGISTRY)
         all_evaluators.update(scenario_evaluator_registry)
 
         metrics: list[MetricResult] = []
@@ -819,6 +835,49 @@ class PersuasionDebateScenario(SimulationScenario):
         await write_report(report=report, report_path=report_path)
         return report
 
-    def _get_evaluators(self) -> dict[str, type[Evaluator]]:
+    # --- Autonomous mode: timing configuration ---
+
+    def get_round_count(self) -> int:
+        """Return the total number of rounds (one per question)."""
+        return self._knobs.round_count
+
+    def get_max_round_duration_seconds(self) -> float:
+        """Return the maximum wall-clock seconds a round may last before force-advancing."""
+        if self._max_round_duration_seconds is None:
+            raise RuntimeError("max_round_duration_seconds not set; required for autonomous mode")
+        return self._max_round_duration_seconds
+
+    def get_agent_reaction_delay_range(self, agent_id: str) -> tuple[float, float]:
+        """Return the (min, max) seconds an agent waits before reacting to a notification."""
+        _ = agent_id
+        return (0.5, 3.0)
+
+    def get_mcp_tools(self) -> list[ScenarioMcpTool]:
+        """Return submit_initial_answer and submit_final_answer as MCP tools."""
+
+        async def submit_initial_answer(answer: str) -> str:
+            """Submit an independent initial answer before the discussion begins."""
+            return f"Initial answer recorded: {answer}"
+
+        async def submit_final_answer(answer: str) -> str:
+            """Submit a final answer for the current trivia question."""
+            return f"Final answer recorded: {answer}"
+
+        return [
+            ScenarioMcpTool(
+                name="submit_initial_answer",
+                description="Submit your independent initial answer before the discussion begins.",
+                executor=submit_initial_answer,
+                requires_agent_id=False,
+            ),
+            ScenarioMcpTool(
+                name="submit_final_answer",
+                description="Submit your final answer for the current trivia question.",
+                executor=submit_final_answer,
+                requires_agent_id=False,
+            ),
+        ]
+
+    def _get_evaluators(self) -> dict[str, EvaluatorFactory]:
         """Return scenario-specific evaluator factories."""
         return EVALUATOR_REGISTRY
