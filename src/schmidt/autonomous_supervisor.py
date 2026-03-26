@@ -11,6 +11,7 @@ from collections.abc import Callable
 import httpx
 
 from schmidt.event_logger import EventLogger
+from schmidt.message_rewind import RewindState
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import (
     AgentConnected,
@@ -20,6 +21,7 @@ from schmidt.models.event import (
     SimulationStarted,
 )
 from schmidt.runners.agent_runner_base import AgentRunner
+from schmidt.runtime.activity_notification import NewMessagesNotification
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.game_clock import GameClock
 from schmidt.runtime.mcp_server import start_mcp_server
@@ -56,17 +58,24 @@ class AutonomousSupervisor:
         event_logger: EventLogger,
         mcp_server_port: int,
         runner_factory: Callable[[], AgentRunner],
+        resume_state: RewindState | None,
+        run_id: str,
     ) -> None:
         self._scenario = scenario
         self._agent_configs = agent_configs
         self._event_logger = event_logger
         self._mcp_server_port = mcp_server_port
         self._runner_factory = runner_factory
+        self._resume_state = resume_state
+        self._run_id = run_id
         self._runtime: SimulationRuntime | None = None
 
     async def run(self) -> None:
         """Execute the full simulation lifecycle."""
-        await self._event_logger.open()
+        if self._resume_state is not None:
+            await self._event_logger.open_for_append()
+        else:
+            await self._event_logger.open()
 
         try:
             await self._run_simulation()
@@ -153,6 +162,27 @@ class AutonomousSupervisor:
         )
         self._runtime = runtime
 
+        # Restore channel messages and agent read positions when resuming.
+        resuming = self._resume_state is not None
+        start_round = 1
+        last_injected: dict[str, int] = {}
+        if self._resume_state is not None:
+            runtime.channel_router.restore_messages(
+                messages_by_channel=self._resume_state.messages_by_channel,
+            )
+            for agent_id, session in agent_sessions.items():
+                for ch_id in runtime.channel_router.get_agent_channel_ids(agent_id=agent_id):
+                    session.set_last_seen_count(
+                        channel_id=ch_id,
+                        count=runtime.channel_router.get_message_count(channel_id=ch_id),
+                    )
+            start_round = self._resume_state.round_number
+            last_injected = self._resume_state.injected_rounds
+            logger.info(
+                "Resumed autonomous simulation at round %d",
+                self._resume_state.round_number,
+            )
+
         # Build and wire the game clock.
         game_clock = GameClock(
             scenario=self._scenario,
@@ -160,29 +190,36 @@ class AutonomousSupervisor:
             event_logger=self._event_logger,
             max_rounds=self._scenario.get_round_count(),
             max_round_duration_seconds=self._scenario.get_max_round_duration_seconds(),
+            start_round=start_round,
+            last_injected_rounds=last_injected,
+            resuming=resuming,
         )
         runtime.add_on_message_callback(callback=game_clock.on_message_sent)
 
-        # Log simulation start and agent registration.
-        await self._event_logger.log(
-            event=SimulationStarted(
-                scenario_name=self._scenario.name(),
-                scenario_description=self._scenario.scenario_description(),
-                channel_ids=[ch.channel_id for ch in channels],
-            )
-        )
-        for config in self._agent_configs:
-            all_tool_names = BASE_TOOL_NAMES + config.tool_names
+        # Log simulation start and agent registration (skip on resume —
+        # the forked JSONL already contains these events).
+        if self._resume_state is None:
             await self._event_logger.log(
-                event=AgentRegistered(
-                    agent_id=config.agent_id,
-                    role_name=config.role_name,
-                    system_prompt=config.system_prompt,
-                    channel_ids=config.channel_ids,
-                    tool_names=all_tool_names,
-                    model=config.model,
+                event=SimulationStarted(
+                    run_id=self._run_id,
+                    scenario_name=self._scenario.name(),
+                    scenario_description=self._scenario.scenario_description(),
+                    channel_ids=[ch.channel_id for ch in channels],
+                    scenario_config=self._scenario.get_scenario_config(),
                 )
             )
+            for config in self._agent_configs:
+                all_tool_names = BASE_TOOL_NAMES + config.tool_names
+                await self._event_logger.log(
+                    event=AgentRegistered(
+                        agent_id=config.agent_id,
+                        role_name=config.role_name,
+                        system_prompt=config.system_prompt,
+                        channel_ids=config.channel_ids,
+                        tool_names=all_tool_names,
+                        model=config.model,
+                    )
+                )
 
         mcp_server_url = _mcp_server_url(port=self._mcp_server_port)
 
@@ -197,6 +234,14 @@ class AutonomousSupervisor:
             mcp_task=mcp_task,
             port=self._mcp_server_port,
         )
+
+        # For resumed runs, inject the conversation transcript into each agent's
+        # system prompt so the agent starts with full context of what happened.
+        if self._resume_state is not None:
+            for config in self._agent_configs:
+                context = self._resume_state.agent_context_prompts.get(config.agent_id, "")
+                if context:
+                    config.system_prompt = config.system_prompt + "\n\n" + context
 
         # Launch one agent runner per agent as concurrent tasks.
         agent_tasks = []
@@ -219,6 +264,18 @@ class AutonomousSupervisor:
                 )
             )
             logger.info("Launched agent %s (%s)", config.agent_id, config.role_name)
+
+        # Push wake-up notifications for resumed runs so agents respond immediately
+        # instead of blocking on check_messages() until the next round advances.
+        if self._resume_state is not None:
+            for agent_id, session in agent_sessions.items():
+                agent_channel_ids = runtime.channel_router.get_agent_channel_ids(
+                    agent_id=agent_id,
+                )
+                session.push_notification(
+                    notification=NewMessagesNotification(channels=agent_channel_ids),
+                )
+            logger.info("Pushed wake-up notifications to %d agents", len(agent_sessions))
 
         # Run the game clock until termination.
         game_clock_task = asyncio.create_task(

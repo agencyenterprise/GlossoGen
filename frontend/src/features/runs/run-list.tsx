@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, HelpCircle, Inbox, Loader2, Trash2, XCircle } from "lucide-react";
+import { CheckCircle, GitFork, HelpCircle, Inbox, Loader2, Trash2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
 import type { components } from "@/types/api.gen";
@@ -145,6 +145,12 @@ export function RunList() {
                     >
                       <HelpCircle className="h-3.5 w-3.5" />
                     </button>
+                    {run.fork_source ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                        <GitFork className="h-2.5 w-2.5" />
+                        Fork
+                      </span>
+                    ) : null}
                   </span>
                   <span className="w-20 text-muted-foreground">{formatTime(run.timestamp)}</span>
                   <span className="w-16 text-muted-foreground">{run.total_messages} messages</span>

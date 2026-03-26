@@ -74,6 +74,7 @@ class SimulationHub:
         event_logger: EventLogger,
         resume_state: ResumeState | None,
         event_bus: EventBus,
+        run_id: str,
     ) -> None:
         self._scenario = scenario
         self._agents = agents
@@ -82,6 +83,7 @@ class SimulationHub:
         self._event_logger = event_logger
         self._resume_state = resume_state
         self._event_bus = event_bus
+        self._run_id = run_id
 
     async def run(self) -> None:
         """Execute the full simulation lifecycle.
@@ -218,6 +220,7 @@ class SimulationHub:
         # Log simulation start and agent registrations (always, including on resume)
         await self._event_logger.log(
             event=SimulationStarted(
+                run_id=self._run_id,
                 scenario_name=self._scenario.name(),
                 scenario_description=self._scenario.scenario_description(),
                 channel_ids=[ch.channel_id for ch in channels],
