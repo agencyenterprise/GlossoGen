@@ -190,6 +190,25 @@ set -a && source .env && set +a && \
 
 Check progress by reading the stdout log file or the JSONL event log.
 
+### Live Streaming
+
+Every `schmidt run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` manifest to the run directory. The `schmidt serve` process discovers this file and proxies the simulation's SSE stream (including token-level deltas from the Claude streaming API) to connected frontends. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing for the completed run.
+
+### Resuming Failed Simulations
+
+If a simulation errors midway through, resume from the last checkpoint using the `--resume` flag pointing at the existing run directory. The simulation picks up from the exact turn where it left off, preserving all channel messages, notebook entries, and shared document contents. Only available in orchestrated mode.
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
+    --mode orchestrated --model <model> --provider <provider> --runs-dir ./runs \
+    --resume ./runs/<scenario>/<timestamp> \
+    <scenario-specific flags like --knobs or --max-turns-per-round> \
+  > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
+```
+
+The `--resume` flag requires the same scenario-specific flags as the original run (e.g. `--knobs` for car_recall/product_launch, `--max-turns-per-round` for incident_response). The `--runs-dir` flag is still required but ignored when resuming.
+
 ### IMPORTANT: Monitoring Long-Running Processes
 
 When running simulations, evaluations, or any long-running background process, **always** follow this pattern:
