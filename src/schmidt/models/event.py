@@ -37,6 +37,7 @@ class SimulationStarted(EventBase):
     """Emitted once when a simulation begins, recording the scenario, channels, and config."""
 
     event_type: Literal["simulation_started"] = "simulation_started"
+    run_id: str
     scenario_name: str
     scenario_description: str
     channel_ids: list[str]

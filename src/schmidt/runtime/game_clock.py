@@ -30,12 +30,18 @@ class GameClock:
         event_logger: EventLogger,
         max_rounds: int,
         max_round_duration_seconds: float,
+        start_round: int,
+        last_injected_rounds: dict[str, int],
+        resuming: bool,
     ) -> None:
         self._scenario = scenario
         self._agent_sessions = agent_sessions
         self._event_logger = event_logger
         self._max_rounds = max_rounds
         self._max_round_duration_seconds = max_round_duration_seconds
+        self._start_round = start_round
+        self._last_injected_rounds = last_injected_rounds
+        self._resuming = resuming
         self._current_round = 0
         self._last_message_time = time.monotonic()
 
@@ -58,8 +64,22 @@ class GameClock:
         return elapsed >= self._max_round_duration_seconds
 
     async def _deliver_injections(self, round_number: int) -> None:
-        """Push injection notifications to agents that have one for this round."""
+        """Push injection notifications to agents that have one for this round.
+
+        Skips agents that already received an injection for this round
+        (tracked via ``_last_injected_rounds``, populated during resume).
+        """
         for agent_id, session in self._agent_sessions.items():
+            already_injected_round = self._last_injected_rounds.get(agent_id, 0)
+            if round_number <= already_injected_round:
+                logger.debug(
+                    "Skipping injection for %s round %d (already delivered up to round %d)",
+                    agent_id,
+                    round_number,
+                    already_injected_round,
+                )
+                continue
+
             injection_text = self._scenario.get_injection(
                 round_number=round_number,
                 agent_id=agent_id,
@@ -105,20 +125,31 @@ class GameClock:
     async def run(self) -> RunStatus:
         """Run the game clock loop. Returns the termination status.
 
-        Delivers round-1 injections immediately, then monitors for
-        all-idle or timeout conditions to advance subsequent rounds.
+        On fresh runs, logs ``RoundAdvanced`` and delivers round-1 injections.
+        On resumed runs, starts from ``start_round`` without re-delivering.
         """
-        # Deliver round 1 injections to kick things off.
-        self._current_round = 1
+        self._current_round = self._start_round
         self._last_message_time = time.monotonic()
-        await self._event_logger.log(
-            event=RoundAdvanced(
-                new_round_number=1,
-                trigger="simulation_start",
+
+        if self._resuming:
+            logger.info(
+                "Game clock resumed at round %d/%d",
+                self._current_round,
+                self._max_rounds,
             )
-        )
-        await self._deliver_injections(round_number=1)
-        logger.info("Game clock started. Round 1/%d, injections delivered.", self._max_rounds)
+        else:
+            await self._event_logger.log(
+                event=RoundAdvanced(
+                    new_round_number=self._current_round,
+                    trigger="simulation_start",
+                )
+            )
+            await self._deliver_injections(round_number=self._current_round)
+            logger.info(
+                "Game clock started. Round %d/%d, injections delivered.",
+                self._current_round,
+                self._max_rounds,
+            )
 
         while True:
             await asyncio.sleep(IDLE_CHECK_INTERVAL_SECONDS)

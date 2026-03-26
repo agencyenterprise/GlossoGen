@@ -14,6 +14,7 @@ import os
 import time
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import uvicorn
 
@@ -24,6 +25,7 @@ from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.llm.provider_factory import create_provider
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
+from schmidt.message_rewind import RewindState, build_rewind_state_from_last_message
 from schmidt.runners.claude_code_runner import ClaudeCodeRunner
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
@@ -109,7 +111,7 @@ def _build_parsers() -> tuple[
     run_parser.add_argument(
         "--resume",
         type=str,
-        help="Path to an existing run directory to resume from (orchestrated mode only)",
+        help="Path to an existing run directory to resume from",
     )
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a simulation log")
@@ -249,15 +251,33 @@ async def _run_autonomous(
 ) -> None:
     """Wire up the autonomous supervisor, start the streaming server, and execute."""
 
-    runs_dir = Path(args.runs_dir)
-    run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
+    resume_dir: str | None = getattr(args, "resume", None)
+    resuming = resume_dir is not None
+
+    if resume_dir is not None:
+        run_dir = Path(resume_dir)
+    else:
+        runs_dir = Path(args.runs_dir)
+        run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
+
     agents = scenario.get_agents(default_model=args.model)
 
     log_path = run_dir / f"{scenario.name()}.jsonl"
     event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
     event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
 
+    resume_state: RewindState | None = None
+    if resuming:
+        logger.info("Loading rewind state from %s", log_path)
+        events = await load_events(log_path=log_path)
+        resume_state = build_rewind_state_from_last_message(events=events)
+        logger.info(
+            "Rewind state loaded: resuming from round %d",
+            resume_state.round_number,
+        )
+
     max_turns = args.max_agent_turns
+    run_id = str(uuid4())
 
     supervisor = AutonomousSupervisor(
         scenario=scenario,
@@ -268,6 +288,8 @@ async def _run_autonomous(
             max_turns=max_turns,
             event_bus=event_bus,
         ),
+        resume_state=resume_state,
+        run_id=run_id,
     )
 
     json_handler, bus_log_handler = _setup_logging(
@@ -276,13 +298,13 @@ async def _run_autonomous(
         event_bus=event_bus,
     )
 
-    run_id = f"{scenario.name()}_{run_dir.name}"
-
     logger.info("Running scenario: %s (autonomous mode)", scenario.name())
     logger.info("Model: %s", args.model)
     logger.info("MCP port: %d, max agent turns: %d", args.mcp_port, max_turns)
     logger.info("Run directory: %s", run_dir)
     logger.info("Log: %s", log_path)
+    if resuming:
+        logger.info("RESUMING from rewind state in %s", run_dir)
 
     server, port = await start_simulation_server(
         event_bus=event_bus,
@@ -342,6 +364,8 @@ async def _run_orchestrated(
             resume_state.round_number,
         )
 
+    run_id = str(uuid4())
+
     hub = SimulationHub(
         scenario=scenario,
         agents=agents,
@@ -350,6 +374,7 @@ async def _run_orchestrated(
         event_logger=event_logger,
         resume_state=resume_state,
         event_bus=event_bus,
+        run_id=run_id,
     )
 
     json_handler, bus_log_handler = _setup_logging(
@@ -357,8 +382,6 @@ async def _run_orchestrated(
         scenario_name=scenario.name(),
         event_bus=event_bus,
     )
-
-    run_id = f"{scenario.name()}_{run_dir.name}"
 
     logger.info("Running scenario: %s (orchestrated mode)", scenario.name())
     logger.info("Model: %s", args.model)

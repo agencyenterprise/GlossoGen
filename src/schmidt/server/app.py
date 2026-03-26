@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from schmidt.server.fork_router import router as fork_router
 from schmidt.server.response_models import HealthResponse, HealthStatus
 from schmidt.server.runs_router import router as runs_router
 
@@ -37,6 +38,7 @@ app.add_middleware(
 )
 
 app.include_router(runs_router)
+app.include_router(fork_router)
 
 
 @app.get("/api/health", response_model=HealthResponse)

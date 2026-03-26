@@ -337,6 +337,20 @@ class ProductLaunchScenario(SimulationScenario):
         max_round_duration: float | None = getattr(args, "max_round_duration", None)
         return cls(knobs=knobs, max_round_duration_seconds=max_round_duration)
 
+    @classmethod
+    def create_from_config(cls, config: dict[str, Any]) -> Self:
+        """Reconstruct the scenario from a serialized config dict."""
+        max_round_duration = config.pop("max_round_duration_seconds", None)
+        knobs = ProductLaunchKnobs(**config)
+        return cls(knobs=knobs, max_round_duration_seconds=max_round_duration)
+
+    def get_scenario_config(self) -> dict[str, object]:
+        """Return product launch knobs as a config dict."""
+        config: dict[str, object] = self._knobs.model_dump()
+        if self._max_round_duration_seconds is not None:
+            config["max_round_duration_seconds"] = self._max_round_duration_seconds
+        return config
+
     def name(self) -> str:
         """Return the scenario identifier."""
         return "product_launch"

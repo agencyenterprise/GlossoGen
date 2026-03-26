@@ -26,6 +26,7 @@ from schmidt.server.response_models import (
     DebugLogEntry,
     EvalMetricResponse,
     EvalReportResponse,
+    ForkSource,
     ReasoningEntry,
     RunDetailResponse,
 )
@@ -149,7 +150,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
 
     for event in events:
         if isinstance(event, SimulationStarted):
-            run_id = event.event_id
+            run_id = event.run_id
             scenario_name = event.scenario_name
             scenario_description = event.scenario_description
             scenario_config = event.scenario_config
@@ -243,6 +244,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     debug_log_path = log_path.with_name(f"{scenario_name}_debug.jsonl")
     debug_logs = await _load_debug_logs(debug_log_path=debug_log_path)
 
+    fork_source = _read_fork_source(run_dir=log_path.parent)
+
     return RunDetailResponse(
         run_id=run_id,
         scenario_name=scenario_name,
@@ -258,4 +261,17 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         reasoning=reasoning,
         debug_logs=debug_logs,
         evaluation=evaluation,
+        fork_source=fork_source,
+    )
+
+
+def _read_fork_source(run_dir: Path) -> ForkSource | None:
+    """Read fork provenance from fork_manifest.json if it exists."""
+    manifest_path = run_dir / "fork_manifest.json"
+    if not manifest_path.exists():
+        return None
+    raw = orjson.loads(manifest_path.read_bytes())
+    return ForkSource(
+        source_run_id=raw["source_run_id"],
+        target_message_id=raw["target_message_id"],
     )
