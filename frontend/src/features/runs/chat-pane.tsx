@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Pencil, Play, X } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
 import type { DisplayEntry } from "./display-entry";
 import { formatTime, humanize } from "./format";
 import { ProseMarkdown } from "./prose-markdown";
+import type { PendingEdit } from "./use-fork";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
 
@@ -22,6 +23,18 @@ interface ChatPaneProps {
   highlightNonce: number;
   /** Agent ID currently streaming a response. */
   streamingAgentId: string | null;
+  /** Whether the fork editing UI is enabled (only for completed/errored runs). */
+  forkEnabled: boolean;
+  /** The message_id currently being edited, or null. */
+  editingMessageId: string | null;
+  /** Saved edits awaiting fork. */
+  pendingEdits: Map<string, PendingEdit>;
+  /** Callbacks for fork editing. */
+  onStartEdit: (messageId: string) => void;
+  onSaveEdit: (messageId: string, newText: string) => void;
+  onCancelEdit: () => void;
+  onRemoveEdit: (messageId: string) => void;
+  onForkFromMessage: (targetMessageId: string) => void;
 }
 
 interface TurnGroup {
@@ -98,6 +111,14 @@ export function ChatPane({
   highlightedMessageId,
   highlightNonce,
   streamingAgentId,
+  forkEnabled,
+  editingMessageId,
+  pendingEdits,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onRemoveEdit,
+  onForkFromMessage,
 }: ChatPaneProps) {
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -184,7 +205,6 @@ export function ChatPane({
     return messages.filter(m => m.is_reasoning || m.channel_ids.includes(selectedChannel));
   }, [messages, selectedChannel]);
 
-  const rounds = useMemo(() => groupByRoundAndTurn(filtered), [filtered]);
   const showChannelBadge = selectedChannel === null;
 
   let headerName = "all activity";
@@ -208,6 +228,15 @@ export function ChatPane({
   const headerDesc =
     selectedChannel === null ? "all channels, global turn order" : `#${selectedChannel}`;
 
+  const [showReasoning, setShowReasoning] = useState(true);
+
+  const visibleFiltered = useMemo(() => {
+    if (showReasoning) return filtered;
+    return filtered.filter(m => !m.is_reasoning);
+  }, [filtered, showReasoning]);
+
+  const rounds = useMemo(() => groupByRoundAndTurn(visibleFiltered), [visibleFiltered]);
+
   return (
     <div className="relative flex flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
@@ -217,8 +246,17 @@ export function ChatPane({
         {headerMembers ? (
           <span className="ml-auto text-[11px] text-muted-foreground">{headerMembers}</span>
         ) : null}
+        <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground select-none">
+          <input
+            type="checkbox"
+            checked={showReasoning}
+            onChange={e => setShowReasoning(e.target.checked)}
+            className="h-3 w-3 rounded border-border accent-foreground"
+          />
+          Reasoning
+        </label>
         {streamingAgentId ? (
-          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
             {agentMap.get(streamingAgentId)?.role_name ?? streamingAgentId} is typing...
           </span>
@@ -279,11 +317,17 @@ export function ChatPane({
                         {formatTime(turn.timestamp)}
                       </span>
                     </div>
-                    {turn.entries.map(entry => {
+                    {turn.entries.map((entry, entryIdx) => {
                       const entryChColor = channelColorMap.get(entry.channel_id);
+                      const isEditing = editingMessageId === entry.message_id;
+                      const pendingEdit = pendingEdits.get(entry.message_id);
+                      const displayText = pendingEdit ? pendingEdit.newText : entry.text;
+                      const canEdit = forkEnabled && !entry.is_reasoning && !entry.is_partial;
+                      const entryKey = `${entry.message_id}-${entry.is_reasoning ? "r" : "m"}-${entryIdx}`;
+
                       return (
                         <div
-                          key={entry.message_id}
+                          key={entryKey}
                           ref={el => {
                             if (el) {
                               messageRefs.current.set(entry.message_id, el);
@@ -291,7 +335,12 @@ export function ChatPane({
                               messageRefs.current.delete(entry.message_id);
                             }
                           }}
-                          className={cn(entry.is_reasoning && "ml-4 opacity-50")}
+                          className={cn(
+                            "group/entry relative",
+                            entry.is_reasoning && "ml-4 opacity-50",
+                            pendingEdit &&
+                              "rounded-md bg-amber-50/50 ring-1 ring-amber-200/50 dark:bg-amber-950/20 dark:ring-amber-800/30"
+                          )}
                         >
                           {entry.is_reasoning ? (
                             <span className="text-[10px] italic text-muted-foreground">
@@ -308,12 +357,55 @@ export function ChatPane({
                               #{entry.channel_id}
                             </span>
                           ) : null}
-                          <ProseMarkdown className="[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]">
-                            {entry.text}
-                          </ProseMarkdown>
-                          {entry.is_partial ? (
-                            <span className="inline-block h-3 w-1.5 animate-pulse bg-foreground/60" />
-                          ) : null}
+
+                          {isEditing ? (
+                            <MessageEditor
+                              initialText={displayText}
+                              onSave={newText => onSaveEdit(entry.message_id, newText)}
+                              onCancel={onCancelEdit}
+                            />
+                          ) : (
+                            <>
+                              <ProseMarkdown className="[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]">
+                                {displayText}
+                              </ProseMarkdown>
+                              {entry.is_partial ? (
+                                <span className="inline-block h-3 w-1.5 animate-pulse bg-foreground/60" />
+                              ) : null}
+
+                              {/* Edit / fork controls */}
+                              {canEdit ? (
+                                <span className="absolute -right-1 top-0 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/entry:opacity-100">
+                                  {pendingEdit ? (
+                                    <>
+                                      <button
+                                        aria-label="Play from this message"
+                                        className="rounded p-0.5 text-green-600 transition-colors hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30"
+                                        onClick={() => onForkFromMessage(entry.message_id)}
+                                      >
+                                        <Play className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        aria-label="Remove edit"
+                                        className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        onClick={() => onRemoveEdit(entry.message_id)}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      aria-label="Edit message"
+                                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                      onClick={() => onStartEdit(entry.message_id)}
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </span>
+                              ) : null}
+                            </>
+                          )}
                         </div>
                       );
                     })}
@@ -338,6 +430,57 @@ export function ChatPane({
             Scroll to bottom
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function MessageEditor({
+  initialText,
+  onSave,
+  onCancel,
+}: {
+  initialText: string;
+  onSave: (newText: string) => void;
+  onCancel: () => void;
+}) {
+  const [text, setText] = useState(initialText);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-1.5 py-1">
+      <textarea
+        ref={textareaRef}
+        value={text}
+        onChange={e => setText(e.target.value)}
+        className="min-h-[60px] w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+        onKeyDown={e => {
+          if (e.key === "Escape") {
+            onCancel();
+          }
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            onSave(text);
+          }
+        }}
+      />
+      <div className="flex items-center gap-1.5">
+        <button
+          className="rounded-md bg-foreground px-2.5 py-0.5 text-[11px] font-medium text-background transition-opacity hover:opacity-80"
+          onClick={() => onSave(text)}
+        >
+          Save
+        </button>
+        <button
+          className="rounded-md border border-border px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+        <span className="text-[10px] text-muted-foreground">Ctrl+Enter to save, Esc to cancel</span>
       </div>
     </div>
   );

@@ -22,6 +22,13 @@ class HealthResponse(BaseModel):
     status: HealthStatus
 
 
+class ForkSource(BaseModel):
+    """Provenance information for a forked simulation run."""
+
+    source_run_id: str
+    target_message_id: str
+
+
 class RunSummary(BaseModel):
     """Summary of a single simulation run for the runs list endpoint."""
 
@@ -34,6 +41,7 @@ class RunSummary(BaseModel):
     status: RunStatus
     has_evaluation: bool
     run_dir: str
+    fork_source: ForkSource | None
 
 
 class RunListResponse(BaseModel):
@@ -124,6 +132,35 @@ class RunDetailResponse(BaseModel):
     reasoning: list[ReasoningEntry]
     debug_logs: list[DebugLogEntry]
     evaluation: EvalReportResponse | None
+    fork_source: ForkSource | None
+
+
+# ---------------------------------------------------------------------------
+# Fork request/response models
+# ---------------------------------------------------------------------------
+
+
+class MessageEdit(BaseModel):
+    """A single message text edit for a fork request."""
+
+    message_id: str
+    new_text: str
+
+
+class ForkRequest(BaseModel):
+    """Request body for creating a forked simulation run."""
+
+    target_message_id: str
+    message_edits: list[MessageEdit]
+    model: str
+    provider: str
+
+
+class ForkResponse(BaseModel):
+    """Response returned after a fork is created."""
+
+    fork_run_id: str
+    fork_run_dir: str
 
 
 # ---------------------------------------------------------------------------
@@ -147,6 +184,7 @@ class SSESimulationStarted(BaseModel):
 
     event_type: Literal["simulation_started"]
     event_id: str
+    run_id: str
     timestamp: datetime
     scenario_name: str
     scenario_description: str

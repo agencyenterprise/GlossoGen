@@ -5,6 +5,7 @@ Expects the standard directory layout:
 """
 
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 import aiofiles
@@ -12,7 +13,7 @@ import orjson
 from pydantic import TypeAdapter
 
 from schmidt.models.event import RunStatus, SimulationEnded, SimulationEvent, SimulationStarted
-from schmidt.server.response_models import RunSummary
+from schmidt.server.response_models import ForkSource, RunSummary
 from schmidt.stream_manifest import delete_manifest, read_manifest
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,23 @@ async def _count_messages(file_path: Path) -> int:
     return count
 
 
+def _timestamp_from_dir(dir_name: str) -> datetime:
+    """Derive a UTC timestamp from a directory name that is a unix epoch."""
+    return datetime.fromtimestamp(int(dir_name), tz=UTC)
+
+
+def _read_fork_source(run_dir: Path) -> ForkSource | None:
+    """Read fork provenance from fork_manifest.json if it exists."""
+    manifest_path = run_dir / "fork_manifest.json"
+    if not manifest_path.exists():
+        return None
+    raw = orjson.loads(manifest_path.read_bytes())
+    return ForkSource(
+        source_run_id=raw["source_run_id"],
+        target_message_id=raw["target_message_id"],
+    )
+
+
 async def discover_runs(runs_dir: Path) -> list[RunSummary]:
     """Scan the runs directory and return a summary for each discovered run.
 
@@ -101,19 +119,22 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                 continue
 
             report_path = timestamp_dir / f"{scenario_name}_report.json"
+            fork_source = _read_fork_source(run_dir=timestamp_dir)
+            run_timestamp = _timestamp_from_dir(dir_name=timestamp_dir.name)
 
             if isinstance(last_event, SimulationEnded):
                 summaries.append(
                     RunSummary(
-                        run_id=first_event.event_id,
+                        run_id=first_event.run_id,
                         scenario_name=first_event.scenario_name,
                         scenario_description=first_event.scenario_description,
                         scenario_config=first_event.scenario_config,
-                        timestamp=first_event.timestamp,
+                        timestamp=run_timestamp,
                         total_messages=last_event.total_messages,
                         status=last_event.reason,
                         has_evaluation=report_path.exists(),
                         run_dir=str(timestamp_dir),
+                        fork_source=fork_source,
                     )
                 )
             else:
@@ -126,15 +147,16 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                     status = RunStatus.ERROR
                 summaries.append(
                     RunSummary(
-                        run_id=first_event.event_id,
+                        run_id=first_event.run_id,
                         scenario_name=first_event.scenario_name,
                         scenario_description=first_event.scenario_description,
                         scenario_config=first_event.scenario_config,
-                        timestamp=first_event.timestamp,
+                        timestamp=run_timestamp,
                         total_messages=message_count,
                         status=status,
                         has_evaluation=False,
                         run_dir=str(timestamp_dir),
+                        fork_source=fork_source,
                     )
                 )
 

@@ -94,7 +94,7 @@ Check progress by reading the stdout log or the JSONL event log in the run direc
 
 ### Resuming a Failed Simulation
 
-If a simulation crashes or is killed, resume from the last checkpoint (orchestrated mode only):
+If a simulation crashes or is killed, resume using the `--resume` flag pointing at the existing run directory. Available in both orchestrated and autonomous modes.
 
 ```bash
 set -a && source .env && set +a && \
@@ -105,7 +105,13 @@ set -a && source .env && set +a && \
   > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
 ```
 
-The simulation picks up from the exact turn where it left off, preserving channel messages, notebook entries, and shared document contents. The `--resume` flag requires the same scenario-specific flags as the original run (e.g. `--knobs` for product_launch, `--max-turns-per-round` for incident_response).
+The simulation picks up from where it left off, preserving channel messages, notebook entries, and shared document contents. The `--resume` flag requires the same scenario-specific flags as the original run (e.g. `--knobs` for product_launch, `--max-turns-per-round` for incident_response).
+
+### Forking Runs (Message-Level Rewind)
+
+The web UI supports forking a completed simulation from any message. In the run detail view, hover over a message to reveal an edit button. Edit the message text, then click the play button to create a fork — a new simulation that starts with channel history up to that message (with the edit applied). Agents continue from there with full context of the prior conversation.
+
+Forked runs appear in the run list with a "Fork" badge and link back to the source run. The fork API is also available programmatically via `POST /api/runs/{run_id}/fork`.
 
 ## Run Output Directory Structure
 
@@ -116,6 +122,7 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── {scenario_name}.jsonl          # Event log
 ├── {scenario_name}_debug.jsonl    # Debug log (JSON lines, visible in FE Logs tab)
 ├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
+└── fork_manifest.json             # (forked runs only) provenance tracking
 ```
 
 ## Running Evaluation
@@ -151,7 +158,7 @@ make dev            # FastAPI backend on port 8000 (reads from ./runs/)
 make dev-frontend   # Next.js dev server on port 3000
 ```
 
-The frontend displays a list of all simulation runs with scenario name, timestamp, message count, status (including in-progress runs), and evaluation status. Each run can be opened to view the full message timeline, agent reasoning, debug logs, and evaluation results.
+The frontend displays a list of all simulation runs with scenario name, timestamp, message count, status (including in-progress runs), evaluation status, and fork badges. Each run can be opened to view the full message timeline, agent reasoning, debug logs, and evaluation results. Completed runs support message-level editing and forking — hover over any message to edit it and launch a new simulation from that point.
 
 ### Live Token Streaming
 
@@ -188,11 +195,14 @@ Six delegation-framed agents (PM, Backend Engineer, Frontend Engineer, Data Anal
 ```
 src/schmidt/
   cli.py                       # CLI: run (autonomous/orchestrated), evaluate, serve
-  autonomous_supervisor.py     # Autonomous mode: round progression, event injection
+  autonomous_supervisor.py     # Autonomous mode: round progression, event injection, resume
   simulation_hub.py            # Orchestrated mode: turn-based orchestrator
   agent_runner.py              # Orchestrated mode: per-agent turn execution
   channel_router.py            # Message storage + membership validation
-  checkpoint_loader.py         # Resume state reconstruction from JSONL event log
+  checkpoint_loader.py         # Resume state reconstruction from JSONL event log (orchestrated)
+  message_rewind.py            # State reconstruction at any message (autonomous fork/resume)
+  fork_writer.py               # Writes truncated+edited JSONL for forked runs
+  conversation_reconstructor.py # Builds per-agent conversation transcript for fork context
   event_logger.py              # JSONL event writer
   event_bus.py                 # In-process pub/sub for SSE streaming
   simulation_server.py         # Embedded SSE server per simulation
@@ -214,6 +224,7 @@ src/schmidt/
   scenarios/                   # One folder per scenario (class + Jinja2 prompts + README)
 
   server/                      # FastAPI web server (schmidt serve)
+    fork_router.py             # POST /api/runs/{run_id}/fork endpoint
 
 frontend/                      # Next.js web application
 ```

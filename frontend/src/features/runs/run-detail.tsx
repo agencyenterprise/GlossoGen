@@ -14,10 +14,12 @@ import { ChatPane } from "./chat-pane";
 import type { DisplayEntry } from "./display-entry";
 import { mergeEntries } from "./display-entry";
 import { EvalPanel } from "./eval-panel";
+import { ForkBadge } from "./fork-badge";
 import { humanize } from "./format";
 import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
+import { useFork } from "./use-fork";
 
 export function RunDetail({ runId }: { runId: string }) {
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
@@ -26,8 +28,10 @@ export function RunDetail({ runId }: { runId: string }) {
   const [highlightNonce, setHighlightNonce] = useState(0);
   const [showDescription, setShowDescription] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
+  const fork = useFork(runId);
 
   const handleSelectChannel = useCallback((ch: string | null) => {
     setSelectedChannel(ch);
@@ -122,6 +126,18 @@ export function RunDetail({ runId }: { runId: string }) {
       queryClient.invalidateQueries({ queryKey: ["run", runId] });
     }
   }, [hasSimEnded, queryClient, runId]);
+
+  // If SSE was enabled (REST said in_progress) but failed to connect,
+  // the simulation likely ended between the REST fetch and SSE attempt.
+  // Refetch REST to get the updated status.
+  const sseFailedToConnect = sseEnabled && !sse.isConnected && sseStatus === null;
+  useEffect(() => {
+    if (!sseFailedToConnect) return undefined;
+    const timer = setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ["run", runId] });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [sseFailedToConnect, queryClient, runId]);
 
   // Determine effective status: SSE overrides REST when streaming
   const effectiveStatus = sseStatus ?? restData?.status ?? null;
@@ -224,6 +240,23 @@ export function RunDetail({ runId }: { runId: string }) {
     return [...restLogs, ...newLogs];
   }, [restData?.debug_logs, sse.debugLogs]);
 
+  const handleForkFromMessage = useCallback((targetMessageId: string) => {
+    setForkModalMessageId(targetMessageId);
+  }, []);
+
+  const handleConfirmFork = useCallback(
+    (model: string, provider: string) => {
+      if (!forkModalMessageId) return;
+      fork.forkMutation.mutate({
+        targetMessageId: forkModalMessageId,
+        model,
+        provider,
+      });
+      setForkModalMessageId(null);
+    },
+    [forkModalMessageId, fork.forkMutation]
+  );
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -256,6 +289,8 @@ export function RunDetail({ runId }: { runId: string }) {
   const hasLogs = allDebugLogs.length > 0;
   const activeAgent = allAgents.find(a => a.agent_id === selectedAgent);
   const activeAgentColor = selectedAgent ? agentColorMap.get(selectedAgent) : undefined;
+  const forkEnabled = effectiveStatus === "scenario_complete" || effectiveStatus === "error";
+  const defaultModel = allAgents[0]?.model ?? "";
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-4">
@@ -271,6 +306,12 @@ export function RunDetail({ runId }: { runId: string }) {
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <span className="flex items-center gap-1.5">
           <h1 className="text-base font-medium">{humanize(restData.scenario_name)}</h1>
+          {restData.fork_source ? (
+            <ForkBadge
+              sourceRunId={restData.fork_source.source_run_id}
+              targetMessageId={restData.fork_source.target_message_id}
+            />
+          ) : null}
           <button
             aria-label="Scenario description"
             className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -379,6 +420,14 @@ export function RunDetail({ runId }: { runId: string }) {
             highlightedMessageId={highlightedMessageId}
             highlightNonce={highlightNonce}
             streamingAgentId={sse.streamingAgentId}
+            forkEnabled={forkEnabled}
+            editingMessageId={fork.editingMessageId}
+            pendingEdits={fork.pendingEdits}
+            onStartEdit={fork.startEdit}
+            onSaveEdit={fork.saveEdit}
+            onCancelEdit={fork.cancelEdit}
+            onRemoveEdit={fork.removeEdit}
+            onForkFromMessage={handleForkFromMessage}
           />
         )}
 
@@ -401,6 +450,77 @@ export function RunDetail({ runId }: { runId: string }) {
             evalMetrics={restData.evaluation?.metrics ?? null}
           />
         ) : null}
+      </div>
+
+      {/* Fork confirmation modal */}
+      {forkModalMessageId ? (
+        <ForkModal
+          defaultModel={defaultModel}
+          isPending={fork.forkMutation.isPending}
+          onConfirm={handleConfirmFork}
+          onCancel={() => setForkModalMessageId(null)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ForkModal({
+  defaultModel,
+  isPending,
+  onConfirm,
+  onCancel,
+}: {
+  defaultModel: string;
+  isPending: boolean;
+  onConfirm: (model: string, provider: string) => void;
+  onCancel: () => void;
+}) {
+  const [model, setModel] = useState(defaultModel);
+  const [provider, setProvider] = useState("anthropic");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-background p-5 shadow-xl">
+        <h3 className="mb-3 text-sm font-medium">Fork simulation</h3>
+        <p className="mb-4 text-xs text-muted-foreground">
+          A new simulation will start from the edited message with the channel history up to that
+          point.
+        </p>
+        <div className="mb-3 flex flex-col gap-2">
+          <label className="text-[11px] font-medium text-muted-foreground">Model</label>
+          <input
+            type="text"
+            value={model}
+            onChange={e => setModel(e.target.value)}
+            className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <label className="text-[11px] font-medium text-muted-foreground">Provider</label>
+          <select
+            value={provider}
+            onChange={e => setProvider(e.target.value)}
+            className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            <option value="anthropic">Anthropic</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            className="rounded-md border border-border px-3 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={onCancel}
+            disabled={isPending}
+          >
+            Cancel
+          </button>
+          <button
+            className="rounded-md bg-foreground px-3 py-1 text-[12px] font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
+            onClick={() => onConfirm(model, provider)}
+            disabled={isPending}
+          >
+            {isPending ? "Launching..." : "Launch fork"}
+          </button>
+        </div>
       </div>
     </div>
   );

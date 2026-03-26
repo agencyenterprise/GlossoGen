@@ -190,6 +190,56 @@
         }
       }
     },
+    "/api/runs/{run_id}/fork": {
+      "post": {
+        "summary": "Fork Run",
+        "description": "Create a forked simulation run from a specific message.\n\nTruncates the source event log at the target message, applies text edits,\nwrites the result to a new run directory, and launches the simulation as\na background subprocess.",
+        "operationId": "fork_run_api_runs__run_id__fork_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForkResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -387,6 +437,76 @@
         "title": "EvalReportResponse",
         "description": "Evaluation report for the run detail endpoint."
       },
+      "ForkRequest": {
+        "properties": {
+          "target_message_id": {
+            "type": "string",
+            "title": "Target Message Id"
+          },
+          "message_edits": {
+            "items": {
+              "$ref": "#/components/schemas/MessageEdit"
+            },
+            "type": "array",
+            "title": "Message Edits"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_message_id",
+          "message_edits",
+          "model",
+          "provider"
+        ],
+        "title": "ForkRequest",
+        "description": "Request body for creating a forked simulation run."
+      },
+      "ForkResponse": {
+        "properties": {
+          "fork_run_id": {
+            "type": "string",
+            "title": "Fork Run Id"
+          },
+          "fork_run_dir": {
+            "type": "string",
+            "title": "Fork Run Dir"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fork_run_id",
+          "fork_run_dir"
+        ],
+        "title": "ForkResponse",
+        "description": "Response returned after a fork is created."
+      },
+      "ForkSource": {
+        "properties": {
+          "source_run_id": {
+            "type": "string",
+            "title": "Source Run Id"
+          },
+          "target_message_id": {
+            "type": "string",
+            "title": "Target Message Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_run_id",
+          "target_message_id"
+        ],
+        "title": "ForkSource",
+        "description": "Provenance information for a forked simulation run."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -420,6 +540,25 @@
         ],
         "title": "HealthStatus",
         "description": "Health check status values."
+      },
+      "MessageEdit": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "title": "Message Id"
+          },
+          "new_text": {
+            "type": "string",
+            "title": "New Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "new_text"
+        ],
+        "title": "MessageEdit",
+        "description": "A single message text edit for a fork request."
       },
       "ReasoningEntry": {
         "properties": {
@@ -548,6 +687,16 @@
                 "type": "null"
               }
             ]
+          },
+          "fork_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ForkSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -565,7 +714,8 @@
           "messages",
           "reasoning",
           "debug_logs",
-          "evaluation"
+          "evaluation",
+          "fork_source"
         ],
         "title": "RunDetailResponse",
         "description": "Full detail of a simulation run including agents, messages, and evaluation."
@@ -635,6 +785,16 @@
           "run_dir": {
             "type": "string",
             "title": "Run Dir"
+          },
+          "fork_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ForkSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -647,7 +807,8 @@
           "total_messages",
           "status",
           "has_evaluation",
-          "run_dir"
+          "run_dir",
+          "fork_source"
         ],
         "title": "RunSummary",
         "description": "Summary of a single simulation run for the runs list endpoint."
@@ -1051,6 +1212,10 @@
             "type": "string",
             "title": "Event Id"
           },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
           "timestamp": {
             "type": "string",
             "format": "date-time",
@@ -1081,6 +1246,7 @@
         "required": [
           "event_type",
           "event_id",
+          "run_id",
           "timestamp",
           "scenario_name",
           "scenario_description",

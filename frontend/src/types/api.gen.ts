@@ -75,6 +75,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/fork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fork Run
+         * @description Create a forked simulation run from a specific message.
+         *
+         *     Truncates the source event log at the target message, applies text edits,
+         *     writes the result to a new run directory, and launches the simulation as
+         *     a background subprocess.
+         */
+        post: operations["fork_run_api_runs__run_id__fork_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -179,6 +203,40 @@ export interface components {
             /** Metrics */
             metrics: components["schemas"]["EvalMetricResponse"][];
         };
+        /**
+         * ForkRequest
+         * @description Request body for creating a forked simulation run.
+         */
+        ForkRequest: {
+            /** Target Message Id */
+            target_message_id: string;
+            /** Message Edits */
+            message_edits: components["schemas"]["MessageEdit"][];
+            /** Model */
+            model: string;
+            /** Provider */
+            provider: string;
+        };
+        /**
+         * ForkResponse
+         * @description Response returned after a fork is created.
+         */
+        ForkResponse: {
+            /** Fork Run Id */
+            fork_run_id: string;
+            /** Fork Run Dir */
+            fork_run_dir: string;
+        };
+        /**
+         * ForkSource
+         * @description Provenance information for a forked simulation run.
+         */
+        ForkSource: {
+            /** Source Run Id */
+            source_run_id: string;
+            /** Target Message Id */
+            target_message_id: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -197,6 +255,16 @@ export interface components {
          * @enum {string}
          */
         HealthStatus: "ok";
+        /**
+         * MessageEdit
+         * @description A single message text edit for a fork request.
+         */
+        MessageEdit: {
+            /** Message Id */
+            message_id: string;
+            /** New Text */
+            new_text: string;
+        };
         /**
          * ReasoningEntry
          * @description An LLM reasoning/thinking entry from an agent's turn.
@@ -260,6 +328,7 @@ export interface components {
             /** Debug Logs */
             debug_logs: components["schemas"]["DebugLogEntry"][];
             evaluation: components["schemas"]["EvalReportResponse"] | null;
+            fork_source: components["schemas"]["ForkSource"] | null;
         };
         /**
          * RunListResponse
@@ -302,6 +371,7 @@ export interface components {
             has_evaluation: boolean;
             /** Run Dir */
             run_dir: string;
+            fork_source: components["schemas"]["ForkSource"] | null;
         };
         /**
          * SSEAgentConnected
@@ -535,6 +605,8 @@ export interface components {
             event_type: "simulation_started";
             /** Event Id */
             event_id: string;
+            /** Run Id */
+            run_id: string;
             /**
              * Timestamp
              * Format: date-time
@@ -721,6 +793,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSETurnAssigned"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fork_run_api_runs__run_id__fork_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForkResponse"];
                 };
             };
             /** @description Validation Error */

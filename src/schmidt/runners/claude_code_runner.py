@@ -122,7 +122,11 @@ class ClaudeCodeRunner(AgentRunner):
                 allowed_tools.append(prefixed)
         logger.debug("Agent %s allowed tools: %s", agent_config.agent_id, allowed_tools)
 
-        full_system_prompt = agent_config.system_prompt + SYSTEM_PROMPT_SUFFIX
+        identity_line = (
+            f'\n\nYour name in the communication channels is "{agent_config.role_name}". '
+            f'Messages from "{agent_config.role_name}" are messages you sent.'
+        )
+        full_system_prompt = agent_config.system_prompt + identity_line + SYSTEM_PROMPT_SUFFIX
 
         base_options = ClaudeAgentOptions(
             system_prompt=full_system_prompt,

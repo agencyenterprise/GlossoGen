@@ -42,6 +42,21 @@ class SimulationScenario(ABC):
         """Parse scenario-specific CLI arguments and construct a scenario instance."""
         ...
 
+    @classmethod
+    def create_from_config(cls, config: dict[str, Any]) -> Self:
+        """Reconstruct a scenario from its serialized config dict.
+
+        The ``config`` is the same dict returned by ``get_scenario_config()``,
+        stored in the ``SimulationStarted`` event. Used by the fork API to
+        reconstruct scenarios without CLI arguments.
+
+        Subclasses that support forking must override this method.
+        """
+        raise NotImplementedError(
+            f"{cls.__name__} does not implement create_from_config. "
+            "Override this method to support simulation forking."
+        )
+
     @abstractmethod
     def name(self) -> str:
         """Return the unique identifier for this scenario."""

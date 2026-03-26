@@ -124,6 +124,12 @@ class CarRecallScenario(SimulationScenario):
         knobs = CarRecallKnobs.model_validate_json(knobs_json)
         return cls(knobs=knobs)
 
+    @classmethod
+    def create_from_config(cls, config: dict[str, Any]) -> Self:
+        """Reconstruct the scenario from a serialized config dict."""
+        knobs = CarRecallKnobs.model_validate(config)
+        return cls(knobs=knobs)
+
     def __init__(self, knobs: CarRecallKnobs) -> None:
         self._knobs = knobs
         if knobs.time_pressure == TimePressure.HIGH:
