@@ -1,6 +1,6 @@
 """Evaluator that computes structural communication metrics from message logs.
 
-Pure computation (no LLM calls). Reads ``MessageSent`` and ``TurnAssigned`` events
+Pure computation (no LLM calls). Reads ``MessageSent`` and ``RoundAdvanced`` events
 to produce per-agent message counts, DM-to-public ratios, information flow, and
 coalition detection metrics.
 """
@@ -12,7 +12,7 @@ from schmidt.evaluation.evaluation_report import MetricResult, Verdict
 from schmidt.evaluation.evaluator_protocol import Evaluator
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import MessageSent, SimulationEvent, TurnAssigned
+from schmidt.models.event import MessageSent, RoundAdvanced, SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -26,16 +26,16 @@ def _get_dm_channels(
 
 
 def _build_round_map(events: list[SimulationEvent]) -> dict[int, int]:
-    """Map turn indices to round numbers from TurnAssigned events.
+    """Map event indices to round numbers from RoundAdvanced events.
 
-    Returns a dict mapping the event list index of each TurnAssigned to its
-    round_number, allowing subsequent MessageSent events to be attributed
+    Returns a dict mapping the event list index of each RoundAdvanced to its
+    new_round_number, allowing subsequent MessageSent events to be attributed
     to the most recent round.
     """
     round_map: dict[int, int] = {}
     for idx, event in enumerate(events):
-        if isinstance(event, TurnAssigned):
-            round_map[idx] = event.round_number
+        if isinstance(event, RoundAdvanced):
+            round_map[idx] = event.new_round_number
     return round_map
 
 

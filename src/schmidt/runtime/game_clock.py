@@ -104,7 +104,7 @@ class GameClock:
             )
 
     async def _advance_round(self, trigger: str) -> None:
-        """Increment the round counter and deliver injections for the new round."""
+        """Increment the round counter, update world state, and deliver injections."""
         self._current_round += 1
         self._last_message_time = time.monotonic()
 
@@ -120,6 +120,8 @@ class GameClock:
             trigger,
         )
 
+        self._scenario.on_round_advanced(round_number=self._current_round)
+
         await self._deliver_injections(round_number=self._current_round)
 
     async def run(self) -> RunStatus:
@@ -132,6 +134,7 @@ class GameClock:
         self._last_message_time = time.monotonic()
 
         if self._resuming:
+            self._scenario.on_round_advanced(round_number=self._current_round)
             logger.info(
                 "Game clock resumed at round %d/%d",
                 self._current_round,
@@ -144,6 +147,7 @@ class GameClock:
                     trigger="simulation_start",
                 )
             )
+            self._scenario.on_round_advanced(round_number=self._current_round)
             await self._deliver_injections(round_number=self._current_round)
             logger.info(
                 "Game clock started. Round %d/%d, injections delivered.",

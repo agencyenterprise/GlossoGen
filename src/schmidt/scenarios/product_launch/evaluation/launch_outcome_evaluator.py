@@ -1,110 +1,154 @@
-"""Evaluator that computes product launch outcomes from ground truth snapshots.
+"""Evaluator that assesses product launch outcomes from the communication transcript.
 
-Pure computation (no LLM calls). Reads ``GroundTruthSnapshot`` events to determine
-feature completion rate, QA pass rate, budget compliance, and quality scores.
-Information accuracy is handled separately by the ``information_integrity`` evaluator.
+Uses an LLM judge to evaluate feature completion claims, QA readiness signals,
+budget discussions, and overall launch preparedness based on agent messages.
 """
 
 import logging
+from pathlib import Path
+from typing import Literal
+
+from jinja2 import Environment, FileSystemLoader
+from pydantic import BaseModel, Field
 
 from schmidt.evaluation.evaluation_report import MetricResult, Verdict
 from schmidt.evaluation.evaluator_protocol import Evaluator
-from schmidt.llm.provider import LLMProvider
+from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
+from schmidt.evaluation.transcript_builder import build_full_transcript
+from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import GroundTruthSnapshot, SimulationEvent
+from schmidt.models.event import SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
+
+_SCENARIO_PROMPTS_DIR = Path(__file__).parent / "prompts"
+_SCENARIO_JINJA_ENV = Environment(
+    loader=FileSystemLoader(_SCENARIO_PROMPTS_DIR),
+    autoescape=False,
+    keep_trailing_newline=False,
+)
 
 logger = logging.getLogger(__name__)
 
+VERDICT_SCORES: dict[Verdict, float] = {
+    Verdict.PASS: 1.0,
+    Verdict.PARTIAL: 0.5,
+    Verdict.FAIL: 0.0,
+}
+
+
+class AgentContribution(BaseModel):
+    """Per-agent contribution assessment."""
+
+    agent_id: str = Field(description="The agent's identifier.")
+    contribution_quality: Literal["strong", "adequate", "weak"] = Field(
+        description="Quality of this agent's contribution to the launch outcome.",
+    )
+    reason: str = Field(description="Brief explanation of the assessment.")
+
+
+class LaunchOutcomeVerdictOutput(BaseModel):
+    """Structured output from the launch outcome LLM judge."""
+
+    verdict: Literal["PASS", "FAIL", "PARTIAL"] = Field(
+        description=(
+            "PASS: team appears launch-ready with features complete and QA passed. "
+            "PARTIAL: some features ready but gaps remain. "
+            "FAIL: significant unresolved issues prevent a successful launch."
+        ),
+    )
+    feature_readiness: str = Field(
+        description="Assessment of overall feature completion based on agent reports.",
+    )
+    qa_status: str = Field(
+        description="Assessment of QA testing status and quality based on agent reports.",
+    )
+    budget_status: str = Field(
+        description="Assessment of budget compliance based on agent discussions.",
+    )
+    overall_assessment: str = Field(
+        description="Overall launch readiness narrative.",
+    )
+    per_agent_contributions: list[AgentContribution] = Field(
+        description="One entry per agent assessing their contribution.",
+    )
+
 
 class LaunchOutcomeEvaluator(Evaluator):
-    """Evaluates the final product launch outcome.
+    """Evaluates the final product launch outcome from the communication transcript.
 
-    Computes: feature completion, QA pass rate, budget compliance,
-    and average quality score.
+    Uses an LLM judge to assess feature completion, QA readiness, budget status,
+    and overall launch preparedness based on what agents communicated.
     """
 
     async def evaluate(
         self,
         events: list[SimulationEvent],
         agent_configs: list[AgentConfig],
-        scenario: SimulationScenario,  # noqa: ARG002
-        llm_provider: LLMProvider,  # noqa: ARG002
+        scenario: SimulationScenario,
+        llm_provider: LLMProvider,
     ) -> MetricResult:
-        """Compute launch outcome metrics from the final ground truth snapshot."""
-        logger.info("LaunchOutcomeEvaluator: analyzing ground truth snapshots")
+        """Assess launch outcome from the communication transcript."""
+        logger.info("LaunchOutcomeEvaluator: analyzing transcript for launch readiness")
 
-        final_snapshot = None
-        for event in reversed(events):
-            if isinstance(event, GroundTruthSnapshot):
-                final_snapshot = event
-                break
+        transcript = build_full_transcript(events=events, scenario=scenario)
+        agent_roles = "\n".join(f"- {ac.agent_id} ({ac.role_name})" for ac in agent_configs)
 
-        if final_snapshot is None:
-            logger.warning("LaunchOutcomeEvaluator: no ground truth snapshots found")
-            return MetricResult(
-                evaluator_name="launch_outcome",
-                verdict=Verdict.FAIL,
-                score=0.0,
-                evidence=["No ground truth snapshots found."],
-                per_agent={ac.agent_id: Verdict.PARTIAL for ac in agent_configs},
-            )
+        template = _SCENARIO_JINJA_ENV.get_template(name="launch_outcome_user.jinja")
+        judge_prompt = template.render(
+            transcript=transcript,
+            agent_roles=agent_roles,
+        ).strip()
 
-        state = final_snapshot.state
-        features = state.get("features", [])
-        budget = state.get("budget", {})
-
-        total_features = len(features)
-        shipped_features = sum(1 for f in features if f.get("status") == "shipped")
-        qa_passed = sum(1 for f in features if f.get("status") in ("qa_passed", "shipped"))
-        integration_ready = sum(
-            1
-            for f in features
-            if f.get("status") in ("integration_ready", "qa_testing", "qa_passed", "shipped")
+        result = await llm_provider.generate_structured(
+            system_prompt=render_evaluator_prompt(
+                template_name="evaluator_system.jinja", template_variables={}
+            ),
+            messages=[LLMMessage(role="user", content=judge_prompt)],
+            output_schema=LaunchOutcomeVerdictOutput,
         )
 
-        avg_quality = 0.0
-        if features:
-            avg_quality = sum(f.get("quality_score", 0.0) for f in features) / total_features
+        overall_verdict = Verdict(result.verdict.lower())
+        overall_score = VERDICT_SCORES[overall_verdict]
 
-        budget_total = budget.get("total_budget_ru", 0)
-        budget_spent = budget.get("spent_ru", 0)
-        budget_remaining = budget_total - budget_spent
-        budget_compliant = budget_remaining >= 0
-
-        completion_rate = shipped_features / total_features if total_features > 0 else 0.0
-        qa_rate = qa_passed / total_features if total_features > 0 else 0.0
-
-        evidence = [
-            f"Features shipped: {shipped_features}/{total_features} " f"({completion_rate:.0%})",
-            f"Features QA passed: {qa_passed}/{total_features} ({qa_rate:.0%})",
-            f"Features integration-ready or beyond: " f"{integration_ready}/{total_features}",
-            f"Average quality score: {avg_quality:.2f}",
-            f"Budget: {budget_spent:.0f}/{budget_total:.0f} RU spent, "
-            f"{budget_remaining:.0f} RU remaining",
-            f"Budget compliant: " f"{'yes' if budget_compliant else 'NO — over budget'}",
+        evidence: list[str] = [
+            result.overall_assessment,
+            f"Feature readiness: {result.feature_readiness}",
+            f"QA status: {result.qa_status}",
+            f"Budget status: {result.budget_status}",
         ]
 
-        score = (
-            (completion_rate * 0.40)
-            + (qa_rate * 0.25)
-            + (avg_quality * 0.20)
-            + (0.15 if budget_compliant else 0.0)
-        )
+        agent_id_set = {ac.agent_id for ac in agent_configs}
+        agent_id_lower_map = {aid.lower(): aid for aid in agent_id_set}
 
-        if score >= 0.7:
-            verdict = Verdict.PASS
-        elif score >= 0.4:
-            verdict = Verdict.PARTIAL
-        else:
-            verdict = Verdict.FAIL
+        per_agent: dict[str, Verdict] = {}
+        for entry in result.per_agent_contributions:
+            canonical_id = agent_id_lower_map.get(entry.agent_id.lower())
+            if canonical_id is None:
+                logger.warning(
+                    "LaunchOutcomeEvaluator: judge returned unknown agent_id '%s', skipping",
+                    entry.agent_id,
+                )
+                continue
+            if entry.contribution_quality == "strong":
+                per_agent[canonical_id] = Verdict.PASS
+            elif entry.contribution_quality == "adequate":
+                per_agent[canonical_id] = Verdict.PARTIAL
+            else:
+                per_agent[canonical_id] = Verdict.FAIL
+            evidence.append(f"{entry.agent_id}: {entry.contribution_quality} - {entry.reason}")
 
-        per_agent = {ac.agent_id: verdict for ac in agent_configs}
+        for ac in agent_configs:
+            if ac.agent_id not in per_agent:
+                logger.warning(
+                    "LaunchOutcomeEvaluator: no verdict for agent %s, defaulting to PARTIAL",
+                    ac.agent_id,
+                )
+                per_agent[ac.agent_id] = Verdict.PARTIAL
 
         return MetricResult(
             evaluator_name="launch_outcome",
-            verdict=verdict,
-            score=round(score, 3),
+            verdict=overall_verdict,
+            score=overall_score,
             evidence=evidence,
             per_agent=per_agent,
         )

@@ -214,8 +214,6 @@ export interface components {
             message_edits: components["schemas"]["MessageEdit"][];
             /** Model */
             model: string;
-            /** Provider */
-            provider: string;
         };
         /**
          * ForkResponse
@@ -314,8 +312,6 @@ export interface components {
             timestamp: string;
             /** Total Messages */
             total_messages: number;
-            /** Total Turns */
-            total_turns: number;
             status: components["schemas"]["RunStatus"];
             /** Channel Ids */
             channel_ids: string[];
@@ -571,8 +567,6 @@ export interface components {
             reason: components["schemas"]["RunStatus"];
             /** Total Messages */
             total_messages: number;
-            /** Total Turns */
-            total_turns: number;
         };
         /**
          * SSESimulationMessagePayload
@@ -642,30 +636,6 @@ export interface components {
             text: string;
             /** Is Final */
             is_final: boolean;
-        };
-        /**
-         * SSETurnAssigned
-         * @description SSE event emitted when a turn is assigned to an agent.
-         */
-        SSETurnAssigned: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            event_type: "turn_assigned";
-            /** Event Id */
-            event_id: string;
-            /**
-             * Timestamp
-             * Format: date-time
-             */
-            timestamp: string;
-            /** Agent Id */
-            agent_id: string;
-            /** Turn Number */
-            turn_number: number;
-            /** Round Number */
-            round_number: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -792,7 +762,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSETurnAssigned"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
                 };
             };
             /** @description Validation Error */

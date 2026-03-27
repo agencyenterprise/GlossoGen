@@ -16,7 +16,7 @@ from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.evaluation.transcript_builder import build_channel_transcript
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import SimulationEvent, TurnAssigned
+from schmidt.models.event import RoundAdvanced, SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.persuasion_debate.agent_ids import DEBATE_CHANNEL_ID
 from schmidt.scenarios.persuasion_debate.evaluation.prompt_renderer import render_persuasion_prompt
@@ -104,17 +104,20 @@ class PersuasionDynamicsEvaluator(Evaluator):
         return self._build_metric_result(analyses=analyses)
 
     def _find_round_boundaries(self, events: list[SimulationEvent]) -> dict[int, tuple[int, int]]:
-        """Find start and end indices for each round in the event list."""
+        """Find start and end indices for each round in the event list.
+
+        Uses RoundAdvanced events to detect round transitions.
+        """
         boundaries: dict[int, tuple[int, int]] = {}
         current_round = 0
         current_start = 0
 
         for i, event in enumerate(events):
-            if isinstance(event, TurnAssigned):
-                if event.round_number != current_round:
+            if isinstance(event, RoundAdvanced):
+                if event.new_round_number != current_round:
                     if current_round > 0:
                         boundaries[current_round] = (current_start, i)
-                    current_round = event.round_number
+                    current_round = event.new_round_number
                     current_start = i
 
         if current_round > 0:

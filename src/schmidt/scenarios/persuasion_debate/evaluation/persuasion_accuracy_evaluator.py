@@ -15,7 +15,7 @@ from schmidt.evaluation.evaluator_protocol import Evaluator
 from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import SimulationEvent, ToolCalled, TurnAssigned
+from schmidt.models.event import LLMResponseReceived, RoundAdvanced, SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.persuasion_debate.evaluation.prompt_renderer import render_persuasion_prompt
 from schmidt.scenarios.persuasion_debate.question_bank import Question, QuestionBank
@@ -108,36 +108,37 @@ class PersuasionAccuracyEvaluator(Evaluator):
 
         Uses 3-phase round numbering: blind=3*q+1, discussion=3*q+2, final=3*q+3.
         Question index is derived as (round_number - 1) // 3 for all phases.
+        Round transitions are detected via RoundAdvanced events, and tool calls
+        are extracted from LLMResponseReceived events.
         """
         question_data: dict[int, QuestionData] = {}
         current_round = 0
 
         for event in events:
-            if isinstance(event, TurnAssigned):
-                current_round = event.round_number
+            if isinstance(event, RoundAdvanced):
+                current_round = event.new_round_number
 
-            elif isinstance(event, ToolCalled) and current_round > 0:
+            elif isinstance(event, LLMResponseReceived) and current_round > 0:
                 question_index = (current_round - 1) // 3
 
-                if event.request.tool_name == "submit_initial_answer":
-                    if question_index not in question_data:
-                        question_data[question_index] = QuestionData(
-                            initial_answers={},
-                            final_answers={},
-                        )
-                    agent_id = event.agent_id
-                    answer = str(event.request.arguments.get("answer", ""))
-                    question_data[question_index].initial_answers[agent_id] = answer
+                for tool_call in event.tool_calls:
+                    if tool_call.tool_name == "submit_initial_answer":
+                        if question_index not in question_data:
+                            question_data[question_index] = QuestionData(
+                                initial_answers={},
+                                final_answers={},
+                            )
+                        answer = str(tool_call.arguments.get("answer", ""))
+                        question_data[question_index].initial_answers[event.agent_id] = answer
 
-                elif event.request.tool_name == "submit_final_answer":
-                    if question_index not in question_data:
-                        question_data[question_index] = QuestionData(
-                            initial_answers={},
-                            final_answers={},
-                        )
-                    agent_id = event.agent_id
-                    answer = str(event.request.arguments.get("answer", ""))
-                    question_data[question_index].final_answers[agent_id] = answer
+                    elif tool_call.tool_name == "submit_final_answer":
+                        if question_index not in question_data:
+                            question_data[question_index] = QuestionData(
+                                initial_answers={},
+                                final_answers={},
+                            )
+                        answer = str(tool_call.arguments.get("answer", ""))
+                        question_data[question_index].final_answers[event.agent_id] = answer
 
         return question_data
 

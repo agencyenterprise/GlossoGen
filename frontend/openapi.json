@@ -128,9 +128,6 @@
                       "$ref": "#/components/schemas/SSEAgentConnected"
                     },
                     {
-                      "$ref": "#/components/schemas/SSETurnAssigned"
-                    },
-                    {
                       "$ref": "#/components/schemas/SSEMessageSent"
                     },
                     {
@@ -161,7 +158,6 @@
                       "simulation_started": "#/components/schemas/SSESimulationStarted",
                       "agent_registered": "#/components/schemas/SSEAgentRegistered",
                       "agent_connected": "#/components/schemas/SSEAgentConnected",
-                      "turn_assigned": "#/components/schemas/SSETurnAssigned",
                       "message_sent": "#/components/schemas/SSEMessageSent",
                       "llm_response_received": "#/components/schemas/SSELLMResponseReceived",
                       "round_advanced": "#/components/schemas/SSERoundAdvanced",
@@ -453,18 +449,13 @@
           "model": {
             "type": "string",
             "title": "Model"
-          },
-          "provider": {
-            "type": "string",
-            "title": "Provider"
           }
         },
         "type": "object",
         "required": [
           "target_message_id",
           "message_edits",
-          "model",
-          "provider"
+          "model"
         ],
         "title": "ForkRequest",
         "description": "Request body for creating a forked simulation run."
@@ -636,10 +627,6 @@
             "type": "integer",
             "title": "Total Messages"
           },
-          "total_turns": {
-            "type": "integer",
-            "title": "Total Turns"
-          },
           "status": {
             "$ref": "#/components/schemas/RunStatus"
           },
@@ -707,7 +694,6 @@
           "scenario_config",
           "timestamp",
           "total_messages",
-          "total_turns",
           "status",
           "channel_ids",
           "agents",
@@ -1148,10 +1134,6 @@
           "total_messages": {
             "type": "integer",
             "title": "Total Messages"
-          },
-          "total_turns": {
-            "type": "integer",
-            "title": "Total Turns"
           }
         },
         "type": "object",
@@ -1160,8 +1142,7 @@
           "event_id",
           "timestamp",
           "reason",
-          "total_messages",
-          "total_turns"
+          "total_messages"
         ],
         "title": "SSESimulationEnded",
         "description": "SSE event emitted once when the simulation finishes."
@@ -1285,47 +1266,6 @@
         ],
         "title": "SSETokenDelta",
         "description": "SSE event emitted token-by-token during LLM response streaming.\n\nTransient \u2014 not persisted to JSONL. The complete text arrives in a\nsubsequent SSELLMResponseReceived event."
-      },
-      "SSETurnAssigned": {
-        "properties": {
-          "event_type": {
-            "type": "string",
-            "const": "turn_assigned",
-            "title": "Event Type"
-          },
-          "event_id": {
-            "type": "string",
-            "title": "Event Id"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Timestamp"
-          },
-          "agent_id": {
-            "type": "string",
-            "title": "Agent Id"
-          },
-          "turn_number": {
-            "type": "integer",
-            "title": "Turn Number"
-          },
-          "round_number": {
-            "type": "integer",
-            "title": "Round Number"
-          }
-        },
-        "type": "object",
-        "required": [
-          "event_type",
-          "event_id",
-          "timestamp",
-          "agent_id",
-          "turn_number",
-          "round_number"
-        ],
-        "title": "SSETurnAssigned",
-        "description": "SSE event emitted when a turn is assigned to an agent."
       },
       "ValidationError": {
         "properties": {

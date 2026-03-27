@@ -24,7 +24,6 @@ router = APIRouter(prefix="/api")
 # Config keys that map directly to CLI flags (key → flag name).
 _CONFIG_TO_CLI_FLAG: dict[str, str] = {
     "max_round_duration_seconds": "--max-round-duration",
-    "max_turns_per_round": "--max-turns-per-round",
 }
 
 # Config keys that contain full knob dicts and need to be written to a temp file.
@@ -128,8 +127,6 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
         "schmidt",
         "run",
         scenario_name,
-        "--mode",
-        "autonomous",
         "--model",
         body.model,
         "--mcp-port",

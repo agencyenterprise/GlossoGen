@@ -124,7 +124,6 @@ class RunDetailResponse(BaseModel):
     scenario_config: dict[str, Any]
     timestamp: datetime
     total_messages: int
-    total_turns: int
     status: RunStatus
     channel_ids: list[str]
     agents: list[AgentDetail]
@@ -153,7 +152,6 @@ class ForkRequest(BaseModel):
     target_message_id: str
     message_edits: list[MessageEdit]
     model: str
-    provider: str
 
 
 class ForkResponse(BaseModel):
@@ -215,17 +213,6 @@ class SSEAgentConnected(BaseModel):
     agent_id: str
 
 
-class SSETurnAssigned(BaseModel):
-    """SSE event emitted when a turn is assigned to an agent."""
-
-    event_type: Literal["turn_assigned"]
-    event_id: str
-    timestamp: datetime
-    agent_id: str
-    turn_number: int
-    round_number: int
-
-
 class SSEMessageSent(BaseModel):
     """SSE event emitted when an agent sends a message to a channel."""
 
@@ -274,7 +261,6 @@ class SSESimulationEnded(BaseModel):
     timestamp: datetime
     reason: RunStatus
     total_messages: int
-    total_turns: int
 
 
 class SSETokenDelta(BaseModel):
@@ -319,7 +305,6 @@ SSEEvent = Annotated[
         SSESimulationStarted,
         SSEAgentRegistered,
         SSEAgentConnected,
-        SSETurnAssigned,
         SSEMessageSent,
         SSELLMResponseReceived,
         SSERoundAdvanced,

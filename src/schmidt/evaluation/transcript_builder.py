@@ -1,17 +1,26 @@
 """Builds formatted transcripts from simulation events for use by evaluators.
 
 Extracts messages and tool calls from the event log and formats them into
-human-readable transcripts. Tool calls are formatted generically using their
-argument names and values.
+human-readable transcripts labeled with sender and channel/tool context.
 """
 
 import logging
 from typing import Any
 
-from schmidt.models.event import MessageSent, SimulationEvent, ToolCalled
+from schmidt.models.event import LLMResponseReceived, MessageSent, SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
+
+# Tool calls that produce their own MessageSent events — including them
+# in the transcript would duplicate information.
+_MESSAGE_TOOLS = {
+    "send_message",
+    "check_messages",
+    "read_channel",
+    "list_channels",
+    "get_channel_members",
+}
 
 
 def _format_tool_args(arguments: dict[str, Any]) -> str:
@@ -32,10 +41,12 @@ def build_full_transcript(
             msg = event.message
             sender_label = scenario.get_agent_display_name(agent_id=msg.sender_agent_id)
             lines.append(f"[{msg.channel_id}] {sender_label}: {msg.text}")
-        elif isinstance(event, ToolCalled):
+        elif isinstance(event, LLMResponseReceived):
             sender_label = scenario.get_agent_display_name(agent_id=event.agent_id)
-            formatted_args = _format_tool_args(arguments=event.request.arguments)
-            lines.append(f"[{event.request.tool_name}] {sender_label}: {formatted_args}")
+            for tool_call in event.tool_calls:
+                if tool_call.tool_name not in _MESSAGE_TOOLS:
+                    formatted_args = _format_tool_args(arguments=tool_call.arguments)
+                    lines.append(f"[{tool_call.tool_name}] {sender_label}: {formatted_args}")
     return "\n".join(lines)
 
 
@@ -70,7 +81,9 @@ def build_agent_transcript(
             msg = event.message
             label = scenario.get_channel_display_name(channel_id=msg.channel_id, agent_id=agent_id)
             lines.append(f"[{label}] {msg.text}")
-        elif isinstance(event, ToolCalled) and event.agent_id == agent_id:
-            formatted_args = _format_tool_args(arguments=event.request.arguments)
-            lines.append(f"[{event.request.tool_name}] {formatted_args}")
+        elif isinstance(event, LLMResponseReceived) and event.agent_id == agent_id:
+            for tool_call in event.tool_calls:
+                if tool_call.tool_name not in _MESSAGE_TOOLS:
+                    formatted_args = _format_tool_args(arguments=tool_call.arguments)
+                    lines.append(f"[{tool_call.tool_name}] {formatted_args}")
     return "\n".join(lines)

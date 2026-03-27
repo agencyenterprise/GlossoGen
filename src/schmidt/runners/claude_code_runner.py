@@ -228,13 +228,14 @@ class ClaudeCodeRunner(AgentRunner):
                                     block.name,
                                     block.input,
                                 )
-                        if text_parts:
+                        if text_parts or tool_calls:
                             joined_text = "\n".join(text_parts)
-                            logger.info(
-                                "Agent %s reasoning: %.200s",
-                                agent_id,
-                                joined_text,
-                            )
+                            if text_parts:
+                                logger.info(
+                                    "Agent %s reasoning: %.200s",
+                                    agent_id,
+                                    joined_text,
+                                )
                             await event_logger.log(
                                 LLMResponseReceived(
                                     agent_id=agent_id,

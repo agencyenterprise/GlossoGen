@@ -1,13 +1,13 @@
 """LLM-judge evaluator that identifies and codes conflict episodes in agent interactions.
 
-Analyzes the full transcript plus reasoning traces through the lens of four designed
-conflict types (quality vs speed, budget vs scope, design fidelity vs timeline,
-individual vs team priority) and classifies each episode's resolution mode.
+Analyzes the full transcript and agent reasoning traces through the lens of four
+designed conflict types (quality vs speed, budget vs scope, design fidelity vs
+timeline, individual vs team priority) and classifies each episode's resolution mode.
 """
 
 import logging
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, Field
@@ -18,7 +18,7 @@ from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.evaluation.transcript_builder import build_full_transcript
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import GroundTruthSnapshot, ReasoningCaptured, SimulationEvent
+from schmidt.models.event import LLMResponseReceived, RoundAdvanced, SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
 
 _SCENARIO_PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -108,58 +108,28 @@ VERDICT_SCORES: dict[Verdict, float] = {
 
 
 def _extract_reasoning_traces(events: list[SimulationEvent]) -> str:
-    """Extract all reasoning captured events into a formatted string."""
+    """Extract agent reasoning from LLM response events.
+
+    In autonomous mode, ``LLMResponseReceived.text`` contains thinking-block
+    content concatenated with regular text, capturing the agent's private
+    reasoning process.
+    """
+    current_round = 1
     traces: list[str] = []
     for event in events:
-        if isinstance(event, ReasoningCaptured):
-            traces.append(f"[Round {event.round_number}] {event.agent_id}:\n{event.reasoning_text}")
+        if isinstance(event, RoundAdvanced):
+            current_round = event.new_round_number
+        elif isinstance(event, LLMResponseReceived) and event.text:
+            traces.append(f"[Round {current_round}] {event.agent_id}:\n{event.text}")
     if not traces:
         return "No reasoning traces captured."
     return "\n\n".join(traces)
 
 
-def _build_ground_truth_summary(events: list[SimulationEvent]) -> str:
-    """Build a per-round ground truth summary for context."""
-    snapshots: list[tuple[int, dict[str, Any]]] = []
-    for event in events:
-        if isinstance(event, GroundTruthSnapshot):
-            snapshots.append((event.round_number, event.state))
-
-    if not snapshots:
-        return "No ground truth snapshots available."
-
-    lines: list[str] = []
-    for rnd, state in snapshots:
-        features = state.get("features", [])
-        budget = state.get("budget", {})
-        shipped = sum(1 for f in features if f.get("status") == "shipped")
-        total = len(features)
-        spent = budget.get("spent_ru", 0)
-        total_budget = budget.get("total_budget_ru", 0)
-        remaining = total_budget - spent
-
-        feature_lines: list[str] = []
-        for f in features:
-            be = f.get("backend_completion_pct", 0.0) * 100
-            fe = f.get("frontend_completion_pct", 0.0) * 100
-            status = f.get("status", "unknown")
-            feature_lines.append(
-                f"  {f['feature_id']} ({f.get('name', '?')}): "
-                f"BE {be:.0f}%, FE {fe:.0f}%, status={status}"
-            )
-        lines.append(
-            f"Round {rnd}: {shipped}/{total} shipped, "
-            f"budget {spent:.0f}/{total_budget:.0f} RU "
-            f"({remaining:.0f} remaining)\n" + "\n".join(feature_lines)
-        )
-
-    return "\n\n".join(lines)
-
-
 class ConflictResolutionEvaluator(Evaluator):
     """Identifies and codes conflict episodes using an LLM judge.
 
-    Analyzes the full transcript and reasoning traces for designed conflict
+    Analyzes the full communication transcript for designed conflict
     points and classifies resolution modes.
     """
 
@@ -175,14 +145,12 @@ class ConflictResolutionEvaluator(Evaluator):
 
         transcript = build_full_transcript(events=events, scenario=scenario)
         reasoning_traces = _extract_reasoning_traces(events=events)
-        ground_truth_summary = _build_ground_truth_summary(events=events)
         agent_roles = "\n".join(f"- {ac.agent_id} ({ac.role_name})" for ac in agent_configs)
 
         template = _SCENARIO_JINJA_ENV.get_template(name="conflict_resolution_user.jinja")
         judge_prompt = template.render(
             transcript=transcript,
             reasoning_traces=reasoning_traces,
-            ground_truth_summary=ground_truth_summary,
             agent_roles=agent_roles,
         ).strip()
 

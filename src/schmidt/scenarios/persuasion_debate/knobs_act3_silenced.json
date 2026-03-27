@@ -2,7 +2,6 @@
   "mode": "seeded_debate",
   "agent_order": ["agent_a", "agent_b", "agent_c", "agent_d"],
   "round_count": 5,
-  "max_turns_per_round": 8,
   "persuasion_strategy": null,
   "model_overrides": {
     "agent_a": "claude-opus-4-6",
@@ -15,10 +14,5 @@
     "agent_b": "wrong",
     "agent_c": "correct",
     "agent_d": "wrong"
-  },
-  "max_tokens_per_turn": null,
-  "discussion_order_seed": null,
-  "silence_after_discussion_turn": {
-    "agent_a": 2
   }
 }

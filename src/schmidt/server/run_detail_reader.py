@@ -12,13 +12,11 @@ from schmidt.models.event import (
     AgentRegistered,
     LLMResponseReceived,
     MessageSent,
-    ReasoningCaptured,
     RoundAdvanced,
     RunStatus,
     SimulationEnded,
     SimulationEvent,
     SimulationStarted,
-    TurnAssigned,
 )
 from schmidt.server.response_models import (
     AgentDetail,
@@ -139,14 +137,9 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     messages: list[ChannelMessage] = []
     reasoning: list[ReasoningEntry] = []
     total_messages = 0
-    total_turns = 0
     status = None
 
     current_round = 0
-    # Per-agent turn/round from TurnAssigned (orchestrated mode).
-    # In autonomous mode these stay empty and we fall back to global counters.
-    agent_turn: dict[str, int] = {}
-    agent_round: dict[str, int] = {}
 
     for event in events:
         if isinstance(event, SimulationStarted):
@@ -172,26 +165,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         elif isinstance(event, RoundAdvanced):
             current_round = event.new_round_number
 
-        elif isinstance(event, TurnAssigned):
-            total_turns = event.turn_number
-            agent_turn[event.agent_id] = event.turn_number
-            agent_round[event.agent_id] = event.round_number
-            current_round = event.round_number
-
-        elif isinstance(event, ReasoningCaptured):
-            total_messages += 1
-            reasoning.append(
-                ReasoningEntry(
-                    message_id=event.event_id,
-                    sender_agent_id=event.agent_id,
-                    text=event.reasoning_text,
-                    timestamp=event.timestamp,
-                    turn_number=agent_turn.get(event.agent_id, total_messages),
-                    round_number=agent_round.get(event.agent_id, current_round),
-                    channel_ids=[],
-                )
-            )
-
         elif isinstance(event, LLMResponseReceived):
             if event.text is not None and event.text.strip():
                 total_messages += 1
@@ -201,8 +174,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                         sender_agent_id=event.agent_id,
                         text=event.text,
                         timestamp=event.timestamp,
-                        turn_number=agent_turn.get(event.agent_id, total_messages),
-                        round_number=agent_round.get(event.agent_id, current_round),
+                        turn_number=total_messages,
+                        round_number=current_round,
                         channel_ids=[],
                     )
                 )
@@ -217,8 +190,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     sender_agent_id=msg.sender_agent_id,
                     text=msg.text,
                     timestamp=msg.timestamp,
-                    turn_number=agent_turn.get(msg.sender_agent_id, total_messages),
-                    round_number=agent_round.get(msg.sender_agent_id, current_round),
+                    turn_number=total_messages,
+                    round_number=current_round,
                 )
             )
 
@@ -253,7 +226,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         scenario_config=scenario_config,
         timestamp=timestamp,
         total_messages=total_messages,
-        total_turns=total_turns,
         status=status,
         channel_ids=channel_ids,
         agents=agents,

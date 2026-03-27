@@ -24,7 +24,7 @@ Each question (round) has three phases, matching the paper's methodology:
 All agents answer the question independently via `submit_initial_answer` without seeing each other's responses. This prevents anchoring bias where later agents simply adopt earlier agents' answers.
 
 ### 2. Discussion Phase
-All agents see each other's initial answers and discuss on the shared debate channel. Agents round-robin for up to `max_turns_per_round` turns. Discussion ends early if all active agents reach consensus (submit the same final answer).
+All agents see each other's initial answers and discuss on the shared debate channel. Discussion ends when all agents are idle or the round duration timeout is reached. Discussion ends early if all active agents reach consensus (submit the same final answer).
 
 ### 3. Final Answer Phase
 After discussion ends, any agent that has not yet submitted a final answer is prompted to do so via `submit_final_answer`. This guarantees every agent has a recorded final answer for evaluation.
@@ -66,13 +66,9 @@ After discussion ends, agents who have not yet submitted a final answer receive 
 | mode | misinformation, balanced, debate, seeded_debate | Evaluation mode |
 | agent_order | list of agent IDs | Ordered list of participating agents (e.g. `["agent_a", "agent_b"]`) |
 | round_count | int | Number of questions (rounds) |
-| max_turns_per_round | int | Maximum discussion turns per question |
 | persuasion_strategy | logical, emotional, credible, null | Adversary's approach (required for misinformation/balanced, null for debate/seeded_debate) |
 | model_overrides | dict | Per-agent model overrides for pairing different strengths |
 | agent_beliefs | dict | Maps each agent to `"correct"` or `"wrong"` (required for seeded_debate, null for other modes) |
-| max_tokens_per_turn | int or null | Max tokens per LLM generation (null = 4096 default) |
-| discussion_order_seed | int or null | Seed for shuffling discussion order per question (null = fixed order) |
-| silence_after_discussion_turn | dict or null | Maps agent IDs to discussion turn after which they are silenced (null = no silencing) |
 
 ## Question Bank
 
@@ -151,7 +147,7 @@ Keeps the 4-agent setup from Act 2 but adds communication constraints. Three sep
 
 ### Condition A — Token limit halved
 
-Agents must argue their case with `max_tokens_per_turn: 2048` instead of the default 4096. Tests whether compressed communication favors confident-but-wrong agents over careful-but-correct ones.
+Agents must argue their case with a reduced token budget. Tests whether compressed communication favors confident-but-wrong agents over careful-but-correct ones.
 
 ```bash
 set -a && source .env && set +a && \
@@ -166,7 +162,7 @@ set -a && source .env && set +a && \
 
 ### Condition B — Turn order scrambled
 
-Discussion order is shuffled deterministically per question (`discussion_order_seed: 42`). Tests whether the ordering effect from the paper amplifies or diminishes with 4 agents.
+Discussion order is shuffled deterministically per question. Tests whether the ordering effect from the paper amplifies or diminishes with 4 agents.
 
 ```bash
 set -a && source .env && set +a && \

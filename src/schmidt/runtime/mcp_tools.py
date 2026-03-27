@@ -7,25 +7,21 @@ context (HTTP query parameter), not from tool arguments.
 
 import asyncio
 import logging
-from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, TypeAlias
+from typing import Any
 from uuid import uuid4
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import FastMCP
 
 from schmidt.models.event import MessageSent
 from schmidt.models.mcp_responses import ChannelMessage, SendMessageResult
 from schmidt.models.message import SimulationMessage
 from schmidt.runtime.activity_notification import NewMessagesNotification
 from schmidt.runtime.agent_session import AgentSession
+from schmidt.runtime.scenario_mcp_tool import ToolContext
 from schmidt.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
-
-# Context is generic over (ServerSession, LifespanContext, Request).
-# We use Any for all since we only access request_context.request.
-ToolContext: TypeAlias = Context[Any, Any, Any]
 
 
 def _resolve_agent_from_context(ctx: ToolContext, runtime: SimulationRuntime) -> AgentSession:
@@ -273,41 +269,11 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
             for mid in member_ids
         ]
 
-    # Register scenario-specific tools. Tools with requires_agent_id=True
-    # get a wrapper that resolves agent_id from the MCP HTTP connection context.
+    # Register scenario-specific tools. Executors accept ctx: ToolContext
+    # directly; FastMCP auto-injects it and hides it from the tool schema.
     for scenario_tool in runtime.scenario.get_mcp_tools():
-        if scenario_tool.requires_agent_id:
-            wrapped = _make_agent_injected_executor(
-                executor=scenario_tool.executor,
-                runtime=runtime,
-            )
-            mcp.tool(
-                name=scenario_tool.name,
-                description=scenario_tool.description,
-            )(wrapped)
-        else:
-            mcp.tool(
-                name=scenario_tool.name,
-                description=scenario_tool.description,
-            )(scenario_tool.executor)
+        mcp.tool(
+            name=scenario_tool.name,
+            description=scenario_tool.description,
+        )(scenario_tool.executor)
         logger.info("Registered scenario MCP tool: %s", scenario_tool.name)
-
-
-def _make_agent_injected_executor(
-    executor: Callable[..., Any],
-    runtime: SimulationRuntime,
-) -> Callable[..., Any]:
-    """Create a wrapper that resolves agent_id from MCP context before calling the executor.
-
-    The returned function accepts ``ctx: ToolContext`` (injected by FastMCP)
-    plus keyword arguments, resolves agent_id from the HTTP connection, and
-    delegates to the original executor with agent_id as the first argument.
-    """
-
-    async def wrapped(ctx: ToolContext, **kwargs: Any) -> str:
-        """Resolve agent_id from MCP context and delegate to the scenario tool executor."""
-        session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
-        result: str = await executor(session.agent_id, **kwargs)
-        return result
-
-    return wrapped
