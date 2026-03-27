@@ -9,6 +9,7 @@ import type { DisplayEntry } from "./display-entry";
 import { EvidenceModal } from "./evidence-modal";
 import { formatTime, humanize } from "./format";
 import { ProseMarkdown } from "./prose-markdown";
+import { ToolCallDisplay } from "./tool-call-display";
 import { VerdictPill } from "./verdict-pill";
 
 interface DrawerTurnGroup {
@@ -142,13 +143,16 @@ export function AgentDrawer({
                     return (
                       <div
                         key={entry.message_id}
-                        className={cn(entry.is_reasoning && "ml-4 opacity-50")}
+                        className={cn(
+                          entry.is_reasoning && "ml-4 opacity-50",
+                          entry.is_tool_use && "ml-4"
+                        )}
                       >
                         {entry.is_reasoning ? (
                           <span className="text-[10px] italic text-muted-foreground">
                             reasoning
                           </span>
-                        ) : (
+                        ) : entry.is_tool_use ? null : (
                           <span className="mb-0.5 flex items-baseline gap-1.5">
                             <button
                               className={cn(
@@ -170,7 +174,15 @@ export function AgentDrawer({
                             </button>
                           </span>
                         )}
-                        <ProseMarkdown>{entry.text}</ProseMarkdown>
+                        {entry.is_tool_use ? (
+                          <ToolCallDisplay
+                            toolName={entry.tool_name}
+                            arguments={entry.tool_arguments}
+                            result={entry.tool_result}
+                          />
+                        ) : (
+                          <ProseMarkdown>{entry.text}</ProseMarkdown>
+                        )}
                       </div>
                     );
                   })}

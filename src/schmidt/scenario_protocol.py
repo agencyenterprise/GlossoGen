@@ -137,6 +137,21 @@ class SimulationScenario(ABC):
         """
         ...
 
+    def set_run_dir(self, run_dir: Path) -> None:
+        """Called after the run directory is computed but before the simulation starts.
+
+        Scenarios that need filesystem access (e.g. code workspaces) override
+        this to store the path and create subdirectories. The default is a no-op.
+        """
+
+    def is_finished_early(self) -> bool:
+        """Return True if the scenario has reached a natural conclusion before max rounds.
+
+        The game clock checks this each iteration and terminates the simulation
+        early when it returns True. The default returns False.
+        """
+        return False
+
     def on_round_advanced(self, round_number: int) -> None:
         """Called by the game clock after advancing to a new round.
 

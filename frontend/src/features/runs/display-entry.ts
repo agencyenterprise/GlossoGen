@@ -2,9 +2,10 @@ import type { components } from "@/types/api.gen";
 
 type ChannelMessage = components["schemas"]["ChannelMessage"];
 type ReasoningEntry = components["schemas"]["ReasoningEntry"];
+type ToolUseEntry = components["schemas"]["ToolUseEntry"];
 
-/** Unified display type used by ChatPane and AgentDrawer to render both
- *  channel messages and reasoning entries in a single turn-grouped timeline. */
+/** Unified display type used by ChatPane and AgentDrawer to render
+ *  channel messages, reasoning entries, and tool uses in a single timeline. */
 export interface DisplayEntry {
   message_id: string;
   channel_id: string;
@@ -15,14 +16,20 @@ export interface DisplayEntry {
   turn_number: number;
   round_number: number;
   is_reasoning: boolean;
+  is_tool_use: boolean;
   /** True when this entry represents in-progress streaming text. */
   is_partial: boolean;
+  /** Tool use fields — only populated when is_tool_use is true. */
+  tool_name: string;
+  tool_arguments: Record<string, unknown>;
+  tool_result: string | null;
 }
 
-/** Merge channel messages and reasoning entries into a single sorted array. */
+/** Merge channel messages, reasoning entries, and tool uses into a single sorted array. */
 export function mergeEntries(
   messages: ChannelMessage[],
-  reasoning: ReasoningEntry[]
+  reasoning: ReasoningEntry[],
+  toolUse: ToolUseEntry[]
 ): DisplayEntry[] {
   const channelEntries: DisplayEntry[] = messages.map(m => ({
     message_id: m.message_id,
@@ -34,7 +41,11 @@ export function mergeEntries(
     turn_number: m.turn_number,
     round_number: m.round_number,
     is_reasoning: false,
+    is_tool_use: false,
     is_partial: false,
+    tool_name: "",
+    tool_arguments: {},
+    tool_result: null,
   }));
 
   const reasoningEntries: DisplayEntry[] = reasoning.map(r => ({
@@ -47,10 +58,31 @@ export function mergeEntries(
     turn_number: r.turn_number,
     round_number: r.round_number,
     is_reasoning: true,
+    is_tool_use: false,
     is_partial: false,
+    tool_name: "",
+    tool_arguments: {},
+    tool_result: null,
   }));
 
-  return [...channelEntries, ...reasoningEntries].sort((a, b) =>
+  const toolEntries: DisplayEntry[] = toolUse.map(t => ({
+    message_id: t.message_id,
+    channel_id: "",
+    channel_ids: [],
+    sender_agent_id: t.sender_agent_id,
+    text: "",
+    timestamp: t.timestamp,
+    turn_number: t.turn_number,
+    round_number: t.round_number,
+    is_reasoning: false,
+    is_tool_use: true,
+    is_partial: false,
+    tool_name: t.tool_name,
+    tool_arguments: t.arguments,
+    tool_result: t.result,
+  }));
+
+  return [...channelEntries, ...reasoningEntries, ...toolEntries].sort((a, b) =>
     a.timestamp.localeCompare(b.timestamp)
   );
 }

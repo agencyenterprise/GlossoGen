@@ -87,6 +87,17 @@ class LLMResponseReceived(EventBase):
     usage: TokenUsage
 
 
+class ToolResultReceived(EventBase):
+    """Emitted when a tool call completes and the result is returned to the agent."""
+
+    event_type: Literal["tool_result_received"] = "tool_result_received"
+    agent_id: str
+    tool_name: str
+    call_id: str
+    arguments: dict[str, Any]
+    result: str
+
+
 class RoundAdvanced(EventBase):
     """Emitted when the game clock advances to a new round in autonomous mode."""
 
@@ -127,6 +138,7 @@ SimulationEvent = Annotated[
         AgentConnected,
         MessageSent,
         LLMResponseReceived,
+        ToolResultReceived,
         RoundAdvanced,
         InjectionDelivered,
         SimulationEnded,

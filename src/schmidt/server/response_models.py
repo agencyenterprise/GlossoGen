@@ -73,6 +73,24 @@ class ChannelMessage(BaseModel):
     round_number: int
 
 
+class ToolUseEntry(BaseModel):
+    """A scenario-specific tool invocation with its result.
+
+    Each entry represents one tool call made by an agent. The ``result``
+    field is filled once the tool execution completes.
+    """
+
+    message_id: str
+    sender_agent_id: str
+    tool_name: str
+    call_id: str
+    arguments: dict[str, Any]
+    result: str | None
+    timestamp: datetime
+    turn_number: int
+    round_number: int
+
+
 class ReasoningEntry(BaseModel):
     """An LLM reasoning/thinking entry from an agent's turn.
 
@@ -129,6 +147,7 @@ class RunDetailResponse(BaseModel):
     agents: list[AgentDetail]
     messages: list[ChannelMessage]
     reasoning: list[ReasoningEntry]
+    tool_use: list[ToolUseEntry]
     debug_logs: list[DebugLogEntry]
     evaluation: EvalReportResponse | None
     fork_source: ForkSource | None
@@ -232,6 +251,19 @@ class SSELLMResponseReceived(BaseModel):
     text: str | None
 
 
+class SSEToolResultReceived(BaseModel):
+    """SSE event emitted when a tool call completes and returns a result."""
+
+    event_type: Literal["tool_result_received"]
+    event_id: str
+    timestamp: datetime
+    agent_id: str
+    tool_name: str
+    call_id: str
+    arguments: dict[str, Any]
+    result: str
+
+
 class SSERoundAdvanced(BaseModel):
     """SSE event emitted when the game clock advances to a new round."""
 
@@ -307,6 +339,7 @@ SSEEvent = Annotated[
         SSEAgentConnected,
         SSEMessageSent,
         SSELLMResponseReceived,
+        SSEToolResultReceived,
         SSERoundAdvanced,
         SSEInjectionDelivered,
         SSESimulationEnded,

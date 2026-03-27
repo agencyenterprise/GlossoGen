@@ -8,6 +8,7 @@ import { deriveInitials, type AgentColor } from "./agent-colors";
 import type { DisplayEntry } from "./display-entry";
 import { formatTime, humanize } from "./format";
 import { ProseMarkdown } from "./prose-markdown";
+import { ToolCallDisplay } from "./tool-call-display";
 import type { PendingEdit } from "./use-fork";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
@@ -229,11 +230,15 @@ export function ChatPane({
     selectedChannel === null ? "all channels, global turn order" : `#${selectedChannel}`;
 
   const [showReasoning, setShowReasoning] = useState(true);
+  const [showTools, setShowTools] = useState(true);
 
   const visibleFiltered = useMemo(() => {
-    if (showReasoning) return filtered;
-    return filtered.filter(m => !m.is_reasoning);
-  }, [filtered, showReasoning]);
+    return filtered.filter(m => {
+      if (m.is_reasoning && !showReasoning) return false;
+      if (m.is_tool_use && !showTools) return false;
+      return true;
+    });
+  }, [filtered, showReasoning, showTools]);
 
   const rounds = useMemo(() => groupByRoundAndTurn(visibleFiltered), [visibleFiltered]);
 
@@ -254,6 +259,15 @@ export function ChatPane({
             className="h-3 w-3 rounded border-border accent-foreground"
           />
           Reasoning
+        </label>
+        <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground select-none">
+          <input
+            type="checkbox"
+            checked={showTools}
+            onChange={e => setShowTools(e.target.checked)}
+            className="h-3 w-3 rounded border-border accent-foreground"
+          />
+          Tools
         </label>
         {streamingAgentId ? (
           <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
@@ -322,8 +336,12 @@ export function ChatPane({
                       const isEditing = editingMessageId === entry.message_id;
                       const pendingEdit = pendingEdits.get(entry.message_id);
                       const displayText = pendingEdit ? pendingEdit.newText : entry.text;
-                      const canEdit = forkEnabled && !entry.is_reasoning && !entry.is_partial;
-                      const entryKey = `${entry.message_id}-${entry.is_reasoning ? "r" : "m"}-${entryIdx}`;
+                      const canEdit =
+                        forkEnabled &&
+                        !entry.is_reasoning &&
+                        !entry.is_tool_use &&
+                        !entry.is_partial;
+                      const entryKey = `${entry.message_id}-${entry.is_reasoning ? "r" : entry.is_tool_use ? "t" : "m"}-${entryIdx}`;
 
                       return (
                         <div
@@ -338,6 +356,7 @@ export function ChatPane({
                           className={cn(
                             "group/entry relative",
                             entry.is_reasoning && "ml-4 opacity-50",
+                            entry.is_tool_use && "ml-4",
                             pendingEdit &&
                               "rounded-md bg-amber-50/50 ring-1 ring-amber-200/50 dark:bg-amber-950/20 dark:ring-amber-800/30"
                           )}
@@ -346,7 +365,7 @@ export function ChatPane({
                             <span className="text-[10px] italic text-muted-foreground">
                               {entry.is_partial ? "streaming..." : "reasoning"}
                             </span>
-                          ) : showChannelBadge ? (
+                          ) : entry.is_tool_use ? null : showChannelBadge ? (
                             <span
                               className={cn(
                                 "mb-0.5 inline-block rounded-full px-1.5 py-px text-[10px] font-medium leading-relaxed",
@@ -358,7 +377,13 @@ export function ChatPane({
                             </span>
                           ) : null}
 
-                          {isEditing ? (
+                          {entry.is_tool_use ? (
+                            <ToolCallDisplay
+                              toolName={entry.tool_name}
+                              arguments={entry.tool_arguments}
+                              result={entry.tool_result}
+                            />
+                          ) : isEditing ? (
                             <MessageEditor
                               initialText={displayText}
                               onSave={newText => onSaveEdit(entry.message_id, newText)}
@@ -366,9 +391,11 @@ export function ChatPane({
                             />
                           ) : (
                             <>
-                              <ProseMarkdown className="[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]">
-                                {displayText}
-                              </ProseMarkdown>
+                              {displayText ? (
+                                <ProseMarkdown className="[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]">
+                                  {displayText}
+                                </ProseMarkdown>
+                              ) : null}
                               {entry.is_partial ? (
                                 <span className="inline-block h-3 w-1.5 animate-pulse bg-foreground/60" />
                               ) : null}

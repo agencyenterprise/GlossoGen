@@ -1,0 +1,9 @@
+{
+    "spec_name": "task_scheduler",
+    "num_seller_teams": 2,
+    "seller_crosschat": false,
+    "impossible_requirements": true,
+    "max_rounds": 8,
+    "max_round_duration": 300,
+    "model_overrides": {}
+}
