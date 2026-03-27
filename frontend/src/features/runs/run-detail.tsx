@@ -442,6 +442,7 @@ export function RunDetail({ runId }: { runId: string }) {
           <LogPanel logs={allDebugLogs} />
         ) : (
           <ChatPane
+            runId={runId}
             messages={allDisplayEntries}
             agents={allAgents}
             selectedChannel={selectedChannel}

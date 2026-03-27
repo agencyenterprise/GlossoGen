@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ data.scenario_name }} — Simulation Export</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 18mm 20mm 18mm;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #1a1a1a;
+  }
+
+  /* ---- Header ---- */
+  .header {
+    border-bottom: 2px solid #e5e5e5;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+  .header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .header .meta {
+    font-size: 10px;
+    color: #737373;
+  }
+  .header .meta span {
+    margin-right: 12px;
+  }
+  .header .description {
+    margin-top: 6px;
+    font-size: 10px;
+    color: #525252;
+    font-style: italic;
+  }
+  .channel-filter-badge {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 500;
+    background: #f0f0f0;
+    color: #525252;
+  }
+
+  /* ---- Agents legend ---- */
+  .agents-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 8px 10px;
+    background: #fafafa;
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+  }
+  .agent-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+  }
+  .agent-chip .avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+  }
+
+  /* ---- Round divider ---- */
+  .round-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0 8px 0;
+    page-break-after: avoid;
+  }
+  .round-divider .line {
+    flex: 1;
+    height: 1px;
+    background: #d4d4d4;
+  }
+  .round-divider .label {
+    white-space: nowrap;
+    font-size: 10px;
+    color: #737373;
+    font-weight: 500;
+  }
+
+  /* ---- Turn ---- */
+  .turn {
+    display: flex;
+    gap: 8px;
+    padding: 6px 0;
+    page-break-inside: avoid;
+  }
+  .turn-avatar-col {
+    width: 24px;
+    flex-shrink: 0;
+  }
+  .turn-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+  }
+  .turn-number {
+    text-align: center;
+    font-size: 9px;
+    color: #a3a3a3;
+    margin-top: 2px;
+  }
+  .turn-content {
+    flex: 1;
+    min-width: 0;
+  }
+  .turn-header {
+    margin-bottom: 2px;
+  }
+  .turn-header .agent-name {
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .turn-header .timestamp {
+    font-size: 9px;
+    color: #a3a3a3;
+    margin-left: 6px;
+  }
+
+  /* ---- Channel badge ---- */
+  .channel-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  /* ---- Message text (markdown) ---- */
+  .message-text {
+    font-size: 11px;
+    line-height: 1.55;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  .message-text p {
+    margin: 2px 0;
+  }
+  .message-text h1, .message-text h2 {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 6px 0 2px 0;
+  }
+  .message-text h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin: 4px 0 2px 0;
+  }
+  .message-text ul, .message-text ol {
+    margin-left: 16px;
+    margin-top: 2px;
+    margin-bottom: 2px;
+  }
+  .message-text code {
+    background: #f5f5f5;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .message-text pre {
+    background: #f5f5f5;
+    border: 1px solid #e5e5e5;
+    border-radius: 4px;
+    padding: 6px 8px;
+    margin: 4px 0;
+    overflow-x: auto;
+    font-size: 10px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .message-text pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+  }
+  .message-text table {
+    border-collapse: collapse;
+    margin: 4px 0;
+    font-size: 10px;
+  }
+  .message-text th, .message-text td {
+    border: 1px solid #d4d4d4;
+    padding: 3px 6px;
+  }
+  .message-text th {
+    background: #f5f5f5;
+    font-weight: 600;
+  }
+  .message-text strong {
+    font-weight: 600;
+  }
+
+  /* ---- Reasoning ---- */
+  .reasoning {
+    margin-left: 16px;
+    opacity: 0.55;
+    page-break-inside: avoid;
+  }
+  .reasoning-label {
+    font-size: 9px;
+    font-style: italic;
+    color: #a3a3a3;
+  }
+  .reasoning .message-text {
+    font-style: italic;
+    color: #525252;
+  }
+
+  /* ---- Tool call ---- */
+  .tool-call {
+    margin-left: 16px;
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin-top: 3px;
+    margin-bottom: 3px;
+    background: #fafafa;
+    page-break-inside: avoid;
+  }
+  .tool-header {
+    font-size: 10px;
+    font-weight: 600;
+    color: #525252;
+    margin-bottom: 4px;
+  }
+  .tool-section-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: #737373;
+    margin-top: 4px;
+    margin-bottom: 2px;
+  }
+  .tool-params {
+    font-size: 10px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .tool-params .param-row {
+    margin-bottom: 2px;
+  }
+  .tool-params .param-key {
+    font-weight: 600;
+    color: #525252;
+  }
+  .tool-params .param-value {
+    color: #1a1a1a;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .tool-result {
+    margin-top: 4px;
+  }
+  .tool-result pre {
+    background: #f0f0f0;
+    border: 1px solid #e5e5e5;
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 9px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 200px;
+    overflow: hidden;
+  }
+
+  /* ---- Footer ---- */
+  .footer {
+    margin-top: 20px;
+    padding-top: 8px;
+    border-top: 1px solid #e5e5e5;
+    font-size: 9px;
+    color: #a3a3a3;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>{{ data.scenario_name | replace("_", " ") | title }}</h1>
+  <div class="meta">
+    <span>{{ data.timestamp | format_datetime }}</span>
+    <span>{{ data.total_messages }} messages</span>
+    <span>{{ data.agents | length }} agents</span>
+    <span>{{ data.rounds | length }} rounds</span>
+  </div>
+  {% if data.scenario_description %}
+  <div class="description">{{ data.scenario_description }}</div>
+  {% endif %}
+  {% if data.channel_filter %}
+  <div class="channel-filter-badge">#{{ data.channel_filter }}</div>
+  {% endif %}
+</div>
+
+<!-- Agents legend -->
+<div class="agents-legend">
+  {% for agent in data.agents %}
+  <span class="agent-chip">
+    <span class="avatar" style="background: {{ agent_colors[agent.agent_id].bg }}; color: {{ agent_colors[agent.agent_id].fg }};">
+      {{ agent_initials[agent.agent_id] }}
+    </span>
+    {{ agent.role_name }}
+  </span>
+  {% endfor %}
+</div>
+
+<!-- Rounds -->
+{% for round in data.rounds %}
+<div class="round-divider">
+  <span class="line"></span>
+  <span class="label">Round {{ round.round_number }}</span>
+  <span class="line"></span>
+</div>
+
+{% for turn in round.turns %}
+<div class="turn">
+  <div class="turn-avatar-col">
+    <div class="turn-avatar" style="background: {{ turn.agent_color.bg }}; color: {{ turn.agent_color.fg }};">
+      {{ turn.agent_initials }}
+    </div>
+    <div class="turn-number">{{ turn.turn_number }}</div>
+  </div>
+  <div class="turn-content">
+    <div class="turn-header">
+      <span class="agent-name">{{ turn.agent_role_name }}</span>
+      <span class="timestamp">{{ turn.timestamp | format_time }}</span>
+    </div>
+
+    {% for entry in turn.entries %}
+      {% if entry.is_reasoning %}
+    <div class="reasoning">
+      <span class="reasoning-label">reasoning</span>
+      <div class="message-text">{{ entry.text | markdown_to_html }}</div>
+    </div>
+
+      {% elif entry.is_tool_use %}
+    <div class="tool-call">
+      <div class="tool-header">{{ entry.tool_name }}</div>
+      {% if entry.tool_arguments %}
+      <div class="tool-section-label">Parameters</div>
+      <div class="tool-params">
+        {% for key, value in entry.tool_arguments.items() %}
+        <div class="param-row">
+          <span class="param-key">{{ key }}:</span>
+          <span class="param-value">{{ value | format_json }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if entry.tool_result %}
+      <div class="tool-result">
+        <div class="tool-section-label">Result</div>
+        <pre>{{ entry.tool_result }}</pre>
+      </div>
+      {% endif %}
+    </div>
+
+      {% else %}
+        {% if show_channel_badges and entry.channel_color %}
+    <span class="channel-badge" style="background: {{ entry.channel_color.bg }}; color: {{ entry.channel_color.fg }};">
+      #{{ entry.channel_id }}
+    </span>
+        {% endif %}
+    <div class="message-text">{{ entry.text | markdown_to_html }}</div>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+{% endfor %}
+
+<div class="footer">
+  Generated from simulation {{ data.scenario_name }} &mdash; {{ data.timestamp | format_datetime }}
+</div>
+
+</body>
+</html>
