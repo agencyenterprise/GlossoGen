@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Pencil, Play, X } from "lucide-react";
+import { ChevronDown, Download, Pencil, Play, X } from "lucide-react";
+import { API_URL } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
@@ -14,6 +15,7 @@ import type { PendingEdit } from "./use-fork";
 type AgentDetail = components["schemas"]["AgentDetail"];
 
 interface ChatPaneProps {
+  runId: string;
   messages: DisplayEntry[];
   agents: AgentDetail[];
   selectedChannel: string | null;
@@ -103,6 +105,7 @@ function groupByRoundAndTurn(messages: DisplayEntry[]): RoundGroup[] {
 const SCROLL_BOTTOM_THRESHOLD = 80;
 
 export function ChatPane({
+  runId,
   messages,
   agents,
   selectedChannel,
@@ -269,6 +272,21 @@ export function ChatPane({
           />
           Tools
         </label>
+        <button
+          aria-label="Export PDF"
+          className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          onClick={() => {
+            const params = new URLSearchParams();
+            if (selectedChannel !== null) {
+              params.set("channel_id", selectedChannel);
+            }
+            const qs = params.toString();
+            const url = `${API_URL}/api/runs/${runId}/export/pdf${qs ? `?${qs}` : ""}`;
+            window.open(url, "_blank");
+          }}
+        >
+          <Download className="h-3.5 w-3.5" />
+        </button>
         {streamingAgentId ? (
           <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />

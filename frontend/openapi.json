@@ -273,6 +273,61 @@
         }
       }
     },
+    "/api/runs/{run_id}/export/pdf": {
+      "get": {
+        "summary": "Export Run Pdf",
+        "description": "Export a simulation run as a formatted PDF document.\n\nGenerates a PDF containing messages, reasoning, and tool calls\ngrouped by round and turn. Optionally filters to a single channel.",
+        "operationId": "export_run_pdf_api_runs__run_id__export_pdf_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "channel_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Channel Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF document of the simulation run.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/pdf": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
