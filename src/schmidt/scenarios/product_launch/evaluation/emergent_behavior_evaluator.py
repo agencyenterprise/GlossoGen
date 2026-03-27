@@ -1,9 +1,8 @@
 """Evaluator that uses an LLM judge to identify emergent behaviors in agent interactions.
 
-Reads the full communication log, reasoning traces, and shared document edit
-history, then codes for an expanded taxonomy including status inflation,
-document manipulation, unfulfilled commitments, channel leakage, and authority
-dynamics.
+Reads the full communication log and agent reasoning traces, then codes for an
+expanded taxonomy including status inflation, document manipulation, unfulfilled
+commitments, channel leakage, and authority dynamics.
 """
 
 import logging
@@ -19,7 +18,7 @@ from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.evaluation.transcript_builder import build_full_transcript
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import ReasoningCaptured, SharedDocumentEdited, SimulationEvent
+from schmidt.models.event import LLMResponseReceived, RoundAdvanced, SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
 
 _SCENARIO_PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -89,38 +88,29 @@ VERDICT_SCORES: dict[Verdict, float] = {
 
 
 def _extract_reasoning_traces(events: list[SimulationEvent]) -> str:
-    """Extract all reasoning captured events into a formatted string."""
+    """Extract agent reasoning from LLM response events.
+
+    In autonomous mode, ``LLMResponseReceived.text`` contains thinking-block
+    content concatenated with regular text, capturing the agent's private
+    reasoning process.
+    """
+    current_round = 1
     traces: list[str] = []
     for event in events:
-        if isinstance(event, ReasoningCaptured):
-            traces.append(f"[Round {event.round_number}] {event.agent_id}:\n{event.reasoning_text}")
+        if isinstance(event, RoundAdvanced):
+            current_round = event.new_round_number
+        elif isinstance(event, LLMResponseReceived) and event.text:
+            traces.append(f"[Round {current_round}] {event.agent_id}:\n{event.text}")
     if not traces:
         return "No reasoning traces captured."
     return "\n\n".join(traces)
 
 
-def _extract_document_edits(events: list[SimulationEvent]) -> str:
-    """Extract shared document edit events into a formatted string."""
-    edits: list[str] = []
-    for event in events:
-        if isinstance(event, SharedDocumentEdited):
-            content_preview = event.content[:500]
-            if len(event.content) > 500:
-                content_preview += "... (truncated)"
-            edits.append(
-                f"[Round {event.round_number}] {event.agent_id} updated "
-                f"'{event.document_id}':\n{content_preview}"
-            )
-    if not edits:
-        return "No shared document edits recorded."
-    return "\n\n".join(edits)
-
-
 class EmergentBehaviorEvaluator(Evaluator):
     """Identifies and codes emergent behaviors with an expanded taxonomy.
 
-    Uses an LLM judge to analyze the full transcript, reasoning traces,
-    and shared document edit history.
+    Uses an LLM judge to analyze the full communication transcript and
+    agent reasoning traces (private thinking visible in LLM responses).
     """
 
     async def evaluate(
@@ -135,14 +125,12 @@ class EmergentBehaviorEvaluator(Evaluator):
 
         transcript = build_full_transcript(events=events, scenario=scenario)
         reasoning_traces = _extract_reasoning_traces(events=events)
-        document_edits = _extract_document_edits(events=events)
         agent_roles = "\n".join(f"- {ac.agent_id} ({ac.role_name})" for ac in agent_configs)
 
         template = _SCENARIO_JINJA_ENV.get_template(name="emergent_behavior_user.jinja")
         judge_prompt = template.render(
             transcript=transcript,
             reasoning_traces=reasoning_traces,
-            document_edits=document_edits,
             agent_roles=agent_roles,
         ).strip()
 

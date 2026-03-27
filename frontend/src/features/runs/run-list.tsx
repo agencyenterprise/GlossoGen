@@ -6,7 +6,7 @@ import { CheckCircle, GitFork, HelpCircle, Inbox, Loader2, Trash2, XCircle } fro
 import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
 import type { components } from "@/types/api.gen";
-import { formatTime, humanize } from "./format";
+import { formatConfigValue, formatTime, humanize } from "./format";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
 
 type RunSummary = components["schemas"]["RunSummary"];
@@ -182,21 +182,15 @@ export function RunList() {
                 </div>
                 {run.scenario_config && Object.keys(run.scenario_config).length > 0 ? (
                   <div className="mt-1.5 flex flex-wrap gap-1">
-                    {Object.entries(run.scenario_config).map(([key, value]) => {
-                      const display =
-                        typeof value === "object" && value !== null
-                          ? JSON.stringify(value)
-                          : String(value);
-                      return (
-                        <span
-                          key={key}
-                          className="inline-flex items-center gap-0.5 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px]"
-                        >
-                          <span className="text-muted-foreground">{humanize(key)}</span>
-                          <span className="font-medium">{display}</span>
-                        </span>
-                      );
-                    })}
+                    {Object.entries(run.scenario_config).map(([key, value]) => (
+                      <span
+                        key={key}
+                        className="inline-flex items-center gap-0.5 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px]"
+                      >
+                        <span className="text-muted-foreground">{humanize(key)}</span>
+                        <span className="font-medium">{formatConfigValue(value)}</span>
+                      </span>
+                    ))}
                   </div>
                 ) : null}
               </Link>

@@ -25,11 +25,6 @@ class EventLogger:
         self._file: aiofiles.threadpool.binary.AsyncBufferedIOBase | None = None
         self._event_bus = event_bus
 
-    @property
-    def is_open(self) -> bool:
-        """Whether the log file is currently open for writing."""
-        return self._file is not None
-
     async def open(self) -> None:
         """Create parent directories if needed and open the log file for writing.
 

@@ -1,7 +1,7 @@
 """Channel ID constants for the product launch scenario.
 
-Defines IDs for the two public group channels, the per-agent dashboard
-channels, and shared document identifiers.
+Defines IDs for the two public group channels and the per-agent dashboard
+channels.
 """
 
 STANDUP_ID = "standup"
@@ -13,9 +13,3 @@ FE_DASHBOARD_ID = "dashboard-fe"
 DA_DASHBOARD_ID = "dashboard-da"
 QA_DASHBOARD_ID = "dashboard-qa"
 PD_DASHBOARD_ID = "dashboard-pd"
-
-PROJECT_TRACKER_DOC_ID = "project_tracker"
-FEATURE_SPECS_DOC_ID = "feature_specs"
-MEETING_NOTES_DOC_ID = "meeting_notes"
-CONCERNS_LOG_DOC_ID = "concerns_log"
-LAUNCH_READINESS_DOC_ID = "launch_readiness_report"

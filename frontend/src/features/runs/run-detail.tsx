@@ -15,7 +15,7 @@ import type { DisplayEntry } from "./display-entry";
 import { mergeEntries } from "./display-entry";
 import { EvalPanel } from "./eval-panel";
 import { ForkBadge } from "./fork-badge";
-import { humanize } from "./format";
+import { formatConfigValue, humanize } from "./format";
 import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
@@ -97,7 +97,8 @@ export function RunDetail({ runId }: { runId: string }) {
   const initialAgentRounds = useMemo(() => {
     if (!restData) return new Map<string, number>();
     const map = new Map<string, number>();
-    for (const m of restData.messages) {
+    const allEntries = [...restData.messages, ...restData.reasoning];
+    for (const m of allEntries) {
       const prev = map.get(m.sender_agent_id) ?? 0;
       if (m.round_number > prev) {
         map.set(m.sender_agent_id, m.round_number);
@@ -223,7 +224,6 @@ export function RunDetail({ runId }: { runId: string }) {
     [displayEntries, partialEntries]
   );
 
-  const totalTurns = sse.totalTurns > 0 ? sse.totalTurns : (restData?.total_turns ?? 0);
   const totalMessages = sse.totalMessages > 0 ? sse.totalMessages : (restData?.total_messages ?? 0);
 
   const agentColorMap = useMemo(
@@ -245,12 +245,11 @@ export function RunDetail({ runId }: { runId: string }) {
   }, []);
 
   const handleConfirmFork = useCallback(
-    (model: string, provider: string) => {
+    (model: string) => {
       if (!forkModalMessageId) return;
       fork.forkMutation.mutate({
         targetMessageId: forkModalMessageId,
         model,
-        provider,
       });
       setForkModalMessageId(null);
     },
@@ -321,8 +320,7 @@ export function RunDetail({ runId }: { runId: string }) {
           </button>
         </span>
         <span className="text-[13px] text-muted-foreground">
-          {maxRound} rounds · {totalMessages} messages · {totalTurns} turns · {allAgents.length}{" "}
-          agents ·{" "}
+          {maxRound} rounds · {totalMessages} messages · {allAgents.length} agents ·{" "}
           {uniqueModels.length <= 1 ? (
             modelLabel
           ) : (
@@ -344,19 +342,15 @@ export function RunDetail({ runId }: { runId: string }) {
       {/* Scenario config */}
       {restData.scenario_config && Object.keys(restData.scenario_config).length > 0 ? (
         <div className="mb-3 flex flex-wrap gap-1.5">
-          {Object.entries(restData.scenario_config).map(([key, value]) => {
-            const display =
-              typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
-            return (
-              <span
-                key={key}
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px]"
-              >
-                <span className="text-muted-foreground">{humanize(key)}</span>
-                <span className="font-medium">{display}</span>
-              </span>
-            );
-          })}
+          {Object.entries(restData.scenario_config).map(([key, value]) => (
+            <span
+              key={key}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px]"
+            >
+              <span className="text-muted-foreground">{humanize(key)}</span>
+              <span className="font-medium">{formatConfigValue(value)}</span>
+            </span>
+          ))}
         </div>
       ) : null}
 
@@ -473,11 +467,10 @@ function ForkModal({
 }: {
   defaultModel: string;
   isPending: boolean;
-  onConfirm: (model: string, provider: string) => void;
+  onConfirm: (model: string) => void;
   onCancel: () => void;
 }) {
   const [model, setModel] = useState(defaultModel);
-  const [provider, setProvider] = useState("anthropic");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -495,15 +488,6 @@ function ForkModal({
             onChange={e => setModel(e.target.value)}
             className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
           />
-          <label className="text-[11px] font-medium text-muted-foreground">Provider</label>
-          <select
-            value={provider}
-            onChange={e => setProvider(e.target.value)}
-            className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="anthropic">Anthropic</option>
-            <option value="openai">OpenAI</option>
-          </select>
         </div>
         <div className="flex justify-end gap-2">
           <button
@@ -515,7 +499,7 @@ function ForkModal({
           </button>
           <button
             className="rounded-md bg-foreground px-3 py-1 text-[12px] font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
-            onClick={() => onConfirm(model, provider)}
+            onClick={() => onConfirm(model)}
             disabled={isPending}
           >
             {isPending ? "Launching..." : "Launch fork"}

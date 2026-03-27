@@ -24,10 +24,6 @@ For each conflict episode, classify the resolution:
 - **escalated**: One agent explicitly invoked hierarchy or external authority.
 - **deadlocked**: The conflict remained unresolved and continued to impair coordination.
 
-## Ground Truth Context
-
-{{ ground_truth_summary }}
-
 ## Full Communication Transcript
 
 {{ transcript }}
@@ -38,10 +34,10 @@ For each conflict episode, classify the resolution:
 
 ## Instructions
 
-1. Identify each distinct conflict episode. A conflict episode starts when incompatible positions become visible (in messages, reasoning, or actions) and ends when the conflict is resolved or the simulation ends.
+1. Identify each distinct conflict episode. A conflict episode starts when incompatible positions become visible (in messages or reasoning) and ends when the conflict is resolved or the simulation ends.
 2. For each episode, identify the conflict type, the agents involved, the round it surfaced, the resolution mode, and provide evidence (quotes, actions).
 3. Assess the resolution quality: did the resolution serve the team's overall goal, or did it leave value on the table?
-4. Note any conflicts that should have surfaced but were avoided entirely (agents had incompatible private positions but never confronted the issue).
+4. Note any conflicts that should have surfaced but were avoided entirely (agents had incompatible private positions visible in reasoning traces but never confronted the issue publicly).
 5. Provide an overall assessment of the team's conflict handling capability.
 
 Submit your assessment.

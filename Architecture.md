@@ -1,18 +1,15 @@
 # Schmidt-POC Architecture
 
-A platform for testing agent communication through real-life simulations. Two execution modes are supported:
+A platform for testing agent communication through real-life simulations. LLM-based agents interact via MCP tools exposed by a central runtime. Agents are external processes (Claude Code instances launched via the Agent SDK) that connect to a shared MCP server. A game clock manages round progression and injection delivery. No centralized turn control.
 
-- **Autonomous mode** — LLM-based agents interact via MCP tools exposed by a central runtime. Agents are external processes (Claude Code instances launched via the Agent SDK) that connect to a shared MCP server. A game clock manages round progression and injection delivery. No centralized turn control.
-- **Orchestrated mode** — A central SimulationHub assigns turns sequentially, calling LLM providers directly (Anthropic, OpenAI, HuggingFace). Supports checkpoint/resume for crash recovery.
-
-A web UI exposes simulation runs and evaluation results through a FastAPI backend and Next.js frontend. Both modes produce the same JSONL event log format and are displayed identically in the frontend.
+A web UI exposes simulation runs and evaluation results through a FastAPI backend and Next.js frontend.
 
 ## Design Decisions
 
 
 | Decision            | Choice                                                       |
 | ------------------- | ------------------------------------------------------------ |
-| LLM Backend         | Autonomous: Claude Code (Agent SDK). Orchestrated: Anthropic, OpenAI, HuggingFace |
+| LLM Backend         | Claude Code (Agent SDK)                                      |
 | Transport           | MCP over Streamable HTTP (agents are external processes)     |
 | Scenario Definition | Python classes                                               |
 | Agent Autonomy      | Agents decide when to speak; no central turn controller      |
@@ -118,22 +115,11 @@ The ChannelRouter stores messages and validates membership.
 - The scenario provides per-agent display names via `get_agent_display_name(agent_id)`, used when rendering message history in `read_channel`.
 - The `send_message` MCP tool validates agent membership before appending a message to a channel.
 
-## Orchestrated Mode
-
-In orchestrated mode, the `SimulationHub` assigns turns sequentially using direct LLM API calls. This mode supports multiple providers (Anthropic, OpenAI, HuggingFace) and checkpoint/resume for crash recovery.
-
-1. **CLI** dispatches to `_run_orchestrated`, which builds per-agent LLM providers via `create_provider()`, creates a `ToolRegistry`, and passes everything to `SimulationHub`.
-2. **SimulationHub.run()** registers built-in tools (`send_message`, `pass_turn`, `think`, `write_notebook`, `read_notebook`, shared document tools), then calls `scenario.register_tools()` for scenario-specific tools. Spawns one `AgentRunner` coroutine per agent.
-3. **Turn loop**: Calls `scenario.decide_next_turn(state)` to get a `TurnDecision` (agent_id, round_number, excluded_tool_names, max_tokens). Wakes the target agent, waits for completion.
-4. **Agent turn**: The `AgentRunner` builds a prompt from channel history via `PromptBuilder`, calls `generate_streaming()` on the LLM provider, executes tool calls in a loop (max 10), and logs all events.
-5. **Round transitions**: For stateful scenarios (implementing `SimulationStateProtocol`), the hub calls `advance_round()`, logs `RoundStateAdvanced` and `GroundTruthSnapshot`, and delivers `StateObservationSent` to each agent.
-6. **Checkpoint/resume**: A `CheckpointSaved` event is written after each `TurnAssigned`. On resume (`--resume`), channel messages, notebook entries, shared documents, and scenario state are reconstructed from the JSONL log.
-
 ## Scenario Protocol
 
-The `SimulationScenario` ABC defines a unified contract for scenario plug-ins. Shared methods are abstract; mode-specific methods have default implementations that raise `NotImplementedError`.
+The `SimulationScenario` ABC defines a contract for scenario plug-ins.
 
-**Shared methods (required by all scenarios):**
+**Core methods (required by all scenarios):**
 - `add_cli_arguments(parser)` — register scenario-specific CLI arguments
 - `create(args)` — construct a scenario instance from parsed CLI arguments
 - `create_from_config(config)` — reconstruct a scenario from its serialized config dict (used by fork system)
@@ -141,20 +127,13 @@ The `SimulationScenario` ABC defines a unified contract for scenario plug-ins. S
 - `get_channel_display_name()`, `get_agent_display_name()`, `get_injection()`
 - `run_evaluation(log_path, evaluator_names, report_path, model, provider_name, inference_provider, reasoning_effort)`
 
-**Autonomous-mode methods (default: NotImplementedError):**
+**Timing and coordination methods:**
 - `get_round_count()` — total number of rounds
 - `get_max_round_duration_seconds()` — max wall-clock seconds per round
 - `get_agent_reaction_delay_range(agent_id)` — `(min, max)` reaction delay in seconds
-- `get_mcp_tools()` — scenario-specific MCP tools (with `requires_agent_id` flag)
+- `get_mcp_tools()` — scenario-specific MCP tools (agent_id injected automatically)
 
-**Orchestrated-mode methods (default: NotImplementedError):**
-- `decide_next_turn(state)` — returns `TurnDecision` or `None` to end
-- `register_tools(registry)` — register scenario tools on the `ToolRegistry`
-- `get_checkpoint()` / `restore_from_checkpoint(checkpoint)` — checkpoint/resume support
-- `get_scenario_config()` — JSON-serializable config dict (default: `{}`)
-- `get_shared_documents()` — shared document definitions (default: `[]`)
-
-In autonomous mode, scenarios define timing parameters; in orchestrated mode, scenarios control turn order via `decide_next_turn()`. Each scenario implements the methods for the mode(s) it supports.
+Scenarios define timing parameters and round structure. The game clock uses these to manage round progression, injection delivery, and termination.
 
 ## Agent Prompt Framing
 
@@ -184,22 +163,8 @@ Event types (discriminated union on `event_type`):
 - `round_advanced` — new round number, trigger reason (`simulation_start`, `all_agents_idle`, `round_timeout`)
 - `injection_delivered` — agent ID, round number, injection text
 - `message_sent` — full SimulationMessage (channel, sender, content, timestamp)
-- `tool_called` — agent ID, ToolCallRequest (name, arguments, call ID)
-- `tool_result_returned` — agent ID, ToolCallResult (call ID, output, is_error)
-- `llm_request_sent` — agent ID, system prompt, messages, tool names
-- `llm_response_received` — agent ID, text, tool calls, stop reason, token usage
-- `simulation_ended` — reason (RunStatus enum), total_messages, total_turns
-
-Orchestrated-mode events (additional):
-- `turn_assigned` — agent ID, turn number, round number
-- `turn_passed` — agent ID, reason
-- `checkpoint_saved` — turn/round counters, scenario state, injection tracking
-- `reasoning_captured` — agent ID, round number, private reasoning text
-- `notebook_entry_written` — agent ID, round number, entry text
-- `shared_document_edited` — agent ID, round number, document ID, content
-- `round_state_advanced` — round number, transition report (stateful scenarios)
-- `ground_truth_snapshot` — round number, full world state (stateful scenarios)
-- `state_observation_sent` — agent ID, round number, filtered observation
+- `llm_response_received` — agent ID, text (includes thinking blocks), tool calls, stop reason, token usage
+- `simulation_ended` — reason (RunStatus enum), total_messages
 
 ## Run Storage
 

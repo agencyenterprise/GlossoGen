@@ -39,10 +39,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/message_rewind.py` — reconstructs simulation state at any message for fork/resume
 - `src/schmidt/fork_writer.py` — writes truncated+edited JSONL for forked runs
 - `src/schmidt/conversation_reconstructor.py` — builds per-agent conversation transcript from events
-- `src/schmidt/simulation_hub.py` — orchestrated mode turn-based orchestrator
-- `src/schmidt/agent_runner.py` — orchestrated mode per-agent turn execution
 - `src/schmidt/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
-- `src/schmidt/tools/` — orchestrated mode tool registry, executor, stores (notebook, document), built-in tools
 - `src/schmidt/evaluation/` — generic evaluators and evaluation infrastructure
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
   - `fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
@@ -127,49 +124,25 @@ runs/{scenario_name}/{unix_timestamp}/
 
 ## Running Simulations
 
-Two execution modes are available, selected via the `--mode` flag:
-
-- **`autonomous`** — Agents run as independent Claude Code processes connected via MCP. A game clock manages round progression. No centralized turn control.
-- **`orchestrated`** — A central hub assigns turns sequentially via direct LLM API calls. Supports multiple providers and checkpoint/resume.
-
-Always run simulations as a background process, piping all output to a log file.
-
-### Autonomous Mode
+Agents run as independent Claude Code processes connected via MCP. A game clock manages round progression. Always run simulations as a background process, piping all output to a log file.
 
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
-    --mode autonomous --model <model> --runs-dir ./runs \
+    --model <model> --runs-dir ./runs \
     <scenario-specific flags> \
   > ./runs/<scenario>_stdout.log 2>&1 &
 ```
 
-Autonomous-mode flags: `--mcp-port` (default: 8001), `--max-agent-turns` (default: 200).
+Optional flags: `--mcp-port` (default: 8001), `--max-agent-turns` (default: 200).
 
 The `incident_response` scenario requires `--max-round-duration`:
 
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-    --mode autonomous --model claude-sonnet-4-20250514 --runs-dir ./runs \
+    --model claude-sonnet-4-20250514 --runs-dir ./runs \
     --max-round-duration 120 \
-  > ./runs/incident_response_stdout.log 2>&1 &
-```
-
-### Orchestrated Mode
-
-Requires `--provider` to select the LLM backend.
-
-The `--provider` flag selects which LLM backend to use. Set the corresponding API key in `.env`:
-- `anthropic` — requires `ANTHROPIC_API_KEY`
-- `openai` — requires `OPENAI_API_KEY`. Optionally use `--reasoning-effort` (low/medium/high) for reasoning models.
-- `huggingface` — requires `HF_TOKEN`. Optionally use `--inference-provider` to route through a third-party backend.
-
-```bash
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-    --mode orchestrated --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
-    --max-turns-per-round 10 \
   > ./runs/incident_response_stdout.log 2>&1 &
 ```
 
@@ -178,7 +151,7 @@ The `car_recall` scenario uses a `--knobs` flag:
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-    --mode orchestrated --model <model> --provider <provider> --runs-dir ./runs \
+    --model <model> --runs-dir ./runs \
     --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
 ```
@@ -188,7 +161,7 @@ The `product_launch` scenario also uses `--knobs`:
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
-    --mode orchestrated --model <model> --provider <provider> --runs-dir ./runs \
+    --model <model> --runs-dir ./runs \
     --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
   > ./runs/product_launch_stdout.log 2>&1 &
 ```
@@ -201,18 +174,18 @@ Every `schmidt run` starts an embedded streaming server on an ephemeral port and
 
 ### Resuming Failed Simulations
 
-If a simulation errors midway through, resume from the last checkpoint using the `--resume` flag pointing at the existing run directory. Available in both orchestrated and autonomous modes.
+If a simulation errors midway through, resume from the last checkpoint using the `--resume` flag pointing at the existing run directory.
 
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
-    --mode orchestrated --model <model> --provider <provider> --runs-dir ./runs \
+    --model <model> --runs-dir ./runs \
     --resume ./runs/<scenario>/<timestamp> \
-    <scenario-specific flags like --knobs or --max-turns-per-round> \
+    <scenario-specific flags like --knobs> \
   > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
 ```
 
-The `--resume` flag requires the same scenario-specific flags as the original run (e.g. `--knobs` for car_recall/product_launch, `--max-turns-per-round` for incident_response). The `--runs-dir` flag is still required but ignored when resuming.
+The `--resume` flag requires the same scenario-specific flags as the original run (e.g. `--knobs` for car_recall/product_launch). The `--runs-dir` flag is still required but ignored when resuming.
 
 ### Forking Runs (Message-Level Rewind)
 

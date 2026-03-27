@@ -2,7 +2,7 @@
 
 Defines the ``schmidt`` CLI with three subcommands:
 
-* ``run``      -- load and execute a simulation scenario in autonomous or orchestrated mode
+* ``run``      -- load and execute a simulation scenario in autonomous mode
 * ``evaluate`` -- score a previously-generated simulation log
 * ``serve``    -- start the FastAPI web server
 """
@@ -13,26 +13,21 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any
 from uuid import uuid4
 
 import uvicorn
 
 from schmidt.autonomous_supervisor import AutonomousSupervisor
-from schmidt.checkpoint_loader import ResumeState, build_resume_state
 from schmidt.evaluation.log_reader import load_events
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
-from schmidt.llm.provider_factory import create_provider
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.message_rewind import RewindState, build_rewind_state_from_last_message
 from schmidt.runners.claude_code_runner import ClaudeCodeRunner
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios import SCENARIO_REGISTRY
-from schmidt.simulation_hub import SimulationHub
 from schmidt.simulation_server import start_simulation_server, stop_simulation_server
-from schmidt.tools.tool_registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -70,43 +65,16 @@ def _build_parsers() -> tuple[
     )
     run_parser.add_argument("--model", type=str, required=True, help="LLM model identifier")
     run_parser.add_argument(
-        "--mode",
-        type=str,
-        required=True,
-        choices=["autonomous", "orchestrated"],
-        help="Execution mode: autonomous (MCP-based) or orchestrated (turn-based)",
-    )
-
-    # Autonomous mode flags
-    run_parser.add_argument(
         "--mcp-port",
         type=int,
         default=DEFAULT_MCP_PORT,
-        help=f"Port for the MCP server (autonomous mode, default: {DEFAULT_MCP_PORT})",
+        help=f"Port for the MCP server (default: {DEFAULT_MCP_PORT})",
     )
     run_parser.add_argument(
         "--max-agent-turns",
         type=int,
         default=DEFAULT_MAX_AGENT_TURNS,
-        help=f"Max agentic turns per agent (autonomous, default: {DEFAULT_MAX_AGENT_TURNS})",
-    )
-
-    # Orchestrated mode flags
-    run_parser.add_argument(
-        "--provider",
-        type=str,
-        help="LLM provider to use (required for orchestrated mode and evaluation)",
-    )
-    run_parser.add_argument(
-        "--inference-provider",
-        type=str,
-        help="HuggingFace inference provider backend (e.g. together, fireworks-ai, cerebras)",
-    )
-    run_parser.add_argument(
-        "--reasoning-effort",
-        type=str,
-        choices=["low", "medium", "high"],
-        help="Reasoning effort level for OpenAI reasoning models (low/medium/high)",
+        help=f"Max agentic turns per agent (default: {DEFAULT_MAX_AGENT_TURNS})",
     )
     run_parser.add_argument(
         "--resume",
@@ -237,18 +205,6 @@ async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
 ) -> None:
-    """Dispatch to the autonomous or orchestrated simulation runner based on --mode."""
-    mode = args.mode
-    if mode == "autonomous":
-        await _run_autonomous(args=args, scenario=scenario)
-    else:
-        await _run_orchestrated(args=args, scenario=scenario)
-
-
-async def _run_autonomous(
-    args: argparse.Namespace,
-    scenario: SimulationScenario,
-) -> None:
     """Wire up the autonomous supervisor, start the streaming server, and execute."""
 
     resume_dir: str | None = getattr(args, "resume", None)
@@ -298,7 +254,7 @@ async def _run_autonomous(
         event_bus=event_bus,
     )
 
-    logger.info("Running scenario: %s (autonomous mode)", scenario.name())
+    logger.info("Running scenario: %s", scenario.name())
     logger.info("Model: %s", args.model)
     logger.info("MCP port: %d, max agent turns: %d", args.mcp_port, max_turns)
     logger.info("Run directory: %s", run_dir)
@@ -320,118 +276,6 @@ async def _run_autonomous(
         await stop_simulation_server(server=server, run_dir=run_dir)
 
     logger.info("Simulation complete. Run directory: %s", run_dir)
-
-
-async def _run_orchestrated(
-    args: argparse.Namespace,
-    scenario: SimulationScenario,
-) -> None:
-    """Wire up the orchestrated simulation hub, start the streaming server, and execute."""
-
-    if not args.provider:
-        raise SystemExit("--provider is required for orchestrated mode")
-
-    resume_dir: str | None = getattr(args, "resume", None)
-    resuming = resume_dir is not None
-
-    if resume_dir is not None:
-        run_dir = Path(resume_dir)
-    else:
-        runs_dir = Path(args.runs_dir)
-        run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
-
-    agents = scenario.get_agents(default_model=args.model)
-    agent_providers = _build_agent_providers(
-        agents=agents,
-        provider_name=args.provider,
-        inference_provider=args.inference_provider,
-        reasoning_effort=getattr(args, "reasoning_effort", None),
-    )
-    registry = ToolRegistry()
-
-    log_path = run_dir / f"{scenario.name()}.jsonl"
-    event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
-    event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
-
-    resume_state: ResumeState | None = None
-    if resuming:
-        logger.info("Loading checkpoint from %s", log_path)
-        events = await load_events(log_path=log_path)
-        resume_state = build_resume_state(events=events)
-        logger.info(
-            "Checkpoint loaded: resuming from turn %d, round %d",
-            resume_state.turn_number,
-            resume_state.round_number,
-        )
-
-    run_id = str(uuid4())
-
-    hub = SimulationHub(
-        scenario=scenario,
-        agents=agents,
-        agent_providers=agent_providers,
-        tool_registry=registry,
-        event_logger=event_logger,
-        resume_state=resume_state,
-        event_bus=event_bus,
-        run_id=run_id,
-    )
-
-    json_handler, bus_log_handler = _setup_logging(
-        run_dir=run_dir,
-        scenario_name=scenario.name(),
-        event_bus=event_bus,
-    )
-
-    logger.info("Running scenario: %s (orchestrated mode)", scenario.name())
-    logger.info("Model: %s", args.model)
-    logger.info("Run directory: %s", run_dir)
-    logger.info("Log: %s", log_path)
-    if resuming:
-        logger.info("RESUMING from checkpoint in %s", run_dir)
-
-    server, port = await start_simulation_server(
-        event_bus=event_bus,
-        run_dir=run_dir,
-        run_id=run_id,
-    )
-    logger.info("Streaming server started on port %d", port)
-
-    try:
-        await hub.run()
-    finally:
-        _teardown_logging(json_handler=json_handler, bus_log_handler=bus_log_handler)
-        await stop_simulation_server(server=server, run_dir=run_dir)
-
-    logger.info("Simulation complete. Run directory: %s", run_dir)
-
-
-def _build_agent_providers(
-    agents: list[Any],
-    provider_name: str,
-    inference_provider: str | None,
-    reasoning_effort: str | None,
-) -> dict[str, Any]:
-    """Build a per-agent LLM provider mapping.
-
-    Providers are deduped so agents sharing the same model share the same
-    provider instance.
-    """
-
-    providers_by_model: dict[str, Any] = {}
-    agent_providers: dict[str, Any] = {}
-
-    for agent in agents:
-        if agent.model not in providers_by_model:
-            providers_by_model[agent.model] = create_provider(
-                provider_name=provider_name,
-                model=agent.model,
-                inference_provider=inference_provider,
-                reasoning_effort=reasoning_effort,
-            )
-        agent_providers[agent.agent_id] = providers_by_model[agent.model]
-
-    return agent_providers
 
 
 async def _run_evaluation(

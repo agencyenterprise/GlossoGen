@@ -1,11 +1,6 @@
 # schmidt-poc
 
-A platform for testing agent communication through real-life simulations. LLM-based agents collaboratively solve scenarios while a central system manages communication channels, injects scenario events, and logs all interactions for post-hoc evaluation. A web UI displays simulation runs and evaluation results.
-
-Two execution modes are supported:
-
-- **Autonomous mode** — Each agent runs as an independent Claude Code process connected via MCP. Agents decide when to speak; a game clock manages round progression. No centralized turn control.
-- **Orchestrated mode** — A central hub assigns turns sequentially via direct LLM API calls. Supports multiple LLM providers (Anthropic, OpenAI, HuggingFace) and checkpoint/resume.
+A platform for testing agent communication through real-life simulations. LLM-based agents run as independent Claude Code processes connected via MCP. Agents decide when to speak; a game clock manages round progression and injects scenario events. All interactions are logged for post-hoc evaluation. A web UI displays simulation runs and evaluation results.
 
 ## Setup
 
@@ -15,97 +10,60 @@ make install
 
 This installs both the Python server dependencies (`uv sync`) and the frontend dependencies (`npm ci`).
 
-Create a `.env` file in the project root with API keys for your chosen provider(s):
+Create a `.env` file in the project root:
 
 ```bash
-# Required for autonomous mode (always uses Claude Code)
 ANTHROPIC_API_KEY=sk-ant-...
-
-# Required for orchestrated mode with --provider openai
-OPENAI_API_KEY=sk-...
-
-# Required for orchestrated mode with --provider huggingface
-HF_TOKEN=hf_...
 ```
 
 ## Running a Simulation
 
-The `--mode` flag selects the execution mode. The CLI auto-generates a timestamped subdirectory under `--runs-dir`.
-
-### Autonomous Mode
-
-Agents run as independent Claude Code processes connected via MCP. Each round, agents communicate freely until all are idle or the round duration expires.
+The CLI auto-generates a timestamped subdirectory under `--runs-dir`. Each round, agents communicate freely until all are idle or the round duration expires.
 
 ```bash
-# Incident Response (autonomous)
+# Incident Response
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-    --mode autonomous --model claude-sonnet-4-20250514 --runs-dir ./runs \
+    --model claude-sonnet-4-20250514 --runs-dir ./runs \
     --max-round-duration 120 \
   > ./runs/incident_response_stdout.log 2>&1 &
 
-# Car Recall (autonomous)
+# Car Recall
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-    --mode autonomous --model claude-sonnet-4-20250514 --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
-  > ./runs/car_recall_stdout.log 2>&1 &
-```
-
-Autonomous-mode flags:
-- `--mcp-port` — Port for the MCP server (default: 8001)
-- `--max-agent-turns` — Maximum agentic turns per agent (default: 200)
-
-### Orchestrated Mode
-
-A central hub assigns turns using direct LLM API calls. Requires `--provider` to select the LLM backend.
-
-```bash
-# Incident Response (orchestrated, Anthropic)
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-    --mode orchestrated --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
-    --max-turns-per-round 10 \
-  > ./runs/incident_response_stdout.log 2>&1 &
-
-# Car Recall (orchestrated, OpenAI)
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-    --mode orchestrated --model gpt-4o --provider openai --runs-dir ./runs \
+    --model claude-sonnet-4-20250514 --runs-dir ./runs \
     --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
 
-# Product Launch (orchestrated, HuggingFace via Together)
+# Product Launch
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
-    --mode orchestrated --model meta-llama/Llama-3.1-70B-Instruct \
-    --provider huggingface --inference-provider together --runs-dir ./runs \
+    --model claude-sonnet-4-20250514 --runs-dir ./runs \
     --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
   > ./runs/product_launch_stdout.log 2>&1 &
 ```
 
-Orchestrated-mode flags:
-- `--provider` — LLM provider (required): `anthropic`, `openai`, `huggingface`
-- `--inference-provider` — HuggingFace inference backend (e.g. `together`, `fireworks-ai`, `cerebras`)
-- `--reasoning-effort` — OpenAI reasoning models: `low`, `medium`, `high`
+Flags:
+- `--mcp-port` — Port for the MCP server (default: 8001)
+- `--max-agent-turns` — Maximum agentic turns per agent (default: 200)
 - `--resume` — Resume from an existing run directory after a crash
 
 Check progress by reading the stdout log or the JSONL event log in the run directory.
 
 ### Resuming a Failed Simulation
 
-If a simulation crashes or is killed, resume using the `--resume` flag pointing at the existing run directory. Available in both orchestrated and autonomous modes.
+If a simulation crashes or is killed, resume using the `--resume` flag pointing at the existing run directory.
 
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
-    --mode orchestrated --model <model> --provider <provider> --runs-dir ./runs \
+    --model <model> --runs-dir ./runs \
     --resume ./runs/<scenario>/<timestamp> \
     <scenario-specific flags> \
   > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
 ```
 
-The simulation picks up from where it left off, preserving channel messages, notebook entries, and shared document contents. The `--resume` flag requires the same scenario-specific flags as the original run (e.g. `--knobs` for product_launch, `--max-turns-per-round` for incident_response).
+The simulation picks up from where it left off, preserving channel messages and scenario state. The `--resume` flag requires the same scenario-specific flags as the original run (e.g. `--knobs` for car_recall/product_launch, `--max-round-duration` for incident_response).
 
 ### Forking Runs (Message-Level Rewind)
 
@@ -194,32 +152,28 @@ Six delegation-framed agents (PM, Backend Engineer, Frontend Engineer, Data Anal
 
 ```
 src/schmidt/
-  cli.py                       # CLI: run (autonomous/orchestrated), evaluate, serve
-  autonomous_supervisor.py     # Autonomous mode: round progression, event injection, resume
-  simulation_hub.py            # Orchestrated mode: turn-based orchestrator
-  agent_runner.py              # Orchestrated mode: per-agent turn execution
+  cli.py                       # CLI: run, evaluate, serve
+  autonomous_supervisor.py     # Round progression, event injection, resume
   channel_router.py            # Message storage + membership validation
-  checkpoint_loader.py         # Resume state reconstruction from JSONL event log (orchestrated)
-  message_rewind.py            # State reconstruction at any message (autonomous fork/resume)
+  message_rewind.py            # State reconstruction at any message (fork/resume)
   fork_writer.py               # Writes truncated+edited JSONL for forked runs
   conversation_reconstructor.py # Builds per-agent conversation transcript for fork context
   event_logger.py              # JSONL event writer
   event_bus.py                 # In-process pub/sub for SSE streaming
   simulation_server.py         # Embedded SSE server per simulation
 
-  runtime/                     # Autonomous mode: MCP server + coordination
+  runtime/                     # MCP server + coordination
     simulation_state.py        # Shared state: channels, sessions, locks
     mcp_tools.py               # MCP tool definitions (check_messages, read_channel, send_message)
     mcp_server.py              # FastMCP over Streamable HTTP
     game_clock.py              # Round progression, injection delivery, termination
     agent_session.py           # Per-agent notification queue, reaction delay, idle tracking
 
-  runners/                     # Autonomous mode: agent runner implementations
+  runners/                     # Agent runner implementations
     claude_code_runner.py      # Claude Code via Agent SDK
 
   models/                      # Pydantic data models
-  llm/                         # LLM provider abstraction + Anthropic/OpenAI/HuggingFace
-  tools/                       # Tool registry, executor, stores (notebook, document), built-in tools
+  llm/                         # LLM provider abstraction (used by evaluation)
   evaluation/                  # Post-hoc LLM-as-judge evaluators
   scenarios/                   # One folder per scenario (class + Jinja2 prompts + README)
 

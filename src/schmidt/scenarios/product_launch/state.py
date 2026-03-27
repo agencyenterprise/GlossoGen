@@ -1,9 +1,9 @@
 """Mutable world state for the product launch scenario.
 
-Implements ``SimulationStateProtocol`` to manage features, budget, quality
-scores, status reports, and external events. Provides role-filtered
-observations: the PM sees only reported status, the Data Analyst sees both
-reported and actual, and technical roles see their own domain metrics.
+Manages features, budget, quality scores, status reports, and external
+events. Provides role-filtered observations: the PM sees only reported
+status, the Data Analyst sees both reported and actual, and technical
+roles see their own domain metrics.
 """
 
 import logging
@@ -22,7 +22,6 @@ from schmidt.scenarios.product_launch.dynamics import (
 )
 from schmidt.scenarios.product_launch.feature_model import Feature, FeatureStatus, QAResult
 from schmidt.scenarios.product_launch.knobs import ProductLaunchKnobs
-from schmidt.simulation_state_protocol import ActionOutcome, AgentAction, RoundTransitionReport
 
 logger = logging.getLogger(__name__)
 
@@ -201,127 +200,6 @@ class ProductLaunchState:
 
         return observation
 
-    def apply_agent_action(self, agent_id: str, action: AgentAction) -> ActionOutcome:
-        """Apply a structured action from an agent to the world state."""
-        action_type = action.action_type
-        params = action.parameters
-
-        if action_type == "allocate_effort":
-            return self._handle_allocate_effort(agent_id=agent_id, params=params)
-        elif action_type == "report_status":
-            return self._handle_report_status(agent_id=agent_id, params=params)
-        elif action_type == "flag_concern":
-            return self._handle_flag_concern(agent_id=agent_id, params=params)
-
-        return ActionOutcome(
-            success=False,
-            agent_visible_result=f"Unknown action type: {action_type}",
-        )
-
-    def advance_round(self, round_number: int) -> RoundTransitionReport:
-        """Advance the world state between rounds.
-
-        Resolves pending effort allocations (with burnout downgrades),
-        rolls for new burnout events from accelerated effort, applies
-        external events, and auto-triggers QA for features reaching
-        integration-ready status.
-        """
-        self._current_round = round_number
-        changes: list[str] = []
-        external_events_applied: list[str] = []
-
-        burned_out_agents = {
-            be.agent_id for be in self._pending_burnouts if be.trigger_round == round_number
-        }
-        for agent_id in burned_out_agents:
-            human_name = AGENT_HUMAN_NAMES.get(agent_id, agent_id)
-            changes.append(
-                f"[{agent_id}] {human_name} called in sick this week — "
-                f"all output reduced to minimum."
-            )
-            logger.info(
-                "Round %d: agent %s is burned out, downgrading effort",
-                round_number,
-                agent_id,
-            )
-        self._pending_burnouts = [
-            be for be in self._pending_burnouts if be.trigger_round != round_number
-        ]
-
-        for agent_id, allocs in self._pending_allocations.items():
-            is_burned_out = agent_id in burned_out_agents
-            results = resolve_effort_allocations(
-                allocations=allocs,
-                features=self._features,
-                budget=self._budget,
-                round_number=round_number,
-                agent_id=agent_id,
-                is_burned_out=is_burned_out,
-            )
-            for r in results:
-                changes.append(f"[{agent_id}] {r}")
-
-            if not is_burned_out:
-                has_accelerated = any(lvl == EffortLevel.ACCELERATED for lvl in allocs.values())
-                if has_accelerated:
-                    burnout = roll_burnout(
-                        agent_id=agent_id,
-                        current_round=round_number,
-                        num_rounds=self._knobs.num_rounds,
-                    )
-                    if burnout is not None:
-                        self._pending_burnouts.append(burnout)
-
-        self._pending_allocations.clear()
-
-        for feature in self._features:
-            if feature.status == FeatureStatus.INTEGRATION_READY and not feature.qa.tested:
-                qa_result = run_qa_on_feature(feature=feature)
-                changes.append(f"[auto-QA] {qa_result}")
-
-        event_key = get_external_event_for_round(
-            round_number=round_number,
-            num_rounds=self._knobs.num_rounds,
-            intensity=self._knobs.external_event_intensity,
-        )
-
-        if event_key is not None and event_key in EXTERNAL_EVENTS:
-            event_changes = apply_external_event(
-                event_key=event_key,
-                features=self._features,
-            )
-            changes.extend(event_changes)
-            external_events_applied.append(event_key)
-            logger.info("Round %d: applied external event '%s'", round_number, event_key)
-
-        shipped_count = sum(1 for f in self._features if f.status == FeatureStatus.SHIPPED)
-        total = len(self._features)
-        summary = (
-            f"Round {round_number}: {shipped_count}/{total} features shipped, "
-            f"budget {self._budget.remaining_ru():.0f} RU remaining"
-        )
-
-        return RoundTransitionReport(
-            round_number=round_number,
-            changes=changes,
-            external_events_applied=external_events_applied,
-            summary=summary,
-        )
-
-    def get_ground_truth(self) -> dict[str, Any]:
-        """Return the complete unfiltered state for logging and evaluation."""
-        return {
-            "round": self._current_round,
-            "features": [f.model_dump(mode="json") for f in self._features],
-            "budget": self._budget.model_dump(mode="json"),
-            "status_reports": [r._asdict() for r in self._status_reports],
-            "concerns": list(self._concerns),
-            "pending_burnouts": [
-                {"agent_id": be.agent_id, "trigger_round": be.trigger_round}
-                for be in self._pending_burnouts
-            ],
-        }
-
     def get_external_event_for_agent(self, round_number: int, agent_id: str) -> str | None:
         """Return external event text if this agent should see it, else None."""
         event_key = get_external_event_for_round(
@@ -339,68 +217,58 @@ class ProductLaunchState:
             return None
         return f"{event_info['description']} {event_info['effect']}"
 
-    # --- Private: action handlers ---
+    # --- Public: MCP tool actions ---
 
-    def _handle_allocate_effort(self, agent_id: str, params: dict[str, Any]) -> ActionOutcome:
-        """Record an effort allocation (last-allocation-wins, max 2 features)."""
-        feature_id = str(params.get("feature_id", ""))
-        level_str = str(params.get("level", "standard"))
+    def allocate_effort(self, agent_id: str, feature_id: str, level_str: str) -> str:
+        """Record an effort allocation (last-allocation-wins, max 2 features).
 
+        Returns a human-readable result message for the calling agent.
+        """
         try:
             level = EffortLevel(level_str)
         except ValueError:
-            return ActionOutcome(
-                success=False,
-                agent_visible_result=(
-                    f"Invalid effort level '{level_str}'. "
-                    f"Use 'reduced', 'standard', or 'accelerated'."
-                ),
+            return (
+                f"Invalid effort level '{level_str}'. "
+                "Use 'reduced', 'standard', or 'accelerated'."
             )
 
         feature = self._find_feature(feature_id=feature_id)
         if feature is None:
-            return ActionOutcome(
-                success=False,
-                agent_visible_result=f"Feature '{feature_id}' not found.",
-            )
+            return f"Feature '{feature_id}' not found."
 
         if agent_id not in self._pending_allocations:
             self._pending_allocations[agent_id] = {}
 
         agent_allocs = self._pending_allocations[agent_id]
         if feature_id not in agent_allocs and len(agent_allocs) >= MAX_EFFORT_ALLOCATIONS_PER_ROUND:
-            return ActionOutcome(
-                success=False,
-                agent_visible_result=(
-                    f"Your person can only focus on {MAX_EFFORT_ALLOCATIONS_PER_ROUND} "
-                    f"features per week. Already working on: "
-                    f"{', '.join(agent_allocs.keys())}."
-                ),
+            return (
+                f"Your person can only focus on {MAX_EFFORT_ALLOCATIONS_PER_ROUND} "
+                f"features per week. Already working on: "
+                f"{', '.join(agent_allocs.keys())}."
             )
 
         agent_allocs[feature_id] = level
 
-        return ActionOutcome(
-            success=True,
-            agent_visible_result=(
-                f"{feature.name}: {level.value} priority set for this week. "
-                f"Work will proceed accordingly."
-            ),
+        return (
+            f"{feature.name}: {level.value} priority set for this week. "
+            "Work will proceed accordingly."
         )
 
-    def _handle_report_status(self, agent_id: str, params: dict[str, Any]) -> ActionOutcome:
-        """Record a structured status report for a feature."""
-        feature_id = str(params.get("feature_id", ""))
-        completion_pct = float(params.get("completion_pct", 0))
-        risk_level = str(params.get("risk_level", "low"))
-        notes = str(params.get("notes", ""))
+    def report_status(
+        self,
+        agent_id: str,
+        feature_id: str,
+        completion_pct: float,
+        risk_level: str,
+        notes: str,
+    ) -> str:
+        """Record a structured status report for a feature.
 
+        Returns a human-readable result message for the calling agent.
+        """
         feature = self._find_feature(feature_id=feature_id)
         if feature is None:
-            return ActionOutcome(
-                success=False,
-                agent_visible_result=f"Feature '{feature_id}' not found.",
-            )
+            return f"Feature '{feature_id}' not found."
 
         report = StatusReport(
             agent_id=agent_id,
@@ -412,14 +280,13 @@ class ProductLaunchState:
         )
         self._status_reports.append(report)
 
-        return ActionOutcome(
-            success=True,
-            agent_visible_result=f"Status report for {feature.name} recorded.",
-        )
+        return f"Status report for {feature.name} recorded."
 
-    def _handle_flag_concern(self, agent_id: str, params: dict[str, Any]) -> ActionOutcome:
-        """Record a flagged concern."""
-        description = str(params.get("description", ""))
+    def flag_concern(self, agent_id: str, description: str) -> str:
+        """Record a flagged concern.
+
+        Returns a human-readable result message for the calling agent.
+        """
         concern = {
             "agent_id": agent_id,
             "round": self._current_round,
@@ -427,11 +294,89 @@ class ProductLaunchState:
         }
         self._concerns.append(concern)
 
-        return ActionOutcome(
-            success=True,
-            agent_visible_result=(
-                f"Concern flagged and appended to the Concerns Log: {description}"
-            ),
+        return f"Concern flagged and appended to the Concerns Log: {description}"
+
+    # --- Round advancement ---
+
+    def advance_round(self, round_number: int) -> None:
+        """Advance the world state between rounds.
+
+        Resolves pending effort allocations (with burnout downgrades),
+        rolls for new burnout events from accelerated effort, applies
+        external events, and auto-triggers QA for features reaching
+        integration-ready status.
+        """
+        self._current_round = round_number
+
+        burned_out_agents = {
+            be.agent_id for be in self._pending_burnouts if be.trigger_round == round_number
+        }
+        for agent_id in burned_out_agents:
+            human_name = AGENT_HUMAN_NAMES.get(agent_id, agent_id)
+            logger.info(
+                "Round %d: agent %s (%s) is burned out, downgrading effort",
+                round_number,
+                agent_id,
+                human_name,
+            )
+        self._pending_burnouts = [
+            be for be in self._pending_burnouts if be.trigger_round != round_number
+        ]
+
+        for agent_id, allocs in self._pending_allocations.items():
+            is_burned_out = agent_id in burned_out_agents
+            results = resolve_effort_allocations(
+                allocations=allocs,
+                features=self._features,
+                budget=self._budget,
+                round_number=round_number,
+                agent_id=agent_id,
+                is_burned_out=is_burned_out,
+            )
+            for r in results:
+                logger.info("Round %d [%s]: %s", round_number, agent_id, r)
+
+            if not is_burned_out:
+                has_accelerated = any(lvl == EffortLevel.ACCELERATED for lvl in allocs.values())
+                if has_accelerated:
+                    burnout = roll_burnout(
+                        agent_id=agent_id,
+                        current_round=round_number,
+                        num_rounds=self._knobs.num_rounds,
+                    )
+                    if burnout is not None:
+                        self._pending_burnouts.append(burnout)
+
+        self._pending_allocations.clear()
+
+        for feature in self._features:
+            if feature.status == FeatureStatus.INTEGRATION_READY and not feature.qa.tested:
+                qa_result = run_qa_on_feature(feature=feature)
+                logger.info("Round %d [auto-QA]: %s", round_number, qa_result)
+
+        event_key = get_external_event_for_round(
+            round_number=round_number,
+            num_rounds=self._knobs.num_rounds,
+            intensity=self._knobs.external_event_intensity,
+        )
+
+        if event_key is not None and event_key in EXTERNAL_EVENTS:
+            event_changes = apply_external_event(
+                event_key=event_key,
+                features=self._features,
+            )
+            for change in event_changes:
+                logger.info("Round %d [external event]: %s", round_number, change)
+            logger.info("Round %d: applied external event '%s'", round_number, event_key)
+
+        shipped_count = sum(1 for f in self._features if f.status == FeatureStatus.SHIPPED)
+        total = len(self._features)
+        logger.info(
+            "Round %d: %d/%d features shipped, budget %.0f RU remaining",
+            round_number,
+            shipped_count,
+            total,
+            self._budget.remaining_ru(),
         )
 
     # --- Private: observation builders ---
@@ -572,28 +517,6 @@ class ProductLaunchState:
         if self._current_round <= 0:
             return 0.0
         return round(self._budget.spent_ru / self._current_round, 1)
-
-    def restore_from_checkpoint(self, world_state: dict[str, Any]) -> None:
-        """Restore the full world state from a checkpoint dict.
-
-        The ``world_state`` dict has the same shape as ``get_ground_truth()`` output.
-        """
-        self._current_round = world_state["round"]
-        self._features = [Feature.model_validate(f) for f in world_state["features"]]
-        self._budget = BudgetTracker.model_validate(world_state["budget"])
-        self._status_reports = [StatusReport(**r) for r in world_state.get("status_reports", [])]
-        self._concerns = list(world_state.get("concerns", []))
-        self._pending_burnouts = [
-            BurnoutEvent(agent_id=b["agent_id"], trigger_round=b["trigger_round"])
-            for b in world_state.get("pending_burnouts", [])
-        ]
-        self._pending_allocations = {}
-        logger.info(
-            "Restored world state: round=%d, features=%d, budget_remaining=%.0f",
-            self._current_round,
-            len(self._features),
-            self._budget.remaining_ru(),
-        )
 
     def _find_feature(self, feature_id: str) -> Feature | None:
         """Look up a feature by ID."""
