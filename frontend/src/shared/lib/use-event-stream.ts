@@ -6,6 +6,7 @@ import { API_URL } from "./api-client";
 
 type ChannelMessage = components["schemas"]["ChannelMessage"];
 type ReasoningEntry = components["schemas"]["ReasoningEntry"];
+type ToolUseEntry = components["schemas"]["ToolUseEntry"];
 type AgentDetail = components["schemas"]["AgentDetail"];
 type RunStatus = components["schemas"]["RunStatus"];
 type DebugLogEntry = components["schemas"]["DebugLogEntry"];
@@ -18,6 +19,7 @@ type SSELLMResponseReceived = components["schemas"]["SSELLMResponseReceived"];
 type SSESimulationEnded = components["schemas"]["SSESimulationEnded"];
 type SSETokenDelta = components["schemas"]["SSETokenDelta"];
 type SSEMessagePreview = components["schemas"]["SSEMessagePreview"];
+type SSEToolResultReceived = components["schemas"]["SSEToolResultReceived"];
 type SSEDebugLog = components["schemas"]["SSEDebugLog"];
 
 /** Partial message being composed by an agent. */
@@ -30,6 +32,7 @@ export interface PartialMessage {
 export interface EventStreamState {
   messages: ChannelMessage[];
   reasoning: ReasoningEntry[];
+  toolUse: ToolUseEntry[];
   agents: AgentDetail[];
   channelIds: string[];
   totalMessages: number;
@@ -67,6 +70,7 @@ export function useEventStream(
 ): EventStreamState {
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [reasoning, setReasoning] = useState<ReasoningEntry[]>([]);
+  const [toolUse, setToolUse] = useState<ToolUseEntry[]>([]);
   const [agents, setAgents] = useState<AgentDetail[]>([]);
   const [channelIds, setChannelIds] = useState<string[]>([]);
   const [totalMessages, setTotalMessages] = useState(0);
@@ -138,6 +142,7 @@ export function useEventStream(
   const resetState = useCallback(() => {
     setMessages([]);
     setReasoning([]);
+    setToolUse([]);
     setAgents([]);
     setChannelIds([]);
     setTotalMessages(0);
@@ -293,6 +298,30 @@ export function useEventStream(
       });
     });
 
+    eventSource.addEventListener("tool_result_received", (e: MessageEvent) => {
+      const data: SSEToolResultReceived = JSON.parse(e.data);
+      // Create a new tool use entry or update an existing one with the result
+      setToolUse(prev => {
+        const existing = prev.find(t => t.call_id === data.call_id);
+        if (existing) {
+          return prev.map(t => (t.call_id === data.call_id ? { ...t, result: data.result } : t));
+        }
+        messageCounterRef.current += 1;
+        const entry: ToolUseEntry = {
+          message_id: data.event_id,
+          sender_agent_id: data.agent_id,
+          tool_name: data.tool_name,
+          call_id: data.call_id,
+          arguments: data.arguments,
+          result: data.result,
+          timestamp: data.timestamp,
+          turn_number: agentTurnRef.current.get(data.agent_id) ?? messageCounterRef.current,
+          round_number: agentRoundRef.current.get(data.agent_id) ?? currentRoundRef.current,
+        };
+        return [...prev, entry];
+      });
+    });
+
     eventSource.addEventListener("simulation_ended", (e: MessageEvent) => {
       const data: SSESimulationEnded = JSON.parse(e.data);
       setStatus(data.reason);
@@ -375,6 +404,7 @@ export function useEventStream(
   return {
     messages,
     reasoning,
+    toolUse,
     agents,
     channelIds,
     totalMessages,

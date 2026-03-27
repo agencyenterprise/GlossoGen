@@ -180,6 +180,7 @@ export function RunDetail({ runId }: { runId: string }) {
   const displayEntries = useMemo(() => {
     const restMessages = restData?.messages ?? [];
     const restReasoning = restData?.reasoning ?? [];
+    const restToolUse = restData?.tool_use ?? [];
 
     // Dedup messages by message_id (REST and SSE may overlap)
     const seenMessageIds = new Set(restMessages.map(m => m.message_id));
@@ -188,8 +189,15 @@ export function RunDetail({ runId }: { runId: string }) {
     const seenReasoningIds = new Set(restReasoning.map(r => r.message_id));
     const newReasoning = sse.reasoning.filter(r => !seenReasoningIds.has(r.message_id));
 
-    return mergeEntries([...restMessages, ...newMessages], [...restReasoning, ...newReasoning]);
-  }, [restData, sse.messages, sse.reasoning]);
+    const seenToolUseIds = new Set(restToolUse.map(t => t.message_id));
+    const newToolUse = sse.toolUse.filter(t => !seenToolUseIds.has(t.message_id));
+
+    return mergeEntries(
+      [...restMessages, ...newMessages],
+      [...restReasoning, ...newReasoning],
+      [...restToolUse, ...newToolUse]
+    );
+  }, [restData, sse.messages, sse.reasoning, sse.toolUse]);
 
   // Build partial streaming entries for reasoning text and message previews
   const partialEntries: DisplayEntry[] = useMemo(() => {
@@ -209,7 +217,11 @@ export function RunDetail({ runId }: { runId: string }) {
           turn_number: sse.agentTurns.get(sse.streamingAgentId) ?? 0,
           round_number: sse.agentRounds.get(sse.streamingAgentId) ?? 0,
           is_reasoning: true,
+          is_tool_use: false,
           is_partial: true,
+          tool_name: "",
+          tool_arguments: {},
+          tool_result: null,
         });
       }
     }
@@ -226,7 +238,11 @@ export function RunDetail({ runId }: { runId: string }) {
         turn_number: sse.agentTurns.get(agentId) ?? 0,
         round_number: sse.agentRounds.get(agentId) ?? 0,
         is_reasoning: false,
+        is_tool_use: false,
         is_partial: true,
+        tool_name: "",
+        tool_arguments: {},
+        tool_result: null,
       });
     }
 

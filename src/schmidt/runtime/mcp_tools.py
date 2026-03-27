@@ -23,6 +23,22 @@ from schmidt.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
 
+HIDDEN_TOOL_NAMES: frozenset[str] = frozenset(
+    {
+        "check_messages",
+        "read_channel",
+        "send_message",
+        "list_channels",
+        "get_channel_members",
+        "ToolSearch",
+    }
+)
+"""Tool names filtered out of the frontend timeline.
+
+Includes base communication tools (whose effects are visible as chat messages)
+and Claude Code SDK infrastructure tools (like ToolSearch).
+"""
+
 
 def _resolve_agent_from_context(ctx: ToolContext, runtime: SimulationRuntime) -> AgentSession:
     """Extract agent_id from the MCP request's query parameters and return the session.
@@ -65,10 +81,24 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         already read (last_seen >= actual count). If all channels in a
         notification are stale, the notification is discarded and the agent
         continues waiting for the next one.
+
+        Returns a no-activity response after 30 seconds of silence so agents
+        are not stuck waiting indefinitely.
         """
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
         while True:
-            notification = await session.wait_for_notification()
+            try:
+                notification = await asyncio.wait_for(
+                    session.wait_for_notification(),
+                    timeout=30.0,
+                )
+            except asyncio.TimeoutError:
+                session.is_idle = False
+                logger.info(
+                    "Agent %s check_messages timed out after 30s, returning no_activity",
+                    session.agent_id,
+                )
+                return {"type": "no_activity", "detail": "No new messages."}
             if isinstance(notification, NewMessagesNotification):
                 fresh_channels = [
                     ch

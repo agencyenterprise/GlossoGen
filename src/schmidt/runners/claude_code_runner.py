@@ -24,6 +24,7 @@ from claude_agent_sdk.types import (  # pyright: ignore[reportMissingImports]
     McpHttpServerConfig,
     TextBlock,
     ThinkingBlock,
+    ToolResultBlock,
     ToolUseBlock,
 )
 
@@ -31,9 +32,10 @@ from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.llm.tool_arg_extractor import SendMessageTextExtractor
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import LLMResponseReceived, TokenUsage
+from schmidt.models.event import LLMResponseReceived, TokenUsage, ToolResultReceived
 from schmidt.models.tool_definition import ToolCallRequest
 from schmidt.runners.agent_runner_base import AgentRunner
+from schmidt.runtime.mcp_tools import HIDDEN_TOOL_NAMES
 from schmidt.server.streaming_event import MessagePreview, TokenDelta
 
 logger = logging.getLogger(__name__)
@@ -167,6 +169,9 @@ class ClaudeCodeRunner(AgentRunner):
                 preview_buffers: dict[int, str] = {}
                 last_preview_time = 0.0
 
+                # Track pending tool calls for matching results
+                pending_tool_calls: dict[str, ToolCallRequest] = {}
+
                 got_done = False
                 async for message in query(
                     prompt=prompt,
@@ -215,13 +220,13 @@ class ClaudeCodeRunner(AgentRunner):
                             elif isinstance(block, TextBlock):
                                 text_parts.append(block.text)
                             elif isinstance(block, ToolUseBlock):
-                                tool_calls.append(
-                                    ToolCallRequest(
-                                        call_id=block.id,
-                                        tool_name=block.name,
-                                        arguments=block.input,
-                                    )
+                                tc_req = ToolCallRequest(
+                                    call_id=block.id,
+                                    tool_name=block.name,
+                                    arguments=block.input,
                                 )
+                                tool_calls.append(tc_req)
+                                pending_tool_calls[block.id] = tc_req
                                 logger.info(
                                     "Agent %s tool call: %s(%s)",
                                     agent_id,
@@ -257,6 +262,27 @@ class ClaudeCodeRunner(AgentRunner):
                             agent_id,
                             content,
                         )
+                        # Log tool results from ToolResultBlock content
+                        if isinstance(message.content, list):
+                            for block in message.content:
+                                if isinstance(block, ToolResultBlock):
+                                    matched = pending_tool_calls.pop(block.tool_use_id, None)
+                                    if matched is None:
+                                        continue
+                                    if matched.tool_name.endswith(tuple(HIDDEN_TOOL_NAMES)):
+                                        continue
+                                    result_text = (
+                                        str(block.content) if block.content is not None else ""
+                                    )
+                                    await event_logger.log(
+                                        ToolResultReceived(
+                                            agent_id=agent_id,
+                                            tool_name=matched.tool_name,
+                                            call_id=matched.call_id,
+                                            arguments=matched.arguments,
+                                            result=result_text,
+                                        )
+                                    )
                         if "'done'" in content or '"done"' in content:
                             got_done = True
                     elif isinstance(message, SystemMessage):
