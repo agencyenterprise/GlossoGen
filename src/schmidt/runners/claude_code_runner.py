@@ -35,6 +35,7 @@ from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import LLMResponseReceived, TokenUsage, ToolResultReceived
 from schmidt.models.tool_definition import ToolCallRequest
 from schmidt.runners.agent_runner_base import AgentRunner
+from schmidt.runtime.mcp_tools import HIDDEN_TOOL_NAMES
 from schmidt.server.streaming_event import MessagePreview, TokenDelta
 
 logger = logging.getLogger(__name__)
@@ -266,19 +267,22 @@ class ClaudeCodeRunner(AgentRunner):
                             for block in message.content:
                                 if isinstance(block, ToolResultBlock):
                                     matched = pending_tool_calls.pop(block.tool_use_id, None)
-                                    if matched is not None:
-                                        result_text = (
-                                            str(block.content) if block.content is not None else ""
+                                    if matched is None:
+                                        continue
+                                    if matched.tool_name.endswith(tuple(HIDDEN_TOOL_NAMES)):
+                                        continue
+                                    result_text = (
+                                        str(block.content) if block.content is not None else ""
+                                    )
+                                    await event_logger.log(
+                                        ToolResultReceived(
+                                            agent_id=agent_id,
+                                            tool_name=matched.tool_name,
+                                            call_id=matched.call_id,
+                                            arguments=matched.arguments,
+                                            result=result_text,
                                         )
-                                        await event_logger.log(
-                                            ToolResultReceived(
-                                                agent_id=agent_id,
-                                                tool_name=matched.tool_name,
-                                                call_id=matched.call_id,
-                                                arguments=matched.arguments,
-                                                result=result_text,
-                                            )
-                                        )
+                                    )
                         if "'done'" in content or '"done"' in content:
                             got_done = True
                     elif isinstance(message, SystemMessage):

@@ -22,14 +22,14 @@ AGENT_TO_TEAM: dict[str, str] = {
 }
 
 TEAM_DISPLAY_NAMES: dict[str, str] = {
-    TEAM_SELLER1: "Team 1",
-    TEAM_SELLER2: "Team 2",
+    TEAM_SELLER1: "Alpha Team",
+    TEAM_SELLER2: "Beta Team",
 }
 
 AGENT_DISPLAY_NAMES: dict[str, str] = {
     BUYER_ID: "Buyer",
-    SELLER1_SALES_ID: "Team 1 Sales Rep",
-    SELLER1_ENGINEER_ID: "Team 1 Engineer",
-    SELLER2_SALES_ID: "Team 2 Sales Rep",
-    SELLER2_ENGINEER_ID: "Team 2 Engineer",
+    SELLER1_SALES_ID: "Alpha Sales Rep",
+    SELLER1_ENGINEER_ID: "Alpha Engineer",
+    SELLER2_SALES_ID: "Beta Sales Rep",
+    SELLER2_ENGINEER_ID: "Beta Engineer",
 }

@@ -81,10 +81,16 @@ BUYER_TOOLS = [
     "write_test",
     "run_tests",
     "check_proposals",
+    "calculate_code_cost",
     "accept_proposal",
     "reject_proposal",
 ]
-SALES_TOOLS = [*BASE_TOOLS, "submit_proposal", "check_cost"]
+SALES_TOOLS = [
+    *BASE_TOOLS,
+    "submit_proposal",
+    "get_deliverable",
+    "calculate_code_cost",
+]
 ENGINEER_TOOLS = [
     *BASE_TOOLS,
     "write_code",
@@ -92,7 +98,6 @@ ENGINEER_TOOLS = [
     "list_files",
     "read_file",
     "submit_deliverable",
-    "check_cost",
 ]
 
 ROLE_TOOLS: dict[str, list[str]] = {
@@ -338,14 +343,12 @@ class SoftwareProcurementScenario(SimulationScenario):
             )
 
         if agent_id in SALES_AGENT_IDS or agent_id in ENGINEER_AGENT_IDS:
-            team_id = AGENT_TO_TEAM[agent_id]
             return self._render_template(
                 template_name="seller_injection.jinja",
                 progress=progress,
                 remaining=remaining,
                 round_number=round_number,
                 max_rounds=self._knobs.max_rounds,
-                cost_summary=self._state.get_cost_summary(team_id=team_id),
             )
 
         return None
@@ -396,11 +399,16 @@ class SoftwareProcurementScenario(SimulationScenario):
             ScenarioMcpTool(
                 name="submit_proposal",
                 description=(
-                    "Submit a formal price proposal to the buyer. "
-                    "Include the price (integer, in dollars) and a description "
-                    "of what your team is offering."
+                    "Submit a formal price proposal with the deliverable code. "
+                    "Include price (integer, in dollars), description, "
+                    "and the full code text."
                 ),
-                executor=_mcp_submit_proposal(state=state),
+                executor=_mcp_submit_proposal(state=state, workspace=workspace),
+            ),
+            ScenarioMcpTool(
+                name="get_deliverable",
+                description=("Retrieve the deliverable code submitted by your engineer."),
+                executor=_mcp_get_deliverable(state=state),
             ),
             # --- Buyer tools ---
             ScenarioMcpTool(
@@ -417,7 +425,7 @@ class SoftwareProcurementScenario(SimulationScenario):
                     "Run your pytest tests against a seller team's submitted "
                     "deliverable. Only works after the team has submitted."
                 ),
-                executor=_mcp_run_tests(state=state, workspace=workspace),
+                executor=_mcp_run_tests(workspace=workspace),
             ),
             ScenarioMcpTool(
                 name="check_proposals",
@@ -437,11 +445,15 @@ class SoftwareProcurementScenario(SimulationScenario):
                 description="Reject a seller team's latest proposal with a reason.",
                 executor=_mcp_reject_proposal(state=state),
             ),
-            # --- Shared tools ---
+            # --- Cost calculator (shared) ---
             ScenarioMcpTool(
-                name="check_cost",
-                description="Check your team's current engineering cost (tool call count).",
-                executor=_mcp_check_cost(state=state),
+                name="calculate_code_cost",
+                description=(
+                    "Calculate the base production cost of code. "
+                    "Pass the code text and get back the character count "
+                    "and cost at $0.10/character."
+                ),
+                executor=_mcp_calculate_code_cost(),
             ),
         ]
 
@@ -560,7 +572,6 @@ def _mcp_write_code(
         """Write a Python file to the calling agent's team workspace."""
         agent_id = resolve_agent_id(ctx=ctx)
         team_id = state.get_team_for_agent(agent_id=agent_id)
-        state.increment_tool_calls(team_id=team_id)
         return await workspace.write_file(team_id=team_id, filename=filename, content=content)
 
     return executor
@@ -576,7 +587,6 @@ def _mcp_execute_code(
         """Run a Python file from the calling agent's team workspace."""
         agent_id = resolve_agent_id(ctx=ctx)
         team_id = state.get_team_for_agent(agent_id=agent_id)
-        state.increment_tool_calls(team_id=team_id)
         return await workspace.execute_file(team_id=team_id, filename=filename)
 
     return executor
@@ -619,26 +629,62 @@ def _mcp_submit_deliverable(
     """Build the submit_deliverable MCP tool executor."""
 
     async def executor(ctx: ToolContext, filename: str) -> str:
-        """Submit a workspace file as the team's final deliverable."""
+        """Submit a workspace file as a deliverable for the sales rep."""
         agent_id = resolve_agent_id(ctx=ctx)
         team_id = state.get_team_for_agent(agent_id=agent_id)
-        result = await workspace.submit_deliverable(team_id=team_id, filename=filename)
-        state.record_deliverable(team_id=team_id, filename=filename)
-        return result
+        code = await workspace.read_file(team_id=team_id, filename=filename)
+        if code.startswith("File not found:"):
+            return code
+        state.store_deliverable(team_id=team_id, filename=filename, code=code)
+        return (
+            f"Deliverable stored: {filename} ({len(code)} chars). "
+            f"Your sales rep can now retrieve it with get_deliverable."
+        )
+
+    return executor
+
+
+def _mcp_get_deliverable(
+    state: SoftwareProcurementState,
+) -> Callable[..., Awaitable[str]]:
+    """Build the get_deliverable MCP tool executor."""
+
+    async def executor(ctx: ToolContext) -> str:
+        """Retrieve the deliverable code submitted by the team's engineer."""
+        agent_id = resolve_agent_id(ctx=ctx)
+        team_id = state.get_team_for_agent(agent_id=agent_id)
+        result = state.get_deliverable(team_id=team_id)
+        if result is None:
+            return "Your engineer has not submitted a deliverable yet."
+        filename, code = result
+        return f"Deliverable: {filename}\n\n{code}"
 
     return executor
 
 
 def _mcp_submit_proposal(
     state: SoftwareProcurementState,
+    workspace: WorkspaceManager,
 ) -> Callable[..., Awaitable[str]]:
     """Build the submit_proposal MCP tool executor."""
 
-    async def executor(ctx: ToolContext, price: int, description: str) -> str:
-        """Submit a formal price proposal to the buyer."""
+    async def executor(ctx: ToolContext, price: int, description: str, code: str) -> str:
+        """Submit a proposal with deliverable code to the buyer."""
         agent_id = resolve_agent_id(ctx=ctx)
         team_id = state.get_team_for_agent(agent_id=agent_id)
-        return state.submit_proposal(team_id=team_id, price=price, description=description)
+        # Use the original filename from the engineer's deliverable if available
+        deliverable = state.get_deliverable(team_id=team_id)
+        if deliverable is not None:
+            filename = deliverable[0]
+        else:
+            filename = "deliverable.py"
+        await workspace.write_deliverable(team_id=team_id, filename=filename, code=code)
+        return state.submit_proposal(
+            team_id=team_id,
+            price=price,
+            description=description,
+            code=code,
+        )
 
     return executor
 
@@ -657,16 +703,13 @@ def _mcp_write_test(
 
 
 def _mcp_run_tests(
-    state: SoftwareProcurementState,
     workspace: WorkspaceManager,
 ) -> Callable[..., Awaitable[str]]:
     """Build the run_tests MCP tool executor."""
 
     async def executor(ctx: ToolContext, seller_team: str) -> str:
-        """Run buyer tests against a seller team's submitted deliverable."""
+        """Run buyer tests against a seller team's proposal deliverable."""
         _ = ctx
-        if not state.has_deliverable(team_id=seller_team):
-            return f"Team {seller_team} has not submitted a deliverable yet."
         return await workspace.run_buyer_tests(team_id=seller_team)
 
     return executor
@@ -711,15 +754,18 @@ def _mcp_reject_proposal(
     return executor
 
 
-def _mcp_check_cost(
-    state: SoftwareProcurementState,
-) -> Callable[..., Awaitable[str]]:
-    """Build the check_cost MCP tool executor."""
+def _mcp_calculate_code_cost() -> Callable[..., Awaitable[str]]:
+    """Build the calculate_code_cost MCP tool executor."""
 
-    async def executor(ctx: ToolContext) -> str:
-        """Return the calling agent's team cost summary."""
-        agent_id = resolve_agent_id(ctx=ctx)
-        team_id = state.get_team_for_agent(agent_id=agent_id)
-        return state.get_cost_summary(team_id=team_id)
+    async def executor(ctx: ToolContext, code: str) -> str:
+        """Calculate the base production cost from a code string."""
+        _ = ctx
+        char_count = len(code)
+        base_cost = char_count * 0.10
+        return (
+            f"{char_count} characters of code. "
+            f"Base production cost: ${base_cost:.2f} "
+            f"(at $0.10 per character)."
+        )
 
     return executor
