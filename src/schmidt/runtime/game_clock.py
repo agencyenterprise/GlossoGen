@@ -158,6 +158,13 @@ class GameClock:
         while True:
             await asyncio.sleep(IDLE_CHECK_INTERVAL_SECONDS)
 
+            if self._scenario.is_finished_early():
+                logger.info(
+                    "Scenario signalled early finish at round %d",
+                    self._current_round,
+                )
+                return RunStatus.SCENARIO_COMPLETE
+
             if self._all_agents_idle():
                 trigger = "all_agents_idle"
             elif self._round_timed_out():

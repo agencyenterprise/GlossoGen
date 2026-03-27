@@ -1,0 +1,5 @@
+{% if progress >= 0.7 %}
+Your management wants to know: have we won the contract yet? {{ cost_summary }} Make sure costs don't exceed your proposed price.
+{% elif progress >= 0.4 %}
+Your engineering costs are accumulating. {{ cost_summary }} Consider whether to keep iterating or submit what you have.
+{% endif %}
