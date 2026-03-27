@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, GitFork, HelpCircle, Inbox, Loader2, Trash2, XCircle } from "lucide-react";
+import {
+  CheckCircle,
+  GitFork,
+  HelpCircle,
+  Inbox,
+  Loader2,
+  Sword,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
 import type { components } from "@/types/api.gen";
@@ -57,6 +66,20 @@ export function RunList() {
       });
       if (error) {
         throw new Error("Failed to delete run");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["runs"] });
+    },
+  });
+
+  const stopMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      const { error } = await api.POST("/api/runs/{run_id}/stop", {
+        params: { path: { run_id: runId } },
+      });
+      if (error) {
+        throw new Error("Failed to stop simulation");
       }
     },
     onSuccess: () => {
@@ -169,6 +192,18 @@ export function RunList() {
                       </span>
                     )}
                   </span>
+                  {run.status === "in_progress" ? (
+                    <button
+                      aria-label="Stop simulation"
+                      className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      onClick={e => {
+                        e.preventDefault();
+                        stopMutation.mutate(run.run_id);
+                      }}
+                    >
+                      <Sword className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
                   <button
                     aria-label="Delete run"
                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"

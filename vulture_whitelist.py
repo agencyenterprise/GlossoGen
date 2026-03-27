@@ -52,6 +52,7 @@ stream_events  # unused function (src/schmidt/simulation_server.py:55)
 _.should_exit  # unused attribute (src/schmidt/simulation_server.py:153)
 _.create_from_config  # unused method — called by fork_router at runtime
 fork_run  # unused function (src/schmidt/server/fork_router.py:62) — FastAPI route
+stop_run  # unused function (src/schmidt/server/runs_router.py) — FastAPI route
 source_run_id  # unused variable (src/schmidt/server/response_models.py:28) — Pydantic field
 fork_run_dir  # unused variable (src/schmidt/server/response_models.py:161) — Pydantic field
 input_tokens  # unused variable — Pydantic field (TokenUsage)
