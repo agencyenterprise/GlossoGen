@@ -17,7 +17,9 @@ from schmidt.models.event import (
     SimulationEnded,
     SimulationEvent,
     SimulationStarted,
+    ToolResultReceived,
 )
+from schmidt.runtime.mcp_tools import HIDDEN_TOOL_NAMES
 from schmidt.server.response_models import (
     AgentDetail,
     ChannelMessage,
@@ -27,6 +29,7 @@ from schmidt.server.response_models import (
     ForkSource,
     ReasoningEntry,
     RunDetailResponse,
+    ToolUseEntry,
 )
 from schmidt.stream_manifest import delete_manifest, read_manifest
 
@@ -136,10 +139,12 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     agents: list[AgentDetail] = []
     messages: list[ChannelMessage] = []
     reasoning: list[ReasoningEntry] = []
+    tool_use: list[ToolUseEntry] = []
     total_messages = 0
     status = None
 
     current_round = 0
+    tool_use_by_call_id: dict[str, ToolUseEntry] = {}
 
     for event in events:
         if isinstance(event, SimulationStarted):
@@ -166,6 +171,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             current_round = event.new_round_number
 
         elif isinstance(event, LLMResponseReceived):
+            # Create reasoning entry for text content
             if event.text is not None and event.text.strip():
                 total_messages += 1
                 reasoning.append(
@@ -179,6 +185,30 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                         channel_ids=[],
                     )
                 )
+
+            # Create separate tool use entries for non-builtin tools
+            for tc in event.tool_calls:
+                if tc.tool_name.endswith(tuple(HIDDEN_TOOL_NAMES)):
+                    continue
+                total_messages += 1
+                tu_entry = ToolUseEntry(
+                    message_id=f"{event.event_id}-{tc.call_id}",
+                    sender_agent_id=event.agent_id,
+                    tool_name=tc.tool_name,
+                    call_id=tc.call_id,
+                    arguments=tc.arguments,
+                    result=None,
+                    timestamp=event.timestamp,
+                    turn_number=total_messages,
+                    round_number=current_round,
+                )
+                tool_use.append(tu_entry)
+                tool_use_by_call_id[tc.call_id] = tu_entry
+
+        elif isinstance(event, ToolResultReceived):
+            matched = tool_use_by_call_id.get(event.call_id)
+            if matched is not None:
+                matched.result = event.result
 
         elif isinstance(event, MessageSent):
             total_messages += 1
@@ -231,6 +261,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         agents=agents,
         messages=messages,
         reasoning=reasoning,
+        tool_use=tool_use,
         debug_logs=debug_logs,
         evaluation=evaluation,
         fork_source=fork_source,
