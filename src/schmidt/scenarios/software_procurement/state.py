@@ -28,6 +28,7 @@ class ProposalRecord(BaseModel):
     team_id: str
     price: int
     description: str
+    code: str
     round_number: int
     status: ProposalStatus
 
@@ -38,7 +39,7 @@ class TeamState(BaseModel):
     team_id: str
     proposals: list[ProposalRecord]
     deliverable_filename: str | None
-    tool_call_count: int
+    deliverable_code: str | None
 
 
 class SoftwareProcurementState:
@@ -55,7 +56,7 @@ class SoftwareProcurementState:
                 team_id=tid,
                 proposals=[],
                 deliverable_filename=None,
-                tool_call_count=0,
+                deliverable_code=None,
             )
             for tid in team_ids
         }
@@ -69,34 +70,24 @@ class SoftwareProcurementState:
             raise ValueError(f"Agent {agent_id} is not part of any seller team")
         return team_id
 
-    def increment_tool_calls(self, team_id: str) -> None:
-        """Increment the engineering cost counter for a team."""
-        self._teams[team_id].tool_call_count += 1
-
-    def get_cost_summary(self, team_id: str) -> str:
-        """Return a human-readable cost summary for a team."""
-        team = self._teams[team_id]
-        return (
-            f"Team {team_id} engineering cost: {team.tool_call_count} tool calls. "
-            f"Deliverable submitted: {'yes' if team.deliverable_filename else 'no'}."
-        )
-
-    def submit_proposal(self, team_id: str, price: int, description: str) -> str:
-        """Record a new proposal from a seller team."""
+    def submit_proposal(self, team_id: str, price: int, description: str, code: str) -> str:
+        """Record a new proposal including the deliverable code."""
         if self._accepted_team is not None:
-            return f"Cannot submit proposal: {self._accepted_team} has already been accepted."
+            return f"Cannot submit proposal: " f"{self._accepted_team} has already been accepted."
 
         record = ProposalRecord(
             team_id=team_id,
             price=price,
             description=description,
+            code=code,
             round_number=self._current_round,
             status=ProposalStatus.PENDING,
         )
         self._teams[team_id].proposals.append(record)
         logger.info("Team %s submitted proposal: $%d", team_id, price)
         return (
-            f"Proposal submitted: ${price}. "
+            f"Proposal submitted: ${price} with deliverable "
+            f"({len(code)} characters of code). "
             f"IMPORTANT: The buyer cannot see this proposal automatically. "
             f"You MUST send a message on the negotiation channel to inform "
             f"the buyer that you have submitted a formal proposal at ${price}."
@@ -135,32 +126,40 @@ class SoftwareProcurementState:
         logger.info("Buyer rejected team %s proposal: %s", team_id, reason)
         return f"Rejected {team_id}'s proposal. Reason sent: {reason}"
 
-    def record_deliverable(self, team_id: str, filename: str) -> None:
-        """Record that a team has submitted a deliverable."""
-        self._teams[team_id].deliverable_filename = filename
-        logger.info("Team %s submitted deliverable: %s", team_id, filename)
+    def store_deliverable(self, team_id: str, filename: str, code: str) -> None:
+        """Store a deliverable submitted by an engineer for the sales rep."""
+        team = self._teams[team_id]
+        team.deliverable_filename = filename
+        team.deliverable_code = code
+        logger.info(
+            "Team %s stored deliverable: %s (%d chars)",
+            team_id,
+            filename,
+            len(code),
+        )
 
-    def has_deliverable(self, team_id: str) -> bool:
-        """Check whether a team has submitted a deliverable."""
+    def get_deliverable(self, team_id: str) -> tuple[str, str] | None:
+        """Return (filename, code) for a team's deliverable, or None."""
         team = self._teams.get(team_id)
         if team is None:
-            return False
-        return team.deliverable_filename is not None
+            return None
+        if team.deliverable_filename is None or team.deliverable_code is None:
+            return None
+        return (team.deliverable_filename, team.deliverable_code)
 
     def get_proposals_summary(self) -> str:
         """Return a summary of all proposals across all teams for the buyer."""
-        lines: list[str] = []
+        sections: list[str] = []
         for team in self._teams.values():
             if not team.proposals:
-                lines.append(f"{team.team_id}: No proposals submitted.")
+                sections.append(f"{team.team_id}: No proposals submitted.")
                 continue
             for p in team.proposals:
-                lines.append(
-                    f"{p.team_id}: ${p.price} ({p.status.value}) " f"- {p.description[:100]}"
-                )
-        if not lines:
+                header = f"{p.team_id}: ${p.price} ({p.status.value}) " f"- {p.description}"
+                sections.append(f"{header}\n--- CODE ---\n{p.code}\n--- END ---")
+        if not sections:
             return "No proposals have been submitted by any team."
-        return "\n".join(lines)
+        return "\n\n".join(sections)
 
     @property
     def accepted_team(self) -> str | None:

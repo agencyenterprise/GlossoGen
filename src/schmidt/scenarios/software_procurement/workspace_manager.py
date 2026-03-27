@@ -37,10 +37,11 @@ class WorkspaceManager:
     """
 
     def __init__(self, run_dir: Path) -> None:
-        self._run_dir = run_dir
-        self._workspaces_dir = run_dir / "workspaces"
-        self._deliverables_dir = run_dir / "deliverables"
-        self._buyer_tests_dir = run_dir / "buyer_tests"
+        resolved = run_dir.resolve()
+        self._run_dir = resolved
+        self._workspaces_dir = resolved / "workspaces"
+        self._deliverables_dir = resolved / "deliverables"
+        self._buyer_tests_dir = resolved / "buyer_tests"
 
     def create_directories(self, team_ids: list[str]) -> None:
         """Create workspace, deliverable, and buyer_tests directories."""
@@ -113,16 +114,11 @@ class WorkspaceManager:
         result = "\n".join(output_parts)
         return f"Exit code {proc.returncode}\n{result}"
 
-    async def submit_deliverable(self, team_id: str, filename: str) -> str:
-        """Copy a file from the workspace to the deliverables directory."""
+    async def write_deliverable(self, team_id: str, filename: str, code: str) -> None:
+        """Write deliverable code to the deliverables directory for testing."""
         _validate_filename(filename=filename)
-        src = self._workspaces_dir / team_id / filename
-        if not src.exists():
-            return f"File not found in workspace: {filename}"
-
-        dst = self._deliverables_dir / team_id / filename
-        shutil.copy2(str(src), str(dst))
-        return f"Deliverable submitted: {filename}"
+        path = self._deliverables_dir / team_id / filename
+        path.write_text(code)
 
     # --- Buyer test operations ---
 
