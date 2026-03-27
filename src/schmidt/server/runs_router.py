@@ -1,7 +1,9 @@
 """FastAPI router for simulation run endpoints, including SSE event streaming."""
 
 import logging
+import os
 import shutil
+import signal
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
@@ -12,7 +14,7 @@ from starlette.responses import StreamingResponse
 from schmidt.server.response_models import RunDetailResponse, RunListResponse, SSEEvent
 from schmidt.server.run_detail_reader import load_run_detail
 from schmidt.server.run_discovery import discover_runs
-from schmidt.stream_manifest import read_manifest
+from schmidt.stream_manifest import delete_manifest, read_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,30 @@ async def delete_run(run_id: str, request: Request) -> None:
     run_dir = Path(matching[0].run_dir)
     shutil.rmtree(run_dir)
     logger.info("Deleted run directory: %s", run_dir)
+
+
+@router.post("/runs/{run_id}/stop", status_code=204)
+async def stop_run(run_id: str, request: Request) -> None:
+    """Stop a running simulation by sending SIGTERM to its process."""
+    runs_dir: Path = request.app.state.runs_dir
+    summaries = await discover_runs(runs_dir=runs_dir)
+
+    matching = [s for s in summaries if s.run_id == run_id]
+    if not matching:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    run_dir = Path(matching[0].run_dir)
+    manifest = read_manifest(run_dir=run_dir)
+    if manifest is None:
+        raise HTTPException(status_code=409, detail="Simulation is not running")
+
+    try:
+        os.kill(manifest.pid, signal.SIGTERM)
+        logger.info("Sent SIGTERM to simulation PID %d for run %s", manifest.pid, run_id)
+    except ProcessLookupError:
+        logger.info("Simulation PID %d already dead for run %s", manifest.pid, run_id)
+
+    delete_manifest(run_dir=run_dir)
 
 
 async def _proxy_simulation_sse(

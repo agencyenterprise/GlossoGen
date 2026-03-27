@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, HelpCircle, Loader2, Radio, XCircle } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, HelpCircle, Loader2, Radio, Sword, XCircle } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
@@ -65,6 +65,20 @@ export function RunDetail({ runId }: { runId: string }) {
         throw new Error("Failed to fetch run detail");
       }
       return data;
+    },
+  });
+
+  const stopMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await api.POST("/api/runs/{run_id}/stop", {
+        params: { path: { run_id: runId } },
+      });
+      if (error) {
+        throw new Error("Failed to stop simulation");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["run", runId] });
     },
   });
 
@@ -374,6 +388,13 @@ export function RunDetail({ runId }: { runId: string }) {
             Simulation in progress
             {sse.isConnected ? " — streaming live" : " — connecting..."}
           </span>
+          <button
+            className="ml-auto rounded p-1 transition-colors hover:bg-yellow-200 dark:hover:bg-yellow-800/50"
+            aria-label="Stop simulation"
+            onClick={() => stopMutation.mutate()}
+          >
+            <Sword className="h-3 w-3" />
+          </button>
         </div>
       ) : null}
 

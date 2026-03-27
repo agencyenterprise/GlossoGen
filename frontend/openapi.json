@@ -95,6 +95,39 @@
         }
       }
     },
+    "/api/runs/{run_id}/stop": {
+      "post": {
+        "summary": "Stop Run",
+        "description": "Stop a running simulation by sending SIGTERM to its process.",
+        "operationId": "stop_run_api_runs__run_id__stop_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs/{run_id}/events": {
       "get": {
         "summary": "Stream Run Events",
