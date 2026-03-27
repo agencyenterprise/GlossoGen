@@ -341,6 +341,8 @@ export interface components {
             messages: components["schemas"]["ChannelMessage"][];
             /** Reasoning */
             reasoning: components["schemas"]["ReasoningEntry"][];
+            /** Tool Use */
+            tool_use: components["schemas"]["ToolUseEntry"][];
             /** Debug Logs */
             debug_logs: components["schemas"]["DebugLogEntry"][];
             evaluation: components["schemas"]["EvalReportResponse"] | null;
@@ -657,6 +659,68 @@ export interface components {
             /** Is Final */
             is_final: boolean;
         };
+        /**
+         * SSEToolResultReceived
+         * @description SSE event emitted when a tool call completes and returns a result.
+         */
+        SSEToolResultReceived: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "tool_result_received";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Tool Name */
+            tool_name: string;
+            /** Call Id */
+            call_id: string;
+            /** Arguments */
+            arguments: {
+                [key: string]: unknown;
+            };
+            /** Result */
+            result: string;
+        };
+        /**
+         * ToolUseEntry
+         * @description A scenario-specific tool invocation with its result.
+         *
+         *     Each entry represents one tool call made by an agent. The ``result``
+         *     field is filled once the tool execution completes.
+         */
+        ToolUseEntry: {
+            /** Message Id */
+            message_id: string;
+            /** Sender Agent Id */
+            sender_agent_id: string;
+            /** Tool Name */
+            tool_name: string;
+            /** Call Id */
+            call_id: string;
+            /** Arguments */
+            arguments: {
+                [key: string]: unknown;
+            };
+            /** Result */
+            result: string | null;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Turn Number */
+            turn_number: number;
+            /** Round Number */
+            round_number: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -811,7 +875,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
                 };
             };
             /** @description Validation Error */

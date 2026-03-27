@@ -23,6 +23,22 @@ from schmidt.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
 
+HIDDEN_TOOL_NAMES: frozenset[str] = frozenset(
+    {
+        "check_messages",
+        "read_channel",
+        "send_message",
+        "list_channels",
+        "get_channel_members",
+        "ToolSearch",
+    }
+)
+"""Tool names filtered out of the frontend timeline.
+
+Includes base communication tools (whose effects are visible as chat messages)
+and Claude Code SDK infrastructure tools (like ToolSearch).
+"""
+
 
 def _resolve_agent_from_context(ctx: ToolContext, runtime: SimulationRuntime) -> AgentSession:
     """Extract agent_id from the MCP request's query parameters and return the session.
