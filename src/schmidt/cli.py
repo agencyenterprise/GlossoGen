@@ -216,6 +216,7 @@ async def _run_simulation(
         runs_dir = Path(args.runs_dir)
         run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
 
+    scenario.set_run_dir(run_dir=run_dir)
     agents = scenario.get_agents(default_model=args.model)
 
     log_path = run_dir / f"{scenario.name()}.jsonl"

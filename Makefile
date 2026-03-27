@@ -18,7 +18,7 @@ lint-server:
 	VIRTUAL_ENV= uv run --no-sync black . --exclude '\.venv|frontend|vulture_whitelist\.py'
 	VIRTUAL_ENV= uv run --no-sync isort . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'vulture_whitelist.py'
 	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude vulture_whitelist.py
-	VIRTUAL_ENV= uv run --no-sync mypy . --exclude '^(\.venv|frontend|vulture_whitelist\.py)'
+	VIRTUAL_ENV= uv run --no-sync mypy . --exclude '^(\.venv|frontend|vulture_whitelist\.py|runs)'
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
 	VIRTUAL_ENV= uv run --no-sync vulture src/ vulture_whitelist.py --min-confidence 60
 	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir .
