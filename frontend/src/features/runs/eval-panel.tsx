@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PanelRightClose } from "lucide-react";
 import type { components } from "@/types/api.gen";
 import { EvidenceModal } from "./evidence-modal";
 import { formatCost, humanize } from "./format";
@@ -9,15 +10,30 @@ import { VerdictPill } from "./verdict-pill";
 type EvalReportResponse = components["schemas"]["EvalReportResponse"];
 type EvalMetricResponse = components["schemas"]["EvalMetricResponse"];
 
-export function EvalPanel({ evaluation }: { evaluation: EvalReportResponse }) {
+export function EvalPanel({
+  evaluation,
+  onClose,
+}: {
+  evaluation: EvalReportResponse;
+  onClose: () => void;
+}) {
   const [expandedMetric, setExpandedMetric] = useState<EvalMetricResponse | null>(null);
 
   return (
     <div className="flex flex-col gap-4 overflow-y-auto border-l border-border p-3.5">
       {/* Evaluators */}
       <div>
-        <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Evaluators
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Evaluators
+          </span>
+          <button
+            className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={onClose}
+            title="Hide evaluators panel"
+          >
+            <PanelRightClose className="h-3.5 w-3.5" />
+          </button>
         </div>
         <div className="divide-y divide-border">
           {evaluation.metrics.map(metric => (

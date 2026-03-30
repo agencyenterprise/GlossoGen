@@ -3,7 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, HelpCircle, Loader2, Radio, Sword, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  HelpCircle,
+  Loader2,
+  PanelRightOpen,
+  Radio,
+  Sword,
+  XCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
@@ -28,6 +36,7 @@ export function RunDetail({ runId }: { runId: string }) {
   const [highlightNonce, setHighlightNonce] = useState(0);
   const [showDescription, setShowDescription] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [showEvalPanel, setShowEvalPanel] = useState(true);
   const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
@@ -425,7 +434,9 @@ export function RunDetail({ runId }: { runId: string }) {
       <div
         className={cn(
           "relative grid h-[calc(100vh-120px)] min-h-[500px] overflow-hidden rounded-xl border border-border bg-background",
-          evaluation !== null ? "grid-cols-[192px_1fr_280px]" : "grid-cols-[192px_1fr]"
+          evaluation !== null && showEvalPanel
+            ? "grid-cols-[192px_1fr_280px]"
+            : "grid-cols-[192px_1fr]"
         )}
       >
         <RunSidebar
@@ -471,7 +482,20 @@ export function RunDetail({ runId }: { runId: string }) {
         )}
 
         {/* Eval panel */}
-        {evaluation !== null ? <EvalPanel evaluation={evaluation} /> : null}
+        {evaluation !== null && showEvalPanel ? (
+          <EvalPanel evaluation={evaluation} onClose={() => setShowEvalPanel(false)} />
+        ) : null}
+
+        {/* Eval panel toggle (when hidden) */}
+        {evaluation !== null && !showEvalPanel ? (
+          <button
+            className="absolute right-2 top-12 z-10 rounded-md border border-border bg-background p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+            onClick={() => setShowEvalPanel(true)}
+            title="Show evaluators panel"
+          >
+            <PanelRightOpen className="h-4 w-4" />
+          </button>
+        ) : null}
 
         {/* Agent drawer */}
         {activeAgent && activeAgentColor ? (
