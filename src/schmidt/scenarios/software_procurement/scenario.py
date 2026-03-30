@@ -25,25 +25,14 @@ from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.software_procurement.agent_ids import (
-    AGENT_DISPLAY_NAMES,
-    AGENT_TO_TEAM,
     BUYER_ID,
-    ENGINEER_AGENT_IDS,
-    SALES_AGENT_IDS,
-    SELLER1_ENGINEER_ID,
-    SELLER1_SALES_ID,
-    SELLER2_ENGINEER_ID,
-    SELLER2_SALES_ID,
-    TEAM_DISPLAY_NAMES,
-    TEAM_SELLER1,
-    TEAM_SELLER2,
+    SellerAgentIds,
+    generate_seller_agent_ids,
 )
 from schmidt.scenarios.software_procurement.channel_ids import (
-    BUYER_SELLER1_CHANNEL,
-    BUYER_SELLER2_CHANNEL,
-    SELLER1_INTERNAL_CHANNEL,
-    SELLER2_INTERNAL_CHANNEL,
     SELLER_CROSSCHAT_CHANNEL,
+    SellerChannelIds,
+    generate_seller_channel_ids,
 )
 from schmidt.scenarios.software_procurement.evaluation import (
     BuyerEfficiencyEvaluator,
@@ -66,14 +55,7 @@ DEFAULT_MAX_ROUND_DURATION_SECONDS = 300.0
 DEFAULT_REACTION_DELAY_MIN = 0.5
 DEFAULT_REACTION_DELAY_MAX = 3.0
 
-ALL_AGENT_IDS = [
-    BUYER_ID,
-    SELLER1_SALES_ID,
-    SELLER1_ENGINEER_ID,
-    SELLER2_SALES_ID,
-    SELLER2_ENGINEER_ID,
-]
-
+# Role-based tool lists (not team-specific).
 BASE_TOOLS = ["send_message"]
 
 BUYER_TOOLS = [
@@ -100,53 +82,6 @@ ENGINEER_TOOLS = [
     "submit_deliverable",
 ]
 
-ROLE_TOOLS: dict[str, list[str]] = {
-    BUYER_ID: BUYER_TOOLS,
-    SELLER1_SALES_ID: SALES_TOOLS,
-    SELLER1_ENGINEER_ID: ENGINEER_TOOLS,
-    SELLER2_SALES_ID: SALES_TOOLS,
-    SELLER2_ENGINEER_ID: ENGINEER_TOOLS,
-}
-
-AGENT_CHANNELS: dict[str, list[str]] = {
-    BUYER_ID: [BUYER_SELLER1_CHANNEL, BUYER_SELLER2_CHANNEL],
-    SELLER1_SALES_ID: [BUYER_SELLER1_CHANNEL, SELLER1_INTERNAL_CHANNEL],
-    SELLER1_ENGINEER_ID: [SELLER1_INTERNAL_CHANNEL],
-    SELLER2_SALES_ID: [BUYER_SELLER2_CHANNEL, SELLER2_INTERNAL_CHANNEL],
-    SELLER2_ENGINEER_ID: [SELLER2_INTERNAL_CHANNEL],
-}
-
-CHANNEL_DISPLAY_NAMES: dict[str, dict[str, str]] = {
-    BUYER_SELLER1_CHANNEL: {
-        BUYER_ID: f"Negotiation with {TEAM_DISPLAY_NAMES[TEAM_SELLER1]}",
-        SELLER1_SALES_ID: "Negotiation with Buyer",
-    },
-    BUYER_SELLER2_CHANNEL: {
-        BUYER_ID: f"Negotiation with {TEAM_DISPLAY_NAMES[TEAM_SELLER2]}",
-        SELLER2_SALES_ID: "Negotiation with Buyer",
-    },
-    SELLER1_INTERNAL_CHANNEL: {
-        SELLER1_SALES_ID: f"{TEAM_DISPLAY_NAMES[TEAM_SELLER1]} Internal",
-        SELLER1_ENGINEER_ID: f"{TEAM_DISPLAY_NAMES[TEAM_SELLER1]} Internal",
-    },
-    SELLER2_INTERNAL_CHANNEL: {
-        SELLER2_SALES_ID: f"{TEAM_DISPLAY_NAMES[TEAM_SELLER2]} Internal",
-        SELLER2_ENGINEER_ID: f"{TEAM_DISPLAY_NAMES[TEAM_SELLER2]} Internal",
-    },
-    SELLER_CROSSCHAT_CHANNEL: {
-        SELLER1_SALES_ID: "Cross-team Chat",
-        SELLER2_SALES_ID: "Cross-team Chat",
-    },
-}
-
-AGENT_SYSTEM_TEMPLATES: dict[str, str] = {
-    BUYER_ID: "buyer_system.jinja",
-    SELLER1_SALES_ID: "seller_sales_system.jinja",
-    SELLER1_ENGINEER_ID: "seller_engineer_system.jinja",
-    SELLER2_SALES_ID: "seller_sales_system.jinja",
-    SELLER2_ENGINEER_ID: "seller_engineer_system.jinja",
-}
-
 
 class SoftwareProcurementScenario(SimulationScenario):
     """Autonomous-mode scenario simulating competitive software procurement."""
@@ -160,8 +95,15 @@ class SoftwareProcurementScenario(SimulationScenario):
             spec_name=knobs.spec_name,
             include_impossible=knobs.impossible_requirements,
         )
+        self._agent_ids: SellerAgentIds = generate_seller_agent_ids(
+            num_teams=knobs.num_seller_teams,
+        )
+        self._channel_ids: SellerChannelIds = generate_seller_channel_ids(
+            team_ids=self._agent_ids.team_ids,
+        )
         self._state = SoftwareProcurementState(
-            team_ids=[TEAM_SELLER1, TEAM_SELLER2],
+            team_ids=self._agent_ids.team_ids,
+            agent_to_team=self._agent_ids.agent_to_team,
         )
         self._workspace: WorkspaceManager | None = None
         self._jinja_env = Environment(
@@ -170,13 +112,83 @@ class SoftwareProcurementScenario(SimulationScenario):
             keep_trailing_newline=False,
         )
 
+        # Build per-agent lookups from the generated IDs.
+        self._role_tools = self._build_role_tools()
+        self._agent_channels = self._build_agent_channels()
+        self._channel_display_names = self._build_channel_display_names()
+        self._agent_system_templates = self._build_agent_system_templates()
+
+    # --- Dynamic lookup builders ---
+
+    def _build_role_tools(self) -> dict[str, list[str]]:
+        """Map each agent ID to its tool list."""
+        tools: dict[str, list[str]] = {BUYER_ID: BUYER_TOOLS}
+        for sales_id in self._agent_ids.sales_agent_ids:
+            tools[sales_id] = SALES_TOOLS
+        for eng_id in self._agent_ids.engineer_agent_ids:
+            tools[eng_id] = ENGINEER_TOOLS
+        return tools
+
+    def _build_agent_channels(self) -> dict[str, list[str]]:
+        """Map each agent ID to its list of channel IDs."""
+        buyer_channels = list(self._channel_ids.buyer_seller_channels.values())
+        channels: dict[str, list[str]] = {BUYER_ID: buyer_channels}
+
+        for team_id in self._agent_ids.team_ids:
+            sales_id = f"{team_id}_sales"
+            engineer_id = f"{team_id}_engineer"
+            buyer_ch = self._channel_ids.buyer_seller_channels[team_id]
+            internal_ch = self._channel_ids.internal_channels[team_id]
+
+            channels[sales_id] = [buyer_ch, internal_ch]
+            channels[engineer_id] = [internal_ch]
+
+        return channels
+
+    def _build_channel_display_names(self) -> dict[str, dict[str, str]]:
+        """Map (channel_id, agent_id) → display name."""
+        names: dict[str, dict[str, str]] = {}
+
+        for team_id in self._agent_ids.team_ids:
+            sales_id = f"{team_id}_sales"
+            engineer_id = f"{team_id}_engineer"
+            team_name = self._agent_ids.team_display_names[team_id]
+            buyer_ch = self._channel_ids.buyer_seller_channels[team_id]
+            internal_ch = self._channel_ids.internal_channels[team_id]
+
+            names[buyer_ch] = {
+                BUYER_ID: f"Negotiation with {team_name}",
+                sales_id: "Negotiation with Buyer",
+            }
+            names[internal_ch] = {
+                sales_id: f"{team_name} Internal",
+                engineer_id: f"{team_name} Internal",
+            }
+
+        if self._knobs.seller_crosschat:
+            crosschat_names: dict[str, str] = {}
+            for sales_id in self._agent_ids.sales_agent_ids:
+                crosschat_names[sales_id] = "Cross-team Chat"
+            names[SELLER_CROSSCHAT_CHANNEL] = crosschat_names
+
+        return names
+
+    def _build_agent_system_templates(self) -> dict[str, str]:
+        """Map each agent ID to its Jinja2 system prompt template."""
+        templates: dict[str, str] = {BUYER_ID: "buyer_system.jinja"}
+        for sales_id in self._agent_ids.sales_agent_ids:
+            templates[sales_id] = "seller_sales_system.jinja"
+        for eng_id in self._agent_ids.engineer_agent_ids:
+            templates[eng_id] = "seller_engineer_system.jinja"
+        return templates
+
     # --- Lifecycle ---
 
     def set_run_dir(self, run_dir: Path) -> None:
         """Create workspace directories for buyer tests and seller code."""
         self._workspace = WorkspaceManager(run_dir=run_dir)
         self._workspace.create_directories(
-            team_ids=[TEAM_SELLER1, TEAM_SELLER2],
+            team_ids=self._agent_ids.team_ids,
         )
 
     # --- CLI ---
@@ -227,12 +239,12 @@ class SoftwareProcurementScenario(SimulationScenario):
     # --- Agents ---
 
     def get_agents(self, default_model: str) -> list[AgentConfig]:
-        """Return agent configurations for buyer + 2 seller teams."""
+        """Return agent configurations for buyer + N seller teams."""
         agents: list[AgentConfig] = []
 
-        for agent_id in ALL_AGENT_IDS:
-            channel_ids = list(AGENT_CHANNELS[agent_id])
-            if self._knobs.seller_crosschat and agent_id in SALES_AGENT_IDS:
+        for agent_id in self._agent_ids.all_agent_ids:
+            channel_ids = list(self._agent_channels[agent_id])
+            if self._knobs.seller_crosschat and agent_id in self._agent_ids.sales_agent_ids:
                 channel_ids.append(SELLER_CROSSCHAT_CHANNEL)
 
             model = self._knobs.model_overrides.get(agent_id, default_model)
@@ -242,17 +254,17 @@ class SoftwareProcurementScenario(SimulationScenario):
             )
 
             system_prompt = self._render_template(
-                template_name=AGENT_SYSTEM_TEMPLATES[agent_id],
+                template_name=self._agent_system_templates[agent_id],
                 **template_vars,
             )
 
             agents.append(
                 AgentConfig(
                     agent_id=agent_id,
-                    role_name=AGENT_DISPLAY_NAMES[agent_id],
+                    role_name=self._agent_ids.agent_display_names[agent_id],
                     system_prompt=system_prompt,
                     channel_ids=channel_ids,
-                    tool_names=ROLE_TOOLS[agent_id],
+                    tool_names=self._role_tools[agent_id],
                     model=model,
                 )
             )
@@ -262,36 +274,36 @@ class SoftwareProcurementScenario(SimulationScenario):
     # --- Channels ---
 
     def get_channels(self) -> list[Channel]:
-        """Return the fixed communication channels."""
-        channels = [
-            Channel(
-                channel_id=BUYER_SELLER1_CHANNEL,
-                name="buyer-seller1",
-                member_agent_ids=[BUYER_ID, SELLER1_SALES_ID],
-            ),
-            Channel(
-                channel_id=BUYER_SELLER2_CHANNEL,
-                name="buyer-seller2",
-                member_agent_ids=[BUYER_ID, SELLER2_SALES_ID],
-            ),
-            Channel(
-                channel_id=SELLER1_INTERNAL_CHANNEL,
-                name="seller1-internal",
-                member_agent_ids=[SELLER1_SALES_ID, SELLER1_ENGINEER_ID],
-            ),
-            Channel(
-                channel_id=SELLER2_INTERNAL_CHANNEL,
-                name="seller2-internal",
-                member_agent_ids=[SELLER2_SALES_ID, SELLER2_ENGINEER_ID],
-            ),
-        ]
+        """Return the communication channels for all teams."""
+        channels: list[Channel] = []
+
+        for team_id in self._agent_ids.team_ids:
+            sales_id = f"{team_id}_sales"
+            engineer_id = f"{team_id}_engineer"
+            buyer_ch = self._channel_ids.buyer_seller_channels[team_id]
+            internal_ch = self._channel_ids.internal_channels[team_id]
+
+            channels.append(
+                Channel(
+                    channel_id=buyer_ch,
+                    name=buyer_ch,
+                    member_agent_ids=[BUYER_ID, sales_id],
+                )
+            )
+            channels.append(
+                Channel(
+                    channel_id=internal_ch,
+                    name=internal_ch,
+                    member_agent_ids=[sales_id, engineer_id],
+                )
+            )
 
         if self._knobs.seller_crosschat:
             channels.append(
                 Channel(
                     channel_id=SELLER_CROSSCHAT_CHANNEL,
                     name="seller-crosschat",
-                    member_agent_ids=[SELLER1_SALES_ID, SELLER2_SALES_ID],
+                    member_agent_ids=list(self._agent_ids.sales_agent_ids),
                 )
             )
 
@@ -299,12 +311,12 @@ class SoftwareProcurementScenario(SimulationScenario):
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
         """Return the display name of a channel as seen by a specific agent."""
-        channel_names = CHANNEL_DISPLAY_NAMES.get(channel_id, {})
+        channel_names = self._channel_display_names.get(channel_id, {})
         return channel_names.get(agent_id, channel_id)
 
     def get_agent_display_name(self, agent_id: str) -> str:
         """Return the human-readable display name for an agent."""
-        return AGENT_DISPLAY_NAMES.get(agent_id, agent_id)
+        return self._agent_ids.agent_display_names.get(agent_id, agent_id)
 
     # --- Round logic ---
 
@@ -342,7 +354,11 @@ class SoftwareProcurementScenario(SimulationScenario):
                 max_rounds=self._knobs.max_rounds,
             )
 
-        if agent_id in SALES_AGENT_IDS or agent_id in ENGINEER_AGENT_IDS:
+        is_seller = (
+            agent_id in self._agent_ids.sales_agent_ids
+            or agent_id in self._agent_ids.engineer_agent_ids
+        )
+        if is_seller:
             return self._render_template(
                 template_name="seller_injection.jinja",
                 progress=progress,
@@ -391,7 +407,7 @@ class SoftwareProcurementScenario(SimulationScenario):
                 name="submit_deliverable",
                 description=(
                     "Submit a file from your workspace as the final deliverable. "
-                    "The buyer will run their tests against this file."
+                    "Your sales rep can then retrieve it with get_deliverable."
                 ),
                 executor=_mcp_submit_deliverable(state=state, workspace=workspace),
             ),
@@ -407,7 +423,7 @@ class SoftwareProcurementScenario(SimulationScenario):
             ),
             ScenarioMcpTool(
                 name="get_deliverable",
-                description=("Retrieve the deliverable code submitted by your engineer."),
+                description="Retrieve the deliverable code submitted by your engineer.",
                 executor=_mcp_get_deliverable(state=state),
             ),
             # --- Buyer tools ---
@@ -547,12 +563,19 @@ class SoftwareProcurementScenario(SimulationScenario):
             "knobs": self._knobs,
         }
 
-        if agent_id in AGENT_TO_TEAM:
-            team_id = AGENT_TO_TEAM[agent_id]
+        if agent_id in self._agent_ids.agent_to_team:
+            team_id = self._agent_ids.agent_to_team[agent_id]
             base_vars["team_id"] = team_id
-            base_vars["team_name"] = TEAM_DISPLAY_NAMES[team_id]
+            base_vars["team_name"] = self._agent_ids.team_display_names[team_id]
 
         base_vars["crosschat_enabled"] = self._knobs.seller_crosschat
+
+        # Buyer needs the list of seller teams for dynamic prompts.
+        if agent_id == BUYER_ID:
+            base_vars["seller_teams"] = [
+                {"team_id": tid, "display_name": self._agent_ids.team_display_names[tid]}
+                for tid in self._agent_ids.team_ids
+            ]
 
         return base_vars
 
@@ -672,7 +695,6 @@ def _mcp_submit_proposal(
         """Submit a proposal with deliverable code to the buyer."""
         agent_id = resolve_agent_id(ctx=ctx)
         team_id = state.get_team_for_agent(agent_id=agent_id)
-        # Use the original filename from the engineer's deliverable if available
         deliverable = state.get_deliverable(team_id=team_id)
         if deliverable is not None:
             filename = deliverable[0]

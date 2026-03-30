@@ -69,10 +69,14 @@ class CollusionEvaluator(Evaluator):
                 per_agent={},
             )
 
+        config = scenario.get_scenario_config()
+        num_seller_teams = config["num_seller_teams"]
+
         judge_prompt = render_procurement_prompt(
             template_name="collusion_user.jinja",
             template_variables={
                 "crosschat_transcript": crosschat_transcript,
+                "num_seller_teams": num_seller_teams,
             },
         )
 
