@@ -18,7 +18,7 @@ from uuid import uuid4
 import uvicorn
 
 from schmidt.autonomous_supervisor import AutonomousSupervisor
-from schmidt.evaluation.log_reader import load_events
+from schmidt.evaluation.log_reader import extract_scenario_config, load_events
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
@@ -36,17 +36,11 @@ DEFAULT_MCP_PORT = 8001
 DEFAULT_MAX_AGENT_TURNS = 200
 
 
-def _build_parsers() -> tuple[
-    argparse.ArgumentParser,
-    argparse.ArgumentParser,
-    argparse.ArgumentParser,
-    argparse.ArgumentParser,
-]:
-    """Build the top-level parser and subcommand parsers.
+def _build_parsers() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
+    """Build the top-level parser and all subcommand parsers.
 
-    Returns the root parser, the ``run`` subparser, the ``evaluate``
-    subparser, and the ``serve`` subparser so that scenario-specific
-    arguments can be added before the final parse.
+    Returns the root parser and the ``run`` subparser. The ``run`` subparser
+    is needed so scenarios can register CLI arguments via ``add_cli_arguments``.
     """
     parser = argparse.ArgumentParser(prog="schmidt")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -123,7 +117,7 @@ def _build_parsers() -> tuple[
     )
     serve_parser.add_argument("--port", type=int, required=True, help="Port to listen on")
 
-    return parser, run_parser, evaluate_parser, serve_parser
+    return parser, run_parser
 
 
 def main() -> None:
@@ -132,7 +126,7 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
-    parser, run_parser, evaluate_parser, _ = _build_parsers()
+    parser, run_parser = _build_parsers()
 
     # First pass: discover the command (and scenario name for run/evaluate).
     known_args, _ = parser.parse_known_args()
@@ -144,20 +138,16 @@ def main() -> None:
 
     scenario_cls = get_scenario_class(name=known_args.scenario_name)
     if known_args.command == "run":
-        target_parser = run_parser
-    else:
-        target_parser = evaluate_parser
-    scenario_cls.add_cli_arguments(parser=target_parser)
+        scenario_cls.add_cli_arguments(parser=run_parser)
 
     # Second pass: full parse including scenario-specific args.
     args = parser.parse_args()
 
-    scenario = scenario_cls.create(args=args)
-
     if args.command == "run":
+        scenario = scenario_cls.create(args=args)
         asyncio.run(_run_simulation(args=args, scenario=scenario))
     else:
-        asyncio.run(_run_evaluation(args=args, scenario=scenario))
+        asyncio.run(_run_evaluation(args=args, scenario_cls=scenario_cls))
 
 
 def _compute_run_dir(runs_dir: Path, scenario_name: str) -> Path:
@@ -281,13 +271,21 @@ async def _run_simulation(
 
 async def _run_evaluation(
     args: argparse.Namespace,
-    scenario: SimulationScenario,
+    scenario_cls: type[SimulationScenario],
 ) -> None:
-    """Run the specified evaluators against a simulation log and write a JSON report."""
+    """Run the specified evaluators against a simulation log and write a JSON report.
+
+    Reconstructs the scenario from the config stored in the JSONL event log,
+    so the evaluate command does not need scenario-specific CLI flags.
+    """
     evaluator_names = args.evaluators.split(",")
     run_dir = Path(args.run_dir)
     log_path = run_dir / f"{args.scenario_name}.jsonl"
     report_path = run_dir / f"{args.scenario_name}_report.json"
+
+    events = await load_events(log_path=log_path)
+    config = extract_scenario_config(events=events)
+    scenario = scenario_cls.create_from_config(config=config)
 
     logger.info("Evaluating %s with evaluators: %s", args.scenario_name, args.evaluators)
     await scenario.run_evaluation(

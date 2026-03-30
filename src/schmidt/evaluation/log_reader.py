@@ -6,6 +6,7 @@ from JSONL event logs.
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import aiofiles
 import orjson
@@ -67,4 +68,15 @@ def extract_simulation_id(events: list[SimulationEvent]) -> str:
     for event in events:
         if isinstance(event, SimulationStarted):
             return event.event_id
+    raise ValueError("No SimulationStarted event found in events")
+
+
+def extract_scenario_config(events: list[SimulationEvent]) -> dict[str, Any]:
+    """Extract the scenario_config dict from the SimulationStarted event.
+
+    Raises ValueError if no SimulationStarted event is found.
+    """
+    for event in events:
+        if isinstance(event, SimulationStarted):
+            return dict(event.scenario_config)
     raise ValueError("No SimulationStarted event found in events")

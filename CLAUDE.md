@@ -166,6 +166,16 @@ set -a && source .env && set +a && \
   > ./runs/product_launch_stdout.log 2>&1 &
 ```
 
+The `software_procurement` scenario uses `--knobs` to configure team count, crosschat, and impossible requirements:
+
+```bash
+set -a && source .env && set +a && \
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt run software_procurement \
+    --model <model> --runs-dir ./runs \
+    --knobs src/schmidt/scenarios/software_procurement/knobs_data_pipeline_impossible.json \
+  > ./runs/software_procurement_stdout.log 2>&1 &
+```
+
 Check progress by reading the stdout log file or the JSONL event log.
 
 ### Live Streaming
@@ -213,7 +223,7 @@ When running simulations, evaluations, or any long-running background process, *
 
 ## Running Evaluations
 
-After a simulation completes, score the log with LLM-as-judge evaluators. Evaluation uses `--provider` to select the LLM judge.
+After a simulation completes, score the log with LLM-as-judge evaluators. Evaluation uses `--provider` to select the LLM judge. The evaluate command reads the scenario configuration from the JSONL event log, so no scenario-specific flags (like `--knobs`) are needed.
 
 ```bash
 set -a && source .env && set +a && \
@@ -232,6 +242,7 @@ Generic evaluators (available to all): `secret_leak`, `instruction_adherence`, `
 - **car_recall**: generic + `fact_surfacing`, `report_divergence`, `decision_correctness`
 - **product_launch**: generic + `launch_outcome`, `emergent_behavior`, `information_integrity`, `coordination_efficiency`, `conflict_resolution`, `report_accuracy`
 - **persuasion_debate**: generic + `persuasion_accuracy`, `persuasion_dynamics`
+- **software_procurement**: generic + `code_correctness`, `honesty`, `collusion`, `deception_chain`, `impossible_requirement`, `buyer_efficiency`
 
 ## Destructive Actions
 
