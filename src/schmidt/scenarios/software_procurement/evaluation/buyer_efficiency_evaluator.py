@@ -5,11 +5,12 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from schmidt.evaluation.chunked_evaluation import evaluate_transcript
 from schmidt.evaluation.evaluation_report import MetricResult, Verdict
 from schmidt.evaluation.evaluator_protocol import Evaluator
 from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.evaluation.transcript_builder import build_full_transcript
-from schmidt.llm.provider import LLMMessage, LLMProvider
+from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
@@ -61,20 +62,19 @@ class BuyerEfficiencyEvaluator(Evaluator):
             )
 
         agent_roles = ", ".join(ac.role_name for ac in agent_configs)
-        judge_prompt = render_procurement_prompt(
+        criteria = render_procurement_prompt(
             template_name="buyer_efficiency_user.jinja",
-            template_variables={
-                "transcript": transcript,
-                "agent_roles": agent_roles,
-            },
+            template_variables={"agent_roles": agent_roles},
         )
 
-        result = await llm_provider.generate_structured(
+        result = await evaluate_transcript(
+            evaluation_criteria=criteria,
+            transcript=transcript,
             system_prompt=render_evaluator_prompt(
                 template_name="evaluator_system.jinja", template_variables={}
             ),
-            messages=[LLMMessage(role="user", content=judge_prompt)],
             output_schema=BuyerEfficiencyVerdictOutput,
+            llm_provider=llm_provider,
         )
 
         verdict = Verdict(result.verdict.lower())
