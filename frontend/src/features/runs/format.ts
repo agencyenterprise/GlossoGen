@@ -26,3 +26,34 @@ export function formatTime(iso: string): string {
     minute: "2-digit",
   });
 }
+
+/** Format a cost in USD. Shows 2 decimals for >= $0.01, 4 decimals for sub-cent. */
+export function formatCost(usd: number): string {
+  if (usd <= 0) {
+    return "--";
+  }
+  if (usd < 0.01) {
+    return `$${usd.toFixed(4)}`;
+  }
+  return `$${usd.toFixed(2)}`;
+}
+
+/** Format seconds into a human-readable duration like "2m 30s" or "1h 5m". */
+export function formatDuration(seconds: number): string {
+  const totalSeconds = Math.round(seconds);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${secs}s`;
+  }
+  return `${secs}s`;
+}
+
+/** Compute elapsed seconds since an ISO timestamp. */
+export function elapsedSince(isoTimestamp: string): number {
+  return (Date.now() - new Date(isoTimestamp).getTime()) / 1000;
+}

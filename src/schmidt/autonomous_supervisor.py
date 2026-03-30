@@ -20,6 +20,7 @@ from schmidt.models.event import (
     SimulationEnded,
     SimulationStarted,
 )
+from schmidt.runners.agent_run_result import AgentRunResult
 from schmidt.runners.agent_runner_base import AgentRunner
 from schmidt.runtime.activity_notification import NewMessagesNotification
 from schmidt.runtime.agent_session import AgentSession
@@ -86,6 +87,7 @@ class AutonomousSupervisor:
                 event=SimulationEnded(
                     reason=RunStatus.ERROR,
                     total_messages=total,
+                    total_cost_usd=0.0,
                 )
             )
             raise
@@ -289,10 +291,12 @@ class AutonomousSupervisor:
         # Broadcast done to all agents.
         runtime.broadcast_done(reason=termination_status.value)
 
-        # Wait for agent tasks to finish (they should exit after receiving done).
+        # Wait for agent tasks to finish and collect their cost results.
+        agent_results: list[AgentRunResult] = []
         for task in agent_tasks:
             try:
-                await asyncio.wait_for(task, timeout=30.0)
+                result = await asyncio.wait_for(task, timeout=30.0)
+                agent_results.append(result)
             except asyncio.TimeoutError:
                 logger.warning("Agent task %s did not finish in 30s, cancelling", task.get_name())
                 task.cancel()
@@ -302,6 +306,8 @@ class AutonomousSupervisor:
                     pass
             except Exception:
                 logger.exception("Agent task %s failed", task.get_name())
+
+        total_cost_usd = sum(r.total_cost_usd for r in agent_results)
 
         # Stop the MCP server.
         logger.info("Stopping MCP server")
@@ -316,6 +322,11 @@ class AutonomousSupervisor:
             event=SimulationEnded(
                 reason=termination_status,
                 total_messages=total_messages,
+                total_cost_usd=total_cost_usd,
             )
         )
-        logger.info("Simulation complete. Total messages: %d", total_messages)
+        logger.info(
+            "Simulation complete. Total messages: %d, total cost: $%.4f",
+            total_messages,
+            total_cost_usd,
+        )

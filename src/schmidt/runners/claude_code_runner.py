@@ -34,6 +34,7 @@ from schmidt.llm.tool_arg_extractor import SendMessageTextExtractor
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import LLMResponseReceived, TokenUsage, ToolResultReceived
 from schmidt.models.tool_definition import ToolCallRequest
+from schmidt.runners.agent_run_result import AgentRunResult
 from schmidt.runners.agent_runner_base import AgentRunner
 from schmidt.runtime.mcp_tools import HIDDEN_TOOL_NAMES
 from schmidt.server.streaming_event import MessagePreview, TokenDelta
@@ -102,7 +103,7 @@ class ClaudeCodeRunner(AgentRunner):
         agent_config: AgentConfig,
         mcp_server_url: str,
         event_logger: EventLogger,
-    ) -> None:
+    ) -> AgentRunResult:
         """Launch a Claude Code agent that loops until it receives a done notification."""
         logger.info(
             "Starting Claude Code agent %s (%s) max_turns=%d",
@@ -316,6 +317,12 @@ class ClaudeCodeRunner(AgentRunner):
             agent_id,
             total_turns,
             total_cost,
+        )
+
+        return AgentRunResult(
+            agent_id=agent_id,
+            total_cost_usd=total_cost,
+            total_turns=total_turns,
         )
 
     def _handle_stream_event(

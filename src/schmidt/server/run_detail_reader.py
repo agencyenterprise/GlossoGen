@@ -141,6 +141,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     reasoning: list[ReasoningEntry] = []
     tool_use: list[ToolUseEntry] = []
     total_messages = 0
+    total_cost_usd = 0.0
+    duration_seconds = 0.0
     status = None
 
     current_round = 0
@@ -227,6 +229,9 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
 
         elif isinstance(event, SimulationEnded):
             status = event.reason
+            total_cost_usd = event.total_cost_usd
+            if timestamp is not None:
+                duration_seconds = (event.timestamp - timestamp).total_seconds()
 
     _link_reasoning_to_channels(reasoning=reasoning, messages=messages)
 
@@ -256,6 +261,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         scenario_config=scenario_config,
         timestamp=timestamp,
         total_messages=total_messages,
+        total_cost_usd=total_cost_usd,
+        duration_seconds=duration_seconds,
         status=status,
         channel_ids=channel_ids,
         agents=agents,

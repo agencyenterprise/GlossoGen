@@ -50,6 +50,10 @@ export interface EventStreamState {
   agentRounds: Map<string, number>;
   /** Debug log entries received via SSE. */
   debugLogs: DebugLogEntry[];
+  /** Total cost in USD from the simulation_ended event. */
+  totalCostUsd: number;
+  /** Duration in seconds from the simulation_ended event. */
+  durationSeconds: number;
 }
 
 /**
@@ -74,6 +78,8 @@ export function useEventStream(
   const [agents, setAgents] = useState<AgentDetail[]>([]);
   const [channelIds, setChannelIds] = useState<string[]>([]);
   const [totalMessages, setTotalMessages] = useState(0);
+  const [totalCostUsd, setTotalCostUsd] = useState(0);
+  const [durationSeconds, setDurationSeconds] = useState(0);
   const [status, setStatus] = useState<RunStatus | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [partialText, setPartialText] = useState<Map<string, string>>(new Map());
@@ -326,6 +332,8 @@ export function useEventStream(
       const data: SSESimulationEnded = JSON.parse(e.data);
       setStatus(data.reason);
       setTotalMessages(data.total_messages);
+      setTotalCostUsd(data.total_cost_usd);
+      setDurationSeconds(data.duration_seconds);
       eventSource.close();
       setIsConnected(false);
     });
@@ -416,5 +424,7 @@ export function useEventStream(
     agentTurns,
     agentRounds,
     debugLogs,
+    totalCostUsd,
+    durationSeconds,
   };
 }
