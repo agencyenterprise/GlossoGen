@@ -10,7 +10,7 @@ import asyncio
 import logging
 from typing import TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.llm.provider import LLMMessage, LLMProvider
@@ -41,6 +41,14 @@ class ChunkEvidence(BaseModel):
             "identify the speaker and channel, and explain the relevance."
         ),
     )
+
+    @field_validator("observations", mode="before")
+    @classmethod
+    def coerce_string_to_list(cls, v: object) -> object:
+        """Handle LLMs that return a single string instead of a list."""
+        if isinstance(v, str):
+            return [line.strip() for line in v.split("\n") if line.strip()]
+        return v
 
 
 def _estimate_tokens(text: str) -> int:
