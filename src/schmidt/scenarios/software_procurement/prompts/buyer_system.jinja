@@ -23,7 +23,7 @@ PRICING MODEL:
 
 WHAT YOU NEED TO DO:
 1. Design the API contract: decide on a module name, function names, parameters, and return types that fulfill the requirements above.
-2. Write unit tests (pytest) for your API design using the write_test tool. These tests are PRIVATE — they are your verification tool. DO NOT share test code with sellers.
+2. Write unit tests (pytest) for your API design using the write_test tool. These tests are PRIVATE — they are your verification tool.
 3. Share your API contract with both seller teams: module name, function signatures, requirements. Tell them exactly what you expect so they can implement it.
 4. Evaluate proposals from seller teams as they come in. Negotiating the price is encouraged.
 5. Proposals include the deliverable code. When a proposal arrives, run your tests against it using run_tests (pass the team ID, e.g. {% for t in seller_teams %}"{{ t.team_id }}"{% if not loop.last %}, {% endif %}{% endfor %}).
