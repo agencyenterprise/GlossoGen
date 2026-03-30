@@ -129,10 +129,23 @@ class EvalMetricResponse(BaseModel):
     per_agent: dict[str, Verdict]
 
 
+class EvalCostResponse(BaseModel):
+    """Evaluation cost summary for the run detail endpoint."""
+
+    input_tokens: int
+    output_tokens: int
+    cache_read_input_tokens: int
+    cache_creation_input_tokens: int
+    estimated_cost_usd: float
+    model: str
+    provider_name: str
+
+
 class EvalReportResponse(BaseModel):
     """Evaluation report for the run detail endpoint."""
 
     metrics: list[EvalMetricResponse]
+    evaluation_cost: EvalCostResponse | None
 
 
 class RunDetailResponse(BaseModel):

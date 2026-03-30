@@ -12,6 +12,7 @@ from typing import Any, NamedTuple, Self
 
 from jinja2 import Environment, FileSystemLoader
 
+from schmidt.evaluation.evaluation_cost import compute_evaluation_cost
 from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult, write_report
 from schmidt.evaluation.evaluator_protocol import EvaluatorFactory
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
@@ -457,10 +458,17 @@ class PersuasionDebateScenario(SimulationScenario):
             )
             metrics.append(result)
 
+        evaluation_cost = compute_evaluation_cost(
+            usage=provider.get_accumulated_usage(),
+            model=model,
+            provider_name=provider_name,
+        )
+
         report = EvaluationReport(
             simulation_id=simulation_id,
             scenario_name=self.name(),
             metrics=metrics,
+            evaluation_cost=evaluation_cost,
         )
         await write_report(report=report, report_path=report_path)
         return report

@@ -10,7 +10,7 @@ import asyncio
 import logging
 from typing import TypeVar
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.llm.provider import LLMMessage, LLMProvider
@@ -41,6 +41,14 @@ class ChunkEvidence(BaseModel):
             "identify the speaker and channel, and explain the relevance."
         ),
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def ensure_observations_present(cls, data: object) -> object:
+        """Handle LLMs that return empty tool arguments."""
+        if isinstance(data, dict) and "observations" not in data:
+            data["observations"] = []
+        return data
 
     @field_validator("observations", mode="before")
     @classmethod

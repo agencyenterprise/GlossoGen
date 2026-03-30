@@ -9,6 +9,8 @@ from typing import TypeVar
 
 from pydantic import BaseModel
 
+from schmidt.evaluation.evaluation_cost import EvaluationTokenUsage
+
 T = TypeVar("T", bound=BaseModel)
 
 
@@ -24,8 +26,38 @@ class LLMProvider(ABC):
 
     Concrete subclasses implement ``generate_structured`` for calls that
     must return a validated Pydantic model. Used by evaluation for
-    LLM-as-judge scoring.
+    LLM-as-judge scoring. Token usage is accumulated across calls and
+    can be read via ``get_accumulated_usage()``.
     """
+
+    def __init__(self) -> None:
+        """Initialize the token usage accumulators to zero."""
+        self._input_tokens = 0
+        self._output_tokens = 0
+        self._cache_read_input_tokens = 0
+        self._cache_creation_input_tokens = 0
+
+    def _record_usage(
+        self,
+        input_tokens: int,
+        output_tokens: int,
+        cache_read_input_tokens: int,
+        cache_creation_input_tokens: int,
+    ) -> None:
+        """Add token counts from a single API call to the running totals."""
+        self._input_tokens += input_tokens
+        self._output_tokens += output_tokens
+        self._cache_read_input_tokens += cache_read_input_tokens
+        self._cache_creation_input_tokens += cache_creation_input_tokens
+
+    def get_accumulated_usage(self) -> EvaluationTokenUsage:
+        """Return the accumulated token usage across all calls made by this provider."""
+        return EvaluationTokenUsage(
+            input_tokens=self._input_tokens,
+            output_tokens=self._output_tokens,
+            cache_read_input_tokens=self._cache_read_input_tokens,
+            cache_creation_input_tokens=self._cache_creation_input_tokens,
+        )
 
     @abstractmethod
     async def generate_structured(

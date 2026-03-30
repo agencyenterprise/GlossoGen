@@ -65,6 +65,7 @@ class HuggingFaceProvider(LLMProvider):
 
         Raises RuntimeError if HF_TOKEN is not set in the environment.
         """
+        super().__init__()
         hf_token = os.environ.get("HF_TOKEN")
         if not hf_token:
             raise RuntimeError("HF_TOKEN environment variable is not set")
@@ -115,6 +116,14 @@ class HuggingFaceProvider(LLMProvider):
             tool_name,
         )
         response = await _chat_completion_with_retry(client=self._client, kwargs=kwargs)
+
+        if response.usage is not None:
+            self._record_usage(
+                input_tokens=response.usage.prompt_tokens,
+                output_tokens=response.usage.completion_tokens,
+                cache_read_input_tokens=0,
+                cache_creation_input_tokens=0,
+            )
 
         choice = response.choices[0]
         message = choice.message

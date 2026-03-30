@@ -10,6 +10,8 @@ import aiofiles
 import orjson
 from pydantic import BaseModel
 
+from schmidt.evaluation.evaluation_cost import EvaluationCost
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,11 +48,13 @@ class EvaluationReport(BaseModel):
         simulation_id: Unique identifier of the simulation that was evaluated.
         scenario_name: Name of the scenario that was simulated.
         metrics: Collection of individual metric results from all evaluators.
+        evaluation_cost: Token usage and estimated dollar cost for the evaluation.
     """
 
     simulation_id: str
     scenario_name: str
     metrics: list[MetricResult]
+    evaluation_cost: EvaluationCost
 
 
 async def write_report(report: EvaluationReport, report_path: Path) -> None:

@@ -51,6 +51,7 @@ class ClaudeProvider(LLMProvider):
 
         Raises RuntimeError if ANTHROPIC_API_KEY is not set in the environment.
         """
+        super().__init__()
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             raise RuntimeError("ANTHROPIC_API_KEY environment variable is not set")
@@ -97,6 +98,13 @@ class ClaudeProvider(LLMProvider):
             tool_name,
         )
         response = await _create_with_retry(client=self._client, kwargs=kwargs)
+
+        self._record_usage(
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+            cache_read_input_tokens=getattr(response.usage, "cache_read_input_tokens", 0),
+            cache_creation_input_tokens=getattr(response.usage, "cache_creation_input_tokens", 0),
+        )
 
         for block in response.content:
             if block.type == "tool_use" and block.name == tool_name:

@@ -24,6 +24,7 @@ from schmidt.server.response_models import (
     AgentDetail,
     ChannelMessage,
     DebugLogEntry,
+    EvalCostResponse,
     EvalMetricResponse,
     EvalReportResponse,
     ForkSource,
@@ -42,9 +43,25 @@ async def _load_evaluation_report(report_path: Path) -> EvalReportResponse | Non
         return None
 
     async with aiofiles.open(report_path, mode="rb") as f:
-        raw = await f.read()
+        raw_bytes = await f.read()
 
-    report = EvaluationReport.model_validate(orjson.loads(raw))
+    raw = orjson.loads(raw_bytes)
+
+    # Backfill for reports written before cost tracking was added.
+    if "evaluation_cost" not in raw:
+        raw["evaluation_cost"] = {
+            "usage": {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+            },
+            "estimated_cost_usd": 0.0,
+            "model": "unknown",
+            "provider_name": "unknown",
+        }
+
+    report = EvaluationReport.model_validate(raw)
 
     metrics = [
         EvalMetricResponse(
@@ -57,7 +74,18 @@ async def _load_evaluation_report(report_path: Path) -> EvalReportResponse | Non
         for m in report.metrics
     ]
 
-    return EvalReportResponse(metrics=metrics)
+    cost = report.evaluation_cost
+    eval_cost = EvalCostResponse(
+        input_tokens=cost.usage.input_tokens,
+        output_tokens=cost.usage.output_tokens,
+        cache_read_input_tokens=cost.usage.cache_read_input_tokens,
+        cache_creation_input_tokens=cost.usage.cache_creation_input_tokens,
+        estimated_cost_usd=cost.estimated_cost_usd,
+        model=cost.model,
+        provider_name=cost.provider_name,
+    )
+
+    return EvalReportResponse(metrics=metrics, evaluation_cost=eval_cost)
 
 
 async def _load_debug_logs(debug_log_path: Path) -> list[DebugLogEntry]:

@@ -52,6 +52,7 @@ class OpenAIProvider(LLMProvider):
 
         Raises RuntimeError if OPENAI_API_KEY is not set in the environment.
         """
+        super().__init__()
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY environment variable is not set")
@@ -96,6 +97,19 @@ class OpenAIProvider(LLMProvider):
             tool_name,
         )
         response = await _responses_with_retry(client=self._client, kwargs=kwargs)
+
+        if response.usage is not None:
+            cached = 0
+            if hasattr(response.usage, "input_tokens_details"):
+                details = response.usage.input_tokens_details
+                if details is not None and hasattr(details, "cached_tokens"):
+                    cached = details.cached_tokens
+            self._record_usage(
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+                cache_read_input_tokens=cached,
+                cache_creation_input_tokens=0,
+            )
 
         for item in response.output:
             if item.type == "function_call" and item.name == tool_name:
