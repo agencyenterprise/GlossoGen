@@ -21,9 +21,13 @@ _EVENT_ADAPTER: TypeAdapter[SimulationEvent] = TypeAdapter(SimulationEvent)
 
 
 def _parse_event(raw: dict[str, object]) -> SimulationEvent:
-    """Validate and deserialize a raw dictionary into a typed
-    SimulationEvent using the discriminated union adapter.
+    """Validate and deserialize a raw dictionary into a typed SimulationEvent.
+
+    Injects default values for fields added after initial release so that
+    older JSONL files parse without errors.
     """
+    if raw.get("event_type") == "simulation_ended":
+        raw.setdefault("total_cost_usd", 0.0)
     return _EVENT_ADAPTER.validate_python(raw)
 
 

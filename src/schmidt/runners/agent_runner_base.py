@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 
 from schmidt.event_logger import EventLogger
 from schmidt.models.agent_config import AgentConfig
+from schmidt.runners.agent_run_result import AgentRunResult
 
 
 class AgentRunner(ABC):
@@ -24,6 +25,6 @@ class AgentRunner(ABC):
         agent_config: AgentConfig,
         mcp_server_url: str,
         event_logger: EventLogger,
-    ) -> None:
+    ) -> AgentRunResult:
         """Start the agent. Blocks until the agent finishes."""
         ...

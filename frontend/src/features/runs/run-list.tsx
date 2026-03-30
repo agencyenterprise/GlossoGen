@@ -15,7 +15,14 @@ import {
 import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
 import type { components } from "@/types/api.gen";
-import { formatConfigValue, formatTime, humanize } from "./format";
+import {
+  elapsedSince,
+  formatConfigValue,
+  formatCost,
+  formatDuration,
+  formatTime,
+  humanize,
+} from "./format";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
 
 type RunSummary = components["schemas"]["RunSummary"];
@@ -153,7 +160,7 @@ export function RunList() {
               <Link
                 key={run.run_id}
                 href={`/runs/${run.run_id}`}
-                className="block px-4 py-2.5 text-sm transition-colors hover:bg-accent/50"
+                className={`block px-4 py-2.5 text-sm transition-colors hover:bg-accent/50 ${run.status === "in_progress" ? "bg-green-50 dark:bg-green-950/20" : ""}`}
               >
                 <div className="flex items-center gap-6">
                   <span className="flex w-40 items-center gap-1.5 font-medium">
@@ -176,7 +183,19 @@ export function RunList() {
                     ) : null}
                   </span>
                   <span className="w-20 text-muted-foreground">{formatTime(run.timestamp)}</span>
-                  <span className="w-16 text-muted-foreground">{run.total_messages} messages</span>
+                  <span className="w-16 text-muted-foreground">{run.total_messages} msgs</span>
+                  {run.total_cost_usd > 0 ? (
+                    <span className="w-16 text-muted-foreground">
+                      {formatCost(run.total_cost_usd)}
+                    </span>
+                  ) : null}
+                  <span className="w-16 text-muted-foreground">
+                    {run.duration_seconds > 0
+                      ? formatDuration(run.duration_seconds)
+                      : run.status === "in_progress"
+                        ? formatDuration(elapsedSince(run.timestamp))
+                        : null}
+                  </span>
                   <span className="w-36 text-muted-foreground">
                     {STATUS_LABELS[run.status] ?? run.status}
                   </span>

@@ -355,6 +355,10 @@ export interface components {
             timestamp: string;
             /** Total Messages */
             total_messages: number;
+            /** Total Cost Usd */
+            total_cost_usd: number;
+            /** Duration Seconds */
+            duration_seconds: number;
             status: components["schemas"]["RunStatus"];
             /** Channel Ids */
             channel_ids: string[];
@@ -407,6 +411,10 @@ export interface components {
             timestamp: string;
             /** Total Messages */
             total_messages: number;
+            /** Total Cost Usd */
+            total_cost_usd: number;
+            /** Duration Seconds */
+            duration_seconds: number;
             status: components["schemas"]["RunStatus"];
             /** Has Evaluation */
             has_evaluation: boolean;
@@ -612,6 +620,10 @@ export interface components {
             reason: components["schemas"]["RunStatus"];
             /** Total Messages */
             total_messages: number;
+            /** Total Cost Usd */
+            total_cost_usd: number;
+            /** Duration Seconds */
+            duration_seconds: number;
         };
         /**
          * SSESimulationMessagePayload

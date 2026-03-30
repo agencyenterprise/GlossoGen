@@ -67,6 +67,8 @@ num_seller_teams  # unused variable — Pydantic field (SoftwareProcurementKnobs
 deliverable_code  # unused variable — Pydantic field (TeamState)
 deliverable_filename  # unused variable — Pydantic field (TeamState)
 code  # unused variable — Pydantic field (ProposalRecord)
+total_cost_usd  # unused variable — Pydantic field (AgentRunResult / SimulationEnded)
+duration_seconds  # unused variable — Pydantic field (RunSummary / RunDetailResponse)
 requirements  # unused variable — Pydantic field (SoftwareSpec)
 impossible_requirement  # unused variable — Pydantic field (SoftwareSpec)
 bg  # unused variable — Pydantic field (HexColor)

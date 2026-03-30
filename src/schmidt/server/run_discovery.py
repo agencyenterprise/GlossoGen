@@ -45,8 +45,14 @@ async def _read_last_line(file_path: Path) -> bytes:
 
 
 def _parse_event(raw_bytes: bytes) -> SimulationEvent:
-    """Parse raw JSON bytes into a typed SimulationEvent."""
+    """Parse raw JSON bytes into a typed SimulationEvent.
+
+    Injects default values for fields added after initial release so that
+    older JSONL files parse without errors.
+    """
     raw = orjson.loads(raw_bytes)  # positional-only parameter
+    if raw.get("event_type") == "simulation_ended":
+        raw.setdefault("total_cost_usd", 0.0)
     return _EVENT_ADAPTER.validate_python(raw)  # positional-only parameter
 
 
@@ -123,6 +129,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
             run_timestamp = _timestamp_from_dir(dir_name=timestamp_dir.name)
 
             if isinstance(last_event, SimulationEnded):
+                duration_seconds = (last_event.timestamp - first_event.timestamp).total_seconds()
                 summaries.append(
                     RunSummary(
                         run_id=first_event.run_id,
@@ -131,6 +138,8 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         scenario_config=first_event.scenario_config,
                         timestamp=run_timestamp,
                         total_messages=last_event.total_messages,
+                        total_cost_usd=last_event.total_cost_usd,
+                        duration_seconds=duration_seconds,
                         status=last_event.reason,
                         has_evaluation=report_path.exists(),
                         run_dir=str(timestamp_dir),
@@ -153,6 +162,8 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         scenario_config=first_event.scenario_config,
                         timestamp=run_timestamp,
                         total_messages=message_count,
+                        total_cost_usd=0.0,
+                        duration_seconds=0.0,
                         status=status,
                         has_evaluation=False,
                         run_dir=str(timestamp_dir),

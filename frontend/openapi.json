@@ -719,6 +719,14 @@
             "type": "integer",
             "title": "Total Messages"
           },
+          "total_cost_usd": {
+            "type": "number",
+            "title": "Total Cost Usd"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "title": "Duration Seconds"
+          },
           "status": {
             "$ref": "#/components/schemas/RunStatus"
           },
@@ -793,6 +801,8 @@
           "scenario_config",
           "timestamp",
           "total_messages",
+          "total_cost_usd",
+          "duration_seconds",
           "status",
           "channel_ids",
           "agents",
@@ -861,6 +871,14 @@
             "type": "integer",
             "title": "Total Messages"
           },
+          "total_cost_usd": {
+            "type": "number",
+            "title": "Total Cost Usd"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "title": "Duration Seconds"
+          },
           "status": {
             "$ref": "#/components/schemas/RunStatus"
           },
@@ -891,6 +909,8 @@
           "scenario_config",
           "timestamp",
           "total_messages",
+          "total_cost_usd",
+          "duration_seconds",
           "status",
           "has_evaluation",
           "run_dir",
@@ -1234,6 +1254,14 @@
           "total_messages": {
             "type": "integer",
             "title": "Total Messages"
+          },
+          "total_cost_usd": {
+            "type": "number",
+            "title": "Total Cost Usd"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "title": "Duration Seconds"
           }
         },
         "type": "object",
@@ -1242,7 +1270,9 @@
           "event_id",
           "timestamp",
           "reason",
-          "total_messages"
+          "total_messages",
+          "total_cost_usd",
+          "duration_seconds"
         ],
         "title": "SSESimulationEnded",
         "description": "SSE event emitted once when the simulation finishes."

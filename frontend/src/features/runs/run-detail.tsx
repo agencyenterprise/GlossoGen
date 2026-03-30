@@ -15,7 +15,7 @@ import type { DisplayEntry } from "./display-entry";
 import { mergeEntries } from "./display-entry";
 import { EvalPanel } from "./eval-panel";
 import { ForkBadge } from "./fork-badge";
-import { formatConfigValue, humanize } from "./format";
+import { elapsedSince, formatConfigValue, formatCost, formatDuration, humanize } from "./format";
 import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
@@ -255,6 +255,9 @@ export function RunDetail({ runId }: { runId: string }) {
   );
 
   const totalMessages = sse.totalMessages > 0 ? sse.totalMessages : (restData?.total_messages ?? 0);
+  const totalCostUsd = sse.totalCostUsd > 0 ? sse.totalCostUsd : (restData?.total_cost_usd ?? 0);
+  const durationSeconds =
+    sse.durationSeconds > 0 ? sse.durationSeconds : (restData?.duration_seconds ?? 0);
 
   const agentColorMap = useMemo(
     () => buildAgentColorMap(allAgents.map(a => a.agent_id)),
@@ -350,7 +353,10 @@ export function RunDetail({ runId }: { runId: string }) {
           </button>
         </span>
         <span className="text-[13px] text-muted-foreground">
-          {maxRound} rounds · {totalMessages} messages · {allAgents.length} agents ·{" "}
+          {maxRound} rounds · {totalMessages} messages · {allAgents.length} agents
+          {totalCostUsd > 0 ? <> · {formatCost(totalCostUsd)}</> : null}
+          {durationSeconds > 0 ? <> · {formatDuration(durationSeconds)}</> : null}
+          {" · "}
           {uniqueModels.length <= 1 ? (
             modelLabel
           ) : (
@@ -403,6 +409,7 @@ export function RunDetail({ runId }: { runId: string }) {
           <span>
             Simulation in progress
             {sse.isConnected ? " — streaming live" : " — connecting..."}
+            {restData ? <> · {formatDuration(elapsedSince(restData.timestamp))}</> : null}
           </span>
           <button
             className="ml-auto rounded p-1 transition-colors hover:bg-yellow-200 dark:hover:bg-yellow-800/50"

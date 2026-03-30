@@ -38,6 +38,8 @@ class RunSummary(BaseModel):
     scenario_config: dict[str, Any]
     timestamp: datetime
     total_messages: int
+    total_cost_usd: float
+    duration_seconds: float
     status: RunStatus
     has_evaluation: bool
     run_dir: str
@@ -142,6 +144,8 @@ class RunDetailResponse(BaseModel):
     scenario_config: dict[str, Any]
     timestamp: datetime
     total_messages: int
+    total_cost_usd: float
+    duration_seconds: float
     status: RunStatus
     channel_ids: list[str]
     agents: list[AgentDetail]
@@ -293,6 +297,8 @@ class SSESimulationEnded(BaseModel):
     timestamp: datetime
     reason: RunStatus
     total_messages: int
+    total_cost_usd: float
+    duration_seconds: float
 
 
 class SSETokenDelta(BaseModel):

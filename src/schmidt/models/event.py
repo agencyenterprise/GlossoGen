@@ -124,11 +124,12 @@ class RunStatus(str, Enum):
 
 
 class SimulationEnded(EventBase):
-    """Emitted when the simulation finishes, recording termination reason and message count."""
+    """Emitted when the simulation finishes, with termination reason, message count, and cost."""
 
     event_type: Literal["simulation_ended"] = "simulation_ended"
     reason: RunStatus
     total_messages: int
+    total_cost_usd: float
 
 
 SimulationEvent = Annotated[
