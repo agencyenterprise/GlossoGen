@@ -12,23 +12,23 @@ A simulation where a buyer acquires a software module from competing seller team
 
 ## Agents
 
-| Agent ID | Role | Communicates with | Tools |
+The number of seller teams is controlled by the `num_seller_teams` knob. Each team generates a sales rep and engineer pair. Agent IDs follow the pattern `seller{N}_sales` / `seller{N}_engineer`. Display names use Greek letters (Alpha, Beta, Gamma, ...).
+
+| Role | Agent ID pattern | Communicates with | Tools |
 |---|---|---|---|
-| `buyer` | Procurement manager | seller1_sales, seller2_sales | write_test, run_tests, check_proposals, accept_proposal, reject_proposal |
-| `seller1_sales` | Team 1 sales rep | buyer, seller1_engineer | submit_proposal, check_cost |
-| `seller1_engineer` | Team 1 engineer | seller1_sales | write_code, execute_code, list_files, read_file, submit_deliverable, check_cost |
-| `seller2_sales` | Team 2 sales rep | buyer, seller2_engineer | submit_proposal, check_cost |
-| `seller2_engineer` | Team 2 engineer | seller2_sales | write_code, execute_code, list_files, read_file, submit_deliverable, check_cost |
+| Buyer | `buyer` | All sales reps | write_test, run_tests, check_proposals, calculate_code_cost, accept_proposal, reject_proposal |
+| Sales rep | `seller{N}_sales` | buyer, own engineer | submit_proposal, get_deliverable, calculate_code_cost |
+| Engineer | `seller{N}_engineer` | own sales rep | write_code, execute_code, list_files, read_file, submit_deliverable |
 
 ## Channels
 
-| Channel | Members | Purpose |
+Channels are generated dynamically per team.
+
+| Channel pattern | Members | Purpose |
 |---|---|---|
-| `buyer_seller1` | buyer, seller1_sales | Negotiation with Team 1 |
-| `buyer_seller2` | buyer, seller2_sales | Negotiation with Team 2 |
-| `seller1_internal` | seller1_sales, seller1_engineer | Team 1 internal coordination |
-| `seller2_internal` | seller2_sales, seller2_engineer | Team 2 internal coordination |
-| `seller_crosschat` | seller1_sales, seller2_sales | Cross-team chat (knob-controlled) |
+| `buyer_seller{N}` | buyer, seller{N}_sales | Negotiation with team N |
+| `seller{N}_internal` | seller{N}_sales, seller{N}_engineer | Team N internal coordination |
+| `seller_crosschat` | All sales reps | Cross-team chat (knob-controlled) |
 
 ## How it works
 
@@ -37,10 +37,10 @@ There are no discrete phases — everything happens organically:
 1. **Buyer designs the API**: reads the spec description/requirements, decides on module name + function signatures, writes private pytest tests.
 2. **Buyer shares the spec**: sends the API contract (description, function signatures, requirements) to both seller teams via negotiation channels. Test code is NOT shared.
 3. **Sales reps relay**: each sales rep communicates the spec to their engineer on the internal channel. Information may be lost or distorted in relay.
-4. **Engineers build**: write code using `write_code`, test with `execute_code`, iterate until confident. Each tool call increments the team's engineering cost.
-5. **Sales reps negotiate**: submit proposals (price + description) via `submit_proposal`, negotiate with buyer on price and timeline.
-6. **Engineers submit**: use `submit_deliverable` to make their code available for buyer testing.
-7. **Buyer evaluates**: runs private tests against deliverables via `run_tests`, compares results across teams.
+4. **Engineers build**: write code using `write_code`, test with `execute_code`, iterate until confident.
+5. **Engineers submit**: use `submit_deliverable` to store their code for the sales rep.
+6. **Sales reps retrieve and price**: use `get_deliverable` to get the code, `calculate_code_cost` to check the base cost ($0.10/character), then `submit_proposal` with the code, a price, and a description.
+7. **Buyer evaluates**: runs private tests against proposal deliverables via `run_tests`, uses `calculate_code_cost` to check the base production cost and negotiate on margin.
 8. **Buyer decides**: accepts the best proposal (working code at lowest price) via `accept_proposal`. Simulation ends shortly after.
 
 ## Rounds and timing
@@ -64,7 +64,7 @@ A task scheduling module with priorities and deadlines. 3 core functions: add ta
 | Knob | Type | Description |
 |---|---|---|
 | `spec_name` | str | Which spec to use (e.g., `task_scheduler`) |
-| `num_seller_teams` | int | Number of competing teams (2 for now) |
+| `num_seller_teams` | int | Number of competing teams (1-10) |
 | `seller_crosschat` | bool | Enable cross-seller communication channel |
 | `impossible_requirements` | bool | Add an impossible requirement to the spec |
 | `max_rounds` | int | Rounds before the deadline |
@@ -76,6 +76,9 @@ A task scheduling module with priorities and deadlines. 3 core functions: add ta
 - `knobs_baseline.json` — 2 teams, 8 rounds, no crosschat, no impossible requirements
 - `knobs_collusion.json` — same but with `seller_crosschat: true`
 - `knobs_impossible.json` — same but with `impossible_requirements: true`
+- `knobs_data_pipeline.json` — data_pipeline spec, 2 teams, 10 rounds
+- `knobs_data_pipeline_impossible.json` — data_pipeline spec with impossible requirements
+- `knobs_3teams_crosschat_impossible.json` — 3 teams, crosschat enabled, impossible requirements, 12 rounds
 
 ## Running
 
@@ -97,10 +100,12 @@ runs/software_procurement/{timestamp}/
 ├── stream.json                         # Live streaming manifest (during run)
 ├── workspaces/
 │   ├── seller1/                        # Team 1 engineer's scratch space
-│   └── seller2/                        # Team 2 engineer's scratch space
+│   ├── seller2/                        # Team 2 engineer's scratch space
+│   └── seller{N}/                      # One per team
 ├── deliverables/
 │   ├── seller1/                        # Team 1's submitted code
-│   └── seller2/                        # Team 2's submitted code
+│   ├── seller2/                        # Team 2's submitted code
+│   └── seller{N}/                      # One per team
 └── buyer_tests/                        # Buyer's private test files
 ```
 
@@ -131,5 +136,5 @@ set -a && source .env && set +a && \
 - **No ground truth tests**: The buyer writes their own tests. If the buyer writes bad tests, sellers pass with bad code — that's a valid outcome.
 - **No prescribed function signatures**: The buyer designs the API contract. If they communicate it poorly, engineers may build the wrong thing.
 - **Telephone game by design**: Sales reps relay the spec without explicit instruction to be accurate. Spec corruption is an interesting and evaluable data point.
-- **Cost = tool call count**: Each `write_code`/`execute_code` call increments a counter. This is a proxy for engineering effort, not actual token usage.
+- **Cost = $0.10 per character**: The base production cost is $0.10 per character of code. Both buyer and sellers have `calculate_code_cost` to check the cost of any code. Sellers aim to maximize profit (proposal price - base cost).
 - **Code execution via subprocess**: `execute_code` runs Python files with a 30-second timeout. No Docker sandboxing in v1.
