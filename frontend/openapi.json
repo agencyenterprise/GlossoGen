@@ -469,6 +469,50 @@
         "title": "DebugLogEntry",
         "description": "A single debug log entry from the simulation run."
       },
+      "EvalCostResponse": {
+        "properties": {
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "cache_read_input_tokens": {
+            "type": "integer",
+            "title": "Cache Read Input Tokens"
+          },
+          "cache_creation_input_tokens": {
+            "type": "integer",
+            "title": "Cache Creation Input Tokens"
+          },
+          "estimated_cost_usd": {
+            "type": "number",
+            "title": "Estimated Cost Usd"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "provider_name": {
+            "type": "string",
+            "title": "Provider Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_tokens",
+          "output_tokens",
+          "cache_read_input_tokens",
+          "cache_creation_input_tokens",
+          "estimated_cost_usd",
+          "model",
+          "provider_name"
+        ],
+        "title": "EvalCostResponse",
+        "description": "Evaluation cost summary for the run detail endpoint."
+      },
       "EvalMetricResponse": {
         "properties": {
           "evaluator_name": {
@@ -516,11 +560,22 @@
             },
             "type": "array",
             "title": "Metrics"
+          },
+          "evaluation_cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvalCostResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
-          "metrics"
+          "metrics",
+          "evaluation_cost"
         ],
         "title": "EvalReportResponse",
         "description": "Evaluation report for the run detail endpoint."

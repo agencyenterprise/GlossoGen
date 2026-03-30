@@ -222,6 +222,26 @@ export interface components {
             message: string;
         };
         /**
+         * EvalCostResponse
+         * @description Evaluation cost summary for the run detail endpoint.
+         */
+        EvalCostResponse: {
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Cache Read Input Tokens */
+            cache_read_input_tokens: number;
+            /** Cache Creation Input Tokens */
+            cache_creation_input_tokens: number;
+            /** Estimated Cost Usd */
+            estimated_cost_usd: number;
+            /** Model */
+            model: string;
+            /** Provider Name */
+            provider_name: string;
+        };
+        /**
          * EvalMetricResponse
          * @description Result of a single evaluator for the run detail endpoint.
          */
@@ -245,6 +265,7 @@ export interface components {
         EvalReportResponse: {
             /** Metrics */
             metrics: components["schemas"]["EvalMetricResponse"][];
+            evaluation_cost: components["schemas"]["EvalCostResponse"] | null;
         };
         /**
          * ForkRequest
