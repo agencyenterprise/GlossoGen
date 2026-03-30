@@ -9,8 +9,6 @@ from enum import Enum
 
 from pydantic import BaseModel
 
-from schmidt.scenarios.software_procurement.agent_ids import AGENT_TO_TEAM
-
 logger = logging.getLogger(__name__)
 
 
@@ -50,7 +48,7 @@ class SoftwareProcurementState:
     (one tool call at a time per agent).
     """
 
-    def __init__(self, team_ids: list[str]) -> None:
+    def __init__(self, team_ids: list[str], agent_to_team: dict[str, str]) -> None:
         self._teams: dict[str, TeamState] = {
             tid: TeamState(
                 team_id=tid,
@@ -60,12 +58,13 @@ class SoftwareProcurementState:
             )
             for tid in team_ids
         }
+        self._agent_to_team = agent_to_team
         self._accepted_team: str | None = None
         self._current_round = 1
 
     def get_team_for_agent(self, agent_id: str) -> str:
         """Resolve an agent ID to its team ID."""
-        team_id = AGENT_TO_TEAM.get(agent_id)
+        team_id = self._agent_to_team.get(agent_id)
         if team_id is None:
             raise ValueError(f"Agent {agent_id} is not part of any seller team")
         return team_id
