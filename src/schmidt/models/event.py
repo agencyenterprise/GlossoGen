@@ -56,6 +56,7 @@ class AgentRegistered(EventBase):
     channel_ids: list[str]
     tool_names: list[str]
     model: str
+    max_tokens: int
 
 
 class AgentConnected(EventBase):

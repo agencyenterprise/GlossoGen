@@ -232,6 +232,7 @@ class ProductLaunchScenario(SimulationScenario):
                 channel_ids=channel_ids,
                 tool_names=ROLE_TOOLS[agent_id],
                 model=default_model,
+                max_tokens=16384,
             )
             agent_configs_for_dm.append(config)
             agents.append(config)
@@ -289,6 +290,7 @@ class ProductLaunchScenario(SimulationScenario):
                 channel_ids=[],
                 tool_names=[],
                 model="",
+                max_tokens=0,
             )
             for aid in ALL_AGENT_IDS
         ]

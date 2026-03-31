@@ -26,6 +26,7 @@ from schmidt.runtime.activity_notification import NewMessagesNotification
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.game_clock import GameClock
 from schmidt.runtime.mcp_server import start_mcp_server
+from schmidt.runtime.mcp_tools import BASE_TOOL_NAMES
 from schmidt.runtime.simulation_state import SimulationRuntime
 from schmidt.scenario_protocol import SimulationScenario
 
@@ -38,15 +39,6 @@ MCP_SERVER_PATH = "/mcp"
 def _mcp_server_url(port: int) -> str:
     """Build the full MCP server URL for the given port."""
     return f"http://{MCP_SERVER_HOST}:{port}{MCP_SERVER_PATH}"
-
-
-BASE_TOOL_NAMES = [
-    "check_messages",
-    "read_channel",
-    "send_message",
-    "list_channels",
-    "get_channel_members",
-]
 
 
 class AutonomousSupervisor:
@@ -155,12 +147,18 @@ class AutonomousSupervisor:
                 reaction_delay_max=delay_max,
             )
 
+        # Build per-agent tool allowlists from scenario-specific tool_names.
+        agent_tool_allowlists: dict[str, frozenset[str]] = {
+            config.agent_id: frozenset(config.tool_names) for config in self._agent_configs
+        }
+
         # Build the simulation runtime (shared state) and store for error-path access.
         runtime = SimulationRuntime(
             scenario=self._scenario,
             channels=channels,
             event_logger=self._event_logger,
             agent_sessions=agent_sessions,
+            agent_tool_allowlists=agent_tool_allowlists,
         )
         self._runtime = runtime
 
@@ -211,7 +209,7 @@ class AutonomousSupervisor:
                 )
             )
             for config in self._agent_configs:
-                all_tool_names = BASE_TOOL_NAMES + config.tool_names
+                all_tool_names = [*BASE_TOOL_NAMES, *config.tool_names]
                 await self._event_logger.log(
                     event=AgentRegistered(
                         agent_id=config.agent_id,
@@ -220,6 +218,7 @@ class AutonomousSupervisor:
                         channel_ids=config.channel_ids,
                         tool_names=all_tool_names,
                         model=config.model,
+                        max_tokens=config.max_tokens,
                     )
                 )
 

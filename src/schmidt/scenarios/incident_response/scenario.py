@@ -187,6 +187,7 @@ class IncidentResponseScenario(SimulationScenario):
                     channel_ids=d.channel_ids,
                     tool_names=["send_message", "propose_resolution"],
                     model=default_model,
+                    max_tokens=16384,
                 )
             )
         return agents

@@ -84,3 +84,4 @@ agent_color  # unused variable — Pydantic field (PdfTurnGroup)
 turns  # unused variable — Pydantic field (PdfRoundGroup)
 export_run_pdf  # unused function — FastAPI route
 stop_reason  # unused variable — Pydantic field (LLMResponseReceived)
+_.__signature__  # unused attribute — set dynamically for FastMCP schema introspection
