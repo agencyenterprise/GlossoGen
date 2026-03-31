@@ -43,7 +43,7 @@ class GameClock:
         self._start_round = start_round
         self._last_injected_rounds = last_injected_rounds
         self._resuming = resuming
-        self._current_round = 0
+        self._current_round = self._start_round
         self._last_message_time = time.monotonic()
 
     def on_message_sent(self) -> None:

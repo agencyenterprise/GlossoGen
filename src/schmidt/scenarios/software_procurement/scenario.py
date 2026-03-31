@@ -23,7 +23,12 @@ from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulat
 from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel, ChannelTemplateEntry
-from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
+from schmidt.runtime.scenario_mcp_tool import (
+    ScenarioMcpTool,
+    ToolContext,
+    ToolReplayer,
+    resolve_agent_id,
+)
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.software_procurement.agent_ids import (
     BUYER_ID,
@@ -386,6 +391,7 @@ class SoftwareProcurementScenario(SimulationScenario):
                 name="write_code",
                 description="Write a Python file to your team's workspace.",
                 executor=_mcp_write_code(state=state, workspace=workspace),
+                replayer=_replay_write_code(state=state, workspace=workspace),
             ),
             ScenarioMcpTool(
                 name="execute_code",
@@ -422,6 +428,7 @@ class SoftwareProcurementScenario(SimulationScenario):
                     "and the full code text."
                 ),
                 executor=_mcp_submit_proposal(state=state, workspace=workspace),
+                replayer=_replay_submit_proposal(state=state, workspace=workspace),
             ),
             ScenarioMcpTool(
                 name="get_deliverable",
@@ -436,6 +443,7 @@ class SoftwareProcurementScenario(SimulationScenario):
                     "seller teams cannot see it."
                 ),
                 executor=_mcp_write_test(workspace=workspace),
+                replayer=_replay_write_test(workspace=workspace),
             ),
             ScenarioMcpTool(
                 name="run_tests",
@@ -800,3 +808,57 @@ def _mcp_calculate_code_cost() -> Callable[..., Awaitable[str]]:
         )
 
     return executor
+
+
+# ---------------------------------------------------------------------------
+# Fork replayer factories
+# ---------------------------------------------------------------------------
+
+
+def _replay_write_code(
+    state: SoftwareProcurementState,
+    workspace: WorkspaceManager,
+) -> ToolReplayer:
+    """Build a replayer that recreates write_code side effects during a fork."""
+
+    async def replayer(agent_id: str, arguments: dict[str, Any]) -> None:
+        team_id = state.get_team_for_agent(agent_id=agent_id)
+        await workspace.write_file(
+            team_id=team_id,
+            filename=arguments["filename"],
+            content=arguments["content"],
+        )
+
+    return replayer
+
+
+def _replay_write_test(
+    workspace: WorkspaceManager,
+) -> ToolReplayer:
+    """Build a replayer that recreates write_test side effects during a fork."""
+
+    async def replayer(agent_id: str, arguments: dict[str, Any]) -> None:
+        _ = agent_id
+        await workspace.write_buyer_test(
+            filename=arguments["filename"],
+            content=arguments["content"],
+        )
+
+    return replayer
+
+
+def _replay_submit_proposal(
+    state: SoftwareProcurementState,
+    workspace: WorkspaceManager,
+) -> ToolReplayer:
+    """Build a replayer that recreates submit_proposal file writes during a fork."""
+
+    async def replayer(agent_id: str, arguments: dict[str, Any]) -> None:
+        team_id = state.get_team_for_agent(agent_id=agent_id)
+        await workspace.write_deliverable(
+            team_id=team_id,
+            filename="deliverable.py",
+            code=arguments["code"],
+        )
+
+    return replayer

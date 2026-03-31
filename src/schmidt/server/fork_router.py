@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Request
 from schmidt.evaluation.log_reader import load_events
 from schmidt.fork_writer import write_fork_log
 from schmidt.message_rewind import build_rewind_state
+from schmidt.scenario_loader import get_scenario_class
 from schmidt.server.response_models import ForkRequest, ForkResponse
 from schmidt.server.run_discovery import discover_runs
 
@@ -113,6 +114,13 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
     }
     manifest_path = new_run_dir / "fork_manifest.json"
     manifest_path.write_bytes(orjson.dumps(manifest))
+
+    # Replay filesystem artifacts (workspace files, deliverables, tests) so the
+    # forked simulation has the same on-disk state as the original at the fork point.
+    truncated_events = await load_events(log_path=new_log_path)
+    scenario_cls = get_scenario_class(name=scenario_name)
+    scenario = scenario_cls.create_from_config(config=dict(matching[0].scenario_config))
+    await scenario.replay_artifacts(events=truncated_events, run_dir=new_run_dir)
 
     # Launch the forked simulation as a background subprocess.
     stdout_log = new_run_dir / f"{scenario_name}_stdout.log"

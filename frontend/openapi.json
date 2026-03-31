@@ -634,12 +634,18 @@
           "target_message_id": {
             "type": "string",
             "title": "Target Message Id"
+          },
+          "forked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Forked At"
           }
         },
         "type": "object",
         "required": [
           "source_run_id",
-          "target_message_id"
+          "target_message_id",
+          "forked_at"
         ],
         "title": "ForkSource",
         "description": "Provenance information for a forked simulation run."
@@ -1215,6 +1221,10 @@
               }
             ],
             "title": "Text"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
           }
         },
         "type": "object",
@@ -1223,7 +1233,8 @@
           "event_id",
           "timestamp",
           "agent_id",
-          "text"
+          "text",
+          "round_number"
         ],
         "title": "SSELLMResponseReceived",
         "description": "SSE event emitted when the LLM returns a response (reasoning text)."
@@ -1250,6 +1261,10 @@
           "is_final": {
             "type": "boolean",
             "title": "Is Final"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
           }
         },
         "type": "object",
@@ -1258,7 +1273,8 @@
           "agent_id",
           "channel_id",
           "text",
-          "is_final"
+          "is_final",
+          "round_number"
         ],
         "title": "SSEMessagePreview",
         "description": "SSE event for in-progress send_message text preview.\n\nTransient \u2014 not persisted to JSONL. The complete message arrives in a\nsubsequent SSEMessageSent event."
@@ -1281,6 +1297,10 @@
           },
           "message": {
             "$ref": "#/components/schemas/SSESimulationMessagePayload"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
           }
         },
         "type": "object",
@@ -1288,7 +1308,8 @@
           "event_type",
           "event_id",
           "timestamp",
-          "message"
+          "message",
+          "round_number"
         ],
         "title": "SSEMessageSent",
         "description": "SSE event emitted when an agent sends a message to a channel."
@@ -1482,6 +1503,10 @@
           "is_final": {
             "type": "boolean",
             "title": "Is Final"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
           }
         },
         "type": "object",
@@ -1489,7 +1514,8 @@
           "event_type",
           "agent_id",
           "text",
-          "is_final"
+          "is_final",
+          "round_number"
         ],
         "title": "SSETokenDelta",
         "description": "SSE event emitted token-by-token during LLM response streaming.\n\nTransient \u2014 not persisted to JSONL. The complete text arrives in a\nsubsequent SSELLMResponseReceived event."
@@ -1530,6 +1556,10 @@
           "result": {
             "type": "string",
             "title": "Result"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
           }
         },
         "type": "object",
@@ -1541,7 +1571,8 @@
           "tool_name",
           "call_id",
           "arguments",
-          "result"
+          "result",
+          "round_number"
         ],
         "title": "SSEToolResultReceived",
         "description": "SSE event emitted when a tool call completes and returns a result."

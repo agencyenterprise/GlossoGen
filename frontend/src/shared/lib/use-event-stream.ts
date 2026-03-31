@@ -13,7 +13,6 @@ type DebugLogEntry = components["schemas"]["DebugLogEntry"];
 
 type SSESimulationStarted = components["schemas"]["SSESimulationStarted"];
 type SSEAgentRegistered = components["schemas"]["SSEAgentRegistered"];
-type SSERoundAdvanced = components["schemas"]["SSERoundAdvanced"];
 type SSEMessageSent = components["schemas"]["SSEMessageSent"];
 type SSELLMResponseReceived = components["schemas"]["SSELLMResponseReceived"];
 type SSESimulationEnded = components["schemas"]["SSESimulationEnded"];
@@ -27,6 +26,7 @@ type SSEDebugLog = components["schemas"]["SSEDebugLog"];
 export interface PartialMessage {
   channelId: string;
   text: string;
+  roundNumber: number;
 }
 
 /** State returned by the useEventStream hook. */
@@ -47,10 +47,6 @@ export interface EventStreamState {
   partialMessages: Map<string, PartialMessage>;
   /** Map of agent_id -> current turn number. */
   agentTurns: Map<string, number>;
-  /** Map of agent_id -> current round number (from round_advanced events). */
-  agentRounds: Map<string, number>;
-  /** Global current round number from the latest round_advanced event. */
-  currentRound: number;
   /** Debug log entries received via SSE. */
   debugLogs: DebugLogEntry[];
   /** Total cost in USD from the simulation_ended event. */
@@ -72,7 +68,6 @@ export function useEventStream(
   enabled: boolean,
   knownEventIds: Set<string>,
   initialAgentTurns: Map<string, number>,
-  initialAgentRounds: Map<string, number>,
   initialMessageCount: number
 ): EventStreamState {
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
@@ -89,27 +84,19 @@ export function useEventStream(
   const [streamingAgentIds, setStreamingAgentIds] = useState<Set<string>>(new Set());
   const [partialMessages, setPartialMessages] = useState<Map<string, PartialMessage>>(new Map());
   const [agentTurns, setAgentTurns] = useState<Map<string, number>>(new Map());
-  const [agentRounds, setAgentRounds] = useState<Map<string, number>>(new Map());
-  const [currentRound, setCurrentRound] = useState(1);
   const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
 
   // Refs mirror the state for synchronous access inside event listeners.
-  // Seeded from REST data so SSE messages arriving before any round_advanced
-  // still get correct turn/round numbers.
   const agentTurnRef = useRef<Map<string, number>>(new Map());
-  const agentRoundRef = useRef<Map<string, number>>(new Map());
   // Global message counter used as fallback turn_number.
   const messageCounterRef = useRef(0);
-  // Global current round — fallback for agents not yet in agentRoundRef.
-  // Defaults to 1 because round 0 never exists in a simulation.
-  const currentRoundRef = useRef(1);
   const agentCostsRef = useRef<Map<string, number>>(new Map());
   const knownIdsRef = useRef(knownEventIds);
   useEffect(() => {
     knownIdsRef.current = knownEventIds;
   }, [knownEventIds]);
 
-  // Seed turn/round refs and message counter from REST data
+  // Seed turn refs and message counter from REST data
   useEffect(() => {
     messageCounterRef.current = initialMessageCount;
     if (initialAgentTurns.size > 0) {
@@ -118,17 +105,7 @@ export function useEventStream(
       }
       setAgentTurns(new Map(agentTurnRef.current));
     }
-    if (initialAgentRounds.size > 0) {
-      let maxRound = 0;
-      for (const [id, round] of initialAgentRounds) {
-        agentRoundRef.current.set(id, round);
-        if (round > maxRound) maxRound = round;
-      }
-      currentRoundRef.current = maxRound;
-      setCurrentRound(maxRound);
-      setAgentRounds(new Map(agentRoundRef.current));
-    }
-  }, [initialAgentTurns, initialAgentRounds, initialMessageCount]);
+  }, [initialAgentTurns, initialMessageCount]);
 
   // Buffer for batching token deltas via requestAnimationFrame
   const pendingDeltasRef = useRef<Map<string, string>>(new Map());
@@ -164,14 +141,10 @@ export function useEventStream(
     setStreamingAgentIds(new Set());
     setPartialMessages(new Map());
     setAgentTurns(new Map());
-    setAgentRounds(new Map());
-    setCurrentRound(1);
     setDebugLogs([]);
     agentTurnRef.current = new Map();
-    agentRoundRef.current = new Map();
     agentCostsRef.current = new Map();
     messageCounterRef.current = 0;
-    currentRoundRef.current = 1;
     pendingDeltasRef.current = new Map();
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
@@ -226,31 +199,11 @@ export function useEventStream(
       setAgents(prev => [...prev, agent]);
     });
 
-    // Round progression from game clock
-    eventSource.addEventListener("round_advanced", (e: MessageEvent) => {
-      const data: SSERoundAdvanced = JSON.parse(e.data);
-      if (knownIdsRef.current.has(data.event_id)) return;
-      currentRoundRef.current = data.round_number;
-      setCurrentRound(data.round_number);
-      // Update round for all known agents since autonomous mode has no per-agent turns
-      for (const agentId of agentRoundRef.current.keys()) {
-        agentRoundRef.current.set(agentId, data.round_number);
-      }
-      setAgentRounds(new Map(agentRoundRef.current));
-    });
-
     eventSource.addEventListener("message_sent", (e: MessageEvent) => {
       const data: SSEMessageSent = JSON.parse(e.data);
       if (knownIdsRef.current.has(data.event_id)) return;
       const msg = data.message;
 
-      // Ensure the agent exists in the round ref (autonomous mode agents
-      // may send before any round_advanced event lists them)
-      if (!agentRoundRef.current.has(msg.sender_agent_id)) {
-        agentRoundRef.current.set(msg.sender_agent_id, 1);
-      }
-
-      // Increment global counter (used as fallback turn_number in autonomous mode)
       messageCounterRef.current += 1;
 
       const channelMessage: ChannelMessage = {
@@ -260,7 +213,7 @@ export function useEventStream(
         text: msg.text,
         timestamp: msg.timestamp,
         turn_number: agentTurnRef.current.get(msg.sender_agent_id) ?? messageCounterRef.current,
-        round_number: agentRoundRef.current.get(msg.sender_agent_id) ?? currentRoundRef.current,
+        round_number: data.round_number,
       };
       setMessages(prev => [...prev, channelMessage]);
       setTotalMessages(prev => prev + 1);
@@ -287,7 +240,7 @@ export function useEventStream(
           text: data.text,
           timestamp: data.timestamp,
           turn_number: agentTurnRef.current.get(data.agent_id) ?? messageCounterRef.current,
-          round_number: agentRoundRef.current.get(data.agent_id) ?? currentRoundRef.current,
+          round_number: data.round_number,
           channel_ids: [],
         };
         setReasoning(prev => [...prev, entry]);
@@ -326,7 +279,7 @@ export function useEventStream(
           result: data.result,
           timestamp: data.timestamp,
           turn_number: agentTurnRef.current.get(data.agent_id) ?? messageCounterRef.current,
-          round_number: agentRoundRef.current.get(data.agent_id) ?? currentRoundRef.current,
+          round_number: data.round_number,
         };
         return [...prev, entry];
       });
@@ -394,9 +347,17 @@ export function useEventStream(
           const next = new Map(prev);
           const existing = next.get(agentId);
           if (existing) {
-            next.set(agentId, { channelId: existing.channelId, text: existing.text + data.text });
+            next.set(agentId, {
+              channelId: existing.channelId,
+              text: existing.text + data.text,
+              roundNumber: data.round_number,
+            });
           } else {
-            next.set(agentId, { channelId: data.channel_id, text: data.text });
+            next.set(agentId, {
+              channelId: data.channel_id,
+              text: data.text,
+              roundNumber: data.round_number,
+            });
           }
           return next;
         });
@@ -444,8 +405,6 @@ export function useEventStream(
     streamingAgentIds,
     partialMessages,
     agentTurns,
-    agentRounds,
-    currentRound,
     debugLogs,
     totalCostUsd,
     durationSeconds,
