@@ -116,7 +116,7 @@ class PersuasionAccuracyEvaluator(Evaluator):
 
         for event in events:
             if isinstance(event, RoundAdvanced):
-                current_round = event.new_round_number
+                current_round = event.round_number
 
             elif isinstance(event, LLMResponseReceived) and current_round > 0:
                 question_index = (current_round - 1) // 3

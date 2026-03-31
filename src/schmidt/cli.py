@@ -251,6 +251,7 @@ async def _run_simulation(
         runner_factory=_make_runner,
         resume_state=resume_state,
         run_id=run_id,
+        provider=args.provider,
     )
 
     json_handler, bus_log_handler = _setup_logging(

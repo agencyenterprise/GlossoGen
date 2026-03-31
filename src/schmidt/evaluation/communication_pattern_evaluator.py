@@ -29,13 +29,13 @@ def _build_round_map(events: list[SimulationEvent]) -> dict[int, int]:
     """Map event indices to round numbers from RoundAdvanced events.
 
     Returns a dict mapping the event list index of each RoundAdvanced to its
-    new_round_number, allowing subsequent MessageSent events to be attributed
+    round_number, allowing subsequent MessageSent events to be attributed
     to the most recent round.
     """
     round_map: dict[int, int] = {}
     for idx, event in enumerate(events):
         if isinstance(event, RoundAdvanced):
-            round_map[idx] = event.new_round_number
+            round_map[idx] = event.round_number
     return round_map
 
 

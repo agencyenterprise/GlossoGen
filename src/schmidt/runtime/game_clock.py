@@ -111,7 +111,7 @@ class GameClock:
 
         await self._event_logger.log(
             event=RoundAdvanced(
-                new_round_number=self._current_round,
+                round_number=self._current_round,
                 trigger=trigger,
             )
         )
@@ -125,11 +125,11 @@ class GameClock:
 
         await self._deliver_injections(round_number=self._current_round)
 
-    async def run(self) -> RunStatus:
-        """Run the game clock loop. Returns the termination status.
+    async def start_initial_round(self) -> None:
+        """Log the first round and deliver injections before agents start.
 
-        On fresh runs, logs ``RoundAdvanced`` and delivers round-1 injections.
-        On resumed runs, starts from ``start_round`` without re-delivering.
+        Must be called before launching agent tasks so that no events are
+        logged with round_number=0.
         """
         self._current_round = self._start_round
         self._last_message_time = time.monotonic()
@@ -144,7 +144,7 @@ class GameClock:
         else:
             await self._event_logger.log(
                 event=RoundAdvanced(
-                    new_round_number=self._current_round,
+                    round_number=self._current_round,
                     trigger="simulation_start",
                 )
             )
@@ -156,6 +156,11 @@ class GameClock:
                 self._max_rounds,
             )
 
+    async def run(self) -> RunStatus:
+        """Run the game clock polling loop. Returns the termination status.
+
+        Assumes ``start_initial_round`` has already been called.
+        """
         while True:
             await asyncio.sleep(IDLE_CHECK_INTERVAL_SECONDS)
 

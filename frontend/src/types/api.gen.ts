@@ -276,8 +276,6 @@ export interface components {
             target_message_id: string;
             /** Message Edits */
             message_edits: components["schemas"]["MessageEdit"][];
-            /** Model */
-            model: string;
         };
         /**
          * ForkResponse
@@ -383,6 +381,8 @@ export interface components {
             status: components["schemas"]["RunStatus"];
             /** Channel Ids */
             channel_ids: string[];
+            /** Provider */
+            provider: string;
             /** Agents */
             agents: components["schemas"]["AgentDetail"][];
             /** Messages */
@@ -444,6 +444,8 @@ export interface components {
             fork_source: components["schemas"]["ForkSource"] | null;
             /** Models */
             models: string[];
+            /** Provider */
+            provider: string;
         };
         /**
          * SSEAgentConnected

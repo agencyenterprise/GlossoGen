@@ -224,7 +224,7 @@ export function RunDetail({ runId }: { runId: string }) {
         text: pm.text,
         timestamp: new Date().toISOString(),
         turn_number: sse.agentTurns.get(agentId) ?? 0,
-        round_number: sse.agentRounds.get(agentId) ?? 0,
+        round_number: sse.agentRounds.get(agentId) ?? sse.currentRound,
         is_reasoning: false,
         is_tool_use: false,
         is_partial: true,
@@ -266,17 +266,13 @@ export function RunDetail({ runId }: { runId: string }) {
     setForkModalMessageId(targetMessageId);
   }, []);
 
-  const handleConfirmFork = useCallback(
-    (model: string) => {
-      if (!forkModalMessageId) return;
-      fork.forkMutation.mutate({
-        targetMessageId: forkModalMessageId,
-        model,
-      });
-      setForkModalMessageId(null);
-    },
-    [forkModalMessageId, fork.forkMutation]
-  );
+  const handleConfirmFork = useCallback(() => {
+    if (!forkModalMessageId) return;
+    fork.forkMutation.mutate({
+      targetMessageId: forkModalMessageId,
+    });
+    setForkModalMessageId(null);
+  }, [forkModalMessageId, fork.forkMutation]);
 
   if (isLoading) {
     return (
@@ -311,7 +307,6 @@ export function RunDetail({ runId }: { runId: string }) {
   const activeAgent = allAgents.find(a => a.agent_id === selectedAgent);
   const activeAgentColor = selectedAgent ? agentColorMap.get(selectedAgent) : undefined;
   const forkEnabled = effectiveStatus === "scenario_complete" || effectiveStatus === "error";
-  const defaultModel = allAgents[0]?.model ?? "";
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-4">
@@ -516,7 +511,6 @@ export function RunDetail({ runId }: { runId: string }) {
       {/* Fork confirmation modal */}
       {forkModalMessageId ? (
         <ForkModal
-          defaultModel={defaultModel}
           isPending={fork.forkMutation.isPending}
           onConfirm={handleConfirmFork}
           onCancel={() => setForkModalMessageId(null)}
@@ -527,35 +521,22 @@ export function RunDetail({ runId }: { runId: string }) {
 }
 
 function ForkModal({
-  defaultModel,
   isPending,
   onConfirm,
   onCancel,
 }: {
-  defaultModel: string;
   isPending: boolean;
-  onConfirm: (model: string) => void;
+  onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const [model, setModel] = useState(defaultModel);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-sm rounded-xl border border-border bg-background p-5 shadow-xl">
         <h3 className="mb-3 text-sm font-medium">Fork simulation</h3>
         <p className="mb-4 text-xs text-muted-foreground">
           A new simulation will start from the edited message with the channel history up to that
-          point.
+          point. The same model and provider from the source run will be used.
         </p>
-        <div className="mb-3 flex flex-col gap-2">
-          <label className="text-[11px] font-medium text-muted-foreground">Model</label>
-          <input
-            type="text"
-            value={model}
-            onChange={e => setModel(e.target.value)}
-            className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-        </div>
         <div className="flex justify-end gap-2">
           <button
             className="rounded-md border border-border px-3 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -566,7 +547,7 @@ function ForkModal({
           </button>
           <button
             className="rounded-md bg-foreground px-3 py-1 text-[12px] font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
-            onClick={() => onConfirm(model)}
+            onClick={onConfirm}
             disabled={isPending}
           >
             {isPending ? "Launching..." : "Launch fork"}

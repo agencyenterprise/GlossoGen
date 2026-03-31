@@ -596,17 +596,12 @@
             },
             "type": "array",
             "title": "Message Edits"
-          },
-          "model": {
-            "type": "string",
-            "title": "Model"
           }
         },
         "type": "object",
         "required": [
           "target_message_id",
-          "message_edits",
-          "model"
+          "message_edits"
         ],
         "title": "ForkRequest",
         "description": "Request body for creating a forked simulation run."
@@ -796,6 +791,10 @@
             "type": "array",
             "title": "Channel Ids"
           },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
           "agents": {
             "items": {
               "$ref": "#/components/schemas/AgentDetail"
@@ -864,6 +863,7 @@
           "duration_seconds",
           "status",
           "channel_ids",
+          "provider",
           "agents",
           "messages",
           "reasoning",
@@ -965,6 +965,10 @@
             },
             "type": "array",
             "title": "Models"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
           }
         },
         "type": "object",
@@ -981,7 +985,8 @@
           "has_evaluation",
           "run_dir",
           "fork_source",
-          "models"
+          "models",
+          "provider"
         ],
         "title": "RunSummary",
         "description": "Summary of a single simulation run for the runs list endpoint."

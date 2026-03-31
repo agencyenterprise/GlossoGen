@@ -121,6 +121,8 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
         run_dir=new_run_dir,
     )
     mcp_port = _find_free_port()
+    source_model = matching[0].models[0]
+    source_provider = matching[0].provider
     cmd = [
         sys.executable,
         "-m",
@@ -128,7 +130,9 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
         "run",
         scenario_name,
         "--model",
-        body.model,
+        source_model,
+        "--provider",
+        source_provider,
         "--mcp-port",
         str(mcp_port),
         "--resume",
