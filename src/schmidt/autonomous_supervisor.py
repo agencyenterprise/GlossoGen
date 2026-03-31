@@ -53,6 +53,7 @@ class AutonomousSupervisor:
         runner_factory: Callable[[], AgentRunner],
         resume_state: RewindState | None,
         run_id: str,
+        provider: str,
     ) -> None:
         self._scenario = scenario
         self._agent_configs = agent_configs
@@ -61,6 +62,7 @@ class AutonomousSupervisor:
         self._runner_factory = runner_factory
         self._resume_state = resume_state
         self._run_id = run_id
+        self._provider = provider
         self._runtime: SimulationRuntime | None = None
 
     async def run(self) -> None:
@@ -206,6 +208,7 @@ class AutonomousSupervisor:
                     scenario_description=self._scenario.scenario_description(),
                     channel_ids=[ch.channel_id for ch in channels],
                     scenario_config=self._scenario.get_scenario_config(),
+                    provider=self._provider,
                 )
             )
             for config in self._agent_configs:
@@ -244,6 +247,10 @@ class AutonomousSupervisor:
                 if context:
                     config.system_prompt = config.system_prompt + "\n\n" + context
 
+        # Log the initial round and deliver injections BEFORE launching agents
+        # so no events are recorded with round_number=0.
+        await game_clock.start_initial_round()
+
         # Launch one agent runner per agent as concurrent tasks.
         agent_tasks = []
         for config in self._agent_configs:
@@ -278,7 +285,7 @@ class AutonomousSupervisor:
                 )
             logger.info("Pushed wake-up notifications to %d agents", len(agent_sessions))
 
-        # Run the game clock until termination.
+        # Run the game clock polling loop until termination.
         game_clock_task = asyncio.create_task(
             game_clock.run(),
             name="game-clock",

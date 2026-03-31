@@ -28,6 +28,10 @@ def _parse_event(raw: dict[str, object]) -> SimulationEvent:
     """
     if raw.get("event_type") == "simulation_ended":
         raw.setdefault("total_cost_usd", 0.0)
+    if raw.get("event_type") == "simulation_started":
+        raw.setdefault("provider", "unknown")
+    if raw.get("event_type") == "round_advanced" and "new_round_number" in raw:
+        raw["round_number"] = raw.pop("new_round_number")
     if raw.get("event_type") == "agent_registered":
         raw.setdefault("max_tokens", 16384)
     return _EVENT_ADAPTER.validate_python(raw)

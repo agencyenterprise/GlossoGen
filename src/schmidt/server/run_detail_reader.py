@@ -162,6 +162,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     scenario_name = ""
     scenario_description = ""
     scenario_config: dict[str, object] = {}
+    provider = "unknown"
     timestamp = None
     channel_ids: list[str] = []
     agents: list[AgentDetail] = []
@@ -173,7 +174,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     duration_seconds = 0.0
     status = None
 
-    current_round = 0
+    current_round = 1
     tool_use_by_call_id: dict[str, ToolUseEntry] = {}
 
     for event in events:
@@ -182,6 +183,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             scenario_name = event.scenario_name
             scenario_description = event.scenario_description
             scenario_config = event.scenario_config
+            provider = event.provider
             timestamp = event.timestamp
             channel_ids = event.channel_ids
 
@@ -198,7 +200,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             )
 
         elif isinstance(event, RoundAdvanced):
-            current_round = event.new_round_number
+            current_round = event.round_number
 
         elif isinstance(event, LLMResponseReceived):
             # Create reasoning entry for text content
@@ -293,6 +295,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         duration_seconds=duration_seconds,
         status=status,
         channel_ids=channel_ids,
+        provider=provider,
         agents=agents,
         messages=messages,
         reasoning=reasoning,

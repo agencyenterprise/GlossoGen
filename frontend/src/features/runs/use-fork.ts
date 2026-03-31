@@ -44,7 +44,7 @@ export function useFork(runId: string) {
   }, []);
 
   const forkMutation = useMutation({
-    mutationFn: async ({ targetMessageId, model }: { targetMessageId: string; model: string }) => {
+    mutationFn: async ({ targetMessageId }: { targetMessageId: string }) => {
       const edits = [...pendingEdits.values()].map(e => ({
         message_id: e.messageId,
         new_text: e.newText,
@@ -55,7 +55,6 @@ export function useFork(runId: string) {
         body: {
           target_message_id: targetMessageId,
           message_edits: edits,
-          model,
         },
       });
       if (error) {

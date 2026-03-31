@@ -53,6 +53,8 @@ def _parse_event(raw_bytes: bytes) -> SimulationEvent:
     raw = orjson.loads(raw_bytes)  # positional-only parameter
     if raw.get("event_type") == "simulation_ended":
         raw.setdefault("total_cost_usd", 0.0)
+    if raw.get("event_type") == "simulation_started":
+        raw.setdefault("provider", "unknown")
     return _EVENT_ADAPTER.validate_python(raw)  # positional-only parameter
 
 
@@ -165,6 +167,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         run_dir=str(timestamp_dir),
                         fork_source=fork_source,
                         models=models,
+                        provider=first_event.provider,
                     )
                 )
             else:
@@ -190,6 +193,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         run_dir=str(timestamp_dir),
                         fork_source=fork_source,
                         models=models,
+                        provider=first_event.provider,
                     )
                 )
 

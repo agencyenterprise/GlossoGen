@@ -45,6 +45,7 @@ class RunSummary(BaseModel):
     run_dir: str
     fork_source: ForkSource | None
     models: list[str]
+    provider: str
 
 
 class RunListResponse(BaseModel):
@@ -162,6 +163,7 @@ class RunDetailResponse(BaseModel):
     duration_seconds: float
     status: RunStatus
     channel_ids: list[str]
+    provider: str
     agents: list[AgentDetail]
     messages: list[ChannelMessage]
     reasoning: list[ReasoningEntry]
@@ -188,7 +190,6 @@ class ForkRequest(BaseModel):
 
     target_message_id: str
     message_edits: list[MessageEdit]
-    model: str
 
 
 class ForkResponse(BaseModel):

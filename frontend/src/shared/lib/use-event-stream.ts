@@ -49,6 +49,8 @@ export interface EventStreamState {
   agentTurns: Map<string, number>;
   /** Map of agent_id -> current round number (from round_advanced events). */
   agentRounds: Map<string, number>;
+  /** Global current round number from the latest round_advanced event. */
+  currentRound: number;
   /** Debug log entries received via SSE. */
   debugLogs: DebugLogEntry[];
   /** Total cost in USD from the simulation_ended event. */
@@ -88,6 +90,7 @@ export function useEventStream(
   const [partialMessages, setPartialMessages] = useState<Map<string, PartialMessage>>(new Map());
   const [agentTurns, setAgentTurns] = useState<Map<string, number>>(new Map());
   const [agentRounds, setAgentRounds] = useState<Map<string, number>>(new Map());
+  const [currentRound, setCurrentRound] = useState(1);
   const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
 
   // Refs mirror the state for synchronous access inside event listeners.
@@ -98,7 +101,8 @@ export function useEventStream(
   // Global message counter used as fallback turn_number.
   const messageCounterRef = useRef(0);
   // Global current round — fallback for agents not yet in agentRoundRef.
-  const currentRoundRef = useRef(0);
+  // Defaults to 1 because round 0 never exists in a simulation.
+  const currentRoundRef = useRef(1);
   const agentCostsRef = useRef<Map<string, number>>(new Map());
   const knownIdsRef = useRef(knownEventIds);
   useEffect(() => {
@@ -121,6 +125,7 @@ export function useEventStream(
         if (round > maxRound) maxRound = round;
       }
       currentRoundRef.current = maxRound;
+      setCurrentRound(maxRound);
       setAgentRounds(new Map(agentRoundRef.current));
     }
   }, [initialAgentTurns, initialAgentRounds, initialMessageCount]);
@@ -160,12 +165,13 @@ export function useEventStream(
     setPartialMessages(new Map());
     setAgentTurns(new Map());
     setAgentRounds(new Map());
+    setCurrentRound(1);
     setDebugLogs([]);
     agentTurnRef.current = new Map();
     agentRoundRef.current = new Map();
     agentCostsRef.current = new Map();
     messageCounterRef.current = 0;
-    currentRoundRef.current = 0;
+    currentRoundRef.current = 1;
     pendingDeltasRef.current = new Map();
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
@@ -225,6 +231,7 @@ export function useEventStream(
       const data: SSERoundAdvanced = JSON.parse(e.data);
       if (knownIdsRef.current.has(data.event_id)) return;
       currentRoundRef.current = data.round_number;
+      setCurrentRound(data.round_number);
       // Update round for all known agents since autonomous mode has no per-agent turns
       for (const agentId of agentRoundRef.current.keys()) {
         agentRoundRef.current.set(agentId, data.round_number);
@@ -438,6 +445,7 @@ export function useEventStream(
     partialMessages,
     agentTurns,
     agentRounds,
+    currentRound,
     debugLogs,
     totalCostUsd,
     durationSeconds,
