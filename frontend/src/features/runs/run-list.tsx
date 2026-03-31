@@ -183,6 +183,12 @@ export function RunList() {
                     ) : null}
                   </span>
                   <span className="w-20 text-muted-foreground">{formatTime(run.timestamp)}</span>
+                  <span
+                    className="w-44 truncate text-muted-foreground"
+                    title={run.models.join(", ")}
+                  >
+                    {run.models.join(", ")}
+                  </span>
                   <span className="w-16 text-muted-foreground">{run.total_messages} msgs</span>
                   {run.total_cost_usd > 0 ? (
                     <span className="w-16 text-muted-foreground">

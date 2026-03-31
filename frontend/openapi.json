@@ -958,6 +958,13 @@
                 "type": "null"
               }
             ]
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
           }
         },
         "type": "object",
@@ -973,7 +980,8 @@
           "status",
           "has_evaluation",
           "run_dir",
-          "fork_source"
+          "fork_source",
+          "models"
         ],
         "title": "RunSummary",
         "description": "Summary of a single simulation run for the runs list endpoint."

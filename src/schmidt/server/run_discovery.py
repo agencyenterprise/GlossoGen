@@ -56,6 +56,25 @@ def _parse_event(raw_bytes: bytes) -> SimulationEvent:
     return _EVENT_ADAPTER.validate_python(raw)  # positional-only parameter
 
 
+async def _extract_models(file_path: Path) -> list[str]:
+    """Extract unique model names from AgentRegistered events at the start of a JSONL file."""
+    seen: dict[str, None] = {}
+    async with aiofiles.open(file_path, mode="rb") as f:
+        async for line in f:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            raw = orjson.loads(stripped)
+            event_type = raw.get("event_type")
+            if event_type == "agent_registered":
+                model = raw.get("model", "")
+                if model and model not in seen:
+                    seen[model] = None
+            elif event_type not in ("simulation_started", "agent_registered"):
+                break
+    return list(seen)
+
+
 async def _count_messages(file_path: Path) -> int:
     """Count MessageSent events in a JSONL file by parsing each line's event_type field."""
     count = 0
@@ -127,6 +146,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
             report_path = timestamp_dir / f"{scenario_name}_report.json"
             fork_source = _read_fork_source(run_dir=timestamp_dir)
             run_timestamp = _timestamp_from_dir(dir_name=timestamp_dir.name)
+            models = await _extract_models(file_path=jsonl_path)
 
             if isinstance(last_event, SimulationEnded):
                 duration_seconds = (last_event.timestamp - first_event.timestamp).total_seconds()
@@ -144,6 +164,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         has_evaluation=report_path.exists(),
                         run_dir=str(timestamp_dir),
                         fork_source=fork_source,
+                        models=models,
                     )
                 )
             else:
@@ -168,6 +189,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         has_evaluation=False,
                         run_dir=str(timestamp_dir),
                         fork_source=fork_source,
+                        models=models,
                     )
                 )
 
