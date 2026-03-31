@@ -1,7 +1,8 @@
 """Shared simulation state accessed by MCP tools and the game clock.
 
 Holds channel state, per-agent notification queues, per-channel write locks,
-and event logging. Does not define MCP tools — those live in ``mcp_tools``.
+per-agent tool authorization allowlists, and event logging. Does not define
+MCP tools — those live in ``mcp_tools``.
 """
 
 import asyncio
@@ -27,11 +28,13 @@ class SimulationRuntime:
         channels: list[Channel],
         event_logger: EventLogger,
         agent_sessions: dict[str, AgentSession],
+        agent_tool_allowlists: dict[str, frozenset[str]],
     ) -> None:
         self._scenario = scenario
         self._channel_router = ChannelRouter(channels=channels)
         self._event_logger = event_logger
         self._agent_sessions = agent_sessions
+        self._agent_tool_allowlists = agent_tool_allowlists
         self._channel_locks: dict[str, asyncio.Lock] = {
             ch.channel_id: asyncio.Lock() for ch in channels
         }
@@ -79,6 +82,13 @@ class SimulationRuntime:
         if session is None:
             raise ValueError(f"Unknown agent: {agent_id}")
         return session
+
+    def is_tool_allowed(self, agent_id: str, tool_name: str) -> bool:
+        """Check whether an agent is authorized to call a scenario tool."""
+        allowlist = self._agent_tool_allowlists.get(agent_id)
+        if allowlist is None:
+            return False
+        return tool_name in allowlist
 
     def broadcast_done(self, reason: str) -> None:
         """Push a done notification to all agents."""

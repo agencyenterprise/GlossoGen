@@ -28,6 +28,8 @@ def _parse_event(raw: dict[str, object]) -> SimulationEvent:
     """
     if raw.get("event_type") == "simulation_ended":
         raw.setdefault("total_cost_usd", 0.0)
+    if raw.get("event_type") == "agent_registered":
+        raw.setdefault("max_tokens", 16384)
     return _EVENT_ADAPTER.validate_python(raw)
 
 
@@ -59,6 +61,7 @@ def extract_agent_configs(events: list[SimulationEvent]) -> list[AgentConfig]:
                     channel_ids=event.channel_ids,
                     tool_names=event.tool_names,
                     model=event.model,
+                    max_tokens=event.max_tokens,
                 )
             )
     return configs

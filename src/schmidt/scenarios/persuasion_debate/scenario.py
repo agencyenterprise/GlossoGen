@@ -266,6 +266,7 @@ class PersuasionDebateScenario(SimulationScenario):
                         "submit_final_answer",
                     ],
                     model=model,
+                    max_tokens=16384,
                 )
             )
         return agents

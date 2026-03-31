@@ -267,6 +267,7 @@ class SoftwareProcurementScenario(SimulationScenario):
                     channel_ids=channel_ids,
                     tool_names=self._role_tools[agent_id],
                     model=model,
+                    max_tokens=16384,
                 )
             )
 

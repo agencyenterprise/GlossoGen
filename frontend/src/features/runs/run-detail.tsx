@@ -22,6 +22,7 @@ import { ChatPane } from "./chat-pane";
 import type { DisplayEntry } from "./display-entry";
 import { mergeEntries } from "./display-entry";
 import { EvalPanel } from "./eval-panel";
+import { ReasoningPanel } from "./reasoning-panel";
 import { ForkBadge } from "./fork-badge";
 import { elapsedSince, formatConfigValue, formatCost, formatDuration, humanize } from "./format";
 import { LogPanel } from "./log-panel";
@@ -37,6 +38,7 @@ export function RunDetail({ runId }: { runId: string }) {
   const [showDescription, setShowDescription] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showEvalPanel, setShowEvalPanel] = useState(true);
+  const [showReasoningPanel, setShowReasoningPanel] = useState(true);
   const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
@@ -208,34 +210,11 @@ export function RunDetail({ runId }: { runId: string }) {
     );
   }, [restData, sse.messages, sse.reasoning, sse.toolUse]);
 
-  // Build partial streaming entries for reasoning text and message previews
+  // Build partial streaming entries for message previews only.
+  // Reasoning partials are shown in the ReasoningPanel sidebar instead.
   const partialEntries: DisplayEntry[] = useMemo(() => {
     const entries: DisplayEntry[] = [];
 
-    // Reasoning text streaming — show all currently-streaming agents
-    for (const agentId of sse.streamingAgentIds) {
-      const text = sse.partialText.get(agentId);
-      if (text) {
-        entries.push({
-          message_id: `partial-reasoning-${agentId}`,
-          channel_id: "",
-          channel_ids: [],
-          sender_agent_id: agentId,
-          text,
-          timestamp: new Date().toISOString(),
-          turn_number: sse.agentTurns.get(agentId) ?? 0,
-          round_number: sse.agentRounds.get(agentId) ?? 0,
-          is_reasoning: true,
-          is_tool_use: false,
-          is_partial: true,
-          tool_name: "",
-          tool_arguments: {},
-          tool_result: null,
-        });
-      }
-    }
-
-    // Message preview streaming (send_message tool calls)
     for (const [agentId, pm] of sse.partialMessages) {
       entries.push({
         message_id: `partial-msg-${agentId}`,
@@ -256,13 +235,7 @@ export function RunDetail({ runId }: { runId: string }) {
     }
 
     return entries;
-  }, [
-    sse.streamingAgentIds,
-    sse.partialText,
-    sse.partialMessages,
-    sse.agentTurns,
-    sse.agentRounds,
-  ]);
+  }, [sse.partialMessages, sse.agentTurns, sse.agentRounds]);
 
   const allDisplayEntries = useMemo(
     () => [...displayEntries, ...partialEntries],
@@ -442,7 +415,7 @@ export function RunDetail({ runId }: { runId: string }) {
       <div
         className={cn(
           "relative grid h-[calc(100vh-120px)] min-h-[500px] overflow-hidden rounded-xl border border-border bg-background",
-          evaluation !== null && showEvalPanel
+          (evaluation !== null && showEvalPanel) || (isInProgress && showReasoningPanel)
             ? "grid-cols-[192px_1fr_280px]"
             : "grid-cols-[192px_1fr]"
         )}
@@ -477,7 +450,6 @@ export function RunDetail({ runId }: { runId: string }) {
             onSelectAgent={setSelectedAgent}
             highlightedMessageId={highlightedMessageId}
             highlightNonce={highlightNonce}
-            streamingAgentIds={sse.streamingAgentIds}
             forkEnabled={forkEnabled}
             editingMessageId={fork.editingMessageId}
             pendingEdits={fork.pendingEdits}
@@ -489,13 +461,31 @@ export function RunDetail({ runId }: { runId: string }) {
           />
         )}
 
-        {/* Eval panel */}
-        {evaluation !== null && showEvalPanel ? (
+        {/* Right panel: reasoning (in-progress) or eval (completed) */}
+        {isInProgress && showReasoningPanel ? (
+          <ReasoningPanel
+            agents={allAgents}
+            agentColorMap={agentColorMap}
+            streamingAgentIds={sse.streamingAgentIds}
+            partialText={sse.partialText}
+            onClose={() => setShowReasoningPanel(false)}
+          />
+        ) : null}
+        {!isInProgress && evaluation !== null && showEvalPanel ? (
           <EvalPanel evaluation={evaluation} onClose={() => setShowEvalPanel(false)} />
         ) : null}
 
-        {/* Eval panel toggle (when hidden) */}
-        {evaluation !== null && !showEvalPanel ? (
+        {/* Right panel toggle (when hidden) */}
+        {isInProgress && !showReasoningPanel ? (
+          <button
+            className="absolute right-2 top-12 z-10 rounded-md border border-border bg-background p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+            onClick={() => setShowReasoningPanel(true)}
+            title="Show reasoning panel"
+          >
+            <PanelRightOpen className="h-4 w-4" />
+          </button>
+        ) : null}
+        {!isInProgress && evaluation !== null && !showEvalPanel ? (
           <button
             className="absolute right-2 top-12 z-10 rounded-md border border-border bg-background p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
             onClick={() => setShowEvalPanel(true)}

@@ -24,8 +24,6 @@ interface ChatPaneProps {
   onSelectAgent: (agentId: string) => void;
   highlightedMessageId: string | null;
   highlightNonce: number;
-  /** Agent ID currently streaming a response. */
-  streamingAgentIds: Set<string>;
   /** Whether the fork editing UI is enabled (only for completed/errored runs). */
   forkEnabled: boolean;
   /** The message_id currently being edited, or null. */
@@ -114,7 +112,6 @@ export function ChatPane({
   onSelectAgent,
   highlightedMessageId,
   highlightNonce,
-  streamingAgentIds,
   forkEnabled,
   editingMessageId,
   pendingEdits,
@@ -457,16 +454,7 @@ export function ChatPane({
       </div>
 
       {/* Status bar */}
-      <div className="flex shrink-0 items-center justify-between border-t border-border px-4 py-1.5">
-        {streamingAgentIds.size > 0 ? (
-          <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
-            {[...streamingAgentIds].map(id => agentMap.get(id)?.role_name ?? id).join(", ")}{" "}
-            {streamingAgentIds.size === 1 ? "is" : "are"} typing...
-          </span>
-        ) : (
-          <span />
-        )}
+      <div className="flex shrink-0 items-center justify-center border-t border-border px-4 py-1.5">
         {isAtBottom ? (
           <span className="text-[11px] text-muted-foreground">Auto-scroll enabled</span>
         ) : (

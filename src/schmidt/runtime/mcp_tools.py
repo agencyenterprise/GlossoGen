@@ -2,11 +2,16 @@
 
 Registers tools on a FastMCP server that agents call to interact with the
 shared simulation world. Agent identity is resolved from the MCP connection
-context (HTTP query parameter), not from tool arguments.
+context (HTTP query parameter), not from tool arguments. Scenario-specific
+tools are wrapped with an authorization guard that checks the per-agent
+allowlist in ``SimulationRuntime`` before dispatching.
 """
 
 import asyncio
+import functools
+import inspect
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -18,12 +23,12 @@ from schmidt.models.mcp_responses import ChannelMessage, SendMessageResult
 from schmidt.models.message import SimulationMessage
 from schmidt.runtime.activity_notification import NewMessagesNotification
 from schmidt.runtime.agent_session import AgentSession
-from schmidt.runtime.scenario_mcp_tool import ToolContext
+from schmidt.runtime.scenario_mcp_tool import ToolContext, resolve_agent_id
 from schmidt.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
 
-HIDDEN_TOOL_NAMES: frozenset[str] = frozenset(
+BASE_TOOL_NAMES: frozenset[str] = frozenset(
     {
         "check_messages",
         "read_channel",
@@ -32,9 +37,15 @@ HIDDEN_TOOL_NAMES: frozenset[str] = frozenset(
         "get_channel_members",
     }
 )
-"""Tool names filtered out of the frontend timeline.
+"""Base communication tools available to all agents unconditionally.
 
-Base communication tools whose effects are visible as chat messages."""
+These are always visible in ``tools/list`` and exempt from the per-agent
+authorization guard. Also used as ``HIDDEN_TOOL_NAMES`` — filtered out of
+the frontend timeline because their effects are visible as chat messages.
+"""
+
+HIDDEN_TOOL_NAMES: frozenset[str] = BASE_TOOL_NAMES
+"""Tool names filtered out of the frontend timeline."""
 
 
 def _resolve_agent_from_context(ctx: ToolContext, runtime: SimulationRuntime) -> AgentSession:
@@ -58,6 +69,41 @@ def _resolve_agent_from_context(ctx: ToolContext, runtime: SimulationRuntime) ->
             f"on MCP connection URL. Request path: {request.url.path}"
         )
     return runtime.resolve_session(agent_id=agent_id)
+
+
+def _build_guarded_executor(
+    tool_name: str,
+    original_executor: Callable[..., Awaitable[str]],
+    runtime: SimulationRuntime,
+) -> Callable[..., Awaitable[str]]:
+    """Wrap a scenario tool executor with a per-agent authorization check.
+
+    The returned wrapper resolves the calling agent's identity from the MCP
+    request context, then checks ``runtime.is_tool_allowed()`` before
+    delegating to the original executor. Unauthorized calls raise a
+    ``ValueError`` that FastMCP surfaces as a tool error to the agent.
+
+    The wrapper preserves the original function's signature so that
+    FastMCP can introspect parameter names and types for the tool schema.
+    """
+
+    @functools.wraps(original_executor)
+    async def _guarded(*args: Any, **kwargs: Any) -> str:
+        ctx_arg: ToolContext = kwargs.get("ctx") or args[0]
+        agent_id = resolve_agent_id(ctx=ctx_arg)
+        if not runtime.is_tool_allowed(agent_id=agent_id, tool_name=tool_name):
+            logger.warning(
+                "Agent %s unauthorized call to tool %s",
+                agent_id,
+                tool_name,
+            )
+            raise ValueError(f"Agent '{agent_id}' is not authorized to call tool '{tool_name}'")
+        return await original_executor(*args, **kwargs)
+
+    # Preserve the original signature so FastMCP generates the correct
+    # JSON schema for the tool's parameters.
+    _guarded.__signature__ = inspect.signature(original_executor)  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+    return _guarded
 
 
 def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
@@ -296,11 +342,17 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
             for mid in member_ids
         ]
 
-    # Register scenario-specific tools. Executors accept ctx: ToolContext
-    # directly; FastMCP auto-injects it and hides it from the tool schema.
+    # Register scenario-specific tools with an authorization guard.
+    # Each executor is wrapped so that only agents whose allowlist
+    # includes the tool name can invoke it.
     for scenario_tool in runtime.scenario.get_mcp_tools():
+        guarded = _build_guarded_executor(
+            tool_name=scenario_tool.name,
+            original_executor=scenario_tool.executor,
+            runtime=runtime,
+        )
         mcp.tool(
             name=scenario_tool.name,
             description=scenario_tool.description,
-        )(scenario_tool.executor)
+        )(guarded)
         logger.info("Registered scenario MCP tool: %s", scenario_tool.name)
