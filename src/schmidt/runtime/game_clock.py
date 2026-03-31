@@ -18,6 +18,7 @@ from schmidt.scenario_protocol import SimulationScenario
 logger = logging.getLogger(__name__)
 
 IDLE_CHECK_INTERVAL_SECONDS = 0.5
+MIN_ROUND_DURATION_SECONDS = 5.0
 
 
 class GameClock:
@@ -84,7 +85,7 @@ class GameClock:
                 round_number=round_number,
                 agent_id=agent_id,
             )
-            if injection_text is None:
+            if not injection_text:
                 continue
 
             session.push_notification(
@@ -165,7 +166,8 @@ class GameClock:
                 )
                 return RunStatus.SCENARIO_COMPLETE
 
-            if self._all_agents_idle():
+            round_age = time.monotonic() - self._last_message_time
+            if self._all_agents_idle() and round_age >= MIN_ROUND_DURATION_SECONDS:
                 trigger = "all_agents_idle"
             elif self._round_timed_out():
                 elapsed = time.monotonic() - self._last_message_time

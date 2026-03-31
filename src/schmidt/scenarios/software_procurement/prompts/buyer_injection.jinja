@@ -1,4 +1,6 @@
-{% if round_number == max_rounds %}
+{% if round_number == 1 %}
+The seller teams are online and waiting. Design your API contract, write your private test suite, and share the specification with all seller teams now.
+{% elif round_number == max_rounds %}
 This is the final round. You must make a decision now. Accept the best available solution or the project will be cancelled. If no team has submitted a working deliverable, reject all and report project failure.
 {% elif progress >= 0.75 %}
 URGENT: The project deadline is in {{ remaining }} rounds. If you haven't found a satisfactory vendor yet, you need to decide very soon. Management is asking for a final decision.

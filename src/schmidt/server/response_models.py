@@ -341,6 +341,18 @@ class SSEMessagePreview(BaseModel):
     is_final: bool
 
 
+class SSEAgentCostUpdated(BaseModel):
+    """SSE event carrying an agent's cumulative cost after each run cycle.
+
+    Transient — not persisted to JSONL. The final total arrives in
+    ``SSESimulationEnded``.
+    """
+
+    event_type: Literal["agent_cost_updated"]
+    agent_id: str
+    cumulative_cost_usd: float
+
+
 class SSEDebugLog(BaseModel):
     """SSE event for a real-time debug log entry from the simulation process."""
 
@@ -364,6 +376,7 @@ SSEEvent = Annotated[
         SSESimulationEnded,
         SSETokenDelta,
         SSEMessagePreview,
+        SSEAgentCostUpdated,
         SSEDebugLog,
     ],
     Discriminator("event_type"),

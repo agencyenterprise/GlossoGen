@@ -34,7 +34,8 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `scenario_mcp_tool.py` — ScenarioMcpTool for scenario-specific tool registration
 - `src/schmidt/runners/` — autonomous mode agent runners:
   - `agent_runner_base.py` — abstract base class for agent runners
-  - `claude_code_runner.py` — Claude Code agent runner via Agent SDK
+  - `pydantic_ai_runner.py` — Pydantic AI agent runner via pydantic-ai framework
+  - `communication_protocol.py` — shared prompts and constants for the agent communication protocol
 - `src/schmidt/autonomous_supervisor.py` — autonomous mode orchestrator (supports resume via `RewindState`)
 - `src/schmidt/message_rewind.py` — reconstructs simulation state at any message for fork/resume
 - `src/schmidt/fork_writer.py` — writes truncated+edited JSONL for forked runs
@@ -124,22 +125,23 @@ runs/{scenario_name}/{unix_timestamp}/
 
 ## Running Simulations
 
-Agents run as independent Claude Code processes connected via MCP. A game clock manages round progression. Always run simulations as a background process, piping all output to a log file.
+Agents connect to a shared MCP server via the Pydantic AI framework. A game clock manages round progression. Always run simulations as a background process, piping all output to a log file.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
-  --model <model> --runs-dir ./runs \
+  --model <model> --provider <provider> --runs-dir ./runs \
   <scenario-specific flags> \
   > ./runs/<scenario>_stdout.log 2>&1 &
 ```
 
+Required flags: `--model`, `--provider` (`anthropic`, `openai`, `google-gla`, `ollama`), `--runs-dir`.
 Optional flags: `--mcp-port` (default: 8001), `--max-agent-turns` (default: 200).
 
 The `incident_response` scenario requires `--max-round-duration`:
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-  --model claude-sonnet-4-20250514 --runs-dir ./runs \
+  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
   --max-round-duration 120 \
   > ./runs/incident_response_stdout.log 2>&1 &
 ```
@@ -148,7 +150,7 @@ The `car_recall` scenario uses a `--knobs` flag:
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-  --model <model> --runs-dir ./runs \
+  --model <model> --provider <provider> --runs-dir ./runs \
   --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
 ```
@@ -157,7 +159,7 @@ The `product_launch` scenario also uses `--knobs`:
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
-  --model <model> --runs-dir ./runs \
+  --model <model> --provider <provider> --runs-dir ./runs \
   --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
   > ./runs/product_launch_stdout.log 2>&1 &
 ```
@@ -166,7 +168,7 @@ The `software_procurement` scenario uses `--knobs` to configure team count, cros
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run software_procurement \
-  --model <model> --runs-dir ./runs \
+  --model <model> --provider <provider> --runs-dir ./runs \
   --knobs src/schmidt/scenarios/software_procurement/knobs_data_pipeline_impossible.json \
   > ./runs/software_procurement_stdout.log 2>&1 &
 ```
@@ -183,7 +185,7 @@ If a simulation errors midway through, resume from the last checkpoint using the
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
-  --model <model> --runs-dir ./runs \
+  --model <model> --provider <provider> --runs-dir ./runs \
   --resume ./runs/<scenario>/<timestamp> \
   <scenario-specific flags like --knobs> \
   > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &

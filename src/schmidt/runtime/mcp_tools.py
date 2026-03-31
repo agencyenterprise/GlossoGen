@@ -30,14 +30,11 @@ HIDDEN_TOOL_NAMES: frozenset[str] = frozenset(
         "send_message",
         "list_channels",
         "get_channel_members",
-        "ToolSearch",
     }
 )
 """Tool names filtered out of the frontend timeline.
 
-Includes base communication tools (whose effects are visible as chat messages)
-and Claude Code SDK infrastructure tools (like ToolSearch).
-"""
+Base communication tools whose effects are visible as chat messages."""
 
 
 def _resolve_agent_from_context(ctx: ToolContext, runtime: SimulationRuntime) -> AgentSession:

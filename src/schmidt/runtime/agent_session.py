@@ -81,11 +81,12 @@ class AgentSession:
         was previously consumed), returns a ``DoneNotification`` immediately
         without blocking.
         """
-        self.is_idle = True
         if self._terminated and self._queue.empty():
             logger.debug("Agent %s already terminated, returning done immediately", self.agent_id)
             return DoneNotification(reason=self._done_reason)
-        logger.debug("Agent %s is now idle, waiting for notification", self.agent_id)
+        if self._queue.empty():
+            self.is_idle = True
+            logger.debug("Agent %s is now idle, waiting for notification", self.agent_id)
         notification = await self._queue.get()
         self.is_idle = False
         logger.debug(

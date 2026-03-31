@@ -464,6 +464,24 @@ export interface components {
             agent_id: string;
         };
         /**
+         * SSEAgentCostUpdated
+         * @description SSE event carrying an agent's cumulative cost after each run cycle.
+         *
+         *     Transient — not persisted to JSONL. The final total arrives in
+         *     ``SSESimulationEnded``.
+         */
+        SSEAgentCostUpdated: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "agent_cost_updated";
+            /** Agent Id */
+            agent_id: string;
+            /** Cumulative Cost Usd */
+            cumulative_cost_usd: number;
+        };
+        /**
          * SSEAgentRegistered
          * @description SSE event emitted when an agent joins the simulation.
          */
@@ -931,7 +949,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEAgentCostUpdated"] | components["schemas"]["SSEDebugLog"];
                 };
             };
             /** @description Validation Error */
