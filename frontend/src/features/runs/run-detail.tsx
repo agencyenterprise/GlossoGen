@@ -212,19 +212,19 @@ export function RunDetail({ runId }: { runId: string }) {
   const partialEntries: DisplayEntry[] = useMemo(() => {
     const entries: DisplayEntry[] = [];
 
-    // Reasoning text streaming
-    if (sse.streamingAgentId) {
-      const text = sse.partialText.get(sse.streamingAgentId);
+    // Reasoning text streaming — show all currently-streaming agents
+    for (const agentId of sse.streamingAgentIds) {
+      const text = sse.partialText.get(agentId);
       if (text) {
         entries.push({
-          message_id: `partial-reasoning-${sse.streamingAgentId}`,
+          message_id: `partial-reasoning-${agentId}`,
           channel_id: "",
           channel_ids: [],
-          sender_agent_id: sse.streamingAgentId,
+          sender_agent_id: agentId,
           text,
           timestamp: new Date().toISOString(),
-          turn_number: sse.agentTurns.get(sse.streamingAgentId) ?? 0,
-          round_number: sse.agentRounds.get(sse.streamingAgentId) ?? 0,
+          turn_number: sse.agentTurns.get(agentId) ?? 0,
+          round_number: sse.agentRounds.get(agentId) ?? 0,
           is_reasoning: true,
           is_tool_use: false,
           is_partial: true,
@@ -256,14 +256,21 @@ export function RunDetail({ runId }: { runId: string }) {
     }
 
     return entries;
-  }, [sse.streamingAgentId, sse.partialText, sse.partialMessages, sse.agentTurns, sse.agentRounds]);
+  }, [
+    sse.streamingAgentIds,
+    sse.partialText,
+    sse.partialMessages,
+    sse.agentTurns,
+    sse.agentRounds,
+  ]);
 
   const allDisplayEntries = useMemo(
     () => [...displayEntries, ...partialEntries],
     [displayEntries, partialEntries]
   );
 
-  const totalMessages = sse.totalMessages > 0 ? sse.totalMessages : (restData?.total_messages ?? 0);
+  const channelMessages = displayEntries.filter(e => !e.is_reasoning && !e.is_tool_use).length;
+  const timelineEntries = displayEntries.length;
   const totalCostUsd = sse.totalCostUsd > 0 ? sse.totalCostUsd : (restData?.total_cost_usd ?? 0);
   const durationSeconds =
     sse.durationSeconds > 0 ? sse.durationSeconds : (restData?.duration_seconds ?? 0);
@@ -362,7 +369,8 @@ export function RunDetail({ runId }: { runId: string }) {
           </button>
         </span>
         <span className="text-[13px] text-muted-foreground">
-          {maxRound} rounds · {totalMessages} messages · {allAgents.length} agents
+          {maxRound} rounds · {channelMessages} messages · {timelineEntries} events ·{" "}
+          {allAgents.length} agents
           {totalCostUsd > 0 ? <> · {formatCost(totalCostUsd)}</> : null}
           {durationSeconds > 0 ? <> · {formatDuration(durationSeconds)}</> : null}
           {" · "}
@@ -469,7 +477,7 @@ export function RunDetail({ runId }: { runId: string }) {
             onSelectAgent={setSelectedAgent}
             highlightedMessageId={highlightedMessageId}
             highlightNonce={highlightNonce}
-            streamingAgentId={sse.streamingAgentId}
+            streamingAgentIds={sse.streamingAgentIds}
             forkEnabled={forkEnabled}
             editingMessageId={fork.editingMessageId}
             pendingEdits={fork.pendingEdits}

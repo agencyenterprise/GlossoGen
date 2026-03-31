@@ -16,7 +16,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "mcp>=1.0.0",
-    "claude-agent-sdk>=0.1.0; sys_platform == 'darwin'",
+    "pydantic-ai>=0.2.0",
     "openai>=2.29.0",
     "datasets>=3.0.0",
     "httpx>=0.28.1",
@@ -61,10 +61,6 @@ python_version = "3.12"
 strict = true
 mypy_path = "src"
 explicit_package_bases = true
-
-[[tool.mypy.overrides]]
-module = "claude_agent_sdk.*"
-ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100

@@ -20,6 +20,7 @@ type SSESimulationEnded = components["schemas"]["SSESimulationEnded"];
 type SSETokenDelta = components["schemas"]["SSETokenDelta"];
 type SSEMessagePreview = components["schemas"]["SSEMessagePreview"];
 type SSEToolResultReceived = components["schemas"]["SSEToolResultReceived"];
+type SSEAgentCostUpdated = components["schemas"]["SSEAgentCostUpdated"];
 type SSEDebugLog = components["schemas"]["SSEDebugLog"];
 
 /** Partial message being composed by an agent. */
@@ -40,8 +41,8 @@ export interface EventStreamState {
   isConnected: boolean;
   /** Map of agent_id -> partial text for in-progress LLM responses (reasoning). */
   partialText: Map<string, string>;
-  /** Agent ID currently generating a response. */
-  streamingAgentId: string | null;
+  /** Set of agent IDs currently generating responses. */
+  streamingAgentIds: Set<string>;
   /** Map of agent_id -> partial message for in-progress send_message tool calls. */
   partialMessages: Map<string, PartialMessage>;
   /** Map of agent_id -> current turn number. */
@@ -83,7 +84,7 @@ export function useEventStream(
   const [status, setStatus] = useState<RunStatus | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [partialText, setPartialText] = useState<Map<string, string>>(new Map());
-  const [streamingAgentId, setStreamingAgentId] = useState<string | null>(null);
+  const [streamingAgentIds, setStreamingAgentIds] = useState<Set<string>>(new Set());
   const [partialMessages, setPartialMessages] = useState<Map<string, PartialMessage>>(new Map());
   const [agentTurns, setAgentTurns] = useState<Map<string, number>>(new Map());
   const [agentRounds, setAgentRounds] = useState<Map<string, number>>(new Map());
@@ -98,6 +99,7 @@ export function useEventStream(
   const messageCounterRef = useRef(0);
   // Global current round — fallback for agents not yet in agentRoundRef.
   const currentRoundRef = useRef(0);
+  const agentCostsRef = useRef<Map<string, number>>(new Map());
   const knownIdsRef = useRef(knownEventIds);
   useEffect(() => {
     knownIdsRef.current = knownEventIds;
@@ -154,13 +156,14 @@ export function useEventStream(
     setTotalMessages(0);
     setStatus(null);
     setPartialText(new Map());
-    setStreamingAgentId(null);
+    setStreamingAgentIds(new Set());
     setPartialMessages(new Map());
     setAgentTurns(new Map());
     setAgentRounds(new Map());
     setDebugLogs([]);
     agentTurnRef.current = new Map();
     agentRoundRef.current = new Map();
+    agentCostsRef.current = new Map();
     messageCounterRef.current = 0;
     currentRoundRef.current = 0;
     pendingDeltasRef.current = new Map();
@@ -255,22 +258,14 @@ export function useEventStream(
       setMessages(prev => [...prev, channelMessage]);
       setTotalMessages(prev => prev + 1);
 
-      // Clear partial text and message preview for this agent
-      setPartialText(prev => {
-        if (!prev.has(msg.sender_agent_id)) return prev;
-        const next = new Map(prev);
-        next.delete(msg.sender_agent_id);
-        return next;
-      });
+      // Clear message preview for this agent (the message was sent successfully).
+      // Do NOT clear partialText or streamingAgentIds — the agent may still be
+      // streaming reasoning for subsequent tool calls within the same run cycle.
       setPartialMessages(prev => {
         if (!prev.has(msg.sender_agent_id)) return prev;
         const next = new Map(prev);
         next.delete(msg.sender_agent_id);
         return next;
-      });
-      setStreamingAgentId(prev => {
-        if (prev === msg.sender_agent_id) return null;
-        return prev;
       });
     });
 
@@ -298,9 +293,11 @@ export function useEventStream(
         next.delete(data.agent_id);
         return next;
       });
-      setStreamingAgentId(prev => {
-        if (prev === data.agent_id) return null;
-        return prev;
+      setStreamingAgentIds(prev => {
+        if (!prev.has(data.agent_id)) return prev;
+        const next = new Set(prev);
+        next.delete(data.agent_id);
+        return next;
       });
     });
 
@@ -350,12 +347,19 @@ export function useEventStream(
           next.delete(agentId);
           return next;
         });
-        setStreamingAgentId(prev => {
-          if (prev === agentId) return null;
-          return prev;
+        setStreamingAgentIds(prev => {
+          if (!prev.has(agentId)) return prev;
+          const next = new Set(prev);
+          next.delete(agentId);
+          return next;
         });
       } else {
-        setStreamingAgentId(agentId);
+        setStreamingAgentIds(prev => {
+          if (prev.has(agentId)) return prev;
+          const next = new Set(prev);
+          next.add(agentId);
+          return next;
+        });
         const pending = pendingDeltasRef.current;
         const existing = pending.get(agentId) ?? "";
         pending.set(agentId, existing + data.text);
@@ -392,6 +396,17 @@ export function useEventStream(
       }
     });
 
+    eventSource.addEventListener("agent_cost_updated", (e: MessageEvent) => {
+      const data: SSEAgentCostUpdated = JSON.parse(e.data);
+      const costs = agentCostsRef.current;
+      costs.set(data.agent_id, data.cumulative_cost_usd);
+      let sum = 0;
+      for (const v of costs.values()) {
+        sum += v;
+      }
+      setTotalCostUsd(sum);
+    });
+
     eventSource.addEventListener("debug_log", (e: MessageEvent) => {
       const data: SSEDebugLog = JSON.parse(e.data);
       const entry: DebugLogEntry = {
@@ -419,7 +434,7 @@ export function useEventStream(
     status,
     isConnected,
     partialText,
-    streamingAgentId,
+    streamingAgentIds,
     partialMessages,
     agentTurns,
     agentRounds,
