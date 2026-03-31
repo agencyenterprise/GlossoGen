@@ -127,10 +127,9 @@ runs/{scenario_name}/{unix_timestamp}/
 Agents run as independent Claude Code processes connected via MCP. A game clock manages round progression. Always run simulations as a background process, piping all output to a log file.
 
 ```bash
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
-    --model <model> --runs-dir ./runs \
-    <scenario-specific flags> \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
+  --model <model> --runs-dir ./runs \
+  <scenario-specific flags> \
   > ./runs/<scenario>_stdout.log 2>&1 &
 ```
 
@@ -139,40 +138,36 @@ Optional flags: `--mcp-port` (default: 8001), `--max-agent-turns` (default: 200)
 The `incident_response` scenario requires `--max-round-duration`:
 
 ```bash
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-    --model claude-sonnet-4-20250514 --runs-dir ./runs \
-    --max-round-duration 120 \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
+  --model claude-sonnet-4-20250514 --runs-dir ./runs \
+  --max-round-duration 120 \
   > ./runs/incident_response_stdout.log 2>&1 &
 ```
 
 The `car_recall` scenario uses a `--knobs` flag:
 
 ```bash
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-    --model <model> --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
+  --model <model> --runs-dir ./runs \
+  --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
 ```
 
 The `product_launch` scenario also uses `--knobs`:
 
 ```bash
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
-    --model <model> --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
+  --model <model> --runs-dir ./runs \
+  --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
   > ./runs/product_launch_stdout.log 2>&1 &
 ```
 
 The `software_procurement` scenario uses `--knobs` to configure team count, crosschat, and impossible requirements:
 
 ```bash
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run software_procurement \
-    --model <model> --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/software_procurement/knobs_data_pipeline_impossible.json \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run software_procurement \
+  --model <model> --runs-dir ./runs \
+  --knobs src/schmidt/scenarios/software_procurement/knobs_data_pipeline_impossible.json \
   > ./runs/software_procurement_stdout.log 2>&1 &
 ```
 
@@ -187,11 +182,10 @@ Every `schmidt run` starts an embedded streaming server on an ephemeral port and
 If a simulation errors midway through, resume from the last checkpoint using the `--resume` flag pointing at the existing run directory.
 
 ```bash
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
-    --model <model> --runs-dir ./runs \
-    --resume ./runs/<scenario>/<timestamp> \
-    <scenario-specific flags like --knobs> \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
+  --model <model> --runs-dir ./runs \
+  --resume ./runs/<scenario>/<timestamp> \
+  <scenario-specific flags like --knobs> \
   > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
 ```
 
@@ -226,11 +220,10 @@ When running simulations, evaluations, or any long-running background process, *
 After a simulation completes, score the log with LLM-as-judge evaluators. Evaluation uses `--provider` to select the LLM judge. The evaluate command reads the scenario configuration from the JSONL event log, so no scenario-specific flags (like `--knobs`) are needed.
 
 ```bash
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
-    --run-dir ./runs/<scenario>/<timestamp> \
-    --evaluators <comma-separated evaluator names> \
-    --model <model> --provider <provider> \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
+  --run-dir ./runs/<scenario>/<timestamp> \
+  --evaluators <comma-separated evaluator names> \
+  --model <model> --provider <provider> \
   > ./runs/<scenario>/<timestamp>/eval_stdout.log 2>&1 &
 ```
 
