@@ -44,6 +44,7 @@ class RunSummary(BaseModel):
     has_evaluation: bool
     run_dir: str
     fork_source: ForkSource | None
+    models: list[str]
 
 
 class RunListResponse(BaseModel):

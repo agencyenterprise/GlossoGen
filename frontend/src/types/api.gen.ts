@@ -442,6 +442,8 @@ export interface components {
             /** Run Dir */
             run_dir: string;
             fork_source: components["schemas"]["ForkSource"] | null;
+            /** Models */
+            models: string[];
         };
         /**
          * SSEAgentConnected
