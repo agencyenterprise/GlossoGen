@@ -16,6 +16,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import uvicorn
+from dotenv import load_dotenv
 
 from schmidt.autonomous_supervisor import AutonomousSupervisor
 from schmidt.evaluation.log_reader import extract_scenario_config, load_events
@@ -122,6 +123,9 @@ def _build_parsers() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
 
 def main() -> None:
     """Parse CLI arguments and dispatch to the ``run``, ``evaluate``, or ``serve`` subcommand."""
+
+    load_dotenv()
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
