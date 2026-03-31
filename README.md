@@ -22,28 +22,26 @@ The CLI auto-generates a timestamped subdirectory under `--runs-dir`. Each round
 
 ```bash
 # Incident Response
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-    --model claude-sonnet-4-20250514 --runs-dir ./runs \
-    --max-round-duration 120 \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
+  --model claude-sonnet-4-20250514 --runs-dir ./runs \
+  --max-round-duration 120 \
   > ./runs/incident_response_stdout.log 2>&1 &
 
 # Car Recall
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-    --model claude-sonnet-4-20250514 --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
+  --model claude-sonnet-4-20250514 --runs-dir ./runs \
+  --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
 
 # Product Launch
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
-    --model claude-sonnet-4-20250514 --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
+  --model claude-sonnet-4-20250514 --runs-dir ./runs \
+  --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
   > ./runs/product_launch_stdout.log 2>&1 &
 ```
 
 Flags:
+
 - `--mcp-port` — Port for the MCP server (default: 8001)
 - `--max-agent-turns` — Maximum agentic turns per agent (default: 200)
 - `--resume` — Resume from an existing run directory after a crash
@@ -55,11 +53,10 @@ Check progress by reading the stdout log or the JSONL event log in the run direc
 If a simulation crashes or is killed, resume using the `--resume` flag pointing at the existing run directory.
 
 ```bash
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
-    --model <model> --runs-dir ./runs \
-    --resume ./runs/<scenario>/<timestamp> \
-    <scenario-specific flags> \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
+  --model <model> --runs-dir ./runs \
+  --resume ./runs/<scenario>/<timestamp> \
+  <scenario-specific flags> \
   > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
 ```
 
@@ -88,16 +85,16 @@ runs/{scenario_name}/{unix_timestamp}/
 After a simulation completes, point `--run-dir` at the specific run directory. Evaluation uses `--provider` to select the LLM judge.
 
 ```bash
-set -a && source .env && set +a && \
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate incident_response \
-    --run-dir ./runs/incident_response/1742234567 \
-    --evaluators secret_leak,instruction_adherence,cooperation \
-    --model claude-sonnet-4-20250514 --provider anthropic
+VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate incident_response \
+  --run-dir ./runs/incident_response/1742234567 \
+  --evaluators secret_leak,instruction_adherence,cooperation \
+  --model claude-sonnet-4-20250514 --provider anthropic
 ```
 
 Generic evaluators (available to all scenarios): `secret_leak`, `instruction_adherence`, `cooperation`, `communication_pattern`
 
 Scenario-specific evaluators:
+
 - **incident_response**: generic evaluators only
 - **car_recall**: `fact_surfacing`, `report_divergence`, `decision_correctness`
 - **product_launch**: `launch_outcome`, `emergent_behavior`, `information_integrity`, `coordination_efficiency`, `conflict_resolution`, `report_accuracy`

@@ -23,6 +23,7 @@ dependencies = [
     "huggingface_hub>=0.25.0",
     "weasyprint>=62.0",
     "markdown>=3.7",
+    "python-dotenv>=1.2.2",
 ]
 
 [dependency-groups]
