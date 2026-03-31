@@ -74,6 +74,7 @@ class MessageSent(EventBase):
 
     event_type: Literal["message_sent"] = "message_sent"
     message: SimulationMessage
+    round_number: int
 
 
 class LLMResponseReceived(EventBase):
@@ -87,6 +88,7 @@ class LLMResponseReceived(EventBase):
     tool_calls: list[ToolCallRequest]
     stop_reason: str
     usage: TokenUsage
+    round_number: int
 
 
 class ToolResultReceived(EventBase):
@@ -98,6 +100,7 @@ class ToolResultReceived(EventBase):
     call_id: str
     arguments: dict[str, Any]
     result: str
+    round_number: int
 
 
 class RoundAdvanced(EventBase):

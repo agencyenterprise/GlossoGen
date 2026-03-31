@@ -163,6 +163,7 @@ class PydanticAIRunner(AgentRunner):
                                 event=event,
                                 state=captured_state,
                                 event_logger=event_logger,
+                                round_number=event_logger.current_round,
                             )
 
                     logger.debug(
@@ -190,12 +191,14 @@ class PydanticAIRunner(AgentRunner):
                             agent_id=agent_id,
                             extractors=state.extractors,
                             preview_buffers=state.preview_buffers,
+                            round_number=event_logger.current_round,
                         )
                         bus.publish(
                             event=TokenDelta(
                                 agent_id=agent_id,
                                 text="",
                                 is_final=True,
+                                round_number=event_logger.current_round,
                             ).model_dump(mode="json")
                         )
                         all_background_tasks.extend(state.background_tasks)
@@ -244,6 +247,7 @@ class PydanticAIRunner(AgentRunner):
                         state=state,
                         event_logger=event_logger,
                         stop_reason="end_turn",
+                        round_number=event_logger.current_round,
                         usage=TokenUsage(
                             input_tokens=usage.input_tokens,
                             output_tokens=usage.output_tokens,
@@ -257,6 +261,7 @@ class PydanticAIRunner(AgentRunner):
                         agent_id=agent_id,
                         extractors=state.extractors,
                         preview_buffers=state.preview_buffers,
+                        round_number=event_logger.current_round,
                     )
 
                     all_background_tasks.extend(state.background_tasks)
@@ -310,6 +315,7 @@ class PydanticAIRunner(AgentRunner):
         state: _StreamingState,
         event_logger: EventLogger,
         stop_reason: str,
+        round_number: int,
         usage: TokenUsage | None = None,
     ) -> None:
         """Log accumulated reasoning + tool calls as one LLMResponseReceived event.
@@ -333,6 +339,7 @@ class PydanticAIRunner(AgentRunner):
                 agent_id=agent_id,
                 text="",
                 is_final=True,
+                round_number=round_number,
             ).model_dump(mode="json")
         )
         logger.info(
@@ -348,6 +355,7 @@ class PydanticAIRunner(AgentRunner):
                     tool_calls=tool_calls,
                     stop_reason=stop_reason,
                     usage=usage,
+                    round_number=round_number,
                 )
             )
         )
@@ -360,6 +368,7 @@ class PydanticAIRunner(AgentRunner):
         event: AgentStreamEvent,
         state: _StreamingState,
         event_logger: EventLogger,
+        round_number: int,
     ) -> None:
         """Route a single streaming event to the appropriate handler.
 
@@ -396,6 +405,7 @@ class PydanticAIRunner(AgentRunner):
                         state=state,
                         event_logger=event_logger,
                         stop_reason="tool_use",
+                        round_number=round_number,
                     )
                 if event.part.content:
                     state.accumulated_reasoning += event.part.content
@@ -404,6 +414,7 @@ class PydanticAIRunner(AgentRunner):
                             agent_id=agent_id,
                             text=event.part.content,
                             is_final=False,
+                            round_number=round_number,
                         ).model_dump(mode="json")
                     )
 
@@ -415,6 +426,7 @@ class PydanticAIRunner(AgentRunner):
                         agent_id=agent_id,
                         text=event.delta.content_delta,
                         is_final=False,
+                        round_number=round_number,
                     ).model_dump(mode="json")
                 )
             elif isinstance(event.delta, ThinkingPartDelta):
@@ -425,6 +437,7 @@ class PydanticAIRunner(AgentRunner):
                             agent_id=agent_id,
                             text=event.delta.content_delta,
                             is_final=False,
+                            round_number=round_number,
                         ).model_dump(mode="json")
                     )
             elif isinstance(event.delta, ToolCallPartDelta):
@@ -435,6 +448,7 @@ class PydanticAIRunner(AgentRunner):
                         index=event.index,
                         args_delta=delta_str,
                         state=state,
+                        round_number=round_number,
                     )
 
         elif isinstance(event, FunctionToolCallEvent):
@@ -448,6 +462,7 @@ class PydanticAIRunner(AgentRunner):
                 agent_id=agent_id,
                 extractors=state.extractors,
                 preview_buffers=state.preview_buffers,
+                round_number=round_number,
             )
 
             args = event.part.args
@@ -486,6 +501,7 @@ class PydanticAIRunner(AgentRunner):
                                 call_id=matched.call_id,
                                 arguments=matched.arguments,
                                 result=result_content,
+                                round_number=round_number,
                             )
                         )
                     )
@@ -529,6 +545,7 @@ class PydanticAIRunner(AgentRunner):
         index: int,
         args_delta: str,
         state: _StreamingState,
+        round_number: int,
     ) -> None:
         """Accumulate streaming tool call arguments and emit message previews."""
         tool_name = state.current_tool_names.get(index, "")
@@ -554,6 +571,7 @@ class PydanticAIRunner(AgentRunner):
                     block_index=index,
                     extractors=state.extractors,
                     preview_buffers=state.preview_buffers,
+                    round_number=round_number,
                 )
                 state.last_preview_time = now
 
@@ -563,6 +581,7 @@ class PydanticAIRunner(AgentRunner):
         block_index: int,
         extractors: dict[int, SendMessageTextExtractor],
         preview_buffers: dict[int, str],
+        round_number: int,
     ) -> None:
         """Flush buffered message preview text for a single tool_use block."""
         text = preview_buffers.pop(block_index, "")
@@ -579,6 +598,7 @@ class PydanticAIRunner(AgentRunner):
             channel_id=channel_id,
             text=text,
             is_final=False,
+            round_number=round_number,
         )
         self._event_bus.publish(event=preview.model_dump(mode="json"))
 
@@ -587,6 +607,7 @@ class PydanticAIRunner(AgentRunner):
         agent_id: str,
         extractors: dict[int, SendMessageTextExtractor],
         preview_buffers: dict[int, str],
+        round_number: int,
     ) -> None:
         """Flush remaining preview text and send is_final for all active previews."""
         for block_index in list(preview_buffers.keys()):
@@ -595,6 +616,7 @@ class PydanticAIRunner(AgentRunner):
                 block_index=block_index,
                 extractors=extractors,
                 preview_buffers=preview_buffers,
+                round_number=round_number,
             )
         for extractor in extractors.values():
             channel_id = extractor.channel_id
@@ -604,6 +626,7 @@ class PydanticAIRunner(AgentRunner):
                     channel_id=channel_id,
                     text="",
                     is_final=True,
+                    round_number=round_number,
                 )
                 self._event_bus.publish(event=final.model_dump(mode="json"))
         extractors.clear()

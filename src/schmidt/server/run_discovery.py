@@ -102,9 +102,11 @@ def _read_fork_source(run_dir: Path) -> ForkSource | None:
     if not manifest_path.exists():
         return None
     raw = orjson.loads(manifest_path.read_bytes())
+    forked_at = datetime.fromtimestamp(raw["forked_at"], tz=UTC)
     return ForkSource(
         source_run_id=raw["source_run_id"],
         target_message_id=raw["target_message_id"],
+        forked_at=forked_at,
     )
 
 

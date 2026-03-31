@@ -21,6 +21,7 @@ class TokenDelta(BaseModel):
     agent_id: str
     text: str
     is_final: bool
+    round_number: int
 
 
 class MessagePreview(BaseModel):
@@ -36,6 +37,7 @@ class MessagePreview(BaseModel):
     channel_id: str
     text: str
     is_final: bool
+    round_number: int
 
 
 class AgentCostUpdated(BaseModel):

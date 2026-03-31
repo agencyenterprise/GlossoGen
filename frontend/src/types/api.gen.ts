@@ -296,6 +296,11 @@ export interface components {
             source_run_id: string;
             /** Target Message Id */
             target_message_id: string;
+            /**
+             * Forked At
+             * Format: date-time
+             */
+            forked_at: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -579,6 +584,8 @@ export interface components {
             agent_id: string;
             /** Text */
             text: string | null;
+            /** Round Number */
+            round_number: number;
         };
         /**
          * SSEMessagePreview
@@ -601,6 +608,8 @@ export interface components {
             text: string;
             /** Is Final */
             is_final: boolean;
+            /** Round Number */
+            round_number: number;
         };
         /**
          * SSEMessageSent
@@ -620,6 +629,8 @@ export interface components {
              */
             timestamp: string;
             message: components["schemas"]["SSESimulationMessagePayload"];
+            /** Round Number */
+            round_number: number;
         };
         /**
          * SSERoundAdvanced
@@ -736,6 +747,8 @@ export interface components {
             text: string;
             /** Is Final */
             is_final: boolean;
+            /** Round Number */
+            round_number: number;
         };
         /**
          * SSEToolResultReceived
@@ -766,6 +779,8 @@ export interface components {
             };
             /** Result */
             result: string;
+            /** Round Number */
+            round_number: number;
         };
         /**
          * ToolUseEntry

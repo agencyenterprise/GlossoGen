@@ -1,6 +1,7 @@
 """Loads and parses a full JSONL simulation log into a RunDetailResponse."""
 
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 import aiofiles
@@ -12,7 +13,6 @@ from schmidt.models.event import (
     AgentRegistered,
     LLMResponseReceived,
     MessageSent,
-    RoundAdvanced,
     RunStatus,
     SimulationEnded,
     SimulationEvent,
@@ -174,7 +174,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     duration_seconds = 0.0
     status = None
 
-    current_round = 1
     tool_use_by_call_id: dict[str, ToolUseEntry] = {}
 
     for event in events:
@@ -199,9 +198,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 )
             )
 
-        elif isinstance(event, RoundAdvanced):
-            current_round = event.round_number
-
         elif isinstance(event, LLMResponseReceived):
             # Create reasoning entry for text content
             if event.text is not None and event.text.strip():
@@ -213,7 +209,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                         text=event.text,
                         timestamp=event.timestamp,
                         turn_number=total_messages,
-                        round_number=current_round,
+                        round_number=event.round_number,
                         channel_ids=[],
                     )
                 )
@@ -232,7 +228,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     result=None,
                     timestamp=event.timestamp,
                     turn_number=total_messages,
-                    round_number=current_round,
+                    round_number=event.round_number,
                 )
                 tool_use.append(tu_entry)
                 tool_use_by_call_id[tc.call_id] = tu_entry
@@ -253,7 +249,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     text=msg.text,
                     timestamp=msg.timestamp,
                     turn_number=total_messages,
-                    round_number=current_round,
+                    round_number=event.round_number,
                 )
             )
 
@@ -284,6 +280,11 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
 
     fork_source = _read_fork_source(run_dir=log_path.parent)
 
+    # For forked runs, the displayed start time is when the fork was created,
+    # not when the original parent simulation started.
+    if fork_source is not None:
+        timestamp = fork_source.forked_at
+
     return RunDetailResponse(
         run_id=run_id,
         scenario_name=scenario_name,
@@ -312,7 +313,9 @@ def _read_fork_source(run_dir: Path) -> ForkSource | None:
     if not manifest_path.exists():
         return None
     raw = orjson.loads(manifest_path.read_bytes())
+    forked_at = datetime.fromtimestamp(raw["forked_at"], tz=UTC)
     return ForkSource(
         source_run_id=raw["source_run_id"],
         target_message_id=raw["target_message_id"],
+        forked_at=forked_at,
     )

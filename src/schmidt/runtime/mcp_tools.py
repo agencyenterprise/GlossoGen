@@ -272,7 +272,12 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                 timestamp=datetime.now(tz=UTC),
             )
             runtime.channel_router.append_message(message=message)
-            await runtime.event_logger.log(event=MessageSent(message=message))
+            await runtime.event_logger.log(
+                event=MessageSent(
+                    message=message,
+                    round_number=runtime.event_logger.current_round,
+                )
+            )
 
             session.record_channel_read(
                 channel_id=channel_id,

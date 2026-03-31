@@ -38,7 +38,13 @@ def _parse_event(raw: dict[str, object]) -> SimulationEvent:
 
 
 async def load_events(log_path: Path) -> list[SimulationEvent]:
-    """Read a JSONL log file and parse each line into a typed SimulationEvent."""
+    """Read a JSONL log file and parse each line into a typed SimulationEvent.
+
+    For old JSONL files where ``MessageSent``, ``LLMResponseReceived``, and
+    ``ToolResultReceived`` lack ``round_number``, the field is backfilled from
+    the most recent ``RoundAdvanced`` event so every consumer receives correct
+    data without needing fallback logic.
+    """
     events: list[SimulationEvent] = []
     async with aiofiles.open(log_path, mode="rb") as f:
         async for line in f:

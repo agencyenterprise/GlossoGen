@@ -27,6 +27,7 @@ class ForkSource(BaseModel):
 
     source_run_id: str
     target_message_id: str
+    forked_at: datetime
 
 
 class RunSummary(BaseModel):
@@ -258,6 +259,7 @@ class SSEMessageSent(BaseModel):
     event_id: str
     timestamp: datetime
     message: SSESimulationMessagePayload
+    round_number: int
 
 
 class SSELLMResponseReceived(BaseModel):
@@ -268,6 +270,7 @@ class SSELLMResponseReceived(BaseModel):
     timestamp: datetime
     agent_id: str
     text: str | None
+    round_number: int
 
 
 class SSEToolResultReceived(BaseModel):
@@ -281,6 +284,7 @@ class SSEToolResultReceived(BaseModel):
     call_id: str
     arguments: dict[str, Any]
     result: str
+    round_number: int
 
 
 class SSERoundAdvanced(BaseModel):
@@ -327,6 +331,7 @@ class SSETokenDelta(BaseModel):
     agent_id: str
     text: str
     is_final: bool
+    round_number: int
 
 
 class SSEMessagePreview(BaseModel):
@@ -341,6 +346,7 @@ class SSEMessagePreview(BaseModel):
     channel_id: str
     text: str
     is_final: bool
+    round_number: int
 
 
 class SSEAgentCostUpdated(BaseModel):

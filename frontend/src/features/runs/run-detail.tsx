@@ -119,19 +119,6 @@ export function RunDetail({ runId }: { runId: string }) {
     return map;
   }, [restData]);
 
-  const initialAgentRounds = useMemo(() => {
-    if (!restData) return new Map<string, number>();
-    const map = new Map<string, number>();
-    const allEntries = [...restData.messages, ...restData.reasoning];
-    for (const m of allEntries) {
-      const prev = map.get(m.sender_agent_id) ?? 0;
-      if (m.round_number > prev) {
-        map.set(m.sender_agent_id, m.round_number);
-      }
-    }
-    return map;
-  }, [restData]);
-
   // SSE streaming for in-progress runs
   const sseEnabled = restData?.status === "in_progress";
   const initialMessageCount = restData?.messages.length ?? 0;
@@ -140,7 +127,6 @@ export function RunDetail({ runId }: { runId: string }) {
     sseEnabled,
     knownEventIds,
     initialAgentTurns,
-    initialAgentRounds,
     initialMessageCount
   );
 
@@ -224,7 +210,7 @@ export function RunDetail({ runId }: { runId: string }) {
         text: pm.text,
         timestamp: new Date().toISOString(),
         turn_number: sse.agentTurns.get(agentId) ?? 0,
-        round_number: sse.agentRounds.get(agentId) ?? sse.currentRound,
+        round_number: pm.roundNumber,
         is_reasoning: false,
         is_tool_use: false,
         is_partial: true,
@@ -235,7 +221,7 @@ export function RunDetail({ runId }: { runId: string }) {
     }
 
     return entries;
-  }, [sse.partialMessages, sse.agentTurns, sse.agentRounds]);
+  }, [sse.partialMessages, sse.agentTurns]);
 
   const allDisplayEntries = useMemo(
     () => [...displayEntries, ...partialEntries],

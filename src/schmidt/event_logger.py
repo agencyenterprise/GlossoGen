@@ -11,7 +11,7 @@ import aiofiles
 import orjson
 
 from schmidt.event_bus import EventBus
-from schmidt.models.event import SimulationEvent
+from schmidt.models.event import RoundAdvanced, SimulationEvent
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,12 @@ class EventLogger:
         self._log_path = log_path
         self._file: aiofiles.threadpool.binary.AsyncBufferedIOBase | None = None
         self._event_bus = event_bus
+        self._current_round = 1
+
+    @property
+    def current_round(self) -> int:
+        """The most recent round number, updated automatically when RoundAdvanced is logged."""
+        return self._current_round
 
     async def open(self) -> None:
         """Create parent directories if needed and open the log file for writing.
@@ -53,6 +59,8 @@ class EventLogger:
         """
         if self._file is None:
             raise RuntimeError("EventLogger is not open. Call open() first.")
+        if isinstance(event, RoundAdvanced):
+            self._current_round = event.round_number
         event_dict = event.model_dump(mode="json")
         data = orjson.dumps(event_dict) + b"\n"
         await self._file.write(data)
