@@ -422,10 +422,6 @@
             "format": "date-time",
             "title": "Timestamp"
           },
-          "turn_number": {
-            "type": "integer",
-            "title": "Turn Number"
-          },
           "round_number": {
             "type": "integer",
             "title": "Round Number"
@@ -438,7 +434,6 @@
           "sender_agent_id",
           "text",
           "timestamp",
-          "turn_number",
           "round_number"
         ],
         "title": "ChannelMessage",
@@ -722,10 +717,6 @@
             "format": "date-time",
             "title": "Timestamp"
           },
-          "turn_number": {
-            "type": "integer",
-            "title": "Turn Number"
-          },
           "round_number": {
             "type": "integer",
             "title": "Round Number"
@@ -744,7 +735,6 @@
           "sender_agent_id",
           "text",
           "timestamp",
-          "turn_number",
           "round_number",
           "channel_ids"
         ],
@@ -1616,10 +1606,6 @@
             "format": "date-time",
             "title": "Timestamp"
           },
-          "turn_number": {
-            "type": "integer",
-            "title": "Turn Number"
-          },
           "round_number": {
             "type": "integer",
             "title": "Round Number"
@@ -1634,7 +1620,6 @@
           "arguments",
           "result",
           "timestamp",
-          "turn_number",
           "round_number"
         ],
         "title": "ToolUseEntry",

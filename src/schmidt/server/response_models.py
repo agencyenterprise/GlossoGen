@@ -74,7 +74,6 @@ class ChannelMessage(BaseModel):
     sender_agent_id: str
     text: str
     timestamp: datetime
-    turn_number: int
     round_number: int
 
 
@@ -92,7 +91,6 @@ class ToolUseEntry(BaseModel):
     arguments: dict[str, Any]
     result: str | None
     timestamp: datetime
-    turn_number: int
     round_number: int
 
 
@@ -108,7 +106,6 @@ class ReasoningEntry(BaseModel):
     sender_agent_id: str
     text: str
     timestamp: datetime
-    turn_number: int
     round_number: int
     channel_ids: list[str]
 

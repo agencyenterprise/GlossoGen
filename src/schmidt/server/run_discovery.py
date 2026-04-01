@@ -15,6 +15,7 @@ from pydantic import TypeAdapter
 from schmidt.models.event import RunStatus, SimulationEnded, SimulationEvent, SimulationStarted
 from schmidt.server.response_models import ForkSource, RunSummary
 from schmidt.stream_manifest import delete_manifest, read_manifest
+from schmidt.token_pricing import find_pricing
 
 logger = logging.getLogger(__name__)
 
@@ -77,18 +78,52 @@ async def _extract_models(file_path: Path) -> list[str]:
     return list(seen)
 
 
-async def _count_messages(file_path: Path) -> int:
-    """Count MessageSent events in a JSONL file by parsing each line's event_type field."""
-    count = 0
+class _RunStats:
+    """Accumulated message count and token-based cost from a JSONL scan."""
+
+    __slots__ = ("message_count", "cost_usd")
+
+    def __init__(self, message_count: int, cost_usd: float) -> None:
+        self.message_count = message_count
+        self.cost_usd = cost_usd
+
+
+async def _scan_run_stats(file_path: Path, model: str) -> _RunStats:
+    """Scan a JSONL file to count messages and estimate cost from token usage."""
+    message_count = 0
+    total_input = 0
+    total_output = 0
+    total_cache_read = 0
+    total_cache_write = 0
+
     async with aiofiles.open(file_path, mode="rb") as f:
         async for line in f:
             stripped = line.strip()
             if not stripped:
                 continue
             raw = orjson.loads(stripped)
-            if raw.get("event_type") == "message_sent":
-                count += 1
-    return count
+            event_type = raw.get("event_type")
+            if event_type == "message_sent":
+                message_count += 1
+            elif event_type == "llm_response_received":
+                usage = raw.get("usage")
+                if usage is not None:
+                    total_input += usage.get("input_tokens", 0)
+                    total_output += usage.get("output_tokens", 0)
+                    total_cache_read += usage.get("cache_read_input_tokens", 0)
+                    total_cache_write += usage.get("cache_creation_input_tokens", 0)
+
+    cost_usd = 0.0
+    pricing = find_pricing(model=model)
+    if pricing is not None and total_input > 0:
+        cost_usd = (
+            total_input * pricing.input_per_mtok
+            + total_output * pricing.output_per_mtok
+            + total_cache_read * pricing.cache_read_per_mtok
+            + total_cache_write * pricing.cache_write_per_mtok
+        ) / 1_000_000
+
+    return _RunStats(message_count=message_count, cost_usd=cost_usd)
 
 
 def _timestamp_from_dir(dir_name: str) -> datetime:
@@ -173,7 +208,8 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                     )
                 )
             else:
-                message_count = await _count_messages(file_path=jsonl_path)
+                model = models[0] if models else "unknown"
+                stats = await _scan_run_stats(file_path=jsonl_path, model=model)
                 manifest = read_manifest(run_dir=timestamp_dir)
                 if manifest is not None:
                     status = RunStatus.IN_PROGRESS
@@ -187,8 +223,8 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         scenario_description=first_event.scenario_description,
                         scenario_config=first_event.scenario_config,
                         timestamp=run_timestamp,
-                        total_messages=message_count,
-                        total_cost_usd=0.0,
+                        total_messages=stats.message_count,
+                        total_cost_usd=stats.cost_usd,
                         duration_seconds=0.0,
                         status=status,
                         has_evaluation=False,

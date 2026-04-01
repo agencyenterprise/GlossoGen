@@ -20,6 +20,7 @@ from schmidt.models.event import (
     ToolResultReceived,
 )
 from schmidt.runtime.mcp_tools import HIDDEN_TOOL_NAMES
+from schmidt.token_pricing import find_pricing
 from schmidt.server.response_models import (
     AgentDetail,
     ChannelMessage,
@@ -175,6 +176,10 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     status = None
 
     tool_use_by_call_id: dict[str, ToolUseEntry] = {}
+    total_input_tokens = 0
+    total_output_tokens = 0
+    total_cache_read_tokens = 0
+    total_cache_write_tokens = 0
 
     for event in events:
         if isinstance(event, SimulationStarted):
@@ -199,6 +204,11 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             )
 
         elif isinstance(event, LLMResponseReceived):
+            total_input_tokens += event.usage.input_tokens
+            total_output_tokens += event.usage.output_tokens
+            total_cache_read_tokens += event.usage.cache_read_input_tokens
+            total_cache_write_tokens += event.usage.cache_creation_input_tokens
+
             # Create reasoning entry for text content
             if event.text is not None and event.text.strip():
                 total_messages += 1
@@ -208,7 +218,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                         sender_agent_id=event.agent_id,
                         text=event.text,
                         timestamp=event.timestamp,
-                        turn_number=total_messages,
                         round_number=event.round_number,
                         channel_ids=[],
                     )
@@ -227,7 +236,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     arguments=tc.arguments,
                     result=None,
                     timestamp=event.timestamp,
-                    turn_number=total_messages,
                     round_number=event.round_number,
                 )
                 tool_use.append(tu_entry)
@@ -248,7 +256,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     sender_agent_id=msg.sender_agent_id,
                     text=msg.text,
                     timestamp=msg.timestamp,
-                    turn_number=total_messages,
                     round_number=event.round_number,
                 )
             )
@@ -258,6 +265,19 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             total_cost_usd = event.total_cost_usd
             if timestamp is not None:
                 duration_seconds = (event.timestamp - timestamp).total_seconds()
+
+    # Compute cost from token usage when the simulation hasn't ended yet
+    # (or when the ended event reported zero cost).
+    if total_cost_usd <= 0 and total_input_tokens > 0:
+        model = agents[0].model if agents else "unknown"
+        pricing = find_pricing(model=model)
+        if pricing is not None:
+            total_cost_usd = (
+                total_input_tokens * pricing.input_per_mtok
+                + total_output_tokens * pricing.output_per_mtok
+                + total_cache_read_tokens * pricing.cache_read_per_mtok
+                + total_cache_write_tokens * pricing.cache_write_per_mtok
+            ) / 1_000_000
 
     _link_reasoning_to_channels(reasoning=reasoning, messages=messages)
 
