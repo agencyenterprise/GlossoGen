@@ -20,7 +20,6 @@ from schmidt.models.event import (
     ToolResultReceived,
 )
 from schmidt.runtime.mcp_tools import HIDDEN_TOOL_NAMES
-from schmidt.token_pricing import find_pricing
 from schmidt.server.response_models import (
     AgentDetail,
     ChannelMessage,
@@ -34,6 +33,7 @@ from schmidt.server.response_models import (
     ToolUseEntry,
 )
 from schmidt.stream_manifest import delete_manifest, read_manifest
+from schmidt.token_pricing import find_pricing
 
 logger = logging.getLogger(__name__)
 
