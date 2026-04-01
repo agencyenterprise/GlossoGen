@@ -418,6 +418,7 @@ class SoftwareProcurementScenario(SimulationScenario):
                     "Your sales rep can then retrieve it with get_deliverable."
                 ),
                 executor=_mcp_submit_deliverable(state=state, workspace=workspace),
+                replayer=_replay_submit_deliverable(state=state, workspace=workspace),
             ),
             # --- Sales rep tools ---
             ScenarioMcpTool(
@@ -843,6 +844,28 @@ def _replay_write_test(
             filename=arguments["filename"],
             content=arguments["content"],
         )
+
+    return replayer
+
+
+def _replay_submit_deliverable(
+    state: SoftwareProcurementState,
+    workspace: WorkspaceManager,
+) -> ToolReplayer:
+    """Build a replayer that recreates submit_deliverable side effects during a fork.
+
+    Reads the file from the workspace (already populated by the write_code
+    replayer), stores it in state, and writes it to the deliverables directory
+    so that run_tests and code_correctness evaluation can find it.
+    """
+
+    async def replayer(agent_id: str, arguments: dict[str, Any]) -> None:
+        team_id = state.get_team_for_agent(agent_id=agent_id)
+        filename = arguments["filename"]
+        code = await workspace.read_file(team_id=team_id, filename=filename)
+        if not code.startswith("File not found:"):
+            state.store_deliverable(team_id=team_id, filename=filename, code=code)
+            await workspace.write_deliverable(team_id=team_id, filename=filename, code=code)
 
     return replayer
 

@@ -116,8 +116,9 @@ async def _scan_run_stats(file_path: Path, model: str) -> _RunStats:
     cost_usd = 0.0
     pricing = find_pricing(model=model)
     if pricing is not None and total_input > 0:
+        non_cached_input = max(0, total_input - total_cache_read - total_cache_write)
         cost_usd = (
-            total_input * pricing.input_per_mtok
+            non_cached_input * pricing.input_per_mtok
             + total_output * pricing.output_per_mtok
             + total_cache_read * pricing.cache_read_per_mtok
             + total_cache_write * pricing.cache_write_per_mtok
