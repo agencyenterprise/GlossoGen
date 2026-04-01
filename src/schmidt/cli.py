@@ -24,7 +24,7 @@ from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.message_rewind import RewindState, build_rewind_state_from_last_message
-from schmidt.runners.claude_code_runner import ClaudeCodeRunner
+from schmidt.runners.pydantic_ai_runner import PydanticAIRunner
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios import SCENARIO_REGISTRY
@@ -60,6 +60,13 @@ def _build_parsers() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
     )
     run_parser.add_argument("--model", type=str, required=True, help="LLM model identifier")
     run_parser.add_argument(
+        "--provider",
+        type=str,
+        required=True,
+        choices=["anthropic", "openai", "google-gla", "ollama"],
+        help="LLM provider (anthropic, openai, google-gla, ollama)",
+    )
+    run_parser.add_argument(
         "--mcp-port",
         type=int,
         default=DEFAULT_MCP_PORT,
@@ -76,7 +83,6 @@ def _build_parsers() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
         type=str,
         help="Path to an existing run directory to resume from",
     )
-
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a simulation log")
     evaluate_parser.add_argument(
         "scenario_name",
@@ -230,17 +236,22 @@ async def _run_simulation(
     max_turns = args.max_agent_turns
     run_id = str(uuid4())
 
+    def _make_runner() -> PydanticAIRunner:
+        return PydanticAIRunner(
+            max_turns=max_turns,
+            event_bus=event_bus,
+            provider=args.provider,
+        )
+
     supervisor = AutonomousSupervisor(
         scenario=scenario,
         agent_configs=agents,
         event_logger=event_logger,
         mcp_server_port=args.mcp_port,
-        runner_factory=lambda: ClaudeCodeRunner(
-            max_turns=max_turns,
-            event_bus=event_bus,
-        ),
+        runner_factory=_make_runner,
         resume_state=resume_state,
         run_id=run_id,
+        provider=args.provider,
     )
 
     json_handler, bus_log_handler = _setup_logging(

@@ -1,4 +1,6 @@
-{% if progress >= 0.7 %}
+{% if round_number == 1 %}
+The buyer is online. Introduce yourself on your negotiation channel and coordinate with your teammate. Wait for the buyer to share their requirements.
+{% elif progress >= 0.7 %}
 Your management wants to know: have we won the contract yet? Make sure to close the deal soon.
 {% elif progress >= 0.4 %}
 Time is passing. Consider whether to keep iterating or submit what you have.

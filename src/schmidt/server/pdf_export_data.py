@@ -82,7 +82,6 @@ class PdfDisplayEntry(BaseModel):
     sender_agent_id: str
     text: str
     timestamp: datetime
-    turn_number: int
     round_number: int
     is_reasoning: bool
     is_tool_use: bool
@@ -95,7 +94,6 @@ class PdfDisplayEntry(BaseModel):
 class PdfTurnGroup(BaseModel):
     """Entries grouped by a single agent turn within a round."""
 
-    turn_number: int
     agent_id: str
     agent_role_name: str
     agent_initials: str
@@ -146,7 +144,6 @@ def _merge_display_entries(
                 sender_agent_id=m.sender_agent_id,
                 text=m.text,
                 timestamp=m.timestamp,
-                turn_number=m.turn_number,
                 round_number=m.round_number,
                 is_reasoning=False,
                 is_tool_use=False,
@@ -166,7 +163,6 @@ def _merge_display_entries(
                 sender_agent_id=r.sender_agent_id,
                 text=r.text,
                 timestamp=r.timestamp,
-                turn_number=r.turn_number,
                 round_number=r.round_number,
                 is_reasoning=True,
                 is_tool_use=False,
@@ -186,7 +182,6 @@ def _merge_display_entries(
                 sender_agent_id=t.sender_agent_id,
                 text="",
                 timestamp=t.timestamp,
-                turn_number=t.turn_number,
                 round_number=t.round_number,
                 is_reasoning=False,
                 is_tool_use=True,
@@ -224,7 +219,6 @@ def _group_by_round_and_turn(
         agent = agent_map.get(entry.sender_agent_id)
         role_name = agent.role_name if agent else entry.sender_agent_id
         return PdfTurnGroup(
-            turn_number=entry.turn_number,
             agent_id=entry.sender_agent_id,
             agent_role_name=role_name,
             agent_initials=derive_initials(role_name=role_name),
@@ -250,11 +244,7 @@ def _group_by_round_and_turn(
             current_round = entry.round_number
             current_turns = []
             current_turn = _make_turn(entry=entry)
-        elif (
-            current_turn is not None
-            and entry.turn_number == current_turn.turn_number
-            and entry.sender_agent_id == current_turn.agent_id
-        ):
+        elif current_turn is not None and entry.sender_agent_id == current_turn.agent_id:
             current_turn.entries.append(entry)
         else:
             if current_turn is not None:

@@ -27,6 +27,7 @@ class ForkSource(BaseModel):
 
     source_run_id: str
     target_message_id: str
+    forked_at: datetime
 
 
 class RunSummary(BaseModel):
@@ -44,6 +45,8 @@ class RunSummary(BaseModel):
     has_evaluation: bool
     run_dir: str
     fork_source: ForkSource | None
+    models: list[str]
+    provider: str
 
 
 class RunListResponse(BaseModel):
@@ -71,7 +74,6 @@ class ChannelMessage(BaseModel):
     sender_agent_id: str
     text: str
     timestamp: datetime
-    turn_number: int
     round_number: int
 
 
@@ -89,7 +91,6 @@ class ToolUseEntry(BaseModel):
     arguments: dict[str, Any]
     result: str | None
     timestamp: datetime
-    turn_number: int
     round_number: int
 
 
@@ -105,7 +106,6 @@ class ReasoningEntry(BaseModel):
     sender_agent_id: str
     text: str
     timestamp: datetime
-    turn_number: int
     round_number: int
     channel_ids: list[str]
 
@@ -161,6 +161,7 @@ class RunDetailResponse(BaseModel):
     duration_seconds: float
     status: RunStatus
     channel_ids: list[str]
+    provider: str
     agents: list[AgentDetail]
     messages: list[ChannelMessage]
     reasoning: list[ReasoningEntry]
@@ -187,7 +188,6 @@ class ForkRequest(BaseModel):
 
     target_message_id: str
     message_edits: list[MessageEdit]
-    model: str
 
 
 class ForkResponse(BaseModel):
@@ -256,6 +256,7 @@ class SSEMessageSent(BaseModel):
     event_id: str
     timestamp: datetime
     message: SSESimulationMessagePayload
+    round_number: int
 
 
 class SSELLMResponseReceived(BaseModel):
@@ -266,6 +267,7 @@ class SSELLMResponseReceived(BaseModel):
     timestamp: datetime
     agent_id: str
     text: str | None
+    round_number: int
 
 
 class SSEToolResultReceived(BaseModel):
@@ -279,6 +281,7 @@ class SSEToolResultReceived(BaseModel):
     call_id: str
     arguments: dict[str, Any]
     result: str
+    round_number: int
 
 
 class SSERoundAdvanced(BaseModel):
@@ -325,6 +328,7 @@ class SSETokenDelta(BaseModel):
     agent_id: str
     text: str
     is_final: bool
+    round_number: int
 
 
 class SSEMessagePreview(BaseModel):
@@ -339,6 +343,19 @@ class SSEMessagePreview(BaseModel):
     channel_id: str
     text: str
     is_final: bool
+    round_number: int
+
+
+class SSEAgentCostUpdated(BaseModel):
+    """SSE event carrying an agent's cumulative cost after each run cycle.
+
+    Transient — not persisted to JSONL. The final total arrives in
+    ``SSESimulationEnded``.
+    """
+
+    event_type: Literal["agent_cost_updated"]
+    agent_id: str
+    cumulative_cost_usd: float
 
 
 class SSEDebugLog(BaseModel):
@@ -364,6 +381,7 @@ SSEEvent = Annotated[
         SSESimulationEnded,
         SSETokenDelta,
         SSEMessagePreview,
+        SSEAgentCostUpdated,
         SSEDebugLog,
     ],
     Discriminator("event_type"),

@@ -15,6 +15,7 @@ from pydantic import TypeAdapter
 from schmidt.models.event import RunStatus, SimulationEnded, SimulationEvent, SimulationStarted
 from schmidt.server.response_models import ForkSource, RunSummary
 from schmidt.stream_manifest import delete_manifest, read_manifest
+from schmidt.token_pricing import find_pricing
 
 logger = logging.getLogger(__name__)
 
@@ -53,21 +54,77 @@ def _parse_event(raw_bytes: bytes) -> SimulationEvent:
     raw = orjson.loads(raw_bytes)  # positional-only parameter
     if raw.get("event_type") == "simulation_ended":
         raw.setdefault("total_cost_usd", 0.0)
+    if raw.get("event_type") == "simulation_started":
+        raw.setdefault("provider", "unknown")
     return _EVENT_ADAPTER.validate_python(raw)  # positional-only parameter
 
 
-async def _count_messages(file_path: Path) -> int:
-    """Count MessageSent events in a JSONL file by parsing each line's event_type field."""
-    count = 0
+async def _extract_models(file_path: Path) -> list[str]:
+    """Extract unique model names from AgentRegistered events at the start of a JSONL file."""
+    seen: dict[str, None] = {}
     async with aiofiles.open(file_path, mode="rb") as f:
         async for line in f:
             stripped = line.strip()
             if not stripped:
                 continue
             raw = orjson.loads(stripped)
-            if raw.get("event_type") == "message_sent":
-                count += 1
-    return count
+            event_type = raw.get("event_type")
+            if event_type == "agent_registered":
+                model = raw.get("model", "")
+                if model and model not in seen:
+                    seen[model] = None
+            elif event_type not in ("simulation_started", "agent_registered"):
+                break
+    return list(seen)
+
+
+class _RunStats:
+    """Accumulated message count and token-based cost from a JSONL scan."""
+
+    __slots__ = ("message_count", "cost_usd")
+
+    def __init__(self, message_count: int, cost_usd: float) -> None:
+        self.message_count = message_count
+        self.cost_usd = cost_usd
+
+
+async def _scan_run_stats(file_path: Path, model: str) -> _RunStats:
+    """Scan a JSONL file to count messages and estimate cost from token usage."""
+    message_count = 0
+    total_input = 0
+    total_output = 0
+    total_cache_read = 0
+    total_cache_write = 0
+
+    async with aiofiles.open(file_path, mode="rb") as f:
+        async for line in f:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            raw = orjson.loads(stripped)
+            event_type = raw.get("event_type")
+            if event_type == "message_sent":
+                message_count += 1
+            elif event_type == "llm_response_received":
+                usage = raw.get("usage")
+                if usage is not None:
+                    total_input += usage.get("input_tokens", 0)
+                    total_output += usage.get("output_tokens", 0)
+                    total_cache_read += usage.get("cache_read_input_tokens", 0)
+                    total_cache_write += usage.get("cache_creation_input_tokens", 0)
+
+    cost_usd = 0.0
+    pricing = find_pricing(model=model)
+    if pricing is not None and total_input > 0:
+        non_cached_input = max(0, total_input - total_cache_read - total_cache_write)
+        cost_usd = (
+            non_cached_input * pricing.input_per_mtok
+            + total_output * pricing.output_per_mtok
+            + total_cache_read * pricing.cache_read_per_mtok
+            + total_cache_write * pricing.cache_write_per_mtok
+        ) / 1_000_000
+
+    return _RunStats(message_count=message_count, cost_usd=cost_usd)
 
 
 def _timestamp_from_dir(dir_name: str) -> datetime:
@@ -81,9 +138,11 @@ def _read_fork_source(run_dir: Path) -> ForkSource | None:
     if not manifest_path.exists():
         return None
     raw = orjson.loads(manifest_path.read_bytes())
+    forked_at = datetime.fromtimestamp(raw["forked_at"], tz=UTC)
     return ForkSource(
         source_run_id=raw["source_run_id"],
         target_message_id=raw["target_message_id"],
+        forked_at=forked_at,
     )
 
 
@@ -127,6 +186,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
             report_path = timestamp_dir / f"{scenario_name}_report.json"
             fork_source = _read_fork_source(run_dir=timestamp_dir)
             run_timestamp = _timestamp_from_dir(dir_name=timestamp_dir.name)
+            models = await _extract_models(file_path=jsonl_path)
 
             if isinstance(last_event, SimulationEnded):
                 duration_seconds = (last_event.timestamp - first_event.timestamp).total_seconds()
@@ -144,10 +204,13 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         has_evaluation=report_path.exists(),
                         run_dir=str(timestamp_dir),
                         fork_source=fork_source,
+                        models=models,
+                        provider=first_event.provider,
                     )
                 )
             else:
-                message_count = await _count_messages(file_path=jsonl_path)
+                model = models[0] if models else "unknown"
+                stats = await _scan_run_stats(file_path=jsonl_path, model=model)
                 manifest = read_manifest(run_dir=timestamp_dir)
                 if manifest is not None:
                     status = RunStatus.IN_PROGRESS
@@ -161,13 +224,15 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         scenario_description=first_event.scenario_description,
                         scenario_config=first_event.scenario_config,
                         timestamp=run_timestamp,
-                        total_messages=message_count,
-                        total_cost_usd=0.0,
+                        total_messages=stats.message_count,
+                        total_cost_usd=stats.cost_usd,
                         duration_seconds=0.0,
                         status=status,
                         has_evaluation=False,
                         run_dir=str(timestamp_dir),
                         fork_source=fork_source,
+                        models=models,
+                        provider=first_event.provider,
                     )
                 )
 

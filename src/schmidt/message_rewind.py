@@ -77,7 +77,7 @@ def build_rewind_state(
             agent_registrations.append(event)
 
         elif isinstance(event, RoundAdvanced):
-            round_number = event.new_round_number
+            round_number = event.round_number
 
         elif isinstance(event, InjectionDelivered):
             current = injected_rounds.get(event.agent_id, 0)

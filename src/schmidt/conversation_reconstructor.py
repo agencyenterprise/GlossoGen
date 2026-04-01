@@ -79,7 +79,7 @@ def _extract_entries(
             entries.append(
                 {
                     "type": "round",
-                    "round_number": event.new_round_number,
+                    "round_number": event.round_number,
                 }
             )
 

@@ -23,25 +23,25 @@ The CLI auto-generates a timestamped subdirectory under `--runs-dir`. Each round
 ```bash
 # Incident Response
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-  --model claude-sonnet-4-20250514 --runs-dir ./runs \
+  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
   --max-round-duration 120 \
   > ./runs/incident_response_stdout.log 2>&1 &
 
 # Car Recall
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-  --model claude-sonnet-4-20250514 --runs-dir ./runs \
+  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
   --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
 
 # Product Launch
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
-  --model claude-sonnet-4-20250514 --runs-dir ./runs \
+  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
   --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
   > ./runs/product_launch_stdout.log 2>&1 &
 ```
 
 Flags:
-
+- `--provider` — LLM provider: `anthropic`, `openai`, `google-gla`, `ollama` (required)
 - `--mcp-port` — Port for the MCP server (default: 8001)
 - `--max-agent-turns` — Maximum agentic turns per agent (default: 200)
 - `--resume` — Resume from an existing run directory after a crash
@@ -54,7 +54,7 @@ If a simulation crashes or is killed, resume using the `--resume` flag pointing 
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
-  --model <model> --runs-dir ./runs \
+  --model <model> --provider <provider> --runs-dir ./runs \
   --resume ./runs/<scenario>/<timestamp> \
   <scenario-specific flags> \
   > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
@@ -167,7 +167,8 @@ src/schmidt/
     agent_session.py           # Per-agent notification queue, reaction delay, idle tracking
 
   runners/                     # Agent runner implementations
-    claude_code_runner.py      # Claude Code via Agent SDK
+    pydantic_ai_runner.py      # Pydantic AI agent runner
+    communication_protocol.py  # Shared prompts for agent communication
 
   models/                      # Pydantic data models
   llm/                         # LLM provider abstraction (used by evaluation)

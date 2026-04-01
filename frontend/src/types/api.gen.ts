@@ -202,8 +202,6 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
-            /** Turn Number */
-            turn_number: number;
             /** Round Number */
             round_number: number;
         };
@@ -276,8 +274,6 @@ export interface components {
             target_message_id: string;
             /** Message Edits */
             message_edits: components["schemas"]["MessageEdit"][];
-            /** Model */
-            model: string;
         };
         /**
          * ForkResponse
@@ -298,6 +294,11 @@ export interface components {
             source_run_id: string;
             /** Target Message Id */
             target_message_id: string;
+            /**
+             * Forked At
+             * Format: date-time
+             */
+            forked_at: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -347,8 +348,6 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
-            /** Turn Number */
-            turn_number: number;
             /** Round Number */
             round_number: number;
             /** Channel Ids */
@@ -383,6 +382,8 @@ export interface components {
             status: components["schemas"]["RunStatus"];
             /** Channel Ids */
             channel_ids: string[];
+            /** Provider */
+            provider: string;
             /** Agents */
             agents: components["schemas"]["AgentDetail"][];
             /** Messages */
@@ -442,6 +443,10 @@ export interface components {
             /** Run Dir */
             run_dir: string;
             fork_source: components["schemas"]["ForkSource"] | null;
+            /** Models */
+            models: string[];
+            /** Provider */
+            provider: string;
         };
         /**
          * SSEAgentConnected
@@ -462,6 +467,24 @@ export interface components {
             timestamp: string;
             /** Agent Id */
             agent_id: string;
+        };
+        /**
+         * SSEAgentCostUpdated
+         * @description SSE event carrying an agent's cumulative cost after each run cycle.
+         *
+         *     Transient — not persisted to JSONL. The final total arrives in
+         *     ``SSESimulationEnded``.
+         */
+        SSEAgentCostUpdated: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "agent_cost_updated";
+            /** Agent Id */
+            agent_id: string;
+            /** Cumulative Cost Usd */
+            cumulative_cost_usd: number;
         };
         /**
          * SSEAgentRegistered
@@ -557,6 +580,8 @@ export interface components {
             agent_id: string;
             /** Text */
             text: string | null;
+            /** Round Number */
+            round_number: number;
         };
         /**
          * SSEMessagePreview
@@ -579,6 +604,8 @@ export interface components {
             text: string;
             /** Is Final */
             is_final: boolean;
+            /** Round Number */
+            round_number: number;
         };
         /**
          * SSEMessageSent
@@ -598,6 +625,8 @@ export interface components {
              */
             timestamp: string;
             message: components["schemas"]["SSESimulationMessagePayload"];
+            /** Round Number */
+            round_number: number;
         };
         /**
          * SSERoundAdvanced
@@ -714,6 +743,8 @@ export interface components {
             text: string;
             /** Is Final */
             is_final: boolean;
+            /** Round Number */
+            round_number: number;
         };
         /**
          * SSEToolResultReceived
@@ -744,6 +775,8 @@ export interface components {
             };
             /** Result */
             result: string;
+            /** Round Number */
+            round_number: number;
         };
         /**
          * ToolUseEntry
@@ -772,8 +805,6 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
-            /** Turn Number */
-            turn_number: number;
             /** Round Number */
             round_number: number;
         };
@@ -931,7 +962,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEDebugLog"];
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEAgentCostUpdated"] | components["schemas"]["SSEDebugLog"];
                 };
             };
             /** @description Validation Error */

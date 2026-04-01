@@ -22,6 +22,7 @@ import { ChatPane } from "./chat-pane";
 import type { DisplayEntry } from "./display-entry";
 import { mergeEntries } from "./display-entry";
 import { EvalPanel } from "./eval-panel";
+import { ReasoningPanel } from "./reasoning-panel";
 import { ForkBadge } from "./fork-badge";
 import { elapsedSince, formatConfigValue, formatCost, formatDuration, humanize } from "./format";
 import { LogPanel } from "./log-panel";
@@ -37,6 +38,7 @@ export function RunDetail({ runId }: { runId: string }) {
   const [showDescription, setShowDescription] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showEvalPanel, setShowEvalPanel] = useState(true);
+  const [showReasoningPanel, setShowReasoningPanel] = useState(true);
   const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
@@ -59,7 +61,7 @@ export function RunDetail({ runId }: { runId: string }) {
     setHighlightedMessageId(messageId);
   }
 
-  // Initial REST fetch — no polling, just a one-time load (+ refetch on SSE completion)
+  // REST fetch — polls every 10s while in-progress to keep cost/messages current
   const {
     data: restData,
     isLoading,
@@ -74,6 +76,13 @@ export function RunDetail({ runId }: { runId: string }) {
         throw new Error("Failed to fetch run detail");
       }
       return data;
+    },
+    refetchInterval: query => {
+      const status = query.state.data?.status;
+      if (status === "in_progress") {
+        return 10_000;
+      }
+      return false;
     },
   });
 
@@ -104,43 +113,9 @@ export function RunDetail({ runId }: { runId: string }) {
     return ids;
   }, [restData]);
 
-  // Derive latest turn/round per agent from REST data to seed the SSE hook
-  const initialAgentTurns = useMemo(() => {
-    if (!restData) return new Map<string, number>();
-    const map = new Map<string, number>();
-    for (const m of restData.messages) {
-      const prev = map.get(m.sender_agent_id) ?? 0;
-      if (m.turn_number > prev) {
-        map.set(m.sender_agent_id, m.turn_number);
-      }
-    }
-    return map;
-  }, [restData]);
-
-  const initialAgentRounds = useMemo(() => {
-    if (!restData) return new Map<string, number>();
-    const map = new Map<string, number>();
-    const allEntries = [...restData.messages, ...restData.reasoning];
-    for (const m of allEntries) {
-      const prev = map.get(m.sender_agent_id) ?? 0;
-      if (m.round_number > prev) {
-        map.set(m.sender_agent_id, m.round_number);
-      }
-    }
-    return map;
-  }, [restData]);
-
   // SSE streaming for in-progress runs
   const sseEnabled = restData?.status === "in_progress";
-  const initialMessageCount = restData?.messages.length ?? 0;
-  const sse = useEventStream(
-    runId,
-    sseEnabled,
-    knownEventIds,
-    initialAgentTurns,
-    initialAgentRounds,
-    initialMessageCount
-  );
+  const sse = useEventStream(runId, sseEnabled, knownEventIds);
 
   // When SSE reports simulation ended, refetch REST for evaluation + debug logs
   const sseStatus = sse.status;
@@ -208,34 +183,11 @@ export function RunDetail({ runId }: { runId: string }) {
     );
   }, [restData, sse.messages, sse.reasoning, sse.toolUse]);
 
-  // Build partial streaming entries for reasoning text and message previews
+  // Build partial streaming entries for message previews only.
+  // Reasoning partials are shown in the ReasoningPanel sidebar instead.
   const partialEntries: DisplayEntry[] = useMemo(() => {
     const entries: DisplayEntry[] = [];
 
-    // Reasoning text streaming
-    if (sse.streamingAgentId) {
-      const text = sse.partialText.get(sse.streamingAgentId);
-      if (text) {
-        entries.push({
-          message_id: `partial-reasoning-${sse.streamingAgentId}`,
-          channel_id: "",
-          channel_ids: [],
-          sender_agent_id: sse.streamingAgentId,
-          text,
-          timestamp: new Date().toISOString(),
-          turn_number: sse.agentTurns.get(sse.streamingAgentId) ?? 0,
-          round_number: sse.agentRounds.get(sse.streamingAgentId) ?? 0,
-          is_reasoning: true,
-          is_tool_use: false,
-          is_partial: true,
-          tool_name: "",
-          tool_arguments: {},
-          tool_result: null,
-        });
-      }
-    }
-
-    // Message preview streaming (send_message tool calls)
     for (const [agentId, pm] of sse.partialMessages) {
       entries.push({
         message_id: `partial-msg-${agentId}`,
@@ -244,8 +196,7 @@ export function RunDetail({ runId }: { runId: string }) {
         sender_agent_id: agentId,
         text: pm.text,
         timestamp: new Date().toISOString(),
-        turn_number: sse.agentTurns.get(agentId) ?? 0,
-        round_number: sse.agentRounds.get(agentId) ?? 0,
+        round_number: pm.roundNumber,
         is_reasoning: false,
         is_tool_use: false,
         is_partial: true,
@@ -256,15 +207,17 @@ export function RunDetail({ runId }: { runId: string }) {
     }
 
     return entries;
-  }, [sse.streamingAgentId, sse.partialText, sse.partialMessages, sse.agentTurns, sse.agentRounds]);
+  }, [sse.partialMessages]);
 
   const allDisplayEntries = useMemo(
     () => [...displayEntries, ...partialEntries],
     [displayEntries, partialEntries]
   );
 
-  const totalMessages = sse.totalMessages > 0 ? sse.totalMessages : (restData?.total_messages ?? 0);
-  const totalCostUsd = sse.totalCostUsd > 0 ? sse.totalCostUsd : (restData?.total_cost_usd ?? 0);
+  const channelMessages = displayEntries.filter(e => !e.is_reasoning && !e.is_tool_use).length;
+  const timelineEntries = displayEntries.length;
+  const restCost = restData?.total_cost_usd ?? 0;
+  const totalCostUsd = Math.max(sse.totalCostUsd, restCost);
   const durationSeconds =
     sse.durationSeconds > 0 ? sse.durationSeconds : (restData?.duration_seconds ?? 0);
 
@@ -286,17 +239,13 @@ export function RunDetail({ runId }: { runId: string }) {
     setForkModalMessageId(targetMessageId);
   }, []);
 
-  const handleConfirmFork = useCallback(
-    (model: string) => {
-      if (!forkModalMessageId) return;
-      fork.forkMutation.mutate({
-        targetMessageId: forkModalMessageId,
-        model,
-      });
-      setForkModalMessageId(null);
-    },
-    [forkModalMessageId, fork.forkMutation]
-  );
+  const handleConfirmFork = useCallback(() => {
+    if (!forkModalMessageId) return;
+    fork.forkMutation.mutate({
+      targetMessageId: forkModalMessageId,
+    });
+    setForkModalMessageId(null);
+  }, [forkModalMessageId, fork.forkMutation]);
 
   if (isLoading) {
     return (
@@ -331,7 +280,6 @@ export function RunDetail({ runId }: { runId: string }) {
   const activeAgent = allAgents.find(a => a.agent_id === selectedAgent);
   const activeAgentColor = selectedAgent ? agentColorMap.get(selectedAgent) : undefined;
   const forkEnabled = effectiveStatus === "scenario_complete" || effectiveStatus === "error";
-  const defaultModel = allAgents[0]?.model ?? "";
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-4">
@@ -362,7 +310,8 @@ export function RunDetail({ runId }: { runId: string }) {
           </button>
         </span>
         <span className="text-[13px] text-muted-foreground">
-          {maxRound} rounds · {totalMessages} messages · {allAgents.length} agents
+          {maxRound} rounds · {channelMessages} messages · {timelineEntries} events ·{" "}
+          {allAgents.length} agents
           {totalCostUsd > 0 ? <> · {formatCost(totalCostUsd)}</> : null}
           {durationSeconds > 0 ? <> · {formatDuration(durationSeconds)}</> : null}
           {" · "}
@@ -434,7 +383,7 @@ export function RunDetail({ runId }: { runId: string }) {
       <div
         className={cn(
           "relative grid h-[calc(100vh-120px)] min-h-[500px] overflow-hidden rounded-xl border border-border bg-background",
-          evaluation !== null && showEvalPanel
+          (evaluation !== null && showEvalPanel) || (isInProgress && showReasoningPanel)
             ? "grid-cols-[192px_1fr_280px]"
             : "grid-cols-[192px_1fr]"
         )}
@@ -469,7 +418,6 @@ export function RunDetail({ runId }: { runId: string }) {
             onSelectAgent={setSelectedAgent}
             highlightedMessageId={highlightedMessageId}
             highlightNonce={highlightNonce}
-            streamingAgentId={sse.streamingAgentId}
             forkEnabled={forkEnabled}
             editingMessageId={fork.editingMessageId}
             pendingEdits={fork.pendingEdits}
@@ -481,13 +429,31 @@ export function RunDetail({ runId }: { runId: string }) {
           />
         )}
 
-        {/* Eval panel */}
-        {evaluation !== null && showEvalPanel ? (
+        {/* Right panel: reasoning (in-progress) or eval (completed) */}
+        {isInProgress && showReasoningPanel ? (
+          <ReasoningPanel
+            agents={allAgents}
+            agentColorMap={agentColorMap}
+            streamingAgentIds={sse.streamingAgentIds}
+            partialText={sse.partialText}
+            onClose={() => setShowReasoningPanel(false)}
+          />
+        ) : null}
+        {!isInProgress && evaluation !== null && showEvalPanel ? (
           <EvalPanel evaluation={evaluation} onClose={() => setShowEvalPanel(false)} />
         ) : null}
 
-        {/* Eval panel toggle (when hidden) */}
-        {evaluation !== null && !showEvalPanel ? (
+        {/* Right panel toggle (when hidden) */}
+        {isInProgress && !showReasoningPanel ? (
+          <button
+            className="absolute right-2 top-12 z-10 rounded-md border border-border bg-background p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+            onClick={() => setShowReasoningPanel(true)}
+            title="Show reasoning panel"
+          >
+            <PanelRightOpen className="h-4 w-4" />
+          </button>
+        ) : null}
+        {!isInProgress && evaluation !== null && !showEvalPanel ? (
           <button
             className="absolute right-2 top-12 z-10 rounded-md border border-border bg-background p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
             onClick={() => setShowEvalPanel(true)}
@@ -518,7 +484,6 @@ export function RunDetail({ runId }: { runId: string }) {
       {/* Fork confirmation modal */}
       {forkModalMessageId ? (
         <ForkModal
-          defaultModel={defaultModel}
           isPending={fork.forkMutation.isPending}
           onConfirm={handleConfirmFork}
           onCancel={() => setForkModalMessageId(null)}
@@ -529,35 +494,22 @@ export function RunDetail({ runId }: { runId: string }) {
 }
 
 function ForkModal({
-  defaultModel,
   isPending,
   onConfirm,
   onCancel,
 }: {
-  defaultModel: string;
   isPending: boolean;
-  onConfirm: (model: string) => void;
+  onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const [model, setModel] = useState(defaultModel);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-sm rounded-xl border border-border bg-background p-5 shadow-xl">
         <h3 className="mb-3 text-sm font-medium">Fork simulation</h3>
         <p className="mb-4 text-xs text-muted-foreground">
           A new simulation will start from the edited message with the channel history up to that
-          point.
+          point. The same model and provider from the source run will be used.
         </p>
-        <div className="mb-3 flex flex-col gap-2">
-          <label className="text-[11px] font-medium text-muted-foreground">Model</label>
-          <input
-            type="text"
-            value={model}
-            onChange={e => setModel(e.target.value)}
-            className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-        </div>
         <div className="flex justify-end gap-2">
           <button
             className="rounded-md border border-border px-3 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -568,7 +520,7 @@ function ForkModal({
           </button>
           <button
             className="rounded-md bg-foreground px-3 py-1 text-[12px] font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
-            onClick={() => onConfirm(model)}
+            onClick={onConfirm}
             disabled={isPending}
           >
             {isPending ? "Launching..." : "Launch fork"}

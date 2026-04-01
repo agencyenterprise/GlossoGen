@@ -246,6 +246,7 @@ class CarRecallScenario(SimulationScenario):
                     channel_ids=d.channel_ids,
                     tool_names=d.tool_names,
                     model=model,
+                    max_tokens=16384,
                 )
             )
         return agents

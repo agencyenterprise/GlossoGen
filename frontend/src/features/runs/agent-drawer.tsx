@@ -13,7 +13,6 @@ import { ToolCallDisplay } from "./tool-call-display";
 import { VerdictPill } from "./verdict-pill";
 
 interface DrawerTurnGroup {
-  turnNumber: number;
   timestamp: string;
   entries: DisplayEntry[];
 }
@@ -23,14 +22,10 @@ function groupByTurn(messages: DisplayEntry[]): DrawerTurnGroup[] {
   let current: DrawerTurnGroup | null = null;
 
   for (const msg of messages) {
-    if (current && msg.turn_number === current.turnNumber) {
+    if (current) {
       current.entries.push(msg);
     } else {
-      if (current) {
-        groups.push(current);
-      }
       current = {
-        turnNumber: msg.turn_number,
         timestamp: msg.timestamp,
         entries: [msg],
       };
@@ -126,10 +121,10 @@ export function AgentDrawer({
         {activeTab === "messages" ? (
           <div className="py-2">
             {turnGroups.map((turn, turnIdx) => (
-              <div key={`${turnIdx}-${turn.turnNumber}`} className="flex gap-2.5 px-5 py-2">
+              <div key={turnIdx} className="flex gap-2.5 px-5 py-2">
                 <div className="flex w-5 shrink-0 flex-col items-center justify-center">
                   <span className="text-[10px] font-medium leading-none text-muted-foreground/50">
-                    {turn.turnNumber}
+                    {turnIdx + 1}
                   </span>
                 </div>
                 <div className="min-w-0 flex-1">

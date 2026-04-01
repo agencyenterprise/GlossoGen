@@ -26,6 +26,7 @@ from schmidt.runtime.activity_notification import NewMessagesNotification
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.game_clock import GameClock
 from schmidt.runtime.mcp_server import start_mcp_server
+from schmidt.runtime.mcp_tools import BASE_TOOL_NAMES
 from schmidt.runtime.simulation_state import SimulationRuntime
 from schmidt.scenario_protocol import SimulationScenario
 
@@ -40,15 +41,6 @@ def _mcp_server_url(port: int) -> str:
     return f"http://{MCP_SERVER_HOST}:{port}{MCP_SERVER_PATH}"
 
 
-BASE_TOOL_NAMES = [
-    "check_messages",
-    "read_channel",
-    "send_message",
-    "list_channels",
-    "get_channel_members",
-]
-
-
 class AutonomousSupervisor:
     """Launches the MCP server, game clock, and agent runners for a simulation."""
 
@@ -61,6 +53,7 @@ class AutonomousSupervisor:
         runner_factory: Callable[[], AgentRunner],
         resume_state: RewindState | None,
         run_id: str,
+        provider: str,
     ) -> None:
         self._scenario = scenario
         self._agent_configs = agent_configs
@@ -69,6 +62,7 @@ class AutonomousSupervisor:
         self._runner_factory = runner_factory
         self._resume_state = resume_state
         self._run_id = run_id
+        self._provider = provider
         self._runtime: SimulationRuntime | None = None
 
     async def run(self) -> None:
@@ -155,12 +149,18 @@ class AutonomousSupervisor:
                 reaction_delay_max=delay_max,
             )
 
+        # Build per-agent tool allowlists from scenario-specific tool_names.
+        agent_tool_allowlists: dict[str, frozenset[str]] = {
+            config.agent_id: frozenset(config.tool_names) for config in self._agent_configs
+        }
+
         # Build the simulation runtime (shared state) and store for error-path access.
         runtime = SimulationRuntime(
             scenario=self._scenario,
             channels=channels,
             event_logger=self._event_logger,
             agent_sessions=agent_sessions,
+            agent_tool_allowlists=agent_tool_allowlists,
         )
         self._runtime = runtime
 
@@ -208,10 +208,11 @@ class AutonomousSupervisor:
                     scenario_description=self._scenario.scenario_description(),
                     channel_ids=[ch.channel_id for ch in channels],
                     scenario_config=self._scenario.get_scenario_config(),
+                    provider=self._provider,
                 )
             )
             for config in self._agent_configs:
-                all_tool_names = BASE_TOOL_NAMES + config.tool_names
+                all_tool_names = [*BASE_TOOL_NAMES, *config.tool_names]
                 await self._event_logger.log(
                     event=AgentRegistered(
                         agent_id=config.agent_id,
@@ -220,6 +221,7 @@ class AutonomousSupervisor:
                         channel_ids=config.channel_ids,
                         tool_names=all_tool_names,
                         model=config.model,
+                        max_tokens=config.max_tokens,
                     )
                 )
 
@@ -244,6 +246,10 @@ class AutonomousSupervisor:
                 context = self._resume_state.agent_context_prompts.get(config.agent_id, "")
                 if context:
                     config.system_prompt = config.system_prompt + "\n\n" + context
+
+        # Log the initial round and deliver injections BEFORE launching agents
+        # so no events are recorded with round_number=0.
+        await game_clock.start_initial_round()
 
         # Launch one agent runner per agent as concurrent tasks.
         agent_tasks = []
@@ -279,7 +285,7 @@ class AutonomousSupervisor:
                 )
             logger.info("Pushed wake-up notifications to %d agents", len(agent_sessions))
 
-        # Run the game clock until termination.
+        # Run the game clock polling loop until termination.
         game_clock_task = asyncio.create_task(
             game_clock.run(),
             name="game-clock",

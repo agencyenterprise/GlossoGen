@@ -1,6 +1,6 @@
 # Schmidt-POC Architecture
 
-A platform for testing agent communication through real-life simulations. LLM-based agents interact via MCP tools exposed by a central runtime. Agents are external processes (Claude Code instances launched via the Agent SDK) that connect to a shared MCP server. A game clock manages round progression and injection delivery. No centralized turn control.
+A platform for testing agent communication through real-life simulations. LLM-based agents interact via MCP tools exposed by a central runtime. Agents are processes launched via the Pydantic AI framework that connect to a shared MCP server. A game clock manages round progression and injection delivery. No centralized turn control.
 
 A web UI exposes simulation runs and evaluation results through a FastAPI backend and Next.js frontend.
 
@@ -9,13 +9,13 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 
 | Decision            | Choice                                                       |
 | ------------------- | ------------------------------------------------------------ |
-| LLM Backend         | Claude Code (Agent SDK)                                      |
+| LLM Backend         | Pydantic AI (supports Anthropic, OpenAI, Ollama)             |
 | Transport           | MCP over Streamable HTTP (agents are external processes)     |
 | Scenario Definition | Python classes                                               |
 | Agent Autonomy      | Agents decide when to speak; no central turn controller      |
 | Round Advancement   | Hybrid: all-agents-idle OR round timeout                     |
 | Channels            | Scenario-defined channels with membership lists              |
-| Agent Runtime       | Claude Code via Agent SDK (pluggable runner protocol)        |
+| Agent Runtime       | Pydantic AI with MCP toolsets (pluggable runner protocol)    |
 | Coordination        | Reaction delays + per-channel write locks                    |
 | Agent Framing       | Agents do not know they are in a simulation; MCP server named "comms", tools feel like Slack |
 | Observability       | Structured JSONL log (one file per run)                      |
@@ -60,14 +60,13 @@ Agents see these as generic communication primitives (the MCP server is named `c
 
 Agent runners launch and manage external agent processes that connect to the MCP server. The `AgentRunner` ABC defines a single method: `start(agent_config, mcp_server_url)`. Each runner instance handles one agent.
 
-**ClaudeCodeRunner** is the primary implementation. It uses the Claude Agent SDK to launch a Claude Code instance with:
+**PydanticAIRunner** is the primary implementation. It uses the Pydantic AI framework to launch an agent with:
 - The agent's system prompt (from `AgentConfig`)
-- A single MCP server connection (`comms`) pointing to the runtime's HTTP endpoint
-- An allowed-tools list built from base MCP tools plus scenario-specific tools from `AgentConfig.tool_names`
+- An `MCPServerStreamableHTTP` toolset pointing to the runtime's HTTP endpoint
 - A configurable `max_turns` limit (default: 200)
 - An initial prompt instructing the agent to start by checking for messages
 
-The runner streams agent activity via `query()` and exits when the agent finishes or receives a done notification via `check_messages`. The supervisor creates a new `ClaudeCodeRunner` per agent.
+The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and exits when a done notification arrives via `check_messages`. The supervisor creates a new `PydanticAIRunner` per agent.
 
 ## Game Clock
 

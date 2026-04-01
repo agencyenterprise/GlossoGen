@@ -21,6 +21,7 @@ class TokenDelta(BaseModel):
     agent_id: str
     text: str
     is_final: bool
+    round_number: int
 
 
 class MessagePreview(BaseModel):
@@ -36,6 +37,21 @@ class MessagePreview(BaseModel):
     channel_id: str
     text: str
     is_final: bool
+    round_number: int
+
+
+class AgentCostUpdated(BaseModel):
+    """Cumulative cost snapshot for a single agent after a run cycle.
+
+    Published after each ``agent.run()`` cycle completes and token usage
+    is tallied. The frontend accumulates per-agent costs and sums them
+    for the displayed total. Not persisted — the final total arrives in
+    ``SimulationEnded``.
+    """
+
+    event_type: Literal["agent_cost_updated"] = "agent_cost_updated"
+    agent_id: str
+    cumulative_cost_usd: float
 
 
 class DebugLogEmitted(BaseModel):

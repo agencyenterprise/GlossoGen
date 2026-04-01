@@ -98,7 +98,7 @@ def _extract_reasoning_traces(events: list[SimulationEvent]) -> str:
     traces: list[str] = []
     for event in events:
         if isinstance(event, RoundAdvanced):
-            current_round = event.new_round_number
+            current_round = event.round_number
         elif isinstance(event, LLMResponseReceived) and event.text:
             traces.append(f"[Round {current_round}] {event.agent_id}:\n{event.text}")
     if not traces:
