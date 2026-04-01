@@ -42,6 +42,7 @@ class SimulationStarted(EventBase):
     scenario_description: str
     channel_ids: list[str]
     scenario_config: dict[str, Any] = Field(default_factory=dict)
+    provider: str
 
 
 class AgentRegistered(EventBase):
@@ -56,6 +57,7 @@ class AgentRegistered(EventBase):
     channel_ids: list[str]
     tool_names: list[str]
     model: str
+    max_tokens: int
 
 
 class AgentConnected(EventBase):
@@ -72,6 +74,7 @@ class MessageSent(EventBase):
 
     event_type: Literal["message_sent"] = "message_sent"
     message: SimulationMessage
+    round_number: int
 
 
 class LLMResponseReceived(EventBase):
@@ -85,6 +88,7 @@ class LLMResponseReceived(EventBase):
     tool_calls: list[ToolCallRequest]
     stop_reason: str
     usage: TokenUsage
+    round_number: int
 
 
 class ToolResultReceived(EventBase):
@@ -96,13 +100,14 @@ class ToolResultReceived(EventBase):
     call_id: str
     arguments: dict[str, Any]
     result: str
+    round_number: int
 
 
 class RoundAdvanced(EventBase):
     """Emitted when the game clock advances to a new round in autonomous mode."""
 
     event_type: Literal["round_advanced"] = "round_advanced"
-    new_round_number: int
+    round_number: int
     trigger: str
 
 

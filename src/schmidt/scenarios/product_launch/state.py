@@ -156,7 +156,7 @@ class ProductLaunchState:
             spent_ru=0.0,
             entries=[],
         )
-        self._current_round = 0
+        self._current_round = 1
         self._pending_allocations: dict[str, dict[str, EffortLevel]] = {}
         self._status_reports: list[StatusReport] = []
         self._concerns: list[dict[str, Any]] = []
@@ -514,8 +514,6 @@ class ProductLaunchState:
 
     def _compute_burn_rate(self) -> float:
         """Compute average RU spent per round so far."""
-        if self._current_round <= 0:
-            return 0.0
         return round(self._budget.spent_ru / self._current_round, 1)
 
     def _find_feature(self, feature_id: str) -> Feature | None:

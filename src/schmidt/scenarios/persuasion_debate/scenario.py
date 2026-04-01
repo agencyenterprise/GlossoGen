@@ -148,7 +148,7 @@ class PersuasionDebateScenario(SimulationScenario):
         # Populated by the submit_final_answer MCP tool at runtime.
         self._final_answers: dict[int, dict[str, str]] = {}
         # Tracks the current round number, updated via on_round_advanced.
-        self._current_round_number: int = 0
+        self._current_round_number: int = 1
 
     def _render_template(self, template_name: str, **kwargs: object) -> str:
         """Render a Jinja2 template from the prompts directory."""
@@ -266,6 +266,7 @@ class PersuasionDebateScenario(SimulationScenario):
                         "submit_final_answer",
                     ],
                     model=model,
+                    max_tokens=16384,
                 )
             )
         return agents

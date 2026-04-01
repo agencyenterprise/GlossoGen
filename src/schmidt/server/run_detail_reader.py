@@ -1,6 +1,7 @@
 """Loads and parses a full JSONL simulation log into a RunDetailResponse."""
 
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 import aiofiles
@@ -12,7 +13,6 @@ from schmidt.models.event import (
     AgentRegistered,
     LLMResponseReceived,
     MessageSent,
-    RoundAdvanced,
     RunStatus,
     SimulationEnded,
     SimulationEvent,
@@ -33,6 +33,7 @@ from schmidt.server.response_models import (
     ToolUseEntry,
 )
 from schmidt.stream_manifest import delete_manifest, read_manifest
+from schmidt.token_pricing import find_pricing
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +163,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     scenario_name = ""
     scenario_description = ""
     scenario_config: dict[str, object] = {}
+    provider = "unknown"
     timestamp = None
     channel_ids: list[str] = []
     agents: list[AgentDetail] = []
@@ -173,8 +175,11 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     duration_seconds = 0.0
     status = None
 
-    current_round = 0
     tool_use_by_call_id: dict[str, ToolUseEntry] = {}
+    total_input_tokens = 0
+    total_output_tokens = 0
+    total_cache_read_tokens = 0
+    total_cache_write_tokens = 0
 
     for event in events:
         if isinstance(event, SimulationStarted):
@@ -182,6 +187,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             scenario_name = event.scenario_name
             scenario_description = event.scenario_description
             scenario_config = event.scenario_config
+            provider = event.provider
             timestamp = event.timestamp
             channel_ids = event.channel_ids
 
@@ -197,10 +203,12 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 )
             )
 
-        elif isinstance(event, RoundAdvanced):
-            current_round = event.new_round_number
-
         elif isinstance(event, LLMResponseReceived):
+            total_input_tokens += event.usage.input_tokens
+            total_output_tokens += event.usage.output_tokens
+            total_cache_read_tokens += event.usage.cache_read_input_tokens
+            total_cache_write_tokens += event.usage.cache_creation_input_tokens
+
             # Create reasoning entry for text content
             if event.text is not None and event.text.strip():
                 total_messages += 1
@@ -210,8 +218,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                         sender_agent_id=event.agent_id,
                         text=event.text,
                         timestamp=event.timestamp,
-                        turn_number=total_messages,
-                        round_number=current_round,
+                        round_number=event.round_number,
                         channel_ids=[],
                     )
                 )
@@ -229,8 +236,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     arguments=tc.arguments,
                     result=None,
                     timestamp=event.timestamp,
-                    turn_number=total_messages,
-                    round_number=current_round,
+                    round_number=event.round_number,
                 )
                 tool_use.append(tu_entry)
                 tool_use_by_call_id[tc.call_id] = tu_entry
@@ -250,8 +256,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     sender_agent_id=msg.sender_agent_id,
                     text=msg.text,
                     timestamp=msg.timestamp,
-                    turn_number=total_messages,
-                    round_number=current_round,
+                    round_number=event.round_number,
                 )
             )
 
@@ -260,6 +265,23 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             total_cost_usd = event.total_cost_usd
             if timestamp is not None:
                 duration_seconds = (event.timestamp - timestamp).total_seconds()
+
+    # Compute cost from token usage when the simulation hasn't ended yet
+    # (or when the ended event reported zero cost).
+    if total_cost_usd <= 0 and total_input_tokens > 0:
+        model = agents[0].model if agents else "unknown"
+        pricing = find_pricing(model=model)
+        if pricing is not None:
+            non_cached_input = max(
+                0,
+                total_input_tokens - total_cache_read_tokens - total_cache_write_tokens,
+            )
+            total_cost_usd = (
+                non_cached_input * pricing.input_per_mtok
+                + total_output_tokens * pricing.output_per_mtok
+                + total_cache_read_tokens * pricing.cache_read_per_mtok
+                + total_cache_write_tokens * pricing.cache_write_per_mtok
+            ) / 1_000_000
 
     _link_reasoning_to_channels(reasoning=reasoning, messages=messages)
 
@@ -282,6 +304,11 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
 
     fork_source = _read_fork_source(run_dir=log_path.parent)
 
+    # For forked runs, the displayed start time is when the fork was created,
+    # not when the original parent simulation started.
+    if fork_source is not None:
+        timestamp = fork_source.forked_at
+
     return RunDetailResponse(
         run_id=run_id,
         scenario_name=scenario_name,
@@ -293,6 +320,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         duration_seconds=duration_seconds,
         status=status,
         channel_ids=channel_ids,
+        provider=provider,
         agents=agents,
         messages=messages,
         reasoning=reasoning,
@@ -309,7 +337,9 @@ def _read_fork_source(run_dir: Path) -> ForkSource | None:
     if not manifest_path.exists():
         return None
     raw = orjson.loads(manifest_path.read_bytes())
+    forked_at = datetime.fromtimestamp(raw["forked_at"], tz=UTC)
     return ForkSource(
         source_run_id=raw["source_run_id"],
         target_message_id=raw["target_message_id"],
+        forked_at=forked_at,
     )

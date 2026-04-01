@@ -18,6 +18,7 @@ from schmidt.scenario_protocol import SimulationScenario
 logger = logging.getLogger(__name__)
 
 IDLE_CHECK_INTERVAL_SECONDS = 0.5
+MIN_ROUND_DURATION_SECONDS = 5.0
 
 
 class GameClock:
@@ -42,7 +43,7 @@ class GameClock:
         self._start_round = start_round
         self._last_injected_rounds = last_injected_rounds
         self._resuming = resuming
-        self._current_round = 0
+        self._current_round = self._start_round
         self._last_message_time = time.monotonic()
 
     def on_message_sent(self) -> None:
@@ -84,7 +85,7 @@ class GameClock:
                 round_number=round_number,
                 agent_id=agent_id,
             )
-            if injection_text is None:
+            if not injection_text:
                 continue
 
             session.push_notification(
@@ -110,7 +111,7 @@ class GameClock:
 
         await self._event_logger.log(
             event=RoundAdvanced(
-                new_round_number=self._current_round,
+                round_number=self._current_round,
                 trigger=trigger,
             )
         )
@@ -124,11 +125,11 @@ class GameClock:
 
         await self._deliver_injections(round_number=self._current_round)
 
-    async def run(self) -> RunStatus:
-        """Run the game clock loop. Returns the termination status.
+    async def start_initial_round(self) -> None:
+        """Log the first round and deliver injections before agents start.
 
-        On fresh runs, logs ``RoundAdvanced`` and delivers round-1 injections.
-        On resumed runs, starts from ``start_round`` without re-delivering.
+        Must be called before launching agent tasks so that no events are
+        logged with round_number=0.
         """
         self._current_round = self._start_round
         self._last_message_time = time.monotonic()
@@ -143,7 +144,7 @@ class GameClock:
         else:
             await self._event_logger.log(
                 event=RoundAdvanced(
-                    new_round_number=self._current_round,
+                    round_number=self._current_round,
                     trigger="simulation_start",
                 )
             )
@@ -155,6 +156,11 @@ class GameClock:
                 self._max_rounds,
             )
 
+    async def run(self) -> RunStatus:
+        """Run the game clock polling loop. Returns the termination status.
+
+        Assumes ``start_initial_round`` has already been called.
+        """
         while True:
             await asyncio.sleep(IDLE_CHECK_INTERVAL_SECONDS)
 
@@ -165,7 +171,8 @@ class GameClock:
                 )
                 return RunStatus.SCENARIO_COMPLETE
 
-            if self._all_agents_idle():
+            round_age = time.monotonic() - self._last_message_time
+            if self._all_agents_idle() and round_age >= MIN_ROUND_DURATION_SECONDS:
                 trigger = "all_agents_idle"
             elif self._round_timed_out():
                 elapsed = time.monotonic() - self._last_message_time

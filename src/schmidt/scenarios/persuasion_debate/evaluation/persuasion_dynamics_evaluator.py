@@ -114,10 +114,10 @@ class PersuasionDynamicsEvaluator(Evaluator):
 
         for i, event in enumerate(events):
             if isinstance(event, RoundAdvanced):
-                if event.new_round_number != current_round:
+                if event.round_number != current_round:
                     if current_round > 0:
                         boundaries[current_round] = (current_start, i)
-                    current_round = event.new_round_number
+                    current_round = event.round_number
                     current_start = i
 
         if current_round > 0:

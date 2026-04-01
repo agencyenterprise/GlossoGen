@@ -28,11 +28,23 @@ def _parse_event(raw: dict[str, object]) -> SimulationEvent:
     """
     if raw.get("event_type") == "simulation_ended":
         raw.setdefault("total_cost_usd", 0.0)
+    if raw.get("event_type") == "simulation_started":
+        raw.setdefault("provider", "unknown")
+    if raw.get("event_type") == "round_advanced" and "new_round_number" in raw:
+        raw["round_number"] = raw.pop("new_round_number")
+    if raw.get("event_type") == "agent_registered":
+        raw.setdefault("max_tokens", 16384)
     return _EVENT_ADAPTER.validate_python(raw)
 
 
 async def load_events(log_path: Path) -> list[SimulationEvent]:
-    """Read a JSONL log file and parse each line into a typed SimulationEvent."""
+    """Read a JSONL log file and parse each line into a typed SimulationEvent.
+
+    For old JSONL files where ``MessageSent``, ``LLMResponseReceived``, and
+    ``ToolResultReceived`` lack ``round_number``, the field is backfilled from
+    the most recent ``RoundAdvanced`` event so every consumer receives correct
+    data without needing fallback logic.
+    """
     events: list[SimulationEvent] = []
     async with aiofiles.open(log_path, mode="rb") as f:
         async for line in f:
@@ -59,6 +71,7 @@ def extract_agent_configs(events: list[SimulationEvent]) -> list[AgentConfig]:
                     channel_ids=event.channel_ids,
                     tool_names=event.tool_names,
                     model=event.model,
+                    max_tokens=event.max_tokens,
                 )
             )
     return configs
