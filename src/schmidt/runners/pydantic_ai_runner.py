@@ -7,6 +7,7 @@ streaming while running tool calls to completion.
 """
 
 import asyncio
+import json
 import logging
 from collections.abc import AsyncIterable
 
@@ -473,8 +474,19 @@ class PydanticAIRunner(AgentRunner):
                 round_number=round_number,
             )
 
-            args = event.part.args
-            if not isinstance(args, dict):
+            raw_args = event.part.args
+            if isinstance(raw_args, dict):
+                args = raw_args
+            elif isinstance(raw_args, str):
+                try:
+                    parsed = json.loads(raw_args)
+                    if isinstance(parsed, dict):
+                        args = parsed
+                    else:
+                        args = {}
+                except json.JSONDecodeError:
+                    args = {}
+            else:
                 args = {}
             tc_req = ToolCallRequest(
                 call_id=event.part.tool_call_id,
