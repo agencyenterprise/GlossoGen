@@ -272,8 +272,12 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         model = agents[0].model if agents else "unknown"
         pricing = find_pricing(model=model)
         if pricing is not None:
+            non_cached_input = max(
+                0,
+                total_input_tokens - total_cache_read_tokens - total_cache_write_tokens,
+            )
             total_cost_usd = (
-                total_input_tokens * pricing.input_per_mtok
+                non_cached_input * pricing.input_per_mtok
                 + total_output_tokens * pricing.output_per_mtok
                 + total_cache_read_tokens * pricing.cache_read_per_mtok
                 + total_cache_write_tokens * pricing.cache_write_per_mtok

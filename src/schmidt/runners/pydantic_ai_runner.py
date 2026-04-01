@@ -237,8 +237,15 @@ class PydanticAIRunner(AgentRunner):
 
                     cycle_pricing = find_pricing(model=agent_config.model)
                     if cycle_pricing is not None:
+                        # pydantic-ai (via genai-prices) includes cache tokens
+                        # in input_tokens, so subtract them before applying
+                        # the base input rate to avoid double-counting.
+                        non_cached_input = max(
+                            0,
+                            total_input_tokens - total_cache_read_tokens - total_cache_write_tokens,
+                        )
                         cumulative_cost = (
-                            total_input_tokens * cycle_pricing.input_per_mtok
+                            non_cached_input * cycle_pricing.input_per_mtok
                             + total_output_tokens * cycle_pricing.output_per_mtok
                             + total_cache_read_tokens * cycle_pricing.cache_read_per_mtok
                             + total_cache_write_tokens * cycle_pricing.cache_write_per_mtok
