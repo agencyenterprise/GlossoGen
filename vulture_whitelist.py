@@ -35,7 +35,6 @@ STANDARD  # unused variable — EffortLevel enum variant
 health  # unused function (src/schmidt/server/app.py:44)
 has_evaluation  # unused variable (src/schmidt/server/response_models.py:42)
 runs  # unused variable (src/schmidt/server/response_models.py:50)
-turn_number  # unused variable — Pydantic field (ChannelMessage / ReasoningEntry)
 logger_name  # unused variable (src/schmidt/server/response_models.py:97)
 is_final  # unused variable (src/schmidt/server/response_models.py:276)
 is_final  # unused variable (src/schmidt/server/response_models.py:290)

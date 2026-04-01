@@ -13,7 +13,6 @@ export interface DisplayEntry {
   sender_agent_id: string;
   text: string;
   timestamp: string;
-  turn_number: number;
   round_number: number;
   is_reasoning: boolean;
   is_tool_use: boolean;
@@ -38,7 +37,6 @@ export function mergeEntries(
     sender_agent_id: m.sender_agent_id,
     text: m.text,
     timestamp: m.timestamp,
-    turn_number: m.turn_number,
     round_number: m.round_number,
     is_reasoning: false,
     is_tool_use: false,
@@ -55,7 +53,6 @@ export function mergeEntries(
     sender_agent_id: r.sender_agent_id,
     text: r.text,
     timestamp: r.timestamp,
-    turn_number: r.turn_number,
     round_number: r.round_number,
     is_reasoning: true,
     is_tool_use: false,
@@ -72,7 +69,6 @@ export function mergeEntries(
     sender_agent_id: t.sender_agent_id,
     text: "",
     timestamp: t.timestamp,
-    turn_number: t.turn_number,
     round_number: t.round_number,
     is_reasoning: false,
     is_tool_use: true,

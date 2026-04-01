@@ -202,8 +202,6 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
-            /** Turn Number */
-            turn_number: number;
             /** Round Number */
             round_number: number;
         };
@@ -350,8 +348,6 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
-            /** Turn Number */
-            turn_number: number;
             /** Round Number */
             round_number: number;
             /** Channel Ids */
@@ -809,8 +805,6 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
-            /** Turn Number */
-            turn_number: number;
             /** Round Number */
             round_number: number;
         };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle,
@@ -12,7 +12,7 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
 import type { components } from "@/types/api.gen";
 import {
@@ -64,6 +64,7 @@ function groupByDay(runs: RunSummary[]): Array<{ label: string; runs: RunSummary
 
 export function RunList() {
   const [modalRun, setModalRun] = useState<RunSummary | null>(null);
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({
@@ -155,106 +156,149 @@ export function RunList() {
       {groups.map(group => (
         <div key={group.label}>
           <h2 className="mb-2 text-sm font-medium text-muted-foreground">{group.label}</h2>
-          <div className="divide-y divide-border rounded-lg border border-border">
-            {group.runs.map(run => (
-              <Link
-                key={run.run_id}
-                href={`/runs/${run.run_id}`}
-                className={`block px-4 py-2.5 text-sm transition-colors hover:bg-accent/50 ${run.status === "in_progress" ? "bg-green-50 dark:bg-green-950/20" : ""}`}
-              >
-                <div className="flex items-center gap-6">
-                  <span className="flex w-40 items-center gap-1.5 font-medium">
-                    {humanize(run.scenario_name)}
-                    <button
-                      aria-label="Scenario description"
-                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      onClick={e => {
-                        e.preventDefault();
-                        setModalRun(run);
+          <div className="overflow-hidden rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <tbody>
+              {group.runs.map((run, idx) => {
+                const hasBadges =
+                  run.fork_source ||
+                  run.has_evaluation ||
+                  (run.scenario_config && Object.keys(run.scenario_config).length > 0);
+                const bgClass =
+                  run.status === "in_progress" ? "bg-green-50 dark:bg-green-950/20" : "";
+                const borderClass = idx > 0 ? "border-t border-border" : "";
+
+                return (
+                  <Fragment key={run.run_id}>
+                    <tr
+                      className={`group cursor-pointer transition-colors hover:bg-accent/50 ${bgClass} ${borderClass}`}
+                      onClick={() => {
+                        router.push(`/runs/${run.run_id}`);
                       }}
                     >
-                      <HelpCircle className="h-3.5 w-3.5" />
-                    </button>
-                    {run.fork_source ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
-                        <GitFork className="h-2.5 w-2.5" />
-                        Fork
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="w-20 text-muted-foreground">{formatTime(run.timestamp)}</span>
-                  <span
-                    className="w-44 truncate text-muted-foreground"
-                    title={run.models.join(", ")}
-                  >
-                    {run.models.join(", ")}
-                  </span>
-                  <span className="w-16 text-muted-foreground">{run.total_messages} msgs</span>
-                  {run.total_cost_usd > 0 ? (
-                    <span className="w-16 text-muted-foreground">
-                      {formatCost(run.total_cost_usd)}
-                    </span>
-                  ) : null}
-                  <span className="w-16 text-muted-foreground">
-                    {run.duration_seconds > 0
-                      ? formatDuration(run.duration_seconds)
-                      : run.status === "in_progress"
-                        ? formatDuration(elapsedSince(run.timestamp))
-                        : null}
-                  </span>
-                  <span className="w-36 text-muted-foreground">
-                    {STATUS_LABELS[run.status] ?? run.status}
-                  </span>
-                  <span className="ml-auto">
-                    {run.has_evaluation ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                        <CheckCircle className="h-3 w-3" />
-                        Evaluated
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                        No evaluation
-                      </span>
-                    )}
-                  </span>
-                  {run.status === "in_progress" ? (
-                    <button
-                      aria-label="Stop simulation"
-                      className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                      onClick={e => {
-                        e.preventDefault();
-                        stopMutation.mutate(run.run_id);
-                      }}
-                    >
-                      <Sword className="h-3.5 w-3.5" />
-                    </button>
-                  ) : null}
-                  <button
-                    aria-label="Delete run"
-                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                    onClick={e => {
-                      e.preventDefault();
-                      deleteMutation.mutate(run.run_id);
-                    }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                {run.scenario_config && Object.keys(run.scenario_config).length > 0 ? (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {Object.entries(run.scenario_config).map(([key, value]) => (
-                      <span
-                        key={key}
-                        className="inline-flex items-center gap-0.5 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px]"
+                      <td className="whitespace-nowrap py-2 pl-4 font-medium">
+                        <span className="inline-flex items-center gap-1.5">
+                          {humanize(run.scenario_name)}
+                          <button
+                            aria-label="Scenario description"
+                            className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            onClick={e => {
+                              e.stopPropagation();
+                              setModalRun(run);
+                            }}
+                          >
+                            <HelpCircle className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      </td>
+                      <td
+                        className="max-w-48 truncate px-3 py-2 text-muted-foreground"
+                        title={run.models.join(", ")}
                       >
-                        <span className="text-muted-foreground">{humanize(key)}</span>
-                        <span className="font-medium">{formatConfigValue(value)}</span>
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-              </Link>
-            ))}
+                        {run.models.join(", ")}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        {run.total_messages}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        {run.total_cost_usd > 0 ? formatCost(run.total_cost_usd) : "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        {run.duration_seconds > 0
+                          ? formatDuration(run.duration_seconds)
+                          : run.status === "in_progress"
+                            ? formatDuration(elapsedSince(run.timestamp))
+                            : "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right text-muted-foreground">
+                        {formatTime(run.timestamp)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right">
+                        <span
+                          className={`text-xs font-medium ${
+                            run.status === "in_progress"
+                              ? "text-green-600 dark:text-green-400"
+                              : run.status === "error"
+                                ? "text-destructive"
+                                : "text-muted-foreground"
+                          }`}
+                        >
+                          {STATUS_LABELS[run.status] ?? run.status}
+                        </span>
+                      </td>
+                      <td className="w-16 py-2 pr-4 text-right">
+                        <span className="inline-flex items-center gap-1">
+                          {run.status === "in_progress" ? (
+                            <button
+                              aria-label="Stop simulation"
+                              className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                              onClick={e => {
+                                e.stopPropagation();
+                                stopMutation.mutate(run.run_id);
+                              }}
+                            >
+                              <Sword className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null}
+                          <button
+                            aria-label="Delete run"
+                            className="rounded p-1 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                            onClick={e => {
+                              e.stopPropagation();
+                              deleteMutation.mutate(run.run_id);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      </td>
+                    </tr>
+                    {hasBadges ? (
+                      <tr
+                        className={`cursor-pointer transition-colors hover:bg-accent/50 ${bgClass}`}
+                        onClick={() => {
+                          router.push(`/runs/${run.run_id}`);
+                        }}
+                      >
+                        <td colSpan={8} className="pb-2 pl-4 pr-4">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {run.fork_source ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                                <GitFork className="h-2.5 w-2.5" />
+                                Fork
+                              </span>
+                            ) : null}
+                            {run.has_evaluation ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                <CheckCircle className="h-3 w-3" />
+                                Evaluated
+                              </span>
+                            ) : null}
+                            {run.scenario_config &&
+                            Object.keys(run.scenario_config).length > 0
+                              ? Object.entries(run.scenario_config).map(([key, value]) => (
+                                  <span
+                                    key={key}
+                                    className="inline-flex items-center gap-0.5 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px]"
+                                  >
+                                    <span className="text-muted-foreground">
+                                      {humanize(key)}
+                                    </span>
+                                    <span className="font-medium">
+                                      {formatConfigValue(value)}
+                                    </span>
+                                  </span>
+                                ))
+                              : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
           </div>
         </div>
       ))}

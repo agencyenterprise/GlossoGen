@@ -61,7 +61,7 @@ export function RunDetail({ runId }: { runId: string }) {
     setHighlightedMessageId(messageId);
   }
 
-  // Initial REST fetch — no polling, just a one-time load (+ refetch on SSE completion)
+  // REST fetch — polls every 10s while in-progress to keep cost/messages current
   const {
     data: restData,
     isLoading,
@@ -76,6 +76,13 @@ export function RunDetail({ runId }: { runId: string }) {
         throw new Error("Failed to fetch run detail");
       }
       return data;
+    },
+    refetchInterval: query => {
+      const status = query.state.data?.status;
+      if (status === "in_progress") {
+        return 10_000;
+      }
+      return false;
     },
   });
 
@@ -106,29 +113,9 @@ export function RunDetail({ runId }: { runId: string }) {
     return ids;
   }, [restData]);
 
-  // Derive latest turn/round per agent from REST data to seed the SSE hook
-  const initialAgentTurns = useMemo(() => {
-    if (!restData) return new Map<string, number>();
-    const map = new Map<string, number>();
-    for (const m of restData.messages) {
-      const prev = map.get(m.sender_agent_id) ?? 0;
-      if (m.turn_number > prev) {
-        map.set(m.sender_agent_id, m.turn_number);
-      }
-    }
-    return map;
-  }, [restData]);
-
   // SSE streaming for in-progress runs
   const sseEnabled = restData?.status === "in_progress";
-  const initialMessageCount = restData?.messages.length ?? 0;
-  const sse = useEventStream(
-    runId,
-    sseEnabled,
-    knownEventIds,
-    initialAgentTurns,
-    initialMessageCount
-  );
+  const sse = useEventStream(runId, sseEnabled, knownEventIds);
 
   // When SSE reports simulation ended, refetch REST for evaluation + debug logs
   const sseStatus = sse.status;
@@ -209,7 +196,6 @@ export function RunDetail({ runId }: { runId: string }) {
         sender_agent_id: agentId,
         text: pm.text,
         timestamp: new Date().toISOString(),
-        turn_number: sse.agentTurns.get(agentId) ?? 0,
         round_number: pm.roundNumber,
         is_reasoning: false,
         is_tool_use: false,
@@ -221,7 +207,7 @@ export function RunDetail({ runId }: { runId: string }) {
     }
 
     return entries;
-  }, [sse.partialMessages, sse.agentTurns]);
+  }, [sse.partialMessages]);
 
   const allDisplayEntries = useMemo(
     () => [...displayEntries, ...partialEntries],
@@ -230,7 +216,8 @@ export function RunDetail({ runId }: { runId: string }) {
 
   const channelMessages = displayEntries.filter(e => !e.is_reasoning && !e.is_tool_use).length;
   const timelineEntries = displayEntries.length;
-  const totalCostUsd = sse.totalCostUsd > 0 ? sse.totalCostUsd : (restData?.total_cost_usd ?? 0);
+  const restCost = restData?.total_cost_usd ?? 0;
+  const totalCostUsd = Math.max(sse.totalCostUsd, restCost);
   const durationSeconds =
     sse.durationSeconds > 0 ? sse.durationSeconds : (restData?.duration_seconds ?? 0);
 

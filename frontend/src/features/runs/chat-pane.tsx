@@ -39,7 +39,6 @@ interface ChatPaneProps {
 }
 
 interface TurnGroup {
-  turnNumber: number;
   agentId: string;
   timestamp: string;
   entries: DisplayEntry[];
@@ -67,23 +66,17 @@ function groupByRoundAndTurn(messages: DisplayEntry[]): RoundGroup[] {
       currentRound = msg.round_number;
       currentTurns = [];
       currentTurn = {
-        turnNumber: msg.turn_number,
         agentId: msg.sender_agent_id,
         timestamp: msg.timestamp,
         entries: [msg],
       };
-    } else if (
-      currentTurn &&
-      msg.turn_number === currentTurn.turnNumber &&
-      msg.sender_agent_id === currentTurn.agentId
-    ) {
+    } else if (currentTurn && msg.sender_agent_id === currentTurn.agentId) {
       currentTurn.entries.push(msg);
     } else {
       if (currentTurn) {
         currentTurns.push(currentTurn);
       }
       currentTurn = {
-        turnNumber: msg.turn_number,
         agentId: msg.sender_agent_id,
         timestamp: msg.timestamp,
         entries: [msg],
@@ -307,7 +300,7 @@ export function ChatPane({
 
               return (
                 <div
-                  key={`${roundIdx}-${turnIdx}-${turn.turnNumber}-${turn.agentId}`}
+                  key={`${roundIdx}-${turnIdx}-${turn.agentId}`}
                   className="flex gap-2.5 px-4 py-1 transition-colors hover:bg-muted/50"
                 >
                   <div className="flex w-7 shrink-0 flex-col items-start">
@@ -324,7 +317,7 @@ export function ChatPane({
                     </button>
                     <div className="flex flex-1 items-center justify-center self-stretch">
                       <span className="text-[10px] font-medium leading-none text-muted-foreground/50">
-                        {turn.turnNumber}
+                        {turnIdx + 1}
                       </span>
                     </div>
                   </div>

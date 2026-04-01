@@ -45,8 +45,6 @@ export interface EventStreamState {
   streamingAgentIds: Set<string>;
   /** Map of agent_id -> partial message for in-progress send_message tool calls. */
   partialMessages: Map<string, PartialMessage>;
-  /** Map of agent_id -> current turn number. */
-  agentTurns: Map<string, number>;
   /** Debug log entries received via SSE. */
   debugLogs: DebugLogEntry[];
   /** Total cost in USD from the simulation_ended event. */
@@ -66,9 +64,7 @@ export interface EventStreamState {
 export function useEventStream(
   runId: string,
   enabled: boolean,
-  knownEventIds: Set<string>,
-  initialAgentTurns: Map<string, number>,
-  initialMessageCount: number
+  knownEventIds: Set<string>
 ): EventStreamState {
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [reasoning, setReasoning] = useState<ReasoningEntry[]>([]);
@@ -83,29 +79,13 @@ export function useEventStream(
   const [partialText, setPartialText] = useState<Map<string, string>>(new Map());
   const [streamingAgentIds, setStreamingAgentIds] = useState<Set<string>>(new Set());
   const [partialMessages, setPartialMessages] = useState<Map<string, PartialMessage>>(new Map());
-  const [agentTurns, setAgentTurns] = useState<Map<string, number>>(new Map());
   const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
 
-  // Refs mirror the state for synchronous access inside event listeners.
-  const agentTurnRef = useRef<Map<string, number>>(new Map());
-  // Global message counter used as fallback turn_number.
-  const messageCounterRef = useRef(0);
   const agentCostsRef = useRef<Map<string, number>>(new Map());
   const knownIdsRef = useRef(knownEventIds);
   useEffect(() => {
     knownIdsRef.current = knownEventIds;
   }, [knownEventIds]);
-
-  // Seed turn refs and message counter from REST data
-  useEffect(() => {
-    messageCounterRef.current = initialMessageCount;
-    if (initialAgentTurns.size > 0) {
-      for (const [id, turn] of initialAgentTurns) {
-        agentTurnRef.current.set(id, turn);
-      }
-      setAgentTurns(new Map(agentTurnRef.current));
-    }
-  }, [initialAgentTurns, initialMessageCount]);
 
   // Buffer for batching token deltas via requestAnimationFrame
   const pendingDeltasRef = useRef<Map<string, string>>(new Map());
@@ -140,11 +120,8 @@ export function useEventStream(
     setPartialText(new Map());
     setStreamingAgentIds(new Set());
     setPartialMessages(new Map());
-    setAgentTurns(new Map());
     setDebugLogs([]);
-    agentTurnRef.current = new Map();
     agentCostsRef.current = new Map();
-    messageCounterRef.current = 0;
     pendingDeltasRef.current = new Map();
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
@@ -171,9 +148,6 @@ export function useEventStream(
     eventSource.onerror = () => {
       setIsConnected(false);
       errorCount += 1;
-      // If the SSE endpoint rejects the connection repeatedly (e.g. simulation
-      // already ended and stream.json was cleaned up), close the EventSource
-      // so the parent component falls back to the REST status.
       if (!hasConnected && errorCount >= 3) {
         eventSource.close();
       }
@@ -204,23 +178,17 @@ export function useEventStream(
       if (knownIdsRef.current.has(data.event_id)) return;
       const msg = data.message;
 
-      messageCounterRef.current += 1;
-
       const channelMessage: ChannelMessage = {
         message_id: msg.message_id,
         channel_id: msg.channel_id,
         sender_agent_id: msg.sender_agent_id,
         text: msg.text,
         timestamp: msg.timestamp,
-        turn_number: agentTurnRef.current.get(msg.sender_agent_id) ?? messageCounterRef.current,
         round_number: data.round_number,
       };
       setMessages(prev => [...prev, channelMessage]);
       setTotalMessages(prev => prev + 1);
 
-      // Clear message preview for this agent (the message was sent successfully).
-      // Do NOT clear partialText or streamingAgentIds — the agent may still be
-      // streaming reasoning for subsequent tool calls within the same run cycle.
       setPartialMessages(prev => {
         if (!prev.has(msg.sender_agent_id)) return prev;
         const next = new Map(prev);
@@ -233,20 +201,17 @@ export function useEventStream(
       const data: SSELLMResponseReceived = JSON.parse(e.data);
       if (knownIdsRef.current.has(data.event_id)) return;
       if (data.text != null && data.text.trim() !== "") {
-        messageCounterRef.current += 1;
         const entry: ReasoningEntry = {
           message_id: data.event_id,
           sender_agent_id: data.agent_id,
           text: data.text,
           timestamp: data.timestamp,
-          turn_number: agentTurnRef.current.get(data.agent_id) ?? messageCounterRef.current,
           round_number: data.round_number,
           channel_ids: [],
         };
         setReasoning(prev => [...prev, entry]);
       }
 
-      // Clear partial text for this agent (LLM response is complete)
       setPartialText(prev => {
         if (!prev.has(data.agent_id)) return prev;
         const next = new Map(prev);
@@ -263,13 +228,11 @@ export function useEventStream(
 
     eventSource.addEventListener("tool_result_received", (e: MessageEvent) => {
       const data: SSEToolResultReceived = JSON.parse(e.data);
-      // Create a new tool use entry or update an existing one with the result
       setToolUse(prev => {
         const existing = prev.find(t => t.call_id === data.call_id);
         if (existing) {
           return prev.map(t => (t.call_id === data.call_id ? { ...t, result: data.result } : t));
         }
-        messageCounterRef.current += 1;
         const entry: ToolUseEntry = {
           message_id: data.event_id,
           sender_agent_id: data.agent_id,
@@ -278,7 +241,6 @@ export function useEventStream(
           arguments: data.arguments,
           result: data.result,
           timestamp: data.timestamp,
-          turn_number: agentTurnRef.current.get(data.agent_id) ?? messageCounterRef.current,
           round_number: data.round_number,
         };
         return [...prev, entry];
@@ -329,8 +291,6 @@ export function useEventStream(
       }
     });
 
-    // Message preview events are paced by the backend (~30ms intervals)
-    // so we update state directly on each event instead of RAF-batching.
     eventSource.addEventListener("message_preview", (e: MessageEvent) => {
       const data: SSEMessagePreview = JSON.parse(e.data);
       const agentId = data.agent_id;
@@ -404,7 +364,6 @@ export function useEventStream(
     partialText,
     streamingAgentIds,
     partialMessages,
-    agentTurns,
     debugLogs,
     totalCostUsd,
     durationSeconds,

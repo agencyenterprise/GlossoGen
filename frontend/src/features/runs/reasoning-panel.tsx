@@ -23,7 +23,7 @@ interface CompletedEntry {
   text: string;
 }
 
-const FADE_AFTER_MS = 3000;
+const FADE_AFTER_MS = 10_000;
 
 let entryCounter = 0;
 
