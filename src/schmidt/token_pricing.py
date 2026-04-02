@@ -25,16 +25,17 @@ class TokenPricing(NamedTuple):
 # Prefix matching allows versioned IDs like "claude-sonnet-4-20250514"
 # to match "claude-sonnet-4".
 _PRICING_TABLE: dict[str, TokenPricing] = {
-    # Anthropic — longer prefixes first so "claude-opus-4.6-*" doesn't
-    # accidentally match the cheaper "claude-opus-4" entry.
-    "claude-opus-4.6": TokenPricing(
+    # Anthropic — keys use dashes (matching actual API model IDs).
+    # Longer prefixes first so "claude-opus-4-6-*" doesn't accidentally
+    # match the cheaper "claude-opus-4" entry.
+    "claude-opus-4-6": TokenPricing(
         provider="anthropic",
         input_per_mtok=5.0,
         output_per_mtok=25.0,
         cache_read_per_mtok=0.50,
         cache_write_per_mtok=6.25,
     ),
-    "claude-opus-4.5": TokenPricing(
+    "claude-opus-4-5": TokenPricing(
         provider="anthropic",
         input_per_mtok=5.0,
         output_per_mtok=25.0,
@@ -48,7 +49,7 @@ _PRICING_TABLE: dict[str, TokenPricing] = {
         cache_read_per_mtok=1.50,
         cache_write_per_mtok=18.75,
     ),
-    "claude-sonnet-4.6": TokenPricing(
+    "claude-sonnet-4-6": TokenPricing(
         provider="anthropic",
         input_per_mtok=3.0,
         output_per_mtok=15.0,
@@ -62,14 +63,14 @@ _PRICING_TABLE: dict[str, TokenPricing] = {
         cache_read_per_mtok=0.30,
         cache_write_per_mtok=3.75,
     ),
-    "claude-haiku-4.5": TokenPricing(
+    "claude-haiku-4-5": TokenPricing(
         provider="anthropic",
         input_per_mtok=1.0,
         output_per_mtok=5.0,
         cache_read_per_mtok=0.10,
         cache_write_per_mtok=1.25,
     ),
-    "claude-haiku-3.5": TokenPricing(
+    "claude-haiku-3-5": TokenPricing(
         provider="anthropic",
         input_per_mtok=0.80,
         output_per_mtok=4.0,
