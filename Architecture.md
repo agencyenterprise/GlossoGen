@@ -250,7 +250,8 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 
 - The server reads from the `runs/` directory at request time (no database).
 - `SCHMIDT_RUNS_DIR` environment variable configures the runs root directory.
-- CORS is configured for `http://localhost:3000` (the frontend dev server).
+- CORS origins are read from the `ALLOWED_ORIGINS` environment variable (comma-separated). Defaults to `http://localhost:3000`.
+- Optional shared-password authentication via `APP_PASSWORD` environment variable. A pure ASGI middleware (`password_auth_middleware.py`) checks `Authorization: Bearer` headers and `?token=` query parameters (for SSE EventSource connections). All endpoints except `GET /api/health` are protected when enabled.
 - Every endpoint declares a `response_model` and returns a Pydantic model instance. No dicts or strings are returned.
 - Status-like fields use enums (`HealthStatus`, `RunStatus`, `Verdict`) instead of bare strings. `RunStatus` includes `IN_PROGRESS` for runs that have not yet completed.
 - The run detail endpoint returns separate `messages` (ChannelMessage) and `reasoning` (ReasoningEntry) arrays, plus `debug_logs` (DebugLogEntry) parsed from the debug JSONL file.

@@ -105,6 +105,28 @@ make gen-api-types
 
 CI fails if `frontend/src/types/api.gen.ts` drifts from the backend schema.
 
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in the values:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Required | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Yes (for simulations) | Anthropic API key |
+| `OPENAI_API_KEY` | Optional | OpenAI API key |
+| `HF_TOKEN` | Optional | HuggingFace token |
+| `APP_PASSWORD` | Optional | Shared password for web UI auth (disabled if unset) |
+| `ALLOWED_ORIGINS` | Optional | Comma-separated CORS origins (defaults to `http://localhost:3000`) |
+
+Frontend environment variables go in `frontend/.env.local` (see `frontend/.env.local.example`):
+
+| Variable | Default | Description |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend API base URL |
+
 ## Development
 
 ```bash

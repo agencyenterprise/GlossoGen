@@ -42,6 +42,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Schmidt Simulation Server", lifespan=lifespan)
 
+_app_password = os.environ.get("APP_PASSWORD")
+if _app_password:
+    app.add_middleware(PasswordAuthMiddleware, password=_app_password)
+
+# CORS must be added last so it is the outermost middleware. This ensures
+# CORS headers are present on all responses, including 401s from the auth
+# middleware. (FastAPI applies middleware in reverse add order.)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_parse_allowed_origins(),
@@ -49,10 +56,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-_app_password = os.environ.get("APP_PASSWORD")
-if _app_password:
-    app.add_middleware(PasswordAuthMiddleware, password=_app_password)
 
 app.include_router(runs_router)
 app.include_router(fork_router)
