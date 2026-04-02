@@ -681,7 +681,7 @@ def _mcp_submit_deliverable(
         code = await workspace.read_file(team_id=team_id, filename=filename)
         if code.startswith("File not found:"):
             return code
-        state.store_deliverable(team_id=team_id, filename=filename, code=code)
+        await workspace.write_deliverable(team_id=team_id, filename=filename, code=code)
         return (
             f"Deliverable stored: {filename} ({len(code)} chars). "
             f"Your sales rep can now retrieve it with get_deliverable."
