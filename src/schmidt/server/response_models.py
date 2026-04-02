@@ -178,6 +178,55 @@ class RunDetailResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Scenario discovery and simulation launch models
+# ---------------------------------------------------------------------------
+
+
+class ScenarioInfo(BaseModel):
+    """Metadata about a single scenario, including its available knobs files."""
+
+    scenario_name: str
+    knobs_files: list[str]
+
+
+class ModelInfo(BaseModel):
+    """A supported model prefix and its provider."""
+
+    model_prefix: str
+    provider: str
+
+
+class ScenariosResponse(BaseModel):
+    """Response listing all available scenarios, models, and providers."""
+
+    scenarios: list[ScenarioInfo]
+    models: list[ModelInfo]
+    providers: list[str]
+
+
+class KnobsContentResponse(BaseModel):
+    """Response containing the parsed contents of a knobs JSON file."""
+
+    knobs: dict[str, Any]
+
+
+class StartRunRequest(BaseModel):
+    """Request body for starting a new simulation run."""
+
+    scenario_name: str
+    model: str
+    provider: str
+    knobs: dict[str, Any] | None
+
+
+class StartRunResponse(BaseModel):
+    """Response after successfully launching a new simulation."""
+
+    run_id: str
+    run_dir: str
+
+
+# ---------------------------------------------------------------------------
 # Fork request/response models
 # ---------------------------------------------------------------------------
 

@@ -120,6 +120,7 @@ cp .env.example .env
 | `HF_TOKEN` | Optional | HuggingFace token |
 | `APP_PASSWORD` | Optional | Shared password for web UI auth (disabled if unset) |
 | `ALLOWED_ORIGINS` | Optional | Comma-separated CORS origins (defaults to `http://localhost:3000`) |
+| `SCHMIDT_RUNS_DIR` | Optional | Directory for simulation run data (defaults to `./runs`) |
 
 Frontend environment variables go in `frontend/.env.local` (see `frontend/.env.local.example`):
 

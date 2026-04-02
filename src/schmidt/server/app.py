@@ -15,6 +15,7 @@ from schmidt.server.password_auth_middleware import PasswordAuthMiddleware
 from schmidt.server.pdf_export_router import router as pdf_export_router
 from schmidt.server.response_models import AuthVerifyResponse, HealthResponse, HealthStatus
 from schmidt.server.runs_router import router as runs_router
+from schmidt.server.scenarios_router import router as scenarios_router
 
 load_dotenv()
 
@@ -32,9 +33,7 @@ def _parse_allowed_origins() -> list[str]:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Store the configured runs directory on app state at startup."""
-    runs_dir_str = os.environ.get("SCHMIDT_RUNS_DIR")
-    if not runs_dir_str:
-        raise RuntimeError("SCHMIDT_RUNS_DIR environment variable is required")
+    runs_dir_str = os.environ.get("SCHMIDT_RUNS_DIR", "./runs")
     app.state.runs_dir = Path(runs_dir_str)
     logger.info("Serving runs from: %s", app.state.runs_dir)
     yield
@@ -60,6 +59,7 @@ app.add_middleware(
 app.include_router(runs_router)
 app.include_router(fork_router)
 app.include_router(pdf_export_router)
+app.include_router(scenarios_router)
 
 
 @app.get("/api/health", response_model=HealthResponse)

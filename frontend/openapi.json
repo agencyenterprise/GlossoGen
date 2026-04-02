@@ -324,6 +324,113 @@
         }
       }
     },
+    "/api/scenarios": {
+      "get": {
+        "summary": "List Scenarios",
+        "description": "List all available scenarios with their knobs files and supported providers.",
+        "operationId": "list_scenarios_api_scenarios_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenariosResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scenarios/{scenario_name}/knobs/{knobs_name}": {
+      "get": {
+        "summary": "Get Knobs Content",
+        "description": "Read and return the contents of a knobs JSON file.",
+        "operationId": "get_knobs_content_api_scenarios__scenario_name__knobs__knobs_name__get",
+        "parameters": [
+          {
+            "name": "scenario_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario Name"
+            }
+          },
+          {
+            "name": "knobs_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Knobs Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnobsContentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/start": {
+      "post": {
+        "summary": "Start Run",
+        "description": "Launch a new simulation as a background subprocess.\n\nValidates inputs, creates a run directory, writes the knobs dict to a\ntemporary JSON file, builds the CLI command, and waits for the subprocess\nto write its first event before returning the run_id.",
+        "operationId": "start_run_api_runs_start_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -704,6 +811,21 @@
         "title": "HealthStatus",
         "description": "Health check status values."
       },
+      "KnobsContentResponse": {
+        "properties": {
+          "knobs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Knobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "knobs"
+        ],
+        "title": "KnobsContentResponse",
+        "description": "Response containing the parsed contents of a knobs JSON file."
+      },
       "MessageEdit": {
         "properties": {
           "message_id": {
@@ -722,6 +844,25 @@
         ],
         "title": "MessageEdit",
         "description": "A single message text edit for a fork request."
+      },
+      "ModelInfo": {
+        "properties": {
+          "model_prefix": {
+            "type": "string",
+            "title": "Model Prefix"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_prefix",
+          "provider"
+        ],
+        "title": "ModelInfo",
+        "description": "A supported model prefix and its provider."
       },
       "ReasoningEntry": {
         "properties": {
@@ -1516,6 +1657,117 @@
         ],
         "title": "SSEToolResultReceived",
         "description": "SSE event emitted when a tool call completes and returns a result."
+      },
+      "ScenarioInfo": {
+        "properties": {
+          "scenario_name": {
+            "type": "string",
+            "title": "Scenario Name"
+          },
+          "knobs_files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Knobs Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_name",
+          "knobs_files"
+        ],
+        "title": "ScenarioInfo",
+        "description": "Metadata about a single scenario, including its available knobs files."
+      },
+      "ScenariosResponse": {
+        "properties": {
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioInfo"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelInfo"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "providers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Providers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenarios",
+          "models",
+          "providers"
+        ],
+        "title": "ScenariosResponse",
+        "description": "Response listing all available scenarios, models, and providers."
+      },
+      "StartRunRequest": {
+        "properties": {
+          "scenario_name": {
+            "type": "string",
+            "title": "Scenario Name"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "knobs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_name",
+          "model",
+          "provider",
+          "knobs"
+        ],
+        "title": "StartRunRequest",
+        "description": "Request body for starting a new simulation run."
+      },
+      "StartRunResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "run_dir": {
+            "type": "string",
+            "title": "Run Dir"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "run_dir"
+        ],
+        "title": "StartRunResponse",
+        "description": "Response after successfully launching a new simulation."
       },
       "ToolUseEntry": {
         "properties": {

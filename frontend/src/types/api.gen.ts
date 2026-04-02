@@ -142,6 +142,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Scenarios
+         * @description List all available scenarios with their knobs files and supported providers.
+         */
+        get: operations["list_scenarios_api_scenarios_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scenarios/{scenario_name}/knobs/{knobs_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Knobs Content
+         * @description Read and return the contents of a knobs JSON file.
+         */
+        get: operations["get_knobs_content_api_scenarios__scenario_name__knobs__knobs_name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Run
+         * @description Launch a new simulation as a background subprocess.
+         *
+         *     Validates inputs, creates a run directory, writes the knobs dict to a
+         *     temporary JSON file, builds the CLI command, and waits for the subprocess
+         *     to write its first event before returning the run_id.
+         */
+        post: operations["start_run_api_runs_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -350,6 +414,16 @@ export interface components {
          */
         HealthStatus: "ok";
         /**
+         * KnobsContentResponse
+         * @description Response containing the parsed contents of a knobs JSON file.
+         */
+        KnobsContentResponse: {
+            /** Knobs */
+            knobs: {
+                [key: string]: unknown;
+            };
+        };
+        /**
          * MessageEdit
          * @description A single message text edit for a fork request.
          */
@@ -358,6 +432,16 @@ export interface components {
             message_id: string;
             /** New Text */
             new_text: string;
+        };
+        /**
+         * ModelInfo
+         * @description A supported model prefix and its provider.
+         */
+        ModelInfo: {
+            /** Model Prefix */
+            model_prefix: string;
+            /** Provider */
+            provider: string;
         };
         /**
          * ReasoningEntry
@@ -764,6 +848,54 @@ export interface components {
             round_number: number;
         };
         /**
+         * ScenarioInfo
+         * @description Metadata about a single scenario, including its available knobs files.
+         */
+        ScenarioInfo: {
+            /** Scenario Name */
+            scenario_name: string;
+            /** Knobs Files */
+            knobs_files: string[];
+        };
+        /**
+         * ScenariosResponse
+         * @description Response listing all available scenarios, models, and providers.
+         */
+        ScenariosResponse: {
+            /** Scenarios */
+            scenarios: components["schemas"]["ScenarioInfo"][];
+            /** Models */
+            models: components["schemas"]["ModelInfo"][];
+            /** Providers */
+            providers: string[];
+        };
+        /**
+         * StartRunRequest
+         * @description Request body for starting a new simulation run.
+         */
+        StartRunRequest: {
+            /** Scenario Name */
+            scenario_name: string;
+            /** Model */
+            model: string;
+            /** Provider */
+            provider: string;
+            /** Knobs */
+            knobs: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * StartRunResponse
+         * @description Response after successfully launching a new simulation.
+         */
+        StartRunResponse: {
+            /** Run Id */
+            run_id: string;
+            /** Run Dir */
+            run_dir: string;
+        };
+        /**
          * ToolUseEntry
          * @description A scenario-specific tool invocation with its result.
          *
@@ -1017,6 +1149,91 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                     "application/pdf": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_scenarios_api_scenarios_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenariosResponse"];
+                };
+            };
+        };
+    };
+    get_knobs_content_api_scenarios__scenario_name__knobs__knobs_name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario_name: string;
+                knobs_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnobsContentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_run_api_runs_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartRunResponse"];
                 };
             };
             /** @description Validation Error */
