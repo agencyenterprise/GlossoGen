@@ -21,7 +21,7 @@ import { AgentDrawer } from "./agent-drawer";
 import { ChatPane } from "./chat-pane";
 import { mergeEntries } from "./display-entry";
 import { EvalPanel } from "./eval-panel";
-import { ForkBadge } from "./fork-badge";
+import { ForkBadge, ForkPointFab } from "./fork-badge";
 import { elapsedSince, formatConfigValue, formatCost, formatDuration, humanize } from "./format";
 import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
@@ -392,6 +392,7 @@ export function RunDetail({ runId }: { runId: string }) {
             onCancelEdit={fork.cancelEdit}
             onRemoveEdit={fork.removeEdit}
             onForkFromMessage={handleForkFromMessage}
+            forkPointMessageId={restData.fork_source?.target_message_id ?? null}
           />
         )}
 
@@ -435,6 +436,32 @@ export function RunDetail({ runId }: { runId: string }) {
           isPending={fork.forkMutation.isPending}
           onConfirm={handleConfirmFork}
           onCancel={() => setForkModalMessageId(null)}
+        />
+      ) : null}
+
+      {restData.fork_source ? (
+        <ForkPointFab
+          onClick={() => {
+            const forkMsgId = restData.fork_source?.target_message_id;
+            if (!forkMsgId) return;
+            const entry = displayEntries.find(e => e.message_id === forkMsgId);
+            if (!entry) return;
+
+            const messageChannel = entry.channel_id;
+            const needsChannelSwitch =
+              selectedChannel !== null && selectedChannel !== messageChannel;
+
+            flushSync(() => {
+              setSelectedAgent(null);
+              setShowLogs(false);
+              if (needsChannelSwitch) {
+                setSelectedChannel(null);
+              }
+              setHighlightedMessageId(null);
+            });
+            setHighlightNonce(n => n + 1);
+            setHighlightedMessageId(forkMsgId);
+          }}
         />
       ) : null}
     </div>

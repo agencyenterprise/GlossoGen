@@ -1,4 +1,8 @@
-"""FastAPI router for forking simulation runs from a specific message."""
+"""FastAPI router for forking simulation runs from a specific message.
+
+Uses the git-backed run repository to clone the source run at the target
+message's commit, apply edits, and launch a resumed simulation.
+"""
 
 import logging
 import socket
@@ -7,14 +11,14 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import orjson
 from fastapi import APIRouter, HTTPException, Request
 
 from schmidt.evaluation.log_reader import load_events
-from schmidt.fork_writer import write_fork_log
 from schmidt.message_rewind import build_rewind_state
-from schmidt.scenario_loader import get_scenario_class
+from schmidt.run_repository import RunRepository
 from schmidt.server.response_models import ForkRequest, ForkResponse
 from schmidt.server.run_discovery import discover_runs
 
@@ -64,9 +68,9 @@ def _build_scenario_cli_flags(
 async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResponse:
     """Create a forked simulation run from a specific message.
 
-    Truncates the source event log at the target message, applies text edits,
-    writes the result to a new run directory, and launches the simulation as
-    a background subprocess.
+    Clones the source run's git repository at the target message's commit,
+    applies text edits to the JSONL, and launches the simulation as a
+    background subprocess with ``--resume``.
     """
     runs_dir: Path = request.app.state.runs_dir
     summaries = await discover_runs(runs_dir=runs_dir)
@@ -77,33 +81,38 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
 
     source_run_dir = Path(matching[0].run_dir)
     scenario_name = matching[0].scenario_name
-    log_path = source_run_dir / f"{scenario_name}.jsonl"
-
-    events = await load_events(log_path=log_path)
-
     message_edits = {edit.message_id: edit.new_text for edit in body.message_edits}
 
-    # Verify the target message exists before creating the fork directory.
+    # Find the git commit for the target message.
+    source_repo = RunRepository(run_dir=source_run_dir)
+    target_sha = await source_repo.find_commit_for_message(message_id=body.target_message_id)
+    if target_sha is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No git commit found for message {body.target_message_id}",
+        )
+
+    # Clone to new run directory and check out the target commit.
+    timestamp = str(int(time.time()))
+    new_run_dir = runs_dir / scenario_name / timestamp
+    forked_repo = await source_repo.clone_to(target_dir=new_run_dir)
+    await forked_repo.checkout(sha=target_sha)
+
+    # The JSONL and all workspace files are now at the correct state.
+    # Apply message edits and assign a new run ID.
+    new_log_path = new_run_dir / f"{scenario_name}.jsonl"
+    fork_run_id = _apply_edits_and_new_run_id(
+        log_path=new_log_path,
+        message_edits=message_edits,
+    )
+
+    # Verify the target message exists in the truncated log.
+    events = await load_events(log_path=new_log_path)
     build_rewind_state(
         events=events,
         target_message_id=body.target_message_id,
         message_edits=message_edits,
     )
-
-    # Create new run directory.
-    timestamp = str(int(time.time()))
-    new_run_dir = runs_dir / scenario_name / timestamp
-    new_run_dir.mkdir(parents=True, exist_ok=True)
-
-    new_log_path = new_run_dir / f"{scenario_name}.jsonl"
-
-    result = write_fork_log(
-        source_events=events,
-        target_message_id=body.target_message_id,
-        message_edits=message_edits,
-        output_path=new_log_path,
-    )
-    fork_run_id = result.fork_run_id
 
     # Write fork manifest for provenance tracking.
     manifest = {
@@ -115,12 +124,11 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
     manifest_path = new_run_dir / "fork_manifest.json"
     manifest_path.write_bytes(orjson.dumps(manifest))
 
-    # Replay filesystem artifacts (workspace files, deliverables, tests) so the
-    # forked simulation has the same on-disk state as the original at the fork point.
-    truncated_events = await load_events(log_path=new_log_path)
-    scenario_cls = get_scenario_class(name=scenario_name)
-    scenario = scenario_cls.create_from_config(config=dict(matching[0].scenario_config))
-    await scenario.replay_artifacts(events=truncated_events, run_dir=new_run_dir)
+    # Commit the edits and manifest.
+    await forked_repo.commit(
+        message="fork: applied message edits and new run_id",
+        paths=None,
+    )
 
     # Launch the forked simulation as a background subprocess.
     stdout_log = new_run_dir / f"{scenario_name}_stdout.log"
@@ -159,6 +167,47 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
         fork_run_id=fork_run_id,
         fork_run_dir=str(new_run_dir),
     )
+
+
+def _apply_edits_and_new_run_id(
+    log_path: Path,
+    message_edits: dict[str, str],
+) -> str:
+    """Rewrite the JSONL in-place, applying message edits and a new run ID.
+
+    Returns the new fork run ID.
+    """
+    fork_run_id = str(uuid4())
+    raw_bytes = log_path.read_bytes()
+    lines = raw_bytes.split(b"\n")
+    output_lines: list[bytes] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        event_dict = orjson.loads(stripped)
+
+        if event_dict.get("event_type") == "simulation_started":
+            event_dict["run_id"] = fork_run_id
+
+        if event_dict.get("event_type") == "message_sent":
+            msg = event_dict.get("message", {})
+            msg_id = msg.get("message_id", "")
+            if msg_id in message_edits:
+                msg["text"] = message_edits[msg_id]
+
+        output_lines.append(orjson.dumps(event_dict))
+
+    log_path.write_bytes(b"\n".join(output_lines) + b"\n")
+
+    logger.info(
+        "Fork edits applied: %d lines, run_id=%s, %d message edits",
+        len(output_lines),
+        fork_run_id,
+        len(message_edits),
+    )
+    return fork_run_id
 
 
 def _find_free_port() -> int:

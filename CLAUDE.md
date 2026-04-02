@@ -38,7 +38,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `communication_protocol.py` — shared prompts and constants for the agent communication protocol
 - `src/schmidt/autonomous_supervisor.py` — autonomous mode orchestrator (supports resume via `RewindState`)
 - `src/schmidt/message_rewind.py` — reconstructs simulation state at any message for fork/resume
-- `src/schmidt/fork_writer.py` — writes truncated+edited JSONL for forked runs
+- `src/schmidt/run_repository.py` — git-backed repository for run directories (init, commit, clone, checkout)
 - `src/schmidt/conversation_reconstructor.py` — builds per-agent conversation transcript from events
 - `src/schmidt/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
 - `src/schmidt/evaluation/` — generic evaluators and evaluation infrastructure
@@ -112,16 +112,36 @@ make dev-frontend   # start Next.js dev server on port 3000
 
 ## Run Output Directory Structure
 
-All simulation outputs use a standard directory layout:
+All simulation outputs use a standard directory layout. Each run directory is a git repository — meaningful events (messages, tool results, round advances) trigger commits that capture the JSONL and any workspace files.
 
 ```
 runs/{scenario_name}/{unix_timestamp}/
+├── .git/                          # Git history (one commit per meaningful event)
 ├── {scenario_name}.jsonl          # Event log (messages, reasoning, round transitions)
-├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, read by FE)
+├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, not in git)
 ├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
-├── {scenario_name}_stdout.log     # (pipe stdout here)
-└── fork_manifest.json             # (forked runs only) provenance: source_run_id, target_message_id
+├── {scenario_name}_stdout.log     # (pipe stdout here, not in git)
+├── fork_manifest.json             # (forked runs only) provenance: source_run_id, target_message_id
+├── workspaces/                    # (software_procurement) engineer code files
+├── deliverables/                  # (software_procurement) submitted deliverables
+└── buyer_tests/                   # (software_procurement) buyer test files
 ```
+
+### Git-Backed Run History
+
+Each run directory is initialized as a git repository at simulation start. The `EventLogger` commits after writing committable events (messages, tool results, rounds, injections). Non-committable events like `LLMResponseReceived` are written to JSONL but only appear in git as part of the next meaningful commit's diff.
+
+All event types are committed except `llm_response_received` and `agent_connected` (high-volume, no forkable state). New event types are committed by default — no platform code changes needed.
+
+Commit messages follow a structured format for searchability:
+```
+{event_type}: {summary}
+
+event_id: {uuid}
+timestamp: {iso8601}
+```
+
+Use `git log --oneline` in a run directory to see the simulation timeline.
 
 ## Running Simulations
 
@@ -177,7 +197,7 @@ Check progress by reading the stdout log file or the JSONL event log.
 
 ### Live Streaming
 
-Every `schmidt run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` manifest to the run directory. The `schmidt serve` process discovers this file and proxies the simulation's SSE stream (including token-level deltas from the Claude streaming API) to connected frontends. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing for the completed run.
+Every `schmidt run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` manifest to the run directory. The `schmidt serve` process discovers this file and proxies the simulation's SSE stream to connected frontends. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing for the completed run.
 
 ### Resuming Failed Simulations
 
@@ -197,13 +217,16 @@ The `--resume` flag requires the same scenario-specific flags as the original ru
 
 The web UI supports forking a completed simulation from any message. In the run detail view, hover over a message to reveal an edit button. Edit the message text, then click the play button to fork. A new simulation starts with the channel history up to that message (with the edit applied), and agents continue from there.
 
-Forking works by:
-1. Truncating the source JSONL at the target message, applying the text edit
-2. Writing the truncated log to a new run directory with a `fork_manifest.json` for provenance
-3. Launching `schmidt run --resume <new_dir>` as a background subprocess
-4. Reconstructing a conversation transcript from the event log and injecting it as each agent's initial prompt, so agents have full context of what happened before the fork point
+Forking uses the git-backed run history:
+1. Find the git commit corresponding to the target message
+2. Clone the source run's git repository to a new run directory
+3. Check out the target commit — the JSONL and all workspace files are at the correct state
+4. Apply message text edits to the JSONL and assign a new run ID
+5. Write `fork_manifest.json` for provenance, commit the edits
+6. Launch `schmidt run --resume <new_dir>` as a background subprocess
+7. Reconstruct a conversation transcript from the event log and inject it as each agent's system prompt context
 
-Agents receive the conversation history (channel messages, scenario injections, round transitions) as their first prompt. They do not receive their prior reasoning — only externally visible state — so they re-derive their thinking naturally in response to the edited message.
+Agents receive the conversation history (channel messages, scenario injections, round transitions) as context. They do not receive their prior reasoning — only externally visible state — so they re-derive their thinking naturally in response to the edited message.
 
 The fork API endpoint is `POST /api/runs/{run_id}/fork`. Forked runs appear in the run list with a "Fork" badge and show a lineage link in the run detail header.
 
@@ -252,3 +275,4 @@ Never assume cleanup is wanted. Ask first, act second.
 
 1. Run `make lint` and fix all errors.
 2. Check for dead code: unused model fields, orphaned functions, stale imports. Remove them.
+3. If vulture reports new false positives, regenerate the whitelist: `VIRTUAL_ENV= uv run --no-sync vulture src/ --min-confidence 60 --make-whitelist > vulture_whitelist.py`

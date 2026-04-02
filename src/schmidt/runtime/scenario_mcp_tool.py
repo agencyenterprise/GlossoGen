@@ -30,11 +30,6 @@ def resolve_agent_id(ctx: ToolContext) -> str:
     return agent_id
 
 
-ToolReplayer: TypeAlias = Callable[[str, dict[str, Any]], Awaitable[None]]
-"""Async callable ``(agent_id, arguments) -> None`` that replays a tool's
-filesystem side effects during a fork without needing an MCP context."""
-
-
 class ScenarioMcpTool(NamedTuple):
     """A scenario-specific tool to be registered on the MCP server.
 
@@ -42,13 +37,8 @@ class ScenarioMcpTool(NamedTuple):
     It may accept a ``ctx: ToolContext`` parameter to access agent identity
     via ``resolve_agent_id(ctx)``; FastMCP auto-injects the context and
     hides it from the LLM-facing tool schema.
-
-    The optional replayer recreates the tool's persistent side effects (file
-    writes, deliverable submissions) from logged arguments during a fork.
-    Tools without filesystem side effects leave it as None.
     """
 
     name: str
     description: str
     executor: Callable[..., Awaitable[str]]
-    replayer: ToolReplayer | None = None

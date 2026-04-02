@@ -13,7 +13,6 @@ from typing import Any, Self
 from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel
-from schmidt.models.event import SimulationEvent, ToolResultReceived
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 
 logger = logging.getLogger(__name__)
@@ -163,34 +162,3 @@ class SimulationScenario(ABC):
         actions (effort allocations, status updates) and advance the simulation.
         The default is a no-op for scenarios without world state.
         """
-
-    async def replay_artifacts(
-        self,
-        events: list[SimulationEvent],
-        run_dir: Path,
-    ) -> None:
-        """Recreate filesystem artifacts from tool calls logged before a fork point.
-
-        Sets up the run directory, then replays every ``ToolResultReceived``
-        event whose tool declares a replayer on its ``ScenarioMcpTool``.
-        Scenarios do not need to override this — they only need to provide
-        ``replayer`` callables on their tools.
-        """
-        self.set_run_dir(run_dir=run_dir)
-        tools = self.get_mcp_tools()
-        replayers = {t.name: t.replayer for t in tools if t.replayer is not None}
-        if not replayers:
-            return
-
-        for event in events:
-            if not isinstance(event, ToolResultReceived):
-                continue
-            replayer = replayers.get(event.tool_name)
-            if replayer is None:
-                continue
-            await replayer(event.agent_id, event.arguments)
-            logger.info(
-                "Replayed %s for agent %s",
-                event.tool_name,
-                event.agent_id,
-            )
