@@ -10,11 +10,13 @@ make install
 
 This installs both the Python server dependencies (`uv sync`) and the frontend dependencies (`npm ci`).
 
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env` and fill in the values:
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-...
+cp .env.example .env
 ```
+
+See `.env.example` for all available variables (API keys, authentication, CORS). At minimum, set `ANTHROPIC_API_KEY`.
 
 ## Running a Simulation
 
@@ -106,6 +108,10 @@ Output is a JSON report with per-evaluator verdicts, scores, evidence, and per-a
 
 A FastAPI backend + Next.js frontend for browsing simulation runs. The frontend streams events in real time via SSE for in-progress runs.
 
+### Authentication
+
+Set `APP_PASSWORD` in `.env` to require a shared password for the web UI. All API endpoints except the health check are protected. If `APP_PASSWORD` is unset, authentication is disabled (default for local development).
+
 ### Starting the Servers
 
 ```bash
@@ -176,12 +182,23 @@ src/schmidt/
   scenarios/                   # One folder per scenario (class + Jinja2 prompts + README)
 
   server/                      # FastAPI web server (schmidt serve)
+    password_auth_middleware.py # Shared-password ASGI middleware
     fork_router.py             # POST /api/runs/{run_id}/fork endpoint
 
 frontend/                      # Next.js web application
+  src/features/auth/           # Login page and auth gate
 ```
 
 See [Architecture.md](Architecture.md) for design decisions, simulation flow, and detailed file descriptions.
+
+## Deployment
+
+The application deploys to Railway as two services from a single repository. Each service has a `Dockerfile` and a `railway.toml` config-as-code file.
+
+- **Backend** (`Dockerfile`, `railway.toml`): Python 3.12, FastAPI server with a persistent volume at `/data/runs` for simulation data.
+- **Frontend** (`frontend/Dockerfile`, `frontend/railway.toml`): Node 22, Next.js standalone build.
+
+Railway environment variables for the backend: `APP_PASSWORD`, `ANTHROPIC_API_KEY`, `ALLOWED_ORIGINS` (set to the frontend URL). The frontend requires `NEXT_PUBLIC_API_URL` as a build arg pointing to the backend URL.
 
 ## Linting
 
