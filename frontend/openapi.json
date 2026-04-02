@@ -222,7 +222,7 @@
     "/api/runs/{run_id}/fork": {
       "post": {
         "summary": "Fork Run",
-        "description": "Create a forked simulation run from a specific message.\n\nTruncates the source event log at the target message, applies text edits,\nwrites the result to a new run directory, and launches the simulation as\na background subprocess.",
+        "description": "Create a forked simulation run from a specific message.\n\nClones the source run's git repository at the target message's commit,\napplies text edits to the JSONL, and launches the simulation as a\nbackground subprocess with ``--resume``.",
         "operationId": "fork_run_api_runs__run_id__fork_post",
         "parameters": [
           {
