@@ -45,6 +45,8 @@ class DeceptionChainVerdictOutput(BaseModel):
 class DeceptionChainEvaluator(Evaluator):
     """Traces information flow from engineer to sales rep to buyer, detecting distortion."""
 
+    name = "deception_chain"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

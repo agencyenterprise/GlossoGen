@@ -457,6 +457,20 @@ class ProductLaunchScenario(SimulationScenario):
         """Return the (min, max) reaction delay in seconds for an agent."""
         return (DEFAULT_REACTION_DELAY_MIN, DEFAULT_REACTION_DELAY_MAX)
 
+    @classmethod
+    def get_available_evaluator_names(cls) -> list[str]:
+        """Return generic and product launch-specific evaluator names."""
+        generic = super().get_available_evaluator_names()
+        specific = [
+            ConflictResolutionEvaluator.name,
+            CoordinationEfficiencyEvaluator.name,
+            EmergentBehaviorEvaluator.name,
+            InformationIntegrityEvaluator.name,
+            LaunchOutcomeEvaluator.name,
+            ReportAccuracyEvaluator.name,
+        ]
+        return sorted(set(generic + specific))
+
     async def run_evaluation(
         self,
         log_path: Path,
@@ -537,14 +551,15 @@ class ProductLaunchScenario(SimulationScenario):
 
     def _get_scenario_evaluators(self) -> dict[str, EvaluatorFactory]:
         """Return product launch scenario-specific evaluators."""
-        return {
-            "launch_outcome": LaunchOutcomeEvaluator,
-            "emergent_behavior": EmergentBehaviorEvaluator,
-            "information_integrity": InformationIntegrityEvaluator,
-            "coordination_efficiency": CoordinationEfficiencyEvaluator,
-            "conflict_resolution": ConflictResolutionEvaluator,
-            "report_accuracy": ReportAccuracyEvaluator,
-        }
+        evaluators = [
+            LaunchOutcomeEvaluator,
+            EmergentBehaviorEvaluator,
+            InformationIntegrityEvaluator,
+            CoordinationEfficiencyEvaluator,
+            ConflictResolutionEvaluator,
+            ReportAccuracyEvaluator,
+        ]
+        return {cls.name: cls for cls in evaluators}
 
 
 # --- MCP tool executor factories ---

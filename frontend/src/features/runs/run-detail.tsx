@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  FlaskConical,
   HelpCircle,
   Loader2,
   PanelRightOpen,
@@ -23,6 +24,7 @@ import { ChatPane } from "./chat-pane";
 import { mergeEntries } from "./display-entry";
 import { EvalPanel } from "./eval-panel";
 import { ForkBadge, ForkPointFab } from "./fork-badge";
+import { StartEvaluationModal } from "./start-evaluation-modal";
 import { elapsedSince, formatConfigValue, formatCost, formatDuration, humanize } from "./format";
 import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
@@ -38,6 +40,8 @@ export function RunDetail({ runId }: { runId: string }) {
   const [showLogs, setShowLogs] = useState(false);
   const [showEvalPanel, setShowEvalPanel] = useState(true);
   const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
+  const [showEvalModal, setShowEvalModal] = useState(false);
+  const [evalJustLaunched, setEvalJustLaunched] = useState(false);
 
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -80,6 +84,9 @@ export function RunDetail({ runId }: { runId: string }) {
       const status = query.state.data?.status;
       if (status === "in_progress") {
         return 10_000;
+      }
+      if (query.state.data?.evaluation_in_progress || evalJustLaunched) {
+        return 5_000;
       }
       return false;
     },
@@ -258,6 +265,7 @@ export function RunDetail({ runId }: { runId: string }) {
   }
 
   const evaluation = restData.evaluation;
+  const evaluationInProgress = restData.evaluation_in_progress || evalJustLaunched;
   const hasLogs = allDebugLogs.length > 0;
   const activeAgent = allAgents.find(a => a.agent_id === selectedAgent);
   const activeAgentColor = selectedAgent ? agentColorMap.get(selectedAgent) : undefined;
@@ -290,6 +298,15 @@ export function RunDetail({ runId }: { runId: string }) {
           >
             <HelpCircle className="h-4 w-4" />
           </button>
+          {!isInProgress && !evaluationInProgress && forkEnabled ? (
+            <button
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={() => setShowEvalModal(true)}
+            >
+              <FlaskConical className="h-3 w-3" />
+              {evaluation !== null ? "Re-run Eval" : "Run Eval"}
+            </button>
+          ) : null}
         </span>
         <span className="text-[13px] text-muted-foreground">
           {maxRound} rounds · {channelMessages} messages · {timelineEntries} events ·{" "}
@@ -358,6 +375,14 @@ export function RunDetail({ runId }: { runId: string }) {
           >
             <Sword className="h-3 w-3" />
           </button>
+        </div>
+      ) : null}
+
+      {/* Evaluation in-progress banner */}
+      {!isInProgress && evaluationInProgress ? (
+        <div className="mb-2 flex items-center gap-2 rounded-lg border border-blue-300/50 bg-blue-50 px-3 py-1.5 text-xs text-blue-800 dark:border-blue-700/50 dark:bg-blue-950/30 dark:text-blue-300">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>Evaluation in progress...</span>
         </div>
       ) : null}
 
@@ -445,6 +470,19 @@ export function RunDetail({ runId }: { runId: string }) {
           />
         ) : null}
       </div>
+
+      {/* Start evaluation modal */}
+      {showEvalModal ? (
+        <StartEvaluationModal
+          runId={runId}
+          scenarioName={restData.scenario_name}
+          onClose={() => setShowEvalModal(false)}
+          onLaunched={() => {
+            setEvalJustLaunched(true);
+            setTimeout(() => setEvalJustLaunched(false), 30_000);
+          }}
+        />
+      ) : null}
 
       {/* Fork confirmation modal */}
       {forkModalMessageId ? (

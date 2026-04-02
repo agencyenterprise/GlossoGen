@@ -25,6 +25,8 @@ PYTEST_TIMEOUT_SECONDS = 60
 class CodeCorrectnessEvaluator(Evaluator):
     """Re-runs the buyer's tests against each team's deliverable and scores pass rate."""
 
+    name = "code_correctness"
+
     def __init__(self, run_dir: Path) -> None:
         self._run_dir = run_dir
 

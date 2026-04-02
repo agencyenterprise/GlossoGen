@@ -27,6 +27,22 @@ class SimulationScenario(ABC):
     """
 
     @classmethod
+    def get_available_evaluator_names(cls) -> list[str]:
+        """Return the names of all evaluators available for this scenario.
+
+        The default returns only generic evaluators (mirroring
+        ``GENERIC_EVALUATOR_REGISTRY`` — imported there from each evaluator's
+        ``name`` class attribute, but listed here to avoid a circular import).
+        Scenarios with scenario-specific evaluators override this method.
+        """
+        return [
+            "communication_pattern",
+            "cooperation",
+            "instruction_adherence",
+            "secret_leak",
+        ]
+
+    @classmethod
     @abstractmethod
     def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:
         """Register scenario-specific CLI arguments on the given parser."""

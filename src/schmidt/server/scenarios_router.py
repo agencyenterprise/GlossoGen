@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Request
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.response_models import (
     KnobsContentResponse,
+    LaunchStatus,
     ModelInfo,
     ScenarioInfo,
     ScenariosResponse,
@@ -70,7 +71,15 @@ async def list_scenarios() -> ScenariosResponse:
     scenarios = []
     for name in sorted(SCENARIO_REGISTRY.keys()):
         knobs_files = _list_knobs_files(scenario_name=name)
-        scenarios.append(ScenarioInfo(scenario_name=name, knobs_files=knobs_files))
+        scenario_cls = SCENARIO_REGISTRY[name]
+        evaluators = scenario_cls.get_available_evaluator_names()
+        scenarios.append(
+            ScenarioInfo(
+                scenario_name=name,
+                knobs_files=knobs_files,
+                available_evaluators=evaluators,
+            )
+        )
     models = [
         ModelInfo(model_prefix=prefix, provider=provider) for prefix, provider in list_models()
     ]
@@ -170,4 +179,4 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
             detail="Failed to launch simulation subprocess",
         )
 
-    return StartRunResponse(status="started")
+    return StartRunResponse(status=LaunchStatus.STARTED)

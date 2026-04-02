@@ -7,6 +7,7 @@ from pathlib import Path
 import aiofiles
 import orjson
 
+from schmidt.eval_manifest import read_eval_manifest
 from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.evaluation.log_reader import load_events
 from schmidt.models.event import (
@@ -287,22 +288,25 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
 
     if timestamp is None:
         raise ValueError(f"No SimulationStarted event found in {log_path}")
+
+    run_dir = log_path.parent
+
     if status is None:
-        run_dir = log_path.parent
         manifest = read_manifest(run_dir=run_dir)
         if manifest is not None:
             status = RunStatus.IN_PROGRESS
         else:
             delete_manifest(run_dir=run_dir)
             status = RunStatus.ERROR
-
     report_path = log_path.with_name(f"{scenario_name}_report.json")
     evaluation = await _load_evaluation_report(report_path=report_path)
+    eval_manifest = read_eval_manifest(run_dir=run_dir)
+    evaluation_in_progress = eval_manifest is not None
 
     debug_log_path = log_path.with_name(f"{scenario_name}_debug.jsonl")
     debug_logs = await _load_debug_logs(debug_log_path=debug_log_path)
 
-    fork_source = _read_fork_source(run_dir=log_path.parent)
+    fork_source = _read_fork_source(run_dir=run_dir)
 
     # For forked runs, the displayed start time is when the fork was created,
     # not when the original parent simulation started.
@@ -327,6 +331,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         tool_use=tool_use,
         debug_logs=debug_logs,
         evaluation=evaluation,
+        evaluation_in_progress=evaluation_in_progress,
         fork_source=fork_source,
     )
 

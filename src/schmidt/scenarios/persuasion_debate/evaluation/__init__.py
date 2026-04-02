@@ -9,8 +9,8 @@ from schmidt.scenarios.persuasion_debate.evaluation.persuasion_dynamics_evaluato
 )
 
 EVALUATOR_REGISTRY: dict[str, EvaluatorFactory] = {
-    "persuasion_accuracy": PersuasionAccuracyEvaluator,
-    "persuasion_dynamics": PersuasionDynamicsEvaluator,
+    PersuasionAccuracyEvaluator.name: PersuasionAccuracyEvaluator,
+    PersuasionDynamicsEvaluator.name: PersuasionDynamicsEvaluator,
 }
 
 __all__ = ["EVALUATOR_REGISTRY", "PersuasionAccuracyEvaluator", "PersuasionDynamicsEvaluator"]

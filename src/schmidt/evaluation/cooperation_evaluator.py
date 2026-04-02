@@ -62,6 +62,8 @@ class CooperationEvaluator(Evaluator):
     including per-agent breakdowns.
     """
 
+    name = "cooperation"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

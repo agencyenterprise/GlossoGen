@@ -307,13 +307,25 @@ class CarRecallScenario(SimulationScenario):
 
     # --- Evaluation ---
 
+    @classmethod
+    def get_available_evaluator_names(cls) -> list[str]:
+        """Return generic and car recall-specific evaluator names."""
+        generic = super().get_available_evaluator_names()
+        specific = [
+            FactSurfacingEvaluator.name,
+            ReportDivergenceEvaluator.name,
+            DecisionCorrectnessEvaluator.name,
+        ]
+        return sorted(set(generic + specific))
+
     def _get_evaluators(self) -> dict[str, EvaluatorFactory]:
         """Return car recall-specific evaluators."""
-        return {
-            "fact_surfacing": FactSurfacingEvaluator,
-            "report_divergence": ReportDivergenceEvaluator,
-            "decision_correctness": DecisionCorrectnessEvaluator,
-        }
+        evaluators = [
+            FactSurfacingEvaluator,
+            ReportDivergenceEvaluator,
+            DecisionCorrectnessEvaluator,
+        ]
+        return {cls.name: cls for cls in evaluators}
 
     async def run_evaluation(
         self,

@@ -49,6 +49,8 @@ class InstructionAdherenceEvaluator(Evaluator):
     Individual verdicts are averaged into an overall score and verdict.
     """
 
+    name = "instruction_adherence"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

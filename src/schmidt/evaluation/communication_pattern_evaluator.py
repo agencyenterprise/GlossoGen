@@ -60,6 +60,8 @@ class CommunicationPatternEvaluator(Evaluator):
     edges, and coalition indicators. All metrics are deterministic (no LLM calls).
     """
 
+    name = "communication_pattern"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

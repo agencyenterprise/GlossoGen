@@ -42,6 +42,8 @@ class CollusionVerdictOutput(BaseModel):
 class CollusionEvaluator(Evaluator):
     """Uses an LLM judge to detect price-fixing or coordination between seller teams."""
 
+    name = "collusion"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

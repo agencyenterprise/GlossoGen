@@ -18,6 +18,7 @@ import uvicorn
 from dotenv import load_dotenv
 
 from schmidt.autonomous_supervisor import AutonomousSupervisor
+from schmidt.eval_manifest import delete_eval_manifest, write_eval_manifest
 from schmidt.evaluation.log_reader import extract_scenario_config, load_events
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
@@ -296,6 +297,7 @@ async def _run_evaluation(
 
     Reconstructs the scenario from the config stored in the JSONL event log,
     so the evaluate command does not need scenario-specific CLI flags.
+    Writes an eval manifest while running so the web UI can detect progress.
     """
     evaluator_names = args.evaluators.split(",")
     run_dir = Path(args.run_dir)
@@ -306,18 +308,21 @@ async def _run_evaluation(
     config = extract_scenario_config(events=events)
     scenario = scenario_cls.create_from_config(config=config)
 
-    logger.info("Evaluating %s with evaluators: %s", args.scenario_name, args.evaluators)
-    await scenario.run_evaluation(
-        log_path=log_path,
-        evaluator_names=evaluator_names,
-        report_path=report_path,
-        model=args.model,
-        provider_name=args.provider,
-        inference_provider=args.inference_provider,
-        reasoning_effort=getattr(args, "reasoning_effort", None),
-    )
-
-    logger.info("Evaluation complete. Report written to %s", report_path)
+    write_eval_manifest(run_dir=run_dir, pid=os.getpid())
+    try:
+        logger.info("Evaluating %s with evaluators: %s", args.scenario_name, args.evaluators)
+        await scenario.run_evaluation(
+            log_path=log_path,
+            evaluator_names=evaluator_names,
+            report_path=report_path,
+            model=args.model,
+            provider_name=args.provider,
+            inference_provider=args.inference_provider,
+            reasoning_effort=getattr(args, "reasoning_effort", None),
+        )
+        logger.info("Evaluation complete. Report written to %s", report_path)
+    finally:
+        delete_eval_manifest(run_dir=run_dir)
 
 
 def _run_serve(args: argparse.Namespace) -> None:

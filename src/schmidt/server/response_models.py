@@ -49,6 +49,7 @@ class RunSummary(BaseModel):
     duration_seconds: float
     status: RunStatus
     has_evaluation: bool
+    evaluation_in_progress: bool
     run_dir: str
     fork_source: ForkSource | None
     models: list[str]
@@ -174,6 +175,7 @@ class RunDetailResponse(BaseModel):
     tool_use: list[ToolUseEntry]
     debug_logs: list[DebugLogEntry]
     evaluation: EvalReportResponse | None
+    evaluation_in_progress: bool
     fork_source: ForkSource | None
 
 
@@ -187,6 +189,7 @@ class ScenarioInfo(BaseModel):
 
     scenario_name: str
     knobs_files: list[str]
+    available_evaluators: list[str]
 
 
 class ModelInfo(BaseModel):
@@ -219,10 +222,30 @@ class StartRunRequest(BaseModel):
     knobs: dict[str, Any] | None
 
 
+class LaunchStatus(str, Enum):
+    """Status value for subprocess launch responses."""
+
+    STARTED = "started"
+
+
 class StartRunResponse(BaseModel):
     """Response after successfully launching a new simulation."""
 
-    status: str
+    status: LaunchStatus
+
+
+class StartEvaluationRequest(BaseModel):
+    """Request body for starting an evaluation on a completed run."""
+
+    model: str
+    provider: str
+    evaluators: list[str]
+
+
+class StartEvaluationResponse(BaseModel):
+    """Response after successfully launching an evaluation subprocess."""
+
+    status: LaunchStatus
 
 
 # ---------------------------------------------------------------------------

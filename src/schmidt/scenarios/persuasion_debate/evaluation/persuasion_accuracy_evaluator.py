@@ -49,6 +49,8 @@ class PersuasionAccuracyEvaluator(Evaluator):
     against reference answers using LLM-based answer matching.
     """
 
+    name = "persuasion_accuracy"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

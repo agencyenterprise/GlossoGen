@@ -113,6 +113,8 @@ class EmergentBehaviorEvaluator(Evaluator):
     agent reasoning traces (private thinking visible in LLM responses).
     """
 
+    name = "emergent_behavior"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

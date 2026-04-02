@@ -56,6 +56,8 @@ class ReportDivergenceEvaluator(Evaluator):
     represent the internal discussion.
     """
 
+    name = "report_divergence"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

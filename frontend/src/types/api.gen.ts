@@ -68,6 +68,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Evaluation
+         * @description Launch an evaluation subprocess for a completed simulation run.
+         *
+         *     Validates that the run exists and is complete, that no evaluation is
+         *     already in progress, and that the requested evaluators and provider
+         *     are valid. Launches ``python -m schmidt evaluate`` as a detached
+         *     background process.
+         */
+        post: operations["start_evaluation_api_runs__run_id__evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/events": {
         parameters: {
             query?: never;
@@ -424,6 +449,12 @@ export interface components {
             };
         };
         /**
+         * LaunchStatus
+         * @description Status value for subprocess launch responses.
+         * @enum {string}
+         */
+        LaunchStatus: "started";
+        /**
          * MessageEdit
          * @description A single message text edit for a fork request.
          */
@@ -510,6 +541,8 @@ export interface components {
             /** Debug Logs */
             debug_logs: components["schemas"]["DebugLogEntry"][];
             evaluation: components["schemas"]["EvalReportResponse"] | null;
+            /** Evaluation In Progress */
+            evaluation_in_progress: boolean;
             fork_source: components["schemas"]["ForkSource"] | null;
         };
         /**
@@ -555,6 +588,8 @@ export interface components {
             status: components["schemas"]["RunStatus"];
             /** Has Evaluation */
             has_evaluation: boolean;
+            /** Evaluation In Progress */
+            evaluation_in_progress: boolean;
             /** Run Dir */
             run_dir: string;
             fork_source: components["schemas"]["ForkSource"] | null;
@@ -856,6 +891,8 @@ export interface components {
             scenario_name: string;
             /** Knobs Files */
             knobs_files: string[];
+            /** Available Evaluators */
+            available_evaluators: string[];
         };
         /**
          * ScenariosResponse
@@ -868,6 +905,25 @@ export interface components {
             models: components["schemas"]["ModelInfo"][];
             /** Providers */
             providers: string[];
+        };
+        /**
+         * StartEvaluationRequest
+         * @description Request body for starting an evaluation on a completed run.
+         */
+        StartEvaluationRequest: {
+            /** Model */
+            model: string;
+            /** Provider */
+            provider: string;
+            /** Evaluators */
+            evaluators: string[];
+        };
+        /**
+         * StartEvaluationResponse
+         * @description Response after successfully launching an evaluation subprocess.
+         */
+        StartEvaluationResponse: {
+            status: components["schemas"]["LaunchStatus"];
         };
         /**
          * StartRunRequest
@@ -890,8 +946,7 @@ export interface components {
          * @description Response after successfully launching a new simulation.
          */
         StartRunResponse: {
-            /** Status */
-            status: string;
+            status: components["schemas"]["LaunchStatus"];
         };
         /**
          * ToolUseEntry
@@ -1048,6 +1103,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_evaluation_api_runs__run_id__evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartEvaluationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartEvaluationResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
