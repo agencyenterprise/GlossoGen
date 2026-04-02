@@ -222,8 +222,7 @@ class StartRunRequest(BaseModel):
 class StartRunResponse(BaseModel):
     """Response after successfully launching a new simulation."""
 
-    run_id: str
-    run_dir: str
+    status: str
 
 
 # ---------------------------------------------------------------------------

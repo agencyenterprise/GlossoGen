@@ -4,17 +4,17 @@ Provides endpoints to list available scenarios with their knobs files,
 read knobs file contents, and start a new simulation as a background subprocess.
 """
 
-import asyncio
 import logging
+import os
 import socket
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import orjson
 from fastapi import APIRouter, HTTPException, Request
 
-from schmidt.run_repository import claim_run_dir
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.response_models import (
     KnobsContentResponse,
@@ -92,44 +92,13 @@ async def get_knobs_content(scenario_name: str, knobs_name: str) -> KnobsContent
     return KnobsContentResponse(knobs=knobs)
 
 
-async def _wait_for_run_id(
-    run_dir: Path,
-    scenario_name: str,
-    timeout_seconds: float,
-) -> str:
-    """Poll the JSONL file until the simulation_started event appears.
-
-    Returns the run_id from the first event. Raises HTTPException if the
-    event does not appear within the timeout.
-    """
-    jsonl_path = run_dir / f"{scenario_name}.jsonl"
-    loop = asyncio.get_event_loop()
-    deadline = loop.time() + timeout_seconds
-
-    while loop.time() < deadline:
-        if jsonl_path.exists():
-            raw = jsonl_path.read_bytes()
-            first_line = raw.split(b"\n")[0].strip()
-            if first_line:
-                event = orjson.loads(first_line)
-                if event.get("event_type") == "simulation_started":
-                    run_id: str = event["run_id"]
-                    return run_id
-        await asyncio.sleep(0.3)
-
-    raise HTTPException(
-        status_code=500,
-        detail="Simulation failed to start within timeout",
-    )
-
-
 @router.post("/runs/start", response_model=StartRunResponse)
 async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse:
     """Launch a new simulation as a background subprocess.
 
-    Validates inputs, creates a run directory, writes the knobs dict to a
-    temporary JSON file, builds the CLI command, and waits for the subprocess
-    to write its first event before returning the run_id.
+    Validates inputs, writes knobs to a temp file, builds the CLI command,
+    and launches the subprocess. Returns immediately — the frontend polls
+    the runs list to discover the new run once it appears.
     """
     runs_dir: Path = request.app.state.runs_dir
 
@@ -154,9 +123,7 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
         )
 
     scenario_dir = _SCENARIOS_BASE / body.scenario_name
-    run_dir = claim_run_dir(runs_dir=runs_dir, scenario_name=body.scenario_name)
     mcp_port = _find_free_port()
-    stdout_log = run_dir / f"{body.scenario_name}_stdout.log"
 
     cmd = [
         sys.executable,
@@ -175,7 +142,9 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
     ]
 
     if body.knobs:
-        knobs_path = run_dir / "knobs.json"
+        fd, tmp_path = tempfile.mkstemp(suffix=".json", prefix="knobs_")
+        os.close(fd)
+        knobs_path = Path(tmp_path)
         knobs_path.write_bytes(orjson.dumps(body.knobs))
         cmd.extend(["--knobs", str(knobs_path)])
 
@@ -185,18 +154,20 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
 
     logger.info("Launching new simulation: %s", " ".join(cmd))
 
-    with open(stdout_log, "w") as log_file:
-        subprocess.Popen(
-            cmd,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
+    try:
+        stdout_log = runs_dir / f"{body.scenario_name}_start.log"
+        with open(stdout_log, "w") as log_file:
+            subprocess.Popen(
+                cmd,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+    except Exception:
+        logger.exception("Failed to launch simulation subprocess")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to launch simulation subprocess",
         )
 
-    run_id = await _wait_for_run_id(
-        run_dir=run_dir,
-        scenario_name=body.scenario_name,
-        timeout_seconds=10.0,
-    )
-
-    return StartRunResponse(run_id=run_id, run_dir=str(run_dir))
+    return StartRunResponse(status="started")

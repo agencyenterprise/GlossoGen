@@ -395,7 +395,7 @@
     "/api/runs/start": {
       "post": {
         "summary": "Start Run",
-        "description": "Launch a new simulation as a background subprocess.\n\nValidates inputs, creates a run directory, writes the knobs dict to a\ntemporary JSON file, builds the CLI command, and waits for the subprocess\nto write its first event before returning the run_id.",
+        "description": "Launch a new simulation as a background subprocess.\n\nValidates inputs, writes knobs to a temp file, builds the CLI command,\nand launches the subprocess. Returns immediately \u2014 the frontend polls\nthe runs list to discover the new run once it appears.",
         "operationId": "start_run_api_runs_start_post",
         "requestBody": {
           "content": {
@@ -1752,19 +1752,14 @@
       },
       "StartRunResponse": {
         "properties": {
-          "run_id": {
+          "status": {
             "type": "string",
-            "title": "Run Id"
-          },
-          "run_dir": {
-            "type": "string",
-            "title": "Run Dir"
+            "title": "Status"
           }
         },
         "type": "object",
         "required": [
-          "run_id",
-          "run_dir"
+          "status"
         ],
         "title": "StartRunResponse",
         "description": "Response after successfully launching a new simulation."
