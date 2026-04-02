@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from schmidt.evaluation.log_reader import load_events
 from schmidt.message_rewind import build_rewind_state
-from schmidt.run_repository import RunRepository
+from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.server.response_models import ForkRequest, ForkResponse
 from schmidt.server.run_discovery import discover_runs
 
@@ -93,8 +93,7 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
         )
 
     # Clone to new run directory and check out the target commit.
-    timestamp = str(int(time.time()))
-    new_run_dir = runs_dir / scenario_name / timestamp
+    new_run_dir = claim_run_dir(runs_dir=runs_dir, scenario_name=scenario_name)
     forked_repo = await source_repo.clone_to(target_dir=new_run_dir)
     await forked_repo.checkout(sha=target_sha)
 

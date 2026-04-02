@@ -11,7 +11,6 @@ import argparse
 import asyncio
 import logging
 import os
-import time
 from pathlib import Path
 from uuid import uuid4
 
@@ -24,7 +23,7 @@ from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.message_rewind import RewindState, build_rewind_state_from_last_message
-from schmidt.run_repository import RunRepository
+from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.runners.pydantic_ai_runner import PydanticAIRunner
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
@@ -162,13 +161,12 @@ def main() -> None:
 
 
 def _compute_run_dir(runs_dir: Path, scenario_name: str) -> Path:
-    """Compute the output directory for a new simulation run.
+    """Claim a unique run directory for a new simulation.
 
-    Uses the current unix timestamp to create a unique subdirectory:
-    ``{runs_dir}/{scenario_name}/{unix_timestamp}/``
+    Delegates to ``claim_run_dir`` which atomically creates the directory,
+    appending a numeric suffix if two runs start in the same second.
     """
-    unix_ts = int(time.time())
-    return runs_dir / scenario_name / str(unix_ts)
+    return claim_run_dir(runs_dir=runs_dir, scenario_name=scenario_name)
 
 
 def _setup_logging(
