@@ -12,6 +12,7 @@ import aiofiles
 import orjson
 from pydantic import TypeAdapter
 
+from schmidt.eval_manifest import read_eval_manifest
 from schmidt.models.event import RunStatus, SimulationEnded, SimulationEvent, SimulationStarted
 from schmidt.server.response_models import ForkSource, RunSummary
 from schmidt.stream_manifest import delete_manifest, read_manifest
@@ -188,6 +189,8 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
             run_timestamp = _timestamp_from_dir(dir_name=timestamp_dir.name)
             models = await _extract_models(file_path=jsonl_path)
 
+            eval_in_progress = read_eval_manifest(run_dir=timestamp_dir) is not None
+
             if isinstance(last_event, SimulationEnded):
                 duration_seconds = (last_event.timestamp - first_event.timestamp).total_seconds()
                 summaries.append(
@@ -202,6 +205,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         duration_seconds=duration_seconds,
                         status=last_event.reason,
                         has_evaluation=report_path.exists(),
+                        evaluation_in_progress=eval_in_progress,
                         run_dir=str(timestamp_dir),
                         fork_source=fork_source,
                         models=models,
@@ -229,6 +233,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         duration_seconds=0.0,
                         status=status,
                         has_evaluation=False,
+                        evaluation_in_progress=eval_in_progress,
                         run_dir=str(timestamp_dir),
                         fork_source=fork_source,
                         models=models,

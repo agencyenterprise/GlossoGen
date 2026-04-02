@@ -80,6 +80,8 @@ class LaunchOutcomeEvaluator(Evaluator):
     and overall launch preparedness based on what agents communicated.
     """
 
+    name = "launch_outcome"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

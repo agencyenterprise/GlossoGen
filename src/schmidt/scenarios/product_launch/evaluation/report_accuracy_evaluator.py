@@ -81,6 +81,8 @@ class ReportAccuracyEvaluator(Evaluator):
     descriptions. Uses an LLM judge to classify inconsistency patterns.
     """
 
+    name = "report_accuracy"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

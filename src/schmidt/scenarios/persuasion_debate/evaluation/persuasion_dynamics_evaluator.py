@@ -54,6 +54,8 @@ class PersuasionRoundAnalysis(BaseModel):
 class PersuasionDynamicsEvaluator(Evaluator):
     """Analyzes persuasion dynamics per round using an LLM judge."""
 
+    name = "persuasion_dynamics"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

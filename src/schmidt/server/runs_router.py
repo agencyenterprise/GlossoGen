@@ -4,6 +4,8 @@ import logging
 import os
 import shutil
 import signal
+import subprocess
+import sys
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
@@ -11,10 +13,21 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from starlette.responses import StreamingResponse
 
-from schmidt.server.response_models import RunDetailResponse, RunListResponse, SSEEvent
+from schmidt.eval_manifest import read_eval_manifest
+from schmidt.models.event import RunStatus
+from schmidt.scenarios import SCENARIO_REGISTRY
+from schmidt.server.response_models import (
+    LaunchStatus,
+    RunDetailResponse,
+    RunListResponse,
+    SSEEvent,
+    StartEvaluationRequest,
+    StartEvaluationResponse,
+)
 from schmidt.server.run_detail_reader import load_run_detail
 from schmidt.server.run_discovery import discover_runs
 from schmidt.stream_manifest import delete_manifest, read_manifest
+from schmidt.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +96,103 @@ async def stop_run(run_id: str, request: Request) -> None:
         logger.info("Simulation PID %d already dead for run %s", manifest.pid, run_id)
 
     delete_manifest(run_dir=run_dir)
+
+
+@router.post(
+    "/runs/{run_id}/evaluate",
+    response_model=StartEvaluationResponse,
+)
+async def start_evaluation(
+    run_id: str,
+    body: StartEvaluationRequest,
+    request: Request,
+) -> StartEvaluationResponse:
+    """Launch an evaluation subprocess for a completed simulation run.
+
+    Validates that the run exists and is complete, that no evaluation is
+    already in progress, and that the requested evaluators and provider
+    are valid. Launches ``python -m schmidt evaluate`` as a detached
+    background process.
+    """
+    runs_dir: Path = request.app.state.runs_dir
+    summaries = await discover_runs(runs_dir=runs_dir)
+
+    matching = [s for s in summaries if s.run_id == run_id]
+    if not matching:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    run_summary = matching[0]
+
+    finished_statuses = {RunStatus.SCENARIO_COMPLETE, RunStatus.ERROR}
+    if run_summary.status not in finished_statuses:
+        raise HTTPException(
+            status_code=422,
+            detail="Evaluation requires a completed or errored run",
+        )
+
+    run_dir = Path(run_summary.run_dir)
+    if read_eval_manifest(run_dir=run_dir) is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="An evaluation is already in progress for this run",
+        )
+
+    if body.provider not in list_providers():
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown provider: {body.provider}",
+        )
+
+    scenario_cls = SCENARIO_REGISTRY.get(run_summary.scenario_name)
+    if scenario_cls is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown scenario: {run_summary.scenario_name}",
+        )
+
+    available = scenario_cls.get_available_evaluator_names()
+    for name in body.evaluators:
+        if name not in available:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unknown evaluator '{name}'. Available: {', '.join(available)}",
+            )
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "schmidt",
+        "evaluate",
+        run_summary.scenario_name,
+        "--run-dir",
+        str(run_dir),
+        "--evaluators",
+        ",".join(body.evaluators),
+        "--model",
+        body.model,
+        "--provider",
+        body.provider,
+    ]
+
+    logger.info("Launching evaluation: %s", " ".join(cmd))
+
+    try:
+        eval_log = run_dir / "eval_stdout.log"
+        with open(eval_log, "w") as log_file:
+            subprocess.Popen(
+                cmd,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+    except Exception:
+        logger.exception("Failed to launch evaluation subprocess")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to launch evaluation subprocess",
+        )
+
+    return StartEvaluationResponse(status=LaunchStatus.STARTED)
 
 
 async def _proxy_simulation_sse(

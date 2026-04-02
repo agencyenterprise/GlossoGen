@@ -66,6 +66,8 @@ class FactSurfacingEvaluator(Evaluator):
     discussion channel. Uses an LLM judge for semantic matching.
     """
 
+    name = "fact_surfacing"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

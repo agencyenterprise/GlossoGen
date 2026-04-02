@@ -133,6 +133,8 @@ class ConflictResolutionEvaluator(Evaluator):
     points and classifies resolution modes.
     """
 
+    name = "conflict_resolution"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

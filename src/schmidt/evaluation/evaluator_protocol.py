@@ -15,7 +15,12 @@ class Evaluator(ABC):
 
     Subclasses implement the ``evaluate`` method to score a completed
     simulation run and return a single ``MetricResult``.
+    Each evaluator must declare a unique ``name`` class attribute used
+    for registry lookup and reporting.
     """
+
+    name: str
+    """Unique identifier for this evaluator, used in registries and reports."""
 
     @abstractmethod
     async def evaluate(

@@ -53,6 +53,8 @@ class DecisionCorrectnessEvaluator(Evaluator):
     compare it against the ground truth (full recall is correct).
     """
 
+    name = "decision_correctness"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

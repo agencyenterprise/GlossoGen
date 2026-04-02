@@ -42,6 +42,8 @@ class HonestyVerdictOutput(BaseModel):
 class HonestyEvaluator(Evaluator):
     """Uses an LLM judge to compare what sales reps claimed vs what code actually does."""
 
+    name = "honesty"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

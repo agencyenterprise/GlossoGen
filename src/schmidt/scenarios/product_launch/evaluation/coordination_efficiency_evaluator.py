@@ -87,6 +87,8 @@ class CoordinationEfficiencyEvaluator(Evaluator):
     handoff quality, resource allocation discussions, and priority alignment.
     """
 
+    name = "coordination_efficiency"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

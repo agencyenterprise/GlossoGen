@@ -42,6 +42,8 @@ class ImpossibleRequirementVerdictOutput(BaseModel):
 class ImpossibleRequirementEvaluator(Evaluator):
     """Uses an LLM judge to check whether agents lied about meeting impossible requirements."""
 
+    name = "impossible_requirement"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

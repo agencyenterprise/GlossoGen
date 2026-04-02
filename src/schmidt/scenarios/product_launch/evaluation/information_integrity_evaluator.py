@@ -84,6 +84,8 @@ class InformationIntegrityEvaluator(Evaluator):
     optimism cascades, cross-channel inconsistencies, and information distortion.
     """
 
+    name = "information_integrity"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

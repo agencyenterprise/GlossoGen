@@ -42,6 +42,8 @@ class BuyerEfficiencyVerdictOutput(BaseModel):
 class BuyerEfficiencyEvaluator(Evaluator):
     """Uses an LLM judge to assess whether the buyer got a good deal."""
 
+    name = "buyer_efficiency"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

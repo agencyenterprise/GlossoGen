@@ -128,6 +128,56 @@
         }
       }
     },
+    "/api/runs/{run_id}/evaluate": {
+      "post": {
+        "summary": "Start Evaluation",
+        "description": "Launch an evaluation subprocess for a completed simulation run.\n\nValidates that the run exists and is complete, that no evaluation is\nalready in progress, and that the requested evaluators and provider\nare valid. Launches ``python -m schmidt evaluate`` as a detached\nbackground process.",
+        "operationId": "start_evaluation_api_runs__run_id__evaluate_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartEvaluationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartEvaluationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs/{run_id}/events": {
       "get": {
         "summary": "Stream Run Events",
@@ -826,6 +876,14 @@
         "title": "KnobsContentResponse",
         "description": "Response containing the parsed contents of a knobs JSON file."
       },
+      "LaunchStatus": {
+        "type": "string",
+        "enum": [
+          "started"
+        ],
+        "title": "LaunchStatus",
+        "description": "Status value for subprocess launch responses."
+      },
       "MessageEdit": {
         "properties": {
           "message_id": {
@@ -1002,6 +1060,10 @@
               }
             ]
           },
+          "evaluation_in_progress": {
+            "type": "boolean",
+            "title": "Evaluation In Progress"
+          },
           "fork_source": {
             "anyOf": [
               {
@@ -1032,6 +1094,7 @@
           "tool_use",
           "debug_logs",
           "evaluation",
+          "evaluation_in_progress",
           "fork_source"
         ],
         "title": "RunDetailResponse",
@@ -1107,6 +1170,10 @@
             "type": "boolean",
             "title": "Has Evaluation"
           },
+          "evaluation_in_progress": {
+            "type": "boolean",
+            "title": "Evaluation In Progress"
+          },
           "run_dir": {
             "type": "string",
             "title": "Run Dir"
@@ -1145,6 +1212,7 @@
           "duration_seconds",
           "status",
           "has_evaluation",
+          "evaluation_in_progress",
           "run_dir",
           "fork_source",
           "models",
@@ -1670,12 +1738,20 @@
             },
             "type": "array",
             "title": "Knobs Files"
+          },
+          "available_evaluators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Evaluators"
           }
         },
         "type": "object",
         "required": [
           "scenario_name",
-          "knobs_files"
+          "knobs_files",
+          "available_evaluators"
         ],
         "title": "ScenarioInfo",
         "description": "Metadata about a single scenario, including its available knobs files."
@@ -1712,6 +1788,46 @@
         ],
         "title": "ScenariosResponse",
         "description": "Response listing all available scenarios, models, and providers."
+      },
+      "StartEvaluationRequest": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "evaluators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "provider",
+          "evaluators"
+        ],
+        "title": "StartEvaluationRequest",
+        "description": "Request body for starting an evaluation on a completed run."
+      },
+      "StartEvaluationResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/LaunchStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "StartEvaluationResponse",
+        "description": "Response after successfully launching an evaluation subprocess."
       },
       "StartRunRequest": {
         "properties": {
@@ -1753,8 +1869,7 @@
       "StartRunResponse": {
         "properties": {
           "status": {
-            "type": "string",
-            "title": "Status"
+            "$ref": "#/components/schemas/LaunchStatus"
           }
         },
         "type": "object",

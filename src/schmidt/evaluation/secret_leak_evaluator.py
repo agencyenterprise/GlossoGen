@@ -48,6 +48,8 @@ class SecretLeakEvaluator(Evaluator):
     of confidential system-prompt content.
     """
 
+    name = "secret_leak"
+
     async def evaluate(
         self,
         events: list[SimulationEvent],

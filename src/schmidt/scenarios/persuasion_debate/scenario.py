@@ -413,6 +413,13 @@ class PersuasionDebateScenario(SimulationScenario):
 
     # --- Evaluation ---
 
+    @classmethod
+    def get_available_evaluator_names(cls) -> list[str]:
+        """Return generic and persuasion debate-specific evaluator names."""
+        generic = super().get_available_evaluator_names()
+        specific = sorted(EVALUATOR_REGISTRY.keys())
+        return sorted(set(generic + specific))
+
     async def run_evaluation(
         self,
         log_path: Path,

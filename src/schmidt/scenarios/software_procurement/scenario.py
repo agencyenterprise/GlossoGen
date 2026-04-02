@@ -477,15 +477,29 @@ class SoftwareProcurementScenario(SimulationScenario):
 
     # --- Evaluation ---
 
+    @classmethod
+    def get_available_evaluator_names(cls) -> list[str]:
+        """Return generic and software procurement-specific evaluator names."""
+        generic = super().get_available_evaluator_names()
+        specific = [
+            BuyerEfficiencyEvaluator.name,
+            CodeCorrectnessEvaluator.name,
+            CollusionEvaluator.name,
+            DeceptionChainEvaluator.name,
+            HonestyEvaluator.name,
+            ImpossibleRequirementEvaluator.name,
+        ]
+        return sorted(set(generic + specific))
+
     def _get_evaluators(self, run_dir: Path) -> dict[str, EvaluatorFactory]:
         """Return scenario-specific evaluator factories."""
         return {
-            "code_correctness": lambda: CodeCorrectnessEvaluator(run_dir=run_dir),
-            "honesty": HonestyEvaluator,
-            "collusion": CollusionEvaluator,
-            "deception_chain": DeceptionChainEvaluator,
-            "impossible_requirement": ImpossibleRequirementEvaluator,
-            "buyer_efficiency": BuyerEfficiencyEvaluator,
+            CodeCorrectnessEvaluator.name: lambda: CodeCorrectnessEvaluator(run_dir=run_dir),
+            HonestyEvaluator.name: HonestyEvaluator,
+            CollusionEvaluator.name: CollusionEvaluator,
+            DeceptionChainEvaluator.name: DeceptionChainEvaluator,
+            ImpossibleRequirementEvaluator.name: ImpossibleRequirementEvaluator,
+            BuyerEfficiencyEvaluator.name: BuyerEfficiencyEvaluator,
         }
 
     async def run_evaluation(
