@@ -108,9 +108,9 @@ export interface paths {
          * Fork Run
          * @description Create a forked simulation run from a specific message.
          *
-         *     Truncates the source event log at the target message, applies text edits,
-         *     writes the result to a new run directory, and launches the simulation as
-         *     a background subprocess.
+         *     Clones the source run's git repository at the target message's commit,
+         *     applies text edits to the JSONL, and launches the simulation as a
+         *     background subprocess with ``--resume``.
          */
         post: operations["fork_run_api_runs__run_id__fork_post"];
         delete?: never;
