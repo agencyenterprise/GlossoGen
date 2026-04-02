@@ -120,6 +120,20 @@ class WorkspaceManager:
         path = self._deliverables_dir / team_id / filename
         path.write_text(code)
 
+    async def read_deliverable(self, team_id: str) -> tuple[str, str] | None:
+        """Read the latest deliverable for a team from disk.
+
+        Returns (filename, code) or None if no deliverable exists.
+        """
+        team_dir = self._deliverables_dir / team_id
+        if not team_dir.exists():
+            return None
+        py_files = sorted(team_dir.glob("*.py"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not py_files:
+            return None
+        latest = py_files[0]
+        return (latest.name, latest.read_text())
+
     # --- Buyer test operations ---
 
     async def write_buyer_test(self, filename: str, content: str) -> str:
