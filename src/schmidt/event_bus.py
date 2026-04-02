@@ -1,9 +1,9 @@
 """Pub/sub event bus for real-time simulation event delivery.
 
 Supports fan-out to multiple subscribers. Carries persisted SimulationEvent
-payloads (via EventLogger) and transient streaming events such as TokenDelta
-and MessagePreview (via AgentRunner). The embedded simulation server reads
-from subscriber queues to stream events over SSE to external consumers.
+payloads (via EventLogger) and transient events such as AgentCostUpdated
+(via AgentRunner). The embedded simulation server reads from subscriber
+queues to stream events over SSE to external consumers.
 """
 
 import asyncio
@@ -17,8 +17,7 @@ class EventBus:
 
     Each call to ``subscribe`` creates a new bounded queue. Published events are
     delivered to every active subscriber. If a subscriber's queue is full, the
-    oldest event is dropped (acceptable for transient token deltas since the
-    complete text arrives in subsequent finalized events).
+    oldest event is dropped.
     """
 
     def __init__(self, max_queue_size: int) -> None:

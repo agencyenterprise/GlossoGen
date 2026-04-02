@@ -16,8 +16,6 @@ export interface DisplayEntry {
   round_number: number;
   is_reasoning: boolean;
   is_tool_use: boolean;
-  /** True when this entry represents in-progress streaming text. */
-  is_partial: boolean;
   /** Tool use fields — only populated when is_tool_use is true. */
   tool_name: string;
   tool_arguments: Record<string, unknown>;
@@ -40,7 +38,7 @@ export function mergeEntries(
     round_number: m.round_number,
     is_reasoning: false,
     is_tool_use: false,
-    is_partial: false,
+
     tool_name: "",
     tool_arguments: {},
     tool_result: null,
@@ -56,7 +54,7 @@ export function mergeEntries(
     round_number: r.round_number,
     is_reasoning: true,
     is_tool_use: false,
-    is_partial: false,
+
     tool_name: "",
     tool_arguments: {},
     tool_result: null,
@@ -72,7 +70,7 @@ export function mergeEntries(
     round_number: t.round_number,
     is_reasoning: false,
     is_tool_use: true,
-    is_partial: false,
+
     tool_name: t.tool_name,
     tool_arguments: t.arguments,
     tool_result: t.result,

@@ -584,30 +584,6 @@ export interface components {
             round_number: number;
         };
         /**
-         * SSEMessagePreview
-         * @description SSE event for in-progress send_message text preview.
-         *
-         *     Transient — not persisted to JSONL. The complete message arrives in a
-         *     subsequent SSEMessageSent event.
-         */
-        SSEMessagePreview: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            event_type: "message_preview";
-            /** Agent Id */
-            agent_id: string;
-            /** Channel Id */
-            channel_id: string;
-            /** Text */
-            text: string;
-            /** Is Final */
-            is_final: boolean;
-            /** Round Number */
-            round_number: number;
-        };
-        /**
          * SSEMessageSent
          * @description SSE event emitted when an agent sends a message to a channel.
          */
@@ -723,28 +699,6 @@ export interface components {
             scenario_config: {
                 [key: string]: unknown;
             };
-        };
-        /**
-         * SSETokenDelta
-         * @description SSE event emitted token-by-token during LLM response streaming.
-         *
-         *     Transient — not persisted to JSONL. The complete text arrives in a
-         *     subsequent SSELLMResponseReceived event.
-         */
-        SSETokenDelta: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            event_type: "token_delta";
-            /** Agent Id */
-            agent_id: string;
-            /** Text */
-            text: string;
-            /** Is Final */
-            is_final: boolean;
-            /** Round Number */
-            round_number: number;
         };
         /**
          * SSEToolResultReceived
@@ -962,7 +916,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSETokenDelta"] | components["schemas"]["SSEMessagePreview"] | components["schemas"]["SSEAgentCostUpdated"] | components["schemas"]["SSEDebugLog"];
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSEAgentCostUpdated"] | components["schemas"]["SSEDebugLog"];
                 };
             };
             /** @description Validation Error */

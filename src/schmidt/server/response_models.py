@@ -317,35 +317,6 @@ class SSESimulationEnded(BaseModel):
     duration_seconds: float
 
 
-class SSETokenDelta(BaseModel):
-    """SSE event emitted token-by-token during LLM response streaming.
-
-    Transient — not persisted to JSONL. The complete text arrives in a
-    subsequent SSELLMResponseReceived event.
-    """
-
-    event_type: Literal["token_delta"]
-    agent_id: str
-    text: str
-    is_final: bool
-    round_number: int
-
-
-class SSEMessagePreview(BaseModel):
-    """SSE event for in-progress send_message text preview.
-
-    Transient — not persisted to JSONL. The complete message arrives in a
-    subsequent SSEMessageSent event.
-    """
-
-    event_type: Literal["message_preview"]
-    agent_id: str
-    channel_id: str
-    text: str
-    is_final: bool
-    round_number: int
-
-
 class SSEAgentCostUpdated(BaseModel):
     """SSE event carrying an agent's cumulative cost after each run cycle.
 
@@ -379,8 +350,6 @@ SSEEvent = Annotated[
         SSERoundAdvanced,
         SSEInjectionDelivered,
         SSESimulationEnded,
-        SSETokenDelta,
-        SSEMessagePreview,
         SSEAgentCostUpdated,
         SSEDebugLog,
     ],

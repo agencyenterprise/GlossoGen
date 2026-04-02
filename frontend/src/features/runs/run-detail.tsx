@@ -19,10 +19,8 @@ import { useEventStream } from "@/shared/lib/use-event-stream";
 import { buildAgentColorMap, buildChannelColorMap } from "./agent-colors";
 import { AgentDrawer } from "./agent-drawer";
 import { ChatPane } from "./chat-pane";
-import type { DisplayEntry } from "./display-entry";
 import { mergeEntries } from "./display-entry";
 import { EvalPanel } from "./eval-panel";
-import { ReasoningPanel } from "./reasoning-panel";
 import { ForkBadge } from "./fork-badge";
 import { elapsedSince, formatConfigValue, formatCost, formatDuration, humanize } from "./format";
 import { LogPanel } from "./log-panel";
@@ -38,7 +36,6 @@ export function RunDetail({ runId }: { runId: string }) {
   const [showDescription, setShowDescription] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showEvalPanel, setShowEvalPanel] = useState(true);
-  const [showReasoningPanel, setShowReasoningPanel] = useState(true);
   const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
@@ -183,37 +180,6 @@ export function RunDetail({ runId }: { runId: string }) {
     );
   }, [restData, sse.messages, sse.reasoning, sse.toolUse]);
 
-  // Build partial streaming entries for message previews only.
-  // Reasoning partials are shown in the ReasoningPanel sidebar instead.
-  const partialEntries: DisplayEntry[] = useMemo(() => {
-    const entries: DisplayEntry[] = [];
-
-    for (const [agentId, pm] of sse.partialMessages) {
-      entries.push({
-        message_id: `partial-msg-${agentId}`,
-        channel_id: pm.channelId,
-        channel_ids: [pm.channelId],
-        sender_agent_id: agentId,
-        text: pm.text,
-        timestamp: new Date().toISOString(),
-        round_number: pm.roundNumber,
-        is_reasoning: false,
-        is_tool_use: false,
-        is_partial: true,
-        tool_name: "",
-        tool_arguments: {},
-        tool_result: null,
-      });
-    }
-
-    return entries;
-  }, [sse.partialMessages]);
-
-  const allDisplayEntries = useMemo(
-    () => [...displayEntries, ...partialEntries],
-    [displayEntries, partialEntries]
-  );
-
   const channelMessages = displayEntries.filter(e => !e.is_reasoning && !e.is_tool_use).length;
   const timelineEntries = displayEntries.length;
   const restCost = restData?.total_cost_usd ?? 0;
@@ -264,7 +230,7 @@ export function RunDetail({ runId }: { runId: string }) {
     );
   }
 
-  const maxRound = allDisplayEntries.reduce((max, m) => Math.max(max, m.round_number), 0);
+  const maxRound = displayEntries.reduce((max, m) => Math.max(max, m.round_number), 0);
   const uniqueModels = [...new Set(allAgents.map(a => a.model))];
   let modelLabel: string;
   if (uniqueModels.length === 1) {
@@ -383,7 +349,7 @@ export function RunDetail({ runId }: { runId: string }) {
       <div
         className={cn(
           "relative grid h-[calc(100vh-120px)] min-h-[500px] overflow-hidden rounded-xl border border-border bg-background",
-          (evaluation !== null && showEvalPanel) || (isInProgress && showReasoningPanel)
+          evaluation !== null && showEvalPanel
             ? "grid-cols-[192px_1fr_280px]"
             : "grid-cols-[192px_1fr]"
         )}
@@ -410,7 +376,7 @@ export function RunDetail({ runId }: { runId: string }) {
         ) : (
           <ChatPane
             runId={runId}
-            messages={allDisplayEntries}
+            messages={displayEntries}
             agents={allAgents}
             selectedChannel={selectedChannel}
             agentColorMap={agentColorMap}
@@ -429,30 +395,12 @@ export function RunDetail({ runId }: { runId: string }) {
           />
         )}
 
-        {/* Right panel: reasoning (in-progress) or eval (completed) */}
-        {isInProgress && showReasoningPanel ? (
-          <ReasoningPanel
-            agents={allAgents}
-            agentColorMap={agentColorMap}
-            streamingAgentIds={sse.streamingAgentIds}
-            partialText={sse.partialText}
-            onClose={() => setShowReasoningPanel(false)}
-          />
-        ) : null}
+        {/* Right panel: eval (completed) */}
         {!isInProgress && evaluation !== null && showEvalPanel ? (
           <EvalPanel evaluation={evaluation} onClose={() => setShowEvalPanel(false)} />
         ) : null}
 
         {/* Right panel toggle (when hidden) */}
-        {isInProgress && !showReasoningPanel ? (
-          <button
-            className="absolute right-2 top-12 z-10 rounded-md border border-border bg-background p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
-            onClick={() => setShowReasoningPanel(true)}
-            title="Show reasoning panel"
-          >
-            <PanelRightOpen className="h-4 w-4" />
-          </button>
-        ) : null}
         {!isInProgress && evaluation !== null && !showEvalPanel ? (
           <button
             className="absolute right-2 top-12 z-10 rounded-md border border-border bg-background p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
@@ -467,7 +415,7 @@ export function RunDetail({ runId }: { runId: string }) {
         {activeAgent && activeAgentColor ? (
           <AgentDrawer
             agent={activeAgent}
-            messages={allDisplayEntries}
+            messages={displayEntries}
             agentColor={activeAgentColor}
             channelColorMap={channelColorMap}
             onClose={() => setSelectedAgent(null)}

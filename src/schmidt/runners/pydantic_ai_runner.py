@@ -2,8 +2,8 @@
 
 Launches a Pydantic AI agent that connects to the simulation runtime's
 MCP server and participates autonomously in the scenario. Uses
-``agent.run()`` with an ``event_stream_handler`` for real-time token
-streaming while running tool calls to completion.
+``agent.run()`` with an ``event_stream_handler`` for accumulating
+reasoning text and detecting tool call results.
 """
 
 import asyncio
@@ -24,8 +24,6 @@ from pydantic_ai.messages import (
     TextPartDelta,
     ThinkingPart,
     ThinkingPartDelta,
-    ToolCallPart,
-    ToolCallPartDelta,
 )
 from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.settings import ModelSettings
@@ -34,7 +32,6 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
-from schmidt.llm.tool_arg_extractor import SendMessageTextExtractor
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import LLMResponseReceived, TokenUsage, ToolResultReceived
 from schmidt.models.tool_definition import ToolCallRequest
@@ -43,11 +40,10 @@ from schmidt.runners.agent_runner_base import AgentRunner
 from schmidt.runners.communication_protocol import (
     CONTINUE_PROMPT,
     INITIAL_PROMPT,
-    PREVIEW_FLUSH_INTERVAL,
     build_full_system_prompt,
 )
 from schmidt.runtime.mcp_tools import HIDDEN_TOOL_NAMES
-from schmidt.server.streaming_event import AgentCostUpdated, MessagePreview, TokenDelta
+from schmidt.server.streaming_event import AgentCostUpdated
 from schmidt.token_pricing import find_pricing
 
 logger = logging.getLogger(__name__)
@@ -65,19 +61,13 @@ def _log_task_exception(task: asyncio.Task[None]) -> None:
 class _StreamingState:
     """Mutable state shared between the event handler and the outer run loop.
 
-    Tracks accumulated reasoning text, in-progress tool call argument
-    fragments, message preview buffers, and the ``got_done`` flag that
-    signals the agent should stop looping.
+    Tracks accumulated reasoning text, pending tool calls, and the
+    ``got_done`` flag that signals the agent should stop looping.
     """
 
     def __init__(self) -> None:
         self.got_done = False
-        self.extractors: dict[int, SendMessageTextExtractor] = {}
-        self.accumulated_args: dict[int, str] = {}
-        self.preview_buffers: dict[int, str] = {}
-        self.current_tool_names: dict[int, str] = {}
         self.pending_tool_calls: dict[str, ToolCallRequest] = {}
-        self.last_preview_time = 0.0
         self.accumulated_reasoning = ""
         self.accumulated_tool_calls: list[ToolCallRequest] = []
         self.background_tasks: list[asyncio.Task[None]] = []
@@ -93,8 +83,8 @@ class PydanticAIRunner(AgentRunner):
     """Runs a single Pydantic AI agent as an autonomous participant.
 
     Uses ``agent.run()`` with ``event_stream_handler`` so the agent
-    executes all tool calls to completion while streaming token deltas
-    and message previews to the EventBus.
+    executes all tool calls to completion while accumulating reasoning
+    text and tool results for JSONL logging.
     """
 
     def __init__(self, max_turns: int, event_bus: EventBus, provider: str) -> None:
@@ -166,9 +156,8 @@ class PydanticAIRunner(AgentRunner):
                     ) -> None:
                         """Consume streaming events from a single agent.run() cycle.
 
-                        Receives token deltas, tool call fragments, and tool results
-                        as they arrive and routes each to the appropriate handler for
-                        logging and frontend streaming.
+                        Accumulates reasoning text and tool call results for
+                        JSONL logging, and detects the done signal.
                         """
                         async for event in event_stream:
                             self._process_stream_event(
@@ -201,20 +190,6 @@ class PydanticAIRunner(AgentRunner):
                             "Agent %s run cycle %d failed, retrying",
                             agent_id,
                             total_turns + 1,
-                        )
-                        self._flush_all_previews(
-                            agent_id=agent_id,
-                            extractors=state.extractors,
-                            preview_buffers=state.preview_buffers,
-                            round_number=event_logger.current_round,
-                        )
-                        bus.publish(
-                            event=TokenDelta(
-                                agent_id=agent_id,
-                                text="",
-                                is_final=True,
-                                round_number=event_logger.current_round,
-                            ).model_dump(mode="json")
                         )
                         all_background_tasks.extend(state.background_tasks)
                         total_turns += 1
@@ -278,14 +253,6 @@ class PydanticAIRunner(AgentRunner):
                         ),
                     )
 
-                    # Flush streaming state
-                    self._flush_all_previews(
-                        agent_id=agent_id,
-                        extractors=state.extractors,
-                        preview_buffers=state.preview_buffers,
-                        round_number=event_logger.current_round,
-                    )
-
                     all_background_tasks.extend(state.background_tasks)
 
                     if state.got_done:
@@ -340,11 +307,7 @@ class PydanticAIRunner(AgentRunner):
         round_number: int,
         usage: TokenUsage | None = None,
     ) -> None:
-        """Log accumulated reasoning + tool calls as one LLMResponseReceived event.
-
-        Sends ``is_final`` to clear the frontend partial, then logs the
-        committed block so the FE can display it immediately.
-        """
+        """Log accumulated reasoning + tool calls as one LLMResponseReceived event."""
         text = state.accumulated_reasoning.strip()
         tool_calls = list(state.accumulated_tool_calls)
         if not text and not tool_calls:
@@ -356,14 +319,6 @@ class PydanticAIRunner(AgentRunner):
                 cache_read_input_tokens=0,
                 cache_creation_input_tokens=0,
             )
-        self._event_bus.publish(
-            event=TokenDelta(
-                agent_id=agent_id,
-                text="",
-                is_final=True,
-                round_number=round_number,
-            ).model_dump(mode="json")
-        )
         logger.info(
             "Agent %s reasoning: %.200s",
             agent_id,
@@ -399,7 +354,7 @@ class PydanticAIRunner(AgentRunner):
         - ``PartStartEvent``: A new content part (text, thinking, or tool call)
           begins in the model response.
         - ``PartDeltaEvent``: An incremental fragment of a content part (text
-          token, thinking token, or tool call argument JSON delta).
+          token or thinking token).
         - ``FunctionToolCallEvent``: A tool call is fully assembled and about
           to be executed by the framework.
         - ``FunctionToolResultEvent``: The MCP server returned a result for a
@@ -414,10 +369,7 @@ class PydanticAIRunner(AgentRunner):
                 event.index,
                 type(event.part).__name__,
             )
-            if isinstance(event.part, ToolCallPart):
-                state.current_tool_names[event.index] = event.part.tool_name
-                state.accumulated_args.pop(event.index, None)
-            elif isinstance(event.part, (TextPart, ThinkingPart)):
+            if isinstance(event.part, (TextPart, ThinkingPart)):
                 # A new text/thinking part is starting. If we have accumulated
                 # tool calls from a previous response, flush them now so each
                 # model response is logged as one reasoning+tools block.
@@ -431,47 +383,13 @@ class PydanticAIRunner(AgentRunner):
                     )
                 if event.part.content:
                     state.accumulated_reasoning += event.part.content
-                    self._event_bus.publish(
-                        event=TokenDelta(
-                            agent_id=agent_id,
-                            text=event.part.content,
-                            is_final=False,
-                            round_number=round_number,
-                        ).model_dump(mode="json")
-                    )
 
         elif isinstance(event, PartDeltaEvent):
             if isinstance(event.delta, TextPartDelta):
                 state.accumulated_reasoning += event.delta.content_delta
-                self._event_bus.publish(
-                    event=TokenDelta(
-                        agent_id=agent_id,
-                        text=event.delta.content_delta,
-                        is_final=False,
-                        round_number=round_number,
-                    ).model_dump(mode="json")
-                )
             elif isinstance(event.delta, ThinkingPartDelta):
                 if event.delta.content_delta:
                     state.accumulated_reasoning += event.delta.content_delta
-                    self._event_bus.publish(
-                        event=TokenDelta(
-                            agent_id=agent_id,
-                            text=event.delta.content_delta,
-                            is_final=False,
-                            round_number=round_number,
-                        ).model_dump(mode="json")
-                    )
-            elif isinstance(event.delta, ToolCallPartDelta):
-                delta_str = event.delta.args_delta
-                if isinstance(delta_str, str):
-                    self._handle_tool_call_delta(
-                        agent_id=agent_id,
-                        index=event.index,
-                        args_delta=delta_str,
-                        state=state,
-                        round_number=round_number,
-                    )
 
         elif isinstance(event, FunctionToolCallEvent):
             logger.debug(
@@ -479,12 +397,6 @@ class PydanticAIRunner(AgentRunner):
                 agent_id,
                 event.part.tool_name,
                 event.part.tool_call_id,
-            )
-            self._flush_all_previews(
-                agent_id=agent_id,
-                extractors=state.extractors,
-                preview_buffers=state.preview_buffers,
-                round_number=round_number,
             )
 
             raw_args = event.part.args
@@ -571,95 +483,3 @@ class PydanticAIRunner(AgentRunner):
                 agent_id,
             )
             state.got_done = True
-
-    def _handle_tool_call_delta(
-        self,
-        agent_id: str,
-        index: int,
-        args_delta: str,
-        state: _StreamingState,
-        round_number: int,
-    ) -> None:
-        """Accumulate streaming tool call arguments and emit message previews."""
-        tool_name = state.current_tool_names.get(index, "")
-        if "send_message" not in tool_name:
-            return
-
-        state.accumulated_args[index] = state.accumulated_args.get(index, "") + args_delta
-
-        if index not in state.extractors:
-            state.extractors[index] = SendMessageTextExtractor()
-
-        extract_result = state.extractors[index].feed(
-            accumulated_json=state.accumulated_args[index],
-        )
-        if extract_result.new_text and extract_result.channel_id is not None:
-            state.preview_buffers[index] = (
-                state.preview_buffers.get(index, "") + extract_result.new_text
-            )
-            now = asyncio.get_running_loop().time()
-            if now - state.last_preview_time >= PREVIEW_FLUSH_INTERVAL:
-                self._flush_preview(
-                    agent_id=agent_id,
-                    block_index=index,
-                    extractors=state.extractors,
-                    preview_buffers=state.preview_buffers,
-                    round_number=round_number,
-                )
-                state.last_preview_time = now
-
-    def _flush_preview(
-        self,
-        agent_id: str,
-        block_index: int,
-        extractors: dict[int, SendMessageTextExtractor],
-        preview_buffers: dict[int, str],
-        round_number: int,
-    ) -> None:
-        """Flush buffered message preview text for a single tool_use block."""
-        text = preview_buffers.pop(block_index, "")
-        if not text:
-            return
-        extractor = extractors.get(block_index)
-        if extractor is None:
-            return
-        channel_id = extractor.channel_id
-        if channel_id is None:
-            return
-        preview = MessagePreview(
-            agent_id=agent_id,
-            channel_id=channel_id,
-            text=text,
-            is_final=False,
-            round_number=round_number,
-        )
-        self._event_bus.publish(event=preview.model_dump(mode="json"))
-
-    def _flush_all_previews(
-        self,
-        agent_id: str,
-        extractors: dict[int, SendMessageTextExtractor],
-        preview_buffers: dict[int, str],
-        round_number: int,
-    ) -> None:
-        """Flush remaining preview text and send is_final for all active previews."""
-        for block_index in list(preview_buffers.keys()):
-            self._flush_preview(
-                agent_id=agent_id,
-                block_index=block_index,
-                extractors=extractors,
-                preview_buffers=preview_buffers,
-                round_number=round_number,
-            )
-        for extractor in extractors.values():
-            channel_id = extractor.channel_id
-            if channel_id is not None:
-                final = MessagePreview(
-                    agent_id=agent_id,
-                    channel_id=channel_id,
-                    text="",
-                    is_final=True,
-                    round_number=round_number,
-                )
-                self._event_bus.publish(event=final.model_dump(mode="json"))
-        extractors.clear()

@@ -11,8 +11,6 @@ from schmidt.template_renderer import TemplateRenderer
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-PREVIEW_FLUSH_INTERVAL = 0.03  # 30ms — roughly 2 animation frames
-
 _renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
 
 INITIAL_PROMPT = _renderer.render(
