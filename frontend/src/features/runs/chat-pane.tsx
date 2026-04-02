@@ -338,11 +338,7 @@ export function ChatPane({
                       const isEditing = editingMessageId === entry.message_id;
                       const pendingEdit = pendingEdits.get(entry.message_id);
                       const displayText = pendingEdit ? pendingEdit.newText : entry.text;
-                      const canEdit =
-                        forkEnabled &&
-                        !entry.is_reasoning &&
-                        !entry.is_tool_use &&
-                        !entry.is_partial;
+                      const canEdit = forkEnabled && !entry.is_reasoning && !entry.is_tool_use;
                       const entryKey = `${entry.message_id}-${entry.is_reasoning ? "r" : entry.is_tool_use ? "t" : "m"}-${entryIdx}`;
 
                       return (
@@ -365,7 +361,7 @@ export function ChatPane({
                         >
                           {entry.is_reasoning ? (
                             <span className="text-[10px] italic text-muted-foreground">
-                              {entry.is_partial ? "streaming..." : "reasoning"}
+                              reasoning
                             </span>
                           ) : entry.is_tool_use ? null : showChannelBadge ? (
                             <span
@@ -398,10 +394,6 @@ export function ChatPane({
                                   {displayText}
                                 </ProseMarkdown>
                               ) : null}
-                              {entry.is_partial ? (
-                                <span className="inline-block h-3 w-1.5 animate-pulse bg-foreground/60" />
-                              ) : null}
-
                               {/* Edit / fork controls */}
                               {canEdit ? (
                                 <span className="absolute -right-1 top-0 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/entry:opacity-100">

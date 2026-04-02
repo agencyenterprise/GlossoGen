@@ -179,12 +179,6 @@
                       "$ref": "#/components/schemas/SSESimulationEnded"
                     },
                     {
-                      "$ref": "#/components/schemas/SSETokenDelta"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SSEMessagePreview"
-                    },
-                    {
                       "$ref": "#/components/schemas/SSEAgentCostUpdated"
                     },
                     {
@@ -203,8 +197,6 @@
                       "round_advanced": "#/components/schemas/SSERoundAdvanced",
                       "injection_delivered": "#/components/schemas/SSEInjectionDelivered",
                       "simulation_ended": "#/components/schemas/SSESimulationEnded",
-                      "token_delta": "#/components/schemas/SSETokenDelta",
-                      "message_preview": "#/components/schemas/SSEMessagePreview",
                       "agent_cost_updated": "#/components/schemas/SSEAgentCostUpdated",
                       "debug_log": "#/components/schemas/SSEDebugLog"
                     }
@@ -1229,46 +1221,6 @@
         "title": "SSELLMResponseReceived",
         "description": "SSE event emitted when the LLM returns a response (reasoning text)."
       },
-      "SSEMessagePreview": {
-        "properties": {
-          "event_type": {
-            "type": "string",
-            "const": "message_preview",
-            "title": "Event Type"
-          },
-          "agent_id": {
-            "type": "string",
-            "title": "Agent Id"
-          },
-          "channel_id": {
-            "type": "string",
-            "title": "Channel Id"
-          },
-          "text": {
-            "type": "string",
-            "title": "Text"
-          },
-          "is_final": {
-            "type": "boolean",
-            "title": "Is Final"
-          },
-          "round_number": {
-            "type": "integer",
-            "title": "Round Number"
-          }
-        },
-        "type": "object",
-        "required": [
-          "event_type",
-          "agent_id",
-          "channel_id",
-          "text",
-          "is_final",
-          "round_number"
-        ],
-        "title": "SSEMessagePreview",
-        "description": "SSE event for in-progress send_message text preview.\n\nTransient \u2014 not persisted to JSONL. The complete message arrives in a\nsubsequent SSEMessageSent event."
-      },
       "SSEMessageSent": {
         "properties": {
           "event_type": {
@@ -1474,41 +1426,6 @@
         ],
         "title": "SSESimulationStarted",
         "description": "SSE event emitted once when a simulation begins."
-      },
-      "SSETokenDelta": {
-        "properties": {
-          "event_type": {
-            "type": "string",
-            "const": "token_delta",
-            "title": "Event Type"
-          },
-          "agent_id": {
-            "type": "string",
-            "title": "Agent Id"
-          },
-          "text": {
-            "type": "string",
-            "title": "Text"
-          },
-          "is_final": {
-            "type": "boolean",
-            "title": "Is Final"
-          },
-          "round_number": {
-            "type": "integer",
-            "title": "Round Number"
-          }
-        },
-        "type": "object",
-        "required": [
-          "event_type",
-          "agent_id",
-          "text",
-          "is_final",
-          "round_number"
-        ],
-        "title": "SSETokenDelta",
-        "description": "SSE event emitted token-by-token during LLM response streaming.\n\nTransient \u2014 not persisted to JSONL. The complete text arrives in a\nsubsequent SSELLMResponseReceived event."
       },
       "SSEToolResultReceived": {
         "properties": {
