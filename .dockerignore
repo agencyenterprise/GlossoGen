@@ -1,0 +1,10 @@
+.venv
+.git
+runs/
+logs/
+frontend/node_modules
+frontend/.next
+__pycache__
+*.egg-info
+.env
+*.pyc

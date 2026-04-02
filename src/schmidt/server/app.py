@@ -17,6 +17,14 @@ from schmidt.server.runs_router import router as runs_router
 logger = logging.getLogger(__name__)
 
 
+def _parse_allowed_origins() -> list[str]:
+    """Read CORS origins from ALLOWED_ORIGINS env var (comma-separated)."""
+    origins_raw = os.environ.get("ALLOWED_ORIGINS", "")
+    if origins_raw:
+        return [origin.strip() for origin in origins_raw.split(",")]
+    return ["http://localhost:3000"]
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Store the configured runs directory on app state at startup."""
@@ -32,7 +40,7 @@ app = FastAPI(title="Schmidt Simulation Server", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_parse_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
