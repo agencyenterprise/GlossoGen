@@ -35,6 +35,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Store the configured runs directory on app state at startup."""
     runs_dir_str = os.environ.get("SCHMIDT_RUNS_DIR", "./runs")
     app.state.runs_dir = Path(runs_dir_str)
+    app.state.runs_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Serving runs from: %s", app.state.runs_dir)
     yield
 
