@@ -4,6 +4,7 @@ Publishes each logged event to an ``EventBus`` for real-time delivery to SSE
 subscribers when a bus is provided at construction time.
 """
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -25,6 +26,7 @@ class EventLogger:
         self._file: aiofiles.threadpool.binary.AsyncBufferedIOBase | None = None
         self._event_bus = event_bus
         self._current_round = 1
+        self._write_lock = asyncio.Lock()
 
     @property
     def current_round(self) -> int:
@@ -63,8 +65,9 @@ class EventLogger:
             self._current_round = event.round_number
         event_dict = event.model_dump(mode="json")
         data = orjson.dumps(event_dict) + b"\n"
-        await self._file.write(data)
-        await self._file.flush()
+        async with self._write_lock:
+            await self._file.write(data)
+            await self._file.flush()
         self._event_bus.publish(event=event_dict)
 
     async def close(self) -> None:

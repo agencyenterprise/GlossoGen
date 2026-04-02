@@ -28,6 +28,7 @@ from pydantic_ai.messages import (
     ToolCallPartDelta,
 )
 from pydantic_ai.models.anthropic import AnthropicModelSettings
+from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage, UsageLimits
 
@@ -126,15 +127,20 @@ class PydanticAIRunner(AgentRunner):
             role_name=agent_config.role_name,
         )
 
+        if self._provider == "anthropic":
+            default_settings: ModelSettings = AnthropicModelSettings(
+                anthropic_cache_instructions=True,
+                anthropic_cache_tool_definitions=True,
+                anthropic_cache_messages=True,
+            )
+        else:
+            default_settings = ModelSettings()
+
         agent: Agent[None, str] = Agent(
             model=f"{self._provider}:{agent_config.model}",
             system_prompt=full_system_prompt,
             toolsets=[mcp_server],
-            model_settings=AnthropicModelSettings(
-                anthropic_cache_instructions=True,
-                anthropic_cache_tool_definitions=True,
-                anthropic_cache_messages=True,
-            ),
+            model_settings=default_settings,
         )
 
         message_history: list[ModelMessage] | None = None
@@ -186,7 +192,7 @@ class PydanticAIRunner(AgentRunner):
                             message_history=message_history,
                             event_stream_handler=_handle_events,
                             usage_limits=UsageLimits(request_limit=None),
-                            model_settings=AnthropicModelSettings(
+                            model_settings=ModelSettings(
                                 max_tokens=agent_config.max_tokens,
                             ),
                         )
