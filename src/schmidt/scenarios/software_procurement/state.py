@@ -36,8 +36,6 @@ class TeamState(BaseModel):
 
     team_id: str
     proposals: list[ProposalRecord]
-    deliverable_filename: str | None
-    deliverable_code: str | None
 
 
 class SoftwareProcurementState:
@@ -53,8 +51,6 @@ class SoftwareProcurementState:
             tid: TeamState(
                 team_id=tid,
                 proposals=[],
-                deliverable_filename=None,
-                deliverable_code=None,
             )
             for tid in team_ids
         }
@@ -124,27 +120,6 @@ class SoftwareProcurementState:
         latest.status = ProposalStatus.REJECTED
         logger.info("Buyer rejected team %s proposal: %s", team_id, reason)
         return f"Rejected {team_id}'s proposal. Reason sent: {reason}"
-
-    def store_deliverable(self, team_id: str, filename: str, code: str) -> None:
-        """Store a deliverable submitted by an engineer for the sales rep."""
-        team = self._teams[team_id]
-        team.deliverable_filename = filename
-        team.deliverable_code = code
-        logger.info(
-            "Team %s stored deliverable: %s (%d chars)",
-            team_id,
-            filename,
-            len(code),
-        )
-
-    def get_deliverable(self, team_id: str) -> tuple[str, str] | None:
-        """Return (filename, code) for a team's deliverable, or None."""
-        team = self._teams.get(team_id)
-        if team is None:
-            return None
-        if team.deliverable_filename is None or team.deliverable_code is None:
-            return None
-        return (team.deliverable_filename, team.deliverable_code)
 
     def get_proposals_summary(self) -> str:
         """Return a summary of all proposals across all teams for the buyer."""
