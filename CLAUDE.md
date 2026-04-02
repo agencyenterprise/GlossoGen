@@ -43,9 +43,11 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
 - `src/schmidt/evaluation/` — generic evaluators and evaluation infrastructure
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
+  - `password_auth_middleware.py` — pure ASGI middleware for shared-password authentication
   - `fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
 - `linter/` — custom linting scripts
 - `frontend/` — Next.js web application
+  - `src/features/auth/` — authentication gate and login page
 
 ### Prompt Templates
 
@@ -109,6 +111,51 @@ CI fails if `frontend/src/types/api.gen.ts` drifts from the backend schema.
 make dev            # start FastAPI backend on port 8000 (reads from ./runs/)
 make dev-frontend   # start Next.js dev server on port 3000
 ```
+
+## Authentication
+
+The application uses optional shared-password authentication controlled by the `APP_PASSWORD` environment variable on the backend.
+
+- **Enabled**: Set `APP_PASSWORD` to a password string. All API endpoints except `GET /api/health` require authentication.
+- **Disabled**: Leave `APP_PASSWORD` unset. All endpoints are open (default for local development).
+
+The backend middleware (`password_auth_middleware.py`) accepts credentials via:
+- `Authorization: Bearer <password>` header (used by the typed API client)
+- `?token=<password>` query parameter (used by SSE EventSource connections, which cannot set custom headers)
+
+The frontend `AuthGate` component probes `POST /api/auth/verify` on mount. If auth is required, it shows a login page. The password is stored in `localStorage` and attached to all API requests via openapi-fetch middleware.
+
+## Deployment
+
+The application deploys to Railway as two services from a single repository.
+
+### Docker
+
+- `Dockerfile` (repo root) — Backend: Python 3.12, uv, weasyprint system dependencies, git
+- `frontend/Dockerfile` — Frontend: Node 22, three-stage build with Next.js standalone output
+
+### Railway Configuration
+
+Each service has a `railway.toml` config-as-code file:
+- `railway.toml` (repo root) — Backend service: Dockerfile builder, `/api/health` healthcheck
+- `frontend/railway.toml` — Frontend service: Dockerfile builder
+
+### Railway Dashboard Setup
+
+**Backend service**: root directory `/`, volume mounted at `/data/runs`.
+
+Environment variables:
+- `APP_PASSWORD` — shared password for authentication
+- `ANTHROPIC_API_KEY` — required for simulations
+- `ALLOWED_ORIGINS` — comma-separated frontend URLs for CORS (e.g. `https://frontend.up.railway.app`)
+- `OPENAI_API_KEY`, `HF_TOKEN` — optional provider keys
+
+**Frontend service**: root directory `frontend`.
+
+Build args:
+- `NEXT_PUBLIC_API_URL` — backend service URL (e.g. `https://backend.up.railway.app`)
+
+**Deploy order**: Backend first (get URL) → set as frontend `NEXT_PUBLIC_API_URL` build arg → deploy frontend → update backend `ALLOWED_ORIGINS` with frontend URL.
 
 ## Run Output Directory Structure
 

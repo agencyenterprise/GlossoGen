@@ -6,13 +6,17 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from schmidt.server.fork_router import router as fork_router
+from schmidt.server.password_auth_middleware import PasswordAuthMiddleware
 from schmidt.server.pdf_export_router import router as pdf_export_router
-from schmidt.server.response_models import HealthResponse, HealthStatus
+from schmidt.server.response_models import AuthVerifyResponse, HealthResponse, HealthStatus
 from schmidt.server.runs_router import router as runs_router
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +50,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_app_password = os.environ.get("APP_PASSWORD")
+if _app_password:
+    app.add_middleware(PasswordAuthMiddleware, password=_app_password)
+
 app.include_router(runs_router)
 app.include_router(fork_router)
 app.include_router(pdf_export_router)
@@ -55,3 +63,13 @@ app.include_router(pdf_export_router)
 async def health() -> HealthResponse:
     """Health check endpoint."""
     return HealthResponse(status=HealthStatus.OK)
+
+
+@app.post("/api/auth/verify", response_model=AuthVerifyResponse)
+async def verify_auth() -> AuthVerifyResponse:
+    """Verify that the provided password is correct.
+
+    If the request reaches this endpoint, the middleware already validated
+    the password. Returns authenticated=True unconditionally.
+    """
+    return AuthVerifyResponse(authenticated=True)

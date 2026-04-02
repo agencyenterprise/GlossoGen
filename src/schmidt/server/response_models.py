@@ -22,6 +22,12 @@ class HealthResponse(BaseModel):
     status: HealthStatus
 
 
+class AuthVerifyResponse(BaseModel):
+    """Response model for the password verification endpoint."""
+
+    authenticated: bool
+
+
 class ForkSource(BaseModel):
     """Provenance information for a forked simulation run."""
 

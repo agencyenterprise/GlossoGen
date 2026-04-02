@@ -342,6 +342,25 @@
           }
         }
       }
+    },
+    "/api/auth/verify": {
+      "post": {
+        "summary": "Verify Auth",
+        "description": "Verify that the provided password is correct.\n\nIf the request reaches this endpoint, the middleware already validated\nthe password. Returns authenticated=True unconditionally.",
+        "operationId": "verify_auth_api_auth_verify_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthVerifyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -390,6 +409,20 @@
         ],
         "title": "AgentDetail",
         "description": "Full agent information for the run detail endpoint."
+      },
+      "AuthVerifyResponse": {
+        "properties": {
+          "authenticated": {
+            "type": "boolean",
+            "title": "Authenticated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "authenticated"
+        ],
+        "title": "AuthVerifyResponse",
+        "description": "Response model for the password verification endpoint."
       },
       "ChannelMessage": {
         "properties": {
