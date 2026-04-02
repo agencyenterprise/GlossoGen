@@ -36,6 +36,8 @@ interface ChatPaneProps {
   onCancelEdit: () => void;
   onRemoveEdit: (messageId: string) => void;
   onForkFromMessage: (targetMessageId: string) => void;
+  /** The message_id that was the fork point, if this is a forked run. */
+  forkPointMessageId: string | null;
 }
 
 interface TurnGroup {
@@ -113,6 +115,7 @@ export function ChatPane({
   onCancelEdit,
   onRemoveEdit,
   onForkFromMessage,
+  forkPointMessageId,
 }: ChatPaneProps) {
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -356,9 +359,17 @@ export function ChatPane({
                             entry.is_reasoning && "ml-4 opacity-50",
                             entry.is_tool_use && "ml-4",
                             pendingEdit &&
-                              "rounded-md bg-amber-50/50 ring-1 ring-amber-200/50 dark:bg-amber-950/20 dark:ring-amber-800/30"
+                              "rounded-md bg-amber-50/50 ring-1 ring-amber-200/50 dark:bg-amber-950/20 dark:ring-amber-800/30",
+                            forkPointMessageId === entry.message_id &&
+                              "rounded-md bg-blue-50/60 px-2 py-1.5 ring-1 ring-blue-300/50 dark:bg-blue-950/30 dark:ring-blue-700/40"
                           )}
                         >
+                          {forkPointMessageId === entry.message_id ? (
+                            <span className="mb-0.5 inline-block rounded-full bg-blue-100 px-1.5 py-px text-[10px] font-medium leading-relaxed text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                              fork point (edited)
+                            </span>
+                          ) : null}
+
                           {entry.is_reasoning ? (
                             <span className="text-[10px] italic text-muted-foreground">
                               reasoning

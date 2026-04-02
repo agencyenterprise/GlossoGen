@@ -24,6 +24,7 @@ from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.message_rewind import RewindState, build_rewind_state_from_last_message
+from schmidt.run_repository import RunRepository
 from schmidt.runners.pydantic_ai_runner import PydanticAIRunner
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
@@ -221,7 +222,12 @@ async def _run_simulation(
 
     log_path = run_dir / f"{scenario.name()}.jsonl"
     event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
-    event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
+
+    repo = RunRepository(run_dir=run_dir)
+    if not resuming:
+        await repo.init()
+
+    event_logger = EventLogger(log_path=log_path, event_bus=event_bus, repo=repo)
 
     resume_state: RewindState | None = None
     if resuming:
