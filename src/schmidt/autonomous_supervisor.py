@@ -239,13 +239,13 @@ class AutonomousSupervisor:
             port=self._mcp_server_port,
         )
 
-        # For resumed runs, inject the conversation transcript into each agent's
-        # system prompt so the agent starts with full context of what happened.
+        # For resumed runs, inject the reconstructed message history so each
+        # agent starts with proper multi-turn context of what happened.
         if self._resume_state is not None:
             for config in self._agent_configs:
-                context = self._resume_state.agent_context_prompts.get(config.agent_id, "")
-                if context:
-                    config.system_prompt = config.system_prompt + "\n\n" + context
+                history = self._resume_state.agent_message_histories.get(config.agent_id)
+                if history:
+                    config.initial_message_history = history
 
         # Log the initial round and deliver injections BEFORE launching agents
         # so no events are recorded with round_number=0.

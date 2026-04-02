@@ -3,6 +3,7 @@ _.coerce_string_to_list  # unused method (src/schmidt/evaluation/chunked_evaluat
 violations  # unused variable (src/schmidt/evaluation/instruction_adherence.py:36)
 leaked_information  # unused variable (src/schmidt/evaluation/secret_leak_evaluator.py:38)
 _.format  # unused method (src/schmidt/logging_format.py:21)
+model_config  # unused variable (src/schmidt/models/agent_config.py:14)
 display_name  # unused variable (src/schmidt/models/channel.py:19)
 detail  # unused variable (src/schmidt/models/mcp_responses.py:27)
 _.get_head_sha  # unused method (src/schmidt/run_repository.py:110)

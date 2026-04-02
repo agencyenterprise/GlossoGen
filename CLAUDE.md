@@ -39,7 +39,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/autonomous_supervisor.py` — autonomous mode orchestrator (supports resume via `RewindState`)
 - `src/schmidt/message_rewind.py` — reconstructs simulation state at any message for fork/resume
 - `src/schmidt/run_repository.py` — git-backed repository for run directories (init, commit, clone, checkout)
-- `src/schmidt/conversation_reconstructor.py` — builds per-agent conversation transcript from events
+- `src/schmidt/message_history_builder.py` — reconstructs pydantic-ai ModelMessage history from JSONL events for fork/resume
 - `src/schmidt/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
 - `src/schmidt/evaluation/` — generic evaluators and evaluation infrastructure
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming

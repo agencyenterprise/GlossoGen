@@ -84,6 +84,7 @@ class LLMResponseReceived(EventBase):
 
     event_type: Literal["llm_response_received"] = "llm_response_received"
     agent_id: str
+    thinking: str | None = None
     text: str | None
     tool_calls: list[ToolCallRequest]
     stop_reason: str
