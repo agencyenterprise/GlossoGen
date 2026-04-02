@@ -426,7 +426,7 @@ class SoftwareProcurementScenario(SimulationScenario):
             ScenarioMcpTool(
                 name="get_deliverable",
                 description="Retrieve the deliverable code submitted by your engineer.",
-                executor=_mcp_get_deliverable(state=state),
+                executor=_mcp_get_deliverable(state=state, workspace=workspace),
             ),
             # --- Buyer tools ---
             ScenarioMcpTool(
@@ -692,6 +692,7 @@ def _mcp_submit_deliverable(
 
 def _mcp_get_deliverable(
     state: SoftwareProcurementState,
+    workspace: WorkspaceManager,
 ) -> Callable[..., Awaitable[str]]:
     """Build the get_deliverable MCP tool executor."""
 
@@ -699,7 +700,7 @@ def _mcp_get_deliverable(
         """Retrieve the deliverable code submitted by the team's engineer."""
         agent_id = resolve_agent_id(ctx=ctx)
         team_id = state.get_team_for_agent(agent_id=agent_id)
-        result = state.get_deliverable(team_id=team_id)
+        result = await workspace.read_deliverable(team_id=team_id)
         if result is None:
             return "Your engineer has not submitted a deliverable yet."
         filename, code = result
@@ -718,7 +719,7 @@ def _mcp_submit_proposal(
         """Submit a proposal with deliverable code to the buyer."""
         agent_id = resolve_agent_id(ctx=ctx)
         team_id = state.get_team_for_agent(agent_id=agent_id)
-        deliverable = state.get_deliverable(team_id=team_id)
+        deliverable = await workspace.read_deliverable(team_id=team_id)
         if deliverable is not None:
             filename = deliverable[0]
         else:
