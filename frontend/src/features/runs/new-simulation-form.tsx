@@ -123,7 +123,11 @@ export function NewSimulationForm() {
 
   const startMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await api.POST("/api/runs/start", {
+      // Snapshot existing run IDs so we can detect the new one.
+      const before = await api.GET("/api/runs");
+      const existingIds = new Set((before.data?.runs ?? []).map(r => r.run_id));
+
+      const { error } = await api.POST("/api/runs/start", {
         body: {
           scenario_name: scenario,
           model,
@@ -132,12 +136,27 @@ export function NewSimulationForm() {
         },
       });
       if (error) {
-        throw new Error("Failed to start simulation");
+        const detail =
+          typeof error === "object" && error !== null && "detail" in error
+            ? String((error as { detail: unknown }).detail)
+            : "Failed to start simulation";
+        throw new Error(detail);
       }
-      return data;
+
+      // Poll until the new run appears in the runs list.
+      const deadline = Date.now() + 30_000;
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 1000));
+        const after = await api.GET("/api/runs");
+        const newRun = (after.data?.runs ?? []).find(r => !existingIds.has(r.run_id));
+        if (newRun) {
+          return newRun.run_id;
+        }
+      }
+      throw new Error("Simulation did not appear within 30 seconds");
     },
-    onSuccess: result => {
-      router.push(`/runs/${result.run_id}`);
+    onSuccess: runId => {
+      router.push(`/runs/${runId}`);
     },
   });
 

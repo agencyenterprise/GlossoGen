@@ -195,9 +195,9 @@ export interface paths {
          * Start Run
          * @description Launch a new simulation as a background subprocess.
          *
-         *     Validates inputs, creates a run directory, writes the knobs dict to a
-         *     temporary JSON file, builds the CLI command, and waits for the subprocess
-         *     to write its first event before returning the run_id.
+         *     Validates inputs, writes knobs to a temp file, builds the CLI command,
+         *     and launches the subprocess. Returns immediately — the frontend polls
+         *     the runs list to discover the new run once it appears.
          */
         post: operations["start_run_api_runs_start_post"];
         delete?: never;
@@ -890,10 +890,8 @@ export interface components {
          * @description Response after successfully launching a new simulation.
          */
         StartRunResponse: {
-            /** Run Id */
-            run_id: string;
-            /** Run Dir */
-            run_dir: string;
+            /** Status */
+            status: string;
         };
         /**
          * ToolUseEntry
