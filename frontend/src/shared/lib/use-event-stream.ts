@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { components } from "@/types/api.gen";
+import { AUTH_STORAGE_KEY } from "@/features/auth/auth-gate";
 import { API_URL } from "./api-client";
 
 type ChannelMessage = components["schemas"]["ChannelMessage"];
@@ -86,7 +87,11 @@ export function useEventStream(
       return undefined;
     }
 
-    const url = `${API_URL}/api/runs/${encodeURIComponent(runId)}/events`;
+    let url = `${API_URL}/api/runs/${encodeURIComponent(runId)}/events`;
+    const storedPassword = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (storedPassword) {
+      url += `?token=${encodeURIComponent(storedPassword)}`;
+    }
     const eventSource = new EventSource(url);
     let hasConnected = false;
     let errorCount = 0;
