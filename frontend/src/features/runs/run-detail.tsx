@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import { useEventStream } from "@/shared/lib/use-event-stream";
@@ -38,6 +39,7 @@ export function RunDetail({ runId }: { runId: string }) {
   const [showEvalPanel, setShowEvalPanel] = useState(true);
   const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
 
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const fork = useFork(runId);
 
@@ -179,6 +181,20 @@ export function RunDetail({ runId }: { runId: string }) {
       [...restToolUse, ...newToolUse]
     );
   }, [restData, sse.messages, sse.reasoning, sse.toolUse]);
+
+  // Auto-highlight a message from ?highlight= query param (e.g. from branches viewer)
+  const highlightParam = searchParams.get("highlight");
+  const [didAutoHighlight, setDidAutoHighlight] = useState(false);
+  useEffect(() => {
+    if (!highlightParam || didAutoHighlight || displayEntries.length === 0) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      setDidAutoHighlight(true);
+      setHighlightNonce(n => n + 1);
+      setHighlightedMessageId(highlightParam);
+    });
+  }, [highlightParam, didAutoHighlight, displayEntries.length]);
 
   const channelMessages = displayEntries.filter(e => !e.is_reasoning && !e.is_tool_use).length;
   const timelineEntries = displayEntries.length;

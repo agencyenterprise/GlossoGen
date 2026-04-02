@@ -1,6 +1,7 @@
 """Pydantic model defining the configuration schema for a single agent in a simulation."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from pydantic_ai.messages import ModelMessage
 
 
 class AgentConfig(BaseModel):
@@ -10,6 +11,8 @@ class AgentConfig(BaseModel):
     channels it can access, and which tools it is allowed to invoke.
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     agent_id: str
     role_name: str
     system_prompt: str
@@ -17,3 +20,4 @@ class AgentConfig(BaseModel):
     tool_names: list[str]
     model: str
     max_tokens: int
+    initial_message_history: list[ModelMessage] | None = None

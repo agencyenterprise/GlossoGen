@@ -9,7 +9,9 @@ import logging
 from datetime import datetime
 from typing import Any, NamedTuple
 
-from schmidt.conversation_reconstructor import build_agent_context
+from pydantic_ai.messages import ModelMessage
+
+from schmidt.message_history_builder import build_message_history
 from schmidt.models.event import (
     AgentRegistered,
     InjectionDelivered,
@@ -19,6 +21,7 @@ from schmidt.models.event import (
     SimulationStarted,
 )
 from schmidt.models.message import SimulationMessage
+from schmidt.runners.communication_protocol import build_full_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +35,7 @@ class RewindState(NamedTuple):
     scenario_name: str
     scenario_config: dict[str, Any]
     agent_registrations: list[AgentRegistered]
-    agent_context_prompts: dict[str, str]
+    agent_message_histories: dict[str, list[ModelMessage]]
 
 
 def build_rewind_state(
@@ -99,13 +102,17 @@ def build_rewind_state(
                 messages_by_channel[channel_id] = []
             messages_by_channel[channel_id].append(msg)
 
-    agent_context_prompts: dict[str, str] = {}
+    agent_message_histories: dict[str, list[ModelMessage]] = {}
     for reg in agent_registrations:
-        agent_context_prompts[reg.agent_id] = build_agent_context(
+        system_prompt = build_full_system_prompt(
+            base_prompt=reg.system_prompt,
+            role_name=reg.role_name,
+        )
+        agent_message_histories[reg.agent_id] = build_message_history(
             events=events,
             agent_id=reg.agent_id,
-            target_message_id=target_message_id,
-            message_edits=message_edits,
+            system_prompt=system_prompt,
+            target_timestamp=target_timestamp,
         )
 
     logger.info(
@@ -123,7 +130,7 @@ def build_rewind_state(
         scenario_name=scenario_name,
         scenario_config=scenario_config,
         agent_registrations=agent_registrations,
-        agent_context_prompts=agent_context_prompts,
+        agent_message_histories=agent_message_histories,
     )
 
 

@@ -1,0 +1,132 @@
+"""Builds pydantic-ai ModelMessage history from simulation JSONL events.
+
+Reconstructs the multi-turn conversation an agent experienced during a
+simulation, producing a list of ``ModelMessage`` objects suitable for
+passing as ``message_history`` to ``agent.run()`` on resume. Includes
+thinking parts, text parts, tool calls, and tool results in the same
+structure pydantic-ai produces during a live run.
+"""
+
+import logging
+from datetime import datetime
+
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    SystemPromptPart,
+    TextPart,
+    ThinkingPart,
+    ToolCallPart,
+    ToolReturnPart,
+    UserPromptPart,
+)
+
+from schmidt.models.event import LLMResponseReceived, SimulationEvent, ToolResultReceived
+from schmidt.runners.communication_protocol import CONTINUE_PROMPT, INITIAL_PROMPT
+
+logger = logging.getLogger(__name__)
+
+
+def build_message_history(
+    events: list[SimulationEvent],
+    agent_id: str,
+    system_prompt: str,
+    target_timestamp: datetime,
+) -> list[ModelMessage]:
+    """Build a pydantic-ai message history for an agent from JSONL events.
+
+    Walks events chronologically up to ``target_timestamp``, extracting
+    LLM responses and tool results for the specified agent. Produces
+    alternating ``ModelRequest`` / ``ModelResponse`` messages matching
+    the structure pydantic-ai creates during a live run.
+
+    Event ordering in JSONL: tool results are logged individually as they
+    complete, while the LLM response containing the tool calls is logged
+    after all calls finish. So for a single cycle the JSONL order is:
+    ``ToolResultReceived, ..., ToolResultReceived, LLMResponseReceived``.
+    The builder reorders these into the correct pydantic-ai conversation
+    structure: ``ModelResponse(ToolCallParts) → ModelRequest(ToolReturnParts)``.
+    """
+    # Collect agent events up to the target timestamp.
+    llm_responses: list[LLMResponseReceived] = []
+    tool_results_by_call_id: dict[str, ToolResultReceived] = {}
+
+    for event in events:
+        if event.timestamp > target_timestamp:
+            break
+        if isinstance(event, LLMResponseReceived) and event.agent_id == agent_id:
+            llm_responses.append(event)
+        elif isinstance(event, ToolResultReceived) and event.agent_id == agent_id:
+            tool_results_by_call_id[event.call_id] = event
+
+    if not llm_responses:
+        return []
+
+    messages: list[ModelMessage] = []
+
+    # First request: system prompt + initial user prompt.
+    messages.append(
+        ModelRequest(
+            parts=[
+                SystemPromptPart(content=system_prompt),
+                UserPromptPart(content=INITIAL_PROMPT),
+            ],
+        )
+    )
+
+    for llm_resp in llm_responses:
+        # Build response parts from the LLM response.
+        response_parts: list[ThinkingPart | TextPart | ToolCallPart] = []
+
+        thinking = getattr(llm_resp, "thinking", None)
+        if thinking:
+            response_parts.append(ThinkingPart(content=thinking))
+
+        if llm_resp.text:
+            response_parts.append(TextPart(content=llm_resp.text))
+
+        for tc in llm_resp.tool_calls:
+            response_parts.append(
+                ToolCallPart(
+                    tool_name=tc.tool_name,
+                    args=tc.arguments,
+                    tool_call_id=tc.call_id,
+                )
+            )
+
+        if response_parts:
+            messages.append(
+                ModelResponse(
+                    parts=response_parts,
+                    timestamp=llm_resp.timestamp,
+                )
+            )
+
+        # Build tool return request from matching tool results.
+        tool_return_parts: list[ToolReturnPart] = []
+        for tc in llm_resp.tool_calls:
+            result_event = tool_results_by_call_id.get(tc.call_id)
+            if result_event is not None:
+                tool_return_parts.append(
+                    ToolReturnPart(
+                        tool_name=result_event.tool_name,
+                        content=result_event.result,
+                        tool_call_id=result_event.call_id,
+                        timestamp=result_event.timestamp,
+                    )
+                )
+
+        if tool_return_parts:
+            messages.append(ModelRequest(parts=tool_return_parts))
+
+        # At cycle boundaries (end_turn), insert continue prompt — but not
+        # after the last response, since the runner will supply it as user_prompt.
+        if llm_resp.stop_reason == "end_turn" and llm_resp is not llm_responses[-1]:
+            messages.append(
+                ModelRequest(
+                    parts=[UserPromptPart(content=CONTINUE_PROMPT)],
+                )
+            )
+
+    return messages

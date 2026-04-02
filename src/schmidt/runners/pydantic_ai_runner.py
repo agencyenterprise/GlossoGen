@@ -42,14 +42,10 @@ from schmidt.runners.communication_protocol import (
     INITIAL_PROMPT,
     build_full_system_prompt,
 )
-from schmidt.runtime.mcp_tools import HIDDEN_TOOL_NAMES
 from schmidt.server.streaming_event import AgentCostUpdated
 from schmidt.token_pricing import find_pricing
 
 logger = logging.getLogger(__name__)
-
-# Pre-computed tuple for str.endswith() checks against hidden tool names.
-_HIDDEN_TOOL_NAME_SUFFIXES: tuple[str, ...] = tuple(HIDDEN_TOOL_NAMES)
 
 
 def _log_task_exception(task: asyncio.Task[None]) -> None:
@@ -68,7 +64,8 @@ class _StreamingState:
     def __init__(self) -> None:
         self.got_done = False
         self.pending_tool_calls: dict[str, ToolCallRequest] = {}
-        self.accumulated_reasoning = ""
+        self.accumulated_thinking = ""
+        self.accumulated_text = ""
         self.accumulated_tool_calls: list[ToolCallRequest] = []
         self.background_tasks: list[asyncio.Task[None]] = []
 
@@ -133,14 +130,17 @@ class PydanticAIRunner(AgentRunner):
             model_settings=default_settings,
         )
 
-        message_history: list[ModelMessage] | None = None
+        message_history: list[ModelMessage] | None = agent_config.initial_message_history
         total_input_tokens = 0
         total_output_tokens = 0
         total_cache_read_tokens = 0
         total_cache_write_tokens = 0
         total_turns = 0
         cumulative_cost = 0.0
-        prompt: str = INITIAL_PROMPT
+        if message_history is not None:
+            prompt: str = CONTINUE_PROMPT
+        else:
+            prompt = INITIAL_PROMPT
         bus = self._event_bus
         all_background_tasks: list[asyncio.Task[None]] = []
 
@@ -307,10 +307,11 @@ class PydanticAIRunner(AgentRunner):
         round_number: int,
         usage: TokenUsage | None = None,
     ) -> None:
-        """Log accumulated reasoning + tool calls as one LLMResponseReceived event."""
-        text = state.accumulated_reasoning.strip()
+        """Log accumulated thinking + text + tool calls as one LLMResponseReceived event."""
+        thinking = state.accumulated_thinking.strip()
+        text = state.accumulated_text.strip()
         tool_calls = list(state.accumulated_tool_calls)
-        if not text and not tool_calls:
+        if not thinking and not text and not tool_calls:
             return
         if usage is None:
             usage = TokenUsage(
@@ -328,7 +329,8 @@ class PydanticAIRunner(AgentRunner):
             event_logger.log(
                 LLMResponseReceived(
                     agent_id=agent_id,
-                    text=state.accumulated_reasoning,
+                    thinking=thinking if thinking else None,
+                    text=text if text else None,
                     tool_calls=tool_calls,
                     stop_reason=stop_reason,
                     usage=usage,
@@ -336,7 +338,8 @@ class PydanticAIRunner(AgentRunner):
                 )
             )
         )
-        state.accumulated_reasoning = ""
+        state.accumulated_thinking = ""
+        state.accumulated_text = ""
         state.accumulated_tool_calls = []
 
     def _process_stream_event(
@@ -372,7 +375,7 @@ class PydanticAIRunner(AgentRunner):
             if isinstance(event.part, (TextPart, ThinkingPart)):
                 # A new text/thinking part is starting. If we have accumulated
                 # tool calls from a previous response, flush them now so each
-                # model response is logged as one reasoning+tools block.
+                # model response is logged as one thinking+text+tools block.
                 if state.accumulated_tool_calls:
                     self._flush_response_block(
                         agent_id=agent_id,
@@ -382,14 +385,17 @@ class PydanticAIRunner(AgentRunner):
                         round_number=round_number,
                     )
                 if event.part.content:
-                    state.accumulated_reasoning += event.part.content
+                    if isinstance(event.part, ThinkingPart):
+                        state.accumulated_thinking += event.part.content
+                    else:
+                        state.accumulated_text += event.part.content
 
         elif isinstance(event, PartDeltaEvent):
             if isinstance(event.delta, TextPartDelta):
-                state.accumulated_reasoning += event.delta.content_delta
+                state.accumulated_text += event.delta.content_delta
             elif isinstance(event.delta, ThinkingPartDelta):
                 if event.delta.content_delta:
-                    state.accumulated_reasoning += event.delta.content_delta
+                    state.accumulated_thinking += event.delta.content_delta
 
         elif isinstance(event, FunctionToolCallEvent):
             logger.debug(
@@ -437,19 +443,18 @@ class PydanticAIRunner(AgentRunner):
             )
             matched = state.pending_tool_calls.pop(event.result.tool_call_id, None)
             if matched is not None:
-                if not matched.tool_name.endswith(_HIDDEN_TOOL_NAME_SUFFIXES):
-                    state.spawn_log_task(
-                        event_logger.log(
-                            ToolResultReceived(
-                                agent_id=agent_id,
-                                tool_name=matched.tool_name,
-                                call_id=matched.call_id,
-                                arguments=matched.arguments,
-                                result=result_content,
-                                round_number=round_number,
-                            )
+                state.spawn_log_task(
+                    event_logger.log(
+                        ToolResultReceived(
+                            agent_id=agent_id,
+                            tool_name=matched.tool_name,
+                            call_id=matched.call_id,
+                            arguments=matched.arguments,
+                            result=result_content,
+                            round_number=round_number,
                         )
                     )
+                )
             self._detect_done_signal(
                 agent_id=agent_id,
                 matched=matched,
