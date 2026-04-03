@@ -380,15 +380,6 @@ export function RunDetail({ runId }: { runId: string }) {
           >
             <HelpCircle className="h-4 w-4" />
           </button>
-          {!isInProgress && !evaluationInProgress && forkEnabled ? (
-            <button
-              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              onClick={() => setShowEvalModal(true)}
-            >
-              <FlaskConical className="h-3 w-3" />
-              {evaluation !== null ? "Re-run Eval" : "Run Eval"}
-            </button>
-          ) : null}
         </span>
         <span className="text-[13px] text-muted-foreground">
           {maxRound} rounds · {channelMessages} messages · {timelineEntries} events ·{" "}
@@ -409,6 +400,18 @@ export function RunDetail({ runId }: { runId: string }) {
               ))}
             </span>
           </span>
+          {!isInProgress && !evaluationInProgress && forkEnabled ? (
+            <>
+              {" · "}
+              <button
+                className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                onClick={() => setShowEvalModal(true)}
+              >
+                <FlaskConical className="h-3 w-3" />
+                {evaluation !== null ? "Re-run Eval" : "Run Eval"}
+              </button>
+            </>
+          ) : null}
         </span>
       </div>
 
