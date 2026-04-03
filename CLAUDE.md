@@ -22,7 +22,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/` — application source code
 - `src/schmidt/scenarios/<scenario_name>/` — one folder per scenario, containing:
   - `README.md` — scenario documentation
-  - `scenario.py` — scenario class (channels, timing, tools, injections, turn logic)
+  - `scenario.py` — scenario class (channels, timing, tools, injections, turn logic, knobs schema)
   - `prompts/` — Jinja2 templates for agent system prompts and injection messages
   - `evaluation/` — scenario-specific evaluators (optional)
 - `src/schmidt/runtime/` — autonomous mode runtime (MCP server + coordination):
@@ -46,7 +46,8 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
   - `password_auth_middleware.py` — pure ASGI middleware for shared-password authentication
   - `fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
-  - `mcp_browser.py` — MCP server mounted at `/mcp` for programmatic run browsing (Claude Code, Cursor)
+  - `mcp_browser.py` — MCP server mounted at `/mcp` for programmatic run browsing and launching (Claude Code, Cursor)
+  - `run_launcher.py` — shared simulation launch helper used by REST and MCP run-start flows
 - `linter/` — custom linting scripts
 - `frontend/` — Next.js web application
   - `src/features/auth/` — authentication gate and login page
@@ -161,6 +162,9 @@ The backend exposes an MCP (Model Context Protocol) server at `/mcp` for program
 - `list_runs` — paginated run listing with filtering by scenario, model, fork status, and run status
 - `get_run_metadata` — lightweight metadata for a single run: agents, channels, configuration, evaluation summary
 - `get_run` — full run content with messages; opt-in sections for reasoning, tool use, debug logs, and system prompts; filtering by agent or channel
+- `get_knobs_schema` — returns a scenario's knobs JSON Schema and available knobs preset files
+- `get_knobs_preset` — loads a knobs preset JSON payload by scenario and preset name
+- `start_run` — launches a simulation subprocess with scenario, model, provider, and optional knobs
 
 ### Connecting
 

@@ -172,6 +172,11 @@ class ProductLaunchScenario(SimulationScenario):
         ]
 
     @classmethod
+    def knobs_json_schema(cls) -> dict[str, Any]:
+        """Return the JSON Schema for ProductLaunchKnobs."""
+        return ProductLaunchKnobs.model_json_schema()
+
+    @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
         """Reconstruct the scenario from a serialized config dict."""
         knobs = ProductLaunchKnobs.model_validate(config)

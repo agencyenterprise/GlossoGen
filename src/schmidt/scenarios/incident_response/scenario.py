@@ -103,6 +103,11 @@ class IncidentResponseScenario(SimulationScenario):
         ]
 
     @classmethod
+    def knobs_json_schema(cls) -> dict[str, Any]:
+        """Return the JSON Schema for IncidentResponseKnobs."""
+        return IncidentResponseKnobs.model_json_schema()
+
+    @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
         """Reconstruct the scenario from a serialized config dict."""
         knobs = IncidentResponseKnobs.model_validate(config)

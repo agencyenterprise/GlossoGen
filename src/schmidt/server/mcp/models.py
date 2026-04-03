@@ -169,3 +169,28 @@ class McpGetRunResult(BaseModel):
     reasoning: list[McpReasoning] | None
     tool_use: list[McpToolCall] | None
     debug_logs: list[McpDebugLog] | None
+
+
+class McpGetKnobsSchemaResult(BaseModel):
+    """Response for get_knobs_schema."""
+
+    scenario_name: str
+    knobs_schema: dict[str, Any]
+    knobs_files: list[str]
+
+
+class McpGetKnobsPresetResult(BaseModel):
+    """Response for get_knobs_preset."""
+
+    scenario_name: str
+    knobs_file: str
+    knobs: dict[str, Any]
+
+
+class McpStartRunResult(BaseModel):
+    """Response for start_run."""
+
+    status: str
+    scenario_name: str
+    model: str
+    provider: str

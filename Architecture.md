@@ -27,7 +27,7 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 | Frontend            | Next.js 16, React 19, TypeScript (strict), Tailwind CSS v4   |
 | API Client          | openapi-fetch with generated types from OpenAPI schema       |
 | Data Fetching       | TanStack React Query                                         |
-| MCP Browse API      | FastMCP mounted at `/mcp` on the FastAPI server (Streamable HTTP) |
+| MCP Runs API        | FastMCP mounted at `/mcp` on the FastAPI server (Streamable HTTP) |
 
 
 
@@ -121,6 +121,7 @@ The `SimulationScenario` ABC defines a contract for scenario plug-ins.
 
 **Core methods (required by all scenarios):**
 - `get_agent_roles(knobs)` — return agent IDs and display names for a knobs/config payload
+- `knobs_json_schema()` — return the JSON Schema for the scenario knobs model
 - `prepare_config(config)` — normalize raw config before validation/instantiation
 - `create_from_config(config)` — reconstruct a scenario from its serialized config dict (used by fork/resume)
 - `name()`, `scenario_description()`, `get_agents()`, `get_channels()`
@@ -258,20 +259,28 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 
 ### MCP Runs Browser
 
-An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport, mounted via `app.mount("/mcp", mcp.streamable_http_app())`.
+An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data and run launch flows for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport, mounted via `app.mount("/mcp", mcp.streamable_http_app())`.
 
-The MCP server exposes four tools:
+The MCP server exposes seven tools:
 
 | Tool               | Description                                                                                      |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
-| `list_scenarios`   | Lists available scenarios with knobs files, evaluators, and supported models/providers            |
-| `list_runs`        | Paginated run listing with filtering by scenario, model, fork status, and run status              |
-| `get_run_metadata` | Lightweight metadata for a single run: agents, channels, configuration, evaluation summary        |
+| `list_scenarios`   | Lists available scenarios with knobs files, evaluators, and supported models/providers           |
+| `list_runs`        | Paginated run listing with filtering by scenario, model, fork status, and run status             |
+| `get_run_metadata` | Lightweight metadata for a single run: agents, channels, configuration, evaluation summary       |
 | `get_run`          | Full run content with messages; opt-in sections for reasoning, tool use, debug logs, system prompts; filtering by agent or channel |
+| `get_knobs_schema` | Returns a scenario knobs JSON Schema (field types, enums, descriptions) and available presets    |
+| `get_knobs_preset` | Loads a knobs preset JSON payload for a scenario                                                  |
+| `start_run`        | Launches a simulation subprocess with scenario, model, provider, and optional knobs               |
 
-All tools return markdown-formatted text. `list_runs` and `get_run` support pagination. `get_run` uses flags (`with_reasoning`, `with_tool_use`, `with_debug_logs`, `with_system_prompts`) to control which sections are included, keeping responses compact by default.
+All tools return structured JSON via Pydantic response models. `list_runs` and `get_run` support pagination. `get_run` uses flags (`with_reasoning`, `with_tool_use`, `with_debug_logs`, `with_system_prompts`) to control which sections are included.
 
-The MCP server reuses the same data layer as the REST API (`discover_runs()`, `load_run_detail()`) and inherits the existing `PasswordAuthMiddleware` and CORS configuration. Run ID parameters accept unique prefixes (e.g., first 8 characters) for convenience.
+For run launch from MCP clients, a typical flow is:
+1. `get_knobs_schema` to inspect available fields and preset names.
+2. `get_knobs_preset` to load a baseline knobs payload.
+3. `start_run` with model/provider and any knob overrides.
+
+The MCP server reuses the same data layer as the REST API (`discover_runs()`, `load_run_detail()`), shares simulation launch helpers with the REST start endpoint (`run_launcher.py`), and inherits the existing `PasswordAuthMiddleware` and CORS configuration. Run ID parameters accept unique prefixes (e.g., first 8 characters) for convenience.
 
 The frontend includes an MCP integration modal (accessible via the **MCP** button on the runs page) that shows connection instructions for Claude Code and Cursor.
 

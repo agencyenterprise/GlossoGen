@@ -52,6 +52,16 @@ class SimulationScenario(ABC):
         ...
 
     @classmethod
+    @abstractmethod
+    def knobs_json_schema(cls) -> dict[str, Any]:
+        """Return the JSON Schema for this scenario's knobs Pydantic model.
+
+        Used by the MCP server to expose available configuration fields,
+        their types, enum values, and descriptions to LLM clients.
+        """
+        ...
+
+    @classmethod
     def prepare_config(cls, config: dict[str, Any]) -> dict[str, Any]:
         """Transform raw CLI config before passing to ``create_from_config``.
 
