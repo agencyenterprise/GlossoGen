@@ -26,6 +26,7 @@ from pydantic_ai.messages import (
     ThinkingPartDelta,
 )
 from pydantic_ai.models.anthropic import AnthropicModelSettings
+from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage, UsageLimits
@@ -119,6 +120,11 @@ class PydanticAIRunner(AgentRunner):
                 anthropic_cache_instructions=True,
                 anthropic_cache_tool_definitions=True,
                 anthropic_cache_messages=True,
+            )
+        elif provider == "openai":
+            default_settings = OpenAIResponsesModelSettings(
+                openai_reasoning_effort="low",
+                openai_reasoning_summary="concise",
             )
         else:
             default_settings = ModelSettings()
