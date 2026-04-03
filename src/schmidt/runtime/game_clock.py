@@ -44,6 +44,7 @@ class GameClock:
         self._last_injected_rounds = last_injected_rounds
         self._resuming = resuming
         self._current_round = self._start_round
+        self._round_start_time = time.monotonic()
         self._last_message_time = time.monotonic()
 
     def on_message_sent(self) -> None:
@@ -60,8 +61,12 @@ class GameClock:
         return True
 
     def _round_timed_out(self) -> bool:
-        """Return True if the current round has exceeded its time limit."""
-        elapsed = time.monotonic() - self._last_message_time
+        """Return True if the current round has exceeded its wall-clock time limit.
+
+        Measured from the round start, not the last message. This ensures
+        rounds advance even when agents are stuck in a messaging loop.
+        """
+        elapsed = time.monotonic() - self._round_start_time
         return elapsed >= self._max_round_duration_seconds
 
     async def _deliver_injections(self, round_number: int) -> None:
@@ -107,6 +112,7 @@ class GameClock:
     async def _advance_round(self, trigger: str) -> None:
         """Increment the round counter, update world state, and deliver injections."""
         self._current_round += 1
+        self._round_start_time = time.monotonic()
         self._last_message_time = time.monotonic()
 
         await self._event_logger.log(
@@ -132,6 +138,7 @@ class GameClock:
         logged with round_number=0.
         """
         self._current_round = self._start_round
+        self._round_start_time = time.monotonic()
         self._last_message_time = time.monotonic()
 
         if self._resuming:
