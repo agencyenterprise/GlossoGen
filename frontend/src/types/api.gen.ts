@@ -259,9 +259,6 @@ export interface paths {
         /**
          * Start Run
          * @description Launch a new simulation as a background subprocess.
-         *
-         *     Validates inputs, writes knobs/config to a config file,
-         *     and launches the subprocess with ``--config``.
          */
         post: operations["start_run_api_runs_start_post"];
         delete?: never;
