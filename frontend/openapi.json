@@ -374,6 +374,45 @@
         }
       }
     },
+    "/api/runs/{run_id}/export/artifacts": {
+      "get": {
+        "summary": "Export Run Artifacts",
+        "description": "Export all artifacts from a simulation run as a zip archive.",
+        "operationId": "export_run_artifacts_api_runs__run_id__export_artifacts_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Zip archive of the simulation run artifacts.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/zip": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/scenarios": {
       "get": {
         "summary": "List Scenarios",

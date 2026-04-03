@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Download, Pencil } from "lucide-react";
+import { ChevronDown, Download, FolderArchive, Pencil } from "lucide-react";
 import { buildApiUrlWithToken } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
@@ -279,6 +279,19 @@ export function ChatPane({
           }}
         >
           <Download className="h-3.5 w-3.5" />
+        </button>
+        <button
+          aria-label="Download artifacts"
+          className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          onClick={() => {
+            const url = buildApiUrlWithToken({
+              path: `/api/runs/${runId}/export/artifacts`,
+              searchParams: new URLSearchParams(),
+            });
+            window.open(url, "_blank");
+          }}
+        >
+          <FolderArchive className="h-3.5 w-3.5" />
         </button>
       </div>
 

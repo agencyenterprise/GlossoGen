@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from schmidt.server.artifact_export_router import router as artifact_export_router
 from schmidt.server.fork_router import router as fork_router
 from schmidt.server.password_auth_middleware import PasswordAuthMiddleware
 from schmidt.server.pdf_export_router import router as pdf_export_router
@@ -60,6 +61,7 @@ app.add_middleware(
 app.include_router(runs_router)
 app.include_router(fork_router)
 app.include_router(pdf_export_router)
+app.include_router(artifact_export_router)
 app.include_router(scenarios_router)
 
 

@@ -10,31 +10,12 @@ from typing import Any
 
 import aiofiles
 import orjson
-from pydantic import TypeAdapter
 
+from schmidt.event_parsing import parse_event
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import AgentRegistered, SimulationEvent, SimulationStarted
 
 logger = logging.getLogger(__name__)
-
-_EVENT_ADAPTER: TypeAdapter[SimulationEvent] = TypeAdapter(SimulationEvent)
-
-
-def _parse_event(raw: dict[str, object]) -> SimulationEvent:
-    """Validate and deserialize a raw dictionary into a typed SimulationEvent.
-
-    Injects default values for fields added after initial release so that
-    older JSONL files parse without errors.
-    """
-    if raw.get("event_type") == "simulation_ended":
-        raw.setdefault("total_cost_usd", 0.0)
-    if raw.get("event_type") == "simulation_started":
-        raw.setdefault("provider", "unknown")
-    if raw.get("event_type") == "round_advanced" and "new_round_number" in raw:
-        raw["round_number"] = raw.pop("new_round_number")
-    if raw.get("event_type") == "agent_registered":
-        raw.setdefault("max_tokens", 16384)
-    return _EVENT_ADAPTER.validate_python(raw)
 
 
 async def load_events(log_path: Path) -> list[SimulationEvent]:
@@ -52,7 +33,7 @@ async def load_events(log_path: Path) -> list[SimulationEvent]:
             if not line:
                 continue
             raw = orjson.loads(line)
-            event = _parse_event(raw=raw)
+            event = parse_event(raw=raw)
             events.append(event)
     logger.info("Loaded %d events from %s", len(events), log_path)
     return events
