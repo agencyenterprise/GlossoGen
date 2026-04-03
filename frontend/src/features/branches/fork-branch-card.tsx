@@ -10,6 +10,7 @@ type RunStatus = components["schemas"]["RunStatus"];
 const STATUS_LABELS: Record<RunStatus, string> = {
   scenario_complete: "Completed",
   in_progress: "In Progress",
+  starting: "Starting",
   error: "Error",
 };
 

@@ -50,7 +50,8 @@ export interface EventStreamState {
 export function useEventStream(
   runId: string,
   enabled: boolean,
-  knownEventIds: Set<string>
+  knownEventIds: Set<string>,
+  retryOnFailure: boolean
 ): EventStreamState {
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [reasoning, setReasoning] = useState<ReasoningEntry[]>([]);
@@ -87,140 +88,166 @@ export function useEventStream(
       return undefined;
     }
 
-    let url = `${API_URL}/api/runs/${encodeURIComponent(runId)}/events`;
-    const storedPassword = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (storedPassword) {
-      url += `?token=${encodeURIComponent(storedPassword)}`;
-    }
-    const eventSource = new EventSource(url);
-    let hasConnected = false;
-    let errorCount = 0;
+    let cancelled = false;
+    let activeSource: EventSource | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    eventSource.onopen = () => {
-      hasConnected = true;
-      errorCount = 0;
-      setIsConnected(true);
-    };
+    function connect() {
+      if (cancelled) return;
 
-    eventSource.onerror = () => {
-      setIsConnected(false);
-      errorCount += 1;
-      if (!hasConnected && errorCount >= 3) {
-        eventSource.close();
+      let url = `${API_URL}/api/runs/${encodeURIComponent(runId)}/events`;
+      const storedPassword = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (storedPassword) {
+        url += `?token=${encodeURIComponent(storedPassword)}`;
       }
-    };
+      const eventSource = new EventSource(url);
+      activeSource = eventSource;
+      let hasConnected = false;
+      let errorCount = 0;
 
-    eventSource.addEventListener("simulation_started", (e: MessageEvent) => {
-      const data: SSESimulationStarted = JSON.parse(e.data);
-      if (knownIdsRef.current.has(data.event_id)) return;
-      setChannelIds(data.channel_ids);
-    });
-
-    eventSource.addEventListener("agent_registered", (e: MessageEvent) => {
-      const data: SSEAgentRegistered = JSON.parse(e.data);
-      if (knownIdsRef.current.has(data.event_id)) return;
-      const agent: AgentDetail = {
-        agent_id: data.agent_id,
-        role_name: data.role_name,
-        channel_ids: data.channel_ids,
-        tool_names: data.tool_names,
-        model: data.model,
-        system_prompt: data.system_prompt,
+      eventSource.onopen = () => {
+        hasConnected = true;
+        errorCount = 0;
+        setIsConnected(true);
       };
-      setAgents(prev => [...prev, agent]);
-    });
 
-    eventSource.addEventListener("message_sent", (e: MessageEvent) => {
-      const data: SSEMessageSent = JSON.parse(e.data);
-      if (knownIdsRef.current.has(data.event_id)) return;
-      const msg = data.message;
+      eventSource.onerror = () => {
+        setIsConnected(false);
+        errorCount += 1;
 
-      const channelMessage: ChannelMessage = {
-        message_id: msg.message_id,
-        channel_id: msg.channel_id,
-        sender_agent_id: msg.sender_agent_id,
-        text: msg.text,
-        timestamp: msg.timestamp,
-        round_number: data.round_number,
-      };
-      setMessages(prev => [...prev, channelMessage]);
-      setTotalMessages(prev => prev + 1);
-    });
+        // Server rejected the connection (e.g. 409 — simulation not running yet).
+        // EventSource goes to CLOSED and won't auto-reconnect.
+        const serverRejected = eventSource.readyState === EventSource.CLOSED;
 
-    eventSource.addEventListener("llm_response_received", (e: MessageEvent) => {
-      const data: SSELLMResponseReceived = JSON.parse(e.data);
-      if (knownIdsRef.current.has(data.event_id)) return;
-      if (data.text != null && data.text.trim() !== "") {
-        const entry: ReasoningEntry = {
-          message_id: data.event_id,
-          sender_agent_id: data.agent_id,
-          text: data.text,
-          timestamp: data.timestamp,
-          round_number: data.round_number,
-          channel_ids: [],
-        };
-        setReasoning(prev => [...prev, entry]);
-      }
-    });
-
-    eventSource.addEventListener("tool_result_received", (e: MessageEvent) => {
-      const data: SSEToolResultReceived = JSON.parse(e.data);
-      setToolUse(prev => {
-        const existing = prev.find(t => t.call_id === data.call_id);
-        if (existing) {
-          return prev.map(t => (t.call_id === data.call_id ? { ...t, result: data.result } : t));
+        if (!hasConnected && (serverRejected || errorCount >= 3)) {
+          eventSource.close();
+          activeSource = null;
+          if (retryOnFailure && !cancelled) {
+            retryTimer = setTimeout(connect, 2000);
+          }
         }
-        const entry: ToolUseEntry = {
-          message_id: data.event_id,
-          sender_agent_id: data.agent_id,
-          tool_name: data.tool_name,
-          call_id: data.call_id,
-          arguments: data.arguments,
-          result: data.result,
-          timestamp: data.timestamp,
+      };
+
+      eventSource.addEventListener("simulation_started", (e: MessageEvent) => {
+        const data: SSESimulationStarted = JSON.parse(e.data);
+        if (knownIdsRef.current.has(data.event_id)) return;
+        setChannelIds(data.channel_ids);
+      });
+
+      eventSource.addEventListener("agent_registered", (e: MessageEvent) => {
+        const data: SSEAgentRegistered = JSON.parse(e.data);
+        if (knownIdsRef.current.has(data.event_id)) return;
+        const agent: AgentDetail = {
+          agent_id: data.agent_id,
+          role_name: data.role_name,
+          channel_ids: data.channel_ids,
+          tool_names: data.tool_names,
+          model: data.model,
+          system_prompt: data.system_prompt,
+        };
+        setAgents(prev => [...prev, agent]);
+      });
+
+      eventSource.addEventListener("message_sent", (e: MessageEvent) => {
+        const data: SSEMessageSent = JSON.parse(e.data);
+        if (knownIdsRef.current.has(data.event_id)) return;
+        const msg = data.message;
+
+        const channelMessage: ChannelMessage = {
+          message_id: msg.message_id,
+          channel_id: msg.channel_id,
+          sender_agent_id: msg.sender_agent_id,
+          text: msg.text,
+          timestamp: msg.timestamp,
           round_number: data.round_number,
         };
-        return [...prev, entry];
+        setMessages(prev => [...prev, channelMessage]);
+        setTotalMessages(prev => prev + 1);
       });
-    });
 
-    eventSource.addEventListener("simulation_ended", (e: MessageEvent) => {
-      const data: SSESimulationEnded = JSON.parse(e.data);
-      setStatus(data.reason);
-      setTotalMessages(data.total_messages);
-      setTotalCostUsd(data.total_cost_usd);
-      setDurationSeconds(data.duration_seconds);
-      eventSource.close();
-      setIsConnected(false);
-    });
+      eventSource.addEventListener("llm_response_received", (e: MessageEvent) => {
+        const data: SSELLMResponseReceived = JSON.parse(e.data);
+        if (knownIdsRef.current.has(data.event_id)) return;
+        if (data.text != null && data.text.trim() !== "") {
+          const entry: ReasoningEntry = {
+            message_id: data.event_id,
+            sender_agent_id: data.agent_id,
+            text: data.text,
+            timestamp: data.timestamp,
+            round_number: data.round_number,
+            channel_ids: [],
+          };
+          setReasoning(prev => [...prev, entry]);
+        }
+      });
 
-    eventSource.addEventListener("agent_cost_updated", (e: MessageEvent) => {
-      const data: SSEAgentCostUpdated = JSON.parse(e.data);
-      const costs = agentCostsRef.current;
-      costs.set(data.agent_id, data.cumulative_cost_usd);
-      let sum = 0;
-      for (const v of costs.values()) {
-        sum += v;
-      }
-      setTotalCostUsd(sum);
-    });
+      eventSource.addEventListener("tool_result_received", (e: MessageEvent) => {
+        const data: SSEToolResultReceived = JSON.parse(e.data);
+        setToolUse(prev => {
+          const existing = prev.find(t => t.call_id === data.call_id);
+          if (existing) {
+            return prev.map(t => (t.call_id === data.call_id ? { ...t, result: data.result } : t));
+          }
+          const entry: ToolUseEntry = {
+            message_id: data.event_id,
+            sender_agent_id: data.agent_id,
+            tool_name: data.tool_name,
+            call_id: data.call_id,
+            arguments: data.arguments,
+            result: data.result,
+            timestamp: data.timestamp,
+            round_number: data.round_number,
+          };
+          return [...prev, entry];
+        });
+      });
 
-    eventSource.addEventListener("debug_log", (e: MessageEvent) => {
-      const data: SSEDebugLog = JSON.parse(e.data);
-      const entry: DebugLogEntry = {
-        timestamp: data.timestamp,
-        logger_name: data.logger_name,
-        level: data.level,
-        message: data.message,
-      };
-      setDebugLogs(prev => [...prev, entry]);
-    });
+      eventSource.addEventListener("simulation_ended", (e: MessageEvent) => {
+        const data: SSESimulationEnded = JSON.parse(e.data);
+        setStatus(data.reason);
+        setTotalMessages(data.total_messages);
+        setTotalCostUsd(data.total_cost_usd);
+        setDurationSeconds(data.duration_seconds);
+        eventSource.close();
+        setIsConnected(false);
+      });
+
+      eventSource.addEventListener("agent_cost_updated", (e: MessageEvent) => {
+        const data: SSEAgentCostUpdated = JSON.parse(e.data);
+        const costs = agentCostsRef.current;
+        costs.set(data.agent_id, data.cumulative_cost_usd);
+        let sum = 0;
+        for (const v of costs.values()) {
+          sum += v;
+        }
+        setTotalCostUsd(sum);
+      });
+
+      eventSource.addEventListener("debug_log", (e: MessageEvent) => {
+        const data: SSEDebugLog = JSON.parse(e.data);
+        const entry: DebugLogEntry = {
+          timestamp: data.timestamp,
+          logger_name: data.logger_name,
+          level: data.level,
+          message: data.message,
+        };
+        setDebugLogs(prev => [...prev, entry]);
+      });
+    }
+
+    connect();
 
     return () => {
-      eventSource.close();
+      cancelled = true;
+      if (retryTimer !== null) {
+        clearTimeout(retryTimer);
+      }
+      if (activeSource !== null) {
+        activeSource.close();
+      }
       resetState();
     };
-  }, [runId, enabled, resetState]);
+  }, [runId, enabled, retryOnFailure, resetState]);
 
   return {
     messages,

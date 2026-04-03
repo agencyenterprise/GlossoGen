@@ -122,10 +122,11 @@ class InjectionDelivered(EventBase):
 
 
 class RunStatus(str, Enum):
-    """Why the simulation ended."""
+    """Status of a simulation run."""
 
     SCENARIO_COMPLETE = "scenario_complete"
     IN_PROGRESS = "in_progress"
+    STARTING = "starting"
     ERROR = "error"
 
 

@@ -555,10 +555,10 @@ export interface components {
         };
         /**
          * RunStatus
-         * @description Why the simulation ended.
+         * @description Status of a simulation run.
          * @enum {string}
          */
-        RunStatus: "scenario_complete" | "in_progress" | "error";
+        RunStatus: "scenario_complete" | "in_progress" | "starting" | "error";
         /**
          * RunSummary
          * @description Summary of a single simulation run for the runs list endpoint.

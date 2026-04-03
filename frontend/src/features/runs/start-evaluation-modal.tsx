@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { api } from "@/shared/lib/api-client";
 import { humanize } from "./format";
+import { ModelPicker } from "./model-picker";
 
 export function StartEvaluationModal({
   runId,
@@ -43,11 +44,9 @@ export function StartEvaluationModal({
     setInitialized(true);
   }
 
-  const filteredModels = data?.models.filter(m => m.provider === provider) ?? [];
-
-  function handleProviderChange(value: string) {
-    setProvider(value);
-    setModel("");
+  function handleModelSelect(selectedModel: string, selectedProvider: string) {
+    setModel(selectedModel);
+    setProvider(selectedProvider);
   }
 
   function toggleEvaluator(name: string) {
@@ -115,52 +114,11 @@ export function StartEvaluationModal({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Provider */}
-            <div className="space-y-1.5">
-              <label htmlFor="eval-provider" className="block text-xs font-medium">
-                Provider
-              </label>
-              <select
-                id="eval-provider"
-                value={provider}
-                onChange={e => handleProviderChange(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-              >
-                <option value="">Select a provider...</option>
-                {data?.providers.map(p => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Model */}
-            <div className="space-y-1.5">
-              <label htmlFor="eval-model" className="block text-xs font-medium">
-                Model
-              </label>
-              <select
-                id="eval-model"
-                value={model}
-                onChange={e => setModel(e.target.value)}
-                disabled={!provider}
-                className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm disabled:bg-muted disabled:text-muted-foreground"
-              >
-                {provider ? (
-                  <>
-                    <option value="">Select a model...</option>
-                    {filteredModels.map(m => (
-                      <option key={m.model_prefix} value={m.model_prefix}>
-                        {m.model_prefix}
-                      </option>
-                    ))}
-                  </>
-                ) : (
-                  <option value="">Select a provider first</option>
-                )}
-              </select>
-            </div>
+            <ModelPicker
+              models={data?.models ?? []}
+              selectedModel={model}
+              onSelect={handleModelSelect}
+            />
 
             {/* Evaluators */}
             <div className="space-y-1.5">
