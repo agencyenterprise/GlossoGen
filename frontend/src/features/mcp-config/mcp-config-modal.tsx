@@ -95,7 +95,7 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
             style={{ maxHeight: "calc(100vh - 6rem)" }}
           >
             <p className="text-sm text-muted-foreground">
-              Connect to simulation data from Claude Code or Cursor.
+              Connect to browse simulation data and launch runs from Claude Code or Cursor.
               {password
                 ? " Your password is pre-filled in the commands below."
                 : " Omit the headers object if auth is disabled."}
@@ -137,6 +137,18 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
                 <li>
                   <code className="font-mono">get_run</code> — full run content with messages,
                   reasoning, tool use (opt-in sections)
+                </li>
+                <li>
+                  <code className="font-mono">get_knobs_schema</code> — knobs JSON Schema and
+                  available preset files for a scenario
+                </li>
+                <li>
+                  <code className="font-mono">get_knobs_preset</code> — load a scenario knobs
+                  preset as a baseline payload
+                </li>
+                <li>
+                  <code className="font-mono">start_run</code> — launch a simulation with
+                  scenario, model, provider, and knobs
                 </li>
               </ul>
             </div>
