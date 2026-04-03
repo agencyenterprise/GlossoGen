@@ -11,6 +11,7 @@ from pathlib import Path
 import orjson
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.scenarios import SCENARIO_REGISTRY
@@ -193,6 +194,9 @@ mcp = FastMCP(
     "schmidt-runs-browser",
     instructions=_INSTRUCTIONS,
     streamable_http_path="/",
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
+    ),
 )
 
 
