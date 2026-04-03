@@ -25,14 +25,23 @@ import { mergeEntries } from "./display-entry";
 import { EvalPanel } from "./eval-panel";
 import { ForkBadge, ForkPointFab } from "./fork-badge";
 import { StartEvaluationModal } from "./start-evaluation-modal";
-import { elapsedSince, formatConfigValue, formatCost, formatDuration, humanize } from "./format";
+import {
+  elapsedSince,
+  formatConfigValue,
+  formatConfigValueFull,
+  formatCost,
+  formatDuration,
+  humanize,
+} from "./format";
 import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
 import { ModelPicker } from "./model-picker";
 import { useFork } from "./use-fork";
+import { ConfigValueModal } from "./config-value-modal";
 
 export function RunDetail({ runId }: { runId: string }) {
+  const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
@@ -346,15 +355,21 @@ export function RunDetail({ runId }: { runId: string }) {
       {/* Scenario config */}
       {restData.scenario_config && Object.keys(restData.scenario_config).length > 0 ? (
         <div className="mb-3 flex shrink-0 flex-wrap gap-1.5">
-          {Object.entries(restData.scenario_config).map(([key, value]) => (
-            <span
-              key={key}
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px]"
-            >
-              <span className="text-muted-foreground">{humanize(key)}</span>
-              <span className="font-medium">{formatConfigValue(value)}</span>
-            </span>
-          ))}
+          {Object.entries(restData.scenario_config).map(([key, value]) => {
+            const displayValue = formatConfigValue(value);
+            const fullValue = formatConfigValueFull(value);
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setConfigPreview({ key, value: fullValue })}
+                className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px] transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <span className="shrink-0 text-muted-foreground">{humanize(key)}</span>
+                <span className="max-w-64 truncate font-medium">{displayValue}</span>
+              </button>
+            );
+          })}
         </div>
       ) : null}
 
@@ -504,6 +519,15 @@ export function RunDetail({ runId }: { runId: string }) {
           sourceProvider={restData.provider}
           onConfirm={handleConfirmFork}
           onCancel={() => setForkModalMessageId(null)}
+        />
+      ) : null}
+
+      {configPreview ? (
+        <ConfigValueModal
+          configKey={configPreview.key}
+          value={configPreview.value}
+          onClose={() => setConfigPreview(null)}
+          secondaryAction={null}
         />
       ) : null}
 

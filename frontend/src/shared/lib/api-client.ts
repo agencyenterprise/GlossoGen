@@ -8,6 +8,27 @@ export const api = createClient<paths>({
   baseUrl: API_URL,
 });
 
+export function buildApiUrlWithToken({
+  path,
+  searchParams,
+}: {
+  path: string;
+  searchParams: URLSearchParams;
+}): string {
+  const params = new URLSearchParams(searchParams);
+  if (typeof window !== "undefined") {
+    const password = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (password) {
+      params.set("token", password);
+    }
+  }
+  const query = params.toString();
+  if (query.length > 0) {
+    return `${API_URL}${path}?${query}`;
+  }
+  return `${API_URL}${path}`;
+}
+
 api.use({
   async onRequest({ request }) {
     if (typeof window !== "undefined") {
