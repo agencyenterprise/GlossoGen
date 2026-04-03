@@ -369,7 +369,11 @@ export function ChatPane({
                           }}
                           className={cn(
                             "group/entry relative",
-                            entry.is_reasoning && "ml-4 opacity-50",
+                            entry.is_reasoning &&
+                              "ml-4 rounded-md border border-border/60 bg-muted/35 px-2 py-1.5 text-muted-foreground dark:bg-muted/20",
+                            !entry.is_reasoning &&
+                              !entry.is_tool_use &&
+                              "rounded-md border border-border/70 bg-background px-2 py-1.5 shadow-sm",
                             entry.is_tool_use && "ml-4",
                             pendingEdit &&
                               "rounded-md bg-amber-50/50 ring-1 ring-amber-200/50 dark:bg-amber-950/20 dark:ring-amber-800/30",
@@ -384,7 +388,7 @@ export function ChatPane({
                           ) : null}
 
                           {entry.is_reasoning ? (
-                            <span className="text-[10px] italic text-muted-foreground">
+                            <span className="mb-1 inline-block rounded-full border border-border/70 bg-background/80 px-1.5 py-px text-[10px] font-medium text-muted-foreground">
                               reasoning
                             </span>
                           ) : entry.is_tool_use ? null : showChannelBadge ? (
@@ -417,12 +421,17 @@ export function ChatPane({
                           ) : (
                             <>
                               {displayText ? (
-                                <ProseMarkdown className="[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]">
+                                <ProseMarkdown
+                                  className={cn(
+                                    !entry.is_reasoning && "text-foreground",
+                                    "[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]"
+                                  )}
+                                >
                                   {displayText}
                                 </ProseMarkdown>
                               ) : null}
                               {canEdit ? (
-                                <span className="absolute -right-1 top-0 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/entry:opacity-100">
+                                <span className="absolute right-1 top-1 flex items-center gap-0.5 rounded-md bg-background/90 p-1 shadow-sm opacity-0 transition-opacity group-hover/entry:opacity-100">
                                   <button
                                     aria-label="Edit and fork from this message"
                                     className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

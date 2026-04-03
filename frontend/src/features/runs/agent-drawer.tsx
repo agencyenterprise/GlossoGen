@@ -139,12 +139,16 @@ export function AgentDrawer({
                       <div
                         key={entry.message_id}
                         className={cn(
-                          entry.is_reasoning && "ml-4 opacity-50",
+                          entry.is_reasoning &&
+                            "ml-4 rounded-md border border-border/60 bg-muted/35 px-2 py-1.5 text-muted-foreground dark:bg-muted/20",
+                          !entry.is_reasoning &&
+                            !entry.is_tool_use &&
+                            "rounded-md border border-border/70 bg-background px-2 py-1.5 shadow-sm",
                           entry.is_tool_use && "ml-4"
                         )}
                       >
                         {entry.is_reasoning ? (
-                          <span className="text-[10px] italic text-muted-foreground">
+                          <span className="mb-1 inline-block rounded-full border border-border/70 bg-background/80 px-1.5 py-px text-[10px] font-medium text-muted-foreground">
                             reasoning
                           </span>
                         ) : entry.is_tool_use ? null : (
@@ -176,7 +180,9 @@ export function AgentDrawer({
                             result={entry.tool_result}
                           />
                         ) : (
-                          <ProseMarkdown>{entry.text}</ProseMarkdown>
+                          <ProseMarkdown className={cn(!entry.is_reasoning && "text-foreground")}>
+                            {entry.text}
+                          </ProseMarkdown>
                         )}
                       </div>
                     );
