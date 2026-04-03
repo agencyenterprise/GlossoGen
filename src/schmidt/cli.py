@@ -442,4 +442,6 @@ def _run_serve(args: argparse.Namespace) -> None:
         host="0.0.0.0",
         port=args.port,
         reload=False,
+        proxy_headers=True,
+        forwarded_allow_ips="*",
     )
