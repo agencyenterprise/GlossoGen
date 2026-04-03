@@ -1,7 +1,6 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
-watchPatterns = ["src/**", "pyproject.toml", "uv.lock"]
 
 [deploy]
 healthcheckPath = "/api/health"

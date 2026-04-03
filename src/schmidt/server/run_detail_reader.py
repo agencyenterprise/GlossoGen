@@ -20,7 +20,6 @@ from schmidt.models.event import (
     SimulationStarted,
     ToolResultReceived,
 )
-from schmidt.runtime.mcp_tools import HIDDEN_TOOL_NAMES
 from schmidt.server.response_models import (
     AgentDetail,
     ChannelMessage,
@@ -223,10 +222,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     )
                 )
 
-            # Create separate tool use entries for non-builtin tools
+            # Create separate tool use entries for tool calls
             for tc in event.tool_calls:
-                if tc.tool_name.endswith(tuple(HIDDEN_TOOL_NAMES)):
-                    continue
                 total_messages += 1
                 tu_entry = ToolUseEntry(
                     message_id=f"{event.event_id}-{tc.call_id}",
