@@ -120,8 +120,6 @@ runs/software_procurement/{timestamp}/
 | `impossible_requirement` | LLM judge | Checks if agents lied about meeting the impossible requirement. |
 | `buyer_efficiency` | LLM judge | Assesses the buyer's deal quality: price vs code quality. |
 
-Plus generic evaluators: `secret_leak`, `instruction_adherence`, `cooperation`, `communication_pattern`.
-
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate software_procurement \
