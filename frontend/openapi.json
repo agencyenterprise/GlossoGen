@@ -534,7 +534,7 @@
     "/api/runs/start": {
       "post": {
         "summary": "Start Run",
-        "description": "Launch a new simulation as a background subprocess.\n\nValidates inputs, writes knobs/config to a config file,\nand launches the subprocess with ``--config``.",
+        "description": "Launch a new simulation as a background subprocess.",
         "operationId": "start_run_api_runs_start_post",
         "requestBody": {
           "content": {
