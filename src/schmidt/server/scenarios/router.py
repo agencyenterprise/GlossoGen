@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
-_SCENARIOS_BASE = Path(__file__).resolve().parent.parent / "scenarios"
+_SCENARIOS_BASE = Path(__file__).resolve().parent.parent.parent / "scenarios"
 
 
 def _find_free_port() -> int:
