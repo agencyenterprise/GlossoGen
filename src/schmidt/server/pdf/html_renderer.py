@@ -12,7 +12,7 @@ import markdown as md
 from jinja2 import Environment, FileSystemLoader
 from markupsafe import Markup
 
-from schmidt.server.pdf_export_data import HexColor, PdfExportData, derive_initials, get_agent_color
+from schmidt.server.pdf.export_data import HexColor, PdfExportData, derive_initials, get_agent_color
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 

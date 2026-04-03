@@ -18,12 +18,12 @@ from fastapi import APIRouter, HTTPException, Request
 
 from schmidt.run_config_validation import validate_run_config
 from schmidt.scenarios import SCENARIO_REGISTRY
-from schmidt.server.response_models import (
+from schmidt.server.response_models import LaunchStatus
+from schmidt.server.scenarios.models import (
     AgentRoleInfo,
     AgentRolesRequest,
     AgentRolesResponse,
     KnobsContentResponse,
-    LaunchStatus,
     ModelInfo,
     ScenarioInfo,
     ScenariosResponse,

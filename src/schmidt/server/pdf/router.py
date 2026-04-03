@@ -8,10 +8,10 @@ import weasyprint  # type: ignore[import-untyped]
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
 
-from schmidt.server.pdf_export_data import build_pdf_export_data
-from schmidt.server.pdf_html_renderer import render_pdf_html
-from schmidt.server.run_detail_reader import load_run_detail
-from schmidt.server.run_discovery import discover_runs
+from schmidt.server.pdf.export_data import build_pdf_export_data
+from schmidt.server.pdf.html_renderer import render_pdf_html
+from schmidt.server.runs.detail_reader import load_run_detail
+from schmidt.server.runs.discovery import discover_runs
 
 logger = logging.getLogger(__name__)
 

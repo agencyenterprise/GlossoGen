@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from schmidt.server.run_discovery import discover_runs
+from schmidt.server.runs.discovery import discover_runs
 
 logger = logging.getLogger(__name__)
 

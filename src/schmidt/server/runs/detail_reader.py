@@ -20,7 +20,7 @@ from schmidt.models.event import (
     SimulationStarted,
     ToolResultReceived,
 )
-from schmidt.server.response_models import (
+from schmidt.server.runs.models import (
     AgentDetail,
     ChannelMessage,
     DebugLogEntry,
