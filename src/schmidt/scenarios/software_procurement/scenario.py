@@ -6,8 +6,6 @@ Information asymmetry — engineers cannot talk to the buyer, sales reps cannot
 see or run code — creates a deception chain where honesty is tested at every link.
 """
 
-import argparse
-import json
 import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -21,7 +19,7 @@ from schmidt.evaluation.evaluator_protocol import EvaluatorFactory
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
 from schmidt.llm.provider_factory import create_provider
-from schmidt.models.agent_config import AgentConfig
+from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.scenario_protocol import SimulationScenario
@@ -192,26 +190,19 @@ class SoftwareProcurementScenario(SimulationScenario):
             team_ids=self._agent_ids.team_ids,
         )
 
-    # --- CLI ---
+    # --- Agent Discovery ---
 
     @classmethod
-    def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        """Register the --knobs argument."""
-        parser.add_argument(
-            "--knobs",
-            type=str,
-            required=True,
-            help="Path to JSON file with SoftwareProcurementKnobs configuration.",
-        )
-
-    @classmethod
-    def create(cls, args: argparse.Namespace) -> Self:
-        """Load knobs from the JSON file and construct the scenario."""
-        knobs_path = Path(args.knobs)
-        with knobs_path.open() as f:
-            knobs_data = json.load(f)
-        knobs = SoftwareProcurementKnobs(**knobs_data)
-        return cls(knobs=knobs)
+    def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
+        """Return agent roles based on num_seller_teams knob."""
+        num_teams = 2
+        if knobs is not None and "num_seller_teams" in knobs:
+            num_teams = int(knobs["num_seller_teams"])
+        agent_ids = generate_seller_agent_ids(num_teams=num_teams)
+        return [
+            AgentRole(agent_id=aid, role_name=agent_ids.agent_display_names[aid])
+            for aid in agent_ids.all_agent_ids
+        ]
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
@@ -239,7 +230,7 @@ class SoftwareProcurementScenario(SimulationScenario):
 
     # --- Agents ---
 
-    def get_agents(self, default_model: str) -> list[AgentConfig]:
+    def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """Return agent configurations for buyer + N seller teams."""
         agents: list[AgentConfig] = []
 
@@ -248,7 +239,6 @@ class SoftwareProcurementScenario(SimulationScenario):
             if self._knobs.seller_crosschat and agent_id in self._agent_ids.sales_agent_ids:
                 channel_ids.append(SELLER_CROSSCHAT_CHANNEL)
 
-            model = self._knobs.model_overrides.get(agent_id, default_model)
             template_vars = self._build_template_vars(
                 agent_id=agent_id,
                 channel_ids=channel_ids,
@@ -266,7 +256,8 @@ class SoftwareProcurementScenario(SimulationScenario):
                     system_prompt=system_prompt,
                     channel_ids=channel_ids,
                     tool_names=self._role_tools[agent_id],
-                    model=model,
+                    model=default_model,
+                    provider=default_provider,
                     max_tokens=16384,
                 )
             )

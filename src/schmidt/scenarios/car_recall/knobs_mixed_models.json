@@ -3,10 +3,5 @@
   "goal_alignment": "low",
   "regulator_pressure": "low",
   "agent_count": "five",
-  "information_overlap": "low",
-  "model_overrides": {
-    "engineer": "claude-opus-4-20250514",
-    "legal": "claude-sonnet-4-20250514",
-    "cfo": "claude-haiku-4-5-20251001"
-  }
+  "information_overlap": "low"
 }

@@ -7,8 +7,6 @@ communicate through #standup, #general, and DM channels and receive
 role-filtered dashboard briefings with deliberately asymmetric information.
 """
 
-import argparse
-import json
 import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -23,7 +21,7 @@ from schmidt.evaluation.evaluator_protocol import EvaluatorFactory
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
 from schmidt.llm.provider_factory import create_provider
-from schmidt.models.agent_config import AgentConfig
+from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.scenario_protocol import SimulationScenario
@@ -169,29 +167,12 @@ class ProductLaunchScenario(SimulationScenario):
         self._dm_display_names: dict[str, dict[str, str]] = {}
 
     @classmethod
-    def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        """Register the --knobs and --max-round-duration arguments."""
-        parser.add_argument(
-            "--knobs",
-            type=str,
-            required=True,
-            help="Path to JSON file with ProductLaunchKnobs configuration.",
-        )
-        parser.add_argument(
-            "--max-round-duration",
-            type=float,
-            help="Maximum seconds per round before force-advancing (autonomous mode)",
-        )
-
-    @classmethod
-    def create(cls, args: argparse.Namespace) -> Self:
-        """Load knobs from the JSON file and construct the scenario."""
-        knobs_path = Path(args.knobs)
-        with open(knobs_path) as f:
-            knobs_data = json.load(f)
-        knobs = ProductLaunchKnobs(**knobs_data)
-        max_round_duration: float | None = getattr(args, "max_round_duration", None)
-        return cls(knobs=knobs, max_round_duration_seconds=max_round_duration)
+    def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:  # noqa: ARG003
+        """Return the fixed six agent roles."""
+        return [
+            AgentRole(agent_id=agent_id, role_name=AGENT_DISPLAY_NAMES[agent_id])
+            for agent_id in ALL_AGENT_IDS
+        ]
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
@@ -218,7 +199,7 @@ class ProductLaunchScenario(SimulationScenario):
             knobs=self._knobs,
         )
 
-    def get_agents(self, default_model: str) -> list[AgentConfig]:
+    def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """Return agent configurations for all 6 roles with DM channels."""
         agent_configs_for_dm: list[AgentConfig] = []
         agents: list[AgentConfig] = []
@@ -232,6 +213,7 @@ class ProductLaunchScenario(SimulationScenario):
                 channel_ids=channel_ids,
                 tool_names=ROLE_TOOLS[agent_id],
                 model=default_model,
+                provider=default_provider,
                 max_tokens=16384,
             )
             agent_configs_for_dm.append(config)
@@ -290,6 +272,7 @@ class ProductLaunchScenario(SimulationScenario):
                 channel_ids=[],
                 tool_names=[],
                 model="",
+                provider="",
                 max_tokens=0,
             )
             for aid in ALL_AGENT_IDS

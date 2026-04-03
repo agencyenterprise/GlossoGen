@@ -11,12 +11,16 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import orjson
 from fastapi import APIRouter, HTTPException, Request
 
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.response_models import (
+    AgentRoleInfo,
+    AgentRolesRequest,
+    AgentRolesResponse,
     KnobsContentResponse,
     LaunchStatus,
     ModelInfo,
@@ -65,6 +69,38 @@ def _resolve_knobs_path(scenario_name: str, knobs_name: str) -> Path:
     return knobs_path
 
 
+def _build_config_and_overrides(
+    knobs: dict[str, Any] | None,
+    model_overrides: dict[str, Any] | None,
+) -> tuple[Path | None, list[str]]:
+    """Build a merged config file and override args for the subprocess.
+
+    Merges knobs and agent model overrides into a single config file
+    under ``--config``. Scenario-specific data (like question bank paths
+    for persuasion_debate) is added as override args.
+
+    Returns the config file path (or None) and a list of override args.
+    """
+    config: dict[str, Any] = {}
+    if knobs:
+        config.update(knobs)
+
+    if model_overrides:
+        agents: dict[str, Any] = {}
+        for agent_id, entry in model_overrides.items():
+            agents[agent_id] = entry
+        config["agents"] = agents
+
+    config_path: Path | None = None
+    if config:
+        fd, tmp_path = tempfile.mkstemp(suffix=".json", prefix="config_")
+        os.close(fd)
+        config_path = Path(tmp_path)
+        config_path.write_bytes(orjson.dumps(config))
+
+    return config_path, []
+
+
 @router.get("/scenarios", response_model=ScenariosResponse)
 async def list_scenarios() -> ScenariosResponse:
     """List all available scenarios with their knobs files and supported providers."""
@@ -101,13 +137,28 @@ async def get_knobs_content(scenario_name: str, knobs_name: str) -> KnobsContent
     return KnobsContentResponse(knobs=knobs)
 
 
+@router.post(
+    "/scenarios/{scenario_name}/agents",
+    response_model=AgentRolesResponse,
+)
+async def get_agent_roles(scenario_name: str, body: AgentRolesRequest) -> AgentRolesResponse:
+    """Return the agent IDs and display names for a scenario with the given knobs."""
+    if scenario_name not in SCENARIO_REGISTRY:
+        raise HTTPException(status_code=404, detail=f"Unknown scenario: {scenario_name}")
+
+    scenario_cls = SCENARIO_REGISTRY[scenario_name]
+    roles = scenario_cls.get_agent_roles(knobs=body.knobs)
+    return AgentRolesResponse(
+        agents=[AgentRoleInfo(agent_id=r.agent_id, role_name=r.role_name) for r in roles]
+    )
+
+
 @router.post("/runs/start", response_model=StartRunResponse)
 async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse:
     """Launch a new simulation as a background subprocess.
 
-    Validates inputs, writes knobs to a temp file, builds the CLI command,
-    and launches the subprocess. Returns immediately — the frontend polls
-    the runs list to discover the new run once it appears.
+    Validates inputs, merges knobs and model overrides into a config file,
+    and launches the subprocess with --config and Hydra-style overrides.
     """
     runs_dir: Path = request.app.state.runs_dir
 
@@ -131,7 +182,6 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
             detail="knobs is required for this scenario",
         )
 
-    scenario_dir = _SCENARIOS_BASE / body.scenario_name
     mcp_port = _find_free_port()
 
     cmd = [
@@ -150,16 +200,20 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
         str(runs_dir),
     ]
 
-    if body.knobs:
-        fd, tmp_path = tempfile.mkstemp(suffix=".json", prefix="knobs_")
-        os.close(fd)
-        knobs_path = Path(tmp_path)
-        knobs_path.write_bytes(orjson.dumps(body.knobs))
-        cmd.extend(["--knobs", str(knobs_path)])
+    overrides_for_model = None
+    if body.model_overrides:
+        overrides_for_model = {
+            agent_id: entry.model_dump() for agent_id, entry in body.model_overrides.items()
+        }
 
-    if body.scenario_name == "persuasion_debate":
-        questions_path = scenario_dir / "questions.json"
-        cmd.extend(["--questions", str(questions_path)])
+    config_path, override_args = _build_config_and_overrides(
+        knobs=body.knobs,
+        model_overrides=overrides_for_model,
+    )
+
+    if config_path is not None:
+        cmd.extend(["--config", str(config_path)])
+    cmd.extend(override_args)
 
     logger.info("Launching new simulation: %s", " ".join(cmd))
 

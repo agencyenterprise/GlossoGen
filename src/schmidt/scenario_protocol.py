@@ -4,14 +4,13 @@ Defines the contract for autonomous execution mode. Each scenario specifies
 its agents, channels, injections, timing parameters, and evaluation logic.
 """
 
-import argparse
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Self
 
 from schmidt.evaluation.evaluation_report import EvaluationReport
-from schmidt.models.agent_config import AgentConfig
+from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 
@@ -44,15 +43,25 @@ class SimulationScenario(ABC):
 
     @classmethod
     @abstractmethod
-    def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        """Register scenario-specific CLI arguments on the given parser."""
+    def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
+        """Return agent IDs and display names for the given knobs configuration.
+
+        Used by the web API to populate the per-agent model override UI
+        before a simulation starts. Must not require a scenario instance.
+        """
         ...
 
     @classmethod
-    @abstractmethod
-    def create(cls, args: argparse.Namespace) -> Self:
-        """Parse scenario-specific CLI arguments and construct a scenario instance."""
-        ...
+    def prepare_config(cls, config: dict[str, Any]) -> dict[str, Any]:
+        """Transform raw CLI config before passing to ``create_from_config``.
+
+        Scenarios override this to resolve file-path references into
+        loaded data. For example, a scenario that needs a data file can
+        accept a file path string in the config and load it here.
+
+        The default is a no-op pass-through.
+        """
+        return config
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
@@ -80,7 +89,7 @@ class SimulationScenario(ABC):
         ...
 
     @abstractmethod
-    def get_agents(self, default_model: str) -> list[AgentConfig]:
+    def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """Return the list of agent configurations participating in this scenario."""
         ...
 

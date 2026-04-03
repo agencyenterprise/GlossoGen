@@ -58,12 +58,11 @@ class PersuasionDebateKnobs(BaseModel):
     agent_order: list[str]
     round_count: int
     persuasion_strategy: PersuasionStrategy | None
-    model_overrides: dict[str, str]
     agent_beliefs: dict[str, BeliefAssignment] | None
 
     @model_validator(mode="after")
     def validate_knob_combinations(self) -> Self:
-        """Validate agent ordering, model overrides, beliefs, strategy, and pressure knobs."""
+        """Validate agent ordering, beliefs, strategy, and pressure knobs."""
         order_set = set(self.agent_order)
         if len(order_set) != len(self.agent_order):
             raise ValueError("agent_order contains duplicate agent IDs")
@@ -73,12 +72,6 @@ class PersuasionDebateKnobs(BaseModel):
             raise ValueError(
                 f"agent_order contains unknown agent IDs: {unknown_order}. "
                 f"Valid IDs: {sorted(ALL_AGENT_IDS)}"
-            )
-
-        unknown_overrides = set(self.model_overrides.keys()) - order_set
-        if unknown_overrides:
-            raise ValueError(
-                f"model_overrides references agents not in agent_order: {unknown_overrides}"
             )
 
         needs_strategy = {DebateMode.MISINFORMATION, DebateMode.BALANCED}

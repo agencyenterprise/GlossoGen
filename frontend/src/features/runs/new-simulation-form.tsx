@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
@@ -10,6 +10,8 @@ import { humanize } from "./format";
 import { ModelPicker } from "./model-picker";
 
 type KnobsMap = Record<string, unknown>;
+
+type ModelOverride = { model: string; provider: string };
 
 function KnobsBadges({
   knobs,
@@ -88,11 +90,88 @@ function KnobsBadges({
   );
 }
 
+function AgentModelOverrides({
+  agents,
+  models,
+  overrides,
+  onChange,
+}: {
+  agents: { agent_id: string; role_name: string }[];
+  models: { model_prefix: string; provider: string }[];
+  overrides: Record<string, ModelOverride>;
+  onChange: (updated: Record<string, ModelOverride>) => void;
+}) {
+  const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
+
+  function handleSelect(agentId: string, selectedModel: string, selectedProvider: string) {
+    onChange({ ...overrides, [agentId]: { model: selectedModel, provider: selectedProvider } });
+    setExpandedAgent(null);
+  }
+
+  function handleClear(agentId: string) {
+    const next = { ...overrides };
+    delete next[agentId];
+    onChange(next);
+    setExpandedAgent(null);
+  }
+
+  return (
+    <div className="space-y-1">
+      {agents.map(agent => {
+        const override = overrides[agent.agent_id];
+        const isExpanded = expandedAgent === agent.agent_id;
+
+        return (
+          <div key={agent.agent_id} className="rounded border border-border bg-muted/20 px-3 py-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">{agent.role_name}</span>
+              <div className="flex items-center gap-2">
+                {override ? (
+                  <>
+                    <span className="text-xs text-primary">
+                      {override.provider}/{override.model}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleClear(agent.agent_id)}
+                      className="text-muted-foreground transition-colors hover:text-destructive"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedAgent(isExpanded ? null : agent.agent_id)}
+                    className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {isExpanded ? "Cancel" : "Override"}
+                  </button>
+                )}
+              </div>
+            </div>
+            {isExpanded ? (
+              <div className="mt-2">
+                <ModelPicker
+                  models={models}
+                  selectedModel=""
+                  onSelect={(m, p) => handleSelect(agent.agent_id, m, p)}
+                />
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function NewSimulationForm() {
   const router = useRouter();
   const [scenario, setScenario] = useState("");
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
+  const [modelOverrides, setModelOverrides] = useState<Record<string, ModelOverride>>({});
 
   function handleModelSelect(selectedModel: string, selectedProvider: string) {
     setModel(selectedModel);
@@ -127,11 +206,40 @@ export function NewSimulationForm() {
     enabled: !!scenario && !!knobsFile,
   });
 
+  const selectedScenario = data?.scenarios.find(s => s.scenario_name === scenario);
+  const knobsFiles = selectedScenario?.knobs_files ?? [];
+  const needsKnobs = knobsFiles.length > 0;
+
+  const agentRolesQuery = useQuery({
+    queryKey: ["agentRoles", scenario, knobs],
+    queryFn: async () => {
+      const { data, error } = await api.POST("/api/scenarios/{scenario_name}/agents", {
+        params: { path: { scenario_name: scenario } },
+        body: { knobs: knobs ?? null },
+      });
+      if (error) {
+        throw new Error("Failed to fetch agent roles");
+      }
+      return data;
+    },
+    enabled: !!scenario && (!needsKnobs || !!knobs),
+  });
+
   const startMutation = useMutation({
     mutationFn: async () => {
       // Snapshot existing run IDs so we can detect the new one.
       const before = await api.GET("/api/runs");
       const existingIds = new Set((before.data?.runs ?? []).map(r => r.run_id));
+
+      const overridesPayload =
+        Object.keys(modelOverrides).length > 0
+          ? Object.fromEntries(
+              Object.entries(modelOverrides).map(([agentId, ov]) => [
+                agentId,
+                { model: ov.model, provider: ov.provider },
+              ])
+            )
+          : null;
 
       const { error } = await api.POST("/api/runs/start", {
         body: {
@@ -139,6 +247,7 @@ export function NewSimulationForm() {
           model,
           provider,
           knobs: knobs ?? null,
+          model_overrides: overridesPayload,
         },
       });
       if (error) {
@@ -166,9 +275,6 @@ export function NewSimulationForm() {
     },
   });
 
-  const selectedScenario = data?.scenarios.find(s => s.scenario_name === scenario);
-  const knobsFiles = selectedScenario?.knobs_files ?? [];
-  const needsKnobs = knobsFiles.length > 0;
   const canSubmit = scenario && model && provider && (!needsKnobs || knobs);
 
   if (isLoading) {
@@ -183,6 +289,7 @@ export function NewSimulationForm() {
     setScenario(value);
     setKnobsFile("");
     setKnobs(null);
+    setModelOverrides({});
   }
 
   function handleKnobsFileChange(value: string) {
@@ -190,6 +297,7 @@ export function NewSimulationForm() {
     if (!value) {
       setKnobs(null);
     }
+    setModelOverrides({});
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -198,6 +306,8 @@ export function NewSimulationForm() {
       startMutation.mutate();
     }
   }
+
+  const agentRoles = agentRolesQuery.data?.agents ?? [];
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -263,6 +373,21 @@ export function NewSimulationForm() {
           </div>
         ) : null}
       </div>
+
+      {agentRoles.length > 0 ? (
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">Agent Model Overrides</label>
+          <p className="text-xs text-muted-foreground">
+            Optionally override the model for individual agents.
+          </p>
+          <AgentModelOverrides
+            agents={agentRoles}
+            models={data?.models ?? []}
+            overrides={modelOverrides}
+            onChange={setModelOverrides}
+          />
+        </div>
+      ) : null}
 
       {startMutation.error ? (
         <p className="text-sm text-destructive">{startMutation.error.message}</p>

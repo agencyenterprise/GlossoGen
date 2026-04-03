@@ -3,6 +3,5 @@
   "goal_alignment": "high",
   "regulator_pressure": "high",
   "agent_count": "five",
-  "information_overlap": "low",
-  "model_overrides": {}
+  "information_overlap": "low"
 }

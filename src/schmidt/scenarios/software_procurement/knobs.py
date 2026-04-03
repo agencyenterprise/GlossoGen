@@ -15,4 +15,3 @@ class SoftwareProcurementKnobs(BaseModel):
     impossible_requirements: bool
     max_rounds: int
     max_round_duration: int
-    model_overrides: dict[str, str]

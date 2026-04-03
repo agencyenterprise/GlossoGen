@@ -36,6 +36,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `agent_runner_base.py` — abstract base class for agent runners
   - `pydantic_ai_runner.py` — Pydantic AI agent runner via pydantic-ai framework
   - `communication_protocol.py` — shared prompts and constants for the agent communication protocol
+- `src/schmidt/config_overrides.py` — Hydra-style dot-notation config override parser
 - `src/schmidt/autonomous_supervisor.py` — autonomous mode orchestrator (supports resume via `RewindState`)
 - `src/schmidt/message_rewind.py` — reconstructs simulation state at any message for fork/resume
 - `src/schmidt/run_repository.py` — git-backed repository for run directories (init, commit, clone, checkout)
@@ -217,51 +218,52 @@ Use `git log --oneline` in a run directory to see the simulation timeline.
 
 Agents connect to a shared MCP server via the Pydantic AI framework. A game clock manages round progression. Always run simulations as a background process, piping all output to a log file.
 
+### Hydra-Style Config & Overrides
+
+The `run` subcommand uses a unified config system inspired by Hydra. A base config file (`--config`) provides scenario knobs, and trailing `key=value` arguments override individual fields using dot-notation. The `agents.*` namespace is reserved for per-agent model/provider overrides.
+
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
   --model <model> --provider <provider> --runs-dir ./runs \
-  <scenario-specific flags> \
+  --config <config-file.json> \
+  [key=value overrides...] \
   > ./runs/<scenario>_stdout.log 2>&1 &
 ```
 
 Required flags: `--model`, `--provider` (`anthropic`, `openai`, `google-gla`, `ollama`), `--runs-dir`.
-Optional flags: `--mcp-port` (default: 8001), `--max-agent-turns` (default: 200).
+Optional flags: `--mcp-port` (default: 8001), `--max-agent-turns` (default: 200), `--config <path>` (base config JSON file).
 
-The `incident_response` scenario requires `--max-round-duration`:
+Examples:
 
 ```bash
+# Car recall with base config
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
+  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
+  --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
+  > ./runs/car_recall_stdout.log 2>&1 &
+
+# Incident response with inline config override
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
   --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
-  --max-round-duration 120 \
+  max_round_duration_seconds=120 \
   > ./runs/incident_response_stdout.log 2>&1 &
-```
 
-The `car_recall` scenario uses a `--knobs` flag:
-
-```bash
+# Car recall with per-agent model overrides
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-  --model <model> --provider <provider> --runs-dir ./runs \
-  --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
+  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
+  --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
+  agents.engineer.model=gpt-4o agents.engineer.provider=openai \
+  > ./runs/car_recall_stdout.log 2>&1 &
+
+# Override knobs inline on top of a base config
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
+  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
+  --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
+  time_pressure=high agent_count=five \
   > ./runs/car_recall_stdout.log 2>&1 &
 ```
 
-The `product_launch` scenario also uses `--knobs`:
-
-```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
-  --model <model> --provider <provider> --runs-dir ./runs \
-  --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
-  > ./runs/product_launch_stdout.log 2>&1 &
-```
-
-The `software_procurement` scenario uses `--knobs` to configure team count, crosschat, and impossible requirements:
-
-```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run software_procurement \
-  --model <model> --provider <provider> --runs-dir ./runs \
-  --knobs src/schmidt/scenarios/software_procurement/knobs_data_pipeline_impossible.json \
-  > ./runs/software_procurement_stdout.log 2>&1 &
-```
+Override values are auto-parsed as JSON: `rounds=5` becomes int, `enabled=true` becomes bool, `name=alice` stays string.
 
 Check progress by reading the stdout log file or the JSONL event log.
 
@@ -277,11 +279,11 @@ If a simulation errors midway through, resume from the last checkpoint using the
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
   --model <model> --provider <provider> --runs-dir ./runs \
   --resume ./runs/<scenario>/<timestamp> \
-  <scenario-specific flags like --knobs> \
+  --config <original-config.json> \
   > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
 ```
 
-The `--resume` flag requires the same scenario-specific flags as the original run (e.g. `--knobs` for car_recall/product_launch). The `--runs-dir` flag is still required but ignored when resuming.
+The `--resume` flag requires the same `--config` as the original run. The `--runs-dir` flag is still required but ignored when resuming.
 
 ### Forking Runs (Message-Level Rewind)
 
@@ -299,6 +301,36 @@ Forking uses the git-backed run history:
 Agents receive the conversation history (channel messages, scenario injections, round transitions) as context. They do not receive their prior reasoning — only externally visible state — so they re-derive their thinking naturally in response to the edited message.
 
 The fork API endpoint is `POST /api/runs/{run_id}/fork`. Forked runs appear in the run list with a "Fork" badge and show a lineage link in the run detail header.
+
+### Per-Agent Model Overrides
+
+Each agent uses the default `--model` and `--provider` unless overridden. Per-agent overrides use the `agents.*` namespace in the Hydra-style config system — every scenario supports them automatically.
+
+**CLI usage:** Pass dot-notation overrides:
+
+```bash
+schmidt run car_recall --model claude-sonnet --provider anthropic --runs-dir ./runs \
+  --config knobs_baseline.json \
+  agents.engineer.model=gpt-4o agents.engineer.provider=openai
+```
+
+Or embed in the `--config` JSON file under the `agents` key:
+
+```json
+{
+  "time_pressure": "high",
+  "agents": {
+    "engineer": {"model": "gpt-4o", "provider": "openai"},
+    "legal": {"model": "claude-opus-4-20250514", "provider": "anthropic"}
+  }
+}
+```
+
+**Web UI:** The "Create simulation" page shows an "Agent Model Overrides" section after selecting a scenario. Each agent can be individually overridden to a different model/provider. The fork dialog also supports per-agent overrides.
+
+**Backend flow:** `POST /api/runs/start` accepts `model_overrides` mapping agent IDs to `{model, provider}`. The server merges knobs and agent overrides into a single `--config` file. In `cli.py`, the `agents.*` keys are extracted after config loading and applied after `scenario.get_agents()` returns — no scenario-specific code needed.
+
+**Agent discovery:** `POST /api/scenarios/{scenario_name}/agents` accepts `{knobs}` and returns the agent IDs and role names for the given configuration. Used by the frontend to populate the override UI. Each scenario implements `get_agent_roles(knobs)` as a classmethod.
 
 ### IMPORTANT: Monitoring Long-Running Processes
 

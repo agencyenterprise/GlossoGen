@@ -5,10 +5,16 @@ Defines the ``schmidt`` CLI with three subcommands:
 * ``run``      -- load and execute a simulation scenario in autonomous mode
 * ``evaluate`` -- score a previously-generated simulation log
 * ``serve``    -- start the FastAPI web server
+
+The ``run`` subcommand uses Hydra-style config overrides: a base config
+file (``--config``) is loaded and then any trailing ``key=value``
+arguments override individual fields using dot-notation paths. The
+``agents.*`` namespace is reserved for per-agent model/provider overrides.
 """
 
 import argparse
 import asyncio
+import json
 import logging
 import os
 from pathlib import Path
@@ -18,12 +24,14 @@ import uvicorn
 from dotenv import load_dotenv
 
 from schmidt.autonomous_supervisor import AutonomousSupervisor
+from schmidt.config_overrides import apply_overrides, parse_overrides, split_agent_overrides
 from schmidt.eval_manifest import delete_eval_manifest, write_eval_manifest
 from schmidt.evaluation.log_reader import extract_scenario_config, load_events
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.message_rewind import RewindState, build_rewind_state_from_last_message
+from schmidt.models.agent_config import AgentConfig
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.runners.pydantic_ai_runner import PydanticAIRunner
 from schmidt.scenario_loader import get_scenario_class
@@ -38,12 +46,8 @@ DEFAULT_MCP_PORT = 8001
 DEFAULT_MAX_AGENT_TURNS = 200
 
 
-def _build_parsers() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
-    """Build the top-level parser and all subcommand parsers.
-
-    Returns the root parser and the ``run`` subparser. The ``run`` subparser
-    is needed so scenarios can register CLI arguments via ``add_cli_arguments``.
-    """
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the top-level parser and all subcommand parsers."""
     parser = argparse.ArgumentParser(prog="schmidt")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -84,6 +88,12 @@ def _build_parsers() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
         type=str,
         help="Path to an existing run directory to resume from",
     )
+    run_parser.add_argument(
+        "--config",
+        type=str,
+        help="Path to a JSON config file (scenario knobs + optional agents overrides)",
+    )
+
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a simulation log")
     evaluate_parser.add_argument(
         "scenario_name",
@@ -125,7 +135,7 @@ def _build_parsers() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
     )
     serve_parser.add_argument("--port", type=int, required=True, help="Port to listen on")
 
-    return parser, run_parser
+    return parser
 
 
 def main() -> None:
@@ -137,7 +147,7 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
-    parser, run_parser = _build_parsers()
+    parser = _build_parser()
 
     # First pass: discover the command (and scenario name for run/evaluate).
     known_args, _ = parser.parse_known_args()
@@ -148,17 +158,70 @@ def main() -> None:
         return
 
     scenario_cls = get_scenario_class(name=known_args.scenario_name)
-    if known_args.command == "run":
-        scenario_cls.add_cli_arguments(parser=run_parser)
 
-    # Second pass: full parse including scenario-specific args.
-    args = parser.parse_args()
+    # Second pass: parse known flags and capture remaining key=value overrides.
+    args, remaining = parser.parse_known_args()
 
     if args.command == "run":
-        scenario = scenario_cls.create(args=args)
-        asyncio.run(_run_simulation(args=args, scenario=scenario))
+        config, agent_overrides = _build_run_config(args=args, remaining=remaining)
+        config = scenario_cls.prepare_config(config=config)
+        scenario = scenario_cls.create_from_config(config=config)
+        asyncio.run(_run_simulation(args=args, scenario=scenario, agent_overrides=agent_overrides))
     else:
         asyncio.run(_run_evaluation(args=args, scenario_cls=scenario_cls))
+
+
+def _build_run_config(
+    args: argparse.Namespace,
+    remaining: list[str],
+) -> tuple[dict[str, object], dict[str, dict[str, str]]]:
+    """Build scenario config from --config file and Hydra-style overrides.
+
+    Loads the base config JSON (if --config is provided), applies any
+    key=value overrides from remaining args, and splits out the
+    ``agents.*`` namespace as per-agent model/provider overrides.
+
+    Returns the scenario config dict and the agent overrides dict.
+    """
+    config: dict[str, object] = {}
+    if args.config is not None:
+        config = json.loads(Path(args.config).read_text())
+
+    if remaining:
+        overrides = parse_overrides(raw_args=remaining)
+        config = apply_overrides(config=config, overrides=overrides)
+
+    split = split_agent_overrides(config=config)
+    return split.scenario_config, split.agent_overrides
+
+
+def _apply_agent_overrides(
+    agents: list[AgentConfig],
+    agent_overrides: dict[str, dict[str, str]],
+    default_provider: str,
+) -> list[AgentConfig]:
+    """Apply per-agent model/provider overrides extracted from the config.
+
+    Validates that all override keys correspond to actual agent IDs.
+    """
+    if not agent_overrides:
+        return agents
+
+    agent_ids = {a.agent_id for a in agents}
+    unknown = set(agent_overrides.keys()) - agent_ids
+    if unknown:
+        raise SystemExit(
+            f"agents.* overrides reference unknown agent IDs: {sorted(unknown)}. "
+            f"Valid IDs: {sorted(agent_ids)}"
+        )
+
+    for agent in agents:
+        if agent.agent_id in agent_overrides:
+            override = agent_overrides[agent.agent_id]
+            agent.model = override["model"]
+            agent.provider = override.get("provider", default_provider)
+
+    return agents
 
 
 def _compute_run_dir(runs_dir: Path, scenario_name: str) -> Path:
@@ -204,6 +267,7 @@ def _teardown_logging(
 async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
+    agent_overrides: dict[str, dict[str, str]],
 ) -> None:
     """Wire up the autonomous supervisor, start the streaming server, and execute."""
 
@@ -217,7 +281,13 @@ async def _run_simulation(
         run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
 
     scenario.set_run_dir(run_dir=run_dir)
-    agents = scenario.get_agents(default_model=args.model)
+    agents = scenario.get_agents(default_model=args.model, default_provider=args.provider)
+
+    agents = _apply_agent_overrides(
+        agents=agents,
+        agent_overrides=agent_overrides,
+        default_provider=args.provider,
+    )
 
     log_path = run_dir / f"{scenario.name()}.jsonl"
     event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
@@ -245,7 +315,6 @@ async def _run_simulation(
         return PydanticAIRunner(
             max_turns=max_turns,
             event_bus=event_bus,
-            provider=args.provider,
         )
 
     supervisor = AutonomousSupervisor(

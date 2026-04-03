@@ -207,6 +207,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/scenarios/{scenario_name}/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Agent Roles
+         * @description Return the agent IDs and display names for a scenario with the given knobs.
+         */
+        post: operations["get_agent_roles_api_scenarios__scenario_name__agents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/start": {
         parameters: {
             query?: never;
@@ -293,8 +313,52 @@ export interface components {
             tool_names: string[];
             /** Model */
             model: string;
+            /** Provider */
+            provider: string;
             /** System Prompt */
             system_prompt: string;
+        };
+        /**
+         * AgentModelSummary
+         * @description Per-agent model and provider info for run summary display.
+         */
+        AgentModelSummary: {
+            /** Agent Id */
+            agent_id: string;
+            /** Role Name */
+            role_name: string;
+            /** Model */
+            model: string;
+            /** Provider */
+            provider: string;
+        };
+        /**
+         * AgentRoleInfo
+         * @description Lightweight agent identity for the agent discovery endpoint.
+         */
+        AgentRoleInfo: {
+            /** Agent Id */
+            agent_id: string;
+            /** Role Name */
+            role_name: string;
+        };
+        /**
+         * AgentRolesRequest
+         * @description Request body for discovering agents in a scenario.
+         */
+        AgentRolesRequest: {
+            /** Knobs */
+            knobs: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * AgentRolesResponse
+         * @description Response listing agents that would participate in a scenario.
+         */
+        AgentRolesResponse: {
+            /** Agents */
+            agents: components["schemas"]["AgentRoleInfo"][];
         };
         /**
          * AuthVerifyResponse
@@ -398,6 +462,10 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
+            /** Model Overrides */
+            model_overrides: {
+                [key: string]: components["schemas"]["ModelOverrideEntry"];
+            } | null;
         };
         /**
          * ForkResponse
@@ -475,6 +543,16 @@ export interface components {
         ModelInfo: {
             /** Model Prefix */
             model_prefix: string;
+            /** Provider */
+            provider: string;
+        };
+        /**
+         * ModelOverrideEntry
+         * @description Per-agent model and provider override.
+         */
+        ModelOverrideEntry: {
+            /** Model */
+            model: string;
             /** Provider */
             provider: string;
         };
@@ -601,6 +679,8 @@ export interface components {
             models: string[];
             /** Provider */
             provider: string;
+            /** Agent Models */
+            agent_models: components["schemas"]["AgentModelSummary"][];
         };
         /**
          * SSEAgentConnected
@@ -669,6 +749,8 @@ export interface components {
             tool_names: string[];
             /** Model */
             model: string;
+            /** Provider */
+            provider: string;
         };
         /**
          * SSEDebugLog
@@ -943,6 +1025,10 @@ export interface components {
             /** Knobs */
             knobs: {
                 [key: string]: unknown;
+            } | null;
+            /** Model Overrides */
+            model_overrides: {
+                [key: string]: components["schemas"]["ModelOverrideEntry"];
             } | null;
         };
         /**
@@ -1293,6 +1379,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnobsContentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_roles_api_scenarios__scenario_name__agents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentRolesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentRolesResponse"];
                 };
             };
             /** @description Validation Error */

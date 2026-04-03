@@ -1,8 +1,10 @@
 {
   "mode": "misinformation",
-  "agent_order": ["agent_a", "agent_b"],
+  "agent_order": [
+    "agent_a",
+    "agent_b"
+  ],
   "round_count": 10,
   "persuasion_strategy": "logical",
-  "model_overrides": {},
   "agent_beliefs": null
 }

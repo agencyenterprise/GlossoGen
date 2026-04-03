@@ -1,14 +1,13 @@
 {
   "mode": "seeded_debate",
-  "agent_order": ["agent_a", "agent_b", "agent_c", "agent_d"],
+  "agent_order": [
+    "agent_a",
+    "agent_b",
+    "agent_c",
+    "agent_d"
+  ],
   "round_count": 5,
   "persuasion_strategy": null,
-  "model_overrides": {
-    "agent_a": "claude-opus-4-6",
-    "agent_b": "claude-haiku-4-5-20251001",
-    "agent_c": "claude-opus-4-6",
-    "agent_d": "claude-haiku-4-5-20251001"
-  },
   "agent_beliefs": {
     "agent_a": "correct",
     "agent_b": "wrong",

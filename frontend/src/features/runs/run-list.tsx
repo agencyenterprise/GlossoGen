@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle,
@@ -66,8 +66,65 @@ function groupByDay(runs: RunSummary[]): Array<{ label: string; runs: RunSummary
 
 export function RunList() {
   const [modalRun, setModalRun] = useState<RunSummary | null>(null);
+  const [modelsPopover, setModelsPopover] = useState<{
+    left: number;
+    top: number;
+    agentModels: RunSummary["agent_models"];
+  } | null>(null);
+  const closePopoverTimerRef = useRef<number | null>(null);
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    return () => {
+      if (closePopoverTimerRef.current !== null) {
+        window.clearTimeout(closePopoverTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (modelsPopover === null) {
+      return undefined;
+    }
+    const handleViewportChange = () => {
+      setModelsPopover(null);
+    };
+    window.addEventListener("scroll", handleViewportChange, true);
+    window.addEventListener("resize", handleViewportChange);
+    return () => {
+      window.removeEventListener("scroll", handleViewportChange, true);
+      window.removeEventListener("resize", handleViewportChange);
+    };
+  }, [modelsPopover]);
+
+  function clearModelsPopoverCloseTimer() {
+    if (closePopoverTimerRef.current !== null) {
+      window.clearTimeout(closePopoverTimerRef.current);
+      closePopoverTimerRef.current = null;
+    }
+  }
+
+  function queueModelsPopoverClose() {
+    clearModelsPopoverCloseTimer();
+    closePopoverTimerRef.current = window.setTimeout(() => {
+      setModelsPopover(null);
+      closePopoverTimerRef.current = null;
+    }, 80);
+  }
+
+  function openModelsPopover(args: {
+    targetElement: HTMLElement;
+    agentModels: RunSummary["agent_models"];
+  }) {
+    clearModelsPopoverCloseTimer();
+    const rect = args.targetElement.getBoundingClientRect();
+    setModelsPopover({
+      left: rect.left,
+      top: rect.bottom + 4,
+      agentModels: args.agentModels,
+    });
+  }
 
   const deleteMutation = useMutation({
     mutationFn: async (runId: string) => {
@@ -99,6 +156,7 @@ export function RunList() {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["runs"],
+    refetchOnMount: "always",
     queryFn: async () => {
       const { data, error } = await api.GET("/api/runs");
       if (error) {
@@ -107,11 +165,13 @@ export function RunList() {
       return data;
     },
     refetchInterval: query => {
-      const hasInProgress = query.state.data?.runs.some(r => r.status === "in_progress");
-      if (hasInProgress) {
+      const hasActiveRun = query.state.data?.runs.some(
+        r => r.status === "in_progress" || r.status === "starting"
+      );
+      if (hasActiveRun) {
         return 5000;
       }
-      return false;
+      return 10000;
     },
   });
 
@@ -155,10 +215,36 @@ export function RunList() {
         />
       ) : null}
 
+      {modelsPopover !== null ? (
+        <div className="pointer-events-none fixed inset-0 z-50">
+          <div
+            className="pointer-events-auto absolute w-max max-w-sm rounded-md border border-border bg-background px-3 py-2 text-xs shadow-lg"
+            style={{
+              left: `${Math.max(8, modelsPopover.left)}px`,
+              top: `${modelsPopover.top}px`,
+            }}
+            onMouseEnter={clearModelsPopoverCloseTimer}
+            onMouseLeave={queueModelsPopoverClose}
+            onClick={e => {
+              e.stopPropagation();
+            }}
+          >
+            {modelsPopover.agentModels.map(a => (
+              <div key={a.agent_id} className="flex justify-between gap-4 py-0.5">
+                <span className="text-muted-foreground">{a.role_name}</span>
+                <span className="font-mono">
+                  {a.provider}:{a.model}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {groups.map(group => (
         <div key={group.label}>
           <h2 className="mb-2 text-sm font-medium text-muted-foreground">{group.label}</h2>
-          <div className="overflow-hidden rounded-lg border border-border">
+          <div className="rounded-lg border border-border">
             <table className="w-full text-sm">
               <tbody>
                 {group.runs.map((run, idx) => {
@@ -193,11 +279,25 @@ export function RunList() {
                             </button>
                           </span>
                         </td>
-                        <td
-                          className="max-w-48 truncate px-3 py-2 text-muted-foreground"
-                          title={run.models.join(", ")}
-                        >
-                          {run.models.join(", ")}
+                        <td className="max-w-48 px-3 py-2 text-muted-foreground">
+                          {run.agent_models.length > 0 ? (
+                            <span
+                              className="inline-block max-w-full"
+                              onMouseEnter={e => {
+                                openModelsPopover({
+                                  targetElement: e.currentTarget,
+                                  agentModels: run.agent_models,
+                                });
+                              }}
+                              onMouseLeave={queueModelsPopoverClose}
+                            >
+                              <span className="block truncate">{run.models.join(", ")}</span>
+                            </span>
+                          ) : (
+                            <span className="block truncate" title={run.models.join(", ")}>
+                              {run.models.join(", ")}
+                            </span>
+                          )}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
                           {run.total_messages}

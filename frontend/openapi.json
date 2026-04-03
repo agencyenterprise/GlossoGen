@@ -442,6 +442,56 @@
         }
       }
     },
+    "/api/scenarios/{scenario_name}/agents": {
+      "post": {
+        "summary": "Get Agent Roles",
+        "description": "Return the agent IDs and display names for a scenario with the given knobs.",
+        "operationId": "get_agent_roles_api_scenarios__scenario_name__agents_post",
+        "parameters": [
+          {
+            "name": "scenario_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRolesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRolesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs/start": {
       "post": {
         "summary": "Start Run",
@@ -550,6 +600,10 @@
             "type": "string",
             "title": "Model"
           },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
           "system_prompt": {
             "type": "string",
             "title": "System Prompt"
@@ -562,10 +616,98 @@
           "channel_ids",
           "tool_names",
           "model",
+          "provider",
           "system_prompt"
         ],
         "title": "AgentDetail",
         "description": "Full agent information for the run detail endpoint."
+      },
+      "AgentModelSummary": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "role_name": {
+            "type": "string",
+            "title": "Role Name"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "role_name",
+          "model",
+          "provider"
+        ],
+        "title": "AgentModelSummary",
+        "description": "Per-agent model and provider info for run summary display."
+      },
+      "AgentRoleInfo": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "role_name": {
+            "type": "string",
+            "title": "Role Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "role_name"
+        ],
+        "title": "AgentRoleInfo",
+        "description": "Lightweight agent identity for the agent discovery endpoint."
+      },
+      "AgentRolesRequest": {
+        "properties": {
+          "knobs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "knobs"
+        ],
+        "title": "AgentRolesRequest",
+        "description": "Request body for discovering agents in a scenario."
+      },
+      "AgentRolesResponse": {
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRoleInfo"
+            },
+            "type": "array",
+            "title": "Agents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agents"
+        ],
+        "title": "AgentRolesResponse",
+        "description": "Response listing agents that would participate in a scenario."
       },
       "AuthVerifyResponse": {
         "properties": {
@@ -781,6 +923,20 @@
           "provider": {
             "type": "string",
             "title": "Provider"
+          },
+          "model_overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/ModelOverrideEntry"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Overrides"
           }
         },
         "type": "object",
@@ -788,7 +944,8 @@
           "target_message_id",
           "message_edits",
           "model",
-          "provider"
+          "provider",
+          "model_overrides"
         ],
         "title": "ForkRequest",
         "description": "Request body for creating a forked simulation run."
@@ -931,6 +1088,25 @@
         ],
         "title": "ModelInfo",
         "description": "A supported model prefix and its provider."
+      },
+      "ModelOverrideEntry": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "provider"
+        ],
+        "title": "ModelOverrideEntry",
+        "description": "Per-agent model and provider override."
       },
       "ReasoningEntry": {
         "properties": {
@@ -1210,6 +1386,13 @@
           "provider": {
             "type": "string",
             "title": "Provider"
+          },
+          "agent_models": {
+            "items": {
+              "$ref": "#/components/schemas/AgentModelSummary"
+            },
+            "type": "array",
+            "title": "Agent Models"
           }
         },
         "type": "object",
@@ -1228,7 +1411,8 @@
           "run_dir",
           "fork_source",
           "models",
-          "provider"
+          "provider",
+          "agent_models"
         ],
         "title": "RunSummary",
         "description": "Summary of a single simulation run for the runs list endpoint."
@@ -1334,6 +1518,10 @@
           "model": {
             "type": "string",
             "title": "Model"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
           }
         },
         "type": "object",
@@ -1346,7 +1534,8 @@
           "system_prompt",
           "channel_ids",
           "tool_names",
-          "model"
+          "model",
+          "provider"
         ],
         "title": "SSEAgentRegistered",
         "description": "SSE event emitted when an agent joins the simulation."
@@ -1866,6 +2055,20 @@
               }
             ],
             "title": "Knobs"
+          },
+          "model_overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/ModelOverrideEntry"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Overrides"
           }
         },
         "type": "object",
@@ -1873,7 +2076,8 @@
           "scenario_name",
           "model",
           "provider",
-          "knobs"
+          "knobs",
+          "model_overrides"
         ],
         "title": "StartRunRequest",
         "description": "Request body for starting a new simulation run."

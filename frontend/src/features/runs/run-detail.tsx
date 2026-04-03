@@ -264,14 +264,14 @@ export function RunDetail({ runId }: { runId: string }) {
   }
 
   const maxRound = displayEntries.reduce((max, m) => Math.max(max, m.round_number), 0);
-  const uniqueModels = [...new Set(allAgents.map(a => a.model))];
+  const uniqueModelKeys = [...new Set(allAgents.map(a => `${a.provider}:${a.model}`))];
   let modelLabel: string;
-  if (uniqueModels.length === 1) {
-    modelLabel = uniqueModels[0] ?? "unknown";
-  } else if (uniqueModels.length === 0) {
+  if (uniqueModelKeys.length === 1) {
+    modelLabel = uniqueModelKeys[0] ?? "unknown";
+  } else if (uniqueModelKeys.length === 0) {
     modelLabel = "unknown";
   } else {
-    modelLabel = `${uniqueModels.length} models`;
+    modelLabel = `${uniqueModelKeys.length} models`;
   }
 
   const evaluation = restData.evaluation;
@@ -285,17 +285,17 @@ export function RunDetail({ runId }: { runId: string }) {
     effectiveStatus === "killed";
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-4">
+    <div className="mx-auto flex h-dvh max-w-7xl min-h-0 flex-col px-4 py-4">
       {/* Back link */}
       <Link
         href="/runs"
-        className="mb-2 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
+        className="mb-2 inline-flex shrink-0 items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> back to runs
       </Link>
 
       {/* Header */}
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+      <div className="mb-3 flex shrink-0 flex-wrap items-baseline justify-between gap-2">
         <span className="flex items-center gap-1.5">
           <h1 className="text-base font-medium">{humanize(restData.scenario_name)}</h1>
           {restData.fork_source ? (
@@ -327,27 +327,25 @@ export function RunDetail({ runId }: { runId: string }) {
           {totalCostUsd > 0 ? <> · {formatCost(totalCostUsd)}</> : null}
           {durationSeconds > 0 ? <> · {formatDuration(durationSeconds)}</> : null}
           {" · "}
-          {uniqueModels.length <= 1 ? (
-            modelLabel
-          ) : (
-            <span className="group relative cursor-default">
-              {modelLabel}
-              <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-border bg-background px-3 py-2 text-xs shadow-lg group-hover:block">
-                {allAgents.map(a => (
-                  <div key={a.agent_id} className="flex justify-between gap-4 py-0.5">
-                    <span className="text-muted-foreground">{humanize(a.agent_id)}</span>
-                    <span className="font-mono">{a.model}</span>
-                  </div>
-                ))}
-              </span>
+          <span className="group relative cursor-default">
+            {modelLabel}
+            <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max rounded-md border border-border bg-background px-3 py-2 text-xs shadow-lg group-hover:block">
+              {allAgents.map(a => (
+                <div key={a.agent_id} className="flex justify-between gap-4 py-0.5">
+                  <span className="text-muted-foreground">{a.role_name}</span>
+                  <span className="font-mono">
+                    {a.provider}:{a.model}
+                  </span>
+                </div>
+              ))}
             </span>
-          )}
+          </span>
         </span>
       </div>
 
       {/* Scenario config */}
       {restData.scenario_config && Object.keys(restData.scenario_config).length > 0 ? (
-        <div className="mb-3 flex flex-wrap gap-1.5">
+        <div className="mb-3 flex shrink-0 flex-wrap gap-1.5">
           {Object.entries(restData.scenario_config).map(([key, value]) => (
             <span
               key={key}
@@ -370,7 +368,7 @@ export function RunDetail({ runId }: { runId: string }) {
 
       {/* Live streaming banner */}
       {isInProgress ? (
-        <div className="mb-2 flex items-center gap-2 rounded-lg border border-yellow-300/50 bg-yellow-50 px-3 py-1.5 text-xs text-yellow-800 dark:border-yellow-700/50 dark:bg-yellow-950/30 dark:text-yellow-300">
+        <div className="mb-2 flex shrink-0 items-center gap-2 rounded-lg border border-yellow-300/50 bg-yellow-50 px-3 py-1.5 text-xs text-yellow-800 dark:border-yellow-700/50 dark:bg-yellow-950/30 dark:text-yellow-300">
           {sse.isConnected ? (
             <Radio className="h-3 w-3 text-green-600 dark:text-green-400" />
           ) : (
@@ -395,7 +393,7 @@ export function RunDetail({ runId }: { runId: string }) {
 
       {/* Evaluation in-progress banner */}
       {!isInProgress && evaluationInProgress ? (
-        <div className="mb-2 flex items-center gap-2 rounded-lg border border-blue-300/50 bg-blue-50 px-3 py-1.5 text-xs text-blue-800 dark:border-blue-700/50 dark:bg-blue-950/30 dark:text-blue-300">
+        <div className="mb-2 flex shrink-0 items-center gap-2 rounded-lg border border-blue-300/50 bg-blue-50 px-3 py-1.5 text-xs text-blue-800 dark:border-blue-700/50 dark:bg-blue-950/30 dark:text-blue-300">
           <Loader2 className="h-3 w-3 animate-spin" />
           <span>Evaluation in progress...</span>
         </div>
@@ -404,7 +402,7 @@ export function RunDetail({ runId }: { runId: string }) {
       {/* Shell */}
       <div
         className={cn(
-          "relative grid h-[calc(100vh-120px)] min-h-[500px] overflow-hidden rounded-xl border border-border bg-background",
+          "relative grid min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-background *:min-h-0",
           evaluation !== null && showEvalPanel
             ? "grid-cols-[192px_1fr_280px]"
             : "grid-cols-[192px_1fr]"

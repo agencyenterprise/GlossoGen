@@ -223,6 +223,7 @@ class AutonomousSupervisor:
                     channel_ids=config.channel_ids,
                     tool_names=all_tool_names,
                     model=config.model,
+                    provider=config.provider,
                     max_tokens=config.max_tokens,
                 )
             )
