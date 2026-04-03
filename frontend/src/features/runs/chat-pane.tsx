@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Download, Pencil, Play, X } from "lucide-react";
+import { ChevronDown, Download, Pencil } from "lucide-react";
 import { API_URL } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
@@ -34,7 +34,6 @@ interface ChatPaneProps {
   onStartEdit: (messageId: string) => void;
   onSaveEdit: (messageId: string, newText: string) => void;
   onCancelEdit: () => void;
-  onRemoveEdit: (messageId: string) => void;
   onForkFromMessage: (targetMessageId: string) => void;
   /** The message_id that was the fork point, if this is a forked run. */
   forkPointMessageId: string | null;
@@ -113,7 +112,6 @@ export function ChatPane({
   onStartEdit,
   onSaveEdit,
   onCancelEdit,
-  onRemoveEdit,
   onForkFromMessage,
   forkPointMessageId,
 }: ChatPaneProps) {
@@ -395,7 +393,10 @@ export function ChatPane({
                           ) : isEditing ? (
                             <MessageEditor
                               initialText={displayText}
-                              onSave={newText => onSaveEdit(entry.message_id, newText)}
+                              onFork={newText => {
+                                onSaveEdit(entry.message_id, newText);
+                                onForkFromMessage(entry.message_id);
+                              }}
                               onCancel={onCancelEdit}
                             />
                           ) : (
@@ -405,35 +406,15 @@ export function ChatPane({
                                   {displayText}
                                 </ProseMarkdown>
                               ) : null}
-                              {/* Edit / fork controls */}
                               {canEdit ? (
                                 <span className="absolute -right-1 top-0 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/entry:opacity-100">
-                                  {pendingEdit ? (
-                                    <>
-                                      <button
-                                        aria-label="Play from this message"
-                                        className="rounded p-0.5 text-green-600 transition-colors hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30"
-                                        onClick={() => onForkFromMessage(entry.message_id)}
-                                      >
-                                        <Play className="h-3 w-3" />
-                                      </button>
-                                      <button
-                                        aria-label="Remove edit"
-                                        className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                        onClick={() => onRemoveEdit(entry.message_id)}
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <button
-                                      aria-label="Edit message"
-                                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                      onClick={() => onStartEdit(entry.message_id)}
-                                    >
-                                      <Pencil className="h-3 w-3" />
-                                    </button>
-                                  )}
+                                  <button
+                                    aria-label="Edit and fork from this message"
+                                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    onClick={() => onStartEdit(entry.message_id)}
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </button>
                                 </span>
                               ) : null}
                             </>
@@ -469,11 +450,11 @@ export function ChatPane({
 
 function MessageEditor({
   initialText,
-  onSave,
+  onFork,
   onCancel,
 }: {
   initialText: string;
-  onSave: (newText: string) => void;
+  onFork: (newText: string) => void;
   onCancel: () => void;
 }) {
   const [text, setText] = useState(initialText);
@@ -495,16 +476,16 @@ function MessageEditor({
             onCancel();
           }
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            onSave(text);
+            onFork(text);
           }
         }}
       />
       <div className="flex items-center gap-1.5">
         <button
           className="rounded-md bg-foreground px-2.5 py-0.5 text-[11px] font-medium text-background transition-opacity hover:opacity-80"
-          onClick={() => onSave(text)}
+          onClick={() => onFork(text)}
         >
-          Save
+          Fork
         </button>
         <button
           className="rounded-md border border-border px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -512,7 +493,7 @@ function MessageEditor({
         >
           Cancel
         </button>
-        <span className="text-[10px] text-muted-foreground">Ctrl+Enter to save, Esc to cancel</span>
+        <span className="text-[10px] text-muted-foreground">Ctrl+Enter to fork, Esc to cancel</span>
       </div>
     </div>
   );

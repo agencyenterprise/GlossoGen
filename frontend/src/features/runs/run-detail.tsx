@@ -29,6 +29,7 @@ import { elapsedSince, formatConfigValue, formatCost, formatDuration, humanize }
 import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
+import { ModelPicker } from "./model-picker";
 import { useFork } from "./use-fork";
 
 export function RunDetail({ runId }: { runId: string }) {
@@ -128,7 +129,8 @@ export function RunDetail({ runId }: { runId: string }) {
 
   // When SSE reports simulation ended, refetch REST for evaluation + debug logs
   const sseStatus = sse.status;
-  const hasSimEnded = sseStatus === "scenario_complete" || sseStatus === "error";
+  const hasSimEnded =
+    sseStatus === "scenario_complete" || sseStatus === "error" || sseStatus === "killed";
   useEffect(() => {
     if (hasSimEnded) {
       queryClient.invalidateQueries({ queryKey: ["run", runId] });
@@ -231,13 +233,18 @@ export function RunDetail({ runId }: { runId: string }) {
     setForkModalMessageId(targetMessageId);
   }, []);
 
-  const handleConfirmFork = useCallback(() => {
-    if (!forkModalMessageId) return;
-    fork.forkMutation.mutate({
-      targetMessageId: forkModalMessageId,
-    });
-    setForkModalMessageId(null);
-  }, [forkModalMessageId, fork.forkMutation]);
+  const handleConfirmFork = useCallback(
+    (model: string, provider: string) => {
+      if (!forkModalMessageId) return;
+      fork.forkMutation.mutate({
+        targetMessageId: forkModalMessageId,
+        model,
+        provider,
+      });
+      setForkModalMessageId(null);
+    },
+    [forkModalMessageId, fork.forkMutation]
+  );
 
   if (isLoading) {
     return (
@@ -272,7 +279,10 @@ export function RunDetail({ runId }: { runId: string }) {
   const hasLogs = allDebugLogs.length > 0;
   const activeAgent = allAgents.find(a => a.agent_id === selectedAgent);
   const activeAgentColor = selectedAgent ? agentColorMap.get(selectedAgent) : undefined;
-  const forkEnabled = effectiveStatus === "scenario_complete" || effectiveStatus === "error";
+  const forkEnabled =
+    effectiveStatus === "scenario_complete" ||
+    effectiveStatus === "error" ||
+    effectiveStatus === "killed";
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-4">
@@ -436,7 +446,6 @@ export function RunDetail({ runId }: { runId: string }) {
             onStartEdit={fork.startEdit}
             onSaveEdit={fork.saveEdit}
             onCancelEdit={fork.cancelEdit}
-            onRemoveEdit={fork.removeEdit}
             onForkFromMessage={handleForkFromMessage}
             forkPointMessageId={restData.fork_source?.target_message_id ?? null}
           />
@@ -493,6 +502,8 @@ export function RunDetail({ runId }: { runId: string }) {
       {forkModalMessageId ? (
         <ForkModal
           isPending={fork.forkMutation.isPending}
+          sourceModel={restData.agents[0]?.model ?? ""}
+          sourceProvider={restData.provider}
           onConfirm={handleConfirmFork}
           onCancel={() => setForkModalMessageId(null)}
         />
@@ -529,21 +540,53 @@ export function RunDetail({ runId }: { runId: string }) {
 
 function ForkModal({
   isPending,
+  sourceModel,
+  sourceProvider,
   onConfirm,
   onCancel,
 }: {
   isPending: boolean;
-  onConfirm: () => void;
+  sourceModel: string;
+  sourceProvider: string;
+  onConfirm: (model: string, provider: string) => void;
   onCancel: () => void;
 }) {
+  const [model, setModel] = useState(sourceModel);
+  const [provider, setProvider] = useState(sourceProvider);
+
+  const { data } = useQuery({
+    queryKey: ["scenarios"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/scenarios");
+      if (error) {
+        throw new Error("Failed to fetch scenarios");
+      }
+      return data;
+    },
+  });
+
+  function handleModelSelect(selectedModel: string, selectedProvider: string) {
+    setModel(selectedModel);
+    setProvider(selectedProvider);
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-background p-5 shadow-xl">
+      <div className="w-full max-w-md rounded-xl border border-border bg-background p-5 shadow-xl">
         <h3 className="mb-3 text-sm font-medium">Fork simulation</h3>
-        <p className="mb-4 text-xs text-muted-foreground">
+        <p className="mb-3 text-xs text-muted-foreground">
           A new simulation will start from the edited message with the channel history up to that
-          point. The same model and provider from the source run will be used.
+          point.
         </p>
+
+        <div className="mb-4">
+          <ModelPicker
+            models={data?.models ?? []}
+            selectedModel={model}
+            onSelect={handleModelSelect}
+          />
+        </div>
+
         <div className="flex justify-end gap-2">
           <button
             className="rounded-md border border-border px-3 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -554,8 +597,8 @@ function ForkModal({
           </button>
           <button
             className="rounded-md bg-foreground px-3 py-1 text-[12px] font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
-            onClick={onConfirm}
-            disabled={isPending}
+            onClick={() => onConfirm(model, provider)}
+            disabled={isPending || !model}
           >
             {isPending ? "Launching..." : "Launch fork"}
           </button>

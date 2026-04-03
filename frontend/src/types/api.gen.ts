@@ -394,6 +394,10 @@ export interface components {
             target_message_id: string;
             /** Message Edits */
             message_edits: components["schemas"]["MessageEdit"][];
+            /** Model */
+            model: string;
+            /** Provider */
+            provider: string;
         };
         /**
          * ForkResponse
@@ -558,7 +562,7 @@ export interface components {
          * @description Status of a simulation run.
          * @enum {string}
          */
-        RunStatus: "scenario_complete" | "in_progress" | "starting" | "error";
+        RunStatus: "scenario_complete" | "in_progress" | "starting" | "error" | "killed";
         /**
          * RunSummary
          * @description Summary of a single simulation run for the runs list endpoint.

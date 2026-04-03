@@ -128,6 +128,7 @@ class RunStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     STARTING = "starting"
     ERROR = "error"
+    KILLED = "killed"
 
 
 class SimulationEnded(EventBase):

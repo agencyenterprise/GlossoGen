@@ -30,21 +30,21 @@ export function useFork(runId: string) {
     setEditingMessageId(null);
   }, []);
 
-  const removeEdit = useCallback((messageId: string) => {
-    setPendingEdits(prev => {
-      const next = new Map(prev);
-      next.delete(messageId);
-      return next;
-    });
-  }, []);
-
   const clearEdits = useCallback(() => {
     setPendingEdits(new Map());
     setEditingMessageId(null);
   }, []);
 
   const forkMutation = useMutation({
-    mutationFn: async ({ targetMessageId }: { targetMessageId: string }) => {
+    mutationFn: async ({
+      targetMessageId,
+      model,
+      provider,
+    }: {
+      targetMessageId: string;
+      model: string;
+      provider: string;
+    }) => {
       const edits = [...pendingEdits.values()].map(e => ({
         message_id: e.messageId,
         new_text: e.newText,
@@ -55,6 +55,8 @@ export function useFork(runId: string) {
         body: {
           target_message_id: targetMessageId,
           message_edits: edits,
+          model,
+          provider,
         },
       });
       if (error) {
@@ -74,7 +76,6 @@ export function useFork(runId: string) {
     startEdit,
     saveEdit,
     cancelEdit,
-    removeEdit,
     clearEdits,
     forkMutation,
   };

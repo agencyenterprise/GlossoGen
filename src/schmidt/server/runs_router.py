@@ -10,11 +10,12 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import httpx
+import orjson
 from fastapi import APIRouter, HTTPException, Request
 from starlette.responses import StreamingResponse
 
 from schmidt.eval_manifest import read_eval_manifest
-from schmidt.models.event import RunStatus
+from schmidt.models.event import RunStatus, SimulationEnded
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.response_models import (
     LaunchStatus,
@@ -84,7 +85,8 @@ async def stop_run(run_id: str, request: Request) -> None:
     if not matching:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    run_dir = Path(matching[0].run_dir)
+    run_summary = matching[0]
+    run_dir = Path(run_summary.run_dir)
     manifest = read_manifest(run_dir=run_dir)
     if manifest is None:
         raise HTTPException(status_code=409, detail="Simulation is not running")
@@ -96,6 +98,31 @@ async def stop_run(run_id: str, request: Request) -> None:
         logger.info("Simulation PID %d already dead for run %s", manifest.pid, run_id)
 
     delete_manifest(run_dir=run_dir)
+
+    _append_killed_event(
+        run_dir=run_dir,
+        scenario_name=run_summary.scenario_name,
+        total_messages=run_summary.total_messages,
+        total_cost_usd=run_summary.total_cost_usd,
+    )
+
+
+def _append_killed_event(
+    run_dir: Path,
+    scenario_name: str,
+    total_messages: int,
+    total_cost_usd: float,
+) -> None:
+    """Append a SimulationEnded event with reason=killed to the JSONL log."""
+    event = SimulationEnded(
+        reason=RunStatus.KILLED,
+        total_messages=total_messages,
+        total_cost_usd=total_cost_usd,
+    )
+    jsonl_path = run_dir / f"{scenario_name}.jsonl"
+    with open(jsonl_path, "ab") as f:
+        f.write(orjson.dumps(event.model_dump(mode="json")) + b"\n")
+    logger.info("Appended killed event to %s", jsonl_path)
 
 
 @router.post(
@@ -123,11 +150,11 @@ async def start_evaluation(
 
     run_summary = matching[0]
 
-    finished_statuses = {RunStatus.SCENARIO_COMPLETE, RunStatus.ERROR}
+    finished_statuses = {RunStatus.SCENARIO_COMPLETE, RunStatus.ERROR, RunStatus.KILLED}
     if run_summary.status not in finished_statuses:
         raise HTTPException(
             status_code=422,
-            detail="Evaluation requires a completed or errored run",
+            detail="Evaluation requires a completed, errored, or killed run",
         )
 
     run_dir = Path(run_summary.run_dir)

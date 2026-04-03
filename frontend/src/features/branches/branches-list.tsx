@@ -16,6 +16,7 @@ const STATUS_LABELS: Record<RunStatus, string> = {
   in_progress: "In Progress",
   starting: "Starting",
   error: "Error",
+  killed: "Killed",
 };
 
 interface SourceRunEntry {

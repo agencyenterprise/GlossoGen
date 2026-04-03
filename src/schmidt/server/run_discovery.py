@@ -13,7 +13,13 @@ import orjson
 from pydantic import TypeAdapter
 
 from schmidt.eval_manifest import read_eval_manifest
-from schmidt.models.event import RunStatus, SimulationEnded, SimulationEvent, SimulationStarted
+from schmidt.models.event import (
+    AgentRegistered,
+    RunStatus,
+    SimulationEnded,
+    SimulationEvent,
+    SimulationStarted,
+)
 from schmidt.server.response_models import ForkSource, RunSummary
 from schmidt.stream_manifest import delete_manifest, read_manifest
 from schmidt.token_pricing import find_pricing
@@ -61,21 +67,27 @@ def _parse_event(raw_bytes: bytes) -> SimulationEvent:
 
 
 async def _extract_models(file_path: Path) -> list[str]:
-    """Extract unique model names from AgentRegistered events at the start of a JSONL file."""
-    seen: dict[str, None] = {}
+    """Extract unique model names from AgentRegistered events in a JSONL file.
+
+    Uses the last AgentRegistered event per agent_id so that forked runs
+    that re-register agents with a new model report the correct model.
+    """
+    models_by_agent: dict[str, str] = {}
     async with aiofiles.open(file_path, mode="rb") as f:
         async for line in f:
             stripped = line.strip()
             if not stripped:
                 continue
             raw = orjson.loads(stripped)
-            event_type = raw.get("event_type")
-            if event_type == "agent_registered":
+            if raw.get("event_type") == "agent_registered":
+                agent_id = raw.get("agent_id", "")
                 model = raw.get("model", "")
-                if model and model not in seen:
-                    seen[model] = None
-            elif event_type not in ("simulation_started", "agent_registered"):
-                break
+                if agent_id and model:
+                    models_by_agent[agent_id] = model
+    seen: dict[str, None] = {}
+    for model in models_by_agent.values():
+        if model not in seen:
+            seen[model] = None
     return list(seen)
 
 
@@ -192,7 +204,8 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
             eval_in_progress = read_eval_manifest(run_dir=timestamp_dir) is not None
 
             if isinstance(last_event, SimulationEnded):
-                duration_seconds = (last_event.timestamp - first_event.timestamp).total_seconds()
+                start_time = run_timestamp if fork_source is not None else first_event.timestamp
+                duration_seconds = (last_event.timestamp - start_time).total_seconds()
                 summaries.append(
                     RunSummary(
                         run_id=first_event.run_id,
@@ -220,8 +233,8 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                     status = RunStatus.IN_PROGRESS
                 else:
                     delete_manifest(run_dir=timestamp_dir)
-                    fork_path = timestamp_dir / "fork_manifest.json"
-                    if fork_path.exists():
+                    still_booting = isinstance(last_event, (SimulationStarted, AgentRegistered))
+                    if still_booting:
                         status = RunStatus.STARTING
                     else:
                         status = RunStatus.ERROR
