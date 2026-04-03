@@ -240,9 +240,8 @@ export interface paths {
          * Start Run
          * @description Launch a new simulation as a background subprocess.
          *
-         *     Validates inputs, writes knobs to a temp file, builds the CLI command,
-         *     and launches the subprocess. Returns immediately — the frontend polls
-         *     the runs list to discover the new run once it appears.
+         *     Validates inputs, merges knobs and model overrides into a config file,
+         *     and launches the subprocess with --config and Hydra-style overrides.
          */
         post: operations["start_run_api_runs_start_post"];
         delete?: never;

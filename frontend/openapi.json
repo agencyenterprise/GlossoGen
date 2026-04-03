@@ -495,7 +495,7 @@
     "/api/runs/start": {
       "post": {
         "summary": "Start Run",
-        "description": "Launch a new simulation as a background subprocess.\n\nValidates inputs, writes knobs to a temp file, builds the CLI command,\nand launches the subprocess. Returns immediately \u2014 the frontend polls\nthe runs list to discover the new run once it appears.",
+        "description": "Launch a new simulation as a background subprocess.\n\nValidates inputs, merges knobs and model overrides into a config file,\nand launches the subprocess with --config and Hydra-style overrides.",
         "operationId": "start_run_api_runs_start_post",
         "requestBody": {
           "content": {
