@@ -11,9 +11,9 @@ from typing import NamedTuple
 
 import aiofiles
 import orjson
-from pydantic import TypeAdapter
 
 from schmidt.eval_manifest import read_eval_manifest
+from schmidt.event_parsing import parse_event_bytes
 from schmidt.models.event import (
     AgentRegistered,
     RunStatus,
@@ -27,8 +27,6 @@ from schmidt.token_pricing import find_pricing
 
 logger = logging.getLogger(__name__)
 
-_EVENT_ADAPTER: TypeAdapter[SimulationEvent] = TypeAdapter(SimulationEvent)
-
 
 async def _read_first_line(file_path: Path) -> bytes:
     """Read the first non-empty line from a file."""
@@ -40,31 +38,31 @@ async def _read_first_line(file_path: Path) -> bytes:
     raise ValueError(f"File is empty: {file_path}")
 
 
-async def _read_last_line(file_path: Path) -> bytes:
-    """Read the last non-empty line from a file."""
-    last = b""
+async def _read_last_event(file_path: Path) -> SimulationEvent:
+    """Parse the last event from a JSONL file, preferring SimulationEnded.
+
+    When a simulation is killed, the stop endpoint appends a
+    ``SimulationEnded`` event, but the dying process may flush buffered
+    events after it. This scans the last 20 lines so the termination
+    marker is not missed.
+    """
+    tail: list[bytes] = []
     async with aiofiles.open(file_path, mode="rb") as f:
         async for line in f:
             stripped = line.strip()
             if stripped:
-                last = stripped
-    if not last:
+                tail.append(stripped)
+                if len(tail) > 20:
+                    tail.pop(0)
+    if not tail:
         raise ValueError(f"File is empty: {file_path}")
-    return last
 
+    for candidate in reversed(tail):
+        event = parse_event_bytes(raw_bytes=candidate)
+        if isinstance(event, SimulationEnded):
+            return event
 
-def _parse_event(raw_bytes: bytes) -> SimulationEvent:
-    """Parse raw JSON bytes into a typed SimulationEvent.
-
-    Injects default values for fields added after initial release so that
-    older JSONL files parse without errors.
-    """
-    raw = orjson.loads(raw_bytes)  # positional-only parameter
-    if raw.get("event_type") == "simulation_ended":
-        raw.setdefault("total_cost_usd", 0.0)
-    if raw.get("event_type") == "simulation_started":
-        raw.setdefault("provider", "unknown")
-    return _EVENT_ADAPTER.validate_python(raw)  # positional-only parameter
+    return parse_event_bytes(raw_bytes=tail[-1])
 
 
 class _AgentModelInfo(NamedTuple):
@@ -217,8 +215,9 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                 continue
 
             try:
-                first_event = _parse_event(raw_bytes=await _read_first_line(file_path=jsonl_path))
-                last_event = _parse_event(raw_bytes=await _read_last_line(file_path=jsonl_path))
+                first_line = await _read_first_line(file_path=jsonl_path)
+                first_event = parse_event_bytes(raw_bytes=first_line)
+                last_event = await _read_last_event(file_path=jsonl_path)
             except Exception:
                 logger.exception("Failed to parse run at %s", timestamp_dir)
                 continue
