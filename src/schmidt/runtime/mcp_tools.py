@@ -40,12 +40,8 @@ BASE_TOOL_NAMES: frozenset[str] = frozenset(
 """Base communication tools available to all agents unconditionally.
 
 These are always visible in ``tools/list`` and exempt from the per-agent
-authorization guard. Also used as ``HIDDEN_TOOL_NAMES`` — filtered out of
-the frontend timeline because their effects are visible as chat messages.
+authorization guard.
 """
-
-HIDDEN_TOOL_NAMES: frozenset[str] = BASE_TOOL_NAMES
-"""Tool names filtered out of the frontend timeline."""
 
 
 def _resolve_agent_from_context(ctx: ToolContext, runtime: SimulationRuntime) -> AgentSession:

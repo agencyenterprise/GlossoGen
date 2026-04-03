@@ -1,7 +1,6 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
-watchPatterns = ["src/**", "package.json", "package-lock.json"]
 
 [deploy]
 healthcheckPath = "/"

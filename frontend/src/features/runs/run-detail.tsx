@@ -39,6 +39,65 @@ import { ScenarioDescriptionModal } from "./scenario-description-modal";
 import { ModelPicker } from "./model-picker";
 import { useFork } from "./use-fork";
 import { ConfigValueModal } from "./config-value-modal";
+import { AgentModelOverrides, type AgentModelOverride } from "./agent-model-overrides";
+
+function extractModelOverridesFromScenarioConfig(args: {
+  scenarioConfig: Record<string, unknown>;
+}): Record<string, AgentModelOverride> {
+  const rawOverrides = args.scenarioConfig.model_overrides;
+  if (typeof rawOverrides !== "object" || rawOverrides === null || Array.isArray(rawOverrides)) {
+    return {};
+  }
+
+  const overrides: Record<string, AgentModelOverride> = {};
+  for (const [agentId, entry] of Object.entries(rawOverrides)) {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      continue;
+    }
+    const payload = entry as Record<string, unknown>;
+    const model = payload.model;
+    const provider = payload.provider;
+    if (typeof model !== "string" || model.trim() === "") {
+      continue;
+    }
+    if (typeof provider !== "string" || provider.trim() === "") {
+      continue;
+    }
+    overrides[agentId] = {
+      model: model.trim(),
+      provider: provider.trim(),
+    };
+  }
+  return overrides;
+}
+
+function deriveInitialForkModelOverrides(args: {
+  sourceModel: string;
+  sourceProvider: string;
+  agents: { agent_id: string; model: string; provider: string }[];
+  scenarioConfig: Record<string, unknown>;
+}): Record<string, AgentModelOverride> {
+  const fromScenarioConfig = extractModelOverridesFromScenarioConfig({
+    scenarioConfig: args.scenarioConfig,
+  });
+  if (Object.keys(fromScenarioConfig).length > 0) {
+    return fromScenarioConfig;
+  }
+
+  const inferred: Record<string, AgentModelOverride> = {};
+  for (const agent of args.agents) {
+    const matchesSourceModel = agent.model === args.sourceModel;
+    const matchesSourceProvider = agent.provider === args.sourceProvider;
+    if (matchesSourceModel && matchesSourceProvider) {
+      continue;
+    }
+    inferred[agent.agent_id] = {
+      model: agent.model,
+      provider: agent.provider,
+    };
+  }
+  return inferred;
+}
 
 export function RunDetail({ runId }: { runId: string }) {
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
@@ -243,12 +302,13 @@ export function RunDetail({ runId }: { runId: string }) {
   }, []);
 
   const handleConfirmFork = useCallback(
-    (model: string, provider: string) => {
+    (model: string, provider: string, modelOverrides: Record<string, AgentModelOverride>) => {
       if (!forkModalMessageId) return;
       fork.forkMutation.mutate({
         targetMessageId: forkModalMessageId,
         model,
         provider,
+        knobs: { model_overrides: modelOverrides },
       });
       setForkModalMessageId(null);
     },
@@ -517,6 +577,22 @@ export function RunDetail({ runId }: { runId: string }) {
           isPending={fork.forkMutation.isPending}
           sourceModel={restData.agents[0]?.model ?? ""}
           sourceProvider={restData.provider}
+          sourceAgents={restData.agents.map(agent => ({
+            agent_id: agent.agent_id,
+            role_name: agent.role_name,
+            model: agent.model,
+            provider: agent.provider,
+          }))}
+          initialModelOverrides={deriveInitialForkModelOverrides({
+            sourceModel: restData.agents[0]?.model ?? "",
+            sourceProvider: restData.provider,
+            agents: restData.agents.map(agent => ({
+              agent_id: agent.agent_id,
+              model: agent.model,
+              provider: agent.provider,
+            })),
+            scenarioConfig: restData.scenario_config,
+          })}
           onConfirm={handleConfirmFork}
           onCancel={() => setForkModalMessageId(null)}
         />
@@ -564,17 +640,27 @@ function ForkModal({
   isPending,
   sourceModel,
   sourceProvider,
+  sourceAgents,
+  initialModelOverrides,
   onConfirm,
   onCancel,
 }: {
   isPending: boolean;
   sourceModel: string;
   sourceProvider: string;
-  onConfirm: (model: string, provider: string) => void;
+  sourceAgents: { agent_id: string; role_name: string; model: string; provider: string }[];
+  initialModelOverrides: Record<string, AgentModelOverride>;
+  onConfirm: (
+    model: string,
+    provider: string,
+    modelOverrides: Record<string, AgentModelOverride>
+  ) => void;
   onCancel: () => void;
 }) {
   const [model, setModel] = useState(sourceModel);
   const [provider, setProvider] = useState(sourceProvider);
+  const [modelOverrides, setModelOverrides] =
+    useState<Record<string, AgentModelOverride>>(initialModelOverrides);
 
   const { data } = useQuery({
     queryKey: ["scenarios"],
@@ -593,37 +679,54 @@ function ForkModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md rounded-xl border border-border bg-background p-5 shadow-xl">
-        <h3 className="mb-3 text-sm font-medium">Fork simulation</h3>
-        <p className="mb-3 text-xs text-muted-foreground">
-          A new simulation will start from the edited message with the channel history up to that
-          point.
-        </p>
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-4">
+      <div className="flex min-h-full items-center justify-center">
+        <div className="flex w-full max-w-md max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-xl">
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <h3 className="mb-3 text-sm font-medium">Fork simulation</h3>
+            <p className="mb-3 text-xs text-muted-foreground">
+              A new simulation will start from the edited message with the channel history up to
+              that point.
+            </p>
 
-        <div className="mb-4">
-          <ModelPicker
-            models={data?.models ?? []}
-            selectedModel={model}
-            onSelect={handleModelSelect}
-          />
-        </div>
+            <div className="mb-4">
+              <ModelPicker
+                models={data?.models ?? []}
+                selectedModel={model}
+                onSelect={handleModelSelect}
+              />
+            </div>
 
-        <div className="flex justify-end gap-2">
-          <button
-            className="rounded-md border border-border px-3 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            onClick={onCancel}
-            disabled={isPending}
-          >
-            Cancel
-          </button>
-          <button
-            className="rounded-md bg-foreground px-3 py-1 text-[12px] font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
-            onClick={() => onConfirm(model, provider)}
-            disabled={isPending || !model}
-          >
-            {isPending ? "Launching..." : "Launch fork"}
-          </button>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Agent Model Overrides</label>
+              <p className="text-xs text-muted-foreground">
+                Overrides from this run are pre-selected. You can adjust any agent before launching.
+              </p>
+              <AgentModelOverrides
+                agents={sourceAgents}
+                models={data?.models ?? []}
+                overrides={modelOverrides}
+                onChange={setModelOverrides}
+              />
+            </div>
+          </div>
+
+          <div className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-3">
+            <button
+              className="rounded-md border border-border px-3 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={onCancel}
+              disabled={isPending}
+            >
+              Cancel
+            </button>
+            <button
+              className="rounded-md bg-foreground px-3 py-1 text-[12px] font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
+              onClick={() => onConfirm(model, provider, modelOverrides)}
+              disabled={isPending || !model}
+            >
+              {isPending ? "Launching..." : "Launch fork"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
