@@ -27,6 +27,7 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 | Frontend            | Next.js 16, React 19, TypeScript (strict), Tailwind CSS v4   |
 | API Client          | openapi-fetch with generated types from OpenAPI schema       |
 | Data Fetching       | TanStack React Query                                         |
+| MCP Browse API      | FastMCP mounted at `/mcp` on the FastAPI server (Streamable HTTP) |
 
 
 
@@ -254,6 +255,25 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 - Every endpoint declares a `response_model` and returns a Pydantic model instance. No dicts or strings are returned.
 - Status-like fields use enums (`HealthStatus`, `RunStatus`, `Verdict`) instead of bare strings. `RunStatus` includes `IN_PROGRESS` for runs that have not yet completed.
 - The run detail endpoint returns separate `messages` (ChannelMessage) and `reasoning` (ReasoningEntry) arrays, plus `debug_logs` (DebugLogEntry) parsed from the debug JSONL file.
+
+### MCP Runs Browser
+
+An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport, mounted via `app.mount("/mcp", mcp.streamable_http_app())`.
+
+The MCP server exposes four tools:
+
+| Tool               | Description                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| `list_scenarios`   | Lists available scenarios with knobs files, evaluators, and supported models/providers            |
+| `list_runs`        | Paginated run listing with filtering by scenario, model, fork status, and run status              |
+| `get_run_metadata` | Lightweight metadata for a single run: agents, channels, configuration, evaluation summary        |
+| `get_run`          | Full run content with messages; opt-in sections for reasoning, tool use, debug logs, system prompts; filtering by agent or channel |
+
+All tools return markdown-formatted text. `list_runs` and `get_run` support pagination. `get_run` uses flags (`with_reasoning`, `with_tool_use`, `with_debug_logs`, `with_system_prompts`) to control which sections are included, keeping responses compact by default.
+
+The MCP server reuses the same data layer as the REST API (`discover_runs()`, `load_run_detail()`) and inherits the existing `PasswordAuthMiddleware` and CORS configuration. Run ID parameters accept unique prefixes (e.g., first 8 characters) for convenience.
+
+The frontend includes an MCP integration modal (accessible via the **MCP** button on the runs page) that shows connection instructions for Claude Code and Cursor.
 
 ### Frontend
 

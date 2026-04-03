@@ -1,0 +1,441 @@
+"""MCP server for browsing simulation runs, mounted inside the FastAPI app.
+
+Exposes four tools over Streamable HTTP: list_scenarios, list_runs,
+get_run_metadata, and get_run. Designed for LLM clients (Claude Code, Cursor)
+to query run data programmatically. All tools return structured JSON.
+"""
+
+import logging
+from pathlib import Path
+
+import orjson
+from fastapi import FastAPI
+from mcp.server.fastmcp import FastMCP
+
+from schmidt.evaluation.evaluation_report import EvaluationReport
+from schmidt.scenarios import SCENARIO_REGISTRY
+from schmidt.server.mcp.models import (
+    McpAgent,
+    McpAgentModel,
+    McpDebugLog,
+    McpEvalMetric,
+    McpForkSource,
+    McpGetRunResult,
+    McpListRunsResult,
+    McpListScenariosResult,
+    McpMessage,
+    McpModel,
+    McpReasoning,
+    McpRunEntry,
+    McpRunMetadata,
+    McpScenario,
+    McpToolCall,
+)
+from schmidt.server.response_models import RunDetailResponse, RunSummary
+from schmidt.server.run_detail_reader import load_run_detail
+from schmidt.server.run_discovery import discover_runs
+from schmidt.token_pricing import list_models, list_providers
+
+logger = logging.getLogger(__name__)
+
+_SCENARIOS_BASE = Path(__file__).resolve().parent.parent.parent / "scenarios"
+
+# Module-level state set by mount_mcp_browser().
+_runs_dir: Path = Path("./runs")
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _list_knobs_files(scenario_name: str) -> list[str]:
+    """Return sorted knobs filenames (without .json extension) for a scenario."""
+    scenario_dir = _SCENARIOS_BASE / scenario_name
+    if not scenario_dir.is_dir():
+        return []
+    return sorted(f.stem for f in scenario_dir.glob("knobs_*.json"))
+
+
+async def _find_run_by_prefix(run_id_prefix: str) -> RunSummary:
+    """Find a unique run whose run_id starts with the given prefix.
+
+    Raises ValueError if zero or multiple runs match.
+    """
+    all_runs = await discover_runs(runs_dir=_runs_dir)
+    matches = [r for r in all_runs if r.run_id.startswith(run_id_prefix)]
+    if len(matches) == 0:
+        raise ValueError(f"No run found matching prefix '{run_id_prefix}'")
+    if len(matches) > 1:
+        ids = ", ".join(r.run_id[:12] for r in matches[:5])
+        raise ValueError(
+            f"Ambiguous prefix '{run_id_prefix}' matches {len(matches)} runs: {ids}..."
+        )
+    return matches[0]
+
+
+async def _load_detail(run_summary: RunSummary) -> RunDetailResponse:
+    """Load full run detail from a RunSummary."""
+    run_dir = Path(run_summary.run_dir)
+    jsonl_path = run_dir / f"{run_summary.scenario_name}.jsonl"
+    return await load_run_detail(log_path=jsonl_path)
+
+
+def _run_summary_to_entry(run: RunSummary) -> McpRunEntry:
+    """Convert a RunSummary to an McpRunEntry."""
+    fork_source: McpForkSource | None = None
+    if run.fork_source is not None:
+        fork_source = McpForkSource(
+            source_run_id=run.fork_source.source_run_id,
+            target_message_id=run.fork_source.target_message_id,
+            forked_at=run.fork_source.forked_at,
+        )
+    return McpRunEntry(
+        run_id=run.run_id,
+        scenario_name=run.scenario_name,
+        status=run.status.value,
+        timestamp=run.timestamp,
+        total_messages=run.total_messages,
+        total_cost_usd=run.total_cost_usd,
+        duration_seconds=run.duration_seconds,
+        provider=run.provider,
+        models=run.models,
+        is_forked=run.fork_source is not None,
+        has_evaluation=run.has_evaluation,
+        agent_models=[
+            McpAgentModel(
+                agent_id=a.agent_id,
+                role_name=a.role_name,
+                model=a.model,
+                provider=a.provider,
+            )
+            for a in run.agent_models
+        ],
+        fork_source=fork_source,
+    )
+
+
+def _load_evaluation_metrics(run_summary: RunSummary) -> list[McpEvalMetric] | None:
+    """Load evaluation metrics from the report JSON, or return None."""
+    run_dir = Path(run_summary.run_dir)
+    report_path = run_dir / f"{run_summary.scenario_name}_report.json"
+    if not report_path.exists():
+        return None
+
+    try:
+        raw = orjson.loads(report_path.read_bytes())
+        if "evaluation_cost" not in raw:
+            raw["evaluation_cost"] = {
+                "usage": {
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_read_input_tokens": 0,
+                    "cache_creation_input_tokens": 0,
+                },
+                "estimated_cost_usd": 0.0,
+                "model": "unknown",
+                "provider_name": "unknown",
+            }
+        report = EvaluationReport.model_validate(raw)
+    except Exception:
+        logger.exception("Failed to load evaluation report from %s", report_path)
+        return None
+
+    return [
+        McpEvalMetric(
+            evaluator_name=m.evaluator_name,
+            verdict=m.verdict.value,
+            score=m.score,
+            evidence=m.evidence,
+            per_agent={agent_id: v.value for agent_id, v in m.per_agent.items()},
+        )
+        for m in report.metrics
+    ]
+
+
+# ---------------------------------------------------------------------------
+# MCP tools
+# ---------------------------------------------------------------------------
+
+
+mcp = FastMCP("schmidt-runs-browser", streamable_http_path="/")
+
+
+@mcp.tool(
+    name="list_scenarios",
+    description=(
+        "List all available simulation scenarios with their "
+        "knobs files, evaluators, and supported models/providers."
+    ),
+)
+async def list_scenarios() -> McpListScenariosResult:
+    """List available scenarios, models, and providers."""
+    scenarios = []
+    for name in sorted(SCENARIO_REGISTRY.keys()):
+        scenario_cls = SCENARIO_REGISTRY[name]
+        scenarios.append(
+            McpScenario(
+                name=name,
+                knobs_files=_list_knobs_files(scenario_name=name),
+                evaluators=scenario_cls.get_available_evaluator_names(),
+            )
+        )
+
+    models = [
+        McpModel(model_prefix=prefix, provider=provider) for prefix, provider in list_models()
+    ]
+
+    return McpListScenariosResult(
+        scenarios=scenarios,
+        models=models,
+        providers=list_providers(),
+    )
+
+
+@mcp.tool(
+    name="list_runs",
+    description=(
+        "List simulation runs with pagination and optional filtering. "
+        "Returns runs sorted by timestamp (newest first)."
+    ),
+)
+async def list_runs(
+    offset: int = 0,
+    limit: int = 20,
+    scenario: str | None = None,
+    model: str | None = None,
+    is_forked: bool | None = None,
+    status: str | None = None,
+) -> McpListRunsResult:
+    """List simulation runs with filtering and pagination."""
+    all_runs = await discover_runs(runs_dir=_runs_dir)
+
+    filtered = all_runs
+    if scenario is not None:
+        scenario_lower = scenario.lower()
+        filtered = [r for r in filtered if scenario_lower in r.scenario_name.lower()]
+    if model is not None:
+        model_lower = model.lower()
+        filtered = [r for r in filtered if any(model_lower in m.lower() for m in r.models)]
+    if is_forked is not None:
+        if is_forked:
+            filtered = [r for r in filtered if r.fork_source is not None]
+        else:
+            filtered = [r for r in filtered if r.fork_source is None]
+    if status is not None:
+        status_lower = status.lower()
+        filtered = [r for r in filtered if r.status.value.lower() == status_lower]
+
+    total = len(filtered)
+    page = filtered[offset : offset + limit]
+
+    return McpListRunsResult(
+        runs=[_run_summary_to_entry(run=r) for r in page],
+        total=total,
+        offset=offset,
+        limit=limit,
+    )
+
+
+@mcp.tool(
+    name="get_run_metadata",
+    description=(
+        "Get lightweight metadata for a single run: header info, agents, "
+        "configuration, and evaluation results. Does not load messages or "
+        "reasoning. Accepts a full run_id or a unique prefix."
+    ),
+)
+async def get_run_metadata(run_id: str) -> McpRunMetadata:
+    """Get run metadata without loading full event log."""
+    run = await _find_run_by_prefix(run_id_prefix=run_id)
+
+    fork_source: McpForkSource | None = None
+    if run.fork_source is not None:
+        fork_source = McpForkSource(
+            source_run_id=run.fork_source.source_run_id,
+            target_message_id=run.fork_source.target_message_id,
+            forked_at=run.fork_source.forked_at,
+        )
+
+    return McpRunMetadata(
+        run_id=run.run_id,
+        scenario_name=run.scenario_name,
+        status=run.status.value,
+        timestamp=run.timestamp,
+        total_messages=run.total_messages,
+        total_cost_usd=run.total_cost_usd,
+        duration_seconds=run.duration_seconds,
+        provider=run.provider,
+        models=run.models,
+        is_forked=run.fork_source is not None,
+        scenario_config=run.scenario_config,
+        agent_models=[
+            McpAgentModel(
+                agent_id=a.agent_id,
+                role_name=a.role_name,
+                model=a.model,
+                provider=a.provider,
+            )
+            for a in run.agent_models
+        ],
+        fork_source=fork_source,
+        evaluation=_load_evaluation_metrics(run_summary=run),
+    )
+
+
+@mcp.tool(
+    name="get_run",
+    description=(
+        "Get detailed run content including messages. Optionally include "
+        "reasoning, tool use, debug logs, and system prompts via flags. "
+        "Filter by agent_id or channel_id. Messages are paginated via "
+        "message_offset/message_limit."
+    ),
+)
+async def get_run(
+    run_id: str,
+    agent_id: str | None = None,
+    channel_id: str | None = None,
+    with_reasoning: bool = False,
+    with_tool_use: bool = False,
+    with_debug_logs: bool = False,
+    with_system_prompts: bool = False,
+    message_limit: int = 50,
+    message_offset: int = 0,
+) -> McpGetRunResult:
+    """Get detailed run content with opt-in sections and filtering."""
+    run_summary = await _find_run_by_prefix(run_id_prefix=run_id)
+    detail = await _load_detail(run_summary=run_summary)
+
+    # Filter by agent across all sections
+    if agent_id is not None:
+        detail = RunDetailResponse(
+            run_id=detail.run_id,
+            scenario_name=detail.scenario_name,
+            scenario_description=detail.scenario_description,
+            scenario_config=detail.scenario_config,
+            timestamp=detail.timestamp,
+            total_messages=detail.total_messages,
+            total_cost_usd=detail.total_cost_usd,
+            duration_seconds=detail.duration_seconds,
+            status=detail.status,
+            channel_ids=detail.channel_ids,
+            provider=detail.provider,
+            agents=[a for a in detail.agents if a.agent_id == agent_id],
+            messages=[m for m in detail.messages if m.sender_agent_id == agent_id],
+            reasoning=[r for r in detail.reasoning if r.sender_agent_id == agent_id],
+            tool_use=[t for t in detail.tool_use if t.sender_agent_id == agent_id],
+            debug_logs=detail.debug_logs,
+            evaluation=detail.evaluation,
+            evaluation_in_progress=detail.evaluation_in_progress,
+            fork_source=detail.fork_source,
+        )
+
+    # Filter messages by channel
+    messages = detail.messages
+    if channel_id is not None:
+        messages = [m for m in messages if m.channel_id == channel_id]
+
+    # Paginate messages
+    total_messages = len(messages)
+    page = messages[message_offset : message_offset + message_limit]
+
+    # Build optional sections
+    agents: list[McpAgent] | None = None
+    if with_system_prompts:
+        agents = [
+            McpAgent(
+                agent_id=a.agent_id,
+                role_name=a.role_name,
+                model=a.model,
+                provider=a.provider,
+                tool_names=a.tool_names,
+                channel_ids=a.channel_ids,
+                system_prompt=a.system_prompt,
+            )
+            for a in detail.agents
+        ]
+
+    reasoning: list[McpReasoning] | None = None
+    if with_reasoning:
+        reasoning = [
+            McpReasoning(
+                message_id=r.message_id,
+                sender_agent_id=r.sender_agent_id,
+                text=r.text,
+                timestamp=r.timestamp,
+                round_number=r.round_number,
+            )
+            for r in detail.reasoning[:50]
+        ]
+
+    tool_use: list[McpToolCall] | None = None
+    if with_tool_use:
+        tool_use = [
+            McpToolCall(
+                message_id=t.message_id,
+                sender_agent_id=t.sender_agent_id,
+                tool_name=t.tool_name,
+                arguments=t.arguments,
+                result=t.result,
+                timestamp=t.timestamp,
+                round_number=t.round_number,
+            )
+            for t in detail.tool_use[:50]
+        ]
+
+    debug_logs: list[McpDebugLog] | None = None
+    if with_debug_logs:
+        debug_logs = [
+            McpDebugLog(
+                timestamp=d.timestamp,
+                logger_name=d.logger_name,
+                level=d.level,
+                message=d.message,
+            )
+            for d in detail.debug_logs[-100:]
+        ]
+
+    return McpGetRunResult(
+        run_id=detail.run_id,
+        scenario_name=detail.scenario_name,
+        messages=[
+            McpMessage(
+                message_id=m.message_id,
+                channel_id=m.channel_id,
+                sender_agent_id=m.sender_agent_id,
+                text=m.text,
+                timestamp=m.timestamp,
+                round_number=m.round_number,
+            )
+            for m in page
+        ],
+        total_messages=total_messages,
+        message_offset=message_offset,
+        message_limit=message_limit,
+        agents=agents,
+        reasoning=reasoning,
+        tool_use=tool_use,
+        debug_logs=debug_logs,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Mount
+# ---------------------------------------------------------------------------
+
+
+def mount_mcp_browser(app: FastAPI, runs_dir: Path) -> None:
+    """Mount the MCP runs browser on the FastAPI app at /mcp.
+
+    Creates the Starlette sub-app and stores the session manager so the
+    main app lifespan can start it (sub-app lifespans do not run when
+    mounted inside FastAPI).
+    """
+    global _runs_dir  # noqa: PLW0603
+    _runs_dir = runs_dir
+
+    starlette_app = mcp.streamable_http_app()
+    app.mount("/mcp", starlette_app)
+    app.state.mcp_session_manager = mcp.session_manager
+    logger.info("MCP runs browser mounted at /mcp")

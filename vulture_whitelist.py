@@ -39,6 +39,8 @@ budget_total_ru  # unused variable (src/schmidt/scenarios/product_launch/knobs.p
 requirements  # unused variable (src/schmidt/scenarios/software_procurement/spec_registry.py:20)
 impossible_requirement  # unused variable (src/schmidt/scenarios/software_procurement/spec_registry.py:21)
 health  # unused function (src/schmidt/server/app.py:68)
+get_run_metadata  # unused function (src/schmidt/server/mcp/browser.py)
+get_run  # unused function (src/schmidt/server/mcp/browser.py)
 verify_auth  # unused function (src/schmidt/server/app.py:74)
 export_run_artifacts  # unused function (src/schmidt/server/artifact_export_router.py:59)
 fork_run  # unused function (src/schmidt/server/fork_router.py:48)

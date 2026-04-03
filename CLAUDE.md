@@ -46,9 +46,11 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
   - `password_auth_middleware.py` — pure ASGI middleware for shared-password authentication
   - `fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
+  - `mcp_browser.py` — MCP server mounted at `/mcp` for programmatic run browsing (Claude Code, Cursor)
 - `linter/` — custom linting scripts
 - `frontend/` — Next.js web application
   - `src/features/auth/` — authentication gate and login page
+  - `src/features/mcp-config/` — MCP integration modal with connection instructions
 
 ### Prompt Templates
 
@@ -148,6 +150,44 @@ The backend middleware (`password_auth_middleware.py`) accepts credentials via:
 - `?token=<password>` query parameter (used by SSE EventSource connections, which cannot set custom headers)
 
 The frontend `AuthGate` component probes `POST /api/auth/verify` on mount. If auth is required, it shows a login page. The password is stored in `localStorage` and attached to all API requests via openapi-fetch middleware.
+
+## MCP Integration
+
+The backend exposes an MCP (Model Context Protocol) server at `/mcp` for programmatic access to simulation data from LLM clients like Claude Code or Cursor. The MCP server is mounted inside the existing FastAPI app and shares the same authentication and CORS configuration.
+
+### Available Tools
+
+- `list_scenarios` — lists available scenarios with knobs files, evaluators, and supported models/providers
+- `list_runs` — paginated run listing with filtering by scenario, model, fork status, and run status
+- `get_run_metadata` — lightweight metadata for a single run: agents, channels, configuration, evaluation summary
+- `get_run` — full run content with messages; opt-in sections for reasoning, tool use, debug logs, and system prompts; filtering by agent or channel
+
+### Connecting
+
+From the web UI, click the **MCP** button on the runs page to see connection instructions. Alternatively:
+
+**Claude Code:**
+
+```bash
+claude mcp add-json schmidt-runs '{"type":"http","url":"<API_URL>/mcp","headers":{"Authorization":"Bearer <APP_PASSWORD>"}}'
+```
+
+**Cursor** (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "schmidt-runs": {
+      "url": "<API_URL>/mcp",
+      "headers": {
+        "Authorization": "Bearer <APP_PASSWORD>"
+      }
+    }
+  }
+}
+```
+
+Replace `<API_URL>` with the backend URL (e.g. `http://localhost:8000` for local development) and `<APP_PASSWORD>` with the shared password. Omit the `headers` object if authentication is disabled.
 
 ## Deployment
 

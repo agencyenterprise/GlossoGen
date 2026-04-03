@@ -133,6 +133,16 @@ All frontend API calls use a typed client generated from the backend's OpenAPI s
 make gen-api-types
 ```
 
+### MCP Integration
+
+The backend exposes an MCP (Model Context Protocol) server at `/mcp` for programmatic access to simulation data from LLM clients like Claude Code or Cursor. Click the **MCP** button on the runs page for connection instructions, or configure manually:
+
+```bash
+claude mcp add-json schmidt-runs '{"type":"http","url":"http://localhost:8000/mcp","headers":{"Authorization":"Bearer <APP_PASSWORD>"}}'
+```
+
+Available tools: `list_scenarios`, `list_runs` (paginated, filterable), `get_run_metadata`, `get_run` (messages, reasoning, tool use).
+
 ## Scenarios
 
 ### Incident Response
@@ -183,9 +193,11 @@ src/schmidt/
   server/                      # FastAPI web server (schmidt serve)
     password_auth_middleware.py # Shared-password ASGI middleware
     fork_router.py             # POST /api/runs/{run_id}/fork endpoint
+    mcp_browser.py             # MCP server at /mcp for programmatic run browsing
 
 frontend/                      # Next.js web application
   src/features/auth/           # Login page and auth gate
+  src/features/mcp-config/     # MCP integration modal with connection instructions
 ```
 
 See [Architecture.md](Architecture.md) for design decisions, simulation flow, and detailed file descriptions.
