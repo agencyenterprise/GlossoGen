@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 import orjson
 
 from schmidt.event_bus import EventBus
-from schmidt.server.streaming_event import DebugLogEmitted
+from schmidt.server.runs.streaming_event import DebugLogEmitted
 
 
 class JsonLineFormatter(logging.Formatter):

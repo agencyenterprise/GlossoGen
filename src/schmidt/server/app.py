@@ -10,14 +10,14 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from schmidt.server.artifact_export_router import router as artifact_export_router
-from schmidt.server.fork_router import router as fork_router
 from schmidt.server.mcp.browser import mount_mcp_browser
 from schmidt.server.password_auth_middleware import PasswordAuthMiddleware
-from schmidt.server.pdf_export_router import router as pdf_export_router
+from schmidt.server.pdf.router import router as pdf_export_router
 from schmidt.server.response_models import AuthVerifyResponse, HealthResponse, HealthStatus
-from schmidt.server.runs_router import router as runs_router
-from schmidt.server.scenarios_router import router as scenarios_router
+from schmidt.server.runs.artifact_router import router as artifact_export_router
+from schmidt.server.runs.fork_router import router as fork_router
+from schmidt.server.runs.router import router as runs_router
+from schmidt.server.scenarios.router import router as scenarios_router
 
 load_dotenv()
 

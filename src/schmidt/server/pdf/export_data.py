@@ -9,7 +9,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from schmidt.server.response_models import (
+from schmidt.server.runs.models import (
     AgentDetail,
     ChannelMessage,
     ReasoningEntry,

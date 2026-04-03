@@ -21,8 +21,8 @@ from schmidt.message_rewind import build_rewind_state
 from schmidt.run_config_validation import validate_run_config
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.scenarios import SCENARIO_REGISTRY
-from schmidt.server.response_models import ForkRequest, ForkResponse
-from schmidt.server.run_discovery import discover_runs
+from schmidt.server.runs.discovery import discover_runs
+from schmidt.server.runs.models import ForkRequest, ForkResponse
 from schmidt.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)

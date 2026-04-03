@@ -42,7 +42,7 @@ from schmidt.runners.communication_protocol import (
     INITIAL_PROMPT,
     build_full_system_prompt,
 )
-from schmidt.server.streaming_event import AgentCostUpdated
+from schmidt.server.runs.streaming_event import AgentCostUpdated
 from schmidt.token_pricing import find_pricing
 
 logger = logging.getLogger(__name__)

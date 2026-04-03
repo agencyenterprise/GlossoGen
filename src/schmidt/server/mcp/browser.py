@@ -31,9 +31,9 @@ from schmidt.server.mcp.models import (
     McpScenario,
     McpToolCall,
 )
-from schmidt.server.response_models import RunDetailResponse, RunSummary
-from schmidt.server.run_detail_reader import load_run_detail
-from schmidt.server.run_discovery import discover_runs
+from schmidt.server.runs.detail_reader import load_run_detail
+from schmidt.server.runs.discovery import discover_runs
+from schmidt.server.runs.models import RunDetailResponse, RunSummary
 from schmidt.token_pricing import list_models, list_providers
 
 logger = logging.getLogger(__name__)
