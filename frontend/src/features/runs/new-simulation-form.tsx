@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -126,6 +126,7 @@ function KnobsBadges({
 
 export function NewSimulationForm() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [scenario, setScenario] = useState("");
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
@@ -259,6 +260,14 @@ export function NewSimulationForm() {
   function handleKnobsFileChange(value: string) {
     setKnobsFile(value);
     if (!value) {
+      setKnobs(null);
+      setModelOverrides({});
+      return;
+    }
+    const cached = queryClient.getQueryData<{ knobs: KnobsMap }>(["knobs", scenario, value]);
+    if (cached) {
+      setKnobs({ ...cached.knobs });
+    } else {
       setKnobs(null);
     }
     setModelOverrides({});
