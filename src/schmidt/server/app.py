@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from schmidt.server.artifact_export_router import router as artifact_export_router
 from schmidt.server.fork_router import router as fork_router
+from schmidt.server.mcp.browser import mount_mcp_browser
 from schmidt.server.password_auth_middleware import PasswordAuthMiddleware
 from schmidt.server.pdf_export_router import router as pdf_export_router
 from schmidt.server.response_models import AuthVerifyResponse, HealthResponse, HealthStatus
@@ -33,12 +34,13 @@ def _parse_allowed_origins() -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Store the configured runs directory on app state at startup."""
+    """Store the configured runs directory and start the MCP session manager."""
     runs_dir_str = os.environ.get("SCHMIDT_RUNS_DIR", "./runs")
     app.state.runs_dir = Path(runs_dir_str)
     app.state.runs_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Serving runs from: %s", app.state.runs_dir)
-    yield
+    async with app.state.mcp_session_manager.run():
+        yield
 
 
 app = FastAPI(title="Schmidt Simulation Server", lifespan=lifespan)
@@ -63,6 +65,9 @@ app.include_router(fork_router)
 app.include_router(pdf_export_router)
 app.include_router(artifact_export_router)
 app.include_router(scenarios_router)
+
+_runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs"))
+mount_mcp_browser(app=app, runs_dir=_runs_dir)
 
 
 @app.get("/api/health", response_model=HealthResponse)
