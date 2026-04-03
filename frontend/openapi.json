@@ -495,7 +495,7 @@
     "/api/runs/start": {
       "post": {
         "summary": "Start Run",
-        "description": "Launch a new simulation as a background subprocess.\n\nValidates inputs, merges knobs and model overrides into a config file,\nand launches the subprocess with --config and Hydra-style overrides.",
+        "description": "Launch a new simulation as a background subprocess.\n\nValidates inputs, writes knobs/config to a config file,\nand launches the subprocess with --config and Hydra-style overrides.",
         "operationId": "start_run_api_runs_start_post",
         "requestBody": {
           "content": {
@@ -924,28 +924,27 @@
             "type": "string",
             "title": "Provider"
           },
-          "model_overrides": {
+          "knobs": {
             "anyOf": [
               {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/ModelOverrideEntry"
-                },
+                "additionalProperties": true,
                 "type": "object"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Model Overrides"
+            "title": "Knobs"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "target_message_id",
           "message_edits",
           "model",
           "provider",
-          "model_overrides"
+          "knobs"
         ],
         "title": "ForkRequest",
         "description": "Request body for creating a forked simulation run."
@@ -1088,25 +1087,6 @@
         ],
         "title": "ModelInfo",
         "description": "A supported model prefix and its provider."
-      },
-      "ModelOverrideEntry": {
-        "properties": {
-          "model": {
-            "type": "string",
-            "title": "Model"
-          },
-          "provider": {
-            "type": "string",
-            "title": "Provider"
-          }
-        },
-        "type": "object",
-        "required": [
-          "model",
-          "provider"
-        ],
-        "title": "ModelOverrideEntry",
-        "description": "Per-agent model and provider override."
       },
       "ReasoningEntry": {
         "properties": {
@@ -2055,29 +2035,15 @@
               }
             ],
             "title": "Knobs"
-          },
-          "model_overrides": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/ModelOverrideEntry"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model Overrides"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "scenario_name",
           "model",
           "provider",
-          "knobs",
-          "model_overrides"
+          "knobs"
         ],
         "title": "StartRunRequest",
         "description": "Request body for starting a new simulation run."

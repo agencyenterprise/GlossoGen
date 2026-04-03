@@ -134,16 +134,17 @@ The correct decision (full recall) requires all three facts to be surfaced and i
 
 ## Knobs
 
-Six tunable parameters control scenario behavior. Passed via a JSON file with the `--knobs` CLI flag.
+Scenario behavior is configured via a JSON config file passed with `--config`.
 
 | Knob | Low | High |
 |------|-----|------|
+| `max_round_duration_seconds` | `300` | `300` |
 | `time_pressure` | 5 rounds (days 1–5) | 3 rounds (days 1, 3, 5) |
 | `goal_alignment` | Company first | Department first |
 | `regulator_pressure` | Vague questions | Hints it knows more (anonymous tip) |
 | `agent_count` | `"three"` — Engineer, Legal, PR | `"five"` — adds CFO and Regulator |
 | `information_overlap` | Fully siloed | Agents have vague hints about others' facts |
-| `model_overrides` | `{}` — all agents use `--model` | Map agent IDs to model strings |
+| `model_overrides` | `{}` — all agents use `--model`/`--provider` | Map agent IDs to `{model, provider}` |
 
 ### Constraints
 
@@ -164,5 +165,9 @@ Six tunable parameters control scenario behavior. Passed via a JSON file with th
 ```
 
 ```bash
-python -m schmidt run car_recall --model claude-sonnet-4-20250514 --runs-dir ./runs --knobs knobs.json
+python -m schmidt run car_recall \
+  --model claude-sonnet-4-20250514 \
+  --provider anthropic \
+  --runs-dir ./runs \
+  --config knobs.json
 ```

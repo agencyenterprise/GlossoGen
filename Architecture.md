@@ -32,7 +32,7 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 
 ## Simulation Flow
 
-1. **CLI** parses arguments in two passes (first to identify the scenario, then to include scenario-specific flags). Builds the scenario, agent configs, event logger, and agent runner. Passes everything into the `AutonomousSupervisor`.
+1. **CLI** parses arguments in two passes (first to identify the scenario, then to parse known flags plus `key=value` overrides). Builds the scenario, agent configs, event logger, and agent runner. Passes everything into the `AutonomousSupervisor`.
 2. **AutonomousSupervisor.run()** opens the event logger, builds per-agent `AgentSession` objects (with scenario-defined reaction delay ranges), creates the `SimulationRuntime` (FastMCP server), and wires a `GameClock`. Logs `SimulationStarted` and one `AgentRegistered` event per agent.
 3. **MCP server starts** on a configured port, exposing the `comms` MCP server. Agent runners are launched as concurrent asyncio tasks, each starting an external Claude Code process connected to the MCP server URL.
 4. **Game clock delivers round-1 injections** as `NewInfoNotification` messages pushed to agent session queues. Agents receive these via the `check_messages` MCP tool and begin interacting.
@@ -119,9 +119,9 @@ The ChannelRouter stores messages and validates membership.
 The `SimulationScenario` ABC defines a contract for scenario plug-ins.
 
 **Core methods (required by all scenarios):**
-- `add_cli_arguments(parser)` — register scenario-specific CLI arguments
-- `create(args)` — construct a scenario instance from parsed CLI arguments
-- `create_from_config(config)` — reconstruct a scenario from its serialized config dict (used by fork system)
+- `get_agent_roles(knobs)` — return agent IDs and display names for a knobs/config payload
+- `prepare_config(config)` — normalize raw config before validation/instantiation
+- `create_from_config(config)` — reconstruct a scenario from its serialized config dict (used by fork/resume)
 - `name()`, `scenario_description()`, `get_agents()`, `get_channels()`
 - `get_channel_display_name()`, `get_agent_display_name()`, `get_injection()`
 - `run_evaluation(log_path, evaluator_names, report_path, model, provider_name, inference_provider, reasoning_effort)`
@@ -187,19 +187,18 @@ The fork system allows rewinding a completed simulation to any message, editing 
 
 ### Fork Flow
 
-1. **Frontend**: User hovers over a message in the run detail view, clicks the edit button, modifies the text, and clicks the play button. The frontend calls `POST /api/runs/{run_id}/fork` with the target message ID, text edits, model, and provider.
-2. **Fork router** (`server/fork_router.py`): Loads events from the source JSONL, creates a new run directory, and calls `write_fork_log` to write a truncated+edited copy of the event log. Writes `fork_manifest.json` for provenance. Launches `schmidt run --resume <new_dir>` as a background subprocess.
-3. **Fork writer** (`fork_writer.py`): Copies events from the source log up to the target message's timestamp. Replaces message text for edited messages. Assigns a new `run_id` to the `SimulationStarted` event so the fork has a unique identity.
-4. **Resume**: The CLI loads the forked JSONL via `build_rewind_state`, which extracts round number, channel messages, injection tracking, and per-agent conversation transcripts. Passes the `RewindState` to `AutonomousSupervisor`.
-5. **Supervisor resume**: Pre-populates the channel router with historical messages, sets agent read positions, starts the game clock from the correct round, and pushes wake-up notifications to all agents.
-6. **Conversation context**: Each agent receives a rich conversation transcript as its initial prompt (built by `conversation_reconstructor.py`). The transcript includes channel messages, scenario injections, and round transitions — but not the agent's prior reasoning, so it re-derives its thinking naturally. The edited message appears silently in the transcript as if it was always there.
-7. **Agents continue**: Fresh Claude Code sessions start with full context of the prior conversation and respond naturally to the (edited) state of the world.
+1. **Frontend**: User hovers over a message in the run detail view, clicks the edit button, modifies the text, and clicks the play button. The frontend calls `POST /api/runs/{run_id}/fork` with target message ID, text edits, model/provider, and optional knobs/config overrides.
+2. **Fork router** (`server/fork_router.py`): Resolves the target message to a git commit, clones the source run repo to a new run directory, and checks out the target commit.
+3. **Edit application**: Rewrites the forked JSONL in-place (`_apply_edits_and_new_run_id`) to apply message text edits and assign a new run ID. Writes `fork_manifest.json` for provenance and commits the fork edits.
+4. **Preflight validation**: Validates merged scenario config (source config plus optional fork knobs) with `validate_run_config`, including `model_overrides` provider checks and scenario-aware agent ID checks.
+5. **Resume**: Launches `schmidt run --resume <new_dir> --config fork_config.json` as a background subprocess.
+6. **Supervisor resume**: CLI rebuilds `RewindState` from the forked JSONL and resumes the simulation from the restored round/channel state.
+7. **Agents continue**: Fresh agent sessions start with reconstructed message history and continue naturally from the edited world state.
 
 ### Key Modules
 
-- `message_rewind.py` — `RewindState` NamedTuple and `build_rewind_state()` to reconstruct state at any message
-- `fork_writer.py` — `write_fork_log()` to create the truncated+edited JSONL
-- `conversation_reconstructor.py` — `build_agent_context()` to build per-agent conversation transcripts
+- `message_rewind.py` — `RewindState` and rewind state reconstruction helpers
+- `message_history_builder.py` — builds per-agent transcript history from events
 - `server/fork_router.py` — `POST /api/runs/{run_id}/fork` API endpoint
 
 ### Provenance

@@ -1,4 +1,6 @@
 {
+  "max_round_duration_seconds": 300,
+  "model_overrides": {},
   "time_pressure": "low",
   "goal_alignment": "low",
   "regulator_pressure": "low",

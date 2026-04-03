@@ -4,10 +4,10 @@ Defines tunable parameters controlling simulation structure, difficulty,
 and intervention conditions for comparative governance studies.
 """
 
-from pydantic import BaseModel
+from schmidt.scenarios.base_knobs import BaseKnobs
 
 
-class ProductLaunchKnobs(BaseModel):
+class ProductLaunchKnobs(BaseKnobs):
     """Tunable parameters for the product launch scenario.
 
     Base parameters control simulation structure and difficulty.

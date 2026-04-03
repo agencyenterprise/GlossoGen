@@ -304,7 +304,7 @@ The fork API endpoint is `POST /api/runs/{run_id}/fork`. Forked runs appear in t
 
 ### Per-Agent Model Overrides
 
-Each agent uses the default `--model` and `--provider` unless overridden. Per-agent overrides use the `agents.*` namespace in the Hydra-style config system — every scenario supports them automatically.
+Each agent uses the default `--model` and `--provider` unless overridden. Per-agent overrides live in `model_overrides` inside scenario knobs/config. The CLI also supports `agents.*` dot-notation overrides, which are normalized into `model_overrides`.
 
 **CLI usage:** Pass dot-notation overrides:
 
@@ -314,21 +314,23 @@ schmidt run car_recall --model claude-sonnet --provider anthropic --runs-dir ./r
   agents.engineer.model=gpt-4o agents.engineer.provider=openai
 ```
 
-Or embed in the `--config` JSON file under the `agents` key:
+Or embed in the `--config` JSON file under `model_overrides`:
 
 ```json
 {
-  "time_pressure": "high",
-  "agents": {
+  "max_round_duration_seconds": 300,
+  "model_overrides": {
     "engineer": {"model": "gpt-4o", "provider": "openai"},
     "legal": {"model": "claude-opus-4-20250514", "provider": "anthropic"}
-  }
+  },
+  "time_pressure": "high",
+  "goal_alignment": "high"
 }
 ```
 
 **Web UI:** The "Create simulation" page shows an "Agent Model Overrides" section after selecting a scenario. Each agent can be individually overridden to a different model/provider. The fork dialog also supports per-agent overrides.
 
-**Backend flow:** `POST /api/runs/start` accepts `model_overrides` mapping agent IDs to `{model, provider}`. The server merges knobs and agent overrides into a single `--config` file. In `cli.py`, the `agents.*` keys are extracted after config loading and applied after `scenario.get_agents()` returns — no scenario-specific code needed.
+**Backend flow:** `POST /api/runs/start` and `POST /api/runs/{run_id}/fork` accept only knobs/config payloads; there is no top-level `model_overrides` field. Preflight validation reads `model_overrides` from knobs/config, validates provider names, and validates agent IDs against scenario roles before launch.
 
 **Agent discovery:** `POST /api/scenarios/{scenario_name}/agents` accepts `{knobs}` and returns the agent IDs and role names for the given configuration. Used by the frontend to populate the override UI. Each scenario implements `get_agent_roles(knobs)` as a classmethod.
 

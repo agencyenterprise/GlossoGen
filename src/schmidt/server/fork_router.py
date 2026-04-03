@@ -18,9 +18,12 @@ from fastapi import APIRouter, HTTPException, Request
 
 from schmidt.evaluation.log_reader import load_events
 from schmidt.message_rewind import build_rewind_state
+from schmidt.run_config_validation import validate_run_config
 from schmidt.run_repository import RunRepository, claim_run_dir
+from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.response_models import ForkRequest, ForkResponse
 from schmidt.server.run_discovery import discover_runs
+from schmidt.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)
 
@@ -29,22 +32,13 @@ router = APIRouter(prefix="/api")
 
 def _build_fork_config(
     scenario_config: dict[str, object],
-    model_overrides: dict[str, Any] | None,
     run_dir: Path,
 ) -> tuple[Path, list[str]]:
     """Build a --config file and override args for a forked simulation.
 
-    Merges the source run's scenario config with any new model overrides
-    into a single config file. Returns the config file path and any
-    extra override args.
+    Writes the fork scenario config to a single file and returns the path.
     """
     config: dict[str, Any] = dict(scenario_config)
-
-    if model_overrides:
-        agents: dict[str, Any] = {}
-        for agent_id, entry in model_overrides.items():
-            agents[agent_id] = entry
-        config["agents"] = agents
 
     config_path = run_dir / "fork_config.json"
     config_path.write_bytes(orjson.dumps(config))
@@ -69,6 +63,11 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
     source_run_dir = Path(matching[0].run_dir)
     scenario_name = matching[0].scenario_name
     message_edits = {edit.message_id: edit.new_text for edit in body.message_edits}
+
+    if body.provider not in list_providers():
+        raise HTTPException(status_code=422, detail=f"Unknown provider: {body.provider}")
+    if scenario_name not in SCENARIO_REGISTRY:
+        raise HTTPException(status_code=422, detail=f"Unknown scenario: {scenario_name}")
 
     # Find the git commit for the target message.
     source_repo = RunRepository(run_dir=source_run_dir)
@@ -116,16 +115,25 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
         paths=None,
     )
 
-    # Build config file from source scenario config + model overrides.
-    overrides_for_model = None
-    if body.model_overrides:
-        overrides_for_model = {
-            agent_id: entry.model_dump() for agent_id, entry in body.model_overrides.items()
-        }
+    # Build config file from source scenario config + optional knobs overrides.
+    scenario_cls = SCENARIO_REGISTRY[scenario_name]
+    source_scenario_config = dict(matching[0].scenario_config)
+    merged_scenario_config = dict(source_scenario_config)
+    if body.knobs is not None:
+        merged_scenario_config.update(body.knobs)
+
+    try:
+        validated = validate_run_config(
+            scenario_cls=scenario_cls,
+            scenario_config=merged_scenario_config,
+            default_provider=body.provider,
+            valid_providers=set(list_providers()),
+        )
+    except (SystemExit, ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid fork configuration: {exc}") from exc
 
     config_path, override_args = _build_fork_config(
-        scenario_config=matching[0].scenario_config,
-        model_overrides=overrides_for_model,
+        scenario_config=validated.scenario_config,
         run_dir=new_run_dir,
     )
 

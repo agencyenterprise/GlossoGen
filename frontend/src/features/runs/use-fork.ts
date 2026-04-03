@@ -40,12 +40,12 @@ export function useFork(runId: string) {
       targetMessageId,
       model,
       provider,
-      modelOverrides,
+      knobs,
     }: {
       targetMessageId: string;
       model: string;
       provider: string;
-      modelOverrides?: Record<string, { model: string; provider: string }> | null;
+      knobs?: Record<string, unknown> | null;
     }) => {
       const edits = [...pendingEdits.values()].map(e => ({
         message_id: e.messageId,
@@ -59,7 +59,7 @@ export function useFork(runId: string) {
           message_edits: edits,
           model,
           provider,
-          model_overrides: modelOverrides ?? null,
+          knobs: knobs ?? null,
         },
       });
       if (error) {

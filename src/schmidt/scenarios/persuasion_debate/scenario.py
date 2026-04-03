@@ -5,7 +5,6 @@ misinformation resistance, balanced persuasion, open debate, and seeded debate.
 Supports 2+ agents discussing trivia questions on a shared channel via MCP.
 """
 
-import json
 import logging
 from pathlib import Path
 from typing import Any, NamedTuple, Self
@@ -88,40 +87,22 @@ class PersuasionDebateScenario(SimulationScenario):
         ]
 
     @classmethod
-    def prepare_config(cls, config: dict[str, Any]) -> dict[str, Any]:
-        """Load the question bank from a file path, or use the default questions.json.
-
-        Accepts three forms for ``question_bank``:
-        - Missing/None → loads the default ``questions.json`` from the scenario directory
-        - A string file path → loads the file
-        - A dict → already loaded, passed through as-is
-        """
-        qb = config.get("question_bank")
-        if qb is None:
-            default_path = Path(__file__).parent / "questions.json"
-            config["question_bank"] = json.loads(default_path.read_text())
-        elif isinstance(qb, str):
-            config["question_bank"] = json.loads(Path(qb).read_text())
-        return config
-
-    @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
         """Reconstruct the scenario from a serialized config dict."""
-        question_bank_data = config.pop("question_bank")
-        question_bank = QuestionBank.model_validate(question_bank_data)
-        max_round_duration = config.pop("max_round_duration_seconds", None)
         knobs = PersuasionDebateKnobs.model_validate(config)
+        question_bank_path = PersuasionDebateKnobs.resolve_question_bank_path(
+            question_bank=knobs.question_bank
+        )
+        question_bank = QuestionBank.load_from_file(path=question_bank_path)
         return cls(
             knobs=knobs,
             question_bank=question_bank,
-            max_round_duration_seconds=max_round_duration,
         )
 
     def __init__(
         self,
         knobs: PersuasionDebateKnobs,
         question_bank: QuestionBank,
-        max_round_duration_seconds: float | None,
     ) -> None:
         if len(question_bank.questions) < knobs.round_count:
             raise ValueError(
@@ -130,7 +111,6 @@ class PersuasionDebateScenario(SimulationScenario):
             )
         self._knobs = knobs
         self._question_bank = question_bank
-        self._max_round_duration_seconds = max_round_duration_seconds
         self._jinja = Environment(
             loader=FileSystemLoader(PROMPTS_DIR),
             autoescape=False,
@@ -156,12 +136,8 @@ class PersuasionDebateScenario(SimulationScenario):
         return "persuasion_debate"
 
     def get_scenario_config(self) -> dict[str, object]:
-        """Return persuasion debate knobs and question bank as a config dict."""
-        config: dict[str, object] = self._knobs.model_dump()
-        config["question_bank"] = self._question_bank.model_dump()
-        if self._max_round_duration_seconds is not None:
-            config["max_round_duration_seconds"] = self._max_round_duration_seconds
-        return config
+        """Return persuasion debate knobs as a config dict."""
+        return self._knobs.model_dump()
 
     def scenario_description(self) -> str:
         """Return a markdown description of the scenario."""
@@ -485,9 +461,7 @@ class PersuasionDebateScenario(SimulationScenario):
 
     def get_max_round_duration_seconds(self) -> float:
         """Return the maximum wall-clock seconds a round may last before force-advancing."""
-        if self._max_round_duration_seconds is None:
-            raise RuntimeError("max_round_duration_seconds not set; required for autonomous mode")
-        return self._max_round_duration_seconds
+        return self._knobs.max_round_duration_seconds
 
     def get_agent_reaction_delay_range(self, agent_id: str) -> tuple[float, float]:
         """Return the (min, max) seconds an agent waits before reacting to a notification."""

@@ -26,19 +26,19 @@ The CLI auto-generates a timestamped subdirectory under `--runs-dir`. Each round
 # Incident Response
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
   --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
-  --max-round-duration 120 \
+  --config src/schmidt/scenarios/incident_response/knobs_baseline.json \
   > ./runs/incident_response_stdout.log 2>&1 &
 
 # Car Recall
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
   --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
-  --knobs src/schmidt/scenarios/car_recall/knobs_baseline.json \
+  --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
 
 # Product Launch
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
   --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
-  --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
+  --config src/schmidt/scenarios/product_launch/knobs_baseline.json \
   > ./runs/product_launch_stdout.log 2>&1 &
 ```
 
@@ -58,11 +58,11 @@ If a simulation crashes or is killed, resume using the `--resume` flag pointing 
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
   --model <model> --provider <provider> --runs-dir ./runs \
   --resume ./runs/<scenario>/<timestamp> \
-  <scenario-specific flags> \
+  --config <original-config.json> \
   > ./runs/<scenario>/<timestamp>/resume_stdout.log 2>&1 &
 ```
 
-The simulation picks up from where it left off, preserving channel messages and scenario state. The `--resume` flag requires the same scenario-specific flags as the original run (e.g. `--knobs` for car_recall/product_launch, `--max-round-duration` for incident_response).
+The simulation picks up from where it left off, preserving channel messages and scenario state. The `--resume` flag requires the same `--config` as the original run.
 
 ### Forking Runs (Message-Level Rewind)
 
@@ -159,8 +159,7 @@ src/schmidt/
   autonomous_supervisor.py     # Round progression, event injection, resume
   channel_router.py            # Message storage + membership validation
   message_rewind.py            # State reconstruction at any message (fork/resume)
-  fork_writer.py               # Writes truncated+edited JSONL for forked runs
-  conversation_reconstructor.py # Builds per-agent conversation transcript for fork context
+  message_history_builder.py   # Builds per-agent transcript history for fork/resume context
   event_logger.py              # JSONL event writer
   event_bus.py                 # In-process pub/sub for SSE streaming
   simulation_server.py         # Embedded SSE server per simulation
