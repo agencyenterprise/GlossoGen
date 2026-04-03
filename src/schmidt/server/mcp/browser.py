@@ -158,7 +158,42 @@ def _load_evaluation_metrics(run_summary: RunSummary) -> list[McpEvalMetric] | N
 # ---------------------------------------------------------------------------
 
 
-mcp = FastMCP("schmidt-runs-browser", streamable_http_path="/")
+_INSTRUCTIONS = """\
+Schmidt simulation browser. Query simulation runs produced by multi-agent \
+scenarios (car_recall, incident_response, product_launch, persuasion_debate, \
+software_procurement).
+
+## Typical workflow
+
+1. `list_scenarios` — see available scenarios, knobs files, evaluators, \
+and supported models.
+2. `list_runs` — browse runs with optional filters (scenario, model, \
+status, is_forked). Paginate with offset/limit.
+3. `get_run_metadata` — inspect a single run's config, agents, and \
+evaluation results without loading messages. Pass a run_id prefix \
+(first 8 chars is usually enough).
+4. `get_run` — load messages (paginated). Add flags for extra sections:
+   - `with_reasoning=true` — LLM thinking/reasoning text
+   - `with_tool_use=true` — tool invocations and results
+   - `with_system_prompts=true` — full agent system prompts
+   - `with_debug_logs=true` — backend debug log entries
+   - `agent_id` — filter everything to one agent
+   - `channel_id` — filter messages to one channel
+
+## Tips
+
+- Run IDs accept unique prefixes (e.g. "cdd6" instead of the full UUID).
+- `list_runs` returns newest runs first.
+- `get_run` messages are paginated: use `message_offset` and \
+`message_limit` to page through.
+- Evaluation metrics include per-agent verdicts (pass/fail/partial).
+"""
+
+mcp = FastMCP(
+    "schmidt-runs-browser",
+    instructions=_INSTRUCTIONS,
+    streamable_http_path="/",
+)
 
 
 @mcp.tool(
