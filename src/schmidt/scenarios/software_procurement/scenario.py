@@ -16,7 +16,6 @@ from jinja2 import Environment, FileSystemLoader
 from schmidt.evaluation.evaluation_cost import compute_evaluation_cost
 from schmidt.evaluation.evaluation_report import EvaluationReport, write_report
 from schmidt.evaluation.evaluator_protocol import EvaluatorFactory
-from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
 from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig, AgentRole
@@ -474,8 +473,7 @@ class SoftwareProcurementScenario(SimulationScenario):
 
     @classmethod
     def get_available_evaluator_names(cls) -> list[str]:
-        """Return generic and software procurement-specific evaluator names."""
-        generic = super().get_available_evaluator_names()
+        """Return software procurement-specific evaluator names."""
         specific = [
             BuyerEfficiencyEvaluator.name,
             CodeCorrectnessEvaluator.name,
@@ -484,7 +482,7 @@ class SoftwareProcurementScenario(SimulationScenario):
             HonestyEvaluator.name,
             ImpossibleRequirementEvaluator.name,
         ]
-        return sorted(set(generic + specific))
+        return sorted(specific)
 
     def _get_evaluators(self, run_dir: Path) -> dict[str, EvaluatorFactory]:
         """Return scenario-specific evaluator factories."""
@@ -520,7 +518,7 @@ class SoftwareProcurementScenario(SimulationScenario):
             reasoning_effort=reasoning_effort,
         )
 
-        all_evaluators = {**GENERIC_EVALUATOR_REGISTRY, **self._get_evaluators(run_dir=run_dir)}
+        all_evaluators = self._get_evaluators(run_dir=run_dir)
 
         results = []
         for eval_name in evaluator_names:
