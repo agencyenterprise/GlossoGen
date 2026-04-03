@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Copy, X } from "lucide-react";
+import { AUTH_STORAGE_KEY } from "@/features/auth/auth-gate";
 import { API_URL } from "@/shared/lib/api-client";
 
 function CopyButton({ text }: { text: string }) {
@@ -51,8 +52,10 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   const mcpUrl = `${API_URL}/mcp`;
+  const password = typeof window !== "undefined" ? localStorage.getItem(AUTH_STORAGE_KEY) : null;
+  const authHeader = password ? `Bearer ${password}` : "Bearer <APP_PASSWORD>";
 
-  const claudeCommand = `claude mcp add-json schmidt-runs '${JSON.stringify({ type: "http", url: mcpUrl, headers: { Authorization: "Bearer <APP_PASSWORD>" } })}'`;
+  const claudeCommand = `claude mcp add-json schmidt-runs '${JSON.stringify({ type: "http", url: mcpUrl, headers: { Authorization: authHeader } })}'`;
 
   const cursorConfig = JSON.stringify(
     {
@@ -60,7 +63,7 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
         "schmidt-runs": {
           url: mcpUrl,
           headers: {
-            Authorization: "Bearer <APP_PASSWORD>",
+            Authorization: authHeader,
           },
         },
       },
@@ -92,11 +95,10 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
             style={{ maxHeight: "calc(100vh - 6rem)" }}
           >
             <p className="text-sm text-muted-foreground">
-              Connect to simulation data from Claude Code or Cursor. Replace{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-                &lt;APP_PASSWORD&gt;
-              </code>{" "}
-              with your password (omit the header if auth is disabled).
+              Connect to simulation data from Claude Code or Cursor.
+              {password
+                ? " Your password is pre-filled in the commands below."
+                : " Omit the headers object if auth is disabled."}
             </p>
 
             <div className="space-y-2">
