@@ -6,12 +6,23 @@ import { ArrowLeft, Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
-import { humanize } from "./format";
+import { formatConfigValueFull, humanize } from "./format";
 import { ModelPicker } from "./model-picker";
+import { ConfigValueModal } from "./config-value-modal";
 
 type KnobsMap = Record<string, unknown>;
 
 type ModelOverride = { model: string; provider: string };
+type KnobPreview = { key: string; value: string };
+
+const MAX_INLINE_KNOB_VALUE_CHARS = 48;
+
+function formatKnobValue(value: unknown): string {
+  if (typeof value === "object" && value !== null) {
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
 
 function KnobsBadges({
   knobs,
@@ -22,6 +33,7 @@ function KnobsBadges({
 }) {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [preview, setPreview] = useState<KnobPreview | null>(null);
 
   function startEditing(key: string) {
     setEditingKey(key);
@@ -50,43 +62,66 @@ function KnobsBadges({
   }
 
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {Object.entries(knobs).map(([key, value]) => {
-        if (editingKey === key) {
+    <>
+      <div className="flex flex-wrap gap-1.5">
+        {Object.entries(knobs).map(([key, value]) => {
+          if (editingKey === key) {
+            return (
+              <span
+                key={key}
+                className="inline-flex items-center gap-1 rounded border border-primary bg-primary/5 px-1.5 py-0.5 text-[11px]"
+              >
+                <span className="text-muted-foreground">{humanize(key)}</span>
+                <input
+                  autoFocus
+                  value={editValue}
+                  onChange={e => setEditValue(e.target.value)}
+                  onBlur={() => commitEdit(key)}
+                  onKeyDown={e => handleKeyDown(e, key)}
+                  className="w-20 rounded border border-input bg-background px-1 py-0 text-[11px] font-medium outline-none focus:border-primary"
+                />
+              </span>
+            );
+          }
+
+          const displayValue = formatKnobValue(value);
+          const isLongValue = displayValue.length > MAX_INLINE_KNOB_VALUE_CHARS;
+
           return (
-            <span
+            <button
               key={key}
-              className="inline-flex items-center gap-1 rounded border border-primary bg-primary/5 px-1.5 py-0.5 text-[11px]"
+              type="button"
+              onClick={() => {
+                if (isLongValue) {
+                  setPreview({ key, value: formatConfigValueFull(value) });
+                  return;
+                }
+                startEditing(key);
+              }}
+              className="inline-flex max-w-full items-center gap-0.5 rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[11px] transition-colors hover:border-primary hover:bg-primary/5"
             >
-              <span className="text-muted-foreground">{humanize(key)}</span>
-              <input
-                autoFocus
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                onBlur={() => commitEdit(key)}
-                onKeyDown={e => handleKeyDown(e, key)}
-                className="w-20 rounded border border-input bg-background px-1 py-0 text-[11px] font-medium outline-none focus:border-primary"
-              />
-            </span>
+              <span className="shrink-0 text-muted-foreground">{humanize(key)}</span>
+              <span className="max-w-64 truncate font-medium">{displayValue}</span>
+            </button>
           );
-        }
-
-        const displayValue =
-          typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
-
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => startEditing(key)}
-            className="inline-flex items-center gap-0.5 rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[11px] transition-colors hover:border-primary hover:bg-primary/5"
-          >
-            <span className="text-muted-foreground">{humanize(key)}</span>
-            <span className="font-medium">{displayValue}</span>
-          </button>
-        );
-      })}
-    </div>
+        })}
+      </div>
+      {preview ? (
+        <ConfigValueModal
+          configKey={preview.key}
+          value={preview.value}
+          onClose={() => setPreview(null)}
+          secondaryAction={{
+            label: "Edit value",
+            onClick: () => {
+              const key = preview.key;
+              setPreview(null);
+              startEditing(key);
+            },
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Download, Pencil } from "lucide-react";
-import { API_URL } from "@/shared/lib/api-client";
+import { buildApiUrlWithToken } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
@@ -271,8 +271,10 @@ export function ChatPane({
             if (selectedChannel !== null) {
               params.set("channel_id", selectedChannel);
             }
-            const qs = params.toString();
-            const url = `${API_URL}/api/runs/${runId}/export/pdf${qs ? `?${qs}` : ""}`;
+            const url = buildApiUrlWithToken({
+              path: `/api/runs/${runId}/export/pdf`,
+              searchParams: params,
+            });
             window.open(url, "_blank");
           }}
         >

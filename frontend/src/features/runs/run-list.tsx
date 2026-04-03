@@ -18,12 +18,14 @@ import type { components } from "@/types/api.gen";
 import {
   elapsedSince,
   formatConfigValue,
+  formatConfigValueFull,
   formatCost,
   formatDuration,
   formatTime,
   humanize,
 } from "./format";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
+import { ConfigValueModal } from "./config-value-modal";
 
 type RunSummary = components["schemas"]["RunSummary"];
 
@@ -66,6 +68,7 @@ function groupByDay(runs: RunSummary[]): Array<{ label: string; runs: RunSummary
 
 export function RunList() {
   const [modalRun, setModalRun] = useState<RunSummary | null>(null);
+  const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [modelsPopover, setModelsPopover] = useState<{
     left: number;
     top: number;
@@ -212,6 +215,15 @@ export function RunList() {
           scenarioName={humanize(modalRun.scenario_name)}
           description={modalRun.scenario_description}
           onClose={() => setModalRun(null)}
+        />
+      ) : null}
+
+      {configPreview !== null ? (
+        <ConfigValueModal
+          configKey={configPreview.key}
+          value={configPreview.value}
+          onClose={() => setConfigPreview(null)}
+          secondaryAction={null}
         />
       ) : null}
 
@@ -378,15 +390,25 @@ export function RunList() {
                               ) : null}
                               {run.scenario_config && Object.keys(run.scenario_config).length > 0
                                 ? Object.entries(run.scenario_config).map(([key, value]) => (
-                                    <span
+                                    <button
                                       key={key}
-                                      className="inline-flex items-center gap-0.5 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px]"
+                                      type="button"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setConfigPreview({
+                                          key,
+                                          value: formatConfigValueFull(value),
+                                        });
+                                      }}
+                                      className="inline-flex max-w-full items-center gap-0.5 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px] transition-colors hover:border-primary hover:bg-primary/5"
                                     >
-                                      <span className="text-muted-foreground">{humanize(key)}</span>
-                                      <span className="font-medium">
+                                      <span className="shrink-0 text-muted-foreground">
+                                        {humanize(key)}
+                                      </span>
+                                      <span className="max-w-48 truncate font-medium">
                                         {formatConfigValue(value)}
                                       </span>
-                                    </span>
+                                    </button>
                                   ))
                                 : null}
                             </div>

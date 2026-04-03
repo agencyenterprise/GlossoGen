@@ -20,6 +20,14 @@ export function formatConfigValue(value: unknown): string {
   return String(value);
 }
 
+/** Format a scenario config value for full-text modal display. */
+export function formatConfigValueFull(value: unknown): string {
+  if (typeof value === "object" && value !== null) {
+    return JSON.stringify(value, null, 2);
+  }
+  return String(value);
+}
+
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", {
     hour: "2-digit",
