@@ -121,11 +121,11 @@ class PydanticAIRunner(AgentRunner):
                 anthropic_cache_tool_definitions=True,
                 anthropic_cache_messages=True,
             )
-        elif provider == "openai":
-            default_settings = OpenAIResponsesModelSettings(
-                openai_reasoning_effort="low",
-                openai_reasoning_summary="concise",
-            )
+        # elif provider == "openai": # not supported by gpt-5.4-nano
+        #     default_settings = OpenAIResponsesModelSettings(
+        #         openai_reasoning_effort="low",
+        #         openai_reasoning_summary="concise",
+        #     )
         else:
             default_settings = ModelSettings()
 

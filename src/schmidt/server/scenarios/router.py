@@ -5,20 +5,14 @@ read knobs file contents, and start a new simulation as a background subprocess.
 """
 
 import logging
-import os
-import socket
-import subprocess
-import sys
-import tempfile
 from pathlib import Path
-from typing import Any
 
 import orjson
 from fastapi import APIRouter, HTTPException, Request
 
-from schmidt.run_config_validation import validate_run_config
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.response_models import LaunchStatus
+from schmidt.server.run_launcher import launch_simulation
 from schmidt.server.scenarios.models import (
     AgentRoleInfo,
     AgentRolesRequest,
@@ -37,14 +31,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 _SCENARIOS_BASE = Path(__file__).resolve().parent.parent.parent / "scenarios"
-
-
-def _find_free_port() -> int:
-    """Find an available TCP port by briefly binding to port 0."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        port: int = s.getsockname()[1]
-        return port
 
 
 def _list_knobs_files(scenario_name: str) -> list[str]:
@@ -68,28 +54,6 @@ def _resolve_knobs_path(scenario_name: str, knobs_name: str) -> Path:
             detail=f"Knobs file not found: {knobs_name}",
         )
     return knobs_path
-
-
-def _build_config_file(
-    knobs: dict[str, Any] | None,
-) -> Path | None:
-    """Build a temporary config file for the subprocess.
-
-    Writes the validated knobs/config payload to a single config file
-    under ``--config``.
-    """
-    config: dict[str, Any] = {}
-    if knobs:
-        config.update(knobs)
-
-    config_path: Path | None = None
-    if config:
-        fd, tmp_path = tempfile.mkstemp(suffix=".json", prefix="config_")
-        os.close(fd)
-        config_path = Path(tmp_path)
-        config_path.write_bytes(orjson.dumps(config))
-
-    return config_path
 
 
 @router.get("/scenarios", response_model=ScenariosResponse)
@@ -146,22 +110,13 @@ async def get_agent_roles(scenario_name: str, body: AgentRolesRequest) -> AgentR
 
 @router.post("/runs/start", response_model=StartRunResponse)
 async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse:
-    """Launch a new simulation as a background subprocess.
-
-    Validates inputs, writes knobs/config to a config file,
-    and launches the subprocess with ``--config``.
-    """
+    """Launch a new simulation as a background subprocess."""
     runs_dir: Path = request.app.state.runs_dir
 
     if body.scenario_name not in SCENARIO_REGISTRY:
         raise HTTPException(
             status_code=422,
             detail=f"Unknown scenario: {body.scenario_name}",
-        )
-    if body.provider not in list_providers():
-        raise HTTPException(
-            status_code=422,
-            detail=f"Unknown provider: {body.provider}",
         )
 
     available_knobs = _list_knobs_files(scenario_name=body.scenario_name)
@@ -173,55 +128,22 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
             detail="knobs is required for this scenario",
         )
 
-    mcp_port = _find_free_port()
-
-    cmd = [
-        sys.executable,
-        "-m",
-        "schmidt",
-        "run",
-        body.scenario_name,
-        "--model",
-        body.model,
-        "--provider",
-        body.provider,
-        "--mcp-port",
-        str(mcp_port),
-        "--runs-dir",
-        str(runs_dir),
-    ]
-
     scenario_cls = SCENARIO_REGISTRY[body.scenario_name]
-    raw_scenario_config = dict(body.knobs) if body.knobs is not None else {}
 
     try:
-        validated = validate_run_config(
+        launch_simulation(
+            scenario_name=body.scenario_name,
+            model=body.model,
+            provider=body.provider,
             scenario_cls=scenario_cls,
-            scenario_config=raw_scenario_config,
-            default_provider=body.provider,
-            valid_providers=set(list_providers()),
+            knobs=body.knobs,
+            runs_dir=runs_dir,
         )
     except (SystemExit, ValueError, TypeError) as exc:
-        raise HTTPException(status_code=422, detail=f"Invalid run configuration: {exc}") from exc
-
-    config_path = _build_config_file(
-        knobs=validated.scenario_config,
-    )
-
-    if config_path is not None:
-        cmd.extend(["--config", str(config_path)])
-
-    logger.info("Launching new simulation: %s", " ".join(cmd))
-
-    try:
-        stdout_log = runs_dir / f"{body.scenario_name}_start.log"
-        with open(stdout_log, "w") as log_file:
-            subprocess.Popen(
-                cmd,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-            )
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid run configuration: {exc}",
+        ) from exc
     except Exception:
         logger.exception("Failed to launch simulation subprocess")
         raise HTTPException(

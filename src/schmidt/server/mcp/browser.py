@@ -7,6 +7,7 @@ to query run data programmatically. All tools return structured JSON.
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import orjson
 from fastapi import FastAPI
@@ -21,6 +22,8 @@ from schmidt.server.mcp.models import (
     McpDebugLog,
     McpEvalMetric,
     McpForkSource,
+    McpGetKnobsPresetResult,
+    McpGetKnobsSchemaResult,
     McpGetRunResult,
     McpListRunsResult,
     McpListScenariosResult,
@@ -30,8 +33,10 @@ from schmidt.server.mcp.models import (
     McpRunEntry,
     McpRunMetadata,
     McpScenario,
+    McpStartRunResult,
     McpToolCall,
 )
+from schmidt.server.run_launcher import launch_simulation
 from schmidt.server.runs.detail_reader import load_run_detail
 from schmidt.server.runs.discovery import discover_runs
 from schmidt.server.runs.models import RunDetailResponse, RunSummary
@@ -160,11 +165,11 @@ def _load_evaluation_metrics(run_summary: RunSummary) -> list[McpEvalMetric] | N
 
 
 _INSTRUCTIONS = """\
-Schmidt simulation browser. Query simulation runs produced by multi-agent \
-scenarios (car_recall, incident_response, product_launch, persuasion_debate, \
+Schmidt simulation platform. Browse and launch multi-agent simulations \
+(car_recall, incident_response, product_launch, persuasion_debate, \
 software_procurement).
 
-## Typical workflow
+## Browsing runs
 
 1. `list_scenarios` — see available scenarios, knobs files, evaluators, \
 and supported models.
@@ -181,6 +186,13 @@ evaluation results without loading messages. Pass a run_id prefix \
    - `agent_id` — filter everything to one agent
    - `channel_id` — filter messages to one channel
 
+## Starting runs
+
+1. `get_knobs_schema` — get the JSON Schema for a scenario's knobs \
+(field names, types, enum values, descriptions) and available presets.
+2. `get_knobs_preset` — load a preset file to use as a starting point.
+3. `start_run` — launch a simulation with a model, provider, and knobs.
+
 ## Tips
 
 - Run IDs accept unique prefixes (e.g. "cdd6" instead of the full UUID).
@@ -188,6 +200,8 @@ evaluation results without loading messages. Pass a run_id prefix \
 - `get_run` messages are paginated: use `message_offset` and \
 `message_limit` to page through.
 - Evaluation metrics include per-agent verdicts (pass/fail/partial).
+- Use `get_knobs_preset` to load a baseline, modify fields, then pass \
+to `start_run`.
 """
 
 mcp = FastMCP(
@@ -456,6 +470,93 @@ async def get_run(
         reasoning=reasoning,
         tool_use=tool_use,
         debug_logs=debug_logs,
+    )
+
+
+@mcp.tool(
+    name="get_knobs_schema",
+    description=(
+        "Get the JSON Schema for a scenario's knobs configuration. "
+        "Returns field names, types, enum values with descriptions, "
+        "and the list of available preset files."
+    ),
+)
+async def get_knobs_schema(scenario_name: str) -> McpGetKnobsSchemaResult:
+    """Get the knobs JSON schema and available presets for a scenario."""
+    if scenario_name not in SCENARIO_REGISTRY:
+        raise ValueError(f"Unknown scenario: {scenario_name}")
+
+    scenario_cls = SCENARIO_REGISTRY[scenario_name]
+    return McpGetKnobsSchemaResult(
+        scenario_name=scenario_name,
+        knobs_schema=scenario_cls.knobs_json_schema(),
+        knobs_files=_list_knobs_files(scenario_name=scenario_name),
+    )
+
+
+@mcp.tool(
+    name="get_knobs_preset",
+    description=(
+        "Load the contents of a knobs preset file for a scenario. "
+        "Use this to get a baseline configuration, then modify "
+        "individual fields before passing to start_run."
+    ),
+)
+async def get_knobs_preset(
+    scenario_name: str,
+    knobs_file: str,
+) -> McpGetKnobsPresetResult:
+    """Load a knobs preset file."""
+    if scenario_name not in SCENARIO_REGISTRY:
+        raise ValueError(f"Unknown scenario: {scenario_name}")
+
+    knobs_path = _SCENARIOS_BASE / scenario_name / f"{knobs_file}.json"
+    if not knobs_path.is_file():
+        raise ValueError(f"Knobs file not found: {knobs_file}")
+
+    knobs = orjson.loads(knobs_path.read_bytes())
+    return McpGetKnobsPresetResult(
+        scenario_name=scenario_name,
+        knobs_file=knobs_file,
+        knobs=knobs,
+    )
+
+
+@mcp.tool(
+    name="start_run",
+    description=(
+        "Launch a new simulation as a background process. "
+        "Requires scenario_name, model, and provider. "
+        "Pass knobs from a preset (via get_knobs_preset) with "
+        "any modifications applied."
+    ),
+)
+async def start_run(
+    scenario_name: str,
+    model: str,
+    provider: str,
+    knobs: dict[str, Any] | None = None,
+) -> McpStartRunResult:
+    """Validate config and launch a simulation subprocess."""
+    if scenario_name not in SCENARIO_REGISTRY:
+        raise ValueError(f"Unknown scenario: {scenario_name}")
+
+    scenario_cls = SCENARIO_REGISTRY[scenario_name]
+
+    launch_simulation(
+        scenario_name=scenario_name,
+        model=model,
+        provider=provider,
+        scenario_cls=scenario_cls,
+        knobs=knobs,
+        runs_dir=_runs_dir,
+    )
+
+    return McpStartRunResult(
+        status="started",
+        scenario_name=scenario_name,
+        model=model,
+        provider=provider,
     )
 
 
