@@ -143,12 +143,12 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
                   available preset files for a scenario
                 </li>
                 <li>
-                  <code className="font-mono">get_knobs_preset</code> — load a scenario knobs
-                  preset as a baseline payload
+                  <code className="font-mono">get_knobs_preset</code> — load a scenario knobs preset
+                  as a baseline payload
                 </li>
                 <li>
-                  <code className="font-mono">start_run</code> — launch a simulation with
-                  scenario, model, provider, and knobs
+                  <code className="font-mono">start_run</code> — launch a simulation with scenario,
+                  model, provider, and knobs
                 </li>
               </ul>
             </div>

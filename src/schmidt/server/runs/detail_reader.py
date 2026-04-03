@@ -242,6 +242,9 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             matched = tool_use_by_call_id.get(event.call_id)
             if matched is not None:
                 matched.result = event.result
+                # Use the tool-result event time so tool entries are ordered by
+                # when each call actually completed.
+                matched.timestamp = event.timestamp
 
         elif isinstance(event, MessageSent):
             total_messages += 1
