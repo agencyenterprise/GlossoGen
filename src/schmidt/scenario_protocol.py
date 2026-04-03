@@ -67,9 +67,10 @@ class SimulationScenario(ABC):
     def create_from_config(cls, config: dict[str, Any]) -> Self:
         """Reconstruct a scenario from its serialized config dict.
 
-        The ``config`` is the same dict returned by ``get_scenario_config()``,
-        stored in the ``SimulationStarted`` event. Used by the fork API to
-        reconstruct scenarios without CLI arguments.
+        Callers use this for both validation and reconstruction:
+        - ``run`` preflight (CLI and API) to validate prepared config payloads
+        - ``evaluate`` to rebuild the scenario from JSONL-stored config
+        - fork/resume flows to reconstruct scenarios from persisted state
 
         Subclasses that support forking must override this method.
         """

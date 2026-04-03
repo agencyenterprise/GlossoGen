@@ -61,7 +61,6 @@ logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-DEFAULT_MAX_ROUND_DURATION_SECONDS = 300.0
 DEFAULT_REACTION_DELAY_MIN = 0.5
 DEFAULT_REACTION_DELAY_MAX = 3.0
 
@@ -153,10 +152,8 @@ class ProductLaunchScenario(SimulationScenario):
     def __init__(
         self,
         knobs: ProductLaunchKnobs,
-        max_round_duration_seconds: float | None,
     ) -> None:
         self._knobs = knobs
-        self._max_round_duration_seconds = max_round_duration_seconds
         self._state = ProductLaunchState(knobs=knobs)
         self._jinja_env = Environment(
             loader=FileSystemLoader(PROMPTS_DIR),
@@ -177,16 +174,12 @@ class ProductLaunchScenario(SimulationScenario):
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
         """Reconstruct the scenario from a serialized config dict."""
-        max_round_duration = config.pop("max_round_duration_seconds", None)
-        knobs = ProductLaunchKnobs(**config)
-        return cls(knobs=knobs, max_round_duration_seconds=max_round_duration)
+        knobs = ProductLaunchKnobs.model_validate(config)
+        return cls(knobs=knobs)
 
     def get_scenario_config(self) -> dict[str, object]:
         """Return product launch knobs as a config dict."""
-        config: dict[str, object] = self._knobs.model_dump()
-        if self._max_round_duration_seconds is not None:
-            config["max_round_duration_seconds"] = self._max_round_duration_seconds
-        return config
+        return self._knobs.model_dump()
 
     def name(self) -> str:
         """Return the scenario identifier."""
@@ -432,9 +425,7 @@ class ProductLaunchScenario(SimulationScenario):
 
     def get_max_round_duration_seconds(self) -> float:
         """Return the maximum wall-clock seconds a round may last."""
-        if self._max_round_duration_seconds is not None:
-            return self._max_round_duration_seconds
-        return DEFAULT_MAX_ROUND_DURATION_SECONDS
+        return self._knobs.max_round_duration_seconds
 
     def get_agent_reaction_delay_range(self, agent_id: str) -> tuple[float, float]:  # noqa: ARG002
         """Return the (min, max) reaction delay in seconds for an agent."""

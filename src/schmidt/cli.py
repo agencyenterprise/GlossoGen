@@ -24,7 +24,13 @@ import uvicorn
 from dotenv import load_dotenv
 
 from schmidt.autonomous_supervisor import AutonomousSupervisor
-from schmidt.config_overrides import apply_overrides, parse_overrides, split_agent_overrides
+from schmidt.config_overrides import (
+    apply_overrides,
+    normalize_agent_overrides,
+    parse_overrides,
+    split_agent_overrides,
+    validate_agent_override_ids,
+)
 from schmidt.eval_manifest import delete_eval_manifest, write_eval_manifest
 from schmidt.evaluation.log_reader import extract_scenario_config, load_events
 from schmidt.event_bus import EventBus
@@ -32,12 +38,14 @@ from schmidt.event_logger import EventLogger
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.message_rewind import RewindState, build_rewind_state_from_last_message
 from schmidt.models.agent_config import AgentConfig
+from schmidt.run_config_validation import validate_run_config
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.runners.pydantic_ai_runner import PydanticAIRunner
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.simulation_server import start_simulation_server, stop_simulation_server
+from schmidt.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)
 
@@ -163,10 +171,24 @@ def main() -> None:
     args, remaining = parser.parse_known_args()
 
     if args.command == "run":
-        config, agent_overrides = _build_run_config(args=args, remaining=remaining)
-        config = scenario_cls.prepare_config(config=config)
-        scenario = scenario_cls.create_from_config(config=config)
-        asyncio.run(_run_simulation(args=args, scenario=scenario, agent_overrides=agent_overrides))
+        config = _build_run_config(args=args, remaining=remaining)
+        try:
+            validated = validate_run_config(
+                scenario_cls=scenario_cls,
+                scenario_config=config,
+                default_provider=args.provider,
+                valid_providers=set(list_providers()),
+            )
+            scenario = scenario_cls.create_from_config(config=validated.scenario_config)
+        except (SystemExit, ValueError, TypeError, KeyError) as exc:
+            raise SystemExit(f"Invalid run configuration: {exc}") from exc
+        asyncio.run(
+            _run_simulation(
+                args=args,
+                scenario=scenario,
+                agent_overrides=validated.normalized_agent_overrides or {},
+            )
+        )
     else:
         asyncio.run(_run_evaluation(args=args, scenario_cls=scenario_cls))
 
@@ -174,14 +196,14 @@ def main() -> None:
 def _build_run_config(
     args: argparse.Namespace,
     remaining: list[str],
-) -> tuple[dict[str, object], dict[str, dict[str, str]]]:
+) -> dict[str, object]:
     """Build scenario config from --config file and Hydra-style overrides.
 
     Loads the base config JSON (if --config is provided), applies any
     key=value overrides from remaining args, and splits out the
     ``agents.*`` namespace as per-agent model/provider overrides.
 
-    Returns the scenario config dict and the agent overrides dict.
+    Returns the merged scenario config dict.
     """
     config: dict[str, object] = {}
     if args.config is not None:
@@ -192,7 +214,20 @@ def _build_run_config(
         config = apply_overrides(config=config, overrides=overrides)
 
     split = split_agent_overrides(config=config)
-    return split.scenario_config, split.agent_overrides
+    if split.agent_overrides:
+        existing_overrides = split.scenario_config.get("model_overrides")
+        if existing_overrides is None:
+            split.scenario_config["model_overrides"] = split.agent_overrides
+        elif isinstance(existing_overrides, dict):
+            merged_overrides = dict(existing_overrides)
+            merged_overrides.update(split.agent_overrides)
+            split.scenario_config["model_overrides"] = merged_overrides
+        else:
+            raise SystemExit(
+                "Invalid model_overrides in config: expected an object "
+                "mapping agent IDs to override payloads."
+            )
+    return split.scenario_config
 
 
 def _apply_agent_overrides(
@@ -207,19 +242,23 @@ def _apply_agent_overrides(
     if not agent_overrides:
         return agents
 
+    normalized_overrides = normalize_agent_overrides(
+        agent_overrides=agent_overrides,
+        default_provider=default_provider,
+        valid_providers=set(list_providers()),
+    )
+
     agent_ids = {a.agent_id for a in agents}
-    unknown = set(agent_overrides.keys()) - agent_ids
-    if unknown:
-        raise SystemExit(
-            f"agents.* overrides reference unknown agent IDs: {sorted(unknown)}. "
-            f"Valid IDs: {sorted(agent_ids)}"
-        )
+    validate_agent_override_ids(
+        agent_overrides=normalized_overrides,
+        valid_agent_ids=agent_ids,
+    )
 
     for agent in agents:
-        if agent.agent_id in agent_overrides:
-            override = agent_overrides[agent.agent_id]
+        if agent.agent_id in normalized_overrides:
+            override = normalized_overrides[agent.agent_id]
             agent.model = override["model"]
-            agent.provider = override.get("provider", default_provider)
+            agent.provider = override["provider"]
 
     return agents
 

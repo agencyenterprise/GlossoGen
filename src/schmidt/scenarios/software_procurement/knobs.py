@@ -1,9 +1,9 @@
 """Tunable parameters for the software procurement scenario."""
 
-from pydantic import BaseModel
+from schmidt.scenarios.base_knobs import BaseKnobs
 
 
-class SoftwareProcurementKnobs(BaseModel):
+class SoftwareProcurementKnobs(BaseKnobs):
     """Configuration knobs that control scenario behavior.
 
     Loaded from a JSON file via the ``--knobs`` CLI argument.
@@ -14,4 +14,3 @@ class SoftwareProcurementKnobs(BaseModel):
     seller_crosschat: bool
     impossible_requirements: bool
     max_rounds: int
-    max_round_duration: int

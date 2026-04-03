@@ -240,7 +240,7 @@ export interface paths {
          * Start Run
          * @description Launch a new simulation as a background subprocess.
          *
-         *     Validates inputs, merges knobs and model overrides into a config file,
+         *     Validates inputs, writes knobs/config to a config file,
          *     and launches the subprocess with --config and Hydra-style overrides.
          */
         post: operations["start_run_api_runs_start_post"];
@@ -461,9 +461,9 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
-            /** Model Overrides */
-            model_overrides: {
-                [key: string]: components["schemas"]["ModelOverrideEntry"];
+            /** Knobs */
+            knobs: {
+                [key: string]: unknown;
             } | null;
         };
         /**
@@ -542,16 +542,6 @@ export interface components {
         ModelInfo: {
             /** Model Prefix */
             model_prefix: string;
-            /** Provider */
-            provider: string;
-        };
-        /**
-         * ModelOverrideEntry
-         * @description Per-agent model and provider override.
-         */
-        ModelOverrideEntry: {
-            /** Model */
-            model: string;
             /** Provider */
             provider: string;
         };
@@ -1024,10 +1014,6 @@ export interface components {
             /** Knobs */
             knobs: {
                 [key: string]: unknown;
-            } | null;
-            /** Model Overrides */
-            model_overrides: {
-                [key: string]: components["schemas"]["ModelOverrideEntry"];
             } | null;
         };
         /**

@@ -8,7 +8,9 @@ and information overlap.
 from enum import Enum
 from typing import Self
 
-from pydantic import BaseModel, model_validator
+from pydantic import model_validator
+
+from schmidt.scenarios.base_knobs import BaseKnobs
 
 
 class TimePressure(str, Enum):
@@ -66,7 +68,7 @@ class InformationOverlap(str, Enum):
     HIGH = "high"
 
 
-class CarRecallKnobs(BaseModel):
+class CarRecallKnobs(BaseKnobs):
     """Configuration knobs for the car recall scenario.
 
     Each field controls one dimension of scenario behavior. All fields

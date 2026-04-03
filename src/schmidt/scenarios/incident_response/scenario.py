@@ -18,6 +18,7 @@ from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext
 from schmidt.scenario_protocol import SimulationScenario
+from schmidt.scenarios.incident_response.knobs import IncidentResponseKnobs
 from schmidt.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
@@ -104,15 +105,14 @@ class IncidentResponseScenario(SimulationScenario):
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
         """Reconstruct the scenario from a serialized config dict."""
-        return cls(
-            max_round_duration_seconds=config.get("max_round_duration_seconds"),
-        )
+        knobs = IncidentResponseKnobs.model_validate(config)
+        return cls(knobs=knobs)
 
     def __init__(
         self,
-        max_round_duration_seconds: float | None,
+        knobs: IncidentResponseKnobs,
     ) -> None:
-        self._max_round_duration_seconds = max_round_duration_seconds
+        self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
 
     def name(self) -> str:
@@ -121,10 +121,7 @@ class IncidentResponseScenario(SimulationScenario):
 
     def get_scenario_config(self) -> dict[str, object]:
         """Return incident response config."""
-        config: dict[str, object] = {}
-        if self._max_round_duration_seconds is not None:
-            config["max_round_duration_seconds"] = self._max_round_duration_seconds
-        return config
+        return self._knobs.model_dump()
 
     def scenario_description(self) -> str:
         """Return a markdown description of the incident response scenario."""
@@ -329,9 +326,7 @@ class IncidentResponseScenario(SimulationScenario):
 
     def get_max_round_duration_seconds(self) -> float:
         """Return the maximum wall-clock seconds a round may last."""
-        if self._max_round_duration_seconds is None:
-            raise RuntimeError("max_round_duration_seconds not set; required for autonomous mode")
-        return self._max_round_duration_seconds
+        return self._knobs.max_round_duration_seconds
 
     def get_agent_reaction_delay_range(self, agent_id: str) -> tuple[float, float]:  # noqa: ARG002
         """Return the (min, max) reaction delay for an agent."""

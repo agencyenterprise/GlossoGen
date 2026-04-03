@@ -1,5 +1,8 @@
 {
+  "max_round_duration_seconds": 300,
+  "model_overrides": {},
   "mode": "seeded_debate",
+  "question_bank": "questions.json",
   "agent_order": [
     "agent_a",
     "agent_b"

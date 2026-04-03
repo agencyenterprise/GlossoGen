@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, Discriminator
+from pydantic import BaseModel, ConfigDict, Discriminator
 
 from schmidt.evaluation.evaluation_report import Verdict
 from schmidt.models.event import RunStatus
@@ -224,13 +224,6 @@ class KnobsContentResponse(BaseModel):
     knobs: dict[str, Any]
 
 
-class ModelOverrideEntry(BaseModel):
-    """Per-agent model and provider override."""
-
-    model: str
-    provider: str
-
-
 class AgentRoleInfo(BaseModel):
     """Lightweight agent identity for the agent discovery endpoint."""
 
@@ -253,11 +246,12 @@ class AgentRolesResponse(BaseModel):
 class StartRunRequest(BaseModel):
     """Request body for starting a new simulation run."""
 
+    model_config = ConfigDict(extra="forbid")
+
     scenario_name: str
     model: str
     provider: str
     knobs: dict[str, Any] | None
-    model_overrides: dict[str, ModelOverrideEntry] | None
 
 
 class LaunchStatus(str, Enum):
@@ -301,11 +295,13 @@ class MessageEdit(BaseModel):
 class ForkRequest(BaseModel):
     """Request body for creating a forked simulation run."""
 
+    model_config = ConfigDict(extra="forbid")
+
     target_message_id: str
     message_edits: list[MessageEdit]
     model: str
     provider: str
-    model_overrides: dict[str, ModelOverrideEntry] | None
+    knobs: dict[str, Any] | None
 
 
 class ForkResponse(BaseModel):

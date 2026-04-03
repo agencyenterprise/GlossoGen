@@ -95,18 +95,22 @@ Agents act autonomously within each round. There is no fixed speaking order — 
 
 **Per-channel locks**: Each channel has a write lock so that only one agent sends a message at a time, preventing message interleaving within a single channel.
 
-**Round structure**: Each round begins with injection messages delivered to each agent. Agents then communicate freely across all channels they belong to (war room and private sidebars). A round ends when all agents are idle (blocked on `check_messages` with no pending activity) or when the `--max-round-duration` timeout is reached.
+**Round structure**: Each round begins with injection messages delivered to each agent. Agents then communicate freely across all channels they belong to (war room and private sidebars). A round ends when all agents are idle (blocked on `check_messages` with no pending activity) or when the `max_round_duration_seconds` timeout is reached.
 
 6 rounds total. The amount of communication per round varies based on agent behavior and the round duration timeout.
 
 ## End Condition
 
-Simulation ends after round 6 completes (all agents idle and no more rounds remain) or when the `--max-round-duration` timeout triggers on the final round.
+Simulation ends after round 6 completes (all agents idle and no more rounds remain) or when the `max_round_duration_seconds` timeout triggers on the final round.
 
 ## CLI
 
 ```bash
-python -m schmidt run incident_response --model <model> --runs-dir ./runs --max-round-duration 300
+python -m schmidt run incident_response \
+  --model <model> \
+  --provider <provider> \
+  --runs-dir ./runs \
+  --config src/schmidt/scenarios/incident_response/knobs_baseline.json
 ```
 
 ## Evaluation Focus

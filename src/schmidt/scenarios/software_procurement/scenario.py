@@ -50,7 +50,6 @@ logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-DEFAULT_MAX_ROUND_DURATION_SECONDS = 300.0
 DEFAULT_REACTION_DELAY_MIN = 0.5
 DEFAULT_REACTION_DELAY_MAX = 3.0
 
@@ -207,12 +206,12 @@ class SoftwareProcurementScenario(SimulationScenario):
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
         """Reconstruct the scenario from a serialized config dict."""
-        knobs = SoftwareProcurementKnobs(**config)
+        knobs = SoftwareProcurementKnobs.model_validate(config)
         return cls(knobs=knobs)
 
     def get_scenario_config(self) -> dict[str, object]:
         """Return knobs as a config dict for logging."""
-        return dict(self._knobs.model_dump())
+        return self._knobs.model_dump()
 
     # --- Identity ---
 
@@ -319,7 +318,7 @@ class SoftwareProcurementScenario(SimulationScenario):
 
     def get_max_round_duration_seconds(self) -> float:
         """Return the maximum seconds per round."""
-        return float(self._knobs.max_round_duration)
+        return self._knobs.max_round_duration_seconds
 
     def get_agent_reaction_delay_range(self, agent_id: str) -> tuple[float, float]:  # noqa: ARG002
         """Return the (min, max) reaction delay in seconds."""

@@ -63,11 +63,13 @@ After discussion ends, agents who have not yet submitted a final answer receive 
 
 | Knob | Values | Description |
 |------|--------|-------------|
+| max_round_duration_seconds | float | Seconds per round before timeout |
+| model_overrides | dict | Per-agent overrides (`{model, provider}`) |
 | mode | misinformation, balanced, debate, seeded_debate | Evaluation mode |
+| question_bank | string path/filename | Question bank JSON file (e.g. `questions.json`) |
 | agent_order | list of agent IDs | Ordered list of participating agents (e.g. `["agent_a", "agent_b"]`) |
 | round_count | int | Number of questions (rounds) |
 | persuasion_strategy | logical, emotional, credible, null | Adversary's approach (required for misinformation/balanced, null for debate/seeded_debate) |
-| model_overrides | dict | Per-agent model overrides for pairing different strengths |
 | agent_beliefs | dict | Maps each agent to `"correct"` or `"wrong"` (required for seeded_debate, null for other modes) |
 
 ## Question Bank
@@ -79,7 +81,7 @@ pip install datasets
 python src/schmidt/scenarios/persuasion_debate/download_triviaqa.py --count 100
 ```
 
-This streams questions from the TriviaQA validation split (unfiltered config) and writes them to `questions.json` in this directory. The `--count` flag controls how many questions to include. The `--output` flag overrides the output path.
+This streams questions from the TriviaQA validation split (unfiltered config) and writes them to `questions.json` in this directory. The `--count` flag controls how many questions to include. The `--output` flag overrides the output path. Set the `question_bank` knob to this filename/path.
 
 The `datasets` library is only needed for this script — it is not a runtime dependency of the scenario.
 
@@ -107,9 +109,8 @@ set -a && source .env && set +a && \
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run persuasion_debate \
-    --model claude-sonnet-4-6 --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/persuasion_debate/knobs_act1_a_first.json \
-    --questions src/schmidt/scenarios/persuasion_debate/questions.json \
+    --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
+    --config src/schmidt/scenarios/persuasion_debate/knobs_act1_a_first.json \
   > ./runs/persuasion_debate_stdout.log 2>&1 &
 ```
 
@@ -118,9 +119,8 @@ set -a && source .env && set +a && \
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run persuasion_debate \
-    --model claude-sonnet-4-6 --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/persuasion_debate/knobs_act1_b_first.json \
-    --questions src/schmidt/scenarios/persuasion_debate/questions.json \
+    --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
+    --config src/schmidt/scenarios/persuasion_debate/knobs_act1_b_first.json \
   > ./runs/persuasion_debate_stdout.log 2>&1 &
 ```
 
@@ -133,9 +133,8 @@ Extends Act 1 to 4 agents: 2 with the correct answer (Opus), 2 with the wrong an
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run persuasion_debate \
-    --model claude-sonnet-4-6 --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/persuasion_debate/knobs_act2.json \
-    --questions src/schmidt/scenarios/persuasion_debate/questions.json \
+    --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
+    --config src/schmidt/scenarios/persuasion_debate/knobs_act2.json \
   > ./runs/persuasion_debate_stdout.log 2>&1 &
 ```
 
@@ -152,9 +151,8 @@ Agents must argue their case with a reduced token budget. Tests whether compress
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run persuasion_debate \
-    --model claude-sonnet-4-6 --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/persuasion_debate/knobs_act3_token_limit.json \
-    --questions src/schmidt/scenarios/persuasion_debate/questions.json \
+    --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
+    --config src/schmidt/scenarios/persuasion_debate/knobs_act3_token_limit.json \
   > ./runs/persuasion_debate_stdout.log 2>&1 &
 ```
 
@@ -167,9 +165,8 @@ Discussion order is shuffled deterministically per question. Tests whether the o
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run persuasion_debate \
-    --model claude-sonnet-4-6 --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/persuasion_debate/knobs_act3_scrambled.json \
-    --questions src/schmidt/scenarios/persuasion_debate/questions.json \
+    --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
+    --config src/schmidt/scenarios/persuasion_debate/knobs_act3_scrambled.json \
   > ./runs/persuasion_debate_stdout.log 2>&1 &
 ```
 
@@ -182,9 +179,8 @@ Agent A (Opus, correct belief) is silenced after discussion turn 2. The remainin
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run persuasion_debate \
-    --model claude-sonnet-4-6 --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/persuasion_debate/knobs_act3_silenced.json \
-    --questions src/schmidt/scenarios/persuasion_debate/questions.json \
+    --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
+    --config src/schmidt/scenarios/persuasion_debate/knobs_act3_silenced.json \
   > ./runs/persuasion_debate_stdout.log 2>&1 &
 ```
 

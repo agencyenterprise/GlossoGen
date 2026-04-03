@@ -240,14 +240,20 @@ export function NewSimulationForm() {
               ])
             )
           : null;
+      let knobsPayload: KnobsMap | null = knobs ? { ...knobs } : null;
+      if (overridesPayload !== null) {
+        if (knobsPayload === null) {
+          knobsPayload = {};
+        }
+        knobsPayload.model_overrides = overridesPayload;
+      }
 
       const { error } = await api.POST("/api/runs/start", {
         body: {
           scenario_name: scenario,
           model,
           provider,
-          knobs: knobs ?? null,
-          model_overrides: overridesPayload,
+          knobs: knobsPayload,
         },
       });
       if (error) {

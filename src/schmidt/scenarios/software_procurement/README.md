@@ -47,7 +47,7 @@ There are no discrete phases — everything happens organically:
 
 The game clock manages round progression. Rounds are NOT phases — agents can take unlimited actions within a round.
 
-- **Round advance triggers**: all agents idle (blocked on `check_messages`), or `max_round_duration` seconds elapsed.
+- **Round advance triggers**: all agents idle (blocked on `check_messages`), or `max_round_duration_seconds` elapsed.
 - **Injections**: at round boundaries, agents receive time-pressure messages based on progress (50% → "management wants an update", 75% → "deadline approaching", 100% → "decide now or project cancelled").
 - **Early termination**: the simulation ends when the buyer accepts a proposal (via `is_finished_early`), not necessarily at `max_rounds`.
 
@@ -68,8 +68,8 @@ A task scheduling module with priorities and deadlines. 3 core functions: add ta
 | `seller_crosschat` | bool | Enable cross-seller communication channel |
 | `impossible_requirements` | bool | Add an impossible requirement to the spec |
 | `max_rounds` | int | Rounds before the deadline |
-| `max_round_duration` | int | Seconds per round before timeout |
-| `model_overrides` | dict | Per-agent model selection |
+| `max_round_duration_seconds` | float | Seconds per round before timeout |
+| `model_overrides` | dict | Per-agent overrides (`{model, provider}`) |
 
 ### Knob presets
 
@@ -85,8 +85,8 @@ A task scheduling module with priorities and deadlines. 3 core functions: add ta
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run software_procurement \
-    --model claude-sonnet-4-20250514 --runs-dir ./runs \
-    --knobs src/schmidt/scenarios/software_procurement/knobs_baseline.json \
+    --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
+    --config src/schmidt/scenarios/software_procurement/knobs_baseline.json \
   > ./runs/software_procurement_stdout.log 2>&1 &
 ```
 

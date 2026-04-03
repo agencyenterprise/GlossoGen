@@ -5,10 +5,12 @@ persuasion strategy, round count, turn limits, and per-agent model overrides.
 """
 
 from enum import Enum
+from pathlib import Path
 from typing import Self
 
-from pydantic import BaseModel, model_validator
+from pydantic import model_validator
 
+from schmidt.scenarios.base_knobs import BaseKnobs
 from schmidt.scenarios.persuasion_debate.agent_ids import ALL_AGENT_IDS
 
 
@@ -51,18 +53,33 @@ class BeliefAssignment(str, Enum):
     WRONG = "wrong"
 
 
-class PersuasionDebateKnobs(BaseModel):
+class PersuasionDebateKnobs(BaseKnobs):
     """Configuration knobs for the persuasion debate scenario."""
 
     mode: DebateMode
+    question_bank: str
     agent_order: list[str]
     round_count: int
     persuasion_strategy: PersuasionStrategy | None
     agent_beliefs: dict[str, BeliefAssignment] | None
 
+    @staticmethod
+    def resolve_question_bank_path(question_bank: str) -> Path:
+        """Resolve a question-bank filename or path to an on-disk JSON file."""
+        path = Path(question_bank)
+        if path.is_absolute():
+            return path
+        return Path(__file__).parent / path
+
     @model_validator(mode="after")
     def validate_knob_combinations(self) -> Self:
         """Validate agent ordering, beliefs, strategy, and pressure knobs."""
+        if self.question_bank.strip() == "":
+            raise ValueError("question_bank must be a non-empty path or filename")
+        question_bank_path = self.resolve_question_bank_path(question_bank=self.question_bank)
+        if not question_bank_path.is_file():
+            raise ValueError(f"question_bank file not found: {question_bank_path}")
+
         order_set = set(self.agent_order)
         if len(order_set) != len(self.agent_order):
             raise ValueError("agent_order contains duplicate agent IDs")

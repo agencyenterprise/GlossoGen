@@ -49,7 +49,6 @@ CFO_ID = "cfo"
 PR_ID = "pr"
 REGULATOR_ID = "regulator"
 
-DEFAULT_MAX_ROUND_DURATION_SECONDS = 300.0
 DEFAULT_REACTION_DELAY_MIN = 0.5
 DEFAULT_REACTION_DELAY_MAX = 3.0
 
@@ -399,7 +398,7 @@ class CarRecallScenario(SimulationScenario):
 
     def get_max_round_duration_seconds(self) -> float:
         """Return the maximum wall-clock seconds a round may last."""
-        return DEFAULT_MAX_ROUND_DURATION_SECONDS
+        return self._knobs.max_round_duration_seconds
 
     def get_agent_reaction_delay_range(self, agent_id: str) -> tuple[float, float]:  # noqa: ARG002
         """Return the (min, max) reaction delay for an agent."""

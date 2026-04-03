@@ -16,6 +16,7 @@ from typing import Any
 import orjson
 from fastapi import APIRouter, HTTPException, Request
 
+from schmidt.run_config_validation import validate_run_config
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.response_models import (
     AgentRoleInfo,
@@ -69,27 +70,17 @@ def _resolve_knobs_path(scenario_name: str, knobs_name: str) -> Path:
     return knobs_path
 
 
-def _build_config_and_overrides(
+def _build_config_file(
     knobs: dict[str, Any] | None,
-    model_overrides: dict[str, Any] | None,
-) -> tuple[Path | None, list[str]]:
-    """Build a merged config file and override args for the subprocess.
+) -> Path | None:
+    """Build a temporary config file for the subprocess.
 
-    Merges knobs and agent model overrides into a single config file
-    under ``--config``. Scenario-specific data (like question bank paths
-    for persuasion_debate) is added as override args.
-
-    Returns the config file path (or None) and a list of override args.
+    Writes the validated knobs/config payload to a single config file
+    under ``--config``.
     """
     config: dict[str, Any] = {}
     if knobs:
         config.update(knobs)
-
-    if model_overrides:
-        agents: dict[str, Any] = {}
-        for agent_id, entry in model_overrides.items():
-            agents[agent_id] = entry
-        config["agents"] = agents
 
     config_path: Path | None = None
     if config:
@@ -98,7 +89,7 @@ def _build_config_and_overrides(
         config_path = Path(tmp_path)
         config_path.write_bytes(orjson.dumps(config))
 
-    return config_path, []
+    return config_path
 
 
 @router.get("/scenarios", response_model=ScenariosResponse)
@@ -157,8 +148,8 @@ async def get_agent_roles(scenario_name: str, body: AgentRolesRequest) -> AgentR
 async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse:
     """Launch a new simulation as a background subprocess.
 
-    Validates inputs, merges knobs and model overrides into a config file,
-    and launches the subprocess with --config and Hydra-style overrides.
+    Validates inputs, writes knobs/config to a config file,
+    and launches the subprocess with ``--config``.
     """
     runs_dir: Path = request.app.state.runs_dir
 
@@ -200,20 +191,25 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
         str(runs_dir),
     ]
 
-    overrides_for_model = None
-    if body.model_overrides:
-        overrides_for_model = {
-            agent_id: entry.model_dump() for agent_id, entry in body.model_overrides.items()
-        }
+    scenario_cls = SCENARIO_REGISTRY[body.scenario_name]
+    raw_scenario_config = dict(body.knobs) if body.knobs is not None else {}
 
-    config_path, override_args = _build_config_and_overrides(
-        knobs=body.knobs,
-        model_overrides=overrides_for_model,
+    try:
+        validated = validate_run_config(
+            scenario_cls=scenario_cls,
+            scenario_config=raw_scenario_config,
+            default_provider=body.provider,
+            valid_providers=set(list_providers()),
+        )
+    except (SystemExit, ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid run configuration: {exc}") from exc
+
+    config_path = _build_config_file(
+        knobs=validated.scenario_config,
     )
 
     if config_path is not None:
         cmd.extend(["--config", str(config_path)])
-    cmd.extend(override_args)
 
     logger.info("Launching new simulation: %s", " ".join(cmd))
 

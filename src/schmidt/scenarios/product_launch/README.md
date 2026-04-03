@@ -92,9 +92,11 @@ Each round (simulated week):
 
 | Parameter | Baseline | High Pressure |
 |-----------|----------|---------------|
-| `num_features` | 8 | 10 |
+| `max_round_duration_seconds` | 300 | 300 |
+| `model_overrides` | `{}` | `{}` |
+| `num_features` | 8 | 8 |
 | `num_rounds` | 12 | 8 |
-| `budget_total_ru` | 500 | 500 |
+| `budget_total_ru` | 830 | 830 |
 | `budget_deficit_pct` | 0.15 | 0.25 |
 | `external_event_intensity` | medium | high |
 
@@ -103,8 +105,8 @@ Each round (simulated week):
 ```bash
 set -a && source .env && set +a && \
   VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
-  --model <model> --runs-dir ./runs \
-  --knobs src/schmidt/scenarios/product_launch/knobs_baseline.json \
+  --model <model> --provider <provider> --runs-dir ./runs \
+  --config src/schmidt/scenarios/product_launch/knobs_baseline.json \
   > ./runs/product_launch_stdout.log 2>&1 &
 ```
 
