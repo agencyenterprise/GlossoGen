@@ -773,12 +773,22 @@
             },
             "type": "array",
             "title": "Message Edits"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
           }
         },
         "type": "object",
         "required": [
           "target_message_id",
-          "message_edits"
+          "message_edits",
+          "model",
+          "provider"
         ],
         "title": "ForkRequest",
         "description": "Request body for creating a forked simulation run."
@@ -1123,7 +1133,8 @@
           "scenario_complete",
           "in_progress",
           "starting",
-          "error"
+          "error",
+          "killed"
         ],
         "title": "RunStatus",
         "description": "Status of a simulation run."

@@ -47,6 +47,7 @@ const STATUS_LABELS: Record<RunStatus, string> = {
   in_progress: "In Progress",
   starting: "Starting",
   error: "Error",
+  killed: "Killed",
 };
 
 function groupByDay(runs: RunSummary[]): Array<{ label: string; runs: RunSummary[] }> {

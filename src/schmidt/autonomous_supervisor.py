@@ -198,8 +198,10 @@ class AutonomousSupervisor:
         )
         runtime.add_on_message_callback(callback=game_clock.on_message_sent)
 
-        # Log simulation start and agent registration (skip on resume —
-        # the forked JSONL already contains these events).
+        # Log simulation start (skip on resume — the forked JSONL already
+        # contains it).  Agent registration is always logged so that
+        # resumed/forked runs record the current model even if it differs
+        # from the source run.
         if self._resume_state is None:
             await self._event_logger.log(
                 event=SimulationStarted(
@@ -211,19 +213,19 @@ class AutonomousSupervisor:
                     provider=self._provider,
                 )
             )
-            for config in self._agent_configs:
-                all_tool_names = [*BASE_TOOL_NAMES, *config.tool_names]
-                await self._event_logger.log(
-                    event=AgentRegistered(
-                        agent_id=config.agent_id,
-                        role_name=config.role_name,
-                        system_prompt=config.system_prompt,
-                        channel_ids=config.channel_ids,
-                        tool_names=all_tool_names,
-                        model=config.model,
-                        max_tokens=config.max_tokens,
-                    )
+        for config in self._agent_configs:
+            all_tool_names = [*BASE_TOOL_NAMES, *config.tool_names]
+            await self._event_logger.log(
+                event=AgentRegistered(
+                    agent_id=config.agent_id,
+                    role_name=config.role_name,
+                    system_prompt=config.system_prompt,
+                    channel_ids=config.channel_ids,
+                    tool_names=all_tool_names,
+                    model=config.model,
+                    max_tokens=config.max_tokens,
                 )
+            )
 
         mcp_server_url = _mcp_server_url(port=self._mcp_server_port)
 

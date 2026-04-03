@@ -265,6 +265,8 @@ class ForkRequest(BaseModel):
 
     target_message_id: str
     message_edits: list[MessageEdit]
+    model: str
+    provider: str
 
 
 class ForkResponse(BaseModel):

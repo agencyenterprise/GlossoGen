@@ -167,7 +167,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     provider = "unknown"
     timestamp = None
     channel_ids: list[str] = []
-    agents: list[AgentDetail] = []
+    agents_by_id: dict[str, AgentDetail] = {}
     messages: list[ChannelMessage] = []
     reasoning: list[ReasoningEntry] = []
     tool_use: list[ToolUseEntry] = []
@@ -193,15 +193,13 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             channel_ids = event.channel_ids
 
         elif isinstance(event, AgentRegistered):
-            agents.append(
-                AgentDetail(
-                    agent_id=event.agent_id,
-                    role_name=event.role_name,
-                    channel_ids=event.channel_ids,
-                    tool_names=event.tool_names,
-                    model=event.model,
-                    system_prompt=event.system_prompt,
-                )
+            agents_by_id[event.agent_id] = AgentDetail(
+                agent_id=event.agent_id,
+                role_name=event.role_name,
+                channel_ids=event.channel_ids,
+                tool_names=event.tool_names,
+                model=event.model,
+                system_prompt=event.system_prompt,
             )
 
         elif isinstance(event, LLMResponseReceived):
@@ -266,6 +264,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             total_cost_usd = event.total_cost_usd
             if timestamp is not None:
                 duration_seconds = (event.timestamp - timestamp).total_seconds()
+
+    agents = list(agents_by_id.values())
 
     # Compute cost from token usage when the simulation hasn't ended yet
     # (or when the ended event reported zero cost).
