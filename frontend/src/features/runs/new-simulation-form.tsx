@@ -168,6 +168,7 @@ export function NewSimulationForm() {
   const selectedScenario = data?.scenarios.find(s => s.scenario_name === scenario);
   const knobsFiles = selectedScenario?.knobs_files ?? [];
   const needsKnobs = knobsFiles.length > 0;
+  const hasSelectedModel = model !== "" && provider !== "";
 
   const agentRolesQuery = useQuery({
     queryKey: ["agentRoles", scenario, knobs],
@@ -314,9 +315,12 @@ export function NewSimulationForm() {
             id="knobs"
             value={knobsFile}
             onChange={e => handleKnobsFileChange(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            disabled={!hasSelectedModel}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:bg-muted disabled:text-muted-foreground"
           >
-            <option value="">Select a knobs preset...</option>
+            <option value="">
+              {hasSelectedModel ? "Select a knobs preset..." : "Select a model first..."}
+            </option>
             {knobsFiles.map(f => (
               <option key={f} value={f}>
                 {humanize(f.replace("knobs_", ""))}
