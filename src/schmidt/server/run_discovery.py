@@ -220,7 +220,11 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                     status = RunStatus.IN_PROGRESS
                 else:
                     delete_manifest(run_dir=timestamp_dir)
-                    status = RunStatus.ERROR
+                    fork_path = timestamp_dir / "fork_manifest.json"
+                    if fork_path.exists():
+                        status = RunStatus.STARTING
+                    else:
+                        status = RunStatus.ERROR
                 summaries.append(
                     RunSummary(
                         run_id=first_event.run_id,

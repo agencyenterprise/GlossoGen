@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
 import { humanize } from "./format";
+import { ModelPicker } from "./model-picker";
 
 type KnobsMap = Record<string, unknown>;
 
@@ -92,6 +93,11 @@ export function NewSimulationForm() {
   const [scenario, setScenario] = useState("");
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
+
+  function handleModelSelect(selectedModel: string, selectedProvider: string) {
+    setModel(selectedModel);
+    setProvider(selectedProvider);
+  }
   const [knobsFile, setKnobsFile] = useState("");
   const [knobs, setKnobs] = useState<KnobsMap | null>(null);
 
@@ -163,7 +169,6 @@ export function NewSimulationForm() {
   const selectedScenario = data?.scenarios.find(s => s.scenario_name === scenario);
   const knobsFiles = selectedScenario?.knobs_files ?? [];
   const needsKnobs = knobsFiles.length > 0;
-  const filteredModels = data?.models.filter(m => m.provider === provider) ?? [];
   const canSubmit = scenario && model && provider && (!needsKnobs || knobs);
 
   if (isLoading) {
@@ -178,11 +183,6 @@ export function NewSimulationForm() {
     setScenario(value);
     setKnobsFile("");
     setKnobs(null);
-  }
-
-  function handleProviderChange(value: string) {
-    setProvider(value);
-    setModel("");
   }
 
   function handleKnobsFileChange(value: string) {
@@ -220,50 +220,7 @@ export function NewSimulationForm() {
         </select>
       </div>
 
-      <div className="space-y-2">
-        <label htmlFor="provider" className="block text-sm font-medium">
-          Provider
-        </label>
-        <select
-          id="provider"
-          value={provider}
-          onChange={e => handleProviderChange(e.target.value)}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-        >
-          <option value="">Select a provider...</option>
-          {data?.providers.map(p => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-y-2">
-        <label htmlFor="model" className="block text-sm font-medium">
-          Model
-        </label>
-        <select
-          id="model"
-          value={model}
-          onChange={e => setModel(e.target.value)}
-          disabled={!provider}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:bg-muted disabled:text-muted-foreground"
-        >
-          {provider ? (
-            <>
-              <option value="">Select a model...</option>
-              {filteredModels.map(m => (
-                <option key={m.model_prefix} value={m.model_prefix}>
-                  {m.model_prefix}
-                </option>
-              ))}
-            </>
-          ) : (
-            <option value="">Select a provider first</option>
-          )}
-        </select>
-      </div>
+      <ModelPicker models={data?.models ?? []} selectedModel={model} onSelect={handleModelSelect} />
 
       <div className="space-y-2">
         <label htmlFor="knobs" className="block text-sm font-medium">

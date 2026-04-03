@@ -85,6 +85,9 @@ export function RunDetail({ runId }: { runId: string }) {
       if (status === "in_progress") {
         return 10_000;
       }
+      if (status === "starting") {
+        return 2_000;
+      }
       if (query.state.data?.evaluation_in_progress || evalJustLaunched) {
         return 5_000;
       }
@@ -120,8 +123,8 @@ export function RunDetail({ runId }: { runId: string }) {
   }, [restData]);
 
   // SSE streaming for in-progress runs
-  const sseEnabled = restData?.status === "in_progress";
-  const sse = useEventStream(runId, sseEnabled, knownEventIds);
+  const sseEnabled = restData?.status === "in_progress" || restData?.status === "starting";
+  const sse = useEventStream(runId, sseEnabled, knownEventIds, true);
 
   // When SSE reports simulation ended, refetch REST for evaluation + debug logs
   const sseStatus = sse.status;
@@ -146,7 +149,7 @@ export function RunDetail({ runId }: { runId: string }) {
 
   // Determine effective status: SSE overrides REST when streaming
   const effectiveStatus = sseStatus ?? restData?.status ?? null;
-  const isInProgress = effectiveStatus === "in_progress";
+  const isInProgress = effectiveStatus === "in_progress" || effectiveStatus === "starting";
 
   // Merge REST + SSE agents (SSE agents are deduplicated by agent_id)
   const allAgents = useMemo(() => {
@@ -368,13 +371,15 @@ export function RunDetail({ runId }: { runId: string }) {
             {sse.isConnected ? " — streaming live" : " — connecting..."}
             {restData ? <> · {formatDuration(elapsedSince(restData.timestamp))}</> : null}
           </span>
-          <button
-            className="ml-auto rounded p-1 transition-colors hover:bg-yellow-200 dark:hover:bg-yellow-800/50"
-            aria-label="Stop simulation"
-            onClick={() => stopMutation.mutate()}
-          >
-            <Sword className="h-3 w-3" />
-          </button>
+          {effectiveStatus !== "starting" ? (
+            <button
+              className="ml-auto rounded p-1 transition-colors hover:bg-yellow-200 dark:hover:bg-yellow-800/50"
+              aria-label="Stop simulation"
+              onClick={() => stopMutation.mutate()}
+            >
+              <Sword className="h-3 w-3" />
+            </button>
+          ) : null}
         </div>
       ) : null}
 

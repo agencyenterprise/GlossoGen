@@ -297,7 +297,11 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             status = RunStatus.IN_PROGRESS
         else:
             delete_manifest(run_dir=run_dir)
-            status = RunStatus.ERROR
+            fork_path = run_dir / "fork_manifest.json"
+            if fork_path.exists():
+                status = RunStatus.STARTING
+            else:
+                status = RunStatus.ERROR
     report_path = log_path.with_name(f"{scenario_name}_report.json")
     evaluation = await _load_evaluation_report(report_path=report_path)
     eval_manifest = read_eval_manifest(run_dir=run_dir)

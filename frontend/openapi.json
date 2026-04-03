@@ -1122,10 +1122,11 @@
         "enum": [
           "scenario_complete",
           "in_progress",
+          "starting",
           "error"
         ],
         "title": "RunStatus",
-        "description": "Why the simulation ended."
+        "description": "Status of a simulation run."
       },
       "RunSummary": {
         "properties": {
