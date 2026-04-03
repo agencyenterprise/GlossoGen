@@ -1,7 +1,16 @@
 """Pydantic model defining the configuration schema for a single agent in a simulation."""
 
+from typing import NamedTuple
+
 from pydantic import BaseModel, ConfigDict
 from pydantic_ai.messages import ModelMessage
+
+
+class AgentRole(NamedTuple):
+    """Lightweight agent identity returned by scenario discovery endpoints."""
+
+    agent_id: str
+    role_name: str
 
 
 class AgentConfig(BaseModel):
@@ -19,5 +28,6 @@ class AgentConfig(BaseModel):
     channel_ids: list[str]
     tool_names: list[str]
     model: str
+    provider: str
     max_tokens: int
     initial_message_history: list[ModelMessage] | None = None

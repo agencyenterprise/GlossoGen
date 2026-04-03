@@ -5,7 +5,7 @@ misinformation resistance, balanced persuasion, open debate, and seeded debate.
 Supports 2+ agents discussing trivia questions on a shared channel via MCP.
 """
 
-import argparse
+import json
 import logging
 from pathlib import Path
 from typing import Any, NamedTuple, Self
@@ -18,11 +18,11 @@ from schmidt.evaluation.evaluator_protocol import EvaluatorFactory
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
 from schmidt.llm.provider_factory import create_provider
-from schmidt.models.agent_config import AgentConfig
+from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.persuasion_debate.agent_ids import DEBATE_CHANNEL_ID
+from schmidt.scenarios.persuasion_debate.agent_ids import ALL_AGENT_IDS, DEBATE_CHANNEL_ID
 from schmidt.scenarios.persuasion_debate.evaluation import EVALUATOR_REGISTRY
 from schmidt.scenarios.persuasion_debate.knobs import (
     BeliefAssignment,
@@ -76,37 +76,33 @@ class PersuasionDebateScenario(SimulationScenario):
     """
 
     @classmethod
-    def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        """Register --knobs, --questions, and --max-round-duration CLI arguments."""
-        parser.add_argument(
-            "--knobs",
-            type=str,
-            required=True,
-            help="Path to a JSON file with persuasion debate scenario knobs",
-        )
-        parser.add_argument(
-            "--questions",
-            type=str,
-            required=True,
-            help="Path to a JSON file with trivia questions",
-        )
-        parser.add_argument(
-            "--max-round-duration",
-            type=float,
-            help="Maximum seconds per round before force-advancing (autonomous mode)",
-        )
+    def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
+        """Return agent roles based on agent_order knob."""
+        if knobs is not None and "agent_order" in knobs:
+            agent_ids = knobs["agent_order"]
+        else:
+            agent_ids = sorted(ALL_AGENT_IDS)
+        return [
+            AgentRole(agent_id=aid, role_name=_display_name_for_agent(agent_id=aid))
+            for aid in agent_ids
+        ]
 
     @classmethod
-    def create(cls, args: argparse.Namespace) -> Self:
-        """Construct the scenario from CLI arguments."""
-        knobs = PersuasionDebateKnobs.model_validate_json(Path(args.knobs).read_text())
-        question_bank = QuestionBank.load_from_file(path=Path(args.questions))
-        max_round_duration = getattr(args, "max_round_duration", None)
-        return cls(
-            knobs=knobs,
-            question_bank=question_bank,
-            max_round_duration_seconds=max_round_duration,
-        )
+    def prepare_config(cls, config: dict[str, Any]) -> dict[str, Any]:
+        """Load the question bank from a file path, or use the default questions.json.
+
+        Accepts three forms for ``question_bank``:
+        - Missing/None → loads the default ``questions.json`` from the scenario directory
+        - A string file path → loads the file
+        - A dict → already loaded, passed through as-is
+        """
+        qb = config.get("question_bank")
+        if qb is None:
+            default_path = Path(__file__).parent / "questions.json"
+            config["question_bank"] = json.loads(default_path.read_text())
+        elif isinstance(qb, str):
+            config["question_bank"] = json.loads(Path(qb).read_text())
+        return config
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
@@ -235,11 +231,10 @@ class PersuasionDebateScenario(SimulationScenario):
             ),
         ]
 
-    def get_agents(self, default_model: str) -> list[AgentConfig]:
+    def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """Return agent configurations for all agents in agent_order."""
         agents: list[AgentConfig] = []
         for agent_id in self._knobs.agent_order:
-            model = self._knobs.model_overrides.get(agent_id, default_model)
             template_name = self._get_system_template(agent_id=agent_id)
 
             template_vars: dict[str, object] = {
@@ -265,7 +260,8 @@ class PersuasionDebateScenario(SimulationScenario):
                         "submit_initial_answer",
                         "submit_final_answer",
                     ],
-                    model=model,
+                    model=default_model,
+                    provider=default_provider,
                     max_tokens=16384,
                 )
             )

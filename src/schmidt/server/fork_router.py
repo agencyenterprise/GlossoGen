@@ -26,42 +26,29 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
-# Config keys that map directly to CLI flags (key → flag name).
-_CONFIG_TO_CLI_FLAG: dict[str, str] = {
-    "max_round_duration_seconds": "--max-round-duration",
-}
 
-# Config keys that contain full knob dicts and need to be written to a temp file.
-_KNOBS_CONFIG_KEYS: set[str] = {"question_bank"}
-
-
-def _build_scenario_cli_flags(
+def _build_fork_config(
     scenario_config: dict[str, object],
+    model_overrides: dict[str, Any] | None,
     run_dir: Path,
-) -> list[str]:
-    """Convert scenario config to CLI flags for the fork subprocess.
+) -> tuple[Path, list[str]]:
+    """Build a --config file and override args for a forked simulation.
 
-    Simple scalar values are mapped to their corresponding CLI flags.
-    Complex knob dicts are written to a JSON file in the run directory
-    and passed via ``--knobs``.
+    Merges the source run's scenario config with any new model overrides
+    into a single config file. Returns the config file path and any
+    extra override args.
     """
-    flags: list[str] = []
-    remaining_knobs: dict[str, object] = {}
+    config: dict[str, Any] = dict(scenario_config)
 
-    for key, value in scenario_config.items():
-        if key in _CONFIG_TO_CLI_FLAG:
-            flags.extend([_CONFIG_TO_CLI_FLAG[key], str(value)])
-        elif key in _KNOBS_CONFIG_KEYS:
-            continue
-        else:
-            remaining_knobs[key] = value
+    if model_overrides:
+        agents: dict[str, Any] = {}
+        for agent_id, entry in model_overrides.items():
+            agents[agent_id] = entry
+        config["agents"] = agents
 
-    if remaining_knobs:
-        knobs_path = run_dir / "fork_knobs.json"
-        knobs_path.write_bytes(orjson.dumps(remaining_knobs))
-        flags.extend(["--knobs", str(knobs_path)])
-
-    return flags
+    config_path = run_dir / "fork_config.json"
+    config_path.write_bytes(orjson.dumps(config))
+    return config_path, []
 
 
 @router.post("/runs/{run_id}/fork", response_model=ForkResponse)
@@ -129,12 +116,21 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
         paths=None,
     )
 
-    # Launch the forked simulation as a background subprocess.
-    stdout_log = new_run_dir / f"{scenario_name}_stdout.log"
-    scenario_flags = _build_scenario_cli_flags(
+    # Build config file from source scenario config + model overrides.
+    overrides_for_model = None
+    if body.model_overrides:
+        overrides_for_model = {
+            agent_id: entry.model_dump() for agent_id, entry in body.model_overrides.items()
+        }
+
+    config_path, override_args = _build_fork_config(
         scenario_config=matching[0].scenario_config,
+        model_overrides=overrides_for_model,
         run_dir=new_run_dir,
     )
+
+    # Launch the forked simulation as a background subprocess.
+    stdout_log = new_run_dir / f"{scenario_name}_stdout.log"
     mcp_port = _find_free_port()
     cmd = [
         sys.executable,
@@ -152,7 +148,9 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
         str(new_run_dir),
         "--runs-dir",
         str(runs_dir),
-        *scenario_flags,
+        "--config",
+        str(config_path),
+        *override_args,
     ]
 
     logger.info("Launching forked simulation: %s", " ".join(cmd))

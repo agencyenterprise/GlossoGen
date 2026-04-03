@@ -71,6 +71,7 @@ def extract_agent_configs(events: list[SimulationEvent]) -> list[AgentConfig]:
                     channel_ids=event.channel_ids,
                     tool_names=event.tool_names,
                     model=event.model,
+                    provider=event.provider,
                     max_tokens=event.max_tokens,
                 )
             )

@@ -6,7 +6,6 @@ while (in 5-agent mode) the PR agent writes summary reports to the Regulator
 on a separate channel.
 """
 
-import argparse
 import logging
 from pathlib import Path
 from typing import Any, NamedTuple, Self
@@ -17,7 +16,7 @@ from schmidt.evaluation.evaluator_protocol import EvaluatorFactory
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
 from schmidt.llm.provider_factory import create_provider
-from schmidt.models.agent_config import AgentConfig
+from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.scenario_protocol import SimulationScenario
@@ -105,21 +104,19 @@ class CarRecallScenario(SimulationScenario):
     """
 
     @classmethod
-    def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        """Register the ``--knobs`` argument required by this scenario."""
-        parser.add_argument(
-            "--knobs",
-            type=str,
-            required=True,
-            help="Path to a JSON file with car recall scenario knobs",
-        )
-
-    @classmethod
-    def create(cls, args: argparse.Namespace) -> Self:
-        """Read the knobs JSON file and construct the scenario."""
-        knobs_json = Path(args.knobs).read_text()
-        knobs = CarRecallKnobs.model_validate_json(knobs_json)
-        return cls(knobs=knobs)
+    def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
+        """Return agent roles based on agent_count knob."""
+        roles = [
+            AgentRole(agent_id=ENGINEER_ID, role_name="Engineer"),
+            AgentRole(agent_id=LEGAL_ID, role_name="Legal"),
+        ]
+        five_agents = knobs is not None and knobs.get("agent_count") == "five"
+        if five_agents:
+            roles.append(AgentRole(agent_id=CFO_ID, role_name="CFO"))
+        roles.append(AgentRole(agent_id=PR_ID, role_name="PR"))
+        if five_agents:
+            roles.append(AgentRole(agent_id=REGULATOR_ID, role_name="Regulator"))
+        return roles
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
@@ -225,11 +222,10 @@ class CarRecallScenario(SimulationScenario):
 
         return defs
 
-    def get_agents(self, default_model: str) -> list[AgentConfig]:
+    def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """Return agent configurations based on the knobs."""
         agents: list[AgentConfig] = []
         for d in self._agent_defs():
-            model = self._knobs.model_overrides.get(d.agent_id, default_model)
             agents.append(
                 AgentConfig(
                     agent_id=d.agent_id,
@@ -245,7 +241,8 @@ class CarRecallScenario(SimulationScenario):
                     ),
                     channel_ids=d.channel_ids,
                     tool_names=d.tool_names,
-                    model=model,
+                    model=default_model,
+                    provider=default_provider,
                     max_tokens=16384,
                 )
             )

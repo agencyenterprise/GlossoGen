@@ -5,7 +5,6 @@ simulates an incident war room. Agents communicate through a shared
 war-room channel and pairwise private sidebar channels.
 """
 
-import argparse
 import logging
 from pathlib import Path
 from typing import Any, NamedTuple, Self
@@ -15,7 +14,7 @@ from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult,
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
 from schmidt.llm.provider_factory import create_provider
-from schmidt.models.agent_config import AgentConfig
+from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext
 from schmidt.scenario_protocol import SimulationScenario
@@ -94,21 +93,13 @@ class IncidentResponseScenario(SimulationScenario):
     """
 
     @classmethod
-    def add_cli_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        """Register scenario-specific CLI arguments."""
-        parser.add_argument(
-            "--max-round-duration",
-            type=float,
-            help="Maximum seconds per round before force-advancing",
-        )
-
-    @classmethod
-    def create(cls, args: argparse.Namespace) -> Self:
-        """Construct the scenario from CLI arguments."""
-        max_round_duration = getattr(args, "max_round_duration", None)
-        return cls(
-            max_round_duration_seconds=max_round_duration,
-        )
+    def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:  # noqa: ARG003
+        """Return the fixed three agents regardless of knobs."""
+        return [
+            AgentRole(agent_id=ENGINEER_ID, role_name="Engineer"),
+            AgentRole(agent_id=SUPPORT_LEAD_ID, role_name="Support Lead"),
+            AgentRole(agent_id=PM_ID, role_name="PM"),
+        ]
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
@@ -151,7 +142,7 @@ class IncidentResponseScenario(SimulationScenario):
             for cid in channel_ids
         ]
 
-    def get_agents(self, default_model: str) -> list[AgentConfig]:
+    def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """Return agent configurations for the Engineer, Support Lead, and PM."""
         agent_defs: list[AgentDef] = [
             AgentDef(
@@ -187,6 +178,7 @@ class IncidentResponseScenario(SimulationScenario):
                     channel_ids=d.channel_ids,
                     tool_names=["send_message", "propose_resolution"],
                     model=default_model,
+                    provider=default_provider,
                     max_tokens=16384,
                 )
             )

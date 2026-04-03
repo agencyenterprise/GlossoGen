@@ -1,8 +1,8 @@
 """Configuration knobs for the car recall scenario.
 
-Defines the six tunable parameters that control scenario behavior:
+Defines the tunable parameters that control scenario behavior:
 time pressure, goal alignment, regulator pressure, agent count,
-information overlap, and per-agent model overrides.
+and information overlap.
 """
 
 from enum import Enum
@@ -66,10 +66,6 @@ class InformationOverlap(str, Enum):
     HIGH = "high"
 
 
-VALID_AGENT_IDS = {"engineer", "legal", "cfo", "pr", "regulator"}
-THREE_AGENT_IDS = {"engineer", "legal", "pr"}
-
-
 class CarRecallKnobs(BaseModel):
     """Configuration knobs for the car recall scenario.
 
@@ -82,7 +78,6 @@ class CarRecallKnobs(BaseModel):
     regulator_pressure: RegulatorPressure
     agent_count: AgentCount
     information_overlap: InformationOverlap
-    model_overrides: dict[str, str]
 
     @model_validator(mode="after")
     def validate_knob_combinations(self) -> Self:
@@ -94,17 +89,6 @@ class CarRecallKnobs(BaseModel):
             raise ValueError(
                 "regulator_pressure cannot be HIGH when agent_count is THREE "
                 "(no Regulator agent exists in 3-agent mode)"
-            )
-
-        if self.agent_count == AgentCount.THREE:
-            active_ids = THREE_AGENT_IDS
-        else:
-            active_ids = VALID_AGENT_IDS
-        unknown = set(self.model_overrides.keys()) - active_ids
-        if unknown:
-            raise ValueError(
-                f"model_overrides contains agent IDs not in the active agent set: {unknown}. "
-                f"Active agents for agent_count={self.agent_count.value}: {sorted(active_ids)}"
             )
 
         return self

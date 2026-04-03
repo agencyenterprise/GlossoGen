@@ -7,6 +7,7 @@ Expects the standard directory layout:
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 
 import aiofiles
 import orjson
@@ -20,7 +21,7 @@ from schmidt.models.event import (
     SimulationEvent,
     SimulationStarted,
 )
-from schmidt.server.response_models import ForkSource, RunSummary
+from schmidt.server.response_models import AgentModelSummary, ForkSource, RunSummary
 from schmidt.stream_manifest import delete_manifest, read_manifest
 from schmidt.token_pricing import find_pricing
 
@@ -66,13 +67,29 @@ def _parse_event(raw_bytes: bytes) -> SimulationEvent:
     return _EVENT_ADAPTER.validate_python(raw)  # positional-only parameter
 
 
-async def _extract_models(file_path: Path) -> list[str]:
-    """Extract unique model names from AgentRegistered events in a JSONL file.
+class _AgentModelInfo(NamedTuple):
+    """Raw per-agent model data extracted from JSONL."""
+
+    agent_id: str
+    role_name: str
+    model: str
+    provider: str
+
+
+class _ExtractedModels(NamedTuple):
+    """Result of scanning JSONL for agent model information."""
+
+    unique_models: list[str]
+    agent_models: list[AgentModelSummary]
+
+
+async def _extract_models(file_path: Path) -> _ExtractedModels:
+    """Extract per-agent model info and unique model list from JSONL.
 
     Uses the last AgentRegistered event per agent_id so that forked runs
     that re-register agents with a new model report the correct model.
     """
-    models_by_agent: dict[str, str] = {}
+    agents_by_id: dict[str, _AgentModelInfo] = {}
     async with aiofiles.open(file_path, mode="rb") as f:
         async for line in f:
             stripped = line.strip()
@@ -83,12 +100,26 @@ async def _extract_models(file_path: Path) -> list[str]:
                 agent_id = raw.get("agent_id", "")
                 model = raw.get("model", "")
                 if agent_id and model:
-                    models_by_agent[agent_id] = model
+                    agents_by_id[agent_id] = _AgentModelInfo(
+                        agent_id=agent_id,
+                        role_name=raw.get("role_name", agent_id),
+                        model=model,
+                        provider=raw.get("provider", "unknown"),
+                    )
     seen: dict[str, None] = {}
-    for model in models_by_agent.values():
-        if model not in seen:
-            seen[model] = None
-    return list(seen)
+    for info in agents_by_id.values():
+        if info.model not in seen:
+            seen[info.model] = None
+    agent_models = [
+        AgentModelSummary(
+            agent_id=info.agent_id,
+            role_name=info.role_name,
+            model=info.model,
+            provider=info.provider,
+        )
+        for info in agents_by_id.values()
+    ]
+    return _ExtractedModels(unique_models=list(seen), agent_models=agent_models)
 
 
 class _RunStats:
@@ -199,7 +230,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
             report_path = timestamp_dir / f"{scenario_name}_report.json"
             fork_source = _read_fork_source(run_dir=timestamp_dir)
             run_timestamp = _timestamp_from_dir(dir_name=timestamp_dir.name)
-            models = await _extract_models(file_path=jsonl_path)
+            extracted = await _extract_models(file_path=jsonl_path)
 
             eval_in_progress = read_eval_manifest(run_dir=timestamp_dir) is not None
 
@@ -221,12 +252,13 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         evaluation_in_progress=eval_in_progress,
                         run_dir=str(timestamp_dir),
                         fork_source=fork_source,
-                        models=models,
+                        models=extracted.unique_models,
                         provider=first_event.provider,
+                        agent_models=extracted.agent_models,
                     )
                 )
             else:
-                model = models[0] if models else "unknown"
+                model = extracted.unique_models[0] if extracted.unique_models else "unknown"
                 stats = await _scan_run_stats(file_path=jsonl_path, model=model)
                 manifest = read_manifest(run_dir=timestamp_dir)
                 if manifest is not None:
@@ -253,8 +285,9 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         evaluation_in_progress=eval_in_progress,
                         run_dir=str(timestamp_dir),
                         fork_source=fork_source,
-                        models=models,
+                        models=extracted.unique_models,
                         provider=first_event.provider,
+                        agent_models=extracted.agent_models,
                     )
                 )
 

@@ -143,6 +143,7 @@ export function useEventStream(
           channel_ids: data.channel_ids,
           tool_names: data.tool_names,
           model: data.model,
+          provider: data.provider,
           system_prompt: data.system_prompt,
         };
         setAgents(prev => [...prev, agent]);

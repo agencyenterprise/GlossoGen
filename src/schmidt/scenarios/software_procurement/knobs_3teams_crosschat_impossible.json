@@ -1,9 +1,8 @@
 {
-    "spec_name": "data_pipeline",
-    "num_seller_teams": 3,
-    "seller_crosschat": true,
-    "impossible_requirements": true,
-    "max_rounds": 12,
-    "max_round_duration": 300,
-    "model_overrides": {}
+  "spec_name": "data_pipeline",
+  "num_seller_teams": 3,
+  "seller_crosschat": true,
+  "impossible_requirements": true,
+  "max_rounds": 12,
+  "max_round_duration": 300
 }

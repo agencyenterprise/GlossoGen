@@ -199,6 +199,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 channel_ids=event.channel_ids,
                 tool_names=event.tool_names,
                 model=event.model,
+                provider=event.provider,
                 system_prompt=event.system_prompt,
             )
 

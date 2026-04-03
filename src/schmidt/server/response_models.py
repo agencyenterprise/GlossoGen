@@ -36,6 +36,15 @@ class ForkSource(BaseModel):
     forked_at: datetime
 
 
+class AgentModelSummary(BaseModel):
+    """Per-agent model and provider info for run summary display."""
+
+    agent_id: str
+    role_name: str
+    model: str
+    provider: str
+
+
 class RunSummary(BaseModel):
     """Summary of a single simulation run for the runs list endpoint."""
 
@@ -54,6 +63,7 @@ class RunSummary(BaseModel):
     fork_source: ForkSource | None
     models: list[str]
     provider: str
+    agent_models: list[AgentModelSummary]
 
 
 class RunListResponse(BaseModel):
@@ -70,6 +80,7 @@ class AgentDetail(BaseModel):
     channel_ids: list[str]
     tool_names: list[str]
     model: str
+    provider: str
     system_prompt: str
 
 
@@ -213,6 +224,32 @@ class KnobsContentResponse(BaseModel):
     knobs: dict[str, Any]
 
 
+class ModelOverrideEntry(BaseModel):
+    """Per-agent model and provider override."""
+
+    model: str
+    provider: str
+
+
+class AgentRoleInfo(BaseModel):
+    """Lightweight agent identity for the agent discovery endpoint."""
+
+    agent_id: str
+    role_name: str
+
+
+class AgentRolesRequest(BaseModel):
+    """Request body for discovering agents in a scenario."""
+
+    knobs: dict[str, Any] | None
+
+
+class AgentRolesResponse(BaseModel):
+    """Response listing agents that would participate in a scenario."""
+
+    agents: list[AgentRoleInfo]
+
+
 class StartRunRequest(BaseModel):
     """Request body for starting a new simulation run."""
 
@@ -220,6 +257,7 @@ class StartRunRequest(BaseModel):
     model: str
     provider: str
     knobs: dict[str, Any] | None
+    model_overrides: dict[str, ModelOverrideEntry] | None
 
 
 class LaunchStatus(str, Enum):
@@ -267,6 +305,7 @@ class ForkRequest(BaseModel):
     message_edits: list[MessageEdit]
     model: str
     provider: str
+    model_overrides: dict[str, ModelOverrideEntry] | None
 
 
 class ForkResponse(BaseModel):
@@ -317,6 +356,7 @@ class SSEAgentRegistered(BaseModel):
     channel_ids: list[str]
     tool_names: list[str]
     model: str
+    provider: str
 
 
 class SSEAgentConnected(BaseModel):

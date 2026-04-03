@@ -84,10 +84,9 @@ class PydanticAIRunner(AgentRunner):
     text and tool results for JSONL logging.
     """
 
-    def __init__(self, max_turns: int, event_bus: EventBus, provider: str) -> None:
+    def __init__(self, max_turns: int, event_bus: EventBus) -> None:
         self._max_turns = max_turns
         self._event_bus = event_bus
-        self._provider = provider
 
     async def start(
         self,
@@ -97,12 +96,13 @@ class PydanticAIRunner(AgentRunner):
     ) -> AgentRunResult:
         """Launch a Pydantic AI agent that loops until it receives a done notification."""
         agent_id = agent_config.agent_id
+        provider = agent_config.provider
         logger.info(
             "Starting Pydantic AI agent %s (%s) max_turns=%d provider=%s model=%s",
             agent_id,
             agent_config.role_name,
             self._max_turns,
-            self._provider,
+            provider,
             agent_config.model,
         )
 
@@ -114,7 +114,7 @@ class PydanticAIRunner(AgentRunner):
             role_name=agent_config.role_name,
         )
 
-        if self._provider == "anthropic":
+        if provider == "anthropic":
             default_settings: ModelSettings = AnthropicModelSettings(
                 anthropic_cache_instructions=True,
                 anthropic_cache_tool_definitions=True,
@@ -124,7 +124,7 @@ class PydanticAIRunner(AgentRunner):
             default_settings = ModelSettings()
 
         agent: Agent[None, str] = Agent(
-            model=f"{self._provider}:{agent_config.model}",
+            model=f"{provider}:{agent_config.model}",
             system_prompt=full_system_prompt,
             toolsets=[mcp_server],
             model_settings=default_settings,
