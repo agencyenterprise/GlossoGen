@@ -176,6 +176,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     status = None
 
     tool_use_by_call_id: dict[str, ToolUseEntry] = {}
+    pending_tool_results_by_call_id: dict[str, ToolResultReceived] = {}
     total_input_tokens = 0
     total_output_tokens = 0
     total_cache_read_tokens = 0
@@ -235,6 +236,12 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     timestamp=event.timestamp,
                     round_number=event.round_number,
                 )
+                pending_result = pending_tool_results_by_call_id.pop(tc.call_id, None)
+                if pending_result is not None:
+                    tu_entry.result = pending_result.result
+                    # Use the tool-result event time so tool entries are ordered by
+                    # when each call actually completed.
+                    tu_entry.timestamp = pending_result.timestamp
                 tool_use.append(tu_entry)
                 tool_use_by_call_id[tc.call_id] = tu_entry
 
@@ -245,6 +252,9 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 # Use the tool-result event time so tool entries are ordered by
                 # when each call actually completed.
                 matched.timestamp = event.timestamp
+            else:
+                # Some runs log tool results before the parent LLM response block.
+                pending_tool_results_by_call_id[event.call_id] = event
 
         elif isinstance(event, MessageSent):
             total_messages += 1
