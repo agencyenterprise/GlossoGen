@@ -2,7 +2,7 @@
 
 Checks every HTTP request for a valid password in either the Authorization
 header (Bearer token) or the ``token`` query parameter. Skips CORS preflight
-(OPTIONS), the health-check endpoint, the MCP endpoint, and non-HTTP scopes.
+(OPTIONS), the health-check endpoint, and non-HTTP scopes.
 """
 
 import hmac
@@ -39,10 +39,6 @@ class PasswordAuthMiddleware:
             return
 
         if request.method == "GET" and request.url.path == "/api/health":
-            await self.app(scope, receive, send)
-            return
-
-        if request.url.path.startswith("/mcp"):
             await self.app(scope, receive, send)
             return
 
