@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Copy, X } from "lucide-react";
-import { AUTH_STORAGE_KEY } from "@/features/auth/auth-gate";
+// import { AUTH_STORAGE_KEY } from "@/features/auth/auth-gate";
 import { API_URL } from "@/shared/lib/api-client";
 
 function CopyButton({ text }: { text: string }) {
@@ -52,19 +52,20 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   const mcpUrl = `${API_URL}/mcp`;
-  const password = typeof window !== "undefined" ? localStorage.getItem(AUTH_STORAGE_KEY) : null;
-  const authHeader = password ? `Bearer ${password}` : "Bearer <APP_PASSWORD>";
+  // const password = typeof window !== "undefined" ? localStorage.getItem(AUTH_STORAGE_KEY) : null;
+  // const authHeader = password ? `Bearer ${password}` : "Bearer <APP_PASSWORD>";
 
-  const claudeCommand = `claude mcp add-json schmidt-runs '${JSON.stringify({ type: "http", url: mcpUrl, headers: { Authorization: authHeader } })}'`;
+  const claudeCommand = `claude mcp add-json schmidt-runs '${JSON.stringify({ type: "http", url: mcpUrl })}'`;
+  // With auth: `claude mcp add-json schmidt-runs '${JSON.stringify({ type: "http", url: mcpUrl, headers: { Authorization: authHeader } })}'`;
 
   const cursorConfig = JSON.stringify(
     {
       mcpServers: {
         "schmidt-runs": {
           url: mcpUrl,
-          headers: {
-            Authorization: authHeader,
-          },
+          // headers: {
+          //   Authorization: authHeader,
+          // },
         },
       },
     },
@@ -96,9 +97,6 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
           >
             <p className="text-sm text-muted-foreground">
               Connect to browse simulation data and launch runs from Claude Code or Cursor.
-              {password
-                ? " Your password is pre-filled in the commands below."
-                : " Omit the headers object if auth is disabled."}
             </p>
 
             <div className="space-y-2">
