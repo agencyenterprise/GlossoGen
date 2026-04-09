@@ -279,16 +279,21 @@ export function RunList() {
                         <td className="whitespace-nowrap py-2 pl-4 font-medium">
                           <span className="inline-flex items-center gap-1.5">
                             {humanize(run.scenario_name)}
-                            <button
-                              aria-label="Scenario description"
-                              className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                              onClick={e => {
-                                e.stopPropagation();
-                                setModalRun(run);
-                              }}
-                            >
-                              <HelpCircle className="h-3.5 w-3.5" />
-                            </button>
+                            <span className="group/help relative">
+                              <button
+                                aria-label="Scenario description"
+                                className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setModalRun(run);
+                                }}
+                              >
+                                <HelpCircle className="h-3.5 w-3.5" />
+                              </button>
+                              <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/help:block">
+                                Scenario description
+                              </span>
+                            </span>
                           </span>
                         </td>
                         <td className="max-w-48 px-3 py-2 text-muted-foreground">
@@ -343,27 +348,37 @@ export function RunList() {
                         <td className="w-16 py-2 pr-4 text-right">
                           <span className="inline-flex items-center gap-1">
                             {run.status === "in_progress" ? (
+                              <span className="group/stop relative">
+                                <button
+                                  aria-label="Stop simulation"
+                                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    stopMutation.mutate(run.run_id);
+                                  }}
+                                >
+                                  <Sword className="h-3.5 w-3.5" />
+                                </button>
+                                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/stop:block">
+                                  Stop simulation
+                                </span>
+                              </span>
+                            ) : null}
+                            <span className="group/delete relative">
                               <button
-                                aria-label="Stop simulation"
-                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                aria-label="Delete run"
+                                className="rounded p-1 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
                                 onClick={e => {
                                   e.stopPropagation();
-                                  stopMutation.mutate(run.run_id);
+                                  deleteMutation.mutate(run.run_id);
                                 }}
                               >
-                                <Sword className="h-3.5 w-3.5" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </button>
-                            ) : null}
-                            <button
-                              aria-label="Delete run"
-                              className="rounded p-1 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                              onClick={e => {
-                                e.stopPropagation();
-                                deleteMutation.mutate(run.run_id);
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                              <span className="pointer-events-none absolute right-0 top-full z-50 mt-1 hidden whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/delete:block">
+                                Delete run
+                              </span>
+                            </span>
                           </span>
                         </td>
                       </tr>
