@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Download, FolderArchive, Pencil } from "lucide-react";
+import { Tooltip } from "@/shared/components/ui/tooltip";
 import { buildApiUrlWithToken } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
@@ -300,7 +301,7 @@ export function ChatPane({
             <FolderArchive className="h-3.5 w-3.5" />
           </button>
           <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/artifacts:block">
-            Download artifacts
+            Download all artifacts
           </span>
         </span>
       </div>
@@ -365,6 +366,7 @@ export function ChatPane({
                       const pendingEdit = pendingEdits.get(entry.message_id);
                       const displayText = pendingEdit ? pendingEdit.newText : entry.text;
                       const canEdit = forkEnabled && !entry.is_reasoning && !entry.is_tool_use;
+
                       const entryKey = `${entry.message_id}-${entry.is_reasoning ? "r" : entry.is_tool_use ? "t" : "m"}-${entryIdx}`;
 
                       return (
@@ -440,18 +442,34 @@ export function ChatPane({
                                   {displayText}
                                 </ProseMarkdown>
                               ) : null}
-                              {canEdit ? (
-                                <span className="group/edit absolute right-1 top-1 flex items-center gap-0.5 rounded-md bg-background/90 p-1 shadow-sm opacity-0 transition-opacity group-hover/entry:opacity-100">
-                                  <button
-                                    aria-label="Edit and fork from this message"
-                                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                    onClick={() => onStartEdit(entry.message_id)}
-                                  >
-                                    <Pencil className="h-3 w-3" />
-                                  </button>
-                                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/edit:block">
-                                    Edit &amp; fork
-                                  </span>
+                              {!entry.is_reasoning && !entry.is_tool_use ? (
+                                <span className="absolute right-1 top-1 z-10 flex items-center gap-0.5 rounded-md bg-background/90 p-1 shadow-sm opacity-0 transition-opacity group-hover/entry:opacity-100">
+                                  {canEdit ? (
+                                    <Tooltip label="Edit &amp; fork">
+                                      <button
+                                        aria-label="Edit and fork from this message"
+                                        className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        onClick={() => onStartEdit(entry.message_id)}
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                      </button>
+                                    </Tooltip>
+                                  ) : null}
+                                  <Tooltip label="Download artifacts up to this point">
+                                    <button
+                                      aria-label="Download artifacts at this message"
+                                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                      onClick={() => {
+                                        const url = buildApiUrlWithToken({
+                                          path: `/api/runs/${runId}/export/artifacts/${entry.message_id}`,
+                                          searchParams: new URLSearchParams(),
+                                        });
+                                        window.open(url, "_blank");
+                                      }}
+                                    >
+                                      <FolderArchive className="h-3 w-3" />
+                                    </button>
+                                  </Tooltip>
                                 </span>
                               ) : null}
                             </>
