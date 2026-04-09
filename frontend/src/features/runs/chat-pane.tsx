@@ -237,7 +237,7 @@ export function ChatPane({
   const rounds = useMemo(() => groupByRoundAndTurn(visibleFiltered), [visibleFiltered]);
 
   return (
-    <div className="relative flex flex-col overflow-hidden">
+    <div className="relative flex min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
         <span className="text-sm text-muted-foreground">#</span>
         <span className="text-[13px] font-medium">{headerName}</span>
@@ -263,36 +263,46 @@ export function ChatPane({
           />
           Tools
         </label>
-        <button
-          aria-label="Export PDF"
-          className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          onClick={() => {
-            const params = new URLSearchParams();
-            if (selectedChannel !== null) {
-              params.set("channel_id", selectedChannel);
-            }
-            const url = buildApiUrlWithToken({
-              path: `/api/runs/${runId}/export/pdf`,
-              searchParams: params,
-            });
-            window.open(url, "_blank");
-          }}
-        >
-          <Download className="h-3.5 w-3.5" />
-        </button>
-        <button
-          aria-label="Download artifacts"
-          className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          onClick={() => {
-            const url = buildApiUrlWithToken({
-              path: `/api/runs/${runId}/export/artifacts`,
-              searchParams: new URLSearchParams(),
-            });
-            window.open(url, "_blank");
-          }}
-        >
-          <FolderArchive className="h-3.5 w-3.5" />
-        </button>
+        <span className="group/pdf relative">
+          <button
+            aria-label="Export PDF"
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={() => {
+              const params = new URLSearchParams();
+              if (selectedChannel !== null) {
+                params.set("channel_id", selectedChannel);
+              }
+              const url = buildApiUrlWithToken({
+                path: `/api/runs/${runId}/export/pdf`,
+                searchParams: params,
+              });
+              window.open(url, "_blank");
+            }}
+          >
+            <Download className="h-3.5 w-3.5" />
+          </button>
+          <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/pdf:block">
+            Export PDF
+          </span>
+        </span>
+        <span className="group/artifacts relative">
+          <button
+            aria-label="Download artifacts"
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={() => {
+              const url = buildApiUrlWithToken({
+                path: `/api/runs/${runId}/export/artifacts`,
+                searchParams: new URLSearchParams(),
+              });
+              window.open(url, "_blank");
+            }}
+          >
+            <FolderArchive className="h-3.5 w-3.5" />
+          </button>
+          <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/artifacts:block">
+            Download artifacts
+          </span>
+        </span>
       </div>
 
       <div
@@ -431,7 +441,7 @@ export function ChatPane({
                                 </ProseMarkdown>
                               ) : null}
                               {canEdit ? (
-                                <span className="absolute right-1 top-1 flex items-center gap-0.5 rounded-md bg-background/90 p-1 shadow-sm opacity-0 transition-opacity group-hover/entry:opacity-100">
+                                <span className="group/edit absolute right-1 top-1 flex items-center gap-0.5 rounded-md bg-background/90 p-1 shadow-sm opacity-0 transition-opacity group-hover/entry:opacity-100">
                                   <button
                                     aria-label="Edit and fork from this message"
                                     className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -439,6 +449,9 @@ export function ChatPane({
                                   >
                                     <Pencil className="h-3 w-3" />
                                   </button>
+                                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/edit:block">
+                                    Edit &amp; fork
+                                  </span>
                                 </span>
                               ) : null}
                             </>
@@ -484,17 +497,28 @@ function MessageEditor({
   const [text, setText] = useState(initialText);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    textareaRef.current?.focus();
+  const autoResize = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight}px`;
   }, []);
+
+  useEffect(() => {
+    autoResize();
+    textareaRef.current?.focus();
+  }, [autoResize]);
 
   return (
     <div className="flex flex-col gap-1.5 py-1">
       <textarea
         ref={textareaRef}
         value={text}
-        onChange={e => setText(e.target.value)}
-        className="min-h-[60px] w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+        onChange={e => {
+          setText(e.target.value);
+          autoResize();
+        }}
+        className="w-full resize-none rounded-md border border-border bg-background px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
         onKeyDown={e => {
           if (e.key === "Escape") {
             onCancel();

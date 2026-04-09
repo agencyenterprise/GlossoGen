@@ -5,6 +5,8 @@ import { flushSync } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  Check,
+  Copy,
   FlaskConical,
   HelpCircle,
   Loader2,
@@ -111,6 +113,7 @@ export function RunDetail({ runId }: { runId: string }) {
   const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
   const [showEvalModal, setShowEvalModal] = useState(false);
   const [evalJustLaunched, setEvalJustLaunched] = useState(false);
+  const [copiedRunId, setCopiedRunId] = useState(false);
 
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -373,13 +376,38 @@ export function RunDetail({ runId }: { runId: string }) {
               targetMessageId={restData.fork_source.target_message_id}
             />
           ) : null}
-          <button
-            aria-label="Scenario description"
-            className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            onClick={() => setShowDescription(true)}
-          >
-            <HelpCircle className="h-4 w-4" />
-          </button>
+          <span className="group/help relative">
+            <button
+              aria-label="Scenario description"
+              className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={() => setShowDescription(true)}
+            >
+              <HelpCircle className="h-4 w-4" />
+            </button>
+            <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/help:block">
+              Scenario description
+            </span>
+          </span>
+          <span className="group/copy relative">
+            <button
+              aria-label="Copy run ID"
+              className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={() => {
+                navigator.clipboard.writeText(runId);
+                setCopiedRunId(true);
+                setTimeout(() => setCopiedRunId(false), 2000);
+              }}
+            >
+              {copiedRunId ? (
+                <Check className="h-4 w-4 text-green-500" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </button>
+            <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/copy:block">
+              {copiedRunId ? "Copied!" : "Copy run ID"}
+            </span>
+          </span>
         </span>
         <span className="text-[13px] text-muted-foreground">
           {maxRound} rounds · {channelMessages} messages · {timelineEntries} events ·{" "}
@@ -403,13 +431,20 @@ export function RunDetail({ runId }: { runId: string }) {
           {!isInProgress && !evaluationInProgress && forkEnabled ? (
             <>
               {" · "}
-              <button
-                className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                onClick={() => setShowEvalModal(true)}
-              >
-                <FlaskConical className="h-3 w-3" />
-                {evaluation !== null ? "Re-run Eval" : "Run Eval"}
-              </button>
+              <span className="group/eval relative">
+                <button
+                  className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  onClick={() => setShowEvalModal(true)}
+                >
+                  <FlaskConical className="h-3 w-3" />
+                  {evaluation !== null ? "Re-run Eval" : "Run Eval"}
+                </button>
+                <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/eval:block">
+                  {evaluation !== null
+                    ? "Re-run LLM-as-judge evaluation"
+                    : "Run LLM-as-judge evaluation"}
+                </span>
+              </span>
             </>
           ) : null}
         </span>
@@ -458,13 +493,18 @@ export function RunDetail({ runId }: { runId: string }) {
             {restData ? <> · {formatDuration(elapsedSince(restData.timestamp))}</> : null}
           </span>
           {effectiveStatus !== "starting" ? (
-            <button
-              className="ml-auto rounded p-1 transition-colors hover:bg-yellow-200 dark:hover:bg-yellow-800/50"
-              aria-label="Stop simulation"
-              onClick={() => stopMutation.mutate()}
-            >
-              <Sword className="h-3 w-3" />
-            </button>
+            <span className="group/stop relative ml-auto">
+              <button
+                className="rounded p-1 transition-colors hover:bg-yellow-200 dark:hover:bg-yellow-800/50"
+                aria-label="Stop simulation"
+                onClick={() => stopMutation.mutate()}
+              >
+                <Sword className="h-3 w-3" />
+              </button>
+              <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/stop:block">
+                Stop simulation
+              </span>
+            </span>
           ) : null}
         </div>
       ) : null}
@@ -480,7 +520,7 @@ export function RunDetail({ runId }: { runId: string }) {
       {/* Shell */}
       <div
         className={cn(
-          "relative grid min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-background *:min-h-0",
+          "relative grid min-h-0 flex-1 rounded-xl border border-border bg-background *:min-h-0",
           evaluation !== null && showEvalPanel
             ? "grid-cols-[192px_1fr_280px]"
             : "grid-cols-[192px_1fr]"
