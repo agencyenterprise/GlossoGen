@@ -40,7 +40,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Run
-         * @description Delete a simulation run and all its files.
+         * @description Stop the simulation if still running, then delete the run directory.
          */
         delete: operations["delete_run_api_runs__run_id__delete"];
         options?: never;

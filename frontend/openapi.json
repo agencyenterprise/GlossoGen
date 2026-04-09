@@ -65,7 +65,7 @@
       },
       "delete": {
         "summary": "Delete Run",
-        "description": "Delete a simulation run and all its files.",
+        "description": "Stop the simulation if still running, then delete the run directory.",
         "operationId": "delete_run_api_runs__run_id__delete",
         "parameters": [
           {

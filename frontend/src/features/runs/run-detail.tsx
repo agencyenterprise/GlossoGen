@@ -619,7 +619,7 @@ export function RunDetail({ runId }: { runId: string }) {
         <ForkModal
           isPending={fork.forkMutation.isPending}
           sourceModel={restData.agents[0]?.model ?? ""}
-          sourceProvider={restData.provider}
+          sourceProvider={restData.agents[0]?.provider ?? restData.provider}
           sourceAgents={restData.agents.map(agent => ({
             agent_id: agent.agent_id,
             role_name: agent.role_name,
@@ -628,7 +628,7 @@ export function RunDetail({ runId }: { runId: string }) {
           }))}
           initialModelOverrides={deriveInitialForkModelOverrides({
             sourceModel: restData.agents[0]?.model ?? "",
-            sourceProvider: restData.provider,
+            sourceProvider: restData.agents[0]?.provider ?? restData.provider,
             agents: restData.agents.map(agent => ({
               agent_id: agent.agent_id,
               model: agent.model,
