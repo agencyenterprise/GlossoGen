@@ -1,8 +1,13 @@
 """MCP server for browsing simulation runs, mounted inside the FastAPI app.
 
-Exposes four tools over Streamable HTTP: list_scenarios, list_runs,
-get_run_metadata, and get_run. Designed for LLM clients (Claude Code, Cursor)
-to query run data programmatically. All tools return structured JSON.
+Exposes tools over Streamable HTTP: list_scenarios, list_runs,
+get_run_metadata, get_run, get_knobs_schema, get_knobs_preset, and
+start_run. Designed for LLM clients (Claude Code, Cursor) to query run
+data programmatically. All tools return structured JSON.
+
+FastMCP construction is deferred to :func:`mount_mcp_browser` so that
+OAuth configuration (which depends on environment variables) can be
+injected at startup.
 """
 
 import logging
@@ -11,8 +16,10 @@ from typing import Any
 
 import orjson
 from fastapi import FastAPI
+from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from pydantic import AnyHttpUrl
 
 from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.scenarios import SCENARIO_REGISTRY
@@ -36,6 +43,7 @@ from schmidt.server.mcp.models import (
     McpStartRunResult,
     McpToolCall,
 )
+from schmidt.server.mcp.oauth_provider import SchmidtOAuthProvider
 from schmidt.server.run_launcher import launch_simulation
 from schmidt.server.runs.detail_reader import load_run_detail
 from schmidt.server.runs.discovery import discover_runs
@@ -160,7 +168,7 @@ def _load_evaluation_metrics(run_summary: RunSummary) -> list[McpEvalMetric] | N
 
 
 # ---------------------------------------------------------------------------
-# MCP tools
+# MCP tool implementations (plain async functions, registered in mount)
 # ---------------------------------------------------------------------------
 
 
@@ -204,24 +212,8 @@ evaluation results without loading messages. Pass a run_id prefix \
 to `start_run`.
 """
 
-mcp = FastMCP(
-    "schmidt-runs-browser",
-    instructions=_INSTRUCTIONS,
-    streamable_http_path="/",
-    transport_security=TransportSecuritySettings(
-        enable_dns_rebinding_protection=False,
-    ),
-)
 
-
-@mcp.tool(
-    name="list_scenarios",
-    description=(
-        "List all available simulation scenarios with their "
-        "knobs files, evaluators, and supported models/providers."
-    ),
-)
-async def list_scenarios() -> McpListScenariosResult:
+async def _tool_list_scenarios() -> McpListScenariosResult:
     """List available scenarios, models, and providers."""
     scenarios = []
     for name in sorted(SCENARIO_REGISTRY.keys()):
@@ -245,14 +237,7 @@ async def list_scenarios() -> McpListScenariosResult:
     )
 
 
-@mcp.tool(
-    name="list_runs",
-    description=(
-        "List simulation runs with pagination and optional filtering. "
-        "Returns runs sorted by timestamp (newest first)."
-    ),
-)
-async def list_runs(
+async def _tool_list_runs(
     offset: int = 0,
     limit: int = 20,
     scenario: str | None = None,
@@ -290,15 +275,7 @@ async def list_runs(
     )
 
 
-@mcp.tool(
-    name="get_run_metadata",
-    description=(
-        "Get lightweight metadata for a single run: header info, agents, "
-        "configuration, and evaluation results. Does not load messages or "
-        "reasoning. Accepts a full run_id or a unique prefix."
-    ),
-)
-async def get_run_metadata(run_id: str) -> McpRunMetadata:
+async def _tool_get_run_metadata(run_id: str) -> McpRunMetadata:
     """Get run metadata without loading full event log."""
     run = await _find_run_by_prefix(run_id_prefix=run_id)
 
@@ -336,16 +313,7 @@ async def get_run_metadata(run_id: str) -> McpRunMetadata:
     )
 
 
-@mcp.tool(
-    name="get_run",
-    description=(
-        "Get detailed run content including messages. Optionally include "
-        "reasoning, tool use, debug logs, and system prompts via flags. "
-        "Filter by agent_id or channel_id. Messages are paginated via "
-        "message_offset/message_limit."
-    ),
-)
-async def get_run(
+async def _tool_get_run(
     run_id: str,
     agent_id: str | None = None,
     channel_id: str | None = None,
@@ -473,15 +441,7 @@ async def get_run(
     )
 
 
-@mcp.tool(
-    name="get_knobs_schema",
-    description=(
-        "Get the JSON Schema for a scenario's knobs configuration. "
-        "Returns field names, types, enum values with descriptions, "
-        "and the list of available preset files."
-    ),
-)
-async def get_knobs_schema(scenario_name: str) -> McpGetKnobsSchemaResult:
+async def _tool_get_knobs_schema(scenario_name: str) -> McpGetKnobsSchemaResult:
     """Get the knobs JSON schema and available presets for a scenario."""
     if scenario_name not in SCENARIO_REGISTRY:
         raise ValueError(f"Unknown scenario: {scenario_name}")
@@ -494,15 +454,7 @@ async def get_knobs_schema(scenario_name: str) -> McpGetKnobsSchemaResult:
     )
 
 
-@mcp.tool(
-    name="get_knobs_preset",
-    description=(
-        "Load the contents of a knobs preset file for a scenario. "
-        "Use this to get a baseline configuration, then modify "
-        "individual fields before passing to start_run."
-    ),
-)
-async def get_knobs_preset(
+async def _tool_get_knobs_preset(
     scenario_name: str,
     knobs_file: str,
 ) -> McpGetKnobsPresetResult:
@@ -522,16 +474,7 @@ async def get_knobs_preset(
     )
 
 
-@mcp.tool(
-    name="start_run",
-    description=(
-        "Launch a new simulation as a background process. "
-        "Requires scenario_name, model, and provider. "
-        "Pass knobs from a preset (via get_knobs_preset) with "
-        "any modifications applied."
-    ),
-)
-async def start_run(
+async def _tool_start_run(
     scenario_name: str,
     model: str,
     provider: str,
@@ -561,11 +504,104 @@ async def start_run(
 
 
 # ---------------------------------------------------------------------------
-# Mount
+# Tool registration table
+# ---------------------------------------------------------------------------
+
+_TOOL_DEFS: list[tuple[str, str, Any]] = [
+    (
+        "list_scenarios",
+        "List all available simulation scenarios with their "
+        "knobs files, evaluators, and supported models/providers.",
+        _tool_list_scenarios,
+    ),
+    (
+        "list_runs",
+        "List simulation runs with pagination and optional filtering. "
+        "Returns runs sorted by timestamp (newest first).",
+        _tool_list_runs,
+    ),
+    (
+        "get_run_metadata",
+        "Get lightweight metadata for a single run: header info, agents, "
+        "configuration, and evaluation results. Does not load messages or "
+        "reasoning. Accepts a full run_id or a unique prefix.",
+        _tool_get_run_metadata,
+    ),
+    (
+        "get_run",
+        "Get detailed run content including messages. Optionally include "
+        "reasoning, tool use, debug logs, and system prompts via flags. "
+        "Filter by agent_id or channel_id. Messages are paginated via "
+        "message_offset/message_limit.",
+        _tool_get_run,
+    ),
+    (
+        "get_knobs_schema",
+        "Get the JSON Schema for a scenario's knobs configuration. "
+        "Returns field names, types, enum values with descriptions, "
+        "and the list of available preset files.",
+        _tool_get_knobs_schema,
+    ),
+    (
+        "get_knobs_preset",
+        "Load the contents of a knobs preset file for a scenario. "
+        "Use this to get a baseline configuration, then modify "
+        "individual fields before passing to start_run.",
+        _tool_get_knobs_preset,
+    ),
+    (
+        "start_run",
+        "Launch a new simulation as a background process. "
+        "Requires scenario_name, model, and provider. "
+        "Pass knobs from a preset (via get_knobs_preset) with "
+        "any modifications applied.",
+        _tool_start_run,
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Factory & mount
 # ---------------------------------------------------------------------------
 
 
-def mount_mcp_browser(app: FastAPI, runs_dir: Path) -> None:
+def _build_mcp_server(oauth_provider: SchmidtOAuthProvider, issuer_url: str) -> FastMCP:
+    """Construct the FastMCP instance with OAuth authentication."""
+    auth_settings = AuthSettings(
+        issuer_url=AnyHttpUrl(issuer_url),
+        resource_server_url=AnyHttpUrl(issuer_url),
+        client_registration_options=ClientRegistrationOptions(
+            enabled=True,
+            valid_scopes=["read", "write"],
+            default_scopes=["read", "write"],
+        ),
+        revocation_options=RevocationOptions(enabled=True),
+        required_scopes=["read"],
+    )
+
+    server = FastMCP(
+        "schmidt-runs-browser",
+        instructions=_INSTRUCTIONS,
+        streamable_http_path="/",
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=False,
+        ),
+        auth=auth_settings,
+        auth_server_provider=oauth_provider,
+    )
+
+    for tool_name, tool_desc, tool_fn in _TOOL_DEFS:
+        server.tool(name=tool_name, description=tool_desc)(tool_fn)
+
+    return server
+
+
+def mount_mcp_browser(
+    app: FastAPI,
+    runs_dir: Path,
+    oauth_provider: SchmidtOAuthProvider,
+    issuer_url: str,
+) -> None:
     """Mount the MCP runs browser on the FastAPI app at /mcp.
 
     Creates the Starlette sub-app and stores the session manager so the
@@ -575,6 +611,7 @@ def mount_mcp_browser(app: FastAPI, runs_dir: Path) -> None:
     global _runs_dir  # noqa: PLW0603
     _runs_dir = runs_dir
 
+    mcp = _build_mcp_server(oauth_provider=oauth_provider, issuer_url=issuer_url)
     starlette_app = mcp.streamable_http_app()
     app.mount("/mcp", starlette_app)
     app.state.mcp_session_manager = mcp.session_manager

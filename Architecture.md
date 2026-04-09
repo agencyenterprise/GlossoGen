@@ -28,6 +28,8 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 | API Client          | openapi-fetch with generated types from OpenAPI schema       |
 | Data Fetching       | TanStack React Query                                         |
 | MCP Runs API        | FastMCP mounted at `/mcp` on the FastAPI server (Streamable HTTP) |
+| MCP Authentication  | OAuth 2.0 with PKCE and dynamic client registration (MCP library built-in) |
+| MCP Token Storage   | SQLite via aiosqlite (`$SCHMIDT_RUNS_DIR/oauth.db`)              |
 
 
 
@@ -252,14 +254,14 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 - The server reads from the `runs/` directory at request time (no database).
 - `SCHMIDT_RUNS_DIR` environment variable configures the runs root directory.
 - CORS origins are read from the `ALLOWED_ORIGINS` environment variable (comma-separated). Defaults to `http://localhost:3000`.
-- Optional shared-password authentication via `APP_PASSWORD` environment variable. A pure ASGI middleware (`password_auth_middleware.py`) checks `Authorization: Bearer` headers and `?token=` query parameters (for SSE EventSource connections). All endpoints except `GET /api/health` are protected when enabled.
+- Optional shared-password authentication via `APP_PASSWORD` environment variable. A pure ASGI middleware (`password_auth_middleware.py`) checks `Authorization: Bearer` headers and `?token=` query parameters (for SSE EventSource connections). All REST endpoints except `GET /api/health` are protected when enabled. The `/mcp` path and OAuth well-known endpoints are excluded from password auth — the MCP server uses its own OAuth-based authentication.
 - Every endpoint declares a `response_model` and returns a Pydantic model instance. No dicts or strings are returned.
 - Status-like fields use enums (`HealthStatus`, `RunStatus`, `Verdict`) instead of bare strings. `RunStatus` includes `IN_PROGRESS` for runs that have not yet completed.
 - The run detail endpoint returns separate `messages` (ChannelMessage) and `reasoning` (ReasoningEntry) arrays, plus `debug_logs` (DebugLogEntry) parsed from the debug JSONL file.
 
 ### MCP Runs Browser
 
-An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data and run launch flows for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport, mounted via `app.mount("/mcp", mcp.streamable_http_app())`.
+An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data and run launch flows for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport, mounted via `app.mount("/mcp", mcp.streamable_http_app())`. Requires `OAUTH_ISSUER_URL` to be set; the MCP endpoint is disabled if unset.
 
 The MCP server exposes seven tools:
 
@@ -280,7 +282,24 @@ For run launch from MCP clients, a typical flow is:
 2. `get_knobs_preset` to load a baseline knobs payload.
 3. `start_run` with model/provider and any knob overrides.
 
-The MCP server reuses the same data layer as the REST API (`discover_runs()`, `load_run_detail()`), shares simulation launch helpers with the REST start endpoint (`run_launcher.py`), and inherits the existing `PasswordAuthMiddleware` and CORS configuration. Run ID parameters accept unique prefixes (e.g., first 8 characters) for convenience.
+The MCP server reuses the same data layer as the REST API (`discover_runs()`, `load_run_detail()`) and shares simulation launch helpers with the REST start endpoint (`run_launcher.py`). Run ID parameters accept unique prefixes (e.g., first 8 characters) for convenience.
+
+#### MCP OAuth Authentication
+
+The MCP endpoint uses OAuth 2.0 with PKCE for authentication, handled by the MCP library's built-in authorization server support. The `/mcp` path is excluded from the shared-password middleware — authentication is handled by the MCP library's `RequireAuthMiddleware`.
+
+The OAuth flow:
+
+1. **Discovery**: Clients fetch `/.well-known/oauth-protected-resource` (RFC 9728) to find the authorization server, then `/.well-known/oauth-authorization-server` (RFC 8414) for endpoint URLs. These are served at the host root as proxy routes since the MCP sub-app is mounted at `/mcp`.
+2. **Client registration**: `POST /mcp/register` (RFC 7591 dynamic client registration). The server generates a `client_id` and `client_secret`, stored in SQLite.
+3. **Authorization**: `GET /mcp/authorize` with PKCE `code_challenge`. If `APP_PASSWORD` is set, redirects to a login form at `/mcp/oauth/login` for password verification. If unset, auto-approves and redirects with an authorization code.
+4. **Token exchange**: `POST /mcp/token` exchanges the authorization code for an access token (1 hour) and refresh token (30 days).
+5. **Authenticated requests**: Bearer token in the `Authorization` header, validated by the MCP library's `BearerAuthBackend`.
+
+Implementation:
+- `server/mcp/oauth_provider.py` — `SchmidtOAuthProvider` implementing the `OAuthAuthorizationServerProvider` protocol
+- `server/mcp/oauth_storage.py` — `OAuthStorage` with SQLite tables for clients, authorization codes, access tokens, and refresh tokens
+- `server/mcp/oauth_login_page.py` — Minimal HTML login form for the authorization flow
 
 The frontend includes an MCP integration modal (accessible via the **MCP** button on the runs page) that shows connection instructions for Claude Code and Cursor.
 
