@@ -187,6 +187,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/export/artifacts/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Run Artifacts At Message
+         * @description Export artifacts from a simulation run as they existed at a specific message.
+         */
+        get: operations["export_run_artifacts_at_message_api_runs__run_id__export_artifacts__message_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/scenarios": {
         parameters: {
             query?: never;
@@ -1354,6 +1374,39 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Zip archive of the simulation run artifacts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/zip": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_run_artifacts_at_message_api_runs__run_id__export_artifacts__message_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Zip archive of artifacts at a specific message commit. */
             200: {
                 headers: {
                     [name: string]: unknown;

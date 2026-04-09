@@ -413,6 +413,54 @@
         }
       }
     },
+    "/api/runs/{run_id}/export/artifacts/{message_id}": {
+      "get": {
+        "summary": "Export Run Artifacts At Message",
+        "description": "Export artifacts from a simulation run as they existed at a specific message.",
+        "operationId": "export_run_artifacts_at_message_api_runs__run_id__export_artifacts__message_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Zip archive of artifacts at a specific message commit.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/zip": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/scenarios": {
       "get": {
         "summary": "List Scenarios",
