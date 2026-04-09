@@ -2,7 +2,8 @@
 
 Checks every HTTP request for a valid password in either the Authorization
 header (Bearer token) or the ``token`` query parameter. Skips CORS preflight
-(OPTIONS), the health-check endpoint, and non-HTTP scopes.
+(OPTIONS), the health-check endpoint, non-HTTP scopes, and ``/mcp`` paths
+(the MCP server handles its own OAuth-based authentication).
 """
 
 import hmac
@@ -13,6 +14,25 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
+
+# Paths that belong to the MCP OAuth flow and must bypass shared-password auth.
+_OAUTH_PATH_PREFIXES = (
+    "/mcp",
+    "/.well-known/oauth-",
+    "/.well-known/openid-configuration",
+    "/authorize",
+    "/token",
+    "/register",
+    "/revoke",
+)
+
+
+def _is_mcp_or_oauth_path(path: str) -> bool:
+    """Check whether a request path belongs to the MCP or OAuth subsystem."""
+    for prefix in _OAUTH_PATH_PREFIXES:
+        if path.startswith(prefix):
+            return True
+    return False
 
 
 class PasswordAuthMiddleware:
@@ -39,6 +59,12 @@ class PasswordAuthMiddleware:
             return
 
         if request.method == "GET" and request.url.path == "/api/health":
+            await self.app(scope, receive, send)
+            return
+
+        # Skip /mcp paths and OAuth endpoints — the MCP server handles its
+        # own OAuth-based authentication via the MCP library.
+        if _is_mcp_or_oauth_path(path=request.url.path):
             await self.app(scope, receive, send)
             return
 

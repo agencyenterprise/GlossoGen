@@ -46,7 +46,10 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
   - `password_auth_middleware.py` — pure ASGI middleware for shared-password authentication
   - `fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
-  - `mcp_browser.py` — MCP server mounted at `/mcp` for programmatic run browsing and launching (Claude Code, Cursor)
+  - `mcp/browser.py` — MCP server mounted at `/mcp` for programmatic run browsing and launching (Claude Code, Cursor)
+  - `mcp/oauth_provider.py` — OAuth 2.0 authorization server provider for MCP
+  - `mcp/oauth_storage.py` — SQLite-backed storage for OAuth clients, codes, and tokens
+  - `mcp/oauth_login_page.py` — login form for the MCP OAuth authorization flow
   - `run_launcher.py` — shared simulation launch helper used by REST and MCP run-start flows
 - `linter/` — custom linting scripts
 - `frontend/` — Next.js web application
@@ -125,6 +128,7 @@ cp .env.example .env
 | `APP_PASSWORD` | Optional | Shared password for web UI auth (disabled if unset) |
 | `ALLOWED_ORIGINS` | Optional | Comma-separated CORS origins (defaults to `http://localhost:3000`) |
 | `SCHMIDT_RUNS_DIR` | Optional | Directory for simulation run data (defaults to `./runs`) |
+| `OAUTH_ISSUER_URL` | Yes (for MCP) | Public backend URL for MCP OAuth (MCP is disabled if unset) |
 
 Frontend environment variables go in `frontend/.env.local` (see `frontend/.env.local.example`):
 
@@ -141,7 +145,11 @@ make dev-frontend   # start Next.js dev server on port 3000
 
 ## Authentication
 
-The application uses optional shared-password authentication controlled by the `APP_PASSWORD` environment variable on the backend.
+The application supports two authentication modes: shared-password (for the REST API and optionally MCP) and OAuth 2.0 (for MCP clients).
+
+### Shared-Password Authentication
+
+Controlled by the `APP_PASSWORD` environment variable.
 
 - **Enabled**: Set `APP_PASSWORD` to a password string. All API endpoints except `GET /api/health` require authentication.
 - **Disabled**: Leave `APP_PASSWORD` unset. All endpoints are open (default for local development).
@@ -152,9 +160,30 @@ The backend middleware (`password_auth_middleware.py`) accepts credentials via:
 
 The frontend `AuthGate` component probes `POST /api/auth/verify` on mount. If auth is required, it shows a login page. The password is stored in `localStorage` and attached to all API requests via openapi-fetch middleware.
 
+### MCP OAuth 2.0 Authentication
+
+The MCP server at `/mcp` uses OAuth 2.0 with PKCE and dynamic client registration. It is controlled by the `OAUTH_ISSUER_URL` environment variable.
+
+- **Enabled**: Set `OAUTH_ISSUER_URL` to the public base URL of the backend (e.g. `https://backend.up.railway.app`). The MCP server is mounted and protected by OAuth. The `/mcp` path is excluded from the shared-password middleware.
+- **Disabled**: Leave `OAUTH_ISSUER_URL` unset. The MCP server is not mounted and the `/mcp` endpoint is unavailable.
+
+OAuth configuration:
+- Clients auto-register via `POST /mcp/register` (dynamic client registration, RFC 7591)
+- Authorization uses the code flow with PKCE (RFC 7636) via `GET /mcp/authorize`
+- When `APP_PASSWORD` is set, authorization redirects to a login form at `/mcp/oauth/login` for password verification
+- When `APP_PASSWORD` is unset, authorization auto-approves (open access)
+- Token exchange at `POST /mcp/token` issues access tokens (1 hour) and refresh tokens (30 days)
+- OAuth metadata is discoverable at `GET /mcp/.well-known/oauth-authorization-server`
+- Token state is stored in SQLite at `$SCHMIDT_RUNS_DIR/oauth.db`
+
+Implementation files:
+- `src/schmidt/server/mcp/oauth_provider.py` — `OAuthAuthorizationServerProvider` implementation
+- `src/schmidt/server/mcp/oauth_storage.py` — SQLite-backed storage for clients, codes, and tokens
+- `src/schmidt/server/mcp/oauth_login_page.py` — login form for the authorization flow
+
 ## MCP Integration
 
-The backend exposes an MCP (Model Context Protocol) server at `/mcp` for programmatic access to simulation data from LLM clients like Claude Code or Cursor. The MCP server is mounted inside the existing FastAPI app and shares the same authentication and CORS configuration.
+The backend exposes an MCP (Model Context Protocol) server at `/mcp` for programmatic access to simulation data from LLM clients like Claude Code or Cursor. The MCP server is mounted inside the existing FastAPI app and uses OAuth 2.0 for authentication. Requires `OAUTH_ISSUER_URL` to be set.
 
 ### Available Tools
 
@@ -168,12 +197,12 @@ The backend exposes an MCP (Model Context Protocol) server at `/mcp` for program
 
 ### Connecting
 
-From the web UI, click the **MCP** button on the runs page to see connection instructions. Alternatively:
+From the web UI, click the **MCP** button on the runs page to see connection instructions. Clients discover OAuth automatically via the well-known metadata endpoint — no auth headers needed in the config.
 
 **Claude Code:**
 
 ```bash
-claude mcp add-json schmidt-runs '{"type":"http","url":"<API_URL>/mcp","headers":{"Authorization":"Bearer <APP_PASSWORD>"}}'
+claude mcp add-json schmidt-runs '{"type":"http","url":"<API_URL>/mcp"}'
 ```
 
 **Cursor** (`.cursor/mcp.json`):
@@ -182,16 +211,13 @@ claude mcp add-json schmidt-runs '{"type":"http","url":"<API_URL>/mcp","headers"
 {
   "mcpServers": {
     "schmidt-runs": {
-      "url": "<API_URL>/mcp",
-      "headers": {
-        "Authorization": "Bearer <APP_PASSWORD>"
-      }
+      "url": "<API_URL>/mcp"
     }
   }
 }
 ```
 
-Replace `<API_URL>` with the backend URL (e.g. `http://localhost:8000` for local development) and `<APP_PASSWORD>` with the shared password. Omit the `headers` object if authentication is disabled.
+Replace `<API_URL>` with the backend URL (e.g. `http://localhost:8000` for local development). The client handles OAuth registration, authorization, and token refresh automatically. If `APP_PASSWORD` is set, the user is prompted with a login form during the authorization flow.
 
 ## Deployment
 
@@ -216,6 +242,7 @@ Environment variables:
 - `APP_PASSWORD` — shared password for authentication
 - `ANTHROPIC_API_KEY` — required for simulations
 - `ALLOWED_ORIGINS` — comma-separated frontend URLs for CORS (e.g. `https://frontend.up.railway.app`)
+- `OAUTH_ISSUER_URL` — public backend URL to enable MCP OAuth (e.g. `https://backend.up.railway.app`)
 - `OPENAI_API_KEY`, `HF_TOKEN` — optional provider keys
 
 **Frontend service**: root directory `frontend`.

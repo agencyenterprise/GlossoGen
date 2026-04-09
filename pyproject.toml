@@ -25,6 +25,7 @@ dependencies = [
     "markdown>=3.7",
     "python-dotenv>=1.2.2",
     "dulwich>=1.1.0",
+    "aiosqlite>=0.22.1",
 ]
 
 [dependency-groups]

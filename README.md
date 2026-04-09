@@ -110,7 +110,9 @@ A FastAPI backend + Next.js frontend for browsing simulation runs. The frontend 
 
 ### Authentication
 
-Set `APP_PASSWORD` in `.env` to require a shared password for the web UI. All API endpoints except the health check are protected. If `APP_PASSWORD` is unset, authentication is disabled (default for local development).
+Set `APP_PASSWORD` in `.env` to require a shared password for the web UI. All REST API endpoints except the health check are protected. If `APP_PASSWORD` is unset, authentication is disabled (default for local development).
+
+The MCP endpoint at `/mcp` uses OAuth 2.0 with PKCE for authentication (see MCP Integration below).
 
 ### Starting the Servers
 
@@ -135,11 +137,17 @@ make gen-api-types
 
 ### MCP Integration
 
-The backend exposes an MCP (Model Context Protocol) server at `/mcp` for programmatic access to simulation data from LLM clients like Claude Code or Cursor. Click the **MCP** button on the runs page for connection instructions, or configure manually:
+The backend exposes an MCP (Model Context Protocol) server at `/mcp` for programmatic access to simulation data from LLM clients like Claude Code or Cursor. The MCP endpoint uses OAuth 2.0 with PKCE and dynamic client registration — clients handle authentication automatically.
+
+**Requires `OAUTH_ISSUER_URL`** to be set to the public backend URL (e.g. `http://localhost:8000`). The MCP endpoint is disabled if this variable is unset.
+
+Click the **MCP** button on the runs page for connection instructions, or configure manually:
 
 ```bash
-claude mcp add-json schmidt-runs '{"type":"http","url":"http://localhost:8000/mcp","headers":{"Authorization":"Bearer <APP_PASSWORD>"}}'
+claude mcp add-json schmidt-runs '{"type":"http","url":"http://localhost:8000/mcp"}'
 ```
+
+No auth headers needed — the client discovers OAuth metadata and handles registration, authorization, and token refresh automatically. If `APP_PASSWORD` is set, the user is prompted with a login form during the authorization flow.
 
 Available tools:
 - `list_scenarios`
@@ -205,8 +213,12 @@ src/schmidt/
   server/                      # FastAPI web server (schmidt serve)
     password_auth_middleware.py # Shared-password ASGI middleware
     fork_router.py             # POST /api/runs/{run_id}/fork endpoint
-    mcp_browser.py             # MCP server at /mcp for run browsing and launching
     run_launcher.py            # Shared run-launch utilities for REST and MCP start endpoints
+    mcp/                       # MCP server at /mcp with OAuth
+      browser.py               # FastMCP tools for run browsing and launching
+      oauth_provider.py        # OAuth 2.0 authorization server provider
+      oauth_storage.py         # SQLite-backed OAuth client/token storage
+      oauth_login_page.py      # Login form for OAuth authorization flow
 
 frontend/                      # Next.js web application
   src/features/auth/           # Login page and auth gate
@@ -222,7 +234,7 @@ The application deploys to Railway as two services from a single repository. Eac
 - **Backend** (`Dockerfile`, `railway.toml`): Python 3.12, FastAPI server with a persistent volume at `/data/runs` for simulation data.
 - **Frontend** (`frontend/Dockerfile`, `frontend/railway.toml`): Node 22, Next.js standalone build.
 
-Railway environment variables for the backend: `APP_PASSWORD`, `ANTHROPIC_API_KEY`, `ALLOWED_ORIGINS` (set to the frontend URL). The frontend requires `NEXT_PUBLIC_API_URL` as a build arg pointing to the backend URL.
+Railway environment variables for the backend: `APP_PASSWORD`, `ANTHROPIC_API_KEY`, `ALLOWED_ORIGINS` (set to the frontend URL), `OAUTH_ISSUER_URL` (set to the backend URL to enable MCP). The frontend requires `NEXT_PUBLIC_API_URL` as a build arg pointing to the backend URL.
 
 ## Linting
 
