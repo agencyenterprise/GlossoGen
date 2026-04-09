@@ -62,7 +62,7 @@ async def get_run_detail(run_id: str, request: Request) -> RunDetailResponse:
 
 @router.delete("/runs/{run_id}", status_code=204)
 async def delete_run(run_id: str, request: Request) -> None:
-    """Delete a simulation run and all its files."""
+    """Stop the simulation if still running, then delete the run directory."""
     runs_dir: Path = request.app.state.runs_dir
     summaries = await discover_runs(runs_dir=runs_dir)
 
@@ -71,6 +71,16 @@ async def delete_run(run_id: str, request: Request) -> None:
         raise HTTPException(status_code=404, detail="Run not found")
 
     run_dir = Path(matching[0].run_dir)
+
+    manifest = read_manifest(run_dir=run_dir)
+    if manifest is not None:
+        try:
+            os.kill(manifest.pid, signal.SIGTERM)
+            logger.info("Sent SIGTERM to simulation PID %d before deleting run %s", manifest.pid, run_id)
+        except ProcessLookupError:
+            logger.info("Simulation PID %d already dead for run %s", manifest.pid, run_id)
+        delete_manifest(run_dir=run_dir)
+
     shutil.rmtree(run_dir)
     logger.info("Deleted run directory: %s", run_dir)
 
