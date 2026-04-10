@@ -173,11 +173,17 @@ class AutonomousSupervisor:
                 messages_by_channel=self._resume_state.messages_by_channel,
             )
             for agent_id, session in agent_sessions.items():
-                for ch_id in runtime.channel_router.get_agent_channel_ids(agent_id=agent_id):
-                    session.set_last_seen_count(
-                        channel_id=ch_id,
-                        count=runtime.channel_router.get_message_count(channel_id=ch_id),
-                    )
+                has_history = bool(self._resume_state.agent_message_histories.get(agent_id))
+                if has_history:
+                    for ch_id in runtime.channel_router.get_agent_channel_ids(
+                        agent_id=agent_id,
+                    ):
+                        session.set_last_seen_count(
+                            channel_id=ch_id,
+                            count=runtime.channel_router.get_message_count(
+                                channel_id=ch_id,
+                            ),
+                        )
             start_round = self._resume_state.round_number
             last_injected = self._resume_state.injected_rounds
             logger.info(
