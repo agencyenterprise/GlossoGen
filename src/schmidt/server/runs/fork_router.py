@@ -178,6 +178,10 @@ def _apply_edits_and_new_run_id(
 ) -> str:
     """Rewrite the JSONL in-place, applying message edits and a new run ID.
 
+    Strips ``llm_response_received`` and ``tool_result_received`` events so
+    that agents start fresh on resume instead of replaying a conversation
+    history that still contains the pre-edit text in tool results.
+
     Returns the new fork run ID.
     """
     fork_run_id = str(uuid4())
@@ -190,11 +194,15 @@ def _apply_edits_and_new_run_id(
         if not stripped:
             continue
         event_dict = orjson.loads(stripped)
+        event_type = event_dict.get("event_type")
 
-        if event_dict.get("event_type") == "simulation_started":
+        if event_type in ("llm_response_received", "tool_result_received"):
+            continue
+
+        if event_type == "simulation_started":
             event_dict["run_id"] = fork_run_id
 
-        if event_dict.get("event_type") == "message_sent":
+        if event_type == "message_sent":
             msg = event_dict.get("message", {})
             msg_id = msg.get("message_id", "")
             if msg_id in message_edits:
