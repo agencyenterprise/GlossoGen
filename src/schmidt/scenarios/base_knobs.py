@@ -15,7 +15,7 @@ class AgentModelOverride(BaseModel):
 class BaseKnobs(BaseModel):
     """Base knobs shared by all scenarios."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     max_round_duration_seconds: float
     model_overrides: dict[str, AgentModelOverride]
