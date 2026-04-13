@@ -23,23 +23,10 @@ See `.env.example` for all available variables (API keys, authentication, CORS).
 The CLI auto-generates a timestamped subdirectory under `--runs-dir`. Each round, agents communicate freely until all are idle or the round duration expires.
 
 ```bash
-# Incident Response
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/incident_response/knobs_baseline.json \
-  > ./runs/incident_response_stdout.log 2>&1 &
-
-# Car Recall
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
   --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
   --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
-
-# Product Launch
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run product_launch \
-  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/product_launch/knobs_baseline.json \
-  > ./runs/product_launch_stdout.log 2>&1 &
 ```
 
 Flags:
@@ -87,20 +74,17 @@ runs/{scenario_name}/{unix_timestamp}/
 After a simulation completes, point `--run-dir` at the specific run directory. Evaluation uses `--provider` to select the LLM judge.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate incident_response \
-  --run-dir ./runs/incident_response/1742234567 \
-  --evaluators secret_leak,instruction_adherence,cooperation \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate car_recall \
+  --run-dir ./runs/car_recall/1742234567 \
+  --evaluators secret_leak,fact_surfacing,decision_correctness \
   --model claude-sonnet-4-20250514 --provider anthropic
 ```
 
-Generic evaluators (available to all scenarios): `secret_leak`, `instruction_adherence`, `cooperation`, `communication_pattern`
+Generic evaluators (available to all scenarios): `secret_leak`
 
 Scenario-specific evaluators:
 
-- **incident_response**: generic evaluators only
 - **car_recall**: `fact_surfacing`, `report_divergence`, `decision_correctness`
-- **product_launch**: `launch_outcome`, `emergent_behavior`, `information_integrity`, `coordination_efficiency`, `conflict_resolution`, `report_accuracy`
-- **persuasion_debate**: `persuasion_accuracy`, `persuasion_dynamics`
 
 Output is a JSON report with per-evaluator verdicts, scores, evidence, and per-agent breakdowns.
 
@@ -165,21 +149,9 @@ Typical MCP run-start workflow:
 
 ## Scenarios
 
-### Incident Response
-
-Three agents (Engineer, Support Lead, PM) collaborate in a war room to diagnose and fix a production bug. The Engineer privately knows the root cause but is instructed to hide it. 6 rounds with escalating pressure. See the [scenario README](src/schmidt/scenarios/incident_response/README.md).
-
 ### Car Recall
 
 Five agents (Engineer, Legal, CFO, PR, Regulator) decide whether to issue a vehicle recall. Each holds private facts that, combined, point to a full recall. 3–5 rounds with escalating pressure. Configurable knobs for time pressure, goal alignment, and more. See the [scenario README](src/schmidt/scenarios/car_recall/README.md).
-
-### Product Launch
-
-Six delegation-framed agents (PM, Backend Engineer, Frontend Engineer, Data Analyst, QA Lead, Product Designer) coordinate to ship a software product within a budget and timeline. Deliberate information asymmetry between agents. 8–12 rounds with configurable knobs. See the [scenario README](src/schmidt/scenarios/product_launch/README.md).
-
-### Persuasion Debate
-
-2+ agents discuss trivia questions with four evaluation modes from the PBT paper (Stengel-Eskin et al., 2025). Each round has a blind phase (independent answers) followed by a discussion phase. See the [scenario README](src/schmidt/scenarios/persuasion_debate/README.md).
 
 ## Project Structure
 
@@ -212,7 +184,7 @@ src/schmidt/
 
   server/                      # FastAPI web server (schmidt serve)
     password_auth_middleware.py # Shared-password ASGI middleware
-    fork_router.py             # POST /api/runs/{run_id}/fork endpoint
+    runs/fork_router.py        # POST /api/runs/{run_id}/fork endpoint
     run_launcher.py            # Shared run-launch utilities for REST and MCP start endpoints
     mcp/                       # MCP server at /mcp with OAuth
       browser.py               # FastMCP tools for run browsing and launching

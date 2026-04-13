@@ -28,28 +28,6 @@ def _format_tool_args(arguments: dict[str, Any]) -> str:
     return ", ".join(f"{k}={v}" for k, v in arguments.items())
 
 
-def build_full_transcript(
-    events: list[SimulationEvent],
-    scenario: SimulationScenario,
-) -> str:
-    """Build a chronological transcript of all messages and tool calls,
-    labeled with sender and channel/tool context.
-    """
-    lines: list[str] = []
-    for event in events:
-        if isinstance(event, MessageSent):
-            msg = event.message
-            sender_label = scenario.get_agent_display_name(agent_id=msg.sender_agent_id)
-            lines.append(f"[{msg.channel_id}] {sender_label}: {msg.text}")
-        elif isinstance(event, LLMResponseReceived):
-            sender_label = scenario.get_agent_display_name(agent_id=event.agent_id)
-            for tool_call in event.tool_calls:
-                if tool_call.tool_name not in _MESSAGE_TOOLS:
-                    formatted_args = _format_tool_args(arguments=tool_call.arguments)
-                    lines.append(f"[{tool_call.tool_name}] {sender_label}: {formatted_args}")
-    return "\n".join(lines)
-
-
 def build_channel_transcript(
     events: list[SimulationEvent],
     channel_id: str,

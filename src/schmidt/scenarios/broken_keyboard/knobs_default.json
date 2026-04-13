@@ -1,6 +1,0 @@
-{
-    "max_round_duration_seconds": 45.0,
-    "model_overrides": {},
-    "r_drop_rate": 0.9,
-    "max_rounds": 18
-}

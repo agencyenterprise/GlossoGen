@@ -159,14 +159,11 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                             channel_id=ch,
                         ),
                     )
-            delay = session.sample_reaction_delay()
             logger.info(
-                "Agent %s received %s, applying %.2fs reaction delay",
+                "Agent %s received %s",
                 session.agent_id,
                 notification.type.value,
-                delay,
             )
-            await asyncio.sleep(delay)
             return notification.model_dump()
 
     @mcp.tool(

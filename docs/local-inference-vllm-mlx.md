@@ -139,7 +139,7 @@ OPENAI_API_KEY=dummy
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate car_recall \
   --run-dir ./runs/car_recall/<timestamp> \
-  --evaluators secret_leak,cooperation \
+  --evaluators secret_leak,fact_surfacing \
   --model mlx-community/Qwen2.5-14B-Instruct-4bit --provider openai
 ```
 

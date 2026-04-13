@@ -162,11 +162,6 @@ class SimulationScenario(ABC):
         ...
 
     @abstractmethod
-    def get_agent_reaction_delay_range(self, agent_id: str) -> tuple[float, float]:
-        """Return the (min, max) seconds an agent waits before reacting to a notification."""
-        ...
-
-    @abstractmethod
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:
         """Return scenario-specific tools to register on the MCP server.
 
