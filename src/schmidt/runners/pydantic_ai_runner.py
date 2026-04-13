@@ -368,7 +368,7 @@ class PydanticAIRunner(AgentRunner):
         - ``FunctionToolCallEvent``: A tool call is fully assembled and about
           to be executed by the framework.
         - ``FunctionToolResultEvent``: The MCP server returned a result for a
-          tool call. The done-detection logic inspects ``check_messages``
+          tool call. The done-detection logic inspects ``read_notifications``
           results here: if the serialized result contains ``"type": "done"``
           the agent's loop will terminate after the current cycle.
         """
@@ -476,9 +476,9 @@ class PydanticAIRunner(AgentRunner):
         result_content: str,
         state: _StreamingState,
     ) -> None:
-        """Check whether a check_messages tool result contains a done notification.
+        """Check whether a read_notifications tool result contains a done notification.
 
-        The MCP server's ``check_messages`` tool returns a JSON object with a
+        The MCP server's ``read_notifications`` tool returns a JSON object with a
         ``"type"`` field. When ``type`` is ``"done"``, the simulation is over
         and the agent should stop after the current cycle. We detect this by
         checking whether the string representation of the result contains
@@ -487,11 +487,11 @@ class PydanticAIRunner(AgentRunner):
         """
         if matched is None:
             return
-        if not matched.tool_name.endswith("check_messages"):
+        if not matched.tool_name.endswith("read_notifications"):
             return
         if '"type": "done"' in result_content or "'type': 'done'" in result_content:
             logger.info(
-                "Agent %s check_messages returned done signal",
+                "Agent %s read_notifications returned done signal",
                 agent_id,
             )
             state.got_done = True

@@ -38,9 +38,9 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 1. **CLI** parses arguments in two passes (first to identify the scenario, then to parse known flags plus `key=value` overrides). Builds the scenario, agent configs, event logger, and agent runner. Passes everything into the `AutonomousSupervisor`.
 2. **AutonomousSupervisor.run()** opens the event logger, builds per-agent `AgentSession` objects (with scenario-defined reaction delay ranges), creates the `SimulationRuntime` (FastMCP server), and wires a `GameClock`. Logs `SimulationStarted` and one `AgentRegistered` event per agent.
 3. **MCP server starts** on a configured port, exposing the `comms` MCP server. Agent runners are launched as concurrent asyncio tasks, each starting an external Claude Code process connected to the MCP server URL.
-4. **Game clock delivers round-1 injections** as `NewInfoNotification` messages pushed to agent session queues. Agents receive these via the `check_messages` MCP tool and begin interacting.
-5. **Agents act autonomously** by calling MCP tools: `check_messages` (blocks until a notification arrives), `read_channel` (fetches recent messages), `send_message` (posts to a channel), `list_channels` (discovers available channels), and `get_channel_members` (sees who is in a channel). There is no central turn controller.
-6. **Round advancement** uses a hybrid condition. The game clock polls at 500ms intervals and advances the round when either (a) all agents are idle (blocked on `check_messages` with empty queues) or (b) the round duration exceeds `max_round_duration_seconds` since the last message. When a round advances, the game clock delivers injections for the new round to the appropriate agents.
+4. **Game clock delivers round-1 injections** as `NewInfoNotification` messages pushed to agent session queues. Agents receive these via the `read_notifications` MCP tool and begin interacting.
+5. **Agents act autonomously** by calling MCP tools: `read_notifications` (blocks until a notification arrives), `read_channel` (fetches recent messages), `send_message` (posts to a channel), `list_channels` (discovers available channels), and `get_channel_members` (sees who is in a channel). There is no central turn controller.
+6. **Round advancement** uses a hybrid condition. The game clock polls at 500ms intervals and advances the round when either (a) all agents are idle (blocked on `read_notifications` with empty queues) or (b) the round duration exceeds `max_round_duration_seconds` since the last message. When a round advances, the game clock delivers injections for the new round to the appropriate agents.
 7. **Termination** occurs when the game clock reaches `max_rounds`. The runtime broadcasts a `DoneNotification` to all agents, waits up to 30 seconds for agent tasks to finish, and logs `SimulationEnded` with total message count.
 
 ## MCP Tools
@@ -49,7 +49,7 @@ The `SimulationRuntime` registers five MCP tools on a FastMCP server named `comm
 
 | Tool                 | Parameters                          | Behavior                                                                                                    |
 | -------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `check_messages`     | *(none)*                   | Blocks until a notification arrives in the agent's queue. Applies a random reaction delay before returning.  |
+| `read_notifications`     | *(none)*                   | Blocks until a notification arrives in the agent's queue. Applies a random reaction delay before returning.  |
 | `read_channel`       | `channel_id`, `last_n`     | Returns the last N messages from a channel the agent belongs to. Validates membership.                      |
 | `send_message`       | `channel_id`, `text`       | Posts a message under a per-channel write lock, notifies other channel members, fires on-message callbacks.  |
 | `list_channels`      | *(none)*                   | Returns channels the agent belongs to with scenario-defined display names.                                  |
@@ -69,14 +69,14 @@ Agent runners launch and manage external agent processes that connect to the MCP
 - A configurable `max_turns` limit (default: 200)
 - An initial prompt instructing the agent to start by checking for messages
 
-The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and exits when a done notification arrives via `check_messages`. The supervisor creates a new `PydanticAIRunner` per agent.
+The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and exits when a done notification arrives via `read_notifications`. The supervisor creates a new `PydanticAIRunner` per agent.
 
 ## Game Clock
 
 The `GameClock` runs as an asyncio task and manages three responsibilities:
 
 1. **Round progression**: Polls at 500ms intervals, checking two advancement conditions:
-   - *All agents idle*: Every agent is blocked on `check_messages` with an empty notification queue.
+   - *All agents idle*: Every agent is blocked on `read_notifications` with an empty notification queue.
    - *Round timeout*: Time since the last message exceeds `max_round_duration_seconds`.
 2. **Injection delivery**: When a round advances, the clock calls `scenario.get_injection(round_number, agent_id)` for each agent and pushes `NewInfoNotification` to agents that have injections scheduled. Logs an `InjectionDelivered` event for each.
 3. **Termination**: When `current_round >= max_rounds` and an advancement trigger fires, the clock returns `RunStatus.SCENARIO_COMPLETE` to the supervisor.
@@ -89,7 +89,7 @@ Each agent has an `AgentSession` that tracks:
 
 - **Notification queue**: An `asyncio.Queue` of `ActivityNotification` objects (new messages, new info, done).
 - **Idle flag**: Set to `True` when the agent is blocked on `wait_for_notification()`, `False` when a notification arrives or is pushed.
-- **Reaction delay**: A `(min, max)` range (configured per-agent by the scenario). When `check_messages` returns, the runtime sleeps for a random duration in this range before delivering the notification.
+- **Reaction delay**: A `(min, max)` range (configured per-agent by the scenario). When `read_notifications` returns, the runtime sleeps for a random duration in this range before delivering the notification.
 
 The idle flag is how the game clock determines whether all agents have finished processing.
 
@@ -106,7 +106,7 @@ Three notification types flow through agent session queues:
 Two mechanisms prevent message collisions and produce realistic timing:
 
 1. **Per-channel write locks**: Each channel has an `asyncio.Lock`. The `send_message` tool acquires the lock before appending a message and notifying other members. This serializes writes to the same channel.
-2. **Reaction delays**: After an agent receives a notification via `check_messages`, the runtime applies a random delay (sampled from the agent's configured range) before returning the result. This staggers agent responses and prevents simultaneous reactions.
+2. **Reaction delays**: After an agent receives a notification via `read_notifications`, the runtime applies a random delay (sampled from the agent's configured range) before returning the result. This staggers agent responses and prevents simultaneous reactions.
 
 ## Channel and Message Routing
 
@@ -151,7 +151,7 @@ The system prompt reads:
 
 This keeps agents grounded as genuine assistants (which they are), avoids roleplay artifacts, and makes secret-leak evaluation more meaningful — confidential information is shared as trusted context between user and assistant.
 
-Agents do not know they are in a simulation. The MCP server is named `comms` and the tools are named after generic communication primitives (`check_messages`, `read_channel`, `send_message`). From the agent's perspective, it is connected to a messaging system.
+Agents do not know they are in a simulation. The MCP server is named `comms` and the tools are named after generic communication primitives (`read_notifications`, `read_channel`, `send_message`). From the agent's perspective, it is connected to a messaging system.
 
 ## Event Log
 
@@ -220,6 +220,7 @@ The user selects which evaluators to run — they are not automatically applied.
 
 **Scenario-specific evaluators:**
 - **car_recall**: `fact_surfacing`, `report_divergence`, `decision_correctness`
+- **emergency_room**: `language_emergence`
 
 **Output**: A JSON report with per-evaluator results:
 

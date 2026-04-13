@@ -132,6 +132,15 @@ class RunStatus(str, Enum):
     KILLED = "killed"
 
 
+class WorldEventDelivered(EventBase):
+    """Emitted when a world simulation pushes a notification to an agent."""
+
+    event_type: Literal["world_event_delivered"] = "world_event_delivered"
+    agent_id: str
+    round_number: int
+    text: str
+
+
 class SimulationEnded(EventBase):
     """Emitted when the simulation finishes, with termination reason, message count, and cost."""
 
@@ -151,6 +160,7 @@ SimulationEvent = Annotated[
         ToolResultReceived,
         RoundAdvanced,
         InjectionDelivered,
+        WorldEventDelivered,
         SimulationEnded,
     ],
     Discriminator("event_type"),

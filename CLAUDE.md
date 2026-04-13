@@ -26,12 +26,13 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `prompts/` — Jinja2 templates for agent system prompts and injection messages
   - `evaluation/` — scenario-specific evaluators (optional)
 - `src/schmidt/runtime/` — autonomous mode runtime (MCP server + coordination):
-  - `simulation_state.py` — shared state: channels, sessions, locks, callbacks
-  - `mcp_tools.py` — MCP tool definitions (check_messages, read_channel, send_message, etc.)
+  - `simulation_state.py` — shared state: channels, sessions, locks, callbacks, world context, token counters
+  - `mcp_tools.py` — MCP tool definitions (read_notifications, read_channel, send_message, etc.)
   - `mcp_server.py` — starts FastMCP over Streamable HTTP
   - `game_clock.py` — round progression, injection delivery, termination detection
   - `agent_session.py` — per-agent notification queue, reaction delay, idle tracking
   - `scenario_mcp_tool.py` — ScenarioMcpTool for scenario-specific tool registration
+  - `scenario_world.py` — ScenarioWorld ABC, WorldContext, MessageEvent, RoundAdvancedEvent
 - `src/schmidt/runners/` — autonomous mode agent runners:
   - `agent_runner_base.py` — abstract base class for agent runners
   - `pydantic_ai_runner.py` — Pydantic AI agent runner via pydantic-ai framework
@@ -423,6 +424,7 @@ Available evaluators per scenario:
 Generic evaluators (available to all): `secret_leak`
 
 - **car_recall**: generic + `fact_surfacing`, `report_divergence`, `decision_correctness`
+- **emergency_room**: generic + `language_emergence`
 
 ## Destructive Actions
 

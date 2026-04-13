@@ -21,8 +21,11 @@ class SendMessageResult(BaseModel):
     On success, status is "sent" and new_messages is empty.
     On conflict (new messages arrived since the agent's last read_channel),
     status is "conflict" and new_messages contains the unseen messages.
+    The token_count reports the word count of the original text as a proxy
+    for LLM tokens, or zero when the message was not delivered.
     """
 
     status: str
     detail: str
     new_messages: list[ChannelMessage]
+    token_count: int

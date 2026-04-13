@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 BASE_TOOL_NAMES: frozenset[str] = frozenset(
     {
-        "check_messages",
+        "read_notifications",
         "read_channel",
         "send_message",
         "list_channels",
@@ -110,10 +110,10 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
     """
 
     @mcp.tool(
-        name="check_messages",
-        description="Check if there are any new messages or updates for you.",
+        name="read_notifications",
+        description="Read the latest updates from the world: new messages, events, or status.",
     )
-    async def check_messages(ctx: ToolContext) -> dict[str, Any]:
+    async def read_notifications(ctx: ToolContext) -> dict[str, Any]:
         """Block until there is activity for the agent, then return it.
 
         For NewMessagesNotifications, filters out channels the agent has
@@ -134,7 +134,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
             except asyncio.TimeoutError:
                 session.is_idle = False
                 logger.info(
-                    "Agent %s check_messages timed out after 30s, returning no_activity",
+                    "Agent %s read_notifications timed out after 30s, returning no_activity",
                     session.agent_id,
                 )
                 return {"type": "no_activity", "detail": "No new messages."}
@@ -255,6 +255,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                         "Review them and either revise your message or re-send with force=true."
                     ),
                     new_messages=new_messages,
+                    token_count=0,
                 ).model_dump()
 
             transformed_text = runtime.scenario.transform_outgoing_message(
@@ -296,11 +297,19 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
 
             runtime.fire_on_message_callbacks()
 
-        logger.info("Agent %s sent %d chars to channel %s", agent_id, len(text), channel_id)
+        token_count = await runtime.count_tokens(agent_id=agent_id, text=text)
+        runtime.notify_world_of_message(
+            agent_id=agent_id,
+            channel_id=channel_id,
+            text=text,
+            token_count=token_count,
+        )
+        logger.info("Agent %s sent %d tokens to channel %s", agent_id, token_count, channel_id)
         return SendMessageResult(
             status="sent",
             detail=f"Message sent to channel '{channel_id}'",
             new_messages=[],
+            token_count=token_count,
         ).model_dump()
 
     @mcp.tool(

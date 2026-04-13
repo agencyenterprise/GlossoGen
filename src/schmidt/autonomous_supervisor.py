@@ -27,6 +27,7 @@ from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.game_clock import GameClock
 from schmidt.runtime.mcp_server import start_mcp_server
 from schmidt.runtime.mcp_tools import BASE_TOOL_NAMES
+from schmidt.runtime.scenario_world import WorldContext
 from schmidt.runtime.simulation_state import SimulationRuntime
 from schmidt.scenario_protocol import SimulationScenario
 
@@ -147,6 +148,12 @@ class AutonomousSupervisor:
             config.agent_id: frozenset(config.tool_names) for config in self._agent_configs
         }
 
+        # Build the world context (needs sessions and logger, not the runtime).
+        world_context = WorldContext(
+            agent_sessions=agent_sessions,
+            event_logger=self._event_logger,
+        )
+
         # Build the simulation runtime (shared state) and store for error-path access.
         runtime = SimulationRuntime(
             scenario=self._scenario,
@@ -154,6 +161,8 @@ class AutonomousSupervisor:
             event_logger=self._event_logger,
             agent_sessions=agent_sessions,
             agent_tool_allowlists=agent_tool_allowlists,
+            world_context=world_context,
+            agent_configs=self._agent_configs,
         )
         self._runtime = runtime
 
@@ -192,6 +201,7 @@ class AutonomousSupervisor:
             scenario=self._scenario,
             agent_sessions=agent_sessions,
             event_logger=self._event_logger,
+            world_context=world_context,
             max_rounds=self._scenario.get_round_count(),
             max_round_duration_seconds=self._scenario.get_max_round_duration_seconds(),
             start_round=start_round,
@@ -278,8 +288,15 @@ class AutonomousSupervisor:
             )
             logger.info("Launched agent %s (%s)", config.agent_id, config.role_name)
 
+        # Start the world simulation task.
+        world = self._scenario.get_world()
+        world_task = asyncio.create_task(
+            world.run(context=world_context),
+            name="world",
+        )
+
         # Push wake-up notifications for resumed runs so agents respond immediately
-        # instead of blocking on check_messages() until the next round advances.
+        # instead of blocking on read_notifications() until the next round advances.
         if self._resume_state is not None:
             for agent_id, session in agent_sessions.items():
                 agent_channel_ids = runtime.channel_router.get_agent_channel_ids(
@@ -319,6 +336,14 @@ class AutonomousSupervisor:
                 logger.exception("Agent task %s failed", task.get_name())
 
         total_cost_usd = sum(r.total_cost_usd for r in agent_results)
+
+        # Stop the world simulation.
+        logger.info("Stopping world simulation")
+        world_task.cancel()
+        try:
+            await world_task
+        except asyncio.CancelledError:
+            pass
 
         # Stop the MCP server.
         logger.info("Stopping MCP server")

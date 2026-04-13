@@ -16,7 +16,7 @@ class AgentRunner(ABC):
     """Launches an autonomous agent connected to the MCP server.
 
     Each runner instance handles one agent. The agent shuts down when
-    the MCP server sends a done notification via ``check_messages``.
+    the MCP server sends a done notification via ``read_notifications``.
     """
 
     @abstractmethod

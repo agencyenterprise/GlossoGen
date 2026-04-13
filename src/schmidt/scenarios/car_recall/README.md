@@ -46,7 +46,7 @@ The Regulator has zero visibility into the internal channel. The internal/extern
 
 **`read_channel(channel_id: str, last_n: int)`** — MCP tool, all agents. Returns the last N messages from a channel.
 
-**`check_messages()`** — MCP tool, all agents. Blocks until new activity occurs on any channel the agent belongs to, then returns the new messages. Agents call this when waiting for others to respond.
+**`read_notifications()`** — MCP tool, all agents. Blocks until new activity occurs on any channel the agent belongs to, then returns the new messages. Agents call this when waiting for others to respond.
 
 **`list_channels()`** — MCP tool, all agents. Returns all channels the agent is a member of, with display names.
 
@@ -88,11 +88,11 @@ Each round, agents receive a private message framed as new developments. Deliver
 
 Agents act autonomously within each round. There is no fixed speaking order — each agent decides independently when to send messages and when to wait.
 
-**Blocking on activity**: Agents call `check_messages` to block until new channel activity occurs. This prevents busy-waiting and naturally staggers responses — agents wake up and react when another agent posts a message.
+**Blocking on activity**: Agents call `read_notifications` to block until new channel activity occurs. This prevents busy-waiting and naturally staggers responses — agents wake up and react when another agent posts a message.
 
 **Per-channel locks**: Each channel has a write lock so that only one agent sends a message at a time, preventing message interleaving within a single channel.
 
-**Round structure**: Each round begins with injection messages delivered to each agent. Agents then communicate freely across all channels they belong to. Internal agents discuss on the internal channel; PR and the Regulator exchange on the regulator-report channel (Days 3–4 in 5-agent mode). A round ends when all agents are idle (blocked on `check_messages` with no pending activity) or when the `max_round_duration_seconds` timeout is reached.
+**Round structure**: Each round begins with injection messages delivered to each agent. Agents then communicate freely across all channels they belong to. Internal agents discuss on the internal channel; PR and the Regulator exchange on the regulator-report channel (Days 3–4 in 5-agent mode). A round ends when all agents are idle (blocked on `read_notifications` with no pending activity) or when the `max_round_duration_seconds` timeout is reached.
 
 | Round | Internal discussion | Regulator discussion |
 |-------|-------------------|---------------------|

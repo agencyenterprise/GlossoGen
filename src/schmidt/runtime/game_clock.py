@@ -13,6 +13,7 @@ from schmidt.event_logger import EventLogger
 from schmidt.models.event import InjectionDelivered, RoundAdvanced, RunStatus
 from schmidt.runtime.activity_notification import NewInfoNotification
 from schmidt.runtime.agent_session import AgentSession
+from schmidt.runtime.scenario_world import WorldContext
 from schmidt.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ class GameClock:
         scenario: SimulationScenario,
         agent_sessions: dict[str, AgentSession],
         event_logger: EventLogger,
+        world_context: WorldContext,
         max_rounds: int,
         max_round_duration_seconds: float,
         start_round: int,
@@ -38,6 +40,7 @@ class GameClock:
         self._scenario = scenario
         self._agent_sessions = agent_sessions
         self._event_logger = event_logger
+        self._world_context = world_context
         self._max_rounds = max_rounds
         self._max_round_duration_seconds = max_round_duration_seconds
         self._start_round = start_round
@@ -52,7 +55,7 @@ class GameClock:
         self._last_message_time = time.monotonic()
 
     def _all_agents_idle(self) -> bool:
-        """Return True if every agent is blocked on check_messages with no pending notifications."""
+        """True when every agent is blocked on read_notifications with empty queues."""
         for session in self._agent_sessions.values():
             if not session.is_idle:
                 return False
@@ -128,6 +131,7 @@ class GameClock:
         )
 
         self._scenario.on_round_advanced(round_number=self._current_round)
+        self._world_context.signal_round_advanced(round_number=self._current_round)
 
         await self._deliver_injections(round_number=self._current_round)
 
@@ -143,6 +147,7 @@ class GameClock:
 
         if self._resuming:
             self._scenario.on_round_advanced(round_number=self._current_round)
+            self._world_context.signal_round_advanced(round_number=self._current_round)
             logger.info(
                 "Game clock resumed at round %d/%d",
                 self._current_round,
@@ -156,6 +161,7 @@ class GameClock:
                 )
             )
             self._scenario.on_round_advanced(round_number=self._current_round)
+            self._world_context.signal_round_advanced(round_number=self._current_round)
             await self._deliver_injections(round_number=self._current_round)
             logger.info(
                 "Game clock started. Round %d/%d, injections delivered.",

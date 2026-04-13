@@ -1,0 +1,5 @@
+Two agents — a first-semester nursing student in an ambulance and an ER doctor at the hospital — communicate over radio to save critically ill patients. Every word sent costs {{ seconds_per_token }} simulated seconds. If total radio time exceeds a patient's time budget, the patient dies.
+
+Five patients arrive across five rounds, with progressively larger time budgets. Early patients have extremely tight budgets (~{{ patient_cases[0].time_budget_seconds }}s) that are nearly impossible with normal language, forcing agents to develop compressed communication patterns.
+
+The nursing student observes symptoms and reports to the doctor in plain language. The doctor diagnoses remotely and gives simple treatment instructions. A live patient monitor sends real-time status updates as time runs out.

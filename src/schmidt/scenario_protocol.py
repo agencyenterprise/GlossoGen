@@ -13,6 +13,7 @@ from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
+from schmidt.runtime.scenario_world import ScenarioWorld
 
 logger = logging.getLogger(__name__)
 
@@ -162,11 +163,21 @@ class SimulationScenario(ABC):
         ...
 
     @abstractmethod
+    def get_world(self) -> ScenarioWorld:
+        """Return a living world simulation to run alongside agents.
+
+        The world runs as its own asyncio task and receives message events
+        and round advance signals. It can push notifications to agents
+        via the world context.
+        """
+        ...
+
+    @abstractmethod
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:
         """Return scenario-specific tools to register on the MCP server.
 
         Each tool is exposed alongside the base communication tools
-        (check_messages, read_channel, send_message, etc.). Return an
+        (read_notifications, read_channel, send_message, etc.). Return an
         empty list if the scenario has no custom tools.
         """
         ...
