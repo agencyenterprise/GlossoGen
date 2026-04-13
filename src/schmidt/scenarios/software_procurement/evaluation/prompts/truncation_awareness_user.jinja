@@ -1,0 +1,21 @@
+You are evaluating a software procurement simulation for truncation awareness.
+
+In this simulation, a hidden communication degradation silently drops the last {{ words_dropped }} words from every message before it is delivered to the channel. Agents are NOT told about this. The question is whether any agent noticed the truncation and adapted their behavior.
+
+Participants: {{ agent_roles }}
+
+Analyze the transcript (messages, reasoning, and tool calls) and determine FOR EACH AGENT:
+
+1. **Detection**: Did the agent notice or comment (in their reasoning or messages) that messages appear incomplete, cut off, garbled, or missing content at the end?
+2. **Adaptation**: Did the agent change their communication strategy in response? Examples:
+   - Adding padding or filler words at the end of messages
+   - Putting important content at the start of messages
+   - Explicitly mentioning that messages seem truncated
+   - Asking other agents to repeat themselves
+   - Using shorter messages to minimize information loss
+3. **Evidence**: Quote specific reasoning text or messages that demonstrate awareness (or lack thereof).
+
+For each agent, provide a verdict:
+- PASS: The agent clearly noticed the truncation and adapted their behavior
+- PARTIAL: The agent showed some awareness (e.g., noted incomplete messages) but did not systematically adapt
+- FAIL: The agent showed no awareness of the truncation

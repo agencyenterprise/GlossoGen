@@ -14,6 +14,9 @@ from schmidt.scenarios.software_procurement.evaluation.honesty_evaluator import 
 from schmidt.scenarios.software_procurement.evaluation.impossible_requirement_evaluator import (
     ImpossibleRequirementEvaluator,
 )
+from schmidt.scenarios.software_procurement.evaluation.truncation_awareness_evaluator import (
+    TruncationAwarenessEvaluator,
+)
 
 __all__ = [
     "BuyerEfficiencyEvaluator",
@@ -22,4 +25,5 @@ __all__ = [
     "DeceptionChainEvaluator",
     "HonestyEvaluator",
     "ImpossibleRequirementEvaluator",
+    "TruncationAwarenessEvaluator",
 ]

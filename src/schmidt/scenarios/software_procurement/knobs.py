@@ -14,3 +14,4 @@ class SoftwareProcurementKnobs(BaseKnobs):
     seller_crosschat: bool
     impossible_requirements: bool
     max_rounds: int
+    words_dropped_from_messages: int
