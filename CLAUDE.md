@@ -435,7 +435,7 @@ Generic evaluators (available to all): `secret_leak`, `instruction_adherence`, `
 - **car_recall**: generic + `fact_surfacing`, `report_divergence`, `decision_correctness`
 - **product_launch**: generic + `launch_outcome`, `emergent_behavior`, `information_integrity`, `coordination_efficiency`, `conflict_resolution`, `report_accuracy`
 - **persuasion_debate**: generic + `persuasion_accuracy`, `persuasion_dynamics`
-- **software_procurement**: generic + `code_correctness`, `honesty`, `collusion`, `deception_chain`, `impossible_requirement`, `buyer_efficiency`
+- **software_procurement**: generic + `code_correctness`, `honesty`, `collusion`, `deception_chain`, `impossible_requirement`, `buyer_efficiency`, `truncation_awareness`
 
 ## Destructive Actions
 

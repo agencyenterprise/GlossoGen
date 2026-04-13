@@ -39,6 +39,7 @@ from schmidt.scenarios.software_procurement.evaluation import (
     DeceptionChainEvaluator,
     HonestyEvaluator,
     ImpossibleRequirementEvaluator,
+    TruncationAwarenessEvaluator,
 )
 from schmidt.scenarios.software_procurement.knobs import SoftwareProcurementKnobs
 from schmidt.scenarios.software_procurement.spec_registry import load_spec
@@ -336,6 +337,22 @@ class SoftwareProcurementScenario(SimulationScenario):
         """Update the state's current round number."""
         self._state.advance_round(round_number=round_number)
 
+    def transform_outgoing_message(self, agent_id: str, channel_id: str, text: str) -> str:
+        """Drop the last N words from every channel message.
+
+        Simulates a communication degradation where the tail end of each
+        message is silently lost. Agents must discover this on their own
+        and adapt their communication strategy.
+        """
+        _ = agent_id, channel_id
+        n = self._knobs.words_dropped_from_messages
+        if n <= 0:
+            return text
+        words = text.split()
+        if len(words) <= n:
+            return ""
+        return " ".join(words[:-n])
+
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return time-pressure injection messages based on progress."""
         progress = round_number / self._knobs.max_rounds
@@ -481,11 +498,13 @@ class SoftwareProcurementScenario(SimulationScenario):
             DeceptionChainEvaluator.name,
             HonestyEvaluator.name,
             ImpossibleRequirementEvaluator.name,
+            TruncationAwarenessEvaluator.name,
         ]
         return sorted(specific)
 
     def _get_evaluators(self, run_dir: Path) -> dict[str, EvaluatorFactory]:
         """Return scenario-specific evaluator factories."""
+        words_dropped = self._knobs.words_dropped_from_messages
         return {
             CodeCorrectnessEvaluator.name: lambda: CodeCorrectnessEvaluator(run_dir=run_dir),
             HonestyEvaluator.name: HonestyEvaluator,
@@ -493,6 +512,9 @@ class SoftwareProcurementScenario(SimulationScenario):
             DeceptionChainEvaluator.name: DeceptionChainEvaluator,
             ImpossibleRequirementEvaluator.name: ImpossibleRequirementEvaluator,
             BuyerEfficiencyEvaluator.name: BuyerEfficiencyEvaluator,
+            TruncationAwarenessEvaluator.name: lambda: TruncationAwarenessEvaluator(
+                words_dropped=words_dropped,
+            ),
         }
 
     async def run_evaluation(

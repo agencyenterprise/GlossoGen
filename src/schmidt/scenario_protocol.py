@@ -191,6 +191,18 @@ class SimulationScenario(ABC):
         """
         return False
 
+    def transform_outgoing_message(self, agent_id: str, channel_id: str, text: str) -> str:
+        """Transform a message before it is stored and delivered to the channel.
+
+        Called by the ``send_message`` MCP tool after validation but before
+        the message is appended. The agent sees the transformed text in
+        subsequent ``read_channel`` calls, not the original.
+
+        The default returns the text unchanged.
+        """
+        _ = agent_id, channel_id
+        return text
+
     def on_round_advanced(self, round_number: int) -> None:
         """Called by the game clock after advancing to a new round.
 

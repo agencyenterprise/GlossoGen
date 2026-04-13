@@ -260,11 +260,16 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                     new_messages=new_messages,
                 ).model_dump()
 
+            transformed_text = runtime.scenario.transform_outgoing_message(
+                agent_id=agent_id,
+                channel_id=channel_id,
+                text=text,
+            )
             message = SimulationMessage(
                 message_id=str(uuid4()),
                 channel_id=channel_id,
                 sender_agent_id=agent_id,
-                text=text,
+                text=transformed_text,
                 timestamp=datetime.now(tz=UTC),
             )
             runtime.channel_router.append_message(message=message)
