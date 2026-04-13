@@ -196,6 +196,9 @@ def _apply_edits_and_new_run_id(
         event_dict = orjson.loads(stripped)
         event_type = event_dict.get("event_type")
 
+        # Strip LLM responses and tool results so agents start fresh on
+        # resume. These events contain pre-edit text that would conflict
+        # with the edited message content injected into the fork.
         if event_type in ("llm_response_received", "tool_result_received"):
             continue
 
