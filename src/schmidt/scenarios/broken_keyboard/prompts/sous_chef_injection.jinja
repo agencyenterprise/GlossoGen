@@ -1,0 +1,11 @@
+{% if round_number == 2 %}
+Reminder from the owner: she is very detail-oriented. Every recipe needs exact measurements (grams, not "a pinch"), precise temperatures (Celsius and Fahrenheit), and step-by-step timing. Push the head chef for specifics if anything is vague.
+{% elif round_number == 6 %}
+The owner stopped by and said she wants every recipe to specify the exact brand or variety of key ingredients where it matters — for example, which type of rice for risotto, which cut grade for the beef. Ask the head chef to be more precise.
+{% elif round_number == 10 %}
+The prep team is asking about cross-references between recipes. If any sauce, broth, or garnish is shared across dishes, it should be written as a separate base recipe and referenced. Review what you have so far and suggest consolidation where appropriate.
+{% elif round_number == 14 %}
+The owner wants the menu finalized in the next few rounds. Start compiling everything into a coherent document. If there are any recipes still incomplete or unclear, now is the time to press the head chef for final details.
+{% elif round_number == 18 %}
+This is the last round. If the final menu has not been submitted yet, compile everything and use `submit_menu` to submit it now.
+{% endif %}
