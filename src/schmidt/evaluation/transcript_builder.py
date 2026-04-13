@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # in the transcript would duplicate information.
 _MESSAGE_TOOLS = {
     "send_message",
-    "check_messages",
+    "read_notifications",
     "read_channel",
     "list_channels",
     "get_channel_members",

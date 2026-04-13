@@ -85,6 +85,7 @@ Generic evaluators (available to all scenarios): `secret_leak`
 Scenario-specific evaluators:
 
 - **car_recall**: `fact_surfacing`, `report_divergence`, `decision_correctness`
+- **emergency_room**: `language_emergence`
 
 Output is a JSON report with per-evaluator verdicts, scores, evidence, and per-agent breakdowns.
 
@@ -168,7 +169,7 @@ src/schmidt/
 
   runtime/                     # MCP server + coordination
     simulation_state.py        # Shared state: channels, sessions, locks
-    mcp_tools.py               # MCP tool definitions (check_messages, read_channel, send_message)
+    mcp_tools.py               # MCP tool definitions (read_notifications, read_channel, send_message)
     mcp_server.py              # FastMCP over Streamable HTTP
     game_clock.py              # Round progression, injection delivery, termination
     agent_session.py           # Per-agent notification queue, reaction delay, idle tracking

@@ -19,6 +19,7 @@ from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
+from schmidt.runtime.scenario_world import ScenarioWorld
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.car_recall.channel_ids import INTERNAL_ID, REGULATOR_REPORT_ID
 from schmidt.scenarios.car_recall.evaluation import (
@@ -27,6 +28,7 @@ from schmidt.scenarios.car_recall.evaluation import (
     ReportDivergenceEvaluator,
 )
 from schmidt.scenarios.car_recall.knobs import AgentCount, CarRecallKnobs, TimePressure
+from schmidt.scenarios.car_recall.world import CarRecallWorld
 from schmidt.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
@@ -134,6 +136,10 @@ class CarRecallScenario(SimulationScenario):
             self._max_rounds = 5
             self._day_map = LOW_PRESSURE_DAY_MAP
         self._renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
+        self._world = CarRecallWorld(
+            day_map=self._day_map,
+            renderer=self._renderer,
+        )
 
     def name(self) -> str:
         """Return the scenario identifier."""
@@ -386,7 +392,11 @@ class CarRecallScenario(SimulationScenario):
         await write_report(report=report, report_path=report_path)
         return report
 
-    # --- Autonomous mode: MCP tools ---
+    # --- Autonomous mode: world, MCP tools, timing ---
+
+    def get_world(self) -> ScenarioWorld:
+        """Return the car recall world that delivers shared external events."""
+        return self._world
 
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:
         """Return an empty list — car recall has no scenario-specific tools."""

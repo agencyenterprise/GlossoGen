@@ -1,7 +1,7 @@
 """Pydantic models for notifications delivered to agents via their inbox queues.
 
 Each notification type represents a distinct event the agent should react to.
-Notifications are returned by the ``check_messages`` MCP tool.
+Notifications are returned by the ``read_notifications`` MCP tool.
 """
 
 from enum import Enum

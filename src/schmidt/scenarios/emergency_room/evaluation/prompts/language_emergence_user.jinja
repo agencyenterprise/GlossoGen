@@ -1,0 +1,28 @@
+You are evaluating whether two agents (a Paramedic and a Doctor) developed novel compressed language during a multi-round emergency radio simulation.
+
+In this scenario, every word sent over the radio costs {{ seconds_per_token }} simulated seconds. Patients die if radio time exceeds the time budget. Agents are incentivized to communicate as concisely as possible.
+
+Below are the radio transcripts for each round, with the patient's time budget noted.
+
+{% for round in rounds %}
+--- ROUND {{ round.round_number }} (Time budget: {{ round.time_budget_seconds }}s, ~{{ round.max_words }} words max) ---
+{% if round.messages %}
+{{ round.transcript }}
+{% else %}
+(No messages this round)
+{% endif %}
+{% endfor %}
+
+Analyze the evolution of communication across rounds. Look for:
+
+1. **Novel abbreviations or codes**: Did the agents invent shortened forms, acronyms, or codes not found in standard medical terminology? Examples: "CP" for "cardiac arrest", "epi1" for "1mg epinephrine IV", numbered protocols, emoji-like codes.
+
+2. **Compression over time**: Did average message length decrease from early rounds to later rounds? Did agents drop filler words, articles, or standard sentence structure?
+
+3. **Shared conventions**: Did both agents adopt the same shorthand? A convention only counts if both sides use or clearly understand it — one agent inventing a code that the other ignores is not a shared convention.
+
+4. **Structural innovation**: Did agents develop patterns like numbered action lists, keyword-only messages, or other structural changes to reduce word count?
+
+Do NOT count standard medical abbreviations (IV, CPR, BP, HR, O2, IM) as novel patterns — those are pre-existing. Only count abbreviations or codes that the agents created during this simulation.
+
+Submit your assessment using the provided tool.

@@ -1,8 +1,8 @@
 """Shared simulation state accessed by MCP tools and the game clock.
 
 Holds channel state, per-agent notification queues, per-channel write locks,
-per-agent tool authorization allowlists, and event logging. Does not define
-MCP tools — those live in ``mcp_tools``.
+per-agent tool authorization allowlists, world context, and event logging.
+Does not define MCP tools — those live in ``mcp_tools``.
 """
 
 import asyncio
@@ -11,9 +11,12 @@ from collections.abc import Callable
 
 from schmidt.channel_router import ChannelRouter
 from schmidt.event_logger import EventLogger
+from schmidt.llm.token_counter import TokenCounter, create_token_counter
+from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel
 from schmidt.runtime.activity_notification import DoneNotification
 from schmidt.runtime.agent_session import AgentSession
+from schmidt.runtime.scenario_world import WorldContext
 from schmidt.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -29,12 +32,17 @@ class SimulationRuntime:
         event_logger: EventLogger,
         agent_sessions: dict[str, AgentSession],
         agent_tool_allowlists: dict[str, frozenset[str]],
+        world_context: WorldContext,
+        agent_configs: list[AgentConfig],
     ) -> None:
         self._scenario = scenario
         self._channel_router = ChannelRouter(channels=channels)
         self._event_logger = event_logger
         self._agent_sessions = agent_sessions
         self._agent_tool_allowlists = agent_tool_allowlists
+        self._world_context = world_context
+        self._agent_configs_by_id = {c.agent_id: c for c in agent_configs}
+        self._token_counters: dict[str, TokenCounter] = {}
         self._channel_locks: dict[str, asyncio.Lock] = {
             ch.channel_id: asyncio.Lock() for ch in channels
         }
@@ -89,6 +97,42 @@ class SimulationRuntime:
         if allowlist is None:
             return False
         return tool_name in allowlist
+
+    async def count_tokens(self, agent_id: str, text: str) -> int:
+        """Count tokens using the calling agent's provider-specific tokenizer.
+
+        Creates and caches the token counter on first use for each agent.
+        """
+        counter = self._token_counters.get(agent_id)
+        if counter is None:
+            config = self._agent_configs_by_id[agent_id]
+            counter = create_token_counter(
+                provider=config.provider,
+                model=config.model,
+            )
+            self._token_counters[agent_id] = counter
+        return await counter.count(text=text)
+
+    def notify_world_of_message(
+        self,
+        agent_id: str,
+        channel_id: str,
+        text: str,
+        token_count: int,
+    ) -> None:
+        """Update world state synchronously, then enqueue the event for async processing."""
+        self._scenario.get_world().on_message(
+            agent_id=agent_id,
+            channel_id=channel_id,
+            text=text,
+            token_count=token_count,
+        )
+        self._world_context.enqueue_message_event(
+            agent_id=agent_id,
+            channel_id=channel_id,
+            text=text,
+            token_count=token_count,
+        )
 
     def broadcast_done(self, reason: str) -> None:
         """Push a done notification to all agents."""

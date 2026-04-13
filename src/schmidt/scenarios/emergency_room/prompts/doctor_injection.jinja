@@ -1,0 +1,12 @@
+{% if previous_outcome is not none %}
+--- PREVIOUS PATIENT RESULT ---
+Patient {{ previous_outcome.case_number }} ({{ previous_outcome.condition_name }}): {% if previous_outcome.survived %}SURVIVED{% else %}DIED{% endif %}
+Radio time used: {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s / {{ previous_outcome.time_budget_seconds }}s budget ({{ previous_outcome.tokens_used }} words at {{ knobs.seconds_per_token }}s each)
+{% endif %}
+{% if current_case is not none %}
+--- INCOMING EMERGENCY ---
+Patient {{ current_case.case_number }} arriving by ambulance.
+Time budget: {{ current_case.time_budget_seconds }} seconds (max ~{{ (current_case.time_budget_seconds / knobs.seconds_per_token) | int }} words total between you and the nursing student)
+
+The nursing student will report symptoms. Diagnose and give treatment orders.
+{% endif %}

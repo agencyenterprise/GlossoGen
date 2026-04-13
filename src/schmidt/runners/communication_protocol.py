@@ -1,7 +1,7 @@
 """Shared prompts and constants for the agent communication protocol.
 
 All agent runners use the same communication protocol: agents call
-check_messages(), read channels, send messages, and loop until done.
+read_notifications(), read channels, send messages, and loop until done.
 Prompt text lives in Jinja2 templates under ``runners/prompts/``.
 """
 
