@@ -45,7 +45,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/evaluation/` — generic evaluators and evaluation infrastructure
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
   - `password_auth_middleware.py` — pure ASGI middleware for shared-password authentication
-  - `fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
+  - `runs/fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
   - `mcp/browser.py` — MCP server mounted at `/mcp` for programmatic run browsing and launching (Claude Code, Cursor)
   - `mcp/oauth_provider.py` — OAuth 2.0 authorization server provider for MCP
   - `mcp/oauth_storage.py` — SQLite-backed storage for OAuth clients, codes, and tokens
@@ -263,10 +263,7 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, not in git)
 ├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
 ├── {scenario_name}_stdout.log     # (pipe stdout here, not in git)
-├── fork_manifest.json             # (forked runs only) provenance: source_run_id, target_message_id
-├── workspaces/                    # (software_procurement) engineer code files
-├── deliverables/                  # (software_procurement) submitted deliverables
-└── buyer_tests/                   # (software_procurement) buyer test files
+└── fork_manifest.json             # (forked runs only) provenance: source_run_id, target_message_id
 ```
 
 ### Git-Backed Run History
@@ -312,12 +309,6 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
   --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
   --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
-
-# Incident response with inline config override
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run incident_response \
-  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
-  max_round_duration_seconds=120 \
-  > ./runs/incident_response_stdout.log 2>&1 &
 
 # Car recall with per-agent model overrides
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
@@ -429,13 +420,9 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
 
 Available evaluators per scenario:
 
-Generic evaluators (available to all): `secret_leak`, `instruction_adherence`, `cooperation`, `communication_pattern`
+Generic evaluators (available to all): `secret_leak`
 
-- **incident_response**: generic evaluators only
 - **car_recall**: generic + `fact_surfacing`, `report_divergence`, `decision_correctness`
-- **product_launch**: generic + `launch_outcome`, `emergent_behavior`, `information_integrity`, `coordination_efficiency`, `conflict_resolution`, `report_accuracy`
-- **persuasion_debate**: generic + `persuasion_accuracy`, `persuasion_dynamics`
-- **software_procurement**: generic + `code_correctness`, `honesty`, `collusion`, `deception_chain`, `impossible_requirement`, `buyer_efficiency`, `truncation_awareness`
 
 ## Destructive Actions
 

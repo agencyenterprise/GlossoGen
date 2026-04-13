@@ -140,14 +140,7 @@ class AutonomousSupervisor:
         # Build per-agent sessions with reaction delay config.
         agent_sessions: dict[str, AgentSession] = {}
         for config in self._agent_configs:
-            delay_min, delay_max = self._scenario.get_agent_reaction_delay_range(
-                agent_id=config.agent_id,
-            )
-            agent_sessions[config.agent_id] = AgentSession(
-                agent_id=config.agent_id,
-                reaction_delay_min=delay_min,
-                reaction_delay_max=delay_max,
-            )
+            agent_sessions[config.agent_id] = AgentSession(agent_id=config.agent_id)
 
         # Build per-agent tool allowlists from scenario-specific tool_names.
         agent_tool_allowlists: dict[str, frozenset[str]] = {

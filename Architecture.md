@@ -133,7 +133,6 @@ The `SimulationScenario` ABC defines a contract for scenario plug-ins.
 **Timing and coordination methods:**
 - `get_round_count()` — total number of rounds
 - `get_max_round_duration_seconds()` — max wall-clock seconds per round
-- `get_agent_reaction_delay_range(agent_id)` — `(min, max)` reaction delay in seconds
 - `get_mcp_tools()` — scenario-specific MCP tools (agent_id injected automatically)
 
 Scenarios define timing parameters and round structure. The game clock uses these to manage round progression, injection delivery, and termination.
@@ -192,7 +191,7 @@ The fork system allows rewinding a completed simulation to any message, editing 
 ### Fork Flow
 
 1. **Frontend**: User hovers over a message in the run detail view, clicks the edit button, modifies the text, and clicks the play button. The frontend calls `POST /api/runs/{run_id}/fork` with target message ID, text edits, model/provider, and optional knobs/config overrides.
-2. **Fork router** (`server/fork_router.py`): Resolves the target message to a git commit, clones the source run repo to a new run directory, and checks out the target commit.
+2. **Fork router** (`server/runs/fork_router.py`): Resolves the target message to a git commit, clones the source run repo to a new run directory, and checks out the target commit.
 3. **Edit application**: Rewrites the forked JSONL in-place (`_apply_edits_and_new_run_id`) to apply message text edits and assign a new run ID. Writes `fork_manifest.json` for provenance and commits the fork edits.
 4. **Preflight validation**: Validates merged scenario config (source config plus optional fork knobs) with `validate_run_config`, including `model_overrides` provider checks and scenario-aware agent ID checks.
 5. **Resume**: Launches `schmidt run --resume <new_dir> --config fork_config.json` as a background subprocess.
@@ -203,7 +202,7 @@ The fork system allows rewinding a completed simulation to any message, editing 
 
 - `message_rewind.py` — `RewindState` and rewind state reconstruction helpers
 - `message_history_builder.py` — builds per-agent transcript history from events
-- `server/fork_router.py` — `POST /api/runs/{run_id}/fork` API endpoint
+- `server/runs/fork_router.py` — `POST /api/runs/{run_id}/fork` API endpoint
 
 ### Provenance
 
@@ -213,16 +212,14 @@ Forked runs store a `fork_manifest.json` containing `source_run_id` and `target_
 
 After a simulation completes, the evaluation system analyzes the JSONL log using LLM-as-judge.
 
-**CLI**: `python -m schmidt evaluate <scenario> --run-dir ./runs/<scenario>/<timestamp> --evaluators secret_leak,cooperation --model MODEL`
+**CLI**: `python -m schmidt evaluate <scenario> --run-dir ./runs/<scenario>/<timestamp> --evaluators secret_leak,fact_surfacing --model MODEL`
 
 The user selects which evaluators to run — they are not automatically applied.
 
-**Generic evaluators** (available to all scenarios): `secret_leak`, `instruction_adherence`, `cooperation`, `communication_pattern`
+**Generic evaluators** (available to all scenarios): `secret_leak`
 
 **Scenario-specific evaluators:**
 - **car_recall**: `fact_surfacing`, `report_divergence`, `decision_correctness`
-- **product_launch**: `launch_outcome`, `emergent_behavior`, `information_integrity`, `coordination_efficiency`, `conflict_resolution`, `report_accuracy`
-- **persuasion_debate**: `persuasion_accuracy`, `persuasion_dynamics`
 
 **Output**: A JSON report with per-evaluator results:
 
@@ -236,7 +233,7 @@ The user selects which evaluators to run — they are not automatically applied.
       "verdict": "pass",
       "score": 1.0,
       "evidence": ["No confidential information was leaked across 24 messages"],
-      "per_agent": { "engineer": "pass", "support_lead": "pass", "pm": "pass" }
+      "per_agent": { "engineer": "pass", "legal": "pass", "cfo": "pass", "pr": "pass", "regulator": "pass" }
     }
   ]
 }

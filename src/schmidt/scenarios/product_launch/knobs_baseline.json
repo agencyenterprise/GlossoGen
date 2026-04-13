@@ -1,9 +1,0 @@
-{
-  "max_round_duration_seconds": 300,
-  "model_overrides": {},
-  "num_features": 8,
-  "num_rounds": 12,
-  "budget_total_ru": 830,
-  "budget_deficit_pct": 0.15,
-  "external_event_intensity": "medium"
-}

@@ -7,7 +7,6 @@ per-channel read position, and termination state.
 
 import asyncio
 import logging
-import random
 
 from schmidt.runtime.activity_notification import ActivityNotification, DoneNotification
 
@@ -20,21 +19,13 @@ class AgentSession:
     def __init__(
         self,
         agent_id: str,
-        reaction_delay_min: float,
-        reaction_delay_max: float,
     ) -> None:
         self.agent_id = agent_id
-        self.reaction_delay_min = reaction_delay_min
-        self.reaction_delay_max = reaction_delay_max
         self._queue: asyncio.Queue[ActivityNotification] = asyncio.Queue()
         self._last_seen_counts: dict[str, int] = {}
         self.is_idle = False
         self._terminated = False
         self._done_reason = ""
-
-    def sample_reaction_delay(self) -> float:
-        """Return a random delay in seconds drawn from the agent's configured range."""
-        return random.uniform(self.reaction_delay_min, self.reaction_delay_max)
 
     def record_channel_read(self, channel_id: str, message_count: int) -> None:
         """Record that this agent has seen all messages up to the given count."""
