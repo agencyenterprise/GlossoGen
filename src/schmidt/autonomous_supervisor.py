@@ -174,6 +174,9 @@ class AutonomousSupervisor:
             )
             for agent_id, session in agent_sessions.items():
                 has_history = bool(self._resume_state.agent_message_histories.get(agent_id))
+                # Only mark channels as seen for agents that had prior conversation
+                # history. Agents without history should see all restored messages
+                # as new so they don't silently skip them on resume.
                 if has_history:
                     for ch_id in runtime.channel_router.get_agent_channel_ids(
                         agent_id=agent_id,
