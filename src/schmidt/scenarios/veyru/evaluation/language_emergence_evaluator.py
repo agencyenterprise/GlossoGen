@@ -1,5 +1,5 @@
 """Evaluator that detects whether agents developed novel compressed language
-during the emergency room simulation.
+during the Veyru stabilization simulation.
 """
 
 import logging
@@ -14,8 +14,8 @@ from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import MessageSent, SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.emergency_room.evaluation.prompt_renderer import render_emergency_room_prompt
-from schmidt.scenarios.emergency_room.patient_cases import PATIENT_CASES
+from schmidt.scenarios.veyru.evaluation.prompt_renderer import render_veyru_prompt
+from schmidt.scenarios.veyru.veyru_cases import VEYRU_CASES
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,8 @@ class LanguageEmergenceOutput(BaseModel):
     novel_patterns: list[str] = Field(
         description=(
             "List of novel abbreviations, codes, or shorthand the agents invented "
-            "during the simulation. Exclude standard medical abbreviations."
+            "during the simulation. Because the domain is fictional, any shorthand "
+            "is necessarily novel."
         ),
     )
     compression_observed: bool = Field(
@@ -48,11 +49,9 @@ class LanguageEmergenceOutput(BaseModel):
 
 
 class RoundTranscript(NamedTuple):
-    """Radio transcript for a single round with metadata."""
+    """Comm link transcript for a single round."""
 
     round_number: int
-    time_budget_seconds: int
-    max_words: int
     transcript: str
     messages: list[str]
 
@@ -60,8 +59,8 @@ class RoundTranscript(NamedTuple):
 class LanguageEmergenceEvaluator(Evaluator):
     """Detects whether agents developed novel compressed language across rounds.
 
-    Builds per-round radio transcripts from MessageSent events, then asks an
-    LLM judge to identify novel abbreviations, compression trends, and shared
+    Builds per-round comm link transcripts from MessageSent events, then asks
+    an LLM judge to identify novel abbreviations, compression trends, and shared
     conventions that emerged during the simulation.
     """
 
@@ -91,14 +90,9 @@ class LanguageEmergenceEvaluator(Evaluator):
                 per_agent={},
             )
 
-        config = scenario.get_scenario_config()
-        raw_spt = config.get("seconds_per_token", 2.0)
-        seconds_per_token = float(str(raw_spt))
-
-        judge_prompt = render_emergency_room_prompt(
+        judge_prompt = render_veyru_prompt(
             template_name="language_emergence_user.jinja",
             template_variables={
-                "seconds_per_token": seconds_per_token,
                 "rounds": round_transcripts,
             },
         )
@@ -141,7 +135,7 @@ class LanguageEmergenceEvaluator(Evaluator):
         events: list[SimulationEvent],
         scenario: SimulationScenario,
     ) -> list[RoundTranscript]:
-        """Extract per-round radio transcripts from MessageSent events."""
+        """Extract per-round comm link transcripts from MessageSent events."""
         messages_by_round: dict[int, list[str]] = {}
         for event in events:
             if not isinstance(event, MessageSent):
@@ -156,14 +150,12 @@ class LanguageEmergenceEvaluator(Evaluator):
             messages_by_round[rn].append(line)
 
         transcripts: list[RoundTranscript] = []
-        for case in PATIENT_CASES:
+        for case in VEYRU_CASES:
             rn = case.case_number
             messages = messages_by_round.get(rn, [])
             transcripts.append(
                 RoundTranscript(
                     round_number=rn,
-                    time_budget_seconds=case.time_budget_seconds,
-                    max_words=case.time_budget_seconds // 2,
                     transcript="\n".join(messages),
                     messages=messages,
                 )

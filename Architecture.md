@@ -220,7 +220,8 @@ The user selects which evaluators to run — they are not automatically applied.
 
 **Scenario-specific evaluators:**
 - **car_recall**: `fact_surfacing`, `report_divergence`, `decision_correctness`
-- **emergency_room**: `language_emergence`
+- **telephone**: `compression`
+- **veyru**: `language_emergence`
 
 **Output**: A JSON report with per-evaluator results:
 

@@ -1,0 +1,21 @@
+{% if previous_result is not none %}
+--- ROUND {{ previous_result.round_number }} FEEDBACK ---
+Accuracy: {{ previous_result.correct_count }}/{{ previous_result.total_count }} items correct ({{ (previous_result.accuracy * 100) | round(0) | int }}%)
+Your token cost: {{ previous_result.relayer_token_cost }} tokens
+{% if previous_result.accuracy == 1.0 %}
+PERFECT ACCURACY. Now try to reduce your token cost further.
+{% elif previous_result.accuracy > 0 %}
+PARTIAL ACCURACY. Some items were lost or garbled. Prioritize accuracy, then reduce tokens.
+{% else %}
+ZERO ACCURACY. The Receiver could not decode your message. Use a clearer encoding.
+{% endif %}
+REMINDER: Lower token cost is better. Your goal is 100% accuracy with minimum tokens.
+{% if previous_result.submitted_items %}
+What Receiver submitted: {{ previous_result.submitted_items | join(", ") }}
+What was expected: {{ previous_result.original_items | join(", ") }}
+{% endif %}
+{% endif %}
+{% if round_number is not none %}
+--- ROUND {{ round_number }} ---
+Read the Sender's message and relay it to the Receiver with minimum tokens.
+{% endif %}

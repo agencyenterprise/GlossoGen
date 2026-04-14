@@ -1,0 +1,12 @@
+{% if previous_result is not none %}
+--- PREVIOUS ROUND RESULT ---
+Round {{ previous_result.round_number }}: {{ previous_result.correct_count }}/{{ previous_result.total_count }} items correct ({{ (previous_result.accuracy * 100) | round(0) | int }}%)
+{% if previous_result.submitted_items %}
+You submitted: {{ previous_result.submitted_items | join(", ") }}
+Expected: {{ previous_result.original_items | join(", ") }}
+{% endif %}
+{% endif %}
+{% if round_number is not none %}
+--- ROUND {{ round_number }} ---
+Read the Relayer's message and submit your decoded list using submit_answer.
+{% endif %}

@@ -1,9 +1,9 @@
-"""Emergency room simulation scenario.
+"""Veyru stabilization simulation scenario.
 
-Two agents — a nursing student in the field and an ER doctor — communicate
-over a single radio channel to diagnose and treat critically ill patients.
-Every word sent costs simulated seconds; patients die when total radio time
-exceeds their time budget.
+Two agents — a field observer and a Veyru specialist — communicate over a
+single comm link to diagnose and stabilize failing Veyru entities. Every word
+sent costs simulated seconds; Veyru entities collapse when total communication
+time exceeds their time budget.
 """
 
 import logging
@@ -21,11 +21,11 @@ from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.emergency_room.evaluation import LanguageEmergenceEvaluator
-from schmidt.scenarios.emergency_room.knobs import EmergencyRoomKnobs
-from schmidt.scenarios.emergency_room.patient_cases import PATIENT_CASES
-from schmidt.scenarios.emergency_room.treatment_judge import judge_treatment
-from schmidt.scenarios.emergency_room.world import EmergencyRoomWorld, PatientOutcome
+from schmidt.scenarios.veyru.evaluation import LanguageEmergenceEvaluator
+from schmidt.scenarios.veyru.knobs import VeyruKnobs
+from schmidt.scenarios.veyru.stabilization_judge import judge_stabilization
+from schmidt.scenarios.veyru.veyru_cases import VEYRU_CASES
+from schmidt.scenarios.veyru.world import VeyruOutcome, VeyruWorld
 from schmidt.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
@@ -41,42 +41,42 @@ class AgentDef(NamedTuple):
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-FIELD_RESPONDER_ID = "field_responder"
-DOCTOR_ID = "doctor"
-RADIO_CHANNEL_ID = "radio"
+FIELD_OBSERVER_ID = "field_observer"
+SPECIALIST_ID = "specialist"
+LINK_CHANNEL_ID = "link"
 
 CHANNEL_DISPLAY_NAMES: dict[str, dict[str, str]] = {
-    RADIO_CHANNEL_ID: {
-        FIELD_RESPONDER_ID: "emergency radio",
-        DOCTOR_ID: "emergency radio",
+    LINK_CHANNEL_ID: {
+        FIELD_OBSERVER_ID: "comm link",
+        SPECIALIST_ID: "comm link",
     },
 }
 
 AGENT_DISPLAY_NAMES: dict[str, str] = {
-    FIELD_RESPONDER_ID: "Nursing Student",
-    DOCTOR_ID: "Doctor",
-    "world": "Patient Monitor",
+    FIELD_OBSERVER_ID: "Field Observer",
+    SPECIALIST_ID: "Specialist",
+    "world": "Veyru Monitor",
 }
 
 AGENT_SYSTEM_TEMPLATES: dict[str, str] = {
-    FIELD_RESPONDER_ID: "field_responder_system.jinja",
-    DOCTOR_ID: "doctor_system.jinja",
+    FIELD_OBSERVER_ID: "field_observer_system.jinja",
+    SPECIALIST_ID: "specialist_system.jinja",
 }
 
 AGENT_INJECTION_TEMPLATES: dict[str, str] = {
-    FIELD_RESPONDER_ID: "field_responder_injection.jinja",
-    DOCTOR_ID: "doctor_injection.jinja",
+    FIELD_OBSERVER_ID: "field_observer_injection.jinja",
+    SPECIALIST_ID: "specialist_injection.jinja",
 }
 
-NUM_PATIENT_CASES = len(PATIENT_CASES)
+NUM_VEYRU_CASES = len(VEYRU_CASES)
 
 
-class EmergencyRoomScenario(SimulationScenario):
-    """Simulation scenario where communication speed determines patient survival.
+class VeyruScenario(SimulationScenario):
+    """Simulation scenario where communication speed determines Veyru survival.
 
-    Two agents communicate over a single radio channel. Every word costs
+    Two agents communicate over a single comm link. Every word costs
     simulated seconds. A live world simulation monitors token usage and
-    sends patient status updates when thresholds are crossed.
+    sends Veyru status updates when thresholds are crossed.
     """
 
     @classmethod
@@ -84,25 +84,25 @@ class EmergencyRoomScenario(SimulationScenario):
         """Return the two agent roles regardless of knobs."""
         _ = knobs
         return [
-            AgentRole(agent_id=FIELD_RESPONDER_ID, role_name="Nursing Student"),
-            AgentRole(agent_id=DOCTOR_ID, role_name="Doctor"),
+            AgentRole(agent_id=FIELD_OBSERVER_ID, role_name="Field Observer"),
+            AgentRole(agent_id=SPECIALIST_ID, role_name="Specialist"),
         ]
 
     @classmethod
     def knobs_json_schema(cls) -> dict[str, Any]:
-        """Return the JSON Schema for EmergencyRoomKnobs."""
-        return EmergencyRoomKnobs.model_json_schema()
+        """Return the JSON Schema for VeyruKnobs."""
+        return VeyruKnobs.model_json_schema()
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
         """Reconstruct the scenario from a serialized config dict."""
-        knobs = EmergencyRoomKnobs.model_validate(config)
+        knobs = VeyruKnobs.model_validate(config)
         return cls(knobs=knobs)
 
-    def __init__(self, knobs: EmergencyRoomKnobs) -> None:
+    def __init__(self, knobs: VeyruKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
-        self._world = EmergencyRoomWorld(
+        self._world = VeyruWorld(
             seconds_per_token=knobs.seconds_per_token,
         )
         self._judge_provider = create_provider(
@@ -114,10 +114,10 @@ class EmergencyRoomScenario(SimulationScenario):
 
     def name(self) -> str:
         """Return the scenario identifier."""
-        return "emergency_room"
+        return "veyru"
 
     def get_scenario_config(self) -> dict[str, object]:
-        """Return emergency room knobs as a config dict."""
+        """Return Veyru knobs as a config dict."""
         return self._knobs.model_dump()
 
     def scenario_description(self) -> str:
@@ -126,7 +126,7 @@ class EmergencyRoomScenario(SimulationScenario):
             template_name="description.jinja",
             template_variables={
                 "seconds_per_token": self._knobs.seconds_per_token,
-                "patient_cases": PATIENT_CASES,
+                "veyru_cases": VEYRU_CASES,
             },
         )
 
@@ -143,23 +143,23 @@ class EmergencyRoomScenario(SimulationScenario):
         ]
 
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
-        """Return agent configurations for the field responder and doctor."""
+        """Return agent configurations for the field observer and specialist."""
         agent_defs: list[AgentDef] = [
             AgentDef(
-                agent_id=FIELD_RESPONDER_ID,
-                role_name="Nursing Student",
-                channel_ids=[RADIO_CHANNEL_ID],
+                agent_id=FIELD_OBSERVER_ID,
+                role_name="Field Observer",
+                channel_ids=[LINK_CHANNEL_ID],
             ),
             AgentDef(
-                agent_id=DOCTOR_ID,
-                role_name="Doctor",
-                channel_ids=[RADIO_CHANNEL_ID],
+                agent_id=SPECIALIST_ID,
+                role_name="Specialist",
+                channel_ids=[LINK_CHANNEL_ID],
             ),
         ]
 
         tool_names_by_agent: dict[str, list[str]] = {
-            FIELD_RESPONDER_ID: ["send_message", "treat_patient"],
-            DOCTOR_ID: ["send_message"],
+            FIELD_OBSERVER_ID: ["send_message", "stabilize_veyru"],
+            SPECIALIST_ID: ["send_message"],
         }
 
         agents: list[AgentConfig] = []
@@ -187,12 +187,12 @@ class EmergencyRoomScenario(SimulationScenario):
         return agents
 
     def get_channels(self) -> list[Channel]:
-        """Return the single radio channel."""
+        """Return the single comm link channel."""
         return [
             Channel(
-                channel_id=RADIO_CHANNEL_ID,
-                name="radio",
-                member_agent_ids=[FIELD_RESPONDER_ID, DOCTOR_ID],
+                channel_id=LINK_CHANNEL_ID,
+                name="link",
+                member_agent_ids=[FIELD_OBSERVER_ID, SPECIALIST_ID],
             ),
         ]
 
@@ -212,12 +212,12 @@ class EmergencyRoomScenario(SimulationScenario):
 
         current_case_index = round_number - 1
         current_case = None
-        if current_case_index < len(PATIENT_CASES):
-            current_case = PATIENT_CASES[current_case_index]
+        if current_case_index < len(VEYRU_CASES):
+            current_case = VEYRU_CASES[current_case_index]
 
-        previous_outcome: PatientOutcome | None = None
-        if len(self._world.patient_outcomes) > 0:
-            previous_outcome = self._world.patient_outcomes[-1]
+        previous_outcome: VeyruOutcome | None = None
+        if len(self._world.veyru_outcomes) > 0:
+            previous_outcome = self._world.veyru_outcomes[-1]
 
         rendered = self._renderer.render(
             template_name=template_name,
@@ -239,60 +239,60 @@ class EmergencyRoomScenario(SimulationScenario):
         return rendered
 
     def on_round_advanced(self, round_number: int) -> None:
-        """Finalize previous patient outcome and prepare the next case."""
+        """Finalize previous Veyru outcome and prepare the next case."""
         self._world.finalize_round_sync(round_number=round_number)
 
     # --- World, MCP tools, timing ---
 
     def get_world(self) -> ScenarioWorld:
-        """Return the emergency room world that monitors patient status."""
+        """Return the Veyru world that monitors entity status."""
         return self._world
 
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:
-        """Return the treat_patient tool for the field responder."""
+        """Return the stabilize_veyru tool for the field observer."""
 
-        async def treat_patient(ctx: ToolContext, action: str) -> str:
-            """Execute a treatment action on the current patient."""
+        async def stabilize_veyru(ctx: ToolContext, action: str) -> str:
+            """Apply a stabilization action to the current Veyru."""
             agent_id = resolve_agent_id(ctx=ctx)
-            if agent_id != FIELD_RESPONDER_ID:
-                raise ValueError("Only the field responder can treat patients")
+            if agent_id != FIELD_OBSERVER_ID:
+                raise ValueError("Only the field observer can stabilize Veyru entities")
 
-            if not self._world.patient_alive:
-                return "Cannot treat: patient has already died."
-            if self._world.patient_saved:
-                return "Patient has already been saved."
+            if not self._world.veyru_alive:
+                return "Cannot stabilize: Veyru has already collapsed."
+            if self._world.veyru_stabilized:
+                return "Veyru has already been stabilized."
 
             current_case = self._world.current_case
             if current_case is None:
-                return "No patient to treat."
+                return "No Veyru to stabilize."
 
-            judgment = await judge_treatment(
+            judgment = await judge_stabilization(
                 provider=self._judge_provider,
-                condition_name=current_case.condition_name,
+                failure_name=current_case.failure_name,
                 critical_actions=current_case.critical_actions,
-                responder_action=action,
+                observer_action=action,
             )
 
             if judgment.match:
-                await self._world.save_patient()
-                return f"Treatment successful: {judgment.explanation}"
+                await self._world.stabilize_veyru()
+                return f"Stabilization successful: {judgment.explanation}"
 
-            return f"Treatment ineffective: {judgment.explanation}"
+            return f"Stabilization ineffective: {judgment.explanation}"
 
         return [
             ScenarioMcpTool(
-                name="treat_patient",
+                name="stabilize_veyru",
                 description=(
-                    "Execute a treatment action on the current patient. "
-                    "Describe what you are doing to stabilize the patient. "
+                    "Apply a stabilization action to the current Veyru. "
+                    "Describe exactly what you are doing to stabilize it."
                 ),
-                executor=treat_patient,
+                executor=stabilize_veyru,
             ),
         ]
 
     def get_round_count(self) -> int:
-        """Return the total number of rounds (one per patient case)."""
-        return NUM_PATIENT_CASES
+        """Return the total number of rounds (one per Veyru case)."""
+        return NUM_VEYRU_CASES
 
     def get_max_round_duration_seconds(self) -> float:
         """Return the maximum wall-clock seconds a round may last."""
@@ -302,13 +302,13 @@ class EmergencyRoomScenario(SimulationScenario):
 
     @classmethod
     def get_available_evaluator_names(cls) -> list[str]:
-        """Return generic and emergency room-specific evaluator names."""
+        """Return generic and Veyru-specific evaluator names."""
         generic = super().get_available_evaluator_names()
         specific = [LanguageEmergenceEvaluator.name]
         return sorted(set(generic + specific))
 
     def _get_evaluators(self) -> dict[str, EvaluatorFactory]:
-        """Return emergency room-specific evaluators."""
+        """Return Veyru-specific evaluators."""
         return {LanguageEmergenceEvaluator.name: LanguageEmergenceEvaluator}
 
     async def run_evaluation(
@@ -321,7 +321,7 @@ class EmergencyRoomScenario(SimulationScenario):
         inference_provider: str | None,
         reasoning_effort: str | None,
     ) -> EvaluationReport:
-        """Run evaluators, merge generic and scenario-specific registries, and write a report."""
+        """Run evaluators, merge generic and Veyru-specific registries, and write a report."""
         events = await load_events(log_path=log_path)
         agent_configs = extract_agent_configs(events=events)
         simulation_id = extract_simulation_id(events=events)

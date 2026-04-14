@@ -1,0 +1,5 @@
+{
+  "max_round_duration_seconds": 180,
+  "model_overrides": {},
+  "round_count": 40
+}
