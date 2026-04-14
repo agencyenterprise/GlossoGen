@@ -41,7 +41,7 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 4. **Game clock delivers round-1 injections** as `NewInfoNotification` messages pushed to agent session queues. Agents receive these via the `read_notifications` MCP tool and begin interacting.
 5. **Agents act autonomously** by calling MCP tools: `read_notifications` (blocks until a notification arrives), `read_channel` (fetches recent messages), `send_message` (posts to a channel), `list_channels` (discovers available channels), and `get_channel_members` (sees who is in a channel). There is no central turn controller.
 6. **Round advancement** uses a hybrid condition. The game clock polls at 500ms intervals and advances the round when either (a) all agents are idle (blocked on `read_notifications` with empty queues) or (b) the round duration exceeds `max_round_duration_seconds` since the last message. When a round advances, the game clock delivers injections for the new round to the appropriate agents.
-7. **Termination** occurs when the game clock reaches `max_rounds`. The runtime broadcasts a `DoneNotification` to all agents, waits up to 30 seconds for agent tasks to finish, and logs `SimulationEnded` with total message count.
+7. **Termination** occurs when the game clock reaches `max_rounds`. The runtime broadcasts a `DoneNotification` to all agents, waits up to 120 seconds for agent tasks to finish, and logs `SimulationEnded` with total message count.
 
 ## MCP Tools
 
