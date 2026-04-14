@@ -28,8 +28,8 @@ class SlangEmergenceOutput(BaseModel):
             "each with round number and exact text."
         ),
     )
-    formality_decreased: bool = Field(
-        description="Whether the overall register shifted from formal to informal over rounds.",
+    rounds_identified: list[int] = Field(
+        description="Round numbers where slang or informal language was observed.",
     )
     shared_slang: bool = Field(
         description="Whether multiple agents adopted the same informal expressions.",
@@ -109,10 +109,10 @@ class SlangEmergenceEvaluator(Evaluator):
             score = 0.5
 
         evidence: list[str] = [result.explanation]
+        if result.rounds_identified:
+            evidence.append(f"Rounds: {', '.join(str(r) for r in result.rounds_identified)}")
         if result.slang_instances:
             evidence.append(f"Slang instances found: {len(result.slang_instances)}")
-        if result.formality_decreased:
-            evidence.append("Formality decreased over rounds")
         if result.shared_slang:
             evidence.append("Shared slang adopted by multiple agents")
         if result.domain_specific_slang:

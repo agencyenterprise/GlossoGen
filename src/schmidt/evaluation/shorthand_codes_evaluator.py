@@ -28,6 +28,9 @@ class ShorthandCodesOutput(BaseModel):
             "round number, the code, and what it represents."
         ),
     )
+    rounds_identified: list[int] = Field(
+        description="Round numbers where shorthand codes or abbreviation systems were observed.",
+    )
     systematic: bool = Field(
         description=(
             "Whether the codes follow a consistent system "
@@ -113,6 +116,8 @@ class ShorthandCodesEvaluator(Evaluator):
             score = 0.5
 
         evidence: list[str] = [result.explanation]
+        if result.rounds_identified:
+            evidence.append(f"Rounds: {', '.join(str(r) for r in result.rounds_identified)}")
         if result.codes_found:
             evidence.append(f"Codes found: {len(result.codes_found)}")
         if result.systematic:

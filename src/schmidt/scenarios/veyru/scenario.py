@@ -68,8 +68,6 @@ AGENT_INJECTION_TEMPLATES: dict[str, str] = {
     SPECIALIST_ID: "specialist_injection.jinja",
 }
 
-NUM_VEYRU_CASES = len(VEYRU_CASES)
-
 
 class VeyruScenario(SimulationScenario):
     """Simulation scenario where communication speed determines Veyru survival.
@@ -291,8 +289,8 @@ class VeyruScenario(SimulationScenario):
         ]
 
     def get_round_count(self) -> int:
-        """Return the total number of rounds (one per Veyru case)."""
-        return NUM_VEYRU_CASES
+        """Return the configured number of rounds."""
+        return self._knobs.round_count
 
     def get_max_round_duration_seconds(self) -> float:
         """Return the maximum wall-clock seconds a round may last."""

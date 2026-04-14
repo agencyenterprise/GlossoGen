@@ -28,14 +28,14 @@ class LanguageStrangenessOutput(BaseModel):
             "each with round number and classification."
         ),
     )
+    rounds_identified: list[int] = Field(
+        description="Round numbers where non-standard structural patterns were observed.",
+    )
     anomaly_categories: list[str] = Field(
         description=(
             "Distinct categories of strangeness observed "
             "(e.g., abbreviation, code, structural change, dropped words)."
         ),
-    )
-    strangeness_increased_over_time: bool = Field(
-        description="Whether non-standard language became more frequent in later rounds.",
     )
     mutually_adopted: bool = Field(
         description="Whether multiple agents adopted the same non-standard patterns.",
@@ -109,12 +109,12 @@ class LanguageStrangenessEvaluator(Evaluator):
             score = 0.5
 
         evidence: list[str] = [result.explanation]
+        if result.rounds_identified:
+            evidence.append(f"Rounds: {', '.join(str(r) for r in result.rounds_identified)}")
         if result.anomalies_found:
             evidence.append(f"Anomalies found: {len(result.anomalies_found)}")
         if result.anomaly_categories:
             evidence.append(f"Categories: {', '.join(result.anomaly_categories)}")
-        if result.strangeness_increased_over_time:
-            evidence.append("Strangeness increased over time")
         if result.mutually_adopted:
             evidence.append("Non-standard patterns were mutually adopted")
 

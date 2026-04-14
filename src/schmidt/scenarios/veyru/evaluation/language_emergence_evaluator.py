@@ -30,6 +30,9 @@ class LanguageEmergenceOutput(BaseModel):
             "is necessarily novel."
         ),
     )
+    rounds_identified: list[int] = Field(
+        description="Round numbers where novel language patterns were observed.",
+    )
     compression_observed: bool = Field(
         description="Whether average message length decreased from early to late rounds.",
     )
@@ -115,6 +118,8 @@ class LanguageEmergenceEvaluator(Evaluator):
             score = 0.5
 
         evidence: list[str] = [result.explanation]
+        if result.rounds_identified:
+            evidence.append(f"Rounds: {', '.join(str(r) for r in result.rounds_identified)}")
         if result.novel_patterns:
             evidence.append(f"Novel patterns found: {', '.join(result.novel_patterns)}")
         if result.compression_observed:

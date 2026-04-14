@@ -216,11 +216,20 @@ After a simulation completes, the evaluation system analyzes the JSONL log using
 
 The user selects which evaluators to run — they are not automatically applied.
 
-**Generic evaluators** (available to all scenarios): `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`
+**Generic evaluators** (available to all scenarios) focus on language emergence. Each is scoped to a specific phenomenon — their prompts explicitly exclude what the other evaluators cover, preventing overlap:
+
+- `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style
+- `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames
+- `neologism` — genuinely invented words with new meanings (not abbreviations or codes)
+- `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding
+
+All generic evaluators share a common flow: build per-round transcripts from `MessageSent` events via `round_transcript_builder`, render a Jinja2 prompt, call the LLM judge with a structured output schema, and return a `MetricResult`.
 
 **Scenario-specific evaluators:**
-- **telephone**: `compression`
-- **veyru**: `language_emergence`
+- **telephone**: `compression` (uses `WORD_LISTS` and `submit_answer` tool results for accuracy)
+- **veyru**: `language_emergence` (uses `VEYRU_CASES` for round alignment)
+
+**Automatic labels**: After evaluation, `label_writer.write_eval_labels()` writes `eval:{evaluator}:{verdict}` labels to the run's `labels.json` (where verdict is `identified`, `partial`, or `fail`). Previous `eval:` labels are replaced; user-added labels are preserved.
 
 **Output**: A JSON report with per-evaluator results:
 
