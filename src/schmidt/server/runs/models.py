@@ -46,6 +46,8 @@ class RunSummary(BaseModel):
     models: list[str]
     provider: str
     agent_models: list[AgentModelSummary]
+    labels: list[str]
+    has_note: bool
 
 
 class RunListResponse(BaseModel):
@@ -170,6 +172,8 @@ class RunDetailResponse(BaseModel):
     evaluation: EvalReportResponse | None
     evaluation_in_progress: bool
     fork_source: ForkSource | None
+    labels: list[str]
+    note: str | None
 
 
 class StartEvaluationRequest(BaseModel):
@@ -215,6 +219,47 @@ class ForkResponse(BaseModel):
 
     fork_run_id: str
     fork_run_dir: str
+
+
+# ---------------------------------------------------------------------------
+# Labels and notes request/response models
+# ---------------------------------------------------------------------------
+
+
+class UpdateLabelsRequest(BaseModel):
+    """Request body for setting labels on a run."""
+
+    labels: list[str]
+
+
+class UpdateLabelsResponse(BaseModel):
+    """Response after updating labels on a run."""
+
+    labels: list[str]
+
+
+class UpdateNoteRequest(BaseModel):
+    """Request body for setting or updating a note on a run."""
+
+    content: str
+
+
+class UpdateNoteResponse(BaseModel):
+    """Response after updating a note on a run."""
+
+    content: str
+
+
+class NoteResponse(BaseModel):
+    """Lightweight response for fetching a run's note content."""
+
+    content: str | None
+
+
+class AllLabelsResponse(BaseModel):
+    """Response containing all unique labels across all runs."""
+
+    labels: list[str]
 
 
 # ---------------------------------------------------------------------------

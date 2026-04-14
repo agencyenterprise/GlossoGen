@@ -349,6 +349,8 @@ async def _tool_get_run(
             evaluation=detail.evaluation,
             evaluation_in_progress=detail.evaluation_in_progress,
             fork_source=detail.fork_source,
+            labels=detail.labels,
+            note=detail.note,
         )
 
     # Filter messages by channel

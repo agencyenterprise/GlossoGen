@@ -174,6 +174,24 @@ def _timestamp_from_dir(dir_name: str) -> datetime:
     return datetime.fromtimestamp(int(dir_name), tz=UTC)
 
 
+def _read_labels(run_dir: Path) -> list[str]:
+    """Read labels from labels.json if it exists, returning empty list otherwise."""
+    labels_path = run_dir / "labels.json"
+    if not labels_path.exists():
+        return []
+    try:
+        result: list[str] = orjson.loads(labels_path.read_bytes())
+        return result
+    except Exception:
+        logger.exception("Failed to read labels from %s", labels_path)
+        return []
+
+
+def _has_note(run_dir: Path) -> bool:
+    """Check whether a note.md file exists in the run directory."""
+    return (run_dir / "note.md").exists()
+
+
 def _read_fork_source(run_dir: Path) -> ForkSource | None:
     """Read fork provenance from fork_manifest.json if it exists."""
     manifest_path = run_dir / "fork_manifest.json"
@@ -230,6 +248,8 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
             fork_source = _read_fork_source(run_dir=timestamp_dir)
             run_timestamp = _timestamp_from_dir(dir_name=timestamp_dir.name)
             extracted = await _extract_models(file_path=jsonl_path)
+            labels = _read_labels(run_dir=timestamp_dir)
+            has_note = _has_note(run_dir=timestamp_dir)
 
             eval_in_progress = read_eval_manifest(run_dir=timestamp_dir) is not None
 
@@ -254,6 +274,8 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         models=extracted.unique_models,
                         provider=first_event.provider,
                         agent_models=extracted.agent_models,
+                        labels=labels,
+                        has_note=has_note,
                     )
                 )
             else:
@@ -287,6 +309,8 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                         models=extracted.unique_models,
                         provider=first_event.provider,
                         agent_models=extracted.agent_models,
+                        labels=labels,
+                        has_note=has_note,
                     )
                 )
 
