@@ -8,6 +8,7 @@ import {
   HelpCircle,
   Inbox,
   Loader2,
+  Package,
   StickyNote,
   Sword,
   Tag,
@@ -15,7 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { api } from "@/shared/lib/api-client";
+import { api, buildApiUrlWithToken } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import {
@@ -450,6 +451,25 @@ export function RunList() {
                                 </span>
                               </span>
                             ) : null}
+                            <span className="group/export relative">
+                              <button
+                                aria-label="Export bundle"
+                                className="rounded p-1 text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  const url = buildApiUrlWithToken({
+                                    path: `/api/runs/${run.run_id}/export/bundle`,
+                                    searchParams: new URLSearchParams(),
+                                  });
+                                  window.open(url, "_blank");
+                                }}
+                              >
+                                <Package className="h-3.5 w-3.5" />
+                              </button>
+                              <span className="pointer-events-none absolute right-0 top-full z-50 mt-1 hidden whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/export:block">
+                                Export bundle
+                              </span>
+                            </span>
                             <span className="group/delete relative">
                               <button
                                 aria-label="Delete run"

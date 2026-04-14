@@ -263,6 +263,27 @@ class AllLabelsResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Bundle export/import models
+# ---------------------------------------------------------------------------
+
+
+class BundleManifest(BaseModel):
+    """Metadata embedded in an exported run bundle tar.gz."""
+
+    run_id: str
+    scenario_name: str
+    exported_at: datetime
+
+
+class ImportBundleResponse(BaseModel):
+    """Response after successfully importing a run bundle."""
+
+    run_id: str
+    scenario_name: str
+    run_dir: str
+
+
+# ---------------------------------------------------------------------------
 # SSE event schemas
 # ---------------------------------------------------------------------------
 

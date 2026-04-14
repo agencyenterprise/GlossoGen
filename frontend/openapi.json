@@ -618,6 +618,80 @@
         }
       }
     },
+    "/api/runs/{run_id}/export/bundle": {
+      "get": {
+        "summary": "Export Run Bundle",
+        "description": "Export a simulation run as a tar.gz bundle including git history.",
+        "operationId": "export_run_bundle_api_runs__run_id__export_bundle_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tar.gz bundle of the simulation run with git history.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/gzip": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/import": {
+      "post": {
+        "summary": "Import Run Bundle",
+        "description": "Import a simulation run from an exported bundle tar.gz.",
+        "operationId": "import_run_bundle_api_runs_import_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_run_bundle_api_runs_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportBundleResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Run with this ID already exists."
+          },
+          "422": {
+            "description": "Invalid or incomplete bundle."
+          }
+        }
+      }
+    },
     "/api/scenarios": {
       "get": {
         "summary": "List Scenarios",
@@ -984,6 +1058,20 @@
         "title": "AuthVerifyResponse",
         "description": "Response model for the password verification endpoint."
       },
+      "Body_import_run_bundle_api_runs_import_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_run_bundle_api_runs_import_post"
+      },
       "ChannelMessage": {
         "properties": {
           "message_id": {
@@ -1287,6 +1375,30 @@
         ],
         "title": "HealthStatus",
         "description": "Health check status values."
+      },
+      "ImportBundleResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "scenario_name": {
+            "type": "string",
+            "title": "Scenario Name"
+          },
+          "run_dir": {
+            "type": "string",
+            "title": "Run Dir"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "scenario_name",
+          "run_dir"
+        ],
+        "title": "ImportBundleResponse",
+        "description": "Response after successfully importing a run bundle."
       },
       "KnobsContentResponse": {
         "properties": {

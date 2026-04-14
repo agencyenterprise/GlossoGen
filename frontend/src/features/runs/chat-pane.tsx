@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Download, FolderArchive, Pencil } from "lucide-react";
+import { ChevronDown, Download, FolderArchive, Package, Pencil } from "lucide-react";
 import { Tooltip } from "@/shared/components/ui/tooltip";
 import { buildApiUrlWithToken } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
@@ -286,7 +286,7 @@ export function ChatPane({
             Export PDF
           </span>
         </span>
-        <span className="group/artifacts relative">
+        <Tooltip label="Download all artifacts">
           <button
             aria-label="Download artifacts"
             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -300,10 +300,22 @@ export function ChatPane({
           >
             <FolderArchive className="h-3.5 w-3.5" />
           </button>
-          <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/artifacts:block">
-            Download all artifacts
-          </span>
-        </span>
+        </Tooltip>
+        <Tooltip label="Export full bundle">
+          <button
+            aria-label="Export bundle (with git history)"
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={() => {
+              const url = buildApiUrlWithToken({
+                path: `/api/runs/${runId}/export/bundle`,
+                searchParams: new URLSearchParams(),
+              });
+              window.open(url, "_blank");
+            }}
+          >
+            <Package className="h-3.5 w-3.5" />
+          </button>
+        </Tooltip>
       </div>
 
       <div

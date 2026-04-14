@@ -1,13 +1,49 @@
 "use client";
 
-import { useState } from "react";
-import { GitFork, Plug, Plus } from "lucide-react";
+import { useRef, useState } from "react";
+import { GitFork, Plug, Plus, Upload } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { McpConfigModal } from "@/features/mcp-config/mcp-config-modal";
 import { RunList } from "@/features/runs/run-list";
+import { API_URL } from "@/shared/lib/api-client";
+import { AUTH_STORAGE_KEY } from "@/features/auth/auth-gate";
 
 export default function RunsPage() {
   const [showMcpConfig, setShowMcpConfig] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const headers: Record<string, string> = {};
+      const password = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (password) {
+        headers["Authorization"] = `Bearer ${password}`;
+      }
+      // eslint-disable-next-line no-restricted-globals -- multipart file upload not supported by openapi-fetch
+      const resp = await fetch(`${API_URL}/api/runs/import`, {
+        method: "POST",
+        body: formData,
+        headers,
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        alert(`Import failed: ${err.detail}`);
+        return;
+      }
+      router.refresh();
+    } finally {
+      setImporting(false);
+      e.target.value = "";
+    }
+  };
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
@@ -28,6 +64,21 @@ export default function RunsPage() {
             <GitFork className="h-4 w-4" />
             Branches
           </Link>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+          >
+            <Upload className="h-4 w-4" />
+            {importing ? "Importing..." : "Import"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".tar.gz,.tgz"
+            className="hidden"
+            onChange={handleImport}
+          />
           <button
             onClick={() => setShowMcpConfig(true)}
             className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
