@@ -121,7 +121,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         notification are stale, the notification is discarded and the agent
         continues waiting for the next one.
 
-        Returns a no-activity response after 30 seconds of silence so agents
+        Returns a no-activity response after 120 seconds of silence so agents
         are not stuck waiting indefinitely.
         """
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
@@ -129,12 +129,12 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
             try:
                 notification = await asyncio.wait_for(
                     session.wait_for_notification(),
-                    timeout=30.0,
+                    timeout=120.0,
                 )
             except asyncio.TimeoutError:
                 session.is_idle = False
                 logger.info(
-                    "Agent %s read_notifications timed out after 30s, returning no_activity",
+                    "Agent %s read_notifications timed out after 120s, returning no_activity",
                     session.agent_id,
                 )
                 return {"type": "no_activity", "detail": "No new messages."}
