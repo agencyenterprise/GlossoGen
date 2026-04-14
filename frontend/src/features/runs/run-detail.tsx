@@ -11,8 +11,11 @@ import {
   HelpCircle,
   Loader2,
   PanelRightOpen,
+  Pencil,
   Radio,
+  StickyNote,
   Sword,
+  Tag,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -42,6 +45,8 @@ import { ModelPicker } from "./model-picker";
 import { useFork } from "./use-fork";
 import { ConfigValueModal } from "./config-value-modal";
 import { AgentModelOverrides, type AgentModelOverride } from "./agent-model-overrides";
+import { LabelPickerModal, labelColor } from "./label-picker-modal";
+import { NoteEditorModal } from "./note-editor-modal";
 
 function extractModelOverridesFromScenarioConfig(args: {
   scenarioConfig: Record<string, unknown>;
@@ -114,6 +119,8 @@ export function RunDetail({ runId }: { runId: string }) {
   const [showEvalModal, setShowEvalModal] = useState(false);
   const [evalJustLaunched, setEvalJustLaunched] = useState(false);
   const [copiedRunId, setCopiedRunId] = useState(false);
+  const [showLabelPicker, setShowLabelPicker] = useState(false);
+  const [showNoteEditor, setShowNoteEditor] = useState(false);
 
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -447,6 +454,22 @@ export function RunDetail({ runId }: { runId: string }) {
               </span>
             </>
           ) : null}
+          {" · "}
+          <button
+            className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={() => setShowLabelPicker(true)}
+          >
+            <Tag className="h-3 w-3" />
+            Labels
+          </button>
+          {" · "}
+          <button
+            className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={() => setShowNoteEditor(true)}
+          >
+            {restData.note ? <Pencil className="h-3 w-3" /> : <StickyNote className="h-3 w-3" />}
+            {restData.note ? "Edit Note" : "Add Note"}
+          </button>
         </span>
       </div>
 
@@ -466,6 +489,23 @@ export function RunDetail({ runId }: { runId: string }) {
                 <span className="shrink-0 text-muted-foreground">{humanize(key)}</span>
                 <span className="max-w-64 truncate font-medium">{displayValue}</span>
               </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {/* Labels */}
+      {restData.labels.length > 0 ? (
+        <div className="mb-3 flex shrink-0 flex-wrap gap-1.5">
+          {restData.labels.map(label => {
+            const color = labelColor(label);
+            return (
+              <span
+                key={label}
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${color.bg} ${color.text}`}
+              >
+                {label}
+              </span>
             );
           })}
         </div>
@@ -611,6 +651,22 @@ export function RunDetail({ runId }: { runId: string }) {
             setEvalJustLaunched(true);
             setTimeout(() => setEvalJustLaunched(false), 30_000);
           }}
+        />
+      ) : null}
+
+      {showLabelPicker ? (
+        <LabelPickerModal
+          runId={runId}
+          currentLabels={restData.labels}
+          onClose={() => setShowLabelPicker(false)}
+        />
+      ) : null}
+
+      {showNoteEditor ? (
+        <NoteEditorModal
+          runId={runId}
+          initialContent={restData.note ?? null}
+          onClose={() => setShowNoteEditor(false)}
         />
       ) : null}
 

@@ -8,6 +8,7 @@ import {
   HelpCircle,
   Inbox,
   Loader2,
+  StickyNote,
   Sword,
   Trash2,
   XCircle,
@@ -26,6 +27,8 @@ import {
 } from "./format";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
 import { ConfigValueModal } from "./config-value-modal";
+import { NoteViewModal } from "./note-view-modal";
+import { labelColor } from "./label-picker-modal";
 
 type RunSummary = components["schemas"]["RunSummary"];
 
@@ -69,6 +72,7 @@ function groupByDay(runs: RunSummary[]): Array<{ label: string; runs: RunSummary
 export function RunList() {
   const [modalRun, setModalRun] = useState<RunSummary | null>(null);
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
+  const [noteModalRunId, setNoteModalRunId] = useState<string | null>(null);
   const [modelsPopover, setModelsPopover] = useState<{
     left: number;
     top: number;
@@ -227,6 +231,10 @@ export function RunList() {
         />
       ) : null}
 
+      {noteModalRunId !== null ? (
+        <NoteViewModal runId={noteModalRunId} onClose={() => setNoteModalRunId(null)} />
+      ) : null}
+
       {modelsPopover !== null ? (
         <div className="pointer-events-none fixed inset-0 z-50">
           <div
@@ -263,6 +271,8 @@ export function RunList() {
                   const hasBadges =
                     run.fork_source ||
                     run.has_evaluation ||
+                    run.labels.length > 0 ||
+                    run.has_note ||
                     (run.scenario_config && Object.keys(run.scenario_config).length > 0);
                   const bgClass =
                     run.status === "in_progress" ? "bg-green-50 dark:bg-green-950/20" : "";
@@ -403,6 +413,32 @@ export function RunList() {
                                   Evaluated
                                 </span>
                               ) : null}
+                              {run.labels.map(label => {
+                                const color = labelColor(label);
+                                return (
+                                  <span
+                                    key={label}
+                                    className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${color.bg} ${color.text}`}
+                                  >
+                                    {label}
+                                  </span>
+                                );
+                              })}
+                              {run.has_note ? (
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-1.5 py-0.5 text-[10px] font-medium text-yellow-700 transition-colors hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/50"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setNoteModalRunId(run.run_id);
+                                  }}
+                                >
+                                  <StickyNote className="h-2.5 w-2.5" />
+                                  Note
+                                </button>
+                              ) : null}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
                               {run.scenario_config && Object.keys(run.scenario_config).length > 0
                                 ? Object.entries(run.scenario_config).map(([key, value]) => (
                                     <button

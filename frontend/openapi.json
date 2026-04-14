@@ -269,6 +269,163 @@
         }
       }
     },
+    "/api/runs/{run_id}/labels": {
+      "put": {
+        "summary": "Update Labels",
+        "description": "Set labels for a simulation run, replacing any existing labels.",
+        "operationId": "update_labels_api_runs__run_id__labels_put",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLabelsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateLabelsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/note": {
+      "put": {
+        "summary": "Update Note",
+        "description": "Set or update the note for a simulation run.",
+        "operationId": "update_note_api_runs__run_id__note_put",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateNoteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Get Note",
+        "description": "Get the note content for a simulation run.",
+        "operationId": "get_note_api_runs__run_id__note_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/labels": {
+      "get": {
+        "summary": "List All Labels",
+        "description": "Get all unique labels across all simulation runs.",
+        "operationId": "list_all_labels_api_labels_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllLabelsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs/{run_id}/fork": {
       "post": {
         "summary": "Fork Run",
@@ -796,6 +953,23 @@
         "title": "AgentRolesResponse",
         "description": "Response listing agents that would participate in a scenario."
       },
+      "AllLabelsResponse": {
+        "properties": {
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "labels"
+        ],
+        "title": "AllLabelsResponse",
+        "description": "Response containing all unique labels across all runs."
+      },
       "AuthVerifyResponse": {
         "properties": {
           "authenticated": {
@@ -1175,6 +1349,27 @@
         "title": "ModelInfo",
         "description": "A supported model prefix and its provider."
       },
+      "NoteResponse": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "NoteResponse",
+        "description": "Lightweight response for fetching a run's note content."
+      },
       "ReasoningEntry": {
         "properties": {
           "message_id": {
@@ -1326,6 +1521,24 @@
                 "type": "null"
               }
             ]
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
           }
         },
         "type": "object",
@@ -1348,7 +1561,9 @@
           "debug_logs",
           "evaluation",
           "evaluation_in_progress",
-          "fork_source"
+          "fork_source",
+          "labels",
+          "note"
         ],
         "title": "RunDetailResponse",
         "description": "Full detail of a simulation run including agents, messages, and evaluation."
@@ -1460,6 +1675,17 @@
             },
             "type": "array",
             "title": "Agent Models"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "has_note": {
+            "type": "boolean",
+            "title": "Has Note"
           }
         },
         "type": "object",
@@ -1479,7 +1705,9 @@
           "fork_source",
           "models",
           "provider",
-          "agent_models"
+          "agent_models",
+          "labels",
+          "has_note"
         ],
         "title": "RunSummary",
         "description": "Summary of a single simulation run for the runs list endpoint."
@@ -2205,6 +2433,68 @@
         ],
         "title": "ToolUseEntry",
         "description": "A scenario-specific tool invocation with its result.\n\nEach entry represents one tool call made by an agent. The ``result``\nfield is filled once the tool execution completes."
+      },
+      "UpdateLabelsRequest": {
+        "properties": {
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "labels"
+        ],
+        "title": "UpdateLabelsRequest",
+        "description": "Request body for setting labels on a run."
+      },
+      "UpdateLabelsResponse": {
+        "properties": {
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "labels"
+        ],
+        "title": "UpdateLabelsResponse",
+        "description": "Response after updating labels on a run."
+      },
+      "UpdateNoteRequest": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "UpdateNoteRequest",
+        "description": "Request body for setting or updating a note on a run."
+      },
+      "UpdateNoteResponse": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "UpdateNoteResponse",
+        "description": "Response after updating a note on a run."
       },
       "ValidationError": {
         "properties": {

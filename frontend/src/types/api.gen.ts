@@ -120,6 +120,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Labels
+         * @description Set labels for a simulation run, replacing any existing labels.
+         */
+        put: operations["update_labels_api_runs__run_id__labels_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Note
+         * @description Get the note content for a simulation run.
+         */
+        get: operations["get_note_api_runs__run_id__note_get"];
+        /**
+         * Update Note
+         * @description Set or update the note for a simulation run.
+         */
+        put: operations["update_note_api_runs__run_id__note_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List All Labels
+         * @description Get all unique labels across all simulation runs.
+         */
+        get: operations["list_all_labels_api_labels_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/fork": {
         parameters: {
             query?: never;
@@ -397,6 +461,14 @@ export interface components {
             agents: components["schemas"]["AgentRoleInfo"][];
         };
         /**
+         * AllLabelsResponse
+         * @description Response containing all unique labels across all runs.
+         */
+        AllLabelsResponse: {
+            /** Labels */
+            labels: string[];
+        };
+        /**
          * AuthVerifyResponse
          * @description Response model for the password verification endpoint.
          */
@@ -583,6 +655,14 @@ export interface components {
             provider: string;
         };
         /**
+         * NoteResponse
+         * @description Lightweight response for fetching a run's note content.
+         */
+        NoteResponse: {
+            /** Content */
+            content: string | null;
+        };
+        /**
          * ReasoningEntry
          * @description An LLM reasoning/thinking entry from an agent's turn.
          *
@@ -652,6 +732,10 @@ export interface components {
             /** Evaluation In Progress */
             evaluation_in_progress: boolean;
             fork_source: components["schemas"]["ForkSource"] | null;
+            /** Labels */
+            labels: string[];
+            /** Note */
+            note: string | null;
         };
         /**
          * RunListResponse
@@ -707,6 +791,10 @@ export interface components {
             provider: string;
             /** Agent Models */
             agent_models: components["schemas"]["AgentModelSummary"][];
+            /** Labels */
+            labels: string[];
+            /** Has Note */
+            has_note: boolean;
         };
         /**
          * SSEAgentConnected
@@ -1090,6 +1178,38 @@ export interface components {
             /** Round Number */
             round_number: number;
         };
+        /**
+         * UpdateLabelsRequest
+         * @description Request body for setting labels on a run.
+         */
+        UpdateLabelsRequest: {
+            /** Labels */
+            labels: string[];
+        };
+        /**
+         * UpdateLabelsResponse
+         * @description Response after updating labels on a run.
+         */
+        UpdateLabelsResponse: {
+            /** Labels */
+            labels: string[];
+        };
+        /**
+         * UpdateNoteRequest
+         * @description Request body for setting or updating a note on a run.
+         */
+        UpdateNoteRequest: {
+            /** Content */
+            content: string;
+        };
+        /**
+         * UpdateNoteResponse
+         * @description Response after updating a note on a run.
+         */
+        UpdateNoteResponse: {
+            /** Content */
+            content: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -1289,6 +1409,127 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_labels_api_runs__run_id__labels_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLabelsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateLabelsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_note_api_runs__run_id__note_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_note_api_runs__run_id__note_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateNoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_all_labels_api_labels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AllLabelsResponse"];
                 };
             };
         };

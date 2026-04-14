@@ -21,11 +21,17 @@ from schmidt.server.response_models import LaunchStatus
 from schmidt.server.runs.detail_reader import load_run_detail
 from schmidt.server.runs.discovery import discover_runs
 from schmidt.server.runs.models import (
+    AllLabelsResponse,
+    NoteResponse,
     RunDetailResponse,
     RunListResponse,
     SSEEvent,
     StartEvaluationRequest,
     StartEvaluationResponse,
+    UpdateLabelsRequest,
+    UpdateLabelsResponse,
+    UpdateNoteRequest,
+    UpdateNoteResponse,
 )
 from schmidt.stream_manifest import delete_manifest, read_manifest
 from schmidt.token_pricing import list_providers
@@ -313,3 +319,70 @@ async def stream_run_events(run_id: str, request: Request) -> StreamingResponse:
             "X-Accel-Buffering": "no",
         },
     )
+
+
+async def _resolve_run_dir(run_id: str, request: Request) -> Path:
+    """Resolve a run_id to its directory path, raising 404 if not found."""
+    runs_dir: Path = request.app.state.runs_dir
+    summaries = await discover_runs(runs_dir=runs_dir)
+    matching = [s for s in summaries if s.run_id == run_id]
+    if not matching:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return Path(matching[0].run_dir)
+
+
+# ---------------------------------------------------------------------------
+# Labels and notes endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.put("/runs/{run_id}/labels", response_model=UpdateLabelsResponse)
+async def update_labels(
+    run_id: str,
+    body: UpdateLabelsRequest,
+    request: Request,
+) -> UpdateLabelsResponse:
+    """Set labels for a simulation run, replacing any existing labels."""
+    run_dir = await _resolve_run_dir(run_id=run_id, request=request)
+    labels_path = run_dir / "labels.json"
+    labels_path.write_bytes(orjson.dumps(body.labels))
+    logger.info("Updated labels for run %s: %s", run_id, body.labels)
+    return UpdateLabelsResponse(labels=body.labels)
+
+
+@router.put("/runs/{run_id}/note", response_model=UpdateNoteResponse)
+async def update_note(
+    run_id: str,
+    body: UpdateNoteRequest,
+    request: Request,
+) -> UpdateNoteResponse:
+    """Set or update the note for a simulation run."""
+    run_dir = await _resolve_run_dir(run_id=run_id, request=request)
+    note_path = run_dir / "note.md"
+    note_path.write_text(body.content, encoding="utf-8")
+    logger.info("Updated note for run %s (%d chars)", run_id, len(body.content))
+    return UpdateNoteResponse(content=body.content)
+
+
+@router.get("/runs/{run_id}/note", response_model=NoteResponse)
+async def get_note(run_id: str, request: Request) -> NoteResponse:
+    """Get the note content for a simulation run."""
+    run_dir = await _resolve_run_dir(run_id=run_id, request=request)
+    note_path = run_dir / "note.md"
+    if not note_path.exists():
+        return NoteResponse(content=None)
+    content = note_path.read_text(encoding="utf-8")
+    return NoteResponse(content=content)
+
+
+@router.get("/labels", response_model=AllLabelsResponse)
+async def list_all_labels(request: Request) -> AllLabelsResponse:
+    """Get all unique labels across all simulation runs."""
+    runs_dir: Path = request.app.state.runs_dir
+    summaries = await discover_runs(runs_dir=runs_dir)
+    seen: dict[str, None] = {}
+    for summary in summaries:
+        for label in summary.labels:
+            if label not in seen:
+                seen[label] = None
+    return AllLabelsResponse(labels=sorted(seen))

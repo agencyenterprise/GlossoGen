@@ -322,6 +322,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     debug_logs = await _load_debug_logs(debug_log_path=debug_log_path)
 
     fork_source = _read_fork_source(run_dir=run_dir)
+    labels = await _read_labels_async(run_dir=run_dir)
+    note = await _read_note(run_dir=run_dir)
 
     # For forked runs, the displayed start time is when the fork was created,
     # not when the original parent simulation started.
@@ -348,7 +350,33 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         evaluation=evaluation,
         evaluation_in_progress=evaluation_in_progress,
         fork_source=fork_source,
+        labels=labels,
+        note=note,
     )
+
+
+async def _read_note(run_dir: Path) -> str | None:
+    """Read note.md from the run directory, returning None if it does not exist."""
+    note_path = run_dir / "note.md"
+    if not note_path.exists():
+        return None
+    async with aiofiles.open(note_path, mode="r") as f:
+        return await f.read()
+
+
+async def _read_labels_async(run_dir: Path) -> list[str]:
+    """Read labels.json from the run directory, returning empty list if missing."""
+    labels_path = run_dir / "labels.json"
+    if not labels_path.exists():
+        return []
+    try:
+        async with aiofiles.open(labels_path, mode="rb") as f:
+            raw_bytes = await f.read()
+        result: list[str] = orjson.loads(raw_bytes)
+        return result
+    except Exception:
+        logger.exception("Failed to read labels from %s", labels_path)
+        return []
 
 
 def _read_fork_source(run_dir: Path) -> ForkSource | None:
