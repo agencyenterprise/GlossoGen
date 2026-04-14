@@ -238,7 +238,7 @@ export function ChatPane({
   const rounds = useMemo(() => groupByRoundAndTurn(visibleFiltered), [visibleFiltered]);
 
   return (
-    <div className="relative flex min-h-0 flex-col">
+    <div className="relative flex min-h-0 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
         <span className="text-sm text-muted-foreground">#</span>
         <span className="text-[13px] font-medium">{headerName}</span>

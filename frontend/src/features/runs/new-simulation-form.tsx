@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
@@ -10,6 +10,7 @@ import { formatConfigValueFull, humanize } from "./format";
 import { ModelPicker } from "./model-picker";
 import { ConfigValueModal } from "./config-value-modal";
 import { AgentModelOverrides, type AgentModelOverride } from "./agent-model-overrides";
+import { labelColor } from "./label-picker-modal";
 
 type KnobsMap = Record<string, unknown>;
 type KnobPreview = { key: string; value: string };
@@ -138,6 +139,9 @@ export function NewSimulationForm() {
   }
   const [knobsFile, setKnobsFile] = useState("");
   const [knobs, setKnobs] = useState<KnobsMap | null>(null);
+  const [labels, setLabels] = useState<string[]>([]);
+  const [labelInput, setLabelInput] = useState("");
+  const [note, setNote] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["scenarios"],
@@ -147,6 +151,14 @@ export function NewSimulationForm() {
         throw new Error("Failed to fetch scenarios");
       }
       return data;
+    },
+  });
+
+  const allLabelsQuery = useQuery({
+    queryKey: ["all-labels"],
+    queryFn: async () => {
+      const { data: resp } = await api.GET("/api/labels");
+      return resp;
     },
   });
 
@@ -226,15 +238,35 @@ export function NewSimulationForm() {
 
       // Poll until the new run appears in the runs list.
       const deadline = Date.now() + 30_000;
+      let newRunId: string | null = null;
       while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 1000));
         const after = await api.GET("/api/runs");
         const newRun = (after.data?.runs ?? []).find(r => !existingIds.has(r.run_id));
         if (newRun) {
-          return newRun.run_id;
+          newRunId = newRun.run_id;
+          break;
         }
       }
-      throw new Error("Simulation did not appear within 30 seconds");
+      if (!newRunId) {
+        throw new Error("Simulation did not appear within 30 seconds");
+      }
+
+      // Apply labels and note if provided.
+      if (labels.length > 0) {
+        await api.PUT("/api/runs/{run_id}/labels", {
+          params: { path: { run_id: newRunId } },
+          body: { labels },
+        });
+      }
+      if (note.trim()) {
+        await api.PUT("/api/runs/{run_id}/note", {
+          params: { path: { run_id: newRunId } },
+          body: { content: note.trim() },
+        });
+      }
+
+      return newRunId;
     },
     onSuccess: runId => {
       router.push(`/runs/${runId}`);
@@ -365,6 +397,84 @@ export function NewSimulationForm() {
           />
         </div>
       ) : null}
+
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">Labels</label>
+        <p className="text-xs text-muted-foreground">Tag this run for easy filtering later.</p>
+        {labels.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 pb-1">
+            {labels.map(label => {
+              const color = labelColor(label);
+              return (
+                <span
+                  key={label}
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${color.bg} ${color.text}`}
+                >
+                  {label}
+                  <button
+                    type="button"
+                    onClick={() => setLabels(labels.filter(l => l !== label))}
+                    className="rounded-full p-0.5 transition-colors hover:bg-black/10 dark:hover:bg-white/10"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        ) : null}
+        <div className="flex flex-wrap gap-1.5">
+          <input
+            type="text"
+            className="w-48 rounded-md border border-input bg-background px-2 py-1 text-xs placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            placeholder="Type a label and press Enter..."
+            value={labelInput}
+            onChange={e => setLabelInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                const trimmed = labelInput.trim().toLowerCase();
+                if (trimmed && !labels.includes(trimmed)) {
+                  setLabels([...labels, trimmed].sort());
+                }
+                setLabelInput("");
+              }
+            }}
+          />
+          {(allLabelsQuery.data?.labels ?? [])
+            .filter(l => !labels.includes(l))
+            .map(suggestion => {
+              const color = labelColor(suggestion);
+              return (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => setLabels([...labels, suggestion].sort())}
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium opacity-50 transition-opacity hover:opacity-100 ${color.bg} ${color.text}`}
+                >
+                  + {suggestion}
+                </button>
+              );
+            })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="run-note" className="block text-sm font-medium">
+          Note
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Describe what you changed or what you expect from this run.
+        </p>
+        <textarea
+          id="run-note"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs leading-relaxed placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          rows={4}
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          placeholder="e.g. veyru-v4: reduced epoch budgets to [1.0, 0.6, 0.3, 0.2], added code invention hints..."
+        />
+      </div>
 
       {startMutation.error ? (
         <p className="text-sm text-destructive">{startMutation.error.message}</p>
