@@ -305,25 +305,25 @@ Optional flags: `--mcp-port` (default: 8001), `--max-agent-turns` (default: 200)
 Examples:
 
 ```bash
-# Car recall with base config
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
+# Telephone with base config
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
-  > ./runs/car_recall_stdout.log 2>&1 &
+  --config src/schmidt/scenarios/telephone/knobs_baseline.json \
+  > ./runs/telephone_stdout.log 2>&1 &
 
-# Car recall with per-agent model overrides
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
+# Telephone with per-agent model overrides
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
-  agents.engineer.model=gpt-4o agents.engineer.provider=openai \
-  > ./runs/car_recall_stdout.log 2>&1 &
+  --config src/schmidt/scenarios/telephone/knobs_baseline.json \
+  agents.relayer.model=gpt-4o agents.relayer.provider=openai \
+  > ./runs/telephone_stdout.log 2>&1 &
 
 # Override knobs inline on top of a base config
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
-  time_pressure=high agent_count=five \
-  > ./runs/car_recall_stdout.log 2>&1 &
+  --config src/schmidt/scenarios/telephone/knobs_baseline.json \
+  max_round_duration_seconds=120 round_count=20 \
+  > ./runs/telephone_stdout.log 2>&1 &
 ```
 
 Override values are auto-parsed as JSON: `rounds=5` becomes int, `enabled=true` becomes bool, `name=alice` stays string.

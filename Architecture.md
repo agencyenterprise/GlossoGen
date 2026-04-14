@@ -212,14 +212,13 @@ Forked runs store a `fork_manifest.json` containing `source_run_id` and `target_
 
 After a simulation completes, the evaluation system analyzes the JSONL log using LLM-as-judge.
 
-**CLI**: `python -m schmidt evaluate <scenario> --run-dir ./runs/<scenario>/<timestamp> --evaluators secret_leak,fact_surfacing --model MODEL`
+**CLI**: `python -m schmidt evaluate <scenario> --run-dir ./runs/<scenario>/<timestamp> --evaluators language_strangeness,compression --model MODEL`
 
 The user selects which evaluators to run — they are not automatically applied.
 
-**Generic evaluators** (available to all scenarios): `secret_leak`
+**Generic evaluators** (available to all scenarios): `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`
 
 **Scenario-specific evaluators:**
-- **car_recall**: `fact_surfacing`, `report_divergence`, `decision_correctness`
 - **telephone**: `compression`
 - **veyru**: `language_emergence`
 

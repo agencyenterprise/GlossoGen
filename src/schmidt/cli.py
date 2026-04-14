@@ -113,7 +113,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--run-dir",
         type=str,
         required=True,
-        help="Path to the run directory (e.g. runs/car_recall/1742234567)",
+        help="Path to the run directory (e.g. runs/telephone/1742234567)",
     )
     evaluate_parser.add_argument(
         "--evaluators", type=str, required=True, help="Comma-separated evaluator names"

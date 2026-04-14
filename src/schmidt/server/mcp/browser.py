@@ -174,7 +174,7 @@ def _load_evaluation_metrics(run_summary: RunSummary) -> list[McpEvalMetric] | N
 
 _INSTRUCTIONS = """\
 Schmidt simulation platform. Browse and launch multi-agent simulations \
-(car_recall, telephone, veyru).
+(telephone, veyru).
 
 ## Browsing runs
 

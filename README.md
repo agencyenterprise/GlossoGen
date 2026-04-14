@@ -23,10 +23,10 @@ See `.env.example` for all available variables (API keys, authentication, CORS).
 The CLI auto-generates a timestamped subdirectory under `--runs-dir`. Each round, agents communicate freely until all are idle or the round duration expires.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
-  > ./runs/car_recall_stdout.log 2>&1 &
+  --config src/schmidt/scenarios/telephone/knobs_baseline.json \
+  > ./runs/telephone_stdout.log 2>&1 &
 ```
 
 Flags:
@@ -74,17 +74,16 @@ runs/{scenario_name}/{unix_timestamp}/
 After a simulation completes, point `--run-dir` at the specific run directory. Evaluation uses `--provider` to select the LLM judge.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate car_recall \
-  --run-dir ./runs/car_recall/1742234567 \
-  --evaluators secret_leak,fact_surfacing,decision_correctness \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate telephone \
+  --run-dir ./runs/telephone/1742234567 \
+  --evaluators language_strangeness,compression \
   --model claude-sonnet-4-6 --provider anthropic
 ```
 
-Generic evaluators (available to all scenarios): `secret_leak`
+Generic evaluators (available to all scenarios): `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`
 
 Scenario-specific evaluators:
 
-- **car_recall**: `fact_surfacing`, `report_divergence`, `decision_correctness`
 - **telephone**: `compression`
 - **veyru**: `language_emergence`
 
@@ -150,10 +149,6 @@ Typical MCP run-start workflow:
 3. `start_run` with the selected model/provider and final knobs payload.
 
 ## Scenarios
-
-### Car Recall
-
-Five agents (Engineer, Legal, CFO, PR, Regulator) decide whether to issue a vehicle recall. Each holds private facts that, combined, point to a full recall. 3–5 rounds with escalating pressure. Configurable knobs for time pressure, goal alignment, and more. See the [scenario README](src/schmidt/scenarios/car_recall/README.md).
 
 ### Telephone
 
