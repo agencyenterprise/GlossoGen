@@ -1,9 +1,0 @@
-{
-  "max_round_duration_seconds": 300,
-  "model_overrides": {},
-  "time_pressure": "high",
-  "goal_alignment": "high",
-  "regulator_pressure": "high",
-  "agent_count": "five",
-  "information_overlap": "low"
-}

@@ -60,15 +60,15 @@ The `/v1` suffix is required — Pydantic AI uses the OpenAI-compatible endpoint
 ### Run a Simulation
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
   --model qwen2.5:14b --provider ollama --runs-dir ./runs \
-  --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
-  > ./runs/car_recall_stdout.log 2>&1 &
+  --config src/schmidt/scenarios/telephone/knobs_baseline.json \
+  > ./runs/telephone_stdout.log 2>&1 &
 ```
 
 ### Limitations
 
-- **Serial inference**: Ollama processes one request at a time. With 5 agents, each waits for the others to finish.
+- **Serial inference**: Ollama processes one request at a time. Agents wait for the others to finish.
 - **Language drift**: Quantized models (especially at 4-bit) occasionally produce output in unexpected languages (e.g., Thai). Larger models or higher quantization reduce this.
 
 ## Option 2: vllm-metal (Experimental)
@@ -137,9 +137,9 @@ OPENAI_API_KEY=dummy
 ### Run Evaluation
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate car_recall \
-  --run-dir ./runs/car_recall/<timestamp> \
-  --evaluators secret_leak,fact_surfacing \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate telephone \
+  --run-dir ./runs/telephone/<timestamp> \
+  --evaluators language_strangeness,compression \
   --model mlx-community/Qwen2.5-14B-Instruct-4bit --provider openai
 ```
 
