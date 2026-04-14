@@ -271,6 +271,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/export/bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Run Bundle
+         * @description Export a simulation run as a tar.gz bundle including git history.
+         */
+        get: operations["export_run_bundle_api_runs__run_id__export_bundle_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Run Bundle
+         * @description Import a simulation run from an exported bundle tar.gz.
+         */
+        post: operations["import_run_bundle_api_runs_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/scenarios": {
         parameters: {
             query?: never;
@@ -476,6 +516,11 @@ export interface components {
             /** Authenticated */
             authenticated: boolean;
         };
+        /** Body_import_run_bundle_api_runs_import_post */
+        Body_import_run_bundle_api_runs_import_post: {
+            /** File */
+            file: string;
+        };
         /**
          * ChannelMessage
          * @description A message sent by an agent to a channel.
@@ -618,6 +663,18 @@ export interface components {
          * @enum {string}
          */
         HealthStatus: "ok";
+        /**
+         * ImportBundleResponse
+         * @description Response after successfully importing a run bundle.
+         */
+        ImportBundleResponse: {
+            /** Run Id */
+            run_id: string;
+            /** Scenario Name */
+            scenario_name: string;
+            /** Run Dir */
+            run_dir: string;
+        };
         /**
          * KnobsContentResponse
          * @description Response containing the parsed contents of a knobs JSON file.
@@ -1665,6 +1722,76 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    export_run_bundle_api_runs__run_id__export_bundle_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tar.gz bundle of the simulation run with git history. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/gzip": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_run_bundle_api_runs_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_run_bundle_api_runs_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportBundleResponse"];
+                };
+            };
+            /** @description Run with this ID already exists. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid or incomplete bundle. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

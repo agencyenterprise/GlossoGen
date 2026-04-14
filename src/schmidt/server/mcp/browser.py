@@ -28,6 +28,7 @@ from schmidt.server.mcp.models import (
     McpAgentModel,
     McpDebugLog,
     McpEvalMetric,
+    McpExportArtifactsResult,
     McpForkSource,
     McpGetKnobsPresetResult,
     McpGetKnobsSchemaResult,
@@ -504,6 +505,21 @@ async def _tool_start_run(
     )
 
 
+async def _tool_export_run_artifacts(run_id: str) -> McpExportArtifactsResult:
+    """Return a download URL for exporting all run artifacts as a zip archive."""
+    run_summary = await _find_run_by_prefix(run_id_prefix=run_id)
+    full_run_id = run_summary.run_id
+    run_id_short = full_run_id[:8]
+    filename = f"{run_summary.scenario_name}_{run_id_short}_artifacts.zip"
+    download_url = f"/api/runs/{full_run_id}/export/artifacts"
+    return McpExportArtifactsResult(
+        run_id=full_run_id,
+        scenario_name=run_summary.scenario_name,
+        download_url=download_url,
+        filename=filename,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tool registration table
 # ---------------------------------------------------------------------------
@@ -557,6 +573,13 @@ _TOOL_DEFS: list[tuple[str, str, Any]] = [
         "Pass knobs from a preset (via get_knobs_preset) with "
         "any modifications applied.",
         _tool_start_run,
+    ),
+    (
+        "export_run_artifacts",
+        "Get a download URL for exporting all run artifacts as a zip archive. "
+        "Returns a relative URL path that can be fetched from the backend server. "
+        "Accepts a full run_id or a unique prefix.",
+        _tool_export_run_artifacts,
     ),
 ]
 

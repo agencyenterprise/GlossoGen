@@ -21,6 +21,7 @@ from schmidt.server.password_auth_middleware import PasswordAuthMiddleware
 from schmidt.server.pdf.router import router as pdf_export_router
 from schmidt.server.response_models import AuthVerifyResponse, HealthResponse, HealthStatus
 from schmidt.server.runs.artifact_router import router as artifact_export_router
+from schmidt.server.runs.bundle_router import router as bundle_router
 from schmidt.server.runs.fork_router import router as fork_router
 from schmidt.server.runs.router import router as runs_router
 from schmidt.server.scenarios.router import router as scenarios_router
@@ -97,6 +98,7 @@ app.include_router(runs_router)
 app.include_router(fork_router)
 app.include_router(pdf_export_router)
 app.include_router(artifact_export_router)
+app.include_router(bundle_router)
 app.include_router(scenarios_router)
 
 # MCP server with OAuth. Requires OAUTH_ISSUER_URL to be set.

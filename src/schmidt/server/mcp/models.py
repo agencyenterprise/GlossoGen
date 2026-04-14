@@ -194,3 +194,12 @@ class McpStartRunResult(BaseModel):
     scenario_name: str
     model: str
     provider: str
+
+
+class McpExportArtifactsResult(BaseModel):
+    """Response for export_run_artifacts."""
+
+    run_id: str
+    scenario_name: str
+    download_url: str
+    filename: str
