@@ -17,6 +17,7 @@ class VeyruKnobs(BaseKnobs):
     the Veyru's critical needs.
     """
 
+    round_count: int
     seconds_per_token: float
     judge_model: str
     judge_provider: str

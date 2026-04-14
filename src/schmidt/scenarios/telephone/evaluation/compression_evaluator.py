@@ -32,6 +32,9 @@ class CompressionAnalysisOutput(BaseModel):
             "Examples: abbreviations, first-letter codes, numbering, categorization."
         ),
     )
+    rounds_identified: list[int] = Field(
+        description="Round numbers where compression strategies were observed.",
+    )
     messages_became_shorter: bool = Field(
         description="Whether the Relayer's messages became shorter or more compressed over rounds.",
     )
@@ -126,6 +129,8 @@ class CompressionEvaluator(Evaluator):
             score = 0.5
 
         evidence: list[str] = [result.explanation]
+        if result.rounds_identified:
+            evidence.append(f"Rounds: {', '.join(str(r) for r in result.rounds_identified)}")
         if result.compression_techniques:
             evidence.append(
                 f"Compression techniques found: {', '.join(result.compression_techniques)}"

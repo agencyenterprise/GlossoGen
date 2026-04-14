@@ -80,14 +80,19 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate telephone \
   --model claude-sonnet-4-6 --provider anthropic
 ```
 
-Generic evaluators (available to all scenarios): `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`
+Generic evaluators (available to all scenarios) focus on language emergence. Each is scoped to a specific phenomenon to avoid overlap:
+
+- `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style
+- `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames
+- `neologism` — genuinely invented words with new meanings (not abbreviations or codes)
+- `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding
 
 Scenario-specific evaluators:
 
-- **telephone**: `compression`
-- **veyru**: `language_emergence`
+- **telephone**: `compression` (relay compression strategies with accuracy tracking)
+- **veyru**: `language_emergence` (novel language in a fictional domain)
 
-Output is a JSON report with per-evaluator verdicts, scores, evidence, and per-agent breakdowns.
+Output is a JSON report with per-evaluator verdicts, scores, and evidence. After evaluation, labels are automatically written to the run in the format `eval:{evaluator}:{verdict}` (where verdict is `identified`, `partial`, or `fail`), visible in the web UI for filtering.
 
 ## Web UI
 

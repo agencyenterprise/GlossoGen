@@ -44,6 +44,16 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/message_history_builder.py` — reconstructs pydantic-ai ModelMessage history from JSONL events for fork/resume
 - `src/schmidt/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
 - `src/schmidt/evaluation/` — generic evaluators and evaluation infrastructure
+  - `evaluator_protocol.py` — `Evaluator` ABC and `EvaluatorFactory` type alias
+  - `evaluator_registry.py` — registry mapping evaluator names to factory callables
+  - `generic_evaluator_names.py` — canonical name list (avoids circular imports with `scenario_protocol`)
+  - `round_transcript_builder.py` — builds per-round message transcripts from events (used by all generic evaluators)
+  - `label_writer.py` — writes `eval:{evaluator}:{verdict}` labels to `labels.json` after evaluation
+  - `language_strangeness_evaluator.py` — detects unusual grammar, structure, formatting (not codes/slang/neologisms)
+  - `slang_emergence_evaluator.py` — detects informal register shifts and colloquial expressions
+  - `neologism_evaluator.py` — detects genuinely invented words (not abbreviations or codes)
+  - `shorthand_codes_evaluator.py` — detects abbreviation systems and symbol-to-meaning mappings
+  - `prompts/` — Jinja2 templates for LLM judge prompts
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
   - `password_auth_middleware.py` — pure ASGI middleware for shared-password authentication
   - `runs/fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
@@ -420,10 +430,19 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
 
 Available evaluators per scenario:
 
-Generic evaluators (available to all): `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`
+Generic evaluators (available to all scenarios) focus on language emergence. Each evaluator is scoped to a specific phenomenon — their prompts explicitly list what the other evaluators cover, so they do not overlap:
 
-- **telephone**: generic + `compression`
-- **veyru**: generic + `language_emergence`
+- `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style (NOT codes, slang, or new words)
+- `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames (NOT codes or new words)
+- `neologism` — genuinely invented words with new meanings (NOT abbreviations or code mappings)
+- `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding (NOT new words or slang)
+
+Scenario-specific evaluators:
+
+- **telephone**: generic + `compression` (relay compression strategies with accuracy tracking)
+- **veyru**: generic + `language_emergence` (novel language in a fictional domain)
+
+After evaluation, labels are automatically written to the run's `labels.json` in the format `eval:{evaluator}:{verdict}` where verdict is `identified`, `partial`, or `fail`. Previous `eval:` labels are replaced; user-added labels are preserved.
 
 ## Destructive Actions
 

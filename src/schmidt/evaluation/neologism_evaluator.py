@@ -28,14 +28,14 @@ class NeologismOutput(BaseModel):
             "the term, and what it appears to mean."
         ),
     )
+    rounds_identified: list[int] = Field(
+        description="Round numbers where genuinely invented words first appeared.",
+    )
     semantically_stable: bool = Field(
         description="Whether invented terms retained consistent meanings across rounds.",
     )
     mutually_adopted: bool = Field(
         description="Whether both agents used the invented terms.",
-    )
-    vocabulary_grew: bool = Field(
-        description="Whether the number of novel terms increased over rounds.",
     )
     verdict: Literal["PASS", "PARTIAL", "FAIL"] = Field(
         description=(
@@ -106,15 +106,14 @@ class NeologismEvaluator(Evaluator):
             score = 0.5
 
         evidence: list[str] = [result.explanation]
+        if result.rounds_identified:
+            evidence.append(f"Rounds: {', '.join(str(r) for r in result.rounds_identified)}")
         if result.novel_terms:
             evidence.append(f"Novel terms found: {len(result.novel_terms)}")
         if result.semantically_stable:
             evidence.append("Invented terms maintained consistent meanings")
         if result.mutually_adopted:
             evidence.append("Novel vocabulary adopted by multiple agents")
-        if result.vocabulary_grew:
-            evidence.append("Vocabulary grew over rounds")
-
         return MetricResult(
             evaluator_name=self.name,
             verdict=verdict,
