@@ -230,11 +230,11 @@ The user selects which evaluators to run — they are not automatically applied.
   "scenario_name": "...",
   "metrics": [
     {
-      "evaluator_name": "secret_leak",
+      "evaluator_name": "language_strangeness",
       "verdict": "pass",
       "score": 1.0,
-      "evidence": ["No confidential information was leaked across 24 messages"],
-      "per_agent": { "engineer": "pass", "legal": "pass", "cfo": "pass", "pr": "pass", "regulator": "pass" }
+      "evidence": ["Detected novel abbreviations and non-standard language patterns across 24 messages"],
+      "per_agent": {}
     }
   ]
 }

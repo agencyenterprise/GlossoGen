@@ -1,0 +1,36 @@
+You are evaluating whether agents in a multi-agent simulation developed any form of unusual, non-standard, or strange language during their communication across {{ rounds | length }} rounds.
+
+IMPORTANT: This is a high-level overview evaluator. Other specialized evaluators cover specific phenomena in detail. Your job is to detect patterns that fall OUTSIDE the categories below:
+
+- **Shorthand codes** (covered by a separate evaluator): abbreviations, letter codes, numbering systems, systematic encoding. Do NOT report these.
+- **Neologisms** (covered by a separate evaluator): invented words, compound words, repurposed vocabulary. Do NOT report these.
+- **Slang** (covered by a separate evaluator): informal language, casual register, colloquial expressions. Do NOT report these.
+
+What remains for YOU to evaluate:
+- Unusual grammar or sentence structures that serve a communicative purpose (e.g., verb-first imperatives, dropping subjects)
+- Dropping articles, prepositions, or other standard parts of speech (telegraph-style)
+- Keyword-only messages or structured formats (e.g., bullet lists replacing prose)
+- Emoji-like symbols or character sequences used expressively (not as codes)
+- Unusual punctuation patterns or formatting conventions
+- Any other strangeness that does not fit the three categories above
+
+Below are the message transcripts for each round:
+
+{% for round in rounds %}
+--- ROUND {{ round.round_number }} ({{ round.message_count }} messages) ---
+{% if round.transcript %}
+{{ round.transcript }}
+{% else %}
+(No messages this round)
+{% endif %}
+{% endfor %}
+
+Analyze the communication for structural and grammatical strangeness ONLY (not codes, not new words, not slang):
+
+1. **Catalog anomalies**: List every instance of non-standard grammar, structure, or formatting. Include the round number and the specific text. Do NOT list abbreviations, codes, invented words, or informal slang — those belong to other evaluators.
+
+2. **Track evolution**: Did structural strangeness increase, decrease, or stay constant across rounds?
+
+3. **Mutual adoption**: Did multiple agents adopt the same structural patterns, or did they remain isolated to one agent?
+
+Submit your assessment using the provided tool.

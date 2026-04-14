@@ -14,13 +14,7 @@ import orjson
 
 from schmidt.eval_manifest import read_eval_manifest
 from schmidt.event_parsing import parse_event_bytes
-from schmidt.models.event import (
-    AgentRegistered,
-    RunStatus,
-    SimulationEnded,
-    SimulationEvent,
-    SimulationStarted,
-)
+from schmidt.models.event import RunStatus, SimulationEnded, SimulationEvent, SimulationStarted
 from schmidt.server.runs.models import AgentModelSummary, ForkSource, RunSummary
 from schmidt.stream_manifest import delete_manifest, read_manifest
 from schmidt.token_pricing import find_pricing
@@ -286,8 +280,8 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                     status = RunStatus.IN_PROGRESS
                 else:
                     delete_manifest(run_dir=timestamp_dir)
-                    still_booting = isinstance(last_event, (SimulationStarted, AgentRegistered))
-                    if still_booting:
+                    fork_path = timestamp_dir / "fork_manifest.json"
+                    if fork_path.exists():
                         status = RunStatus.STARTING
                     else:
                         status = RunStatus.ERROR

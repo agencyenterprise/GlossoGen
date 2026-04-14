@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle,
@@ -10,11 +10,13 @@ import {
   Loader2,
   StickyNote,
   Sword,
+  Tag,
   Trash2,
   XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
+import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import {
   elapsedSince,
@@ -28,6 +30,7 @@ import {
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
 import { ConfigValueModal } from "./config-value-modal";
 import { NoteViewModal } from "./note-view-modal";
+import { LabelBadges } from "./eval-label-group";
 import { labelColor } from "./label-picker-modal";
 
 type RunSummary = components["schemas"]["RunSummary"];
@@ -73,6 +76,7 @@ export function RunList() {
   const [modalRun, setModalRun] = useState<RunSummary | null>(null);
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [noteModalRunId, setNoteModalRunId] = useState<string | null>(null);
+  const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
   const [modelsPopover, setModelsPopover] = useState<{
     left: number;
     top: number;
@@ -81,6 +85,29 @@ export function RunList() {
   const closePopoverTimerRef = useRef<number | null>(null);
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  const { data: labelsData } = useQuery({
+    queryKey: ["all-labels"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/labels");
+      if (error) {
+        throw new Error("Failed to fetch labels");
+      }
+      return data;
+    },
+  });
+
+  function toggleLabel(label: string) {
+    setSelectedLabels(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     return () => {
@@ -182,6 +209,15 @@ export function RunList() {
     },
   });
 
+  const allRuns = useMemo(() => data?.runs ?? [], [data]);
+  const allLabels = labelsData?.labels ?? [];
+  const runs = useMemo(() => {
+    if (selectedLabels.size === 0) {
+      return allRuns;
+    }
+    return allRuns.filter(run => [...selectedLabels].every(label => run.labels.includes(label)));
+  }, [allRuns, selectedLabels]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -199,9 +235,7 @@ export function RunList() {
     );
   }
 
-  const runs = data!.runs;
-
-  if (runs.length === 0) {
+  if (allRuns.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-20 text-muted-foreground">
         <Inbox className="h-10 w-10" />
@@ -214,6 +248,41 @@ export function RunList() {
 
   return (
     <div className="space-y-6">
+      {allLabels.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+          {allLabels.map(label => {
+            const active = selectedLabels.has(label);
+            const color = labelColor(label);
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => toggleLabel(label)}
+                className={cn(
+                  "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium transition-all",
+                  active
+                    ? `${color.bg} ${color.text} ring-1 ring-current`
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
+          {selectedLabels.size > 0 ? (
+            <button
+              type="button"
+              onClick={() => setSelectedLabels(new Set())}
+              className="ml-1 inline-flex items-center gap-0.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <XCircle className="h-3 w-3" />
+              Clear
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {modalRun !== null ? (
         <ScenarioDescriptionModal
           scenarioName={humanize(modalRun.scenario_name)}
@@ -258,6 +327,13 @@ export function RunList() {
               </div>
             ))}
           </div>
+        </div>
+      ) : null}
+
+      {runs.length === 0 && selectedLabels.size > 0 ? (
+        <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
+          <Inbox className="h-8 w-8" />
+          <p className="text-sm">No runs match the selected labels</p>
         </div>
       ) : null}
 
@@ -413,17 +489,7 @@ export function RunList() {
                                   Evaluated
                                 </span>
                               ) : null}
-                              {run.labels.map(label => {
-                                const color = labelColor(label);
-                                return (
-                                  <span
-                                    key={label}
-                                    className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${color.bg} ${color.text}`}
-                                  >
-                                    {label}
-                                  </span>
-                                );
-                              })}
+                              <LabelBadges labels={run.labels} size="sm" />
                               {run.has_note ? (
                                 <button
                                   type="button"

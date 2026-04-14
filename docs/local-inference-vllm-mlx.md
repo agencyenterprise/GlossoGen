@@ -62,7 +62,7 @@ The `/v1` suffix is required — Pydantic AI uses the OpenAI-compatible endpoint
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
   --model qwen2.5:14b --provider ollama --runs-dir ./runs \
-  --config src/schmidt/scenarios/telephone/knobs_baseline.json \
+  --config src/schmidt/scenarios/telephone/knobs_default.json \
   > ./runs/telephone_stdout.log 2>&1 &
 ```
 

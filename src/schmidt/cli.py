@@ -32,6 +32,7 @@ from schmidt.config_overrides import (
     validate_agent_override_ids,
 )
 from schmidt.eval_manifest import delete_eval_manifest, write_eval_manifest
+from schmidt.evaluation.label_writer import write_eval_labels
 from schmidt.evaluation.log_reader import extract_scenario_config, load_events
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
@@ -419,7 +420,7 @@ async def _run_evaluation(
     write_eval_manifest(run_dir=run_dir, pid=os.getpid())
     try:
         logger.info("Evaluating %s with evaluators: %s", args.scenario_name, args.evaluators)
-        await scenario.run_evaluation(
+        report = await scenario.run_evaluation(
             log_path=log_path,
             evaluator_names=evaluator_names,
             report_path=report_path,
@@ -428,6 +429,7 @@ async def _run_evaluation(
             inference_provider=args.inference_provider,
             reasoning_effort=getattr(args, "reasoning_effort", None),
         )
+        write_eval_labels(run_dir=run_dir, report=report)
         logger.info("Evaluation complete. Report written to %s", report_path)
     finally:
         delete_eval_manifest(run_dir=run_dir)

@@ -1,0 +1,38 @@
+You are evaluating whether agents in a multi-agent simulation invented genuinely new words or terms during their communication across {{ rounds | length }} rounds.
+
+IMPORTANT: Other specialized evaluators cover different phenomena. Only report what belongs to THIS evaluator:
+
+- **Shorthand codes** (covered separately): abbreviations, letter codes, numbering systems like "A=flicker" or "P1". These are MAPPINGS from short symbols to existing concepts. Do NOT report them here.
+- **Slang** (covered separately): informal variants of existing words ("gonna", "nah", "yep"). Do NOT report these.
+- **Structural strangeness** (covered separately): unusual grammar, dropped articles, formatting. Do NOT report these.
+
+What belongs to THIS evaluator — neologisms (genuinely new vocabulary):
+- Completely new words that don't exist in any language (e.g., "chromaflux", "stabilon")
+- Compound words created by merging existing words in novel ways (e.g., "hum-flicker", "pulse-fade")
+- Existing words repurposed with entirely new domain-specific meanings that differ from standard usage
+- Portmanteaus or blends of existing words creating new terms
+
+The key distinction: a neologism is a NEW WORD with a new meaning. A code like "A=flicker" is just a shorthand mapping — "A" is not a new word, it's a label. Report only genuine vocabulary invention.
+
+Below are the message transcripts for each round:
+
+{% for round in rounds %}
+--- ROUND {{ round.round_number }} ({{ round.message_count }} messages) ---
+{% if round.transcript %}
+{{ round.transcript }}
+{% else %}
+(No messages this round)
+{% endif %}
+{% endfor %}
+
+Analyze the communication for neologism creation:
+
+1. **Catalog new terms**: List every genuinely invented word or term, with the round number and exact text. For each, explain why it qualifies as a neologism rather than a code or abbreviation.
+
+2. **Semantic stability**: Once a new term was introduced, did it retain a consistent meaning across later rounds?
+
+3. **Adoption**: Did both agents use the new terms, or did one agent's inventions go unrecognized by the other?
+
+4. **Vocabulary growth**: Did the number of novel terms increase over rounds? Did agents build on earlier inventions to create more complex terminology?
+
+Submit your assessment using the provided tool.
