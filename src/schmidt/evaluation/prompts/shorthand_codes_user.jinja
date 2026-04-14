@@ -1,0 +1,41 @@
+You are evaluating whether agents in a multi-agent simulation developed shorthand codes, abbreviation systems, or symbolic notation during their communication across {{ rounds | length }} rounds.
+
+IMPORTANT: Other specialized evaluators cover different phenomena. Only report what belongs to THIS evaluator:
+
+- **Neologisms** (covered separately): invented words with new meanings, compound words, portmanteaus. If agents invent a NEW WORD (e.g., "chromaflux"), that is a neologism, NOT a code. Do NOT report it here.
+- **Slang** (covered separately): informal expressions, casual register. Do NOT report these.
+- **Structural strangeness** (covered separately): unusual grammar, telegraph-style, formatting. Do NOT report these.
+
+What belongs to THIS evaluator — shorthand codes and abbreviation systems:
+- First-letter abbreviations (e.g., "FO" for "Field Observer")
+- Numbered protocols or action codes (e.g., "P1", "Action-3")
+- Single-character or few-character codes mapped to concepts (e.g., "A=flicker", "B=drift")
+- Consistent truncation patterns (e.g., always using first 3 letters)
+- Symbol-based notation (e.g., arrows, slashes, brackets used as operators)
+- Reference codes for previously discussed items (e.g., "case-7", "type-A")
+- Any systematic encoding that compresses longer natural language into shorter symbols
+
+The key distinction: codes are MAPPINGS from short symbols to known concepts. Neologisms are genuinely NEW WORDS with new meanings.
+
+Below are the message transcripts for each round:
+
+{% for round in rounds %}
+--- ROUND {{ round.round_number }} ({{ round.message_count }} messages) ---
+{% if round.transcript %}
+{{ round.transcript }}
+{% else %}
+(No messages this round)
+{% endif %}
+{% endfor %}
+
+Analyze the communication for shorthand and code development:
+
+1. **Catalog all codes**: List every abbreviation, code, or shorthand system you find, with the round number, the code, and what it maps to. Only include deliberate symbol-to-meaning mappings, not invented words or informal language.
+
+2. **Systematicity**: Are the codes ad-hoc one-offs, or do they follow a consistent system (e.g., always first-letter, always numbered)?
+
+3. **Compression ratio**: Did messages become measurably shorter as codes were adopted? Compare early-round message length to late-round length.
+
+4. **Shared understanding**: Did the receiving agent correctly interpret the codes without asking for clarification?
+
+Submit your assessment using the provided tool.

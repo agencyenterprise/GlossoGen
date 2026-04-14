@@ -308,20 +308,20 @@ Examples:
 # Telephone with base config
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/telephone/knobs_baseline.json \
+  --config src/schmidt/scenarios/telephone/knobs_default.json \
   > ./runs/telephone_stdout.log 2>&1 &
 
 # Telephone with per-agent model overrides
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/telephone/knobs_baseline.json \
+  --config src/schmidt/scenarios/telephone/knobs_default.json \
   agents.relayer.model=gpt-4o agents.relayer.provider=openai \
   > ./runs/telephone_stdout.log 2>&1 &
 
 # Override knobs inline on top of a base config
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/telephone/knobs_baseline.json \
+  --config src/schmidt/scenarios/telephone/knobs_default.json \
   max_round_duration_seconds=120 round_count=20 \
   > ./runs/telephone_stdout.log 2>&1 &
 ```
@@ -372,9 +372,9 @@ Each agent uses the default `--model` and `--provider` unless overridden. Per-ag
 **CLI usage:** Pass dot-notation overrides:
 
 ```bash
-schmidt run car_recall --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config knobs_baseline.json \
-  agents.engineer.model=gpt-5.4 agents.engineer.provider=openai
+schmidt run telephone --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
+  --config knobs_default.json \
+  agents.relayer.model=gpt-5.4 agents.relayer.provider=openai
 ```
 
 Or embed in the `--config` JSON file under `model_overrides`:
@@ -383,11 +383,10 @@ Or embed in the `--config` JSON file under `model_overrides`:
 {
   "max_round_duration_seconds": 300,
   "model_overrides": {
-    "engineer": {"model": "gpt-5.4", "provider": "openai"},
-    "legal": {"model": "claude-opus-4-6", "provider": "anthropic"}
+    "relayer": {"model": "gpt-5.4", "provider": "openai"},
+    "receiver": {"model": "claude-opus-4-6", "provider": "anthropic"}
   },
-  "time_pressure": "high",
-  "goal_alignment": "high"
+  "round_count": 40
 }
 ```
 
@@ -421,9 +420,8 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
 
 Available evaluators per scenario:
 
-Generic evaluators (available to all): `secret_leak`
+Generic evaluators (available to all): `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`
 
-- **car_recall**: generic + `fact_surfacing`, `report_divergence`, `decision_correctness`
 - **telephone**: generic + `compression`
 - **veyru**: generic + `language_emergence`
 

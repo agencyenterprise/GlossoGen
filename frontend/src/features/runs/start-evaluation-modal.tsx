@@ -39,8 +39,13 @@ export function StartEvaluationModal({
   const scenarioInfo = data?.scenarios.find(s => s.scenario_name === scenarioName);
   const availableEvaluators = scenarioInfo?.available_evaluators ?? [];
 
-  if (!initialized && availableEvaluators.length > 0) {
+  if (!initialized && availableEvaluators.length > 0 && data) {
     setSelectedEvaluators(new Set(availableEvaluators));
+    const haiku = data.models.find(m => m.model_prefix.includes("haiku"));
+    if (haiku) {
+      setModel(haiku.model_prefix);
+      setProvider(haiku.provider);
+    }
     setInitialized(true);
   }
 

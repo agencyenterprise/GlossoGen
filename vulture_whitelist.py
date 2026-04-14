@@ -1,5 +1,4 @@
 model_config  # unused variable (src/schmidt/config_overrides.py:27)
-leaked_information  # unused variable (src/schmidt/evaluation/secret_leak_evaluator.py:38)
 _.format  # unused method (src/schmidt/logging_format.py:21)
 model_config  # unused variable (src/schmidt/models/agent_config.py:23)
 display_name  # unused variable (src/schmidt/models/channel.py:19)

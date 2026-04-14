@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Self
 
 from schmidt.evaluation.evaluation_report import EvaluationReport
+from schmidt.evaluation.generic_evaluator_names import GENERIC_EVALUATOR_NAMES
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
@@ -30,17 +31,10 @@ class SimulationScenario(ABC):
     def get_available_evaluator_names(cls) -> list[str]:
         """Return the names of all evaluators available for this scenario.
 
-        The default returns only generic evaluators (mirroring
-        ``GENERIC_EVALUATOR_REGISTRY`` — imported there from each evaluator's
-        ``name`` class attribute, but listed here to avoid a circular import).
+        The default returns only generic evaluators.
         Scenarios with scenario-specific evaluators override this method.
         """
-        return [
-            "communication_pattern",
-            "cooperation",
-            "instruction_adherence",
-            "secret_leak",
-        ]
+        return sorted(GENERIC_EVALUATOR_NAMES)
 
     @classmethod
     @abstractmethod

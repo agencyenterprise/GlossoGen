@@ -25,7 +25,7 @@ The CLI auto-generates a timestamped subdirectory under `--runs-dir`. Each round
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/telephone/knobs_baseline.json \
+  --config src/schmidt/scenarios/telephone/knobs_default.json \
   > ./runs/telephone_stdout.log 2>&1 &
 ```
 

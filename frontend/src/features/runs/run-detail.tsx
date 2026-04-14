@@ -27,6 +27,7 @@ import { buildAgentColorMap, buildChannelColorMap } from "./agent-colors";
 import { AgentDrawer } from "./agent-drawer";
 import { ChatPane } from "./chat-pane";
 import { mergeEntries } from "./display-entry";
+import { LabelBadges } from "./eval-label-group";
 import { EvalPanel } from "./eval-panel";
 import { ForkBadge, ForkPointFab } from "./fork-badge";
 import { StartEvaluationModal } from "./start-evaluation-modal";
@@ -45,7 +46,7 @@ import { ModelPicker } from "./model-picker";
 import { useFork } from "./use-fork";
 import { ConfigValueModal } from "./config-value-modal";
 import { AgentModelOverrides, type AgentModelOverride } from "./agent-model-overrides";
-import { LabelPickerModal, labelColor } from "./label-picker-modal";
+import { LabelPickerModal } from "./label-picker-modal";
 import { NoteEditorModal } from "./note-editor-modal";
 
 function extractModelOverridesFromScenarioConfig(args: {
@@ -497,17 +498,7 @@ export function RunDetail({ runId }: { runId: string }) {
       {/* Labels */}
       {restData.labels.length > 0 ? (
         <div className="mb-3 flex shrink-0 flex-wrap gap-1.5">
-          {restData.labels.map(label => {
-            const color = labelColor(label);
-            return (
-              <span
-                key={label}
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${color.bg} ${color.text}`}
-              >
-                {label}
-              </span>
-            );
-          })}
+          <LabelBadges labels={restData.labels} size="md" />
         </div>
       ) : null}
 

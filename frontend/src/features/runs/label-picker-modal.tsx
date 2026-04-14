@@ -17,7 +17,34 @@ const LABEL_COLORS = [
   { bg: "bg-pink-100 dark:bg-pink-900/30", text: "text-pink-700 dark:text-pink-400" },
 ];
 
+const EVAL_IDENTIFIED_COLOR = {
+  bg: "bg-emerald-100 dark:bg-emerald-900/30",
+  text: "text-emerald-700 dark:text-emerald-400",
+};
+
+const EVAL_PARTIAL_COLOR = {
+  bg: "bg-amber-100 dark:bg-amber-900/30",
+  text: "text-amber-700 dark:text-amber-400",
+};
+
+const EVAL_FAIL_COLOR = {
+  bg: "bg-rose-100 dark:bg-rose-900/30",
+  text: "text-rose-700 dark:text-rose-400",
+};
+
 export function labelColor(label: string): (typeof LABEL_COLORS)[number] {
+  if (label.startsWith("eval:")) {
+    if (label.endsWith(":identified")) {
+      return EVAL_IDENTIFIED_COLOR;
+    }
+    if (label.endsWith(":partial")) {
+      return EVAL_PARTIAL_COLOR;
+    }
+    if (label.endsWith(":fail")) {
+      return EVAL_FAIL_COLOR;
+    }
+  }
+
   let hash = 0;
   for (let i = 0; i < label.length; i++) {
     hash = (hash * 31 + label.charCodeAt(i)) | 0;
