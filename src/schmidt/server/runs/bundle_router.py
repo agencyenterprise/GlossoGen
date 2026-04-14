@@ -53,7 +53,12 @@ def _should_include_in_bundle(path: Path, run_dir: Path) -> bool:
     return True
 
 
-def _build_bundle_bytes(run_dir: Path, run_id: str, scenario_name: str) -> bytes:
+def _build_bundle_bytes(
+    run_dir: Path,
+    run_id: str,
+    scenario_name: str,
+    original_timestamp: int,
+) -> bytes:
     """Build a tar.gz archive of the run directory including git history."""
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
@@ -69,6 +74,7 @@ def _build_bundle_bytes(run_dir: Path, run_id: str, scenario_name: str) -> bytes
             run_id=run_id,
             scenario_name=scenario_name,
             exported_at=datetime.now(tz=UTC),
+            original_timestamp=original_timestamp,
         )
         manifest_bytes = orjson.dumps(manifest.model_dump(mode="json"), option=orjson.OPT_INDENT_2)
         info = tarfile.TarInfo(name=_MANIFEST_FILENAME)
@@ -99,11 +105,14 @@ async def export_run_bundle(run_id: str, request: Request) -> StreamingResponse:
     run_summary = matching[0]
     run_dir = Path(run_summary.run_dir)
 
+    original_timestamp = int(run_dir.name.split("_")[0])
+
     bundle_bytes = await asyncio.to_thread(
         _build_bundle_bytes,
         run_dir,
         run_id,
         run_summary.scenario_name,
+        original_timestamp,
     )
 
     run_id_short = run_id[:8]
@@ -165,6 +174,32 @@ def _has_git_members(tar: tarfile.TarFile) -> bool:
         if member.name.startswith(".git/"):
             return True
     return False
+
+
+def _rename_to_original_timestamp(run_dir: Path, original_timestamp: int) -> Path:
+    """Rename a run directory to use the original timestamp from the bundle.
+
+    Uses the same collision-avoidance suffix scheme as claim_run_dir. If the
+    directory already has the correct name, returns it unchanged.
+    """
+    target_name = str(original_timestamp)
+    if run_dir.name == target_name:
+        return run_dir
+
+    parent = run_dir.parent
+    candidate = parent / target_name
+    if not candidate.exists():
+        run_dir.rename(candidate)
+        return candidate
+
+    # Collision: append _2, _3, ... until we find a free slot.
+    suffix = 2
+    while True:
+        candidate = parent / f"{target_name}_{suffix}"
+        if not candidate.exists():
+            run_dir.rename(candidate)
+            return candidate
+        suffix += 1
 
 
 def _extract_and_validate_bundle(
@@ -231,10 +266,17 @@ def _extract_and_validate_bundle(
                 detail="Failed to extract bundle",
             )
 
+    # Rename directory to preserve the original timestamp so the run list
+    # shows the execution time rather than the import time.
+    target_dir = _rename_to_original_timestamp(
+        run_dir=run_dir,
+        original_timestamp=manifest.original_timestamp,
+    )
+
     return ImportBundleResponse(
         run_id=manifest.run_id,
         scenario_name=manifest.scenario_name,
-        run_dir=str(run_dir),
+        run_dir=str(target_dir),
     )
 
 

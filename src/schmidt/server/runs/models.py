@@ -273,6 +273,7 @@ class BundleManifest(BaseModel):
     run_id: str
     scenario_name: str
     exported_at: datetime
+    original_timestamp: int
 
 
 class ImportBundleResponse(BaseModel):
