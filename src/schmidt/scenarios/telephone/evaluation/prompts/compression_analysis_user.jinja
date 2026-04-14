@@ -1,0 +1,27 @@
+You are evaluating whether a Relayer agent developed efficient compression strategies in a telephone game over {{ rounds | length }} rounds.
+
+In each round, a Sender transmits a word list to the Relayer, who must forward it to a Receiver using as few tokens as possible. The Receiver decodes and submits an answer. The Relayer receives feedback after each round showing accuracy and token cost.
+
+Ten base word lists (3–17 items) are repeated across 4 shuffled epochs. Epoch 1 introduces lists in order; epochs 2–4 shuffle them so agents encounter familiar word sets unpredictably, testing whether stable encodings persist.
+
+Below are the relay transcripts and results for each round:
+
+{% for round in rounds %}
+--- ROUND {{ round.round_number }} ---
+Original items ({{ round.item_count }}): {{ round.original_items }}
+Relayer's message to Receiver: {{ round.relay_message }}
+Receiver's submission: {{ round.submitted_items }}
+Accuracy: {{ round.correct_count }}/{{ round.total_count }} ({{ round.accuracy_pct }}%)
+{% endfor %}
+
+Analyze the evolution of the Relayer's compression strategy across rounds:
+
+1. **Compression techniques**: What encoding strategies did the Relayer develop? Look for abbreviations, truncation, numbering, categorization codes, first-letter codes, or other novel approaches.
+
+2. **Message brevity over time**: Did the Relayer's messages become shorter or more compressed from early to late rounds, especially as list length increased?
+
+3. **Accuracy maintenance**: Did compression come at the cost of accuracy, or did the Relayer maintain high accuracy while compressing?
+
+4. **Shared codebook**: Did the Relayer and Receiver establish conventions that persisted across rounds and epochs? Did the Receiver adapt to the Relayer's compression? Were word lists in later epochs encoded more efficiently than the same lists in epoch 1?
+
+Submit your assessment using the provided tool.

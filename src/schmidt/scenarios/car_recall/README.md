@@ -166,7 +166,7 @@ Scenario behavior is configured via a JSON config file passed with `--config`.
 
 ```bash
 python -m schmidt run car_recall \
-  --model claude-sonnet-4-20250514 \
+  --model claude-sonnet-4-6 \
   --provider anthropic \
   --runs-dir ./runs \
   --config knobs.json

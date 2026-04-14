@@ -307,20 +307,20 @@ Examples:
 ```bash
 # Car recall with base config
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
+  --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
   > ./runs/car_recall_stdout.log 2>&1 &
 
 # Car recall with per-agent model overrides
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
+  --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
   agents.engineer.model=gpt-4o agents.engineer.provider=openai \
   > ./runs/car_recall_stdout.log 2>&1 &
 
 # Override knobs inline on top of a base config
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run car_recall \
-  --model claude-sonnet-4-20250514 --provider anthropic --runs-dir ./runs \
+  --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config src/schmidt/scenarios/car_recall/knobs_baseline.json \
   time_pressure=high agent_count=five \
   > ./runs/car_recall_stdout.log 2>&1 &
@@ -372,9 +372,9 @@ Each agent uses the default `--model` and `--provider` unless overridden. Per-ag
 **CLI usage:** Pass dot-notation overrides:
 
 ```bash
-schmidt run car_recall --model claude-sonnet --provider anthropic --runs-dir ./runs \
+schmidt run car_recall --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config knobs_baseline.json \
-  agents.engineer.model=gpt-4o agents.engineer.provider=openai
+  agents.engineer.model=gpt-5.4 agents.engineer.provider=openai
 ```
 
 Or embed in the `--config` JSON file under `model_overrides`:
@@ -383,8 +383,8 @@ Or embed in the `--config` JSON file under `model_overrides`:
 {
   "max_round_duration_seconds": 300,
   "model_overrides": {
-    "engineer": {"model": "gpt-4o", "provider": "openai"},
-    "legal": {"model": "claude-opus-4-20250514", "provider": "anthropic"}
+    "engineer": {"model": "gpt-5.4", "provider": "openai"},
+    "legal": {"model": "claude-opus-4-6", "provider": "anthropic"}
   },
   "time_pressure": "high",
   "goal_alignment": "high"
@@ -424,7 +424,8 @@ Available evaluators per scenario:
 Generic evaluators (available to all): `secret_leak`
 
 - **car_recall**: generic + `fact_surfacing`, `report_divergence`, `decision_correctness`
-- **emergency_room**: generic + `language_emergence`
+- **telephone**: generic + `compression`
+- **veyru**: generic + `language_emergence`
 
 ## Destructive Actions
 
