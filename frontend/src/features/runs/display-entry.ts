@@ -16,6 +16,8 @@ export interface DisplayEntry {
   round_number: number;
   is_reasoning: boolean;
   is_tool_use: boolean;
+  /** Token count of the message text — only meaningful for channel messages. */
+  token_count: number;
   /** Tool use fields — only populated when is_tool_use is true. */
   tool_name: string;
   tool_arguments: Record<string, unknown>;
@@ -38,6 +40,7 @@ export function mergeEntries(
     round_number: m.round_number,
     is_reasoning: false,
     is_tool_use: false,
+    token_count: m.token_count,
 
     tool_name: "",
     tool_arguments: {},
@@ -54,6 +57,7 @@ export function mergeEntries(
     round_number: r.round_number,
     is_reasoning: true,
     is_tool_use: false,
+    token_count: 0,
 
     tool_name: "",
     tool_arguments: {},
@@ -70,13 +74,17 @@ export function mergeEntries(
     round_number: t.round_number,
     is_reasoning: false,
     is_tool_use: true,
+    token_count: 0,
 
     tool_name: t.tool_name,
     tool_arguments: t.arguments,
     tool_result: t.result,
   }));
 
-  return [...channelEntries, ...reasoningEntries, ...toolEntries].sort((a, b) =>
-    a.timestamp.localeCompare(b.timestamp)
-  );
+  return [...channelEntries, ...reasoningEntries, ...toolEntries].sort((a, b) => {
+    if (a.round_number !== b.round_number) {
+      return a.round_number - b.round_number;
+    }
+    return a.timestamp.localeCompare(b.timestamp);
+  });
 }

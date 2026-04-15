@@ -16,6 +16,7 @@ class NotificationType(str, Enum):
     NEW_MESSAGES = "new_messages"
     NEW_INFO = "new_info"
     DONE = "done"
+    NO_ACTIVITY = "no_activity"
 
 
 class NewMessagesNotification(BaseModel):
@@ -39,7 +40,14 @@ class DoneNotification(BaseModel):
     reason: str
 
 
+class NoActivityNotification(BaseModel):
+    """No activity was detected within the timeout window."""
+
+    type: NotificationType = NotificationType.NO_ACTIVITY
+    detail: str
+
+
 ActivityNotification = Annotated[
-    Union[NewMessagesNotification, NewInfoNotification, DoneNotification],
+    Union[NewMessagesNotification, NewInfoNotification, DoneNotification, NoActivityNotification],
     Discriminator("type"),
 ]

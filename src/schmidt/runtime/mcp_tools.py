@@ -21,7 +21,7 @@ from mcp.server.fastmcp import FastMCP
 from schmidt.models.event import MessageSent
 from schmidt.models.mcp_responses import ChannelMessage, SendMessageResult
 from schmidt.models.message import SimulationMessage
-from schmidt.runtime.activity_notification import NewMessagesNotification
+from schmidt.runtime.activity_notification import NewMessagesNotification, NoActivityNotification
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.scenario_mcp_tool import ToolContext, resolve_agent_id
 from schmidt.runtime.simulation_state import SimulationRuntime
@@ -137,7 +137,9 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                     "Agent %s read_notifications timed out after 120s, returning no_activity",
                     session.agent_id,
                 )
-                return {"type": "no_activity", "detail": "No new messages."}
+                return NoActivityNotification(
+                    detail="No new messages.",
+                ).model_dump()
             if isinstance(notification, NewMessagesNotification):
                 fresh_channels = [
                     ch
@@ -222,6 +224,10 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
 
         display_name_fn = runtime.scenario.get_agent_display_name
 
+        # Count tokens before acquiring the lock to avoid holding the lock
+        # during a potentially slow external API call.
+        token_count = await runtime.count_tokens(agent_id=agent_id, text=text)
+
         async with runtime.get_channel_lock(channel_id=channel_id):
             actual_count = runtime.channel_router.get_message_count(
                 channel_id=channel_id,
@@ -275,6 +281,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                 event=MessageSent(
                     message=message,
                     round_number=runtime.event_logger.current_round,
+                    token_count=token_count,
                 )
             )
 
@@ -297,7 +304,6 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
 
             runtime.fire_on_message_callbacks()
 
-        token_count = await runtime.count_tokens(agent_id=agent_id, text=text)
         runtime.notify_world_of_message(
             agent_id=agent_id,
             channel_id=channel_id,

@@ -1,7 +1,7 @@
 {% if previous_result is not none %}
 --- PREVIOUS ROUND RESULT ---
-Round {{ previous_result.round_number }}: {{ previous_result.correct_count }}/{{ previous_result.total_count }} items correct ({{ (previous_result.accuracy * 100) | round(0) | int }}%)
-Relayer used {{ previous_result.relayer_token_cost }} tokens to relay the message.
+Round {{ previous_result.round_number }}: {% if previous_result.budget_exceeded %}LOST (budget exceeded — {{ previous_result.relayer_token_cost }}/{{ previous_result.token_budget }} tokens){% else %}WON ({{ previous_result.relayer_token_cost }}/{{ previous_result.token_budget }} tokens){% endif %}
+Accuracy: {{ previous_result.correct_count }}/{{ previous_result.total_count }} items correct ({{ (previous_result.accuracy * 100) | round(0) | int }}%)
 {% if not previous_result.answer_submitted %}
 WARNING: Receiver did not submit an answer last round.
 {% endif %}

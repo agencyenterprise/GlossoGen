@@ -76,6 +76,7 @@ class MessageSent(EventBase):
     event_type: Literal["message_sent"] = "message_sent"
     message: SimulationMessage
     round_number: int
+    token_count: int
 
 
 class LLMResponseReceived(EventBase):

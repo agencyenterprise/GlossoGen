@@ -31,7 +31,6 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
 
 Flags:
 - `--provider` — LLM provider: `anthropic`, `openai`, `google-gla`, `ollama` (required)
-- `--mcp-port` — Port for the MCP server (default: 8001)
 - `--max-agent-turns` — Maximum agentic turns per agent (default: 200)
 - `--resume` — Resume from an existing run directory after a crash
 

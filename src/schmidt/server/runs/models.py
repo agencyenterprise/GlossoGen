@@ -77,6 +77,7 @@ class ChannelMessage(BaseModel):
     text: str
     timestamp: datetime
     round_number: int
+    token_count: int
 
 
 class ToolUseEntry(BaseModel):
@@ -344,6 +345,7 @@ class SSEMessageSent(BaseModel):
     timestamp: datetime
     message: SSESimulationMessagePayload
     round_number: int
+    token_count: int
 
 
 class SSELLMResponseReceived(BaseModel):

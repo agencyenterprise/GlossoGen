@@ -6,7 +6,6 @@ new simulation runs as background processes.
 
 import logging
 import os
-import socket
 import subprocess
 import sys
 import tempfile
@@ -20,14 +19,6 @@ from schmidt.scenario_protocol import SimulationScenario
 from schmidt.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)
-
-
-def find_free_port() -> int:
-    """Find an available TCP port by briefly binding to port 0."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        port: int = s.getsockname()[1]
-        return port
 
 
 def build_config_file(knobs: dict[str, Any] | None) -> Path | None:
@@ -73,8 +64,6 @@ def launch_simulation(
         valid_providers=set(list_providers()),
     )
 
-    mcp_port = find_free_port()
-
     cmd = [
         sys.executable,
         "-m",
@@ -85,8 +74,6 @@ def launch_simulation(
         model,
         "--provider",
         provider,
-        "--mcp-port",
-        str(mcp_port),
         "--runs-dir",
         str(runs_dir),
     ]

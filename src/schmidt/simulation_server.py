@@ -9,7 +9,6 @@ its output to the frontend.
 import asyncio
 import logging
 import os
-import socket
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
@@ -20,18 +19,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
 
 from schmidt.event_bus import EventBus
+from schmidt.port_allocator import find_free_port
 from schmidt.server.response_models import HealthResponse, HealthStatus
 from schmidt.stream_manifest import StreamManifest, delete_manifest, write_manifest
 
 logger = logging.getLogger(__name__)
-
-
-def _find_free_port() -> int:
-    """Bind to port 0 and return the OS-assigned port number."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        port: int = sock.getsockname()[1]
-        return port
 
 
 def _create_simulation_app(event_bus: EventBus) -> FastAPI:
@@ -115,7 +107,7 @@ async def start_simulation_server(
     and returns the server instance and assigned port. The server runs
     as an asyncio task in the caller's event loop.
     """
-    port = _find_free_port()
+    port = find_free_port()
     app = _create_simulation_app(event_bus=event_bus)
 
     config = uvicorn.Config(

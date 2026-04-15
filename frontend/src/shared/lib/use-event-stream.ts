@@ -159,6 +159,7 @@ export function useEventStream(
           text: msg.text,
           timestamp: msg.timestamp,
           round_number: data.round_number,
+          token_count: data.token_count,
         };
         setMessages(prev => [...prev, channelMessage]);
         setTotalMessages(prev => prev + 1);

@@ -541,6 +541,8 @@ export interface components {
             timestamp: string;
             /** Round Number */
             round_number: number;
+            /** Token Count */
+            token_count: number;
         };
         /**
          * DebugLogEntry
@@ -1010,6 +1012,8 @@ export interface components {
             message: components["schemas"]["SSESimulationMessagePayload"];
             /** Round Number */
             round_number: number;
+            /** Token Count */
+            token_count: number;
         };
         /**
          * SSERoundAdvanced

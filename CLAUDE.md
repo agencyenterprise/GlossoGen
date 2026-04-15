@@ -310,7 +310,7 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
 ```
 
 Required flags: `--model`, `--provider` (`anthropic`, `openai`, `google-gla`, `ollama`), `--runs-dir`.
-Optional flags: `--mcp-port` (default: 8001), `--max-agent-turns` (default: 200), `--config <path>` (base config JSON file).
+Optional flags: `--max-agent-turns` (default: 200), `--config <path>` (base config JSON file).
 
 Examples:
 

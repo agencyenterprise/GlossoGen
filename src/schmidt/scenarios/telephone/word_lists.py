@@ -91,14 +91,19 @@ _BASE_LISTS: list[_BaseList] = [
     ),
 ]
 
-# Four epochs, each a permutation of the 10 base lists.
+# Budget multipliers per epoch — epoch 1 is generous, later epochs
+# shrink the token budget to create compression pressure.
+EPOCH_BUDGET_MULTIPLIERS: list[float] = [1.0, 0.75, 0.5, 0.35, 0.25]
+
+# Five epochs, each a permutation of the 10 base lists.
 # Epoch 1 introduces lists in designed order (short first, then longer).
-# Epochs 2-4 shuffle so agents encounter familiar lists unpredictably.
+# Epochs 2-5 shuffle so agents encounter familiar lists unpredictably.
 _EPOCH_ORDERS: list[list[int]] = [
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
     [3, 7, 0, 5, 9, 1, 8, 4, 2, 6],
     [6, 2, 8, 0, 4, 9, 3, 1, 7, 5],
     [9, 5, 4, 8, 1, 6, 0, 3, 2, 7],
+    [1, 8, 5, 2, 7, 0, 6, 9, 3, 4],
 ]
 
 WORD_LISTS: list[WordList] = []

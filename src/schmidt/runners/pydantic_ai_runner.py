@@ -56,6 +56,16 @@ def _log_task_exception(task: asyncio.Task[None]) -> None:
         logger.error("Background log task failed", exc_info=task.exception())
 
 
+def _serialize_tool_result(content: object) -> str:
+    """Serialize a tool result to a string, using JSON for dicts and lists."""
+    if isinstance(content, (dict, list)):
+        try:
+            return json.dumps(content)
+        except (TypeError, ValueError):
+            logger.exception("Failed to JSON-serialize tool result, falling back to str()")
+    return str(content)
+
+
 class _StreamingState:
     """Mutable state shared between the event handler and the outer run loop.
 
@@ -441,7 +451,7 @@ class PydanticAIRunner(AgentRunner):
             )
 
         elif isinstance(event, FunctionToolResultEvent):
-            result_content = str(event.result.content)
+            result_content = _serialize_tool_result(content=event.result.content)
             logger.debug(
                 "Agent %s FunctionToolResult call_id=%s content=%.200s",
                 agent_id,
