@@ -94,7 +94,7 @@ Every word sent over the link costs {{ knobs.seconds_per_token }} seconds of the
 STABILIZATION:
 Give the technician clear physical instructions. They will execute them using the stabilize_veyru tool. If the action is correct, the Veyru is stabilized. If not, they can try again. The tool call itself does not cost time — only messages on the comm link do.
 
-You will be told each Veyru's time budget. Budgets shrink over time. You MUST develop compressed codes with the technician to survive later rounds. Assign short labels, numbers, or symbols to recurring failure types and procedures. For example, agree that a single code word means a specific diagnosis and action sequence. The technician will learn to recognize these codes from context. Do not explain codes in advance — introduce them and the technician will adapt.
+You will be told each Veyru's time budget. Budgets shrink over time.
 
 You have access to the following communication channels. Use the exact channel_id when sending messages:
 {% for channel in channels %}- "{{ channel.display_name }}" (channel_id: {{ channel.channel_id }})

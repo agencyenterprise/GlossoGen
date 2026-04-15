@@ -109,7 +109,9 @@ class TelephoneScenario(SimulationScenario):
     def __init__(self, knobs: TelephoneKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
-        self._world = TelephoneWorld()
+        self._world = TelephoneWorld(
+            base_tokens_per_item=knobs.base_tokens_per_item,
+        )
 
     def name(self) -> str:
         """Return the scenario identifier."""
@@ -224,8 +226,12 @@ class TelephoneScenario(SimulationScenario):
 
         current_word_list_index = round_number - 1
         current_word_list = None
+        current_token_budget = 0
         if current_word_list_index < len(WORD_LISTS):
             current_word_list = WORD_LISTS[current_word_list_index]
+            current_token_budget = self._world.compute_budget(
+                word_list=current_word_list,
+            )
 
         rendered = self._renderer.render(
             template_name=template_name,
@@ -233,6 +239,7 @@ class TelephoneScenario(SimulationScenario):
                 "round_number": round_number,
                 "previous_result": previous_result,
                 "current_word_list": current_word_list,
+                "current_token_budget": current_token_budget,
             },
         )
         if not rendered:

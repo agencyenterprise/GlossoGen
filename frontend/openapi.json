@@ -1098,6 +1098,10 @@
           "round_number": {
             "type": "integer",
             "title": "Round Number"
+          },
+          "token_count": {
+            "type": "integer",
+            "title": "Token Count"
           }
         },
         "type": "object",
@@ -1107,7 +1111,8 @@
           "sender_agent_id",
           "text",
           "timestamp",
-          "round_number"
+          "round_number",
+          "token_count"
         ],
         "title": "ChannelMessage",
         "description": "A message sent by an agent to a channel."
@@ -2093,6 +2098,10 @@
           "round_number": {
             "type": "integer",
             "title": "Round Number"
+          },
+          "token_count": {
+            "type": "integer",
+            "title": "Token Count"
           }
         },
         "type": "object",
@@ -2101,7 +2110,8 @@
           "event_id",
           "timestamp",
           "message",
-          "round_number"
+          "round_number",
+          "token_count"
         ],
         "title": "SSEMessageSent",
         "description": "SSE event emitted when an agent sends a message to a channel."

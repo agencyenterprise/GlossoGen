@@ -11,7 +11,7 @@ Every word you send over the link costs {{ knobs.seconds_per_token }} seconds of
 STABILIZATION:
 When the specialist tells you what to do, execute their instructions by calling stabilize_veyru(action="describe exactly what you are doing"). If your action is correct, the Veyru is stabilized. If not, you can try again. The tool call itself does not cost time — only messages on the comm link do.
 
-You will be told each Veyru's time budget. Budgets shrink over time. As you encounter recurring situations, develop compressed codes with the specialist. If the specialist uses a short label or code for a diagnosis, learn it and use it in future reports. You can also propose your own shorthand for symptom patterns you see repeatedly. The shorter your messages, the more Veyru you save.
+You will be told each Veyru's time budget. Budgets shrink over time.
 
 You have access to the following communication channels. Use the exact channel_id when sending messages:
 {% for channel in channels %}- "{{ channel.display_name }}" (channel_id: {{ channel.channel_id }})

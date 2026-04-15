@@ -267,6 +267,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     text=msg.text,
                     timestamp=msg.timestamp,
                     round_number=event.round_number,
+                    token_count=event.token_count,
                 )
             )
 

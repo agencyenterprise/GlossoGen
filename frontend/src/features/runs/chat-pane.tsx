@@ -10,6 +10,11 @@ import { deriveInitials, type AgentColor } from "./agent-colors";
 import type { DisplayEntry } from "./display-entry";
 import { formatTime, humanize } from "./format";
 import { ProseMarkdown } from "./prose-markdown";
+import {
+  NotificationDisplay,
+  parseNotificationResult,
+  TOOL_NAME_READ_NOTIFICATIONS,
+} from "./notification-display";
 import { ToolCallDisplay } from "./tool-call-display";
 import type { PendingEdit } from "./use-fork";
 
@@ -198,7 +203,7 @@ export function ChatPane({
     if (selectedChannel === null) {
       return messages;
     }
-    return messages.filter(m => m.is_reasoning || m.channel_ids.includes(selectedChannel));
+    return messages.filter(m => m.channel_ids.includes(selectedChannel));
   }, [messages, selectedChannel]);
 
   const showChannelBadge = selectedChannel === null;
@@ -428,11 +433,7 @@ export function ChatPane({
                           ) : null}
 
                           {entry.is_tool_use ? (
-                            <ToolCallDisplay
-                              toolName={entry.tool_name}
-                              arguments={entry.tool_arguments}
-                              result={entry.tool_result}
-                            />
+                            <ToolOrNotification entry={entry} />
                           ) : isEditing ? (
                             <MessageEditor
                               initialText={displayText}
@@ -453,6 +454,13 @@ export function ChatPane({
                                 >
                                   {displayText}
                                 </ProseMarkdown>
+                              ) : null}
+                              {!entry.is_reasoning &&
+                              !entry.is_tool_use &&
+                              entry.token_count > 0 ? (
+                                <span className="mt-0.5 block text-[10px] text-muted-foreground/60">
+                                  {entry.token_count.toLocaleString()} tokens
+                                </span>
                               ) : null}
                               {!entry.is_reasoning && !entry.is_tool_use ? (
                                 <span className="absolute right-1 top-1 z-10 flex items-center gap-0.5 rounded-md bg-background/90 p-1 shadow-sm opacity-0 transition-opacity group-hover/entry:opacity-100">
@@ -574,5 +582,23 @@ function MessageEditor({
         <span className="text-[10px] text-muted-foreground">Ctrl+Enter to fork, Esc to cancel</span>
       </div>
     </div>
+  );
+}
+
+/** Renders a tool call as either a notification display or a generic tool call.
+ *  Falls back to ToolCallDisplay when the result is not a parseable notification. */
+function ToolOrNotification({ entry }: { entry: DisplayEntry }) {
+  if (entry.tool_name === TOOL_NAME_READ_NOTIFICATIONS) {
+    const payload = parseNotificationResult(entry.tool_result);
+    if (payload) {
+      return <NotificationDisplay result={entry.tool_result} />;
+    }
+  }
+  return (
+    <ToolCallDisplay
+      toolName={entry.tool_name}
+      arguments={entry.tool_arguments}
+      result={entry.tool_result}
+    />
   );
 }

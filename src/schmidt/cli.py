@@ -39,6 +39,7 @@ from schmidt.event_logger import EventLogger
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.message_rewind import RewindState, build_rewind_state_from_last_message
 from schmidt.models.agent_config import AgentConfig
+from schmidt.port_allocator import find_free_port
 from schmidt.run_config_validation import validate_run_config
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.runners.pydantic_ai_runner import PydanticAIRunner
@@ -51,7 +52,6 @@ from schmidt.token_pricing import list_providers
 logger = logging.getLogger(__name__)
 
 EVENT_BUS_MAX_QUEUE_SIZE = 1000
-DEFAULT_MCP_PORT = 8001
 DEFAULT_MAX_AGENT_TURNS = 200
 
 
@@ -79,12 +79,6 @@ def _build_parser() -> argparse.ArgumentParser:
         required=True,
         choices=["anthropic", "openai", "google-gla", "ollama"],
         help="LLM provider (anthropic, openai, google-gla, ollama)",
-    )
-    run_parser.add_argument(
-        "--mcp-port",
-        type=int,
-        default=DEFAULT_MCP_PORT,
-        help=f"Port for the MCP server (default: {DEFAULT_MCP_PORT})",
     )
     run_parser.add_argument(
         "--max-agent-turns",
@@ -357,11 +351,13 @@ async def _run_simulation(
             event_bus=event_bus,
         )
 
+    mcp_port = find_free_port()
+
     supervisor = AutonomousSupervisor(
         scenario=scenario,
         agent_configs=agents,
         event_logger=event_logger,
-        mcp_server_port=args.mcp_port,
+        mcp_server_port=mcp_port,
         runner_factory=_make_runner,
         resume_state=resume_state,
         run_id=run_id,
@@ -376,7 +372,7 @@ async def _run_simulation(
 
     logger.info("Running scenario: %s", scenario.name())
     logger.info("Model: %s", args.model)
-    logger.info("MCP port: %d, max agent turns: %d", args.mcp_port, max_turns)
+    logger.info("MCP port: %d, max agent turns: %d", mcp_port, max_turns)
     logger.info("Run directory: %s", run_dir)
     logger.info("Log: %s", log_path)
     if resuming:

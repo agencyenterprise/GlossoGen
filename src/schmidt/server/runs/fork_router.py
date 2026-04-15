@@ -5,7 +5,6 @@ message's commit, apply edits, and launch a resumed simulation.
 """
 
 import logging
-import socket
 import subprocess
 import sys
 import time
@@ -139,7 +138,6 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
 
     # Launch the forked simulation as a background subprocess.
     stdout_log = new_run_dir / f"{scenario_name}_stdout.log"
-    mcp_port = _find_free_port()
     cmd = [
         sys.executable,
         "-m",
@@ -150,8 +148,6 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
         body.model,
         "--provider",
         body.provider,
-        "--mcp-port",
-        str(mcp_port),
         "--resume",
         str(new_run_dir),
         "--runs-dir",
@@ -222,14 +218,6 @@ def _apply_edits_and_new_run_id(
         len(message_edits),
     )
     return fork_run_id
-
-
-def _find_free_port() -> int:
-    """Find an available TCP port by briefly binding to port 0."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        port: int = s.getsockname()[1]
-        return port
 
 
 def _launch_subprocess(cmd: list[str], log_file: Any) -> None:

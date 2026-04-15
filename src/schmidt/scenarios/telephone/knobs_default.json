@@ -1,5 +1,6 @@
 {
   "max_round_duration_seconds": 180,
   "model_overrides": {},
-  "round_count": 15
+  "round_count": 30,
+  "base_tokens_per_item": 5
 }
