@@ -191,6 +191,19 @@ class StartEvaluationResponse(BaseModel):
     status: LaunchStatus
 
 
+class EvalLogLine(BaseModel):
+    """A single line from the evaluation stdout log."""
+
+    line_number: int
+    text: str
+
+
+class EvalLogsResponse(BaseModel):
+    """Response containing evaluation subprocess stdout/stderr output."""
+
+    lines: list[EvalLogLine]
+
+
 # ---------------------------------------------------------------------------
 # Fork request/response models
 # ---------------------------------------------------------------------------

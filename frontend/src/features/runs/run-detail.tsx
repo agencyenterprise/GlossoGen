@@ -28,6 +28,7 @@ import { AgentDrawer } from "./agent-drawer";
 import { ChatPane } from "./chat-pane";
 import { mergeEntries } from "./display-entry";
 import { LabelBadges } from "./eval-label-group";
+import { EvalLogPanel } from "./eval-log-panel";
 import { EvalPanel } from "./eval-panel";
 import { ForkBadge, ForkPointFab } from "./fork-badge";
 import { StartEvaluationModal } from "./start-evaluation-modal";
@@ -115,6 +116,7 @@ export function RunDetail({ runId }: { runId: string }) {
   const [highlightNonce, setHighlightNonce] = useState(0);
   const [showDescription, setShowDescription] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [showEvalLogs, setShowEvalLogs] = useState(false);
   const [showEvalPanel, setShowEvalPanel] = useState(true);
   const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
   const [showEvalModal, setShowEvalModal] = useState(false);
@@ -131,6 +133,7 @@ export function RunDetail({ runId }: { runId: string }) {
     setSelectedChannel(ch);
     setSelectedAgent(null);
     setShowLogs(false);
+    setShowEvalLogs(false);
   }, []);
 
   function handleNavigateToMessage(messageId: string, channelId: string) {
@@ -138,6 +141,7 @@ export function RunDetail({ runId }: { runId: string }) {
       setSelectedAgent(null);
       setSelectedChannel(channelId);
       setShowLogs(false);
+      setShowEvalLogs(false);
       setHighlightedMessageId(null);
     });
     setHighlightNonce(n => n + 1);
@@ -357,6 +361,7 @@ export function RunDetail({ runId }: { runId: string }) {
   const evaluation = restData.evaluation;
   const evaluationInProgress = restData.evaluation_in_progress || evalJustLaunched;
   const hasLogs = allDebugLogs.length > 0;
+  const hasEvalLogs = evaluationInProgress || evaluation !== null;
   const activeAgent = allAgents.find(a => a.agent_id === selectedAgent);
   const activeAgentColor = selectedAgent ? agentColorMap.get(selectedAgent) : undefined;
   const forkEnabled =
@@ -563,19 +568,29 @@ export function RunDetail({ runId }: { runId: string }) {
           selectedChannel={selectedChannel}
           selectedAgent={selectedAgent}
           showLogs={showLogs}
+          showEvalLogs={showEvalLogs}
           hasLogs={hasLogs}
+          hasEvalLogs={hasEvalLogs}
           agentColorMap={agentColorMap}
           onSelectChannel={handleSelectChannel}
           onSelectAgent={setSelectedAgent}
           onSelectLogs={() => {
             setShowLogs(true);
+            setShowEvalLogs(false);
+            setSelectedAgent(null);
+          }}
+          onSelectEvalLogs={() => {
+            setShowEvalLogs(true);
+            setShowLogs(false);
             setSelectedAgent(null);
           }}
         />
 
-        {/* Main content: chat or logs */}
+        {/* Main content: chat, logs, or eval logs */}
         {showLogs ? (
           <LogPanel logs={allDebugLogs} />
+        ) : showEvalLogs ? (
+          <EvalLogPanel runId={runId} evaluationInProgress={evaluationInProgress} />
         ) : (
           <ChatPane
             runId={runId}

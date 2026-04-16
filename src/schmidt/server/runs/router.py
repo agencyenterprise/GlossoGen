@@ -22,6 +22,8 @@ from schmidt.server.runs.detail_reader import load_run_detail
 from schmidt.server.runs.discovery import discover_runs
 from schmidt.server.runs.models import (
     AllLabelsResponse,
+    EvalLogLine,
+    EvalLogsResponse,
     NoteResponse,
     RunDetailResponse,
     RunListResponse,
@@ -64,6 +66,30 @@ async def get_run_detail(run_id: str, request: Request) -> RunDetailResponse:
     log_path = run_dir / f"{run_summary.scenario_name}.jsonl"
 
     return await load_run_detail(log_path=log_path)
+
+
+@router.get("/runs/{run_id}/eval-logs", response_model=EvalLogsResponse)
+async def get_eval_logs(run_id: str, request: Request) -> EvalLogsResponse:
+    """Return the contents of the evaluation stdout log file."""
+    runs_dir: Path = request.app.state.runs_dir
+    summaries = await discover_runs(runs_dir=runs_dir)
+
+    matching = [s for s in summaries if s.run_id == run_id]
+    if not matching:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    run_dir = Path(matching[0].run_dir)
+    eval_log_path = run_dir / "eval_stdout.log"
+
+    if not eval_log_path.exists():
+        return EvalLogsResponse(lines=[])
+
+    text = eval_log_path.read_text(encoding="utf-8", errors="replace")
+    lines = [
+        EvalLogLine(line_number=i + 1, text=line)
+        for i, line in enumerate(text.splitlines())
+    ]
+    return EvalLogsResponse(lines=lines)
 
 
 @router.delete("/runs/{run_id}", status_code=204)

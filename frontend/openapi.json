@@ -95,6 +95,46 @@
         }
       }
     },
+    "/api/runs/{run_id}/eval-logs": {
+      "get": {
+        "summary": "Get Eval Logs",
+        "description": "Return the contents of the evaluation stdout log file.",
+        "operationId": "get_eval_logs_api_runs__run_id__eval_logs_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalLogsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs/{run_id}/stop": {
       "post": {
         "summary": "Stop Run",
@@ -1189,6 +1229,42 @@
         ],
         "title": "EvalCostResponse",
         "description": "Evaluation cost summary for the run detail endpoint."
+      },
+      "EvalLogLine": {
+        "properties": {
+          "line_number": {
+            "type": "integer",
+            "title": "Line Number"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line_number",
+          "text"
+        ],
+        "title": "EvalLogLine",
+        "description": "A single line from the evaluation stdout log."
+      },
+      "EvalLogsResponse": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/EvalLogLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lines"
+        ],
+        "title": "EvalLogsResponse",
+        "description": "Response containing evaluation subprocess stdout/stderr output."
       },
       "EvalMetricResponse": {
         "properties": {

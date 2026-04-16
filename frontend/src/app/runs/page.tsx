@@ -75,7 +75,7 @@ export default function RunsPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".tar.gz,.tgz"
+            accept=".tar.gz,.tgz,.gz,application/gzip,application/x-gzip,application/x-tar"
             className="hidden"
             onChange={handleImport}
           />
