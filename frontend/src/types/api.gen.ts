@@ -48,6 +48,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/eval-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Eval Logs
+         * @description Return the contents of the evaluation stdout log file.
+         */
+        get: operations["get_eval_logs_api_runs__run_id__eval_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/stop": {
         parameters: {
             query?: never;
@@ -577,6 +597,24 @@ export interface components {
             model: string;
             /** Provider Name */
             provider_name: string;
+        };
+        /**
+         * EvalLogLine
+         * @description A single line from the evaluation stdout log.
+         */
+        EvalLogLine: {
+            /** Line Number */
+            line_number: number;
+            /** Text */
+            text: string;
+        };
+        /**
+         * EvalLogsResponse
+         * @description Response containing evaluation subprocess stdout/stderr output.
+         */
+        EvalLogsResponse: {
+            /** Lines */
+            lines: components["schemas"]["EvalLogLine"][];
         };
         /**
          * EvalMetricResponse
@@ -1367,6 +1405,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_eval_logs_api_runs__run_id__eval_logs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalLogsResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

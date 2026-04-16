@@ -13,11 +13,14 @@ interface RunSidebarProps {
   selectedChannel: string | null;
   selectedAgent: string | null;
   showLogs: boolean;
+  showEvalLogs: boolean;
   hasLogs: boolean;
+  hasEvalLogs: boolean;
   agentColorMap: Map<string, AgentColor>;
   onSelectChannel: (channelId: string | null) => void;
   onSelectAgent: (agentId: string) => void;
   onSelectLogs: () => void;
+  onSelectEvalLogs: () => void;
 }
 
 export function RunSidebar({
@@ -26,11 +29,14 @@ export function RunSidebar({
   selectedChannel,
   selectedAgent,
   showLogs,
+  showEvalLogs,
   hasLogs,
+  hasEvalLogs,
   agentColorMap,
   onSelectChannel,
   onSelectAgent,
   onSelectLogs,
+  onSelectEvalLogs,
 }: RunSidebarProps) {
   return (
     <div className="flex flex-col overflow-y-auto border-r border-border bg-muted/50 py-4">
@@ -99,19 +105,32 @@ export function RunSidebar({
         })}
       </div>
 
-      {hasLogs ? (
+      {hasLogs || hasEvalLogs ? (
         <>
           <div className="mx-3.5 mb-4 mt-4 h-px bg-border" />
           <div>
-            <button
-              className={cn(
-                "flex w-full items-center gap-2 px-3.5 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent/50",
-                showLogs && "bg-accent font-medium text-foreground"
-              )}
-              onClick={onSelectLogs}
-            >
-              <span className="opacity-50">{">"}_</span> Logs
-            </button>
+            {hasLogs ? (
+              <button
+                className={cn(
+                  "flex w-full items-center gap-2 px-3.5 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent/50",
+                  showLogs && "bg-accent font-medium text-foreground"
+                )}
+                onClick={onSelectLogs}
+              >
+                <span className="opacity-50">{">"}_</span> Logs
+              </button>
+            ) : null}
+            {hasEvalLogs ? (
+              <button
+                className={cn(
+                  "flex w-full items-center gap-2 px-3.5 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent/50",
+                  showEvalLogs && "bg-accent font-medium text-foreground"
+                )}
+                onClick={onSelectEvalLogs}
+              >
+                <span className="opacity-50">{">"}_</span> Eval logs
+              </button>
+            ) : null}
           </div>
         </>
       ) : null}
