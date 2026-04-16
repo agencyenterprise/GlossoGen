@@ -239,9 +239,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 pending_result = pending_tool_results_by_call_id.pop(tc.call_id, None)
                 if pending_result is not None:
                     tu_entry.result = pending_result.result
-                    # Use the tool-result event time so tool entries are ordered by
-                    # when each call actually completed.
-                    tu_entry.timestamp = pending_result.timestamp
                 tool_use.append(tu_entry)
                 tool_use_by_call_id[tc.call_id] = tu_entry
 
@@ -249,9 +246,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             matched = tool_use_by_call_id.get(event.call_id)
             if matched is not None:
                 matched.result = event.result
-                # Use the tool-result event time so tool entries are ordered by
-                # when each call actually completed.
-                matched.timestamp = event.timestamp
             else:
                 # Some runs log tool results before the parent LLM response block.
                 pending_tool_results_by_call_id[event.call_id] = event

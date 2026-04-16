@@ -263,8 +263,8 @@ export function RunDetail({ runId }: { runId: string }) {
     const seenReasoningIds = new Set(restReasoning.map(r => r.message_id));
     const newReasoning = sse.reasoning.filter(r => !seenReasoningIds.has(r.message_id));
 
-    const seenToolUseIds = new Set(restToolUse.map(t => t.message_id));
-    const newToolUse = sse.toolUse.filter(t => !seenToolUseIds.has(t.message_id));
+    const seenToolCallIds = new Set(restToolUse.map(t => t.call_id));
+    const newToolUse = sse.toolUse.filter(t => !seenToolCallIds.has(t.call_id));
 
     return mergeEntries(
       [...restMessages, ...newMessages],

@@ -23,7 +23,7 @@ from schmidt.runtime.scenario_world import ScenarioWorld
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.telephone.evaluation import CompressionEvaluator
 from schmidt.scenarios.telephone.knobs import TelephoneKnobs
-from schmidt.scenarios.telephone.word_lists import WordList, get_word_lists_for_epoch
+from schmidt.scenarios.telephone.word_lists import WordList, get_word_lists
 from schmidt.scenarios.telephone.world import RoundResult, TelephoneWorld
 from schmidt.template_renderer import TemplateRenderer
 
@@ -109,10 +109,9 @@ class TelephoneScenario(SimulationScenario):
     def __init__(self, knobs: TelephoneKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
-        self._word_lists: list[WordList] = get_word_lists_for_epoch(epoch=knobs.epoch)
+        self._word_lists: list[WordList] = get_word_lists(seed=knobs.seed)
         self._world = TelephoneWorld(
-            base_tokens_per_item=knobs.base_tokens_per_item,
-            epoch=knobs.epoch,
+            token_budget=knobs.token_budget,
             word_lists=self._word_lists,
         )
 
@@ -135,6 +134,7 @@ class TelephoneScenario(SimulationScenario):
             template_name="description.jinja",
             template_variables={
                 "round_count": self._knobs.round_count,
+                "token_budget": self._knobs.token_budget,
             },
         )
 

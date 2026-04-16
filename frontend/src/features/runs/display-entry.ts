@@ -81,10 +81,22 @@ export function mergeEntries(
     tool_result: t.result,
   }));
 
+  // Sort priority for entries at the same timestamp:
+  // channel messages (0) → tool use (1) → reasoning (2).
+  // Tool results (e.g. read_notifications) provide context that reasoning
+  // reacts to, so they should appear before reasoning from the same LLM response.
+  function sortRank(e: DisplayEntry): number {
+    if (e.is_reasoning) return 2;
+    if (e.is_tool_use) return 1;
+    return 0;
+  }
+
   return [...channelEntries, ...reasoningEntries, ...toolEntries].sort((a, b) => {
     if (a.round_number !== b.round_number) {
       return a.round_number - b.round_number;
     }
-    return a.timestamp.localeCompare(b.timestamp);
+    const ts = a.timestamp.localeCompare(b.timestamp);
+    if (ts !== 0) return ts;
+    return sortRank(a) - sortRank(b);
   });
 }

@@ -78,6 +78,7 @@ export function RunList() {
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [noteModalRunId, setNoteModalRunId] = useState<string | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
+  const [selectedScenarios, setSelectedScenarios] = useState<Set<string>>(new Set());
   const [modelsPopover, setModelsPopover] = useState<{
     left: number;
     top: number;
@@ -105,6 +106,18 @@ export function RunList() {
         next.delete(label);
       } else {
         next.add(label);
+      }
+      return next;
+    });
+  }
+
+  function toggleScenario(scenario: string) {
+    setSelectedScenarios(prev => {
+      const next = new Set(prev);
+      if (next.has(scenario)) {
+        next.delete(scenario);
+      } else {
+        next.add(scenario);
       }
       return next;
     });
@@ -212,12 +225,25 @@ export function RunList() {
 
   const allRuns = useMemo(() => data?.runs ?? [], [data]);
   const allLabels = labelsData?.labels ?? [];
-  const runs = useMemo(() => {
-    if (selectedLabels.size === 0) {
-      return allRuns;
+  const allScenarios = useMemo(() => {
+    const seen = new Set<string>();
+    for (const run of allRuns) {
+      seen.add(run.scenario_name);
     }
-    return allRuns.filter(run => [...selectedLabels].every(label => run.labels.includes(label)));
-  }, [allRuns, selectedLabels]);
+    return Array.from(seen).sort();
+  }, [allRuns]);
+  const runs = useMemo(() => {
+    let filtered = allRuns;
+    if (selectedScenarios.size > 0) {
+      filtered = filtered.filter(run => selectedScenarios.has(run.scenario_name));
+    }
+    if (selectedLabels.size > 0) {
+      filtered = filtered.filter(run =>
+        [...selectedLabels].every(label => run.labels.includes(label))
+      );
+    }
+    return filtered;
+  }, [allRuns, selectedLabels, selectedScenarios]);
 
   if (isLoading) {
     return (
@@ -249,6 +275,40 @@ export function RunList() {
 
   return (
     <div className="space-y-6">
+      {allScenarios.length > 1 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Package className="h-3.5 w-3.5 text-muted-foreground" />
+          {allScenarios.map(scenario => {
+            const active = selectedScenarios.has(scenario);
+            return (
+              <button
+                key={scenario}
+                type="button"
+                onClick={() => toggleScenario(scenario)}
+                className={cn(
+                  "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium transition-all",
+                  active
+                    ? "bg-primary/15 text-primary ring-1 ring-primary/30"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {humanize(scenario)}
+              </button>
+            );
+          })}
+          {selectedScenarios.size > 0 ? (
+            <button
+              type="button"
+              onClick={() => setSelectedScenarios(new Set())}
+              className="ml-1 inline-flex items-center gap-0.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <XCircle className="h-3 w-3" />
+              Clear
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {allLabels.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5">
           <Tag className="h-3.5 w-3.5 text-muted-foreground" />
@@ -331,10 +391,10 @@ export function RunList() {
         </div>
       ) : null}
 
-      {runs.length === 0 && selectedLabels.size > 0 ? (
+      {runs.length === 0 && (selectedLabels.size > 0 || selectedScenarios.size > 0) ? (
         <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
           <Inbox className="h-8 w-8" />
-          <p className="text-sm">No runs match the selected labels</p>
+          <p className="text-sm">No runs match the selected filters</p>
         </div>
       ) : null}
 

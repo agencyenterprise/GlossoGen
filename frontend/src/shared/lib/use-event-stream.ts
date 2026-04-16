@@ -65,6 +65,7 @@ export function useEventStream(
   const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
 
   const agentCostsRef = useRef<Map<string, number>>(new Map());
+  const seenSseIdsRef = useRef<Set<string>>(new Set());
   const knownIdsRef = useRef(knownEventIds);
   useEffect(() => {
     knownIdsRef.current = knownEventIds;
@@ -80,6 +81,7 @@ export function useEventStream(
     setStatus(null);
     setDebugLogs([]);
     agentCostsRef.current = new Map();
+    seenSseIdsRef.current = new Set();
   }, []);
 
   useEffect(() => {
@@ -126,15 +128,23 @@ export function useEventStream(
         }
       };
 
+      /** Return true if this event_id was already processed (REST snapshot or prior SSE). */
+      function isDuplicate(eventId: string): boolean {
+        if (knownIdsRef.current.has(eventId)) return true;
+        if (seenSseIdsRef.current.has(eventId)) return true;
+        seenSseIdsRef.current.add(eventId);
+        return false;
+      }
+
       eventSource.addEventListener("simulation_started", (e: MessageEvent) => {
         const data: SSESimulationStarted = JSON.parse(e.data);
-        if (knownIdsRef.current.has(data.event_id)) return;
+        if (isDuplicate(data.event_id)) return;
         setChannelIds(data.channel_ids);
       });
 
       eventSource.addEventListener("agent_registered", (e: MessageEvent) => {
         const data: SSEAgentRegistered = JSON.parse(e.data);
-        if (knownIdsRef.current.has(data.event_id)) return;
+        if (isDuplicate(data.event_id)) return;
         const agent: AgentDetail = {
           agent_id: data.agent_id,
           role_name: data.role_name,
@@ -149,7 +159,7 @@ export function useEventStream(
 
       eventSource.addEventListener("message_sent", (e: MessageEvent) => {
         const data: SSEMessageSent = JSON.parse(e.data);
-        if (knownIdsRef.current.has(data.event_id)) return;
+        if (isDuplicate(data.event_id)) return;
         const msg = data.message;
 
         const channelMessage: ChannelMessage = {
@@ -167,7 +177,7 @@ export function useEventStream(
 
       eventSource.addEventListener("llm_response_received", (e: MessageEvent) => {
         const data: SSELLMResponseReceived = JSON.parse(e.data);
-        if (knownIdsRef.current.has(data.event_id)) return;
+        if (isDuplicate(data.event_id)) return;
         if (data.text != null && data.text.trim() !== "") {
           const entry: ReasoningEntry = {
             message_id: data.event_id,
@@ -183,13 +193,14 @@ export function useEventStream(
 
       eventSource.addEventListener("tool_result_received", (e: MessageEvent) => {
         const data: SSEToolResultReceived = JSON.parse(e.data);
+        if (isDuplicate(data.event_id)) return;
         setToolUse(prev => {
           const existing = prev.find(t => t.call_id === data.call_id);
           if (existing) {
             return prev.map(t => (t.call_id === data.call_id ? { ...t, result: data.result } : t));
           }
           const entry: ToolUseEntry = {
-            message_id: data.event_id,
+            message_id: `${data.event_id}-${data.call_id}`,
             sender_agent_id: data.agent_id,
             tool_name: data.tool_name,
             call_id: data.call_id,
