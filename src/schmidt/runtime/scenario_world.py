@@ -130,3 +130,13 @@ class ScenarioWorld(ABC):
         Async notifications should be sent from the ``run`` loop instead.
         """
         _ = agent_id, channel_id, text, token_count
+
+    def on_count_tokens(self, agent_id: str) -> int | None:
+        """Called before a ``count_tokens`` tool invocation.
+
+        Return the number of remaining calls this round, or ``None`` if
+        unlimited. Raise ``ValueError`` to deny the call (e.g. limit exceeded).
+        The default is unlimited.
+        """
+        _ = agent_id
+        return None

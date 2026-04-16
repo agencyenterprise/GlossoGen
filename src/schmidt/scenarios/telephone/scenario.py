@@ -113,6 +113,7 @@ class TelephoneScenario(SimulationScenario):
         self._world = TelephoneWorld(
             token_budget=knobs.token_budget,
             word_lists=self._word_lists,
+            count_tokens_limit_per_round=knobs.count_tokens_limit_per_round,
         )
 
     @property

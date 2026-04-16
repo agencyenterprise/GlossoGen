@@ -1,4 +1,5 @@
 {
+  "count_tokens_limit_per_round": 10,
   "max_round_duration_seconds": 180,
   "model_overrides": {},
   "round_count": 40,
