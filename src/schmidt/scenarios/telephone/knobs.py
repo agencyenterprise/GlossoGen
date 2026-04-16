@@ -19,3 +19,4 @@ class TelephoneKnobs(BaseKnobs):
     token_budget: int
     round_count: int
     seed: int
+    count_tokens_limit_per_round: int

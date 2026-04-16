@@ -46,9 +46,16 @@ class TelephoneWorld(ScenarioWorld):
     the budget, the round is marked as lost.
     """
 
-    def __init__(self, token_budget: int, word_lists: list[WordList]) -> None:
+    def __init__(
+        self,
+        token_budget: int,
+        word_lists: list[WordList],
+        count_tokens_limit_per_round: int,
+    ) -> None:
         self._token_budget = token_budget
         self._word_lists = word_lists
+        self._count_tokens_limit = count_tokens_limit_per_round
+        self._count_tokens_calls: dict[str, int] = {}
         self._round_results: list[RoundResult] = []
         self._current_word_list: WordList | None = None
         self._current_relayer_tokens: int = 0
@@ -120,6 +127,7 @@ class TelephoneWorld(ScenarioWorld):
         self._budget_exceeded = False
         self._answer_submitted = False
         self._submitted_items = []
+        self._count_tokens_calls = {}
         current_index = (round_number - 1) % len(self._word_lists)
         self._current_word_list = self._word_lists[current_index]
         self._current_token_budget = self.compute_budget(
@@ -176,6 +184,18 @@ class TelephoneWorld(ScenarioWorld):
                 and self._current_relayer_tokens > self._current_token_budget
             ):
                 self._budget_exceeded = True
+
+    def on_count_tokens(self, agent_id: str) -> int | None:
+        """Enforce per-round limit on count_tokens calls."""
+        used = self._count_tokens_calls.get(agent_id, 0)
+        remaining = self._count_tokens_limit - used
+        if remaining <= 0:
+            raise ValueError(
+                f"count_tokens limit reached ({self._count_tokens_limit} calls per round). "
+                "Send your best message or wait for the next round."
+            )
+        self._count_tokens_calls[agent_id] = used + 1
+        return remaining - 1
 
     async def run(self, context: WorldContext) -> None:
         """Process events. Budget enforcement is synchronous via on_message."""

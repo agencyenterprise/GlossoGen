@@ -2,8 +2,10 @@
 --- ROUND {{ round_number - 1 }} RESULT ---
 {% if previous_result.budget_exceeded %}
 LOST — budget exceeded ({{ previous_result.relayer_token_cost }} tokens used, budget was {{ previous_result.token_budget }}).
+{% elif previous_result.accuracy < 1.0 %}
+LOST — {{ previous_result.correct_count }}/{{ previous_result.total_count }} items correct ({{ (previous_result.accuracy * 100) | round(0) | int }}%). All items must be correct to win.
 {% else %}
-WON — {{ previous_result.relayer_token_cost }}/{{ previous_result.token_budget }} tokens used.
+WON — {{ previous_result.relayer_token_cost }}/{{ previous_result.token_budget }} tokens used, all {{ previous_result.total_count }} items correct!
 {% endif %}
 Accuracy: {{ previous_result.correct_count }}/{{ previous_result.total_count }} items correct ({{ (previous_result.accuracy * 100) | round(0) | int }}%)
 {% if previous_result.submitted_items %}

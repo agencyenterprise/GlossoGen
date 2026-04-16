@@ -3264,6 +3264,7 @@ dependencies = [
     { name = "aiofiles" },
     { name = "aiosqlite" },
     { name = "anthropic" },
+    { name = "cachetools" },
     { name = "datasets" },
     { name = "dulwich" },
     { name = "fastapi" },
@@ -3291,6 +3292,7 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
     { name = "types-aiofiles" },
+    { name = "types-cachetools" },
     { name = "types-markdown" },
     { name = "vulture" },
 ]
@@ -3300,6 +3302,7 @@ requires-dist = [
     { name = "aiofiles", specifier = ">=24.0.0" },
     { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "anthropic", specifier = ">=0.40.0" },
+    { name = "cachetools", specifier = ">=7.0.5" },
     { name = "datasets", specifier = ">=3.0.0" },
     { name = "dulwich", specifier = ">=1.1.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
@@ -3327,6 +3330,7 @@ dev = [
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "ruff", specifier = ">=0.14.3" },
     { name = "types-aiofiles", specifier = ">=25.1.0.20251011" },
+    { name = "types-cachetools", specifier = ">=6.2.0.20260408" },
     { name = "types-markdown", specifier = ">=3.7.0.20250322" },
     { name = "vulture", specifier = ">=2.14" },
 ]
@@ -3556,6 +3560,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/84/6c/6d23908a8217e36704aa9c79d99a620f2fdd388b66a4b7f72fbc6b6ff6c6/types_aiofiles-25.1.0.20251011.tar.gz", hash = "sha256:1c2b8ab260cb3cd40c15f9d10efdc05a6e1e6b02899304d80dfa0410e028d3ff", size = 14535, upload-time = "2025-10-11T02:44:51.237Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/71/0f/76917bab27e270bb6c32addd5968d69e558e5b6f7fb4ac4cbfa282996a96/types_aiofiles-25.1.0.20251011-py3-none-any.whl", hash = "sha256:8ff8de7f9d42739d8f0dadcceeb781ce27cd8d8c4152d4a7c52f6b20edb8149c", size = 14338, upload-time = "2025-10-11T02:44:50.054Z" },
+]
+
+[[package]]
+name = "types-cachetools"
+version = "6.2.0.20260408"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ec/61/475b0e8f4a92e5e33affcc6f4e6344c6dee540824021d22f695ea170da63/types_cachetools-6.2.0.20260408.tar.gz", hash = "sha256:0d8ae2dd5ba0b4cfe6a55c34396dd0415f1be07d0033d84781cdc4ed9c2ebc6b", size = 9854, upload-time = "2026-04-08T04:31:49.665Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bb/7d/579f50f4f004ee93c7d1baa95339591cac1fe02f4e3fb8fc0f900ee4a80f/types_cachetools-6.2.0.20260408-py3-none-any.whl", hash = "sha256:470e0b274737feae74beed3d764885bf4664002ecc393fba3778846b13ce92cb", size = 9350, upload-time = "2026-04-08T04:31:48.826Z" },
 ]
 
 [[package]]
