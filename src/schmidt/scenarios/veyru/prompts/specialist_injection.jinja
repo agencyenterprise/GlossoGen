@@ -1,10 +1,10 @@
 {% if previous_outcome is not none %}
 --- PREVIOUS VEYRU RESULT ---
-Veyru {{ previous_outcome.case_number }} ({{ previous_outcome.failure_name }}): {% if previous_outcome.stabilized %}STABILIZED{% else %}COLLAPSED — too many words used ({{ previous_outcome.tokens_used }} words = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s, budget was {{ previous_outcome.time_budget_seconds }}s). You must use fewer words next time.{% endif %}
+Veyru {{ round_number - 1 }} ({{ previous_outcome.failure_name }}): {% if previous_outcome.stabilized %}STABILIZED{% else %}COLLAPSED — too many words used ({{ previous_outcome.tokens_used }} words = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s, budget was {{ previous_outcome.time_budget_seconds }}s). You must use fewer words next time.{% endif %}
 {% endif %}
 {% if current_case is not none %}
 --- INCOMING VEYRU ---
-Veyru {{ current_case.case_number }}
+Veyru {{ round_number }}
 Time budget: {{ current_case.time_budget_seconds }}s (~{{ (current_case.time_budget_seconds / knobs.seconds_per_token) | int }} words total for both of you)
 
 The field technician will report observations. Diagnose and give stabilization instructions.

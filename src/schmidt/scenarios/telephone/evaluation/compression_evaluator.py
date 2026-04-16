@@ -15,7 +15,7 @@ from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import MessageSent, SimulationEvent, ToolResultReceived
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.telephone.evaluation.prompt_renderer import render_telephone_prompt
-from schmidt.scenarios.telephone.word_lists import WORD_LISTS
+from schmidt.scenarios.telephone.word_lists import WordList
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +91,9 @@ class CompressionEvaluator(Evaluator):
         llm_provider: LLMProvider,
     ) -> MetricResult:
         """Evaluate whether compression strategies emerged across rounds."""
-        _ = agent_configs, scenario
-        round_data = self._build_round_data(events=events)
+        _ = agent_configs
+        word_lists: list[WordList] = scenario.word_lists  # type: ignore[attr-defined]
+        round_data = self._build_round_data(events=events, word_lists=word_lists)
 
         if not round_data:
             logger.warning("CompressionEvaluator: no round data found")
@@ -153,6 +154,7 @@ class CompressionEvaluator(Evaluator):
     def _build_round_data(
         self,
         events: list[SimulationEvent],
+        word_lists: list[WordList],
     ) -> list[RoundEvalData]:
         """Extract per-round relay data from MessageSent events and ToolResultReceived events."""
         relay_messages_by_round: dict[int, list[str]] = {}
@@ -173,9 +175,13 @@ class CompressionEvaluator(Evaluator):
 
         submitted_by_round = self._extract_submissions(events=events)
 
+        all_round_numbers = sorted(
+            set(relay_messages_by_round.keys()) | set(submitted_by_round.keys())
+        )
+
         round_data: list[RoundEvalData] = []
-        for word_list in WORD_LISTS:
-            rn = word_list.round_number
+        for rn in all_round_numbers:
+            word_list = word_lists[(rn - 1) % len(word_lists)]
             messages = relay_messages_by_round.get(rn, [])
             relay_text = "\n".join(messages)
 

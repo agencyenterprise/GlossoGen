@@ -1,3 +1,3 @@
 Three agents play a telephone game across {{ round_count }} rounds. A Sender receives a random word list and transmits it to a Relayer. The Relayer compresses the list and forwards it to a Receiver using as few tokens as possible. The Receiver decodes and submits an answer.
 
-The Relayer receives feedback each round: accuracy, token cost, and a reminder that lower cost is better. Ten base word lists (3–17 items) are repeated across 4 shuffled epochs for {{ round_count }} total rounds. Epoch 1 introduces lists in order; epochs 2–4 shuffle them so agents encounter familiar word sets unpredictably, testing whether stable encodings persist.
+The Relayer receives feedback each round: accuracy, token cost, and a reminder that lower cost is better. Ten base word lists (3-17 items) cycle across {{ round_count }} rounds under a fixed token budget. The same word sets recur, testing whether agents develop stable compressed encodings over time.

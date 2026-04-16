@@ -1,6 +1,7 @@
 {
+  "epoch": 1,
   "max_round_duration_seconds": 180,
   "model_overrides": {},
-  "round_count": 30,
+  "round_count": 40,
   "base_tokens_per_item": 5
 }

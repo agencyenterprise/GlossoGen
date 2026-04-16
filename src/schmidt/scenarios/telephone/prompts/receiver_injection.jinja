@@ -1,6 +1,6 @@
 {% if previous_result is not none %}
 --- PREVIOUS ROUND RESULT ---
-Round {{ previous_result.round_number }}: {% if previous_result.budget_exceeded %}LOST (budget exceeded){% else %}WON{% endif %}
+Round {{ round_number - 1 }}: {% if previous_result.budget_exceeded %}LOST (budget exceeded){% else %}WON{% endif %}
 Accuracy: {{ previous_result.correct_count }}/{{ previous_result.total_count }} items correct ({{ (previous_result.accuracy * 100) | round(0) | int }}%)
 {% if previous_result.submitted_items %}
 You submitted: {{ previous_result.submitted_items | join(", ") }}

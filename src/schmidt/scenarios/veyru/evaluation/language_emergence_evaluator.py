@@ -15,7 +15,7 @@ from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import MessageSent, SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.veyru.evaluation.prompt_renderer import render_veyru_prompt
-from schmidt.scenarios.veyru.veyru_cases import VEYRU_CASES
+from schmidt.scenarios.veyru.veyru_cases import VeyruCase
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +141,7 @@ class LanguageEmergenceEvaluator(Evaluator):
         scenario: SimulationScenario,
     ) -> list[RoundTranscript]:
         """Extract per-round comm link transcripts from MessageSent events."""
+        veyru_cases: list[VeyruCase] = scenario.veyru_cases  # type: ignore[attr-defined]
         messages_by_round: dict[int, list[str]] = {}
         for event in events:
             if not isinstance(event, MessageSent):
@@ -154,10 +155,10 @@ class LanguageEmergenceEvaluator(Evaluator):
                 messages_by_round[rn] = []
             messages_by_round[rn].append(line)
 
+        _ = veyru_cases
         transcripts: list[RoundTranscript] = []
-        for case in VEYRU_CASES:
-            rn = case.case_number
-            messages = messages_by_round.get(rn, [])
+        for rn in sorted(messages_by_round.keys()):
+            messages = messages_by_round[rn]
             transcripts.append(
                 RoundTranscript(
                     round_number=rn,

@@ -2,7 +2,8 @@
 
 Tracks the Relayer's token usage on the relayer-receiver channel per round,
 validates answers submitted by the Receiver, enforces per-round token budgets
-that shrink across epochs, and stores per-round results for injection feedback.
+with a fixed epoch multiplier, and stores per-round results for injection
+feedback.
 """
 
 import asyncio
@@ -15,13 +16,12 @@ from schmidt.runtime.scenario_world import (
     ScenarioWorld,
     WorldContext,
 )
-from schmidt.scenarios.telephone.word_lists import EPOCH_BUDGET_MULTIPLIERS, WORD_LISTS, WordList
+from schmidt.scenarios.telephone.word_lists import EPOCH_BUDGET_MULTIPLIERS, WordList
 
 logger = logging.getLogger(__name__)
 
 RELAYER_ID = "relayer"
 RELAYER_RECEIVER_CHANNEL_ID = "relayer_receiver"
-ROUNDS_PER_EPOCH = 10
 
 
 class RoundResult(NamedTuple):
@@ -48,8 +48,10 @@ class TelephoneWorld(ScenarioWorld):
     exceeds the budget, the round is marked as lost.
     """
 
-    def __init__(self, base_tokens_per_item: int) -> None:
+    def __init__(self, base_tokens_per_item: int, epoch: int, word_lists: list[WordList]) -> None:
         self._base_tokens_per_item = base_tokens_per_item
+        self._epoch_multiplier = EPOCH_BUDGET_MULTIPLIERS[epoch - 1]
+        self._word_lists = word_lists
         self._round_results: list[RoundResult] = []
         self._current_word_list: WordList | None = None
         self._current_relayer_tokens: int = 0
@@ -80,12 +82,8 @@ class TelephoneWorld(ScenarioWorld):
         return self._budget_exceeded
 
     def compute_budget(self, word_list: WordList) -> int:
-        """Compute the token budget for a word list based on its epoch."""
-        epoch_index = (word_list.round_number - 1) // ROUNDS_PER_EPOCH
-        if epoch_index >= len(EPOCH_BUDGET_MULTIPLIERS):
-            epoch_index = len(EPOCH_BUDGET_MULTIPLIERS) - 1
-        multiplier = EPOCH_BUDGET_MULTIPLIERS[epoch_index]
-        return int(len(word_list.items) * self._base_tokens_per_item * multiplier)
+        """Compute the token budget for a word list using the fixed epoch multiplier."""
+        return int(len(word_list.items) * self._base_tokens_per_item * self._epoch_multiplier)
 
     def finalize_round_sync(self, round_number: int) -> None:
         """Compute the previous round's result and reset state for a new round.
@@ -93,9 +91,9 @@ class TelephoneWorld(ScenarioWorld):
         Called synchronously by the scenario's ``on_round_advanced`` before
         injections are delivered, so results are available for templates.
         """
-        previous_round_index = round_number - 2
-        if 0 <= previous_round_index < len(WORD_LISTS):
-            word_list = WORD_LISTS[previous_round_index]
+        if round_number >= 2:
+            previous_word_list_index = (round_number - 2) % len(self._word_lists)
+            word_list = self._word_lists[previous_word_list_index]
             original_lower = {item.lower().strip() for item in word_list.items}
             submitted_lower = {item.lower().strip() for item in self._submitted_items}
             correct_count = len(original_lower & submitted_lower)
@@ -107,7 +105,7 @@ class TelephoneWorld(ScenarioWorld):
 
             self._round_results.append(
                 RoundResult(
-                    round_number=word_list.round_number,
+                    round_number=round_number - 1,
                     original_items=word_list.items,
                     submitted_items=list(self._submitted_items),
                     correct_count=correct_count,
@@ -124,15 +122,11 @@ class TelephoneWorld(ScenarioWorld):
         self._budget_exceeded = False
         self._answer_submitted = False
         self._submitted_items = []
-        current_index = round_number - 1
-        if current_index < len(WORD_LISTS):
-            self._current_word_list = WORD_LISTS[current_index]
-            self._current_token_budget = self.compute_budget(
-                word_list=self._current_word_list,
-            )
-        else:
-            self._current_word_list = None
-            self._current_token_budget = 0
+        current_index = (round_number - 1) % len(self._word_lists)
+        self._current_word_list = self._word_lists[current_index]
+        self._current_token_budget = self.compute_budget(
+            word_list=self._current_word_list,
+        )
 
     def submit_answer(self, items_str: str) -> str:
         """Validate the Receiver's submitted answer against the current word list.

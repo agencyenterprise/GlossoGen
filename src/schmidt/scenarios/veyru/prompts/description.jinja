@@ -1,5 +1,5 @@
 Two agents — a field technician observing a Veyru and a specialist at headquarters — communicate over a link to stabilize failing Veyru entities. Every word sent costs {{ seconds_per_token }} simulated seconds. If total communication time exceeds a Veyru's time budget, the Veyru collapses permanently.
 
-Forty-eight Veyru arrive across forty-eight rounds (12 base cases repeated 4 times in shuffled order). Early Veyru have extremely tight budgets (~{{ veyru_cases[0].time_budget_seconds }}s) that are nearly impossible with normal language, forcing agents to develop compressed communication patterns. The same failure motifs recur many times to encourage shorthand reuse. Some rounds combine multiple failure motifs, requiring more complex diagnosis under time pressure.
+Veyru entities arrive across {{ round_count }} rounds. Twelve base failure cases cycle under a fixed time budget. The same failure motifs recur, encouraging shorthand reuse. Some rounds combine multiple failure motifs, requiring more complex diagnosis under time pressure.
 
 A Veyru is a non-organic box entity with internal wave-patterns. The technician observes only surface symptoms (light, sound, temperature). The specialist knows the six failure motifs and their stabilization procedures but must diagnose remotely from symptom descriptions alone.
