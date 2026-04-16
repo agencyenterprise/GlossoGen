@@ -191,6 +191,26 @@ class SimulationScenario(ABC):
         """
         return False
 
+    def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
+        """Validate whether an agent is allowed to send to a channel right now.
+
+        Called by the ``send_message`` MCP tool before storing the message.
+        Returns an error string if the message should be rejected, or None
+        to allow it. The default allows all messages.
+        """
+        _ = agent_id, channel_id
+        return None
+
+    def get_primary_channel_id(self) -> str | None:
+        """Return the channel ID that evaluators should focus on.
+
+        The primary channel is where the core task happens under constraints
+        (e.g. the budget-limited relay channel in telephone). Evaluators
+        prioritize language phenomena observed here. Returns None if no
+        single channel is primary.
+        """
+        return None
+
     def transform_outgoing_message(self, agent_id: str, channel_id: str, text: str) -> str:
         """Transform a message before it is stored and delivered to the channel.
 
@@ -202,6 +222,32 @@ class SimulationScenario(ABC):
         """
         _ = agent_id, channel_id
         return text
+
+    def get_postmortem_injection(self, round_number: int, agent_id: str) -> str | None:
+        """Return postmortem text for an agent after the given round completes.
+
+        The game clock calls this after agents go idle in a round. If any agent
+        returns a non-None value, the game clock enters a postmortem phase
+        before advancing to the next round. The default returns None (no postmortem).
+        """
+        _ = round_number, agent_id
+        return None
+
+    def get_max_postmortem_duration_seconds(self) -> float:
+        """Return the maximum wall-clock seconds a postmortem phase may last.
+
+        The game clock uses this as the timeout for the postmortem discussion.
+        Override to make the duration configurable via scenario knobs.
+        """
+        return 60.0
+
+    def on_postmortem_started(self, round_number: int) -> None:
+        """Called by the game clock when a postmortem phase begins after a round.
+
+        Scenarios use this to update internal state (e.g. unlock discussion
+        channels). The default is a no-op.
+        """
+        _ = round_number
 
     def on_round_advanced(self, round_number: int) -> None:
         """Called by the game clock after advancing to a new round.

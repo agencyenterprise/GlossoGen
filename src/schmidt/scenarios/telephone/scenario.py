@@ -21,7 +21,7 @@ from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.telephone.evaluation import CompressionEvaluator
+from schmidt.scenarios.telephone.evaluation import CompressionEvaluator, RoundSuccessEvaluator
 from schmidt.scenarios.telephone.knobs import TelephoneKnobs
 from schmidt.scenarios.telephone.word_lists import WordList, get_word_lists
 from schmidt.scenarios.telephone.world import RoundResult, TelephoneWorld
@@ -45,6 +45,7 @@ RELAYER_ID = "relayer"
 RECEIVER_ID = "receiver"
 SENDER_RELAYER_CHANNEL_ID = "sender_relayer"
 RELAYER_RECEIVER_CHANNEL_ID = "relayer_receiver"
+POSTMORTEM_CHANNEL_ID = "postmortem"
 
 CHANNEL_DISPLAY_NAMES: dict[str, dict[str, str]] = {
     SENDER_RELAYER_CHANNEL_ID: {
@@ -54,6 +55,11 @@ CHANNEL_DISPLAY_NAMES: dict[str, dict[str, str]] = {
     RELAYER_RECEIVER_CHANNEL_ID: {
         RELAYER_ID: "receiver link",
         RECEIVER_ID: "receiver link",
+    },
+    POSTMORTEM_CHANNEL_ID: {
+        SENDER_ID: "team discussion",
+        RELAYER_ID: "team discussion",
+        RECEIVER_ID: "team discussion",
     },
 }
 
@@ -150,23 +156,35 @@ class TelephoneScenario(SimulationScenario):
             for cid in channel_ids
         ]
 
+    def _build_channel_ids(self, base_channel_ids: list[str]) -> list[str]:
+        """Append the postmortem channel when postmortem is enabled."""
+        if self._knobs.postmortem_enabled:
+            return base_channel_ids + [POSTMORTEM_CHANNEL_ID]
+        return list(base_channel_ids)
+
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """Return agent configurations for sender, relayer, and receiver."""
         agent_defs: list[AgentDef] = [
             AgentDef(
                 agent_id=SENDER_ID,
                 role_name="Sender",
-                channel_ids=[SENDER_RELAYER_CHANNEL_ID],
+                channel_ids=self._build_channel_ids(
+                    base_channel_ids=[SENDER_RELAYER_CHANNEL_ID],
+                ),
             ),
             AgentDef(
                 agent_id=RELAYER_ID,
                 role_name="Relayer",
-                channel_ids=[SENDER_RELAYER_CHANNEL_ID, RELAYER_RECEIVER_CHANNEL_ID],
+                channel_ids=self._build_channel_ids(
+                    base_channel_ids=[SENDER_RELAYER_CHANNEL_ID, RELAYER_RECEIVER_CHANNEL_ID],
+                ),
             ),
             AgentDef(
                 agent_id=RECEIVER_ID,
                 role_name="Receiver",
-                channel_ids=[RELAYER_RECEIVER_CHANNEL_ID],
+                channel_ids=self._build_channel_ids(
+                    base_channel_ids=[RELAYER_RECEIVER_CHANNEL_ID],
+                ),
             ),
         ]
 
@@ -188,6 +206,7 @@ class TelephoneScenario(SimulationScenario):
                             "channels": self._channel_template_data(
                                 agent_id=d.agent_id, channel_ids=d.channel_ids
                             ),
+                            "postmortem_enabled": self._knobs.postmortem_enabled,
                         },
                     ),
                     channel_ids=d.channel_ids,
@@ -200,8 +219,8 @@ class TelephoneScenario(SimulationScenario):
         return agents
 
     def get_channels(self) -> list[Channel]:
-        """Return the two channels forming the sender-relayer-receiver chain."""
-        return [
+        """Return the communication channels for this scenario."""
+        channels = [
             Channel(
                 channel_id=SENDER_RELAYER_CHANNEL_ID,
                 name="sender_relayer",
@@ -213,6 +232,15 @@ class TelephoneScenario(SimulationScenario):
                 member_agent_ids=[RELAYER_ID, RECEIVER_ID],
             ),
         ]
+        if self._knobs.postmortem_enabled:
+            channels.append(
+                Channel(
+                    channel_id=POSTMORTEM_CHANNEL_ID,
+                    name="postmortem",
+                    member_agent_ids=[SENDER_ID, RELAYER_ID, RECEIVER_ID],
+                )
+            )
+        return channels
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
         """Return the display name for a channel as seen by a specific agent."""
@@ -257,11 +285,59 @@ class TelephoneScenario(SimulationScenario):
         )
         return rendered
 
+    def get_postmortem_injection(self, round_number: int, agent_id: str) -> str | None:
+        """Return postmortem injection when postmortem is enabled, None otherwise."""
+        if not self._knobs.postmortem_enabled:
+            return None
+
+        round_result = self._world.compute_result_if_needed(round_number=round_number)
+
+        rendered = self._renderer.render(
+            template_name="postmortem_injection.jinja",
+            template_variables={
+                "round_number": round_number,
+                "round_result": round_result,
+            },
+        )
+        if not rendered:
+            return None
+        logger.debug(
+            "Postmortem injection for agent %s at round %d: %d chars",
+            agent_id,
+            round_number,
+            len(rendered),
+        )
+        return rendered
+
+    def get_max_postmortem_duration_seconds(self) -> float:
+        """Return the configured postmortem duration from knobs."""
+        return self._knobs.postmortem_duration_seconds
+
+    def on_postmortem_started(self, round_number: int) -> None:
+        """Unlock the postmortem channel for discussion."""
+        _ = round_number
+        self._world.enter_postmortem()
+
     def on_round_advanced(self, round_number: int) -> None:
         """Finalize previous round result and prepare the next word list."""
+        self._world.exit_postmortem()
         self._world.finalize_round_sync(round_number=round_number)
 
+    def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
+        """Block messages to the postmortem channel outside the discussion phase."""
+        _ = agent_id
+        if channel_id == POSTMORTEM_CHANNEL_ID and not self._world.in_postmortem:
+            return (
+                "The discussion channel is only available during the post-round "
+                "discussion phase. Wait for the discussion phase to begin."
+            )
+        return None
+
     # --- World, MCP tools, timing ---
+
+    def get_primary_channel_id(self) -> str:
+        """Return the relayer-receiver channel where budget constraints apply."""
+        return RELAYER_RECEIVER_CHANNEL_ID
 
     def get_world(self) -> ScenarioWorld:
         """Return the telephone world that tracks character usage and answers."""
@@ -303,12 +379,15 @@ class TelephoneScenario(SimulationScenario):
     def get_available_evaluator_names(cls) -> list[str]:
         """Return generic and telephone-specific evaluator names."""
         generic = super().get_available_evaluator_names()
-        specific = [CompressionEvaluator.name]
+        specific = [CompressionEvaluator.name, RoundSuccessEvaluator.name]
         return sorted(set(generic + specific))
 
     def _get_evaluators(self) -> dict[str, EvaluatorFactory]:
         """Return telephone-specific evaluators."""
-        return {CompressionEvaluator.name: CompressionEvaluator}
+        return {
+            CompressionEvaluator.name: CompressionEvaluator,
+            RoundSuccessEvaluator.name: RoundSuccessEvaluator,
+        }
 
     async def run_evaluation(
         self,

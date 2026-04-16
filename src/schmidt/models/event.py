@@ -142,6 +142,13 @@ class WorldEventDelivered(EventBase):
     text: str
 
 
+class PostmortemStarted(EventBase):
+    """Emitted when the game clock enters a postmortem discussion phase after a round."""
+
+    event_type: Literal["postmortem_started"] = "postmortem_started"
+    round_number: int
+
+
 class SimulationEnded(EventBase):
     """Emitted when the simulation finishes, with termination reason, message count, and cost."""
 
@@ -161,6 +168,7 @@ SimulationEvent = Annotated[
         ToolResultReceived,
         RoundAdvanced,
         InjectionDelivered,
+        PostmortemStarted,
         WorldEventDelivered,
         SimulationEnded,
     ],

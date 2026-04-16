@@ -222,6 +222,18 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         ):
             raise ValueError(f"You are not a member of channel '{channel_id}'")
 
+        rejection_reason = runtime.scenario.validate_outgoing_message(
+            agent_id=agent_id,
+            channel_id=channel_id,
+        )
+        if rejection_reason is not None:
+            return SendMessageResult(
+                status="rejected",
+                detail=rejection_reason,
+                new_messages=[],
+                token_count=0,
+            ).model_dump()
+
         display_name_fn = runtime.scenario.get_agent_display_name
 
         # Count tokens before acquiring the lock to avoid holding the lock
