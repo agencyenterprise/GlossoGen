@@ -8,6 +8,7 @@ import asyncio
 import io
 import logging
 import shutil
+import subprocess
 import tarfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -53,6 +54,25 @@ def _should_include_in_bundle(path: Path, run_dir: Path) -> bool:
     return True
 
 
+def _pack_git_objects(run_dir: Path) -> None:
+    """Run git gc to pack loose objects, dramatically reducing .git size.
+
+    Loose objects store each JSONL snapshot as a separate blob. Packing
+    enables delta compression across commits, typically shrinking .git
+    from hundreds of megabytes to a few megabytes.
+    """
+    git_dir = run_dir / ".git"
+    if not git_dir.is_dir():
+        return
+    subprocess.run(
+        ["git", "gc", "--aggressive", "--quiet"],
+        cwd=str(run_dir),
+        check=True,
+        capture_output=True,
+        timeout=120,
+    )
+
+
 def _build_bundle_bytes(
     run_dir: Path,
     run_id: str,
@@ -60,6 +80,7 @@ def _build_bundle_bytes(
     original_timestamp: int,
 ) -> bytes:
     """Build a tar.gz archive of the run directory including git history."""
+    _pack_git_objects(run_dir=run_dir)
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
         for file_path in sorted(run_dir.rglob("*")):
