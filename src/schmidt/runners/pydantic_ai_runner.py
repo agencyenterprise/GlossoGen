@@ -26,8 +26,7 @@ from pydantic_ai.messages import (
     ThinkingPartDelta,
 )
 from pydantic_ai.models.anthropic import AnthropicModelSettings
-
-# from pydantic_ai.models.openai import OpenAIResponsesModelSettings
+from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage, UsageLimits
@@ -132,16 +131,17 @@ class PydanticAIRunner(AgentRunner):
                 anthropic_cache_tool_definitions=True,
                 anthropic_cache_messages=True,
             )
-        # elif provider == "openai": # not supported by gpt-5.4-nano
-        #     default_settings = OpenAIResponsesModelSettings(
-        #         openai_reasoning_effort="low",
-        #         openai_reasoning_summary="concise",
-        #     )
+        elif provider == "openai":
+            default_settings = OpenAIResponsesModelSettings(
+                openai_reasoning_effort="high",
+                openai_reasoning_summary="concise",
+            )
         else:
             default_settings = ModelSettings()
 
+        model_prefix = "openai-responses" if provider == "openai" else provider
         agent: Agent[None, str] = Agent(
-            model=f"{provider}:{agent_config.model}",
+            model=f"{model_prefix}:{agent_config.model}",
             system_prompt=full_system_prompt,
             toolsets=[mcp_server],
             model_settings=default_settings,

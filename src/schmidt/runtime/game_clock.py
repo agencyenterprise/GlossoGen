@@ -10,7 +10,7 @@ import logging
 import time
 
 from schmidt.event_logger import EventLogger
-from schmidt.models.event import InjectionDelivered, RoundAdvanced, RunStatus
+from schmidt.models.event import InjectionDelivered, PostmortemStarted, RoundAdvanced, RunStatus
 from schmidt.runtime.activity_notification import NewInfoNotification
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.scenario_world import WorldContext
@@ -49,6 +49,8 @@ class GameClock:
         self._current_round = self._start_round
         self._round_start_time = time.monotonic()
         self._last_message_time = time.monotonic()
+        self._in_postmortem = False
+        self._postmortem_duration_seconds = scenario.get_max_postmortem_duration_seconds()
 
     def on_message_sent(self) -> None:
         """Called by the simulation runtime whenever a message is sent."""
@@ -63,14 +65,63 @@ class GameClock:
                 return False
         return True
 
-    def _round_timed_out(self) -> bool:
-        """Return True if the current round has exceeded its wall-clock time limit.
+    def _phase_timed_out(self) -> bool:
+        """Return True if the current phase has exceeded its wall-clock time limit.
 
-        Measured from the round start, not the last message. This ensures
-        rounds advance even when agents are stuck in a messaging loop.
+        Uses the postmortem duration when in a postmortem phase, otherwise
+        the regular round duration. Measured from the phase start time.
         """
         elapsed = time.monotonic() - self._round_start_time
+        if self._in_postmortem:
+            return elapsed >= self._postmortem_duration_seconds
         return elapsed >= self._max_round_duration_seconds
+
+    def _has_postmortem(self, round_number: int) -> bool:
+        """Check whether any agent has a postmortem injection for the given round."""
+        for agent_id in self._agent_sessions:
+            injection = self._scenario.get_postmortem_injection(
+                round_number=round_number,
+                agent_id=agent_id,
+            )
+            if injection is not None:
+                return True
+        return False
+
+    async def _deliver_postmortem_injections(self, round_number: int) -> None:
+        """Enter the postmortem phase and deliver postmortem injections to agents."""
+        self._in_postmortem = True
+        self._round_start_time = time.monotonic()
+        self._last_message_time = time.monotonic()
+
+        await self._event_logger.log(
+            event=PostmortemStarted(round_number=round_number),
+        )
+        self._scenario.on_postmortem_started(round_number=round_number)
+        logger.info("Postmortem started for round %d", round_number)
+
+        for agent_id, session in self._agent_sessions.items():
+            injection_text = self._scenario.get_postmortem_injection(
+                round_number=round_number,
+                agent_id=agent_id,
+            )
+            if not injection_text:
+                continue
+
+            session.push_notification(
+                notification=NewInfoNotification(text=injection_text),
+            )
+            await self._event_logger.log(
+                event=InjectionDelivered(
+                    agent_id=agent_id,
+                    round_number=round_number,
+                    text=injection_text,
+                ),
+            )
+            logger.debug(
+                "Postmortem injection delivered to %s for round %d",
+                agent_id,
+                round_number,
+            )
 
     async def _deliver_injections(self, round_number: int) -> None:
         """Push injection notifications to agents that have one for this round.
@@ -173,6 +224,9 @@ class GameClock:
         """Run the game clock polling loop. Returns the termination status.
 
         Assumes ``start_initial_round`` has already been called.
+        After each round's game phase, the clock checks whether the scenario
+        has postmortem injections. If so, it enters a postmortem phase (with
+        its own timeout) before advancing to the next round.
         """
         while True:
             await asyncio.sleep(IDLE_CHECK_INTERVAL_SECONDS)
@@ -187,22 +241,38 @@ class GameClock:
             round_age = time.monotonic() - self._last_message_time
             if self._all_agents_idle() and round_age >= MIN_ROUND_DURATION_SECONDS:
                 trigger = "all_agents_idle"
-            elif self._round_timed_out():
+            elif self._phase_timed_out():
                 elapsed = time.monotonic() - self._last_message_time
-                trigger = "round_timeout"
+                phase_label = "Postmortem" if self._in_postmortem else "Round"
+                trigger = "postmortem_timeout" if self._in_postmortem else "round_timeout"
                 logger.info(
-                    "Round %d timed out after %.1f seconds",
+                    "%s %d timed out after %.1f seconds idle",
+                    phase_label,
                     self._current_round,
                     elapsed,
                 )
             else:
                 continue
 
-            if self._current_round >= self._max_rounds:
-                logger.info(
-                    "All %d rounds complete, ending simulation",
-                    self._max_rounds,
-                )
-                return RunStatus.SCENARIO_COMPLETE
-
-            await self._advance_round(trigger=trigger)
+            if self._in_postmortem:
+                self._in_postmortem = False
+                if self._current_round >= self._max_rounds:
+                    logger.info(
+                        "All %d rounds complete (after postmortem), ending simulation",
+                        self._max_rounds,
+                    )
+                    return RunStatus.SCENARIO_COMPLETE
+                await self._advance_round(trigger=trigger)
+            else:
+                if self._has_postmortem(round_number=self._current_round):
+                    await self._deliver_postmortem_injections(
+                        round_number=self._current_round,
+                    )
+                else:
+                    if self._current_round >= self._max_rounds:
+                        logger.info(
+                            "All %d rounds complete, ending simulation",
+                            self._max_rounds,
+                        )
+                        return RunStatus.SCENARIO_COMPLETE
+                    await self._advance_round(trigger=trigger)

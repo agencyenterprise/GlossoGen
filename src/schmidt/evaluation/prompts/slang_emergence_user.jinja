@@ -1,20 +1,21 @@
-You are evaluating whether agents in a multi-agent simulation developed informal slang or colloquial expressions during their communication across {{ rounds | length }} rounds.
+You are evaluating whether agents in a multi-agent simulation assigned NEW MEANINGS to existing words during their communication across {{ rounds | length }} rounds.
+
+Focus on the PRIMARY CHANNEL messages — these are the budget-constrained communications where novel language is most likely to emerge. Messages from OTHER CHANNELS provide context but are secondary.
 
 IMPORTANT: Other specialized evaluators cover different phenomena. Only report what belongs to THIS evaluator:
 
 - **Shorthand codes** (covered separately): abbreviations, letter codes, numbering systems like "A=flicker" or "P1". Do NOT report these.
 - **Neologisms** (covered separately): invented words, compound words, portmanteaus. Do NOT report these.
 - **Structural strangeness** (covered separately): unusual grammar, dropped articles, telegraph-style. Do NOT report these.
+- **Existing slang usage**: Expressions like "let's go!", "on fire!", "nailed it" used with their standard colloquial meanings are NOT slang emergence. Do NOT report these.
 
-What belongs to THIS evaluator — slang and informal register shifts:
-- Informal shortened forms of existing words (e.g., "gonna", "gotta", "def" for "definitely")
-- Casual expressions replacing formal equivalents (e.g., "nah" for "no", "yep" for "yes")
-- Playful or humorous rewordings of standard terms
-- Tone shifts from formal to casual register over time
-- Pet names or nicknames for concepts, tools, or processes (e.g., calling a stabilization procedure "the squeeze")
-- In-group casual language that signals familiarity between agents
+What belongs to THIS evaluator — existing words repurposed with new meanings:
+- An existing word used to mean something different from its standard definition (e.g., using "squeeze" to mean a specific procedure, not the physical action)
+- Common words adopted as task-specific jargon with meanings only understood by the agents in context
+- Metaphors that solidify into persistent terminology (e.g., calling rounds "chapters" and consistently meaning it)
+- Words whose meaning drifts or narrows within the agents' shared context over multiple rounds
 
-The key distinction: slang is INFORMAL VARIANTS of existing language. It is not coded abbreviations (those are shorthand) and not invented words (those are neologisms). Focus on register shifts and casualness.
+The key distinction: slang emergence means agents CREATED new meanings for existing words. Using "gonna" or "let's go!" with their standard meanings is NOT slang emergence — those are just casual register.
 
 Below are the message transcripts for each round:
 
@@ -29,12 +30,12 @@ Below are the message transcripts for each round:
 
 Analyze the communication for slang emergence:
 
-1. **Identify slang instances**: List every case of informal or slang-like language, with the round number and exact text. Do NOT include codes, abbreviations, or invented words — those belong to other evaluators.
+1. **Identify new meanings**: List every case where an existing word was used with a NEW meaning created by the agents. Include the round number, exact text, the standard meaning of the word, and the new meaning the agents assigned. Do NOT include standard slang, codes, abbreviations, or invented words.
 
-2. **Identify rounds**: List the specific round numbers where slang or informal language was observed.
+2. **Identify rounds**: List the specific round numbers where new word meanings emerged.
 
-3. **Shared slang**: Did both agents adopt the same informal expressions, or did slang remain one-sided?
+3. **Shared adoption**: Did multiple agents adopt the same repurposed word, or did new meanings remain one-sided?
 
-4. **Context-specific slang**: Did agents develop casual nicknames or informal terms specific to their task?
+4. **Persistence**: Did the new meanings persist across rounds, or were they one-off usages?
 
 Submit your assessment using the provided tool.
