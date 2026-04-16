@@ -1,5 +1,5 @@
 {% if previous_result is not none %}
---- ROUND {{ previous_result.round_number }} RESULT ---
+--- ROUND {{ round_number - 1 }} RESULT ---
 {% if previous_result.budget_exceeded %}
 LOST — budget exceeded ({{ previous_result.relayer_token_cost }} tokens used, budget was {{ previous_result.token_budget }}).
 {% else %}

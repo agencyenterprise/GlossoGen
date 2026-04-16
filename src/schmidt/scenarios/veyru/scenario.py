@@ -24,7 +24,7 @@ from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.veyru.evaluation import LanguageEmergenceEvaluator
 from schmidt.scenarios.veyru.knobs import VeyruKnobs
 from schmidt.scenarios.veyru.stabilization_judge import judge_stabilization
-from schmidt.scenarios.veyru.veyru_cases import VEYRU_CASES
+from schmidt.scenarios.veyru.veyru_cases import VeyruCase, get_cases_for_epoch
 from schmidt.scenarios.veyru.world import VeyruOutcome, VeyruWorld
 from schmidt.template_renderer import TemplateRenderer
 
@@ -100,8 +100,10 @@ class VeyruScenario(SimulationScenario):
     def __init__(self, knobs: VeyruKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
+        self._veyru_cases: list[VeyruCase] = get_cases_for_epoch(epoch=knobs.epoch)
         self._world = VeyruWorld(
             seconds_per_token=knobs.seconds_per_token,
+            veyru_cases=self._veyru_cases,
         )
         self._judge_provider = create_provider(
             provider_name=knobs.judge_provider,
@@ -109,6 +111,11 @@ class VeyruScenario(SimulationScenario):
             inference_provider=None,
             reasoning_effort=None,
         )
+
+    @property
+    def veyru_cases(self) -> list[VeyruCase]:
+        """Return the Veyru cases for the selected epoch."""
+        return self._veyru_cases
 
     def name(self) -> str:
         """Return the scenario identifier."""
@@ -124,7 +131,8 @@ class VeyruScenario(SimulationScenario):
             template_name="description.jinja",
             template_variables={
                 "seconds_per_token": self._knobs.seconds_per_token,
-                "veyru_cases": VEYRU_CASES,
+                "round_count": self._knobs.round_count,
+                "veyru_cases": self._veyru_cases,
             },
         )
 
@@ -208,10 +216,8 @@ class VeyruScenario(SimulationScenario):
         if template_name is None:
             return None
 
-        current_case_index = round_number - 1
-        current_case = None
-        if current_case_index < len(VEYRU_CASES):
-            current_case = VEYRU_CASES[current_case_index]
+        current_case_index = (round_number - 1) % len(self._veyru_cases)
+        current_case = self._veyru_cases[current_case_index]
 
         previous_outcome: VeyruOutcome | None = None
         if len(self._world.veyru_outcomes) > 0:

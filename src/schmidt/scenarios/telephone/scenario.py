@@ -23,7 +23,7 @@ from schmidt.runtime.scenario_world import ScenarioWorld
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.telephone.evaluation import CompressionEvaluator
 from schmidt.scenarios.telephone.knobs import TelephoneKnobs
-from schmidt.scenarios.telephone.word_lists import WORD_LISTS
+from schmidt.scenarios.telephone.word_lists import WordList, get_word_lists_for_epoch
 from schmidt.scenarios.telephone.world import RoundResult, TelephoneWorld
 from schmidt.template_renderer import TemplateRenderer
 
@@ -109,9 +109,17 @@ class TelephoneScenario(SimulationScenario):
     def __init__(self, knobs: TelephoneKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
+        self._word_lists: list[WordList] = get_word_lists_for_epoch(epoch=knobs.epoch)
         self._world = TelephoneWorld(
             base_tokens_per_item=knobs.base_tokens_per_item,
+            epoch=knobs.epoch,
+            word_lists=self._word_lists,
         )
+
+    @property
+    def word_lists(self) -> list[WordList]:
+        """Return the word lists for the selected epoch."""
+        return self._word_lists
 
     def name(self) -> str:
         """Return the scenario identifier."""
@@ -224,14 +232,11 @@ class TelephoneScenario(SimulationScenario):
         if len(self._world.round_results) > 0:
             previous_result = self._world.round_results[-1]
 
-        current_word_list_index = round_number - 1
-        current_word_list = None
-        current_token_budget = 0
-        if current_word_list_index < len(WORD_LISTS):
-            current_word_list = WORD_LISTS[current_word_list_index]
-            current_token_budget = self._world.compute_budget(
-                word_list=current_word_list,
-            )
+        current_word_list_index = (round_number - 1) % len(self._word_lists)
+        current_word_list = self._word_lists[current_word_list_index]
+        current_token_budget = self._world.compute_budget(
+            word_list=current_word_list,
+        )
 
         rendered = self._renderer.render(
             template_name=template_name,

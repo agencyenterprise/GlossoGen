@@ -17,7 +17,7 @@ from schmidt.runtime.scenario_world import (
     ScenarioWorld,
     WorldContext,
 )
-from schmidt.scenarios.veyru.veyru_cases import VEYRU_CASES, VeyruCase
+from schmidt.scenarios.veyru.veyru_cases import VeyruCase
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +43,9 @@ class VeyruWorld(ScenarioWorld):
     calls ``stabilize_veyru`` with a correct action before time runs out.
     """
 
-    def __init__(self, seconds_per_token: float) -> None:
+    def __init__(self, seconds_per_token: float, veyru_cases: list[VeyruCase]) -> None:
         self._seconds_per_token = seconds_per_token
+        self._veyru_cases = veyru_cases
         self._current_round_tokens: int = 0
         self._current_case: VeyruCase | None = None
         self._veyru_alive: bool = True
@@ -80,13 +81,13 @@ class VeyruWorld(ScenarioWorld):
         injections are delivered, so outcomes are available for templates.
         Veyru survives only if ``stabilize_veyru`` was called during the round.
         """
-        previous_case_index = round_number - 2
-        if 0 <= previous_case_index < len(VEYRU_CASES):
-            case = VEYRU_CASES[previous_case_index]
+        if round_number >= 2:
+            previous_case_index = (round_number - 2) % len(self._veyru_cases)
+            case = self._veyru_cases[previous_case_index]
             time_elapsed = self._current_round_tokens * self._seconds_per_token
             self._veyru_outcomes.append(
                 VeyruOutcome(
-                    case_number=case.case_number,
+                    case_number=round_number - 1,
                     failure_name=case.failure_name,
                     stabilized=self._veyru_stabilized,
                     tokens_used=self._current_round_tokens,
@@ -100,11 +101,8 @@ class VeyruWorld(ScenarioWorld):
         self._veyru_stabilized = False
         self._notified_thresholds = set()
 
-        case_index = round_number - 1
-        if case_index < len(VEYRU_CASES):
-            self._current_case = VEYRU_CASES[case_index]
-        else:
-            self._current_case = None
+        case_index = (round_number - 1) % len(self._veyru_cases)
+        self._current_case = self._veyru_cases[case_index]
 
     async def stabilize_veyru(self) -> None:
         """Mark the current Veyru as stabilized and broadcast to all agents.

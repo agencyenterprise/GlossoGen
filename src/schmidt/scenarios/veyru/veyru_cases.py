@@ -1,10 +1,9 @@
 """Hardcoded Veyru failure cases for the stabilization scenario.
 
-Defines 12 base failure templates (6 single-motif + 6 composite) and
-generates 48 rounds by repeating them across 4 shuffled epochs. Repetition
-forces agents to develop compressed communication patterns for recurring
-motifs. Epoch 1 introduces cases in order; epochs 2-4 shuffle them so
-agents encounter familiar failures in unpredictable sequence.
+Defines 12 base failure templates (6 single-motif + 6 composite) and 4
+epoch orderings. Each epoch applies a fixed budget multiplier. Callers
+select a single epoch via ``get_cases_for_epoch`` to get 12 cases with
+case numbers 1-12 and constant time budgets.
 """
 
 from typing import NamedTuple
@@ -258,17 +257,30 @@ _EPOCH_ORDERS: list[list[int]] = [
 # communication patterns for motifs they have already encountered.
 _EPOCH_BUDGET_MULTIPLIERS: list[float] = [1.0, 0.75, 0.5, 0.35]
 
-VEYRU_CASES: list[VeyruCase] = []
-for _epoch_idx, _epoch in enumerate(_EPOCH_ORDERS):
-    _multiplier = _EPOCH_BUDGET_MULTIPLIERS[_epoch_idx]
-    for _pos, _base_idx in enumerate(_epoch):
-        _base = _BASE_CASES[_base_idx]
-        VEYRU_CASES.append(
+EPOCH_COUNT: int = len(_EPOCH_BUDGET_MULTIPLIERS)
+
+
+def get_cases_for_epoch(epoch: int) -> list[VeyruCase]:
+    """Return the 12 cases for a single epoch, numbered 1-12.
+
+    ``epoch`` is 1-indexed (1 through 4). Time budgets reflect the
+    epoch's budget multiplier.
+    """
+    if epoch < 1 or epoch > EPOCH_COUNT:
+        raise ValueError(f"epoch must be between 1 and {EPOCH_COUNT}, got {epoch}")
+    epoch_index = epoch - 1
+    order = _EPOCH_ORDERS[epoch_index]
+    multiplier = _EPOCH_BUDGET_MULTIPLIERS[epoch_index]
+    cases: list[VeyruCase] = []
+    for pos, base_idx in enumerate(order):
+        base = _BASE_CASES[base_idx]
+        cases.append(
             VeyruCase(
-                case_number=_epoch_idx * 12 + _pos + 1,
-                failure_name=_base.failure_name,
-                observable_symptoms=_base.observable_symptoms,
-                critical_actions=_base.critical_actions,
-                time_budget_seconds=int(_base.time_budget_seconds * _multiplier),
+                case_number=pos + 1,
+                failure_name=base.failure_name,
+                observable_symptoms=base.observable_symptoms,
+                critical_actions=base.critical_actions,
+                time_budget_seconds=int(base.time_budget_seconds * multiplier),
             )
         )
+    return cases
