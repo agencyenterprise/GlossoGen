@@ -1,11 +1,11 @@
 """Word lists for the telephone scenario.
 
-Defines 40 base word lists with all unique words (no word appears in more than
-one list) and 5 epoch orderings. Each epoch applies a fixed budget multiplier.
-Callers select a single epoch via ``get_word_lists_for_epoch`` to get 40 word
-lists with round numbers 1-40 and a constant multiplier.
+A pool of common English words is shuffled with a fixed seed and dealt into
+40 round lists whose sizes cycle uniformly from 5 to 16 items. No word
+appears in more than one list.
 """
 
+import random
 from typing import NamedTuple
 
 
@@ -16,492 +16,503 @@ class WordList(NamedTuple):
     items: list[str]
 
 
-class _BaseList(NamedTuple):
-    """Template for a word list, before round_number assignment."""
-
-    items: list[str]
-
-
-# 40 base word lists, sizes cycling 3, 4, 5, 5, 6, 7, 7, 8, 9, 17.
-# Every word appears exactly once across all lists.
-_BASE_LISTS: list[_BaseList] = [
-    # --- cycle 1 (lists 0-9) ---
-    # 0: 3 items
-    _BaseList(items=["apple", "chair", "river"]),
-    # 1: 4 items
-    _BaseList(items=["hammer", "cloud", "penguin", "blanket"]),
-    # 2: 5 items
-    _BaseList(items=["guitar", "volcano", "sandwich", "telescope", "candle"]),
-    # 3: 5 items
-    _BaseList(items=["elephant", "microscope", "cinnamon", "lighthouse", "parachute"]),
-    # 4: 6 items
-    _BaseList(items=["dolphin", "compass", "lantern", "marble", "feather", "trumpet"]),
-    # 5: 7 items
-    _BaseList(
-        items=["glacier", "pyramid", "anchor", "biscuit", "violin", "tornado", "sapphire"],
-    ),
-    # 6: 7 items
-    _BaseList(
-        items=["basket", "magnet", "pepper", "fountain", "curtain", "whistle", "diamond"],
-    ),
-    # 7: 8 items
-    _BaseList(
-        items=[
-            "mushroom",
-            "lanyard",
-            "cabinet",
-            "sparrow",
-            "crystal",
-            "balloon",
-            "vinegar",
-            "sextant",
-        ],
-    ),
-    # 8: 9 items
-    _BaseList(
-        items=[
-            "hammock",
-            "ceramic",
-            "blizzard",
-            "octopus",
-            "tambourine",
-            "scarecrow",
-            "nutmeg",
-            "gazelle",
-            "prism",
-        ],
-    ),
-    # 9: 17 items
-    _BaseList(
-        items=[
-            "avalanche",
-            "bamboo",
-            "chimney",
-            "dungeon",
-            "emerald",
-            "falcon",
-            "garlic",
-            "horizon",
-            "igloo",
-            "jasmine",
-            "kettle",
-            "lemon",
-            "mango",
-            "napkin",
-            "orchid",
-            "pillow",
-            "quartz",
-        ],
-    ),
-    # --- cycle 2 (lists 10-19) ---
-    # 10: 3 items
-    _BaseList(items=["rocket", "saddle", "walnut"]),
-    # 11: 4 items
-    _BaseList(items=["beacon", "cobweb", "furnace", "gravel"]),
-    # 12: 5 items
-    _BaseList(items=["hermit", "javelin", "ketchup", "lobster", "mitten"]),
-    # 13: 5 items
-    _BaseList(items=["nectar", "oxygen", "plumber", "quarry", "raisin"]),
-    # 14: 6 items
-    _BaseList(items=["saffron", "thistle", "umbrella", "velvet", "waffle", "zenith"]),
-    # 15: 7 items
-    _BaseList(
-        items=["apricot", "bonfire", "catapult", "dragonfly", "easel", "flamingo", "gondola"],
-    ),
-    # 16: 7 items
-    _BaseList(
-        items=["harness", "incense", "jigsaw", "kaleidoscope", "lattice", "meadow", "nozzle"],
-    ),
-    # 17: 8 items
-    _BaseList(
-        items=[
-            "obelisk",
-            "panther",
-            "quicksand",
-            "ratchet",
-            "stallion",
-            "thimble",
-            "urchin",
-            "venom",
-        ],
-    ),
-    # 18: 9 items
-    _BaseList(
-        items=[
-            "whirlpool",
-            "xylophone",
-            "yardstick",
-            "zeppelin",
-            "acorn",
-            "bramble",
-            "caribou",
-            "daffodil",
-            "eclipse",
-        ],
-    ),
-    # 19: 17 items
-    _BaseList(
-        items=[
-            "ferret",
-            "goblet",
-            "harpoon",
-            "ivory",
-            "juniper",
-            "keystone",
-            "lagoon",
-            "masquerade",
-            "nebula",
-            "origami",
-            "porcelain",
-            "quintet",
-            "riddle",
-            "satchel",
-            "tapestry",
-            "utensil",
-            "viaduct",
-        ],
-    ),
-    # --- cycle 3 (lists 20-29) ---
-    # 20: 3 items
-    _BaseList(items=["wasp", "yeti", "zodiac"]),
-    # 21: 4 items
-    _BaseList(items=["asteroid", "barricade", "canyon", "dynamo"]),
-    # 22: 5 items
-    _BaseList(items=["ember", "fjord", "geyser", "hibiscus", "icicle"]),
-    # 23: 5 items
-    _BaseList(items=["jackal", "kayak", "locket", "monocle", "narwhal"]),
-    # 24: 6 items
-    _BaseList(items=["osprey", "palette", "quiver", "rampart", "scepter", "trellis"]),
-    # 25: 7 items
-    _BaseList(
-        items=["unicorn", "vulture", "windmill", "xerox", "yachtsman", "zephyr", "albatross"],
-    ),
-    # 26: 7 items
-    _BaseList(
-        items=["bobsled", "cactus", "dagger", "espresso", "foxglove", "gargoyle", "hedgehog"],
-    ),
-    # 27: 8 items
-    _BaseList(
-        items=[
-            "ibex",
-            "junco",
-            "koala",
-            "lemur",
-            "mongoose",
-            "newt",
-            "ocelot",
-            "platypus",
-        ],
-    ),
-    # 28: 9 items
-    _BaseList(
-        items=[
-            "quetzal",
-            "raccoon",
-            "starfish",
-            "toucan",
-            "armadillo",
-            "viper",
-            "wombat",
-            "xerus",
-            "yak",
-        ],
-    ),
-    # 29: 17 items
-    _BaseList(
-        items=[
-            "abacus",
-            "bellows",
-            "chariot",
-            "dominoes",
-            "envelope",
-            "firewood",
-            "galleon",
-            "handcart",
-            "inkwell",
-            "journal",
-            "knapsack",
-            "lariat",
-            "mandolin",
-            "nomad",
-            "overcoat",
-            "parchment",
-            "rudder",
-        ],
-    ),
-    # --- cycle 4 (lists 30-39) ---
-    # 30: 3 items
-    _BaseList(items=["sphinx", "trident", "unicycle"]),
-    # 31: 4 items
-    _BaseList(items=["velveteen", "whippet", "xeric", "yarrow"]),
-    # 32: 5 items
-    _BaseList(items=["zinnia", "aileron", "bulkhead", "capstan", "derrick"]),
-    # 33: 5 items
-    _BaseList(items=["eyelet", "flint", "gimbal", "hatchet", "ingot"]),
-    # 34: 6 items
-    _BaseList(items=["jackdaw", "kingpin", "lintel", "mortar", "nacelle", "oxbow"]),
-    # 35: 7 items
-    _BaseList(
-        items=["pinnacle", "quartzite", "rigging", "schooner", "turret", "vestibule", "warbler"],
-    ),
-    # 36: 7 items
-    _BaseList(
-        items=["anemone", "barnacle", "cistern", "dragnet", "estuary", "flywheel", "grommet"],
-    ),
-    # 37: 8 items
-    _BaseList(
-        items=[
-            "halyard",
-            "impeller",
-            "jetty",
-            "keel",
-            "longbow",
-            "mizzenmast",
-            "nautilus",
-            "oarlock",
-        ],
-    ),
-    # 38: 9 items
-    _BaseList(
-        items=[
-            "portcullis",
-            "quarterdeck",
-            "ratline",
-            "spyglass",
-            "topsail",
-            "upwind",
-            "vanguard",
-            "windlass",
-            "yardarm",
-        ],
-    ),
-    # 39: 17 items
-    _BaseList(
-        items=[
-            "almanac",
-            "belfry",
-            "canopy",
-            "drawbridge",
-            "escarpment",
-            "fortress",
-            "gatehouse",
-            "haystack",
-            "ironwork",
-            "jousting",
-            "kiln",
-            "limestone",
-            "moat",
-            "parapet",
-            "bastion",
-            "stockade",
-            "watchtower",
-        ],
-    ),
+# Pool of 420+ common, concrete English nouns — easy to visualize, unambiguous.
+# Must contain at least 404 words (sum of sizes 5..16 cycled over 40 rounds).
+WORD_POOL: list[str] = [
+    # A
+    "acorn",
+    "admiral",
+    "albatross",
+    "almond",
+    "anchor",
+    "antelope",
+    "antler",
+    "anvil",
+    "apple",
+    "apricot",
+    "armadillo",
+    "armchair",
+    "arrow",
+    "artichoke",
+    "atlas",
+    "avocado",
+    "axle",
+    # B
+    "badge",
+    "badger",
+    "balloon",
+    "bamboo",
+    "banjo",
+    "barnacle",
+    "barrel",
+    "basket",
+    "beacon",
+    "beetle",
+    "biscuit",
+    "blanket",
+    "blossom",
+    "bluebird",
+    "bobcat",
+    "bonfire",
+    "bookshelf",
+    "boulder",
+    "bramble",
+    "brimstone",
+    "broom",
+    "bucket",
+    "bugle",
+    "bullfrog",
+    "bunker",
+    "butterfly",
+    "button",
+    # C
+    "cabin",
+    "cactus",
+    "camel",
+    "candle",
+    "cannon",
+    "canyon",
+    "carpet",
+    "carrot",
+    "castle",
+    "caterpillar",
+    "cauldron",
+    "cellar",
+    "chariot",
+    "cherry",
+    "chestnut",
+    "chimney",
+    "chisel",
+    "cinnamon",
+    "clover",
+    "cobalt",
+    "cobweb",
+    "coconut",
+    "compass",
+    "condor",
+    "coral",
+    "cormorant",
+    "cradle",
+    "cricket",
+    "crocodile",
+    "crossbow",
+    "crystal",
+    "curtain",
+    "cypress",
+    # D
+    "dagger",
+    "dandelion",
+    "diamond",
+    "dinosaur",
+    "dolphin",
+    "donkey",
+    "doorbell",
+    "dormouse",
+    "dragonfly",
+    "drumstick",
+    "dungeon",
+    "dustpan",
+    # E
+    "eagle",
+    "earring",
+    "easel",
+    "eggplant",
+    "elephant",
+    "ember",
+    "emerald",
+    "envelope",
+    "ermine",
+    # F
+    "falcon",
+    "feather",
+    "fiddler",
+    "fig",
+    "finch",
+    "firefly",
+    "flamingo",
+    "flintlock",
+    "flounder",
+    "fortress",
+    "fossil",
+    "fountain",
+    "foxglove",
+    "furnace",
+    # G
+    "garlic",
+    "garnet",
+    "gazelle",
+    "gerbil",
+    "giraffe",
+    "glacier",
+    "goblet",
+    "goldfinch",
+    "gondola",
+    "gooseberry",
+    "gorilla",
+    "grapevine",
+    "grasshopper",
+    "gravel",
+    "grenade",
+    "grizzly",
+    "guitar",
+    "gutter",
+    # H
+    "hammock",
+    "hamster",
+    "harpoon",
+    "harpsichord",
+    "haystack",
+    "hedgehog",
+    "helmet",
+    "heron",
+    "hibiscus",
+    "horizon",
+    "hornet",
+    "horseshoe",
+    "hourglass",
+    "hummingbird",
+    # I
+    "ibex",
+    "iceberg",
+    "igloo",
+    "iguana",
+    "inkwell",
+    "ivory",
+    # J
+    "jackal",
+    "jackrabbit",
+    "jaguar",
+    "javelin",
+    "jellyfish",
+    "journal",
+    "juniper",
+    # K
+    "kangaroo",
+    "kayak",
+    "kennel",
+    "ketchup",
+    "kettle",
+    "kingfisher",
+    "knapsack",
+    "koala",
+    # L
+    "labyrinth",
+    "ladder",
+    "ladybug",
+    "lantern",
+    "lemon",
+    "lemur",
+    "leopard",
+    "lighthouse",
+    "lizard",
+    "lobster",
+    "locket",
+    "locust",
+    "lynx",
+    # M
+    "mackerel",
+    "magnet",
+    "mammoth",
+    "mandolin",
+    "mantis",
+    "maple",
+    "marble",
+    "marigold",
+    "meadow",
+    "meerkat",
+    "mirror",
+    "mitten",
+    "monocle",
+    "mongoose",
+    "mosquito",
+    "mushroom",
+    "mustard",
+    # N
+    "napkin",
+    "narwhal",
+    "nectar",
+    "necklace",
+    "newt",
+    "nightingale",
+    "nutmeg",
+    # O
+    "obelisk",
+    "obsidian",
+    "octopus",
+    "olive",
+    "onion",
+    "opal",
+    "orchid",
+    "osprey",
+    "ostrich",
+    "otter",
+    "overcoat",
+    "oyster",
+    # P
+    "palette",
+    "panther",
+    "parachute",
+    "parsley",
+    "parsnip",
+    "partridge",
+    "peacock",
+    "pebble",
+    "pelican",
+    "penguin",
+    "pepper",
+    "pheasant",
+    "pickaxe",
+    "pillow",
+    "pineapple",
+    "piranha",
+    "platypus",
+    "plumber",
+    "pomegranate",
+    "porcupine",
+    "pretzel",
+    "prism",
+    "puffin",
+    "pumpkin",
+    "pyramid",
+    # Q
+    "quarry",
+    "quartz",
+    "quiver",
+    # R
+    "rabbit",
+    "raccoon",
+    "radish",
+    "raisin",
+    "ratchet",
+    "raven",
+    "reindeer",
+    "rhinoceros",
+    "riddle",
+    "robin",
+    "rocket",
+    "rosemary",
+    "rudder",
+    # S
+    "saddle",
+    "saffron",
+    "salamander",
+    "salmon",
+    "sandcastle",
+    "sapphire",
+    "satchel",
+    "scarecrow",
+    "scepter",
+    "schooner",
+    "scorpion",
+    "seagull",
+    "seahorse",
+    "shamrock",
+    "skeleton",
+    "sparrow",
+    "sphinx",
+    "spinach",
+    "spyglass",
+    "squirrel",
+    "stallion",
+    "starfish",
+    "stingray",
+    "stork",
+    "sundial",
+    "sunflower",
+    "swallow",
+    "swordfish",
+    # T
+    "tambourine",
+    "tangerine",
+    "tapestry",
+    "telescope",
+    "termite",
+    "thimble",
+    "thistle",
+    "timber",
+    "tornado",
+    "tortoise",
+    "toucan",
+    "trident",
+    "trumpet",
+    "tulip",
+    "turret",
+    "turtle",
+    # U
+    "umbrella",
+    "unicorn",
+    "urchin",
+    # V
+    "vanilla",
+    "venom",
+    "velvet",
+    "viper",
+    "violin",
+    "volcano",
+    "vulture",
+    # W
+    "waffle",
+    "walnut",
+    "walrus",
+    "warbler",
+    "warthog",
+    "waterfall",
+    "weasel",
+    "whirlpool",
+    "willow",
+    "windmill",
+    "wolverine",
+    "wombat",
+    "woodpecker",
+    # X
+    "xylophone",
+    # Y
+    "yak",
+    "yardstick",
+    # Z
+    "zebra",
+    "zeppelin",
+    "zinnia",
+    # --- extra words to fill pool ---
+    "accordion",
+    "asparagus",
+    "barnyard",
+    "basilisk",
+    "binoculars",
+    "blackbird",
+    "blueberry",
+    "boomerang",
+    "bracelet",
+    "broccoli",
+    "buckwheat",
+    "bulldozer",
+    "candelabra",
+    "cardboard",
+    "carousel",
+    "catamaran",
+    "centipede",
+    "chandelier",
+    "corkscrew",
+    "cranberry",
+    "dalmatian",
+    "dirigible",
+    "doorstep",
+    "dumbbell",
+    "earthworm",
+    "eyelash",
+    "fishbowl",
+    "flagpole",
+    "footprint",
+    "frostbite",
+    "gadget",
+    "gallstone",
+    "gingerbread",
+    "groundhog",
+    "harmonica",
+    "hazelnut",
+    "holster",
+    "honeybee",
+    "hurricane",
+    "jackknife",
+    "jukebox",
+    "kaleidoscope",
+    "kettledrum",
+    "lamppost",
+    "laundry",
+    "lawnmower",
+    "licorice",
+    "limestone",
+    "mandarin",
+    "maypole",
+    "milkshake",
+    "mockingbird",
+    "moonstone",
+    "moustache",
+    "nectarine",
+    "nighthawk",
+    "oatmeal",
+    "orangutan",
+    "parakeet",
+    "pendulum",
+    "periscope",
+    "pitchfork",
+    "portrait",
+    "quicksand",
+    "raspberry",
+    "sailboat",
+    "sandpiper",
+    "saxophone",
+    "slingshot",
+    "snowflake",
+    "stopwatch",
+    "suitcase",
+    "terrarium",
+    "toadstool",
+    "tombstone",
+    "trapezoid",
+    "tumbleweed",
+    "turquoise",
+    "vineyard",
+    "whippoorwill",
+    "zucchini",
+    "alligator",
+    "blunderbuss",
+    "chinchilla",
+    "dragonboat",
+    "eucalyptus",
+    "fisherman",
+    "guacamole",
+    "handkerchief",
+    "jellybean",
+    "limousine",
+    "marshmallow",
+    "nightcrawler",
+    "peppermint",
+    "rattlesnake",
+    "silverware",
+    "thumbtack",
+    "wallpaper",
+    "windshield",
+    "yellowtail",
+    "cantaloupe",
+    "cauliflower",
 ]
 
-# Budget multipliers per epoch — epoch 1 is generous, later epochs
-# shrink the token budget to create compression pressure.
-EPOCH_BUDGET_MULTIPLIERS: list[float] = [1.0, 0.75, 0.5, 0.35, 0.25]
+# Sizes cycle 7..15 across 40 rounds.
+_ROUND_SIZES: list[int] = [7 + (i % 9) for i in range(40)]
 
-EPOCH_COUNT: int = len(EPOCH_BUDGET_MULTIPLIERS)
-
-# Five epochs, each a permutation of the 40 base lists.
-# Epoch 1 introduces lists in designed order (short first, then longer).
-# Epochs 2-5 shuffle so agents encounter lists unpredictably.
-_EPOCH_ORDERS: list[list[int]] = [
-    # Epoch 1: in order
-    list(range(40)),
-    # Epoch 2: shuffled
-    [
-        23,
-        7,
-        30,
-        15,
-        39,
-        1,
-        28,
-        14,
-        2,
-        36,
-        19,
-        5,
-        22,
-        37,
-        10,
-        26,
-        3,
-        31,
-        18,
-        8,
-        33,
-        12,
-        25,
-        0,
-        38,
-        16,
-        9,
-        20,
-        35,
-        4,
-        27,
-        11,
-        34,
-        6,
-        29,
-        17,
-        21,
-        32,
-        13,
-        24,
-    ],
-    # Epoch 3: shuffled
-    [
-        38,
-        4,
-        21,
-        16,
-        9,
-        33,
-        0,
-        27,
-        12,
-        35,
-        6,
-        29,
-        17,
-        24,
-        39,
-        2,
-        13,
-        30,
-        8,
-        25,
-        18,
-        37,
-        10,
-        3,
-        22,
-        31,
-        15,
-        36,
-        1,
-        20,
-        34,
-        7,
-        28,
-        11,
-        19,
-        26,
-        5,
-        32,
-        14,
-        23,
-    ],
-    # Epoch 4: shuffled
-    [
-        17,
-        32,
-        5,
-        28,
-        11,
-        20,
-        36,
-        1,
-        24,
-        39,
-        14,
-        23,
-        8,
-        35,
-        3,
-        30,
-        19,
-        6,
-        27,
-        13,
-        38,
-        0,
-        21,
-        16,
-        9,
-        33,
-        4,
-        29,
-        12,
-        25,
-        37,
-        2,
-        15,
-        34,
-        7,
-        22,
-        31,
-        10,
-        26,
-        18,
-    ],
-    # Epoch 5: shuffled
-    [
-        10,
-        35,
-        26,
-        3,
-        18,
-        31,
-        14,
-        39,
-        6,
-        21,
-        28,
-        13,
-        36,
-        9,
-        0,
-        25,
-        22,
-        7,
-        32,
-        17,
-        4,
-        29,
-        12,
-        37,
-        20,
-        15,
-        34,
-        1,
-        24,
-        11,
-        38,
-        5,
-        16,
-        27,
-        8,
-        33,
-        30,
-        19,
-        2,
-        23,
-    ],
-]
+# Total words needed across all 40 rounds.
+_TOTAL_WORDS_NEEDED: int = sum(_ROUND_SIZES)
 
 
-def get_word_lists_for_epoch(epoch: int) -> list[WordList]:
-    """Return the 40 word lists for a single epoch, numbered 1-40.
+def get_word_lists(seed: int) -> list[WordList]:
+    """Generate 40 word lists by shuffling the pool with a fixed seed.
 
-    ``epoch`` is 1-indexed (1 through 5).
+    Sizes cycle 7-15. The pool is shuffled once, then words are dealt
+    sequentially into each round's list. A second shuffle randomizes
+    the round order so list sizes are unpredictable.
     """
-    if epoch < 1 or epoch > EPOCH_COUNT:
-        raise ValueError(f"epoch must be between 1 and {EPOCH_COUNT}, got {epoch}")
-    epoch_index = epoch - 1
-    order = _EPOCH_ORDERS[epoch_index]
-    word_lists: list[WordList] = []
-    for pos, base_idx in enumerate(order):
-        base = _BASE_LISTS[base_idx]
-        word_lists.append(
+    if len(WORD_POOL) < _TOTAL_WORDS_NEEDED:
+        raise ValueError(
+            f"Word pool has {len(WORD_POOL)} words but {_TOTAL_WORDS_NEEDED} are needed"
+        )
+
+    rng = random.Random(seed)
+    pool = list(WORD_POOL)
+    rng.shuffle(pool)
+
+    # Deal words into lists of cycling sizes.
+    lists: list[WordList] = []
+    offset = 0
+    for i, size in enumerate(_ROUND_SIZES):
+        lists.append(
             WordList(
-                round_number=pos + 1,
-                items=list(base.items),
+                round_number=i + 1,
+                items=pool[offset : offset + size],
             )
         )
-    return word_lists
+        offset += size
+
+    # Shuffle round order so sizes are unpredictable, then renumber.
+    rng.shuffle(lists)
+    return [WordList(round_number=pos + 1, items=wl.items) for pos, wl in enumerate(lists)]

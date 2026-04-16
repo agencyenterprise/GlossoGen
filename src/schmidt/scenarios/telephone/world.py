@@ -1,9 +1,8 @@
 """World simulation for the telephone scenario.
 
 Tracks the Relayer's token usage on the relayer-receiver channel per round,
-validates answers submitted by the Receiver, enforces per-round token budgets
-with a fixed epoch multiplier, and stores per-round results for injection
-feedback.
+validates answers submitted by the Receiver, and enforces a constant per-round
+token budget.
 """
 
 import asyncio
@@ -16,7 +15,7 @@ from schmidt.runtime.scenario_world import (
     ScenarioWorld,
     WorldContext,
 )
-from schmidt.scenarios.telephone.word_lists import EPOCH_BUDGET_MULTIPLIERS, WordList
+from schmidt.scenarios.telephone.word_lists import WordList
 
 logger = logging.getLogger(__name__)
 
@@ -43,14 +42,12 @@ class TelephoneWorld(ScenarioWorld):
     """Monitors relayer token usage, enforces budgets, and validates receiver answers.
 
     Tracks cumulative token count for the Relayer on the relayer-receiver
-    channel. Each round has a token budget computed from the word list size,
-    the base tokens-per-item knob, and the epoch multiplier. If the Relayer
-    exceeds the budget, the round is marked as lost.
+    channel. Each round has a constant token budget. If the Relayer exceeds
+    the budget, the round is marked as lost.
     """
 
-    def __init__(self, base_tokens_per_item: int, epoch: int, word_lists: list[WordList]) -> None:
-        self._base_tokens_per_item = base_tokens_per_item
-        self._epoch_multiplier = EPOCH_BUDGET_MULTIPLIERS[epoch - 1]
+    def __init__(self, token_budget: int, word_lists: list[WordList]) -> None:
+        self._token_budget = token_budget
         self._word_lists = word_lists
         self._round_results: list[RoundResult] = []
         self._current_word_list: WordList | None = None
@@ -82,8 +79,9 @@ class TelephoneWorld(ScenarioWorld):
         return self._budget_exceeded
 
     def compute_budget(self, word_list: WordList) -> int:
-        """Compute the token budget for a word list using the fixed epoch multiplier."""
-        return int(len(word_list.items) * self._base_tokens_per_item * self._epoch_multiplier)
+        """Return the constant token budget (independent of word list size)."""
+        _ = word_list
+        return self._token_budget
 
     def finalize_round_sync(self, round_number: int) -> None:
         """Compute the previous round's result and reset state for a new round.

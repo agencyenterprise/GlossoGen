@@ -1,8 +1,6 @@
 """Configuration knobs for the telephone scenario.
 
-Controls epoch selection, round count, and the per-round token budget.
-Each epoch applies a fixed budget multiplier to create uniform compression
-pressure across all rounds.
+Controls the constant per-round token budget, round count, and word list seed.
 """
 
 from schmidt.scenarios.base_knobs import BaseKnobs
@@ -11,14 +9,13 @@ from schmidt.scenarios.base_knobs import BaseKnobs
 class TelephoneKnobs(BaseKnobs):
     """Configuration knobs for the telephone scenario.
 
-    ``epoch`` selects which epoch to run (1-indexed). Each epoch uses a
-    fixed budget multiplier so pressure is constant across all rounds.
+    ``token_budget`` is the constant token allowance per round. Word list
+    sizes vary (7-15 items) so some rounds fit within the budget and
+    others require compression.
     ``round_count`` controls how many rounds the telephone game runs.
-    ``base_tokens_per_item`` is the base token allowance per word-list
-    item before the epoch multiplier is applied. The per-round budget is
-    ``len(items) * base_tokens_per_item * epoch_multiplier``.
+    ``seed`` controls the random shuffle of the word pool into round lists.
     """
 
-    epoch: int
+    token_budget: int
     round_count: int
-    base_tokens_per_item: int
+    seed: int
