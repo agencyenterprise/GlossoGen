@@ -35,7 +35,6 @@ BASE_TOOL_NAMES: frozenset[str] = frozenset(
         "send_message",
         "list_channels",
         "get_channel_members",
-        "count_tokens",
     }
 )
 """Base communication tools available to all agents unconditionally.
@@ -360,27 +359,6 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
             }
             for mid in member_ids
         ]
-
-    @mcp.tool(
-        name="count_tokens",
-        description=(
-            "Count the number of tokens in a text string using your model's tokenizer. "
-            "Use this to check whether a message fits within a token budget before sending it. "
-            "This tool has a limited number of calls per round."
-        ),
-    )
-    async def count_tokens(ctx: ToolContext, text: str) -> str:
-        """Count tokens in the given text using the calling agent's tokenizer."""
-        session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
-        world = runtime.scenario.get_world()
-        remaining = world.on_count_tokens(agent_id=session.agent_id)
-        token_count = await runtime.count_tokens(
-            agent_id=session.agent_id,
-            text=text,
-        )
-        if remaining is not None:
-            return f"{token_count} tokens ({remaining} count_tokens calls remaining this round)"
-        return f"{token_count} tokens"
 
     # Register scenario-specific tools with an authorization guard.
     # Each executor is wrapped so that only agents whose allowlist

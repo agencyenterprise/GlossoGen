@@ -1,6 +1,6 @@
 {% if previous_result is not none %}
 --- PREVIOUS ROUND RESULT ---
-Round {{ round_number - 1 }}: {% if previous_result.budget_exceeded %}LOST (budget exceeded — {{ previous_result.relayer_token_cost }}/{{ previous_result.token_budget }} tokens){% elif previous_result.accuracy < 1.0 %}LOST ({{ previous_result.correct_count }}/{{ previous_result.total_count }} items correct, all must be correct){% else %}WON ({{ previous_result.relayer_token_cost }}/{{ previous_result.token_budget }} tokens){% endif %}
+Round {{ round_number - 1 }}: {% if previous_result.budget_exceeded %}LOST (budget exceeded — {{ previous_result.relayer_character_cost }}/{{ previous_result.character_budget }} characters){% elif previous_result.accuracy < 1.0 %}LOST ({{ previous_result.correct_count }}/{{ previous_result.total_count }} items correct, all must be correct){% else %}WON ({{ previous_result.relayer_character_cost }}/{{ previous_result.character_budget }} characters){% endif %}
 Accuracy: {{ previous_result.correct_count }}/{{ previous_result.total_count }} items correct ({{ (previous_result.accuracy * 100) | round(0) | int }}%)
 {% if not previous_result.answer_submitted %}
 WARNING: Receiver did not submit an answer last round.

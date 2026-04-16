@@ -77,7 +77,7 @@ class CompressionEvaluator(Evaluator):
     """Detects whether the Relayer developed compression strategies across rounds.
 
     Builds per-round transcripts from Relayer messages on the relayer-receiver
-    channel, then asks an LLM judge to identify compression techniques, token
+    channel, then asks an LLM judge to identify compression techniques, character
     reduction trends, and shared codebook emergence.
     """
 

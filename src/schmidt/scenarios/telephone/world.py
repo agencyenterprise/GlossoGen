@@ -1,8 +1,8 @@
 """World simulation for the telephone scenario.
 
-Tracks the Relayer's token usage on the relayer-receiver channel per round,
+Tracks the Relayer's character usage on the relayer-receiver channel per round,
 validates answers submitted by the Receiver, and enforces a constant per-round
-token budget.
+character budget.
 """
 
 import asyncio
@@ -32,34 +32,31 @@ class RoundResult(NamedTuple):
     correct_count: int
     total_count: int
     accuracy: float
-    relayer_token_cost: int
+    relayer_character_cost: int
     answer_submitted: bool
-    token_budget: int
+    character_budget: int
     budget_exceeded: bool
 
 
 class TelephoneWorld(ScenarioWorld):
-    """Monitors relayer token usage, enforces budgets, and validates receiver answers.
+    """Monitors relayer character usage, enforces budgets, and validates receiver answers.
 
-    Tracks cumulative token count for the Relayer on the relayer-receiver
-    channel. Each round has a constant token budget. If the Relayer exceeds
+    Tracks cumulative character count for the Relayer on the relayer-receiver
+    channel. Each round has a constant character budget. If the Relayer exceeds
     the budget, the round is marked as lost.
     """
 
     def __init__(
         self,
-        token_budget: int,
+        character_budget: int,
         word_lists: list[WordList],
-        count_tokens_limit_per_round: int,
     ) -> None:
-        self._token_budget = token_budget
+        self._character_budget = character_budget
         self._word_lists = word_lists
-        self._count_tokens_limit = count_tokens_limit_per_round
-        self._count_tokens_calls: dict[str, int] = {}
         self._round_results: list[RoundResult] = []
         self._current_word_list: WordList | None = None
-        self._current_relayer_tokens: int = 0
-        self._current_token_budget: int = 0
+        self._current_relayer_characters: int = 0
+        self._current_character_budget: int = 0
         self._budget_exceeded: bool = False
         self._answer_submitted: bool = False
         self._submitted_items: list[str] = []
@@ -82,13 +79,13 @@ class TelephoneWorld(ScenarioWorld):
 
     @property
     def budget_exceeded(self) -> bool:
-        """Whether the Relayer has exceeded the token budget this round."""
+        """Whether the Relayer has exceeded the character budget this round."""
         return self._budget_exceeded
 
     def compute_budget(self, word_list: WordList) -> int:
-        """Return the constant token budget (independent of word list size)."""
+        """Return the constant character budget (independent of word list size)."""
         _ = word_list
-        return self._token_budget
+        return self._character_budget
 
     def finalize_round_sync(self, round_number: int) -> None:
         """Compute the previous round's result and reset state for a new round.
@@ -116,21 +113,20 @@ class TelephoneWorld(ScenarioWorld):
                     correct_count=correct_count,
                     total_count=total_count,
                     accuracy=accuracy,
-                    relayer_token_cost=self._current_relayer_tokens,
+                    relayer_character_cost=self._current_relayer_characters,
                     answer_submitted=self._answer_submitted,
-                    token_budget=self._current_token_budget,
+                    character_budget=self._current_character_budget,
                     budget_exceeded=self._budget_exceeded,
                 )
             )
 
-        self._current_relayer_tokens = 0
+        self._current_relayer_characters = 0
         self._budget_exceeded = False
         self._answer_submitted = False
         self._submitted_items = []
-        self._count_tokens_calls = {}
         current_index = (round_number - 1) % len(self._word_lists)
         self._current_word_list = self._word_lists[current_index]
-        self._current_token_budget = self.compute_budget(
+        self._current_character_budget = self.compute_budget(
             word_list=self._current_word_list,
         )
 
@@ -159,11 +155,12 @@ class TelephoneWorld(ScenarioWorld):
 
         budget_status = ""
         if self._budget_exceeded:
-            budget_status = " ROUND LOST — token budget exceeded."
+            budget_status = " ROUND LOST — character budget exceeded."
 
         return (
             f"Answer submitted. {correct_count}/{total_count} items correct ({accuracy_pct}%). "
-            f"Relayer used {self._current_relayer_tokens}/{self._current_token_budget} tokens."
+            f"Relayer used {self._current_relayer_characters}"
+            f"/{self._current_character_budget} characters."
             f"{budget_status}"
         )
 
@@ -174,28 +171,16 @@ class TelephoneWorld(ScenarioWorld):
         text: str,
         token_count: int,
     ) -> None:
-        """Accumulate relayer tokens and check budget on the relayer-receiver channel."""
-        _ = text
+        """Accumulate relayer characters and check budget on the relayer-receiver channel."""
+        _ = token_count
         if agent_id == RELAYER_ID and channel_id == RELAYER_RECEIVER_CHANNEL_ID:
-            self._current_relayer_tokens += token_count
+            self._current_relayer_characters += len(text)
             if (
-                self._current_token_budget > 0
+                self._current_character_budget > 0
                 and not self._budget_exceeded
-                and self._current_relayer_tokens > self._current_token_budget
+                and self._current_relayer_characters > self._current_character_budget
             ):
                 self._budget_exceeded = True
-
-    def on_count_tokens(self, agent_id: str) -> int | None:
-        """Enforce per-round limit on count_tokens calls."""
-        used = self._count_tokens_calls.get(agent_id, 0)
-        remaining = self._count_tokens_limit - used
-        if remaining <= 0:
-            raise ValueError(
-                f"count_tokens limit reached ({self._count_tokens_limit} calls per round). "
-                "Send your best message or wait for the next round."
-            )
-        self._count_tokens_calls[agent_id] = used + 1
-        return remaining - 1
 
     async def run(self, context: WorldContext) -> None:
         """Process events. Budget enforcement is synchronous via on_message."""
