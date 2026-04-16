@@ -3,7 +3,7 @@
 Three agents form a chain: Sender receives a word list, transmits it to
 the Relayer, who compresses and forwards to the Receiver. The Receiver
 decodes and submits an answer. The Relayer receives per-round feedback
-on accuracy and token cost, incentivizing compression.
+on accuracy and character cost, incentivizing compression.
 """
 
 import logging
@@ -78,10 +78,10 @@ AGENT_INJECTION_TEMPLATES: dict[str, str] = {
 
 
 class TelephoneScenario(SimulationScenario):
-    """Scenario where a Relayer compresses word lists under token-cost pressure.
+    """Scenario where a Relayer compresses word lists under character-cost pressure.
 
     Three agents form a chain: Sender -> Relayer -> Receiver. The Relayer
-    receives feedback each round on accuracy and token cost, incentivizing
+    receives feedback each round on accuracy and character cost, incentivizing
     the development of compressed encoding strategies.
     """
 
@@ -111,9 +111,8 @@ class TelephoneScenario(SimulationScenario):
         self._renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
         self._word_lists: list[WordList] = get_word_lists(seed=knobs.seed)
         self._world = TelephoneWorld(
-            token_budget=knobs.token_budget,
+            character_budget=knobs.character_budget,
             word_lists=self._word_lists,
-            count_tokens_limit_per_round=knobs.count_tokens_limit_per_round,
         )
 
     @property
@@ -135,7 +134,7 @@ class TelephoneScenario(SimulationScenario):
             template_name="description.jinja",
             template_variables={
                 "round_count": self._knobs.round_count,
-                "token_budget": self._knobs.token_budget,
+                "character_budget": self._knobs.character_budget,
             },
         )
 
@@ -235,7 +234,7 @@ class TelephoneScenario(SimulationScenario):
 
         current_word_list_index = (round_number - 1) % len(self._word_lists)
         current_word_list = self._word_lists[current_word_list_index]
-        current_token_budget = self._world.compute_budget(
+        current_character_budget = self._world.compute_budget(
             word_list=current_word_list,
         )
 
@@ -245,7 +244,7 @@ class TelephoneScenario(SimulationScenario):
                 "round_number": round_number,
                 "previous_result": previous_result,
                 "current_word_list": current_word_list,
-                "current_token_budget": current_token_budget,
+                "current_character_budget": current_character_budget,
             },
         )
         if not rendered:
@@ -265,7 +264,7 @@ class TelephoneScenario(SimulationScenario):
     # --- World, MCP tools, timing ---
 
     def get_world(self) -> ScenarioWorld:
-        """Return the telephone world that tracks token usage and answers."""
+        """Return the telephone world that tracks character usage and answers."""
         return self._world
 
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:

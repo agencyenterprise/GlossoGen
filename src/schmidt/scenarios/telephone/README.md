@@ -1,6 +1,6 @@
 # Scenario: Telephone Game
 
-Three agents play a telephone game to test emergent compression in multi-agent communication. A Sender receives a word list and transmits it to a Relayer, who compresses and forwards it to a Receiver using as few tokens as possible. The Receiver decodes the message and submits an answer. Over 40 rounds (10 base lists repeated across 4 shuffled epochs), the Relayer receives feedback on accuracy and token cost, incentivizing the development of compressed encoding strategies.
+Three agents play a telephone game to test emergent compression in multi-agent communication. A Sender receives a word list and transmits it to a Relayer, who compresses and forwards it to a Receiver using as few characters as possible. The Receiver decodes the message and submits an answer. Over 40 rounds (10 base lists repeated across 4 shuffled epochs), the Relayer receives feedback on accuracy and character cost, incentivizing the development of compressed encoding strategies.
 
 ## Agents
 
@@ -10,7 +10,7 @@ Receives a word list via injection each round. Sends the full list clearly to th
 
 ### Relayer
 
-Reads the Sender's word list and forwards it to the Receiver. Every token sent to the Receiver counts as cost. The Relayer receives per-round feedback showing accuracy, token cost, and what the Receiver submitted vs what was expected. The goal is 100% accuracy with minimum tokens.
+Reads the Sender's word list and forwards it to the Receiver. Every character sent to the Receiver counts as cost. The Relayer receives per-round feedback showing accuracy, character cost, and what the Receiver submitted vs what was expected. The goal is 100% accuracy with minimum characters.
 
 ### Receiver
 
@@ -51,26 +51,27 @@ Ten base word lists range from 3 to 17 items, using a pool of 17 unique words. T
 
 Order-independent set matching. Each item in the original list is checked against the submission (case-insensitive, whitespace-stripped). Accuracy = correct items / total items.
 
-## Token Counting
+## Character Counting
 
-Only the Relayer's tokens on the `relayer_receiver` channel are counted as cost. The Sender's verbosity is not penalized — the Sender is supposed to provide complete information.
+Only the Relayer's characters on the `relayer_receiver` channel are counted as cost. The Sender's verbosity is not penalized — the Sender is supposed to provide complete information. Characters are counted as `len(text)` — each letter, space, and punctuation mark counts as one character.
 
 ## Feedback
 
 Each round injection includes feedback from the previous round:
 
-- **Sender**: Accuracy and relayer token cost
-- **Relayer**: Accuracy, token cost, expected vs submitted items, and encouragement to compress further (or fix accuracy if items were lost)
+- **Sender**: Accuracy and relayer character cost
+- **Relayer**: Accuracy, character cost, expected vs submitted items, and encouragement to compress further (or fix accuracy if items were lost)
 - **Receiver**: Accuracy, expected vs submitted items
 
 ## Evaluation Focus
 
-- **`compression`**: Did the Relayer develop novel encoding strategies? Did per-item token cost decrease over rounds? Did accuracy hold? Did a shared codebook emerge between Relayer and Receiver?
+- **`compression`**: Did the Relayer develop novel encoding strategies? Did per-item character cost decrease over rounds? Did accuracy hold? Did a shared codebook emerge between Relayer and Receiver?
 
 ## Knobs
 
 | Knob | Default | Description |
 |------|---------|-------------|
+| `character_budget` | `150` | Character allowance per round |
 | `max_round_duration_seconds` | `180` | Wall-clock timeout per round |
 | `round_count` | `40` | Number of rounds to play |
 | `model_overrides` | `{}` | Per-agent model/provider overrides |
@@ -79,6 +80,7 @@ Each round injection includes feedback from the previous round:
 
 ```json
 {
+  "character_budget": 150,
   "max_round_duration_seconds": 180,
   "round_count": 40,
   "model_overrides": {}

@@ -1,10 +1,10 @@
 You are the Relayer in a telephone game. Your job is to receive a list of items from the Sender and relay them to the Receiver.
 
-CRITICAL CONSTRAINT: Each round has a token budget. If your message to the Receiver exceeds the budget, the round is LOST. Your goal is to transmit the information while staying within the token budget.
+CRITICAL CONSTRAINT: Each round has a character budget. If your message to the Receiver exceeds the budget, the round is LOST. Your goal is to transmit the information while staying within the character budget. You can count characters yourself using len() logic — each letter, space, and punctuation mark counts as one character.
 
 You will receive feedback after each round showing:
 - Whether the round was WON or LOST
-- How many tokens you used vs the budget
+- How many characters you used vs the budget
 - Whether the Receiver got the items correct
 
 You and the Receiver share the same conversation context, so anything you establish in one round persists into the next.
@@ -12,5 +12,4 @@ You and the Receiver share the same conversation context, so anything you establ
 You have access to the following communication channels. Use the exact channel_id when sending messages:
 {% for channel in channels %}- "{{ channel.display_name }}" (channel_id: {{ channel.channel_id }})
 {% endfor %}
-don't forget, the message sent must not exceed the tokens budget for this round.
-Use the count_tokens tool to check your message length before sending. This uses the exact same tokenizer that scores your messages, so you can verify you are within budget.
+Remember: the message sent must not exceed the character budget for this round. Count your characters carefully before sending.

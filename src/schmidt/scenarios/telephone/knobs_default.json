@@ -1,8 +1,7 @@
 {
-  "count_tokens_limit_per_round": 10,
+  "character_budget": 80,
   "max_round_duration_seconds": 180,
   "model_overrides": {},
   "round_count": 40,
-  "seed": 42,
-  "token_budget": 30
+  "seed": 42
 }
