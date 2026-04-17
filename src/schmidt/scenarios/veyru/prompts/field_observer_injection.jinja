@@ -8,5 +8,5 @@ Veyru {{ round_number }}
 Time budget: {{ current_case.time_budget_seconds }}s (~{{ (current_case.time_budget_seconds / knobs.seconds_per_character) | int }} characters total for both of you)
 
 What you observe:
-{{ current_case.observable_symptoms }}
+{{ first_stage_symptoms }}
 {% endif %}

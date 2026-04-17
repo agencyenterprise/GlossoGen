@@ -213,8 +213,14 @@ async def resolve_run(runs_dir: Path, run_id: str) -> ResolvedRun:
 
 
 def _timestamp_from_dir(dir_name: str) -> datetime:
-    """Derive a UTC timestamp from a directory name that is a unix epoch."""
-    return datetime.fromtimestamp(int(dir_name), tz=UTC)
+    """Derive a UTC timestamp from a directory name that is a unix epoch.
+
+    Directory names may have a deduplication suffix (e.g. ``1776443092_2``)
+    when multiple runs start in the same second. Only the part before the
+    first underscore is the actual epoch.
+    """
+    epoch_str = dir_name.split("_")[0]
+    return datetime.fromtimestamp(int(epoch_str), tz=UTC)
 
 
 def _read_labels(run_dir: Path) -> list[str]:
