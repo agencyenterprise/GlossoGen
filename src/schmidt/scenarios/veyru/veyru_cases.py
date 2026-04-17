@@ -3,8 +3,7 @@
 Defines 14 failure motifs (matching the specialist's training) and generates
 unique cases per round by combining motifs with seed-based randomisation.
 Each round gets 1-3 motifs and a random location, producing singles and
-composites with ordered stabilization procedures. A constant budget
-multiplier scales all base time budgets uniformly.
+composites with ordered stabilization procedures.
 """
 
 import random
@@ -345,13 +344,11 @@ def _build_critical_actions(motifs: list[FailureMotif]) -> str:
 def get_cases(
     seed: int,
     round_count: int,
-    budget_multiplier: float,
 ) -> list[VeyruCase]:
     """Generate unique failure cases for each round via seed-based selection.
 
     Each round gets 1-3 failure motifs drawn from the 14-motif pool, a random
-    location, and combined symptoms and procedures. The constant
-    ``budget_multiplier`` scales every base time budget uniformly.
+    location, and combined symptoms and procedures.
     """
     rng = random.Random(seed)
     pool_size = len(_FAILURE_MOTIFS)
@@ -380,9 +377,7 @@ def get_cases(
                     location=location,
                 ),
                 critical_actions=_build_critical_actions(motifs=selected),
-                time_budget_seconds=int(
-                    sum(m.base_time_budget_seconds for m in selected) * budget_multiplier
-                ),
+                time_budget_seconds=int(sum(m.base_time_budget_seconds for m in selected)),
             )
         )
 

@@ -206,7 +206,7 @@ class VeyruWorld(ScenarioWorld):
         budget = self._current_case.time_budget_seconds
 
         if not self._veyru_alive and "collapsed" not in self._notified_thresholds:
-            self._notified_thresholds.add("collapsed")
+            self._notified_thresholds.update(["collapsed", "critical", "warning"])
             await context.send_update(
                 text=(
                     f"VEYRU HAS COLLAPSED. "
@@ -218,18 +218,14 @@ class VeyruWorld(ScenarioWorld):
         elif self._veyru_stabilized:
             return
         elif time_elapsed > budget * 0.75 and "critical" not in self._notified_thresholds:
-            self._notified_thresholds.add("critical")
+            self._notified_thresholds.update(["critical", "warning"])
             remaining = budget - time_elapsed
             await context.send_update(
-                text=(
-                    f"CRITICAL: Veyru destabilizing rapidly. " f"{remaining:.0f} seconds remaining."
-                ),
+                text=(f"CRITICAL: Veyru destabilizing rapidly. {remaining:.0f} seconds remaining."),
             )
         elif time_elapsed > budget * 0.5 and "warning" not in self._notified_thresholds:
             self._notified_thresholds.add("warning")
             remaining = budget - time_elapsed
             await context.send_update(
-                text=(
-                    f"WARNING: Veyru condition worsening. " f"{remaining:.0f} seconds remaining."
-                ),
+                text=(f"WARNING: Veyru condition worsening. {remaining:.0f} seconds remaining."),
             )
