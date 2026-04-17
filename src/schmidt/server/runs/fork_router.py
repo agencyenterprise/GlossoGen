@@ -17,10 +17,11 @@ from fastapi import APIRouter, HTTPException, Request
 
 from schmidt.evaluation.log_reader import load_events
 from schmidt.message_rewind import build_rewind_state
+from schmidt.models.event import SimulationStarted
 from schmidt.run_config_validation import validate_run_config
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.scenarios import SCENARIO_REGISTRY
-from schmidt.server.runs.discovery import discover_runs
+from schmidt.server.runs.discovery import resolve_run
 from schmidt.server.runs.models import ForkRequest, ForkResponse
 from schmidt.token_pricing import list_providers
 
@@ -53,14 +54,13 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
     background subprocess with ``--resume``.
     """
     runs_dir: Path = request.app.state.runs_dir
-    summaries = await discover_runs(runs_dir=runs_dir)
-
-    matching = [s for s in summaries if s.run_id == run_id]
-    if not matching:
+    try:
+        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    source_run_dir = Path(matching[0].run_dir)
-    scenario_name = matching[0].scenario_name
+    source_run_dir = resolved.run_dir
+    scenario_name = resolved.scenario_name
     message_edits = {edit.message_id: edit.new_text for edit in body.message_edits}
 
     if body.provider not in list_providers():
@@ -116,7 +116,10 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
 
     # Build config file from source scenario config + optional knobs overrides.
     scenario_cls = SCENARIO_REGISTRY[scenario_name]
-    source_scenario_config = dict(matching[0].scenario_config)
+    first_event = events[0]
+    if not isinstance(first_event, SimulationStarted):
+        raise HTTPException(status_code=500, detail="First event is not SimulationStarted")
+    source_scenario_config = dict(first_event.scenario_config)
     merged_scenario_config = dict(source_scenario_config)
     if body.knobs is not None:
         merged_scenario_config.update(body.knobs)

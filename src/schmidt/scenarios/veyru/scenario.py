@@ -1,9 +1,9 @@
 """Veyru stabilization simulation scenario.
 
 Two agents — a field observer and a Veyru specialist — communicate over a
-single comm link to diagnose and stabilize failing Veyru entities. Every word
-sent costs simulated seconds; Veyru entities collapse when total communication
-time exceeds their time budget.
+single comm link to diagnose and stabilize failing Veyru entities. Every
+character sent costs simulated seconds; Veyru entities collapse when total
+communication time exceeds their time budget.
 """
 
 import logging
@@ -21,10 +21,10 @@ from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.veyru.evaluation import LanguageEmergenceEvaluator
+from schmidt.scenarios.veyru.evaluation import LanguageEmergenceEvaluator, RoundSuccessEvaluator
 from schmidt.scenarios.veyru.knobs import VeyruKnobs
 from schmidt.scenarios.veyru.stabilization_judge import judge_stabilization
-from schmidt.scenarios.veyru.veyru_cases import VeyruCase, get_cases_for_epoch
+from schmidt.scenarios.veyru.veyru_cases import VeyruCase, get_cases
 from schmidt.scenarios.veyru.world import VeyruOutcome, VeyruWorld
 from schmidt.template_renderer import TemplateRenderer
 
@@ -44,11 +44,16 @@ PROMPTS_DIR = Path(__file__).parent / "prompts"
 FIELD_OBSERVER_ID = "field_observer"
 SPECIALIST_ID = "specialist"
 LINK_CHANNEL_ID = "link"
+POSTMORTEM_CHANNEL_ID = "postmortem"
 
 CHANNEL_DISPLAY_NAMES: dict[str, dict[str, str]] = {
     LINK_CHANNEL_ID: {
         FIELD_OBSERVER_ID: "comm link",
         SPECIALIST_ID: "comm link",
+    },
+    POSTMORTEM_CHANNEL_ID: {
+        FIELD_OBSERVER_ID: "team discussion",
+        SPECIALIST_ID: "team discussion",
     },
 }
 
@@ -72,8 +77,8 @@ AGENT_INJECTION_TEMPLATES: dict[str, str] = {
 class VeyruScenario(SimulationScenario):
     """Simulation scenario where communication speed determines Veyru survival.
 
-    Two agents communicate over a single comm link. Every word costs
-    simulated seconds. A live world simulation monitors token usage and
+    Two agents communicate over a single comm link. Every character costs
+    simulated seconds. A live world simulation monitors character usage and
     sends Veyru status updates when thresholds are crossed.
     """
 
@@ -100,9 +105,13 @@ class VeyruScenario(SimulationScenario):
     def __init__(self, knobs: VeyruKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
-        self._veyru_cases: list[VeyruCase] = get_cases_for_epoch(epoch=knobs.epoch)
+        self._veyru_cases: list[VeyruCase] = get_cases(
+            seed=knobs.seed,
+            round_count=knobs.round_count,
+            budget_multiplier=knobs.budget_multiplier,
+        )
         self._world = VeyruWorld(
-            seconds_per_token=knobs.seconds_per_token,
+            seconds_per_character=knobs.seconds_per_character,
             veyru_cases=self._veyru_cases,
         )
         self._judge_provider = create_provider(
@@ -114,7 +123,7 @@ class VeyruScenario(SimulationScenario):
 
     @property
     def veyru_cases(self) -> list[VeyruCase]:
-        """Return the Veyru cases for the selected epoch."""
+        """Return the Veyru cases for this simulation."""
         return self._veyru_cases
 
     def name(self) -> str:
@@ -130,7 +139,8 @@ class VeyruScenario(SimulationScenario):
         return self._renderer.render(
             template_name="description.jinja",
             template_variables={
-                "seconds_per_token": self._knobs.seconds_per_token,
+                "seconds_per_character": self._knobs.seconds_per_character,
+                "budget_multiplier": self._knobs.budget_multiplier,
                 "round_count": self._knobs.round_count,
                 "veyru_cases": self._veyru_cases,
             },
@@ -148,18 +158,28 @@ class VeyruScenario(SimulationScenario):
             for cid in channel_ids
         ]
 
+    def _build_channel_ids(self, base_channel_ids: list[str]) -> list[str]:
+        """Append the postmortem channel when postmortem is enabled."""
+        if self._knobs.postmortem_enabled:
+            return base_channel_ids + [POSTMORTEM_CHANNEL_ID]
+        return list(base_channel_ids)
+
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """Return agent configurations for the field observer and specialist."""
         agent_defs: list[AgentDef] = [
             AgentDef(
                 agent_id=FIELD_OBSERVER_ID,
                 role_name="Field Observer",
-                channel_ids=[LINK_CHANNEL_ID],
+                channel_ids=self._build_channel_ids(
+                    base_channel_ids=[LINK_CHANNEL_ID],
+                ),
             ),
             AgentDef(
                 agent_id=SPECIALIST_ID,
                 role_name="Specialist",
-                channel_ids=[LINK_CHANNEL_ID],
+                channel_ids=self._build_channel_ids(
+                    base_channel_ids=[LINK_CHANNEL_ID],
+                ),
             ),
         ]
 
@@ -181,6 +201,7 @@ class VeyruScenario(SimulationScenario):
                                 agent_id=d.agent_id, channel_ids=d.channel_ids
                             ),
                             "knobs": self._knobs,
+                            "postmortem_enabled": self._knobs.postmortem_enabled,
                         },
                     ),
                     channel_ids=d.channel_ids,
@@ -193,14 +214,23 @@ class VeyruScenario(SimulationScenario):
         return agents
 
     def get_channels(self) -> list[Channel]:
-        """Return the single comm link channel."""
-        return [
+        """Return communication channels including optional postmortem channel."""
+        channels: list[Channel] = [
             Channel(
                 channel_id=LINK_CHANNEL_ID,
                 name="link",
                 member_agent_ids=[FIELD_OBSERVER_ID, SPECIALIST_ID],
             ),
         ]
+        if self._knobs.postmortem_enabled:
+            channels.append(
+                Channel(
+                    channel_id=POSTMORTEM_CHANNEL_ID,
+                    name="postmortem",
+                    member_agent_ids=[FIELD_OBSERVER_ID, SPECIALIST_ID],
+                )
+            )
+        return channels
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
         """Return the display name for a channel as seen by a specific agent."""
@@ -242,11 +272,59 @@ class VeyruScenario(SimulationScenario):
         )
         return rendered
 
+    def get_postmortem_injection(self, round_number: int, agent_id: str) -> str | None:
+        """Return postmortem injection when postmortem is enabled, None otherwise."""
+        if not self._knobs.postmortem_enabled:
+            return None
+
+        outcome = self._world.compute_outcome_if_needed(round_number=round_number)
+
+        rendered = self._renderer.render(
+            template_name="postmortem_injection.jinja",
+            template_variables={
+                "round_number": round_number,
+                "previous_outcome": outcome,
+            },
+        )
+        if not rendered:
+            return None
+        logger.debug(
+            "Postmortem injection for agent %s at round %d: %d chars",
+            agent_id,
+            round_number,
+            len(rendered),
+        )
+        return rendered
+
+    def get_max_postmortem_duration_seconds(self) -> float:
+        """Return the configured postmortem duration from knobs."""
+        return self._knobs.postmortem_duration_seconds
+
+    def on_postmortem_started(self, round_number: int) -> None:
+        """Unlock the postmortem channel for discussion."""
+        _ = round_number
+        self._world.enter_postmortem()
+
     def on_round_advanced(self, round_number: int) -> None:
         """Finalize previous Veyru outcome and prepare the next case."""
+        self._world.exit_postmortem()
         self._world.finalize_round_sync(round_number=round_number)
 
+    def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
+        """Block messages to the postmortem channel outside the discussion phase."""
+        _ = agent_id
+        if channel_id == POSTMORTEM_CHANNEL_ID and not self._world.in_postmortem:
+            return (
+                "The discussion channel is only available during the post-round "
+                "discussion phase. Wait for the discussion phase to begin."
+            )
+        return None
+
     # --- World, MCP tools, timing ---
+
+    def get_primary_channel_id(self) -> str:
+        """Return the comm link channel where budget constraints apply."""
+        return LINK_CHANNEL_ID
 
     def get_world(self) -> ScenarioWorld:
         """Return the Veyru world that monitors entity status."""
@@ -308,12 +386,15 @@ class VeyruScenario(SimulationScenario):
     def get_available_evaluator_names(cls) -> list[str]:
         """Return generic and Veyru-specific evaluator names."""
         generic = super().get_available_evaluator_names()
-        specific = [LanguageEmergenceEvaluator.name]
+        specific = [LanguageEmergenceEvaluator.name, RoundSuccessEvaluator.name]
         return sorted(set(generic + specific))
 
     def _get_evaluators(self) -> dict[str, EvaluatorFactory]:
         """Return Veyru-specific evaluators."""
-        return {LanguageEmergenceEvaluator.name: LanguageEmergenceEvaluator}
+        return {
+            LanguageEmergenceEvaluator.name: LanguageEmergenceEvaluator,
+            RoundSuccessEvaluator.name: RoundSuccessEvaluator,
+        }
 
     async def run_evaluation(
         self,

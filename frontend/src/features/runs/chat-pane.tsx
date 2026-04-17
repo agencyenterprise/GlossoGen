@@ -457,9 +457,9 @@ export function ChatPane({
                               ) : null}
                               {!entry.is_reasoning &&
                               !entry.is_tool_use &&
-                              entry.token_count > 0 ? (
+                              entry.character_count > 0 ? (
                                 <span className="mt-0.5 block text-[10px] text-muted-foreground/60">
-                                  {entry.token_count.toLocaleString()} tokens
+                                  {entry.character_count.toLocaleString()} characters
                                 </span>
                               ) : null}
                               {!entry.is_reasoning && !entry.is_tool_use ? (

@@ -1,9 +1,12 @@
 {
-  "epoch": 1,
+  "budget_multiplier": 0.5,
+  "judge_model": "claude-haiku-4-5-20251001",
+  "judge_provider": "anthropic",
   "max_round_duration_seconds": 300,
   "model_overrides": {},
+  "postmortem_duration_seconds": 120,
+  "postmortem_enabled": true,
   "round_count": 48,
-  "seconds_per_token": 2.0,
-  "judge_model": "claude-haiku-4-5-20251001",
-  "judge_provider": "anthropic"
+  "seconds_per_character": 0.3,
+  "seed": 42
 }

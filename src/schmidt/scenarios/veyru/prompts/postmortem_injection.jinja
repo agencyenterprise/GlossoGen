@@ -1,0 +1,6 @@
+--- ROUND {{ round_number }} DISCUSSION PHASE ---
+{% if previous_outcome is not none %}
+Result: {% if previous_outcome.stabilized %}STABILIZED ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s of {{ previous_outcome.time_budget_seconds }}s budget){% else %}COLLAPSED ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s, budget was {{ previous_outcome.time_budget_seconds }}s){% endif %}
+Failure: {{ previous_outcome.failure_name }}
+{% endif %}
+The discussion channel is now open. Both agents can talk in the "team discussion" channel (channel_id: postmortem).

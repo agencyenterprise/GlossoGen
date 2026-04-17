@@ -80,7 +80,7 @@ Harmonic Split:
 
 Thermal Bleed:
 - Symptoms: the Veyru is very hot all over but dim, the hum is a low rumble instead of a tone, surfaces feel rough or gritty, light has a reddish tint
-- Fix: submerge the Veyru in cool water for 15 seconds (or wrap in a wet cloth if water is unavailable). Remove and immediately apply sustained pressure to all six faces for 10 seconds. The heat converts back to wave-intention energy. If the reddish tint persists, repeat the cooling cycle.
+- Fix: wrap the Veyru in a wet cloth for 15 seconds to cool it. Remove and immediately apply sustained pressure to all six faces for 10 seconds. The heat converts back to wave-intention energy. If the reddish tint persists, repeat the cooling cycle.
 
 Core Void:
 - Symptoms: faces glow normally at the surface but the Veyru feels hollow when tapped (sounds empty), light does not penetrate — holding it up to a light source shows a dark center, the hum sounds thin and surface-level
@@ -88,13 +88,18 @@ Core Void:
 
 For combination failures, address each component in order. The general priority is: seal leaks first, then adjust intensity, then fix alignment/drift/echo. Draining echo before correcting drift prevents overload. Boosting intensity before alignment reset ensures sufficient energy for the reset to hold.
 
-CRITICAL RULE — EVERY WORD COSTS TIME:
-Every word sent over the link costs {{ knobs.seconds_per_token }} seconds of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the technician) exceeds the Veyru's time budget, the Veyru collapses permanently.
+CRITICAL RULE — EVERY CHARACTER COSTS TIME:
+Every character sent over the link costs {{ knobs.seconds_per_character }} seconds of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the technician) exceeds the Veyru's time budget, the Veyru collapses permanently.
 
 STABILIZATION:
 Give the technician clear physical instructions. They will execute them using the stabilize_veyru tool. If the action is correct, the Veyru is stabilized. If not, they can try again. The tool call itself does not cost time — only messages on the comm link do.
 
-You will be told each Veyru's time budget. Budgets shrink over time.
+You will be told each Veyru's time budget. Budget pressure is constant across all rounds.
+{% if postmortem_enabled %}
+
+DISCUSSION PHASE:
+After each round, there is a discussion phase where both you and the technician can talk in the "team discussion" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.
+{% endif %}
 
 You have access to the following communication channels. Use the exact channel_id when sending messages:
 {% for channel in channels %}- "{{ channel.display_name }}" (channel_id: {{ channel.channel_id }})
