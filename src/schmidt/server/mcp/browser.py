@@ -349,6 +349,7 @@ async def _tool_get_run(
             debug_logs=detail.debug_logs,
             evaluation=detail.evaluation,
             evaluation_in_progress=detail.evaluation_in_progress,
+            has_eval_log_file=detail.has_eval_log_file,
             fork_source=detail.fork_source,
             labels=detail.labels,
             note=detail.note,
