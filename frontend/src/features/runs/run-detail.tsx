@@ -361,7 +361,7 @@ export function RunDetail({ runId }: { runId: string }) {
   const evaluation = restData.evaluation;
   const evaluationInProgress = restData.evaluation_in_progress || evalJustLaunched;
   const hasLogs = allDebugLogs.length > 0;
-  const hasEvalLogs = evaluationInProgress || evaluation !== null;
+  const hasEvalLogs = evaluationInProgress || evaluation !== null || restData.has_eval_log_file;
   const activeAgent = allAgents.find(a => a.agent_id === selectedAgent);
   const activeAgentColor = selectedAgent ? agentColorMap.get(selectedAgent) : undefined;
   const forkEnabled =

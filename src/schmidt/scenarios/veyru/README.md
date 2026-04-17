@@ -81,11 +81,10 @@ Cases are generated procedurally using a seed for reproducibility. Each round ge
 
 Communication cost is tracked per round on the comm link:
 
-1. Each character in a `send_message` call costs `seconds_per_character` simulated seconds (default: 0.3)
+1. Each character in a `send_message` call costs `seconds_per_character` simulated seconds (default: 0.6)
 2. Both agents' messages count toward the shared budget
-3. At 50% of budget: warning notification ("condition worsening")
-4. At 75% of budget: critical notification ("destabilizing rapidly")
-5. At 100%+ of budget: Veyru collapses permanently
+3. At 75% of budget: critical notification ("destabilizing rapidly")
+4. At 100%+ of budget: Veyru collapses permanently
 
 Collapse feedback in the next round's injection shows character count and time used vs budget, pressuring agents to use fewer characters.
 
@@ -111,7 +110,7 @@ Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only Eng
 | `seed` | `42` | Controls case shuffling and motif selection |
 | `round_count` | `48` | Number of rounds |
 | `postmortem_enabled` | `true` | Whether the discussion phase is active |
-| `postmortem_duration_seconds` | `120` | Time limit for the discussion phase |
+| `postmortem_duration_seconds` | `120` | Time limit for the discussion phase (inherited from base, only relevant when postmortem is enabled) |
 | `judge_model` | `claude-haiku-4-5-20251001` | LLM for stabilization action judgment |
 | `judge_provider` | `anthropic` | Provider for the judge model |
 | `max_round_duration_seconds` | `300` | Wall-clock timeout per round |
@@ -125,7 +124,6 @@ Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only Eng
   "judge_provider": "anthropic",
   "max_round_duration_seconds": 300,
   "model_overrides": {},
-  "postmortem_duration_seconds": 120,
   "postmortem_enabled": true,
   "round_count": 48,
   "seconds_per_character": 0.6,

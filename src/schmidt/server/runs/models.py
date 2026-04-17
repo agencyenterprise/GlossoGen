@@ -172,6 +172,7 @@ class RunDetailResponse(BaseModel):
     debug_logs: list[DebugLogEntry]
     evaluation: EvalReportResponse | None
     evaluation_in_progress: bool
+    has_eval_log_file: bool
     fork_source: ForkSource | None
     labels: list[str]
     note: str | None

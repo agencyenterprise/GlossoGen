@@ -1705,6 +1705,10 @@
             "type": "boolean",
             "title": "Evaluation In Progress"
           },
+          "has_eval_log_file": {
+            "type": "boolean",
+            "title": "Has Eval Log File"
+          },
           "fork_source": {
             "anyOf": [
               {
@@ -1754,6 +1758,7 @@
           "debug_logs",
           "evaluation",
           "evaluation_in_progress",
+          "has_eval_log_file",
           "fork_source",
           "labels",
           "note"

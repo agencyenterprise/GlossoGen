@@ -198,7 +198,13 @@ class VeyruWorld(ScenarioWorld):
             return
 
     async def _send_threshold_notifications(self, context: WorldContext) -> None:
-        """Send Veyru status notifications for any newly crossed thresholds."""
+        """Send Veyru status notifications when critical thresholds are crossed.
+
+        Only two notification levels: CRITICAL at 75% budget used, and
+        COLLAPSED at 100%. A single CRITICAL notification per round avoids
+        noisy bursts where multiple threshold alerts arrive in the same
+        agent notification batch.
+        """
         if self._current_case is None:
             return
 
@@ -206,7 +212,7 @@ class VeyruWorld(ScenarioWorld):
         budget = self._current_case.time_budget_seconds
 
         if not self._veyru_alive and "collapsed" not in self._notified_thresholds:
-            self._notified_thresholds.update(["collapsed", "critical", "warning"])
+            self._notified_thresholds.update(["collapsed", "critical"])
             await context.send_update(
                 text=(
                     f"VEYRU HAS COLLAPSED. "
@@ -218,14 +224,8 @@ class VeyruWorld(ScenarioWorld):
         elif self._veyru_stabilized:
             return
         elif time_elapsed > budget * 0.75 and "critical" not in self._notified_thresholds:
-            self._notified_thresholds.update(["critical", "warning"])
+            self._notified_thresholds.add("critical")
             remaining = budget - time_elapsed
             await context.send_update(
                 text=(f"CRITICAL: Veyru destabilizing rapidly. {remaining:.0f} seconds remaining."),
-            )
-        elif time_elapsed > budget * 0.5 and "warning" not in self._notified_thresholds:
-            self._notified_thresholds.add("warning")
-            remaining = budget - time_elapsed
-            await context.send_update(
-                text=(f"WARNING: Veyru condition worsening. {remaining:.0f} seconds remaining."),
             )

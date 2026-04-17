@@ -14,15 +14,13 @@ class VeyruKnobs(BaseKnobs):
     character costs when agents communicate — higher values mean tighter
     budgets. ``seed`` controls the random shuffle of failure motifs into
     round cases. ``postmortem_enabled`` controls whether a shared discussion
-    phase follows each round. ``postmortem_duration_seconds`` sets the time
-    limit for the discussion phase. ``judge_model`` and ``judge_provider``
-    specify the LLM used to evaluate whether stabilization actions match the
-    Veyru's needs.
+    phase follows each round. ``judge_model`` and ``judge_provider`` specify
+    the LLM used to evaluate whether stabilization actions match the Veyru's
+    needs.
     """
 
     judge_model: str
     judge_provider: str
-    postmortem_duration_seconds: float
     postmortem_enabled: bool
     round_count: int
     seconds_per_character: float

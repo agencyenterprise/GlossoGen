@@ -312,6 +312,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     evaluation = await _load_evaluation_report(report_path=report_path)
     eval_manifest = read_eval_manifest(run_dir=run_dir)
     evaluation_in_progress = eval_manifest is not None
+    has_eval_log_file = (run_dir / "eval_stdout.log").exists()
 
     debug_log_path = log_path.with_name(f"{scenario_name}_debug.jsonl")
     debug_logs = await _load_debug_logs(debug_log_path=debug_log_path)
@@ -344,6 +345,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         debug_logs=debug_logs,
         evaluation=evaluation,
         evaluation_in_progress=evaluation_in_progress,
+        has_eval_log_file=has_eval_log_file,
         fork_source=fork_source,
         labels=labels,
         note=note,

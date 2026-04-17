@@ -2,7 +2,6 @@
   "character_budget": 80,
   "max_round_duration_seconds": 420,
   "model_overrides": {},
-  "postmortem_duration_seconds": 120,
   "postmortem_enabled": true,
   "round_count": 40,
   "seed": 42
