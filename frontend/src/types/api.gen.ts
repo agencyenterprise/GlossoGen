@@ -828,6 +828,8 @@ export interface components {
             evaluation: components["schemas"]["EvalReportResponse"] | null;
             /** Evaluation In Progress */
             evaluation_in_progress: boolean;
+            /** Has Eval Log File */
+            has_eval_log_file: boolean;
             fork_source: components["schemas"]["ForkSource"] | null;
             /** Labels */
             labels: string[];
