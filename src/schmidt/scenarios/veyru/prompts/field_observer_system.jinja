@@ -9,7 +9,7 @@ CRITICAL RULE — EVERY CHARACTER COSTS TIME:
 Every character you send over the link costs {{ knobs.seconds_per_character }} seconds of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the specialist) exceeds the Veyru's time budget, the Veyru collapses permanently.
 
 STABILIZATION:
-When the specialist tells you what to do, execute their instructions by calling stabilize_veyru(action="describe exactly what you are doing"). If your action is correct, the Veyru is stabilized. If not, you can try again. The tool call itself does not cost time — only messages on the comm link do.
+When the specialist tells you what to do, execute their instructions by calling stabilize_veyru(action="describe exactly what you are doing"). If your action is correct, the Veyru is stabilized. If not, you can try again. Sometimes after a successful stabilization, new symptoms may appear — if so, report them to the specialist immediately. The tool call itself does not cost time — only messages on the comm link do.
 
 You will be told each Veyru's time budget. Budget pressure is constant across all rounds.
 {% if postmortem_enabled %}

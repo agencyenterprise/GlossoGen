@@ -17,11 +17,18 @@ from schmidt.runtime.scenario_world import (
     ScenarioWorld,
     WorldContext,
 )
-from schmidt.scenarios.veyru.veyru_cases import VeyruCase
+from schmidt.scenarios.veyru.veyru_cases import VeyruCase, VeyruStage
 
 logger = logging.getLogger(__name__)
 
 POSTMORTEM_CHANNEL_ID = "postmortem"
+
+
+class StageOutcome(NamedTuple):
+    """Result of a single stage within a composite case."""
+
+    motif_name: str
+    stabilized: bool
 
 
 class VeyruOutcome(NamedTuple):
@@ -33,6 +40,9 @@ class VeyruOutcome(NamedTuple):
     characters_used: int
     time_elapsed_seconds: float
     time_budget_seconds: int
+    stages_completed: int
+    total_stages: int
+    stage_outcomes: tuple[StageOutcome, ...]
 
 
 class VeyruWorld(ScenarioWorld):
@@ -60,6 +70,8 @@ class VeyruWorld(ScenarioWorld):
         self._veyru_outcomes: list[VeyruOutcome] = []
         self._context: WorldContext | None = None
         self._in_postmortem: bool = False
+        self._current_stage_index: int = 0
+        self._stage_outcomes: list[StageOutcome] = []
 
     @property
     def veyru_outcomes(self) -> list[VeyruOutcome]:
@@ -80,6 +92,15 @@ class VeyruWorld(ScenarioWorld):
     def current_case(self) -> VeyruCase | None:
         """The Veyru case for the current round."""
         return self._current_case
+
+    @property
+    def current_stage(self) -> VeyruStage | None:
+        """The currently active stage, or None if no case is loaded."""
+        if self._current_case is None:
+            return None
+        if self._current_stage_index >= len(self._current_case.stages):
+            return None
+        return self._current_case.stages[self._current_stage_index]
 
     @property
     def in_postmortem(self) -> bool:
@@ -112,6 +133,15 @@ class VeyruWorld(ScenarioWorld):
         case = self._veyru_cases[case_index]
         time_elapsed = self._current_round_characters * self._seconds_per_character
 
+        all_stage_outcomes = list(self._stage_outcomes)
+        for i in range(len(all_stage_outcomes), len(case.stages)):
+            all_stage_outcomes.append(
+                StageOutcome(
+                    motif_name=case.stages[i].motif_name,
+                    stabilized=False,
+                )
+            )
+
         outcome = VeyruOutcome(
             case_number=round_number,
             failure_name=case.failure_name,
@@ -119,6 +149,9 @@ class VeyruWorld(ScenarioWorld):
             characters_used=self._current_round_characters,
             time_elapsed_seconds=time_elapsed,
             time_budget_seconds=case.time_budget_seconds,
+            stages_completed=len(self._stage_outcomes),
+            total_stages=len(case.stages),
+            stage_outcomes=tuple(all_stage_outcomes),
         )
         self._veyru_outcomes.append(outcome)
         return outcome
@@ -137,21 +170,43 @@ class VeyruWorld(ScenarioWorld):
         self._veyru_alive = True
         self._veyru_stabilized = False
         self._notified_thresholds = set()
+        self._current_stage_index = 0
+        self._stage_outcomes = []
 
         case_index = (round_number - 1) % len(self._veyru_cases)
         self._current_case = self._veyru_cases[case_index]
 
-    async def stabilize_veyru(self) -> None:
-        """Mark the current Veyru as stabilized and broadcast to all agents.
+    async def stabilize_veyru(self) -> bool:
+        """Advance to the next stage or fully stabilize the current Veyru.
 
-        Called by the ``stabilize_veyru`` tool executor when the LLM judge
-        confirms the stabilization action is adequate.
+        Records the current stage as stabilized. If more stages remain,
+        advances the stage index and broadcasts a generic notification
+        (symptoms go to the observer via the tool result, not here).
+        If all stages are done, marks the Veyru as fully stabilized.
+
+        Returns True if more stages remain, False if fully stabilized.
         """
-        self._veyru_stabilized = True
+        if self._current_case is None:
+            return False
+
+        stage = self._current_case.stages[self._current_stage_index]
+        self._stage_outcomes.append(StageOutcome(motif_name=stage.motif_name, stabilized=True))
+
+        next_index = self._current_stage_index + 1
+        if next_index >= len(self._current_case.stages):
+            self._veyru_stabilized = True
+            if self._context is not None:
+                await self._context.send_update(
+                    text="VEYRU STABILIZED. All issues resolved.",
+                )
+            return False
+
+        self._current_stage_index = next_index
         if self._context is not None:
             await self._context.send_update(
-                text="VEYRU STABILIZED. Action successful.",
+                text="Issue stabilized, but the Veyru remains unstable — new symptoms detected.",
             )
+        return True
 
     def on_message(
         self,

@@ -256,6 +256,7 @@ class VeyruScenario(SimulationScenario):
             template_variables={
                 "round_number": round_number,
                 "current_case": current_case,
+                "first_stage_symptoms": current_case.stages[0].observable_symptoms,
                 "previous_outcome": previous_outcome,
                 "knobs": self._knobs,
             },
@@ -342,19 +343,27 @@ class VeyruScenario(SimulationScenario):
             if self._world.veyru_stabilized:
                 return "Veyru has already been stabilized."
 
-            current_case = self._world.current_case
-            if current_case is None:
+            current_stage = self._world.current_stage
+            if current_stage is None:
                 return "No Veyru to stabilize."
 
             judgment = await judge_stabilization(
                 provider=self._judge_provider,
-                failure_name=current_case.failure_name,
-                critical_actions=current_case.critical_actions,
+                failure_name=current_stage.motif_name,
+                critical_actions=current_stage.critical_actions,
                 observer_action=action,
             )
 
             if judgment.match:
-                await self._world.stabilize_veyru()
+                has_more = await self._world.stabilize_veyru()
+                if has_more:
+                    next_stage = self._world.current_stage
+                    assert next_stage is not None
+                    return (
+                        f"Stabilization successful, but new symptoms have appeared. "
+                        f"What you now observe: {next_stage.observable_symptoms} "
+                        f"Report these to the specialist."
+                    )
                 return f"Stabilization successful: {judgment.explanation}"
 
             return f"Stabilization ineffective: {judgment.explanation}"

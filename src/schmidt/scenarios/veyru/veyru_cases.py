@@ -2,21 +2,34 @@
 
 Defines 14 failure motifs (matching the specialist's training) and generates
 unique cases per round by combining motifs with seed-based randomisation.
-Each round gets 1-3 motifs and a random location, producing singles and
-composites with ordered stabilization procedures.
+Each round gets 1-3 motifs and a random location. Composite cases (2-3
+motifs) are staged: symptoms are revealed one motif at a time, requiring
+iterative diagnosis and stabilization.
 """
 
 import random
 from typing import NamedTuple
 
 
+class VeyruStage(NamedTuple):
+    """One motif within a (possibly multi-stage) Veyru case."""
+
+    motif_name: str
+    observable_symptoms: str
+    critical_actions: str
+
+
 class VeyruCase(NamedTuple):
-    """A single Veyru failure case presented per round."""
+    """A single Veyru failure case presented per round.
+
+    Composite cases have multiple stages, each corresponding to a single
+    failure motif. Symptoms are revealed one stage at a time — the next
+    stage's symptoms appear only after the current stage is stabilized.
+    """
 
     case_number: int
     failure_name: str
-    observable_symptoms: str
-    critical_actions: str
+    stages: tuple[VeyruStage, ...]
     time_budget_seconds: int
 
 
@@ -307,38 +320,21 @@ _LOCATIONS: list[str] = [
 _MOTIF_COUNT_WEIGHTS: list[int] = [40, 40, 20]
 
 
-def _build_symptoms(
-    rng: random.Random,
-    motifs: list[FailureMotif],
+def _build_stage_symptoms(
+    motif: FailureMotif,
     location: str,
+    is_first_stage: bool,
 ) -> str:
-    """Combine motif symptoms into an observer-perspective paragraph."""
-    parts: list[str] = [f"A Veyru {location}."]
+    """Build observer-perspective symptoms for a single stage.
 
-    if len(motifs) == 1:
-        # Single motif: use all symptom phrases.
-        parts.extend(motifs[0].symptom_phrases)
-    else:
-        # Composite: pick 1-2 phrases per motif to keep it readable.
-        for motif in motifs:
-            count = min(2, len(motif.symptom_phrases))
-            selected = rng.sample(motif.symptom_phrases, k=count)
-            parts.extend(selected)
-
+    The first stage includes the location prefix. Subsequent stages omit it
+    because the agents already know where the Veyru is.
+    """
+    parts: list[str] = []
+    if is_first_stage:
+        parts.append(f"A Veyru {location}.")
+    parts.extend(motif.symptom_phrases)
     return " ".join(parts)
-
-
-def _build_critical_actions(motifs: list[FailureMotif]) -> str:
-    """Concatenate procedures in priority order with sequencing markers."""
-    if len(motifs) == 1:
-        return motifs[0].critical_actions
-
-    prefixes = ["First: ", "Then: ", "Finally: "]
-    sections: list[str] = []
-    for i, motif in enumerate(motifs):
-        prefix = prefixes[i]
-        sections.append(f"{prefix}{motif.critical_actions}")
-    return " ".join(sections)
 
 
 def get_cases(
@@ -348,7 +344,8 @@ def get_cases(
     """Generate unique failure cases for each round via seed-based selection.
 
     Each round gets 1-3 failure motifs drawn from the 14-motif pool, a random
-    location, and combined symptoms and procedures.
+    location, and per-motif stages. Composite cases (2-3 motifs) have multiple
+    stages whose symptoms are revealed one at a time during the simulation.
     """
     rng = random.Random(seed)
     pool_size = len(_FAILURE_MOTIFS)
@@ -367,16 +364,25 @@ def get_cases(
 
         location = rng.choice(_LOCATIONS)
 
+        stages: list[VeyruStage] = []
+        for stage_idx, motif in enumerate(selected):
+            stages.append(
+                VeyruStage(
+                    motif_name=motif.name,
+                    observable_symptoms=_build_stage_symptoms(
+                        motif=motif,
+                        location=location,
+                        is_first_stage=(stage_idx == 0),
+                    ),
+                    critical_actions=motif.critical_actions,
+                )
+            )
+
         cases.append(
             VeyruCase(
                 case_number=i + 1,
                 failure_name=" + ".join(m.name for m in selected),
-                observable_symptoms=_build_symptoms(
-                    rng=rng,
-                    motifs=selected,
-                    location=location,
-                ),
-                critical_actions=_build_critical_actions(motifs=selected),
+                stages=tuple(stages),
                 time_budget_seconds=int(sum(m.base_time_budget_seconds for m in selected)),
             )
         )

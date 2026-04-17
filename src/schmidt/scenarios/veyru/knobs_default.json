@@ -4,7 +4,7 @@
   "max_round_duration_seconds": 300,
   "model_overrides": {},
   "postmortem_enabled": true,
-  "round_count": 48,
+  "round_count": 12,
   "seconds_per_character": 0.6,
   "seed": 42
 }

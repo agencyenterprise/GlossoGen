@@ -2,7 +2,8 @@
 
 A round is won when the field observer calls ``stabilize_veyru`` with an
 action that the LLM judge approves before the communication budget runs
-out and the Veyru collapses.
+out and the Veyru collapses. For composite cases (multiple stages),
+partial stage progress is tracked and reported in evidence.
 """
 
 import logging
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 STABILIZE_TOOL = "stabilize_veyru"
 SUCCESS_MARKER = "Stabilization successful"
+STAGE_MARKER = "new symptoms have appeared"
 COLLAPSED_MARKER = "VEYRU HAS COLLAPSED"
 
 
@@ -49,6 +51,7 @@ class RoundSuccessEvaluator(Evaluator):
         total_rounds = _count_rounds(events=events)
         stabilized_rounds = _find_stabilized_rounds(events=events)
         collapsed_rounds = _find_collapsed_rounds(events=events)
+        partial_rounds = _find_partial_rounds(events=events)
 
         won = 0
         lost_details: list[str] = []
@@ -56,9 +59,15 @@ class RoundSuccessEvaluator(Evaluator):
             if rnd in stabilized_rounds:
                 won += 1
             elif rnd in collapsed_rounds:
-                lost_details.append(f"R{rnd}: collapsed")
+                if rnd in partial_rounds:
+                    lost_details.append(f"R{rnd}: collapsed (partial stages completed)")
+                else:
+                    lost_details.append(f"R{rnd}: collapsed")
             else:
-                lost_details.append(f"R{rnd}: no successful stabilization")
+                if rnd in partial_rounds:
+                    lost_details.append(f"R{rnd}: partial stages completed, not fully stabilized")
+                else:
+                    lost_details.append(f"R{rnd}: no successful stabilization")
 
         if total_rounds > 0:
             score = won / total_rounds
@@ -115,5 +124,22 @@ def _find_collapsed_rounds(events: list[SimulationEvent]) -> set[int]:
         if not isinstance(event, WorldEventDelivered):
             continue
         if COLLAPSED_MARKER in event.text:
+            rounds.add(event.round_number)
+    return rounds
+
+
+def _find_partial_rounds(events: list[SimulationEvent]) -> set[int]:
+    """Return the set of rounds where at least one stage was stabilized.
+
+    Detects intermediate stage completions from tool results that contain
+    the stage marker but not the full-success marker.
+    """
+    rounds: set[int] = set()
+    for event in events:
+        if not isinstance(event, ToolResultReceived):
+            continue
+        if event.tool_name != STABILIZE_TOOL:
+            continue
+        if STAGE_MARKER in event.result and SUCCESS_MARKER not in event.result:
             rounds.add(event.round_number)
     return rounds
