@@ -1,6 +1,6 @@
 # Scenario: Veyru Stabilization
 
-Two agents — a field technician observing a Veyru and a remote specialist — communicate over a single link to stabilize failing Veyru entities. Every character sent costs simulated seconds. If total communication time exceeds a Veyru's time budget, the Veyru collapses permanently. Over 48 rounds, fourteen failure motifs are combined into unique cases (singles, doubles, triples), encouraging the development of compressed communication patterns.
+Two agents — a field technician observing a Veyru and a remote specialist — communicate over a single link to stabilize failing Veyru entities. Every character sent costs simulated seconds. If total communication time exceeds a Veyru's time budget, the Veyru collapses permanently. Fourteen failure motifs are combined into unique cases (singles, doubles, triples), encouraging the development of compressed communication patterns. The position of reference star SAGWE392 changes each round, remapping which treatment procedure is correct for a given set of symptoms and varying the physical parameters (hold duration, starting face, pressure level). Only the specialist has the stellar reader, ensuring per-round communication is always required.
 
 ## Domain
 
@@ -35,11 +35,11 @@ The comm link is the primary channel where character costs apply. The postmortem
 
 ## Round Flow
 
-1. Round starts — both agents receive an injection with previous outcome and new case info (symptoms, time budget)
+1. Round starts — both agents receive an injection with previous outcome and new case info (symptoms, time budget). The specialist also receives the SAGWE392 stellar reading with the treatment mapping and physical parameters for this round
 2. Field Observer reports what they see on the comm link
-3. Specialist diagnoses and sends stabilization instructions
+3. Specialist looks up the remapped treatment for the diagnosed failure, applies the stellar parameters, and sends stabilization instructions
 4. Field Observer calls `stabilize_veyru` with an action description
-5. LLM judge evaluates whether the action matches the required procedure
+5. LLM judge evaluates whether the action matches the remapped procedure with the stellar parameters
 6. World tracks cumulative character cost and sends threshold warnings at 50% and 75% of budget
 7. If total communication time exceeds budget, the Veyru collapses
 8. Round ends — outcome recorded
@@ -77,6 +77,32 @@ Composite cases combine two or three motifs per round. Procedure order matters �
 
 Cases are generated procedurally using a seed for reproducibility. Each round gets a random combination of 1-3 motifs (40% singles, 40% doubles, 20% triples) and a random location.
 
+## Stellar Alignment — SAGWE392
+
+Each round, the position of reference star SAGWE392 changes the treatment in two ways:
+
+### Treatment Remapping
+
+A stellar offset (1-13) shifts the mapping between failure symptoms and correct treatment. The observer sees symptoms of motif X, but the correct procedure comes from a different motif Y. The specialist receives a 14-entry lookup table each round showing the full symptom→treatment mapping. The offset changes every round.
+
+### Parameter Variation
+
+Each round also generates unique physical parameters for the treatment:
+
+- **Hold/press duration** — chosen from [5, 8, 10, 12, 15, 20] seconds
+- **Starting face** — one of [top, bottom, left, right, front, back]
+- **Pressure level** — one of [gentle, moderate, firm]
+
+The specialist receives these values in their round injection and must communicate them to the observer along with the remapped procedure.
+
+### Information Asymmetry
+
+Only the specialist has the stellar reader instrument. The field observer is told that treatments depend on SAGWE392 but receives no stellar data. This prevents the observer from self-diagnosing and self-treating even if they learn all 14 motif procedures during postmortem discussions — the treatment mapping and parameters change every round.
+
+### Stabilization Judge
+
+The LLM judge evaluates each `stabilize_veyru` call against the remapped treatment motif's procedure with the stellar parameters. The judge receives the treatment motif name, the base procedure text, and the stellar parameters (hold duration, starting face, pressure level) as separate structured inputs.
+
 ## Budget and Collapse Mechanics
 
 Communication cost is tracked per round on the comm link:
@@ -106,9 +132,9 @@ Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only Eng
 
 | Knob | Default | Description |
 |------|---------|-------------|
-| `seconds_per_character` | `0.6` | Simulated seconds per character sent on the comm link |
+| `seconds_per_character` | `2.0` | Simulated seconds per character sent on the comm link |
 | `seed` | `42` | Controls case shuffling and motif selection |
-| `round_count` | `48` | Number of rounds |
+| `round_count` | `12` | Number of rounds |
 | `postmortem_enabled` | `true` | Whether the discussion phase is active |
 | `postmortem_duration_seconds` | `120` | Time limit for the discussion phase (inherited from base, only relevant when postmortem is enabled) |
 | `judge_model` | `claude-haiku-4-5-20251001` | LLM for stabilization action judgment |
@@ -125,8 +151,8 @@ Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only Eng
   "max_round_duration_seconds": 300,
   "model_overrides": {},
   "postmortem_enabled": true,
-  "round_count": 48,
-  "seconds_per_character": 0.6,
+  "round_count": 12,
+  "seconds_per_character": 2.0,
   "seed": 42
 }
 ```
