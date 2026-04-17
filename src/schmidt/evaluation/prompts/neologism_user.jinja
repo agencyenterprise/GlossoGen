@@ -2,19 +2,28 @@ You are evaluating whether agents in a multi-agent simulation invented genuinely
 
 Focus on the PRIMARY CHANNEL messages — these are the budget-constrained communications where novel vocabulary is most likely to emerge. Messages from OTHER CHANNELS provide context but are secondary.
 
+IMPORTANT — PRE-DEFINED VOCABULARY:
+The agents were given the following system prompts at the start of the simulation. Any terminology, failure names, procedure names, or domain vocabulary that appears in these prompts is NOT a neologism — the agents did not invent it, they were given it. You MUST exclude all such terms from your analysis.
+
+{% for agent in agent_prompts %}
+--- SYSTEM PROMPT FOR {{ agent.role_name | upper }} ---
+{{ agent.system_prompt }}
+{% endfor %}
+
 IMPORTANT: Other specialized evaluators cover different phenomena. Only report what belongs to THIS evaluator:
 
 - **Shorthand codes** (covered separately): abbreviations, letter codes, numbering systems like "A=flicker" or "P1". These are MAPPINGS from short symbols to existing concepts. Do NOT report them here.
 - **Slang** (covered separately): informal variants of existing words ("gonna", "nah", "yep"). Do NOT report these.
 - **Structural strangeness** (covered separately): unusual grammar, dropped articles, formatting. Do NOT report these.
+- **Pre-defined terms** (see system prompts above): any term, name, or phrase that already appears in the agents' system prompts. Do NOT report these — the agents did not invent them.
 
 What belongs to THIS evaluator — neologisms (genuinely new vocabulary):
-- Completely new words that don't exist in any language (e.g., "chromaflux", "stabilon")
-- Compound words created by merging existing words in novel ways (e.g., "hum-flicker", "pulse-fade")
-- Existing words repurposed with entirely new domain-specific meanings that differ from standard usage
-- Portmanteaus or blends of existing words creating new terms
+- Completely new words that don't exist in any language AND were not in the system prompts (e.g., "chromaflux", "stabilon")
+- Compound words created by merging existing words in novel ways AND not present in system prompts (e.g., "hum-flicker", "pulse-fade")
+- Existing words repurposed with entirely new domain-specific meanings that differ from both standard usage AND from the meanings in the system prompts
+- Portmanteaus or blends of existing words creating new terms not found in system prompts
 
-The key distinction: a neologism is a NEW WORD with a new meaning. A code like "A=flicker" is just a shorthand mapping — "A" is not a new word, it's a label. Report only genuine vocabulary invention.
+The key distinction: a neologism is a NEW WORD with a new meaning that the agents themselves created during the simulation. Terms from the system prompts, even if domain-specific or unusual, are pre-defined vocabulary — not neologisms. A code like "A=flicker" is just a shorthand mapping — "A" is not a new word, it's a label. Report only genuine vocabulary invention that goes beyond what was provided.
 
 Below are the message transcripts for each round:
 

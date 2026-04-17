@@ -67,7 +67,6 @@ class NeologismEvaluator(Evaluator):
         llm_provider: LLMProvider,
     ) -> MetricResult:
         """Evaluate whether agents invented new vocabulary."""
-        _ = agent_configs
         round_transcripts = build_round_transcripts(
             events=events,
             scenario=scenario,
@@ -83,9 +82,17 @@ class NeologismEvaluator(Evaluator):
                 per_agent={},
             )
 
+        agent_prompts = [
+            {"role_name": config.role_name, "system_prompt": config.system_prompt}
+            for config in agent_configs
+        ]
+
         judge_prompt = render_evaluator_prompt(
             template_name="neologism_user.jinja",
-            template_variables={"rounds": round_transcripts},
+            template_variables={
+                "rounds": round_transcripts,
+                "agent_prompts": agent_prompts,
+            },
         )
 
         result = await llm_provider.generate_structured(
