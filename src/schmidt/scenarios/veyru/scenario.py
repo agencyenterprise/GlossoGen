@@ -108,7 +108,6 @@ class VeyruScenario(SimulationScenario):
         self._veyru_cases: list[VeyruCase] = get_cases(
             seed=knobs.seed,
             round_count=knobs.round_count,
-            budget_multiplier=knobs.budget_multiplier,
         )
         self._world = VeyruWorld(
             seconds_per_character=knobs.seconds_per_character,
@@ -140,7 +139,6 @@ class VeyruScenario(SimulationScenario):
             template_name="description.jinja",
             template_variables={
                 "seconds_per_character": self._knobs.seconds_per_character,
-                "budget_multiplier": self._knobs.budget_multiplier,
                 "round_count": self._knobs.round_count,
                 "veyru_cases": self._veyru_cases,
             },

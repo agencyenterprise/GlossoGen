@@ -1,6 +1,6 @@
 # Scenario: Veyru Stabilization
 
-Two agents — a field technician observing a Veyru and a remote specialist — communicate over a single link to stabilize failing Veyru entities. Every character sent costs simulated seconds. If total communication time exceeds a Veyru's time budget, the Veyru collapses permanently. Over 48 rounds, fourteen failure motifs are combined into unique cases (singles, doubles, triples) under a constant budget multiplier, encouraging the development of compressed communication patterns.
+Two agents — a field technician observing a Veyru and a remote specialist — communicate over a single link to stabilize failing Veyru entities. Every character sent costs simulated seconds. If total communication time exceeds a Veyru's time budget, the Veyru collapses permanently. Over 48 rounds, fourteen failure motifs are combined into unique cases (singles, doubles, triples), encouraging the development of compressed communication patterns.
 
 ## Domain
 
@@ -75,7 +75,7 @@ Composite cases combine two or three motifs per round. Procedure order matters �
 
 ### Case Generation
 
-Cases are generated procedurally using a seed for reproducibility. Each round gets a random combination of 1-3 motifs (40% singles, 40% doubles, 20% triples) and a random location. This produces unique cases per round while maintaining a constant budget multiplier across the simulation.
+Cases are generated procedurally using a seed for reproducibility. Each round gets a random combination of 1-3 motifs (40% singles, 40% doubles, 20% triples) and a random location.
 
 ## Budget and Collapse Mechanics
 
@@ -107,8 +107,7 @@ Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only Eng
 
 | Knob | Default | Description |
 |------|---------|-------------|
-| `budget_multiplier` | `0.5` | Constant multiplier applied to all base case time budgets |
-| `seconds_per_character` | `0.3` | Simulated seconds per character sent on the comm link |
+| `seconds_per_character` | `0.6` | Simulated seconds per character sent on the comm link |
 | `seed` | `42` | Controls case shuffling and motif selection |
 | `round_count` | `48` | Number of rounds |
 | `postmortem_enabled` | `true` | Whether the discussion phase is active |
@@ -122,7 +121,6 @@ Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only Eng
 
 ```json
 {
-  "budget_multiplier": 0.5,
   "judge_model": "claude-haiku-4-5-20251001",
   "judge_provider": "anthropic",
   "max_round_duration_seconds": 300,
@@ -130,7 +128,7 @@ Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only Eng
   "postmortem_duration_seconds": 120,
   "postmortem_enabled": true,
   "round_count": 48,
-  "seconds_per_character": 0.3,
+  "seconds_per_character": 0.6,
   "seed": 42
 }
 ```

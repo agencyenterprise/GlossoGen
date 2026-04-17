@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { GitFork, Plug, Plus, Upload } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { McpConfigModal } from "@/features/mcp-config/mcp-config-modal";
 import { RunList } from "@/features/runs/run-list";
 import { API_URL } from "@/shared/lib/api-client";
@@ -13,7 +13,7 @@ export default function RunsPage() {
   const [showMcpConfig, setShowMcpConfig] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
+  const queryClient = useQueryClient();
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -38,7 +38,7 @@ export default function RunsPage() {
         alert(`Import failed: ${err.detail}`);
         return;
       }
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: ["runs"] });
     } finally {
       setImporting(false);
       e.target.value = "";
