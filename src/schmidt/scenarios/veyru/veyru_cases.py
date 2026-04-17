@@ -11,12 +11,34 @@ import random
 from typing import NamedTuple
 
 
+class StellarReading(NamedTuple):
+    """Per-round stellar parameters derived from the position of star SAGWE392.
+
+    The stellar alignment shifts the treatment mapping and modifies physical
+    parameters of the procedure. Generated once per case from the seed-based RNG.
+    """
+
+    offset: int
+    hold_duration: int
+    starting_face: str
+    pressure_level: str
+
+
+class StellarMapping(NamedTuple):
+    """One entry in the symptom-to-treatment lookup table for a given stellar offset."""
+
+    symptom_motif: str
+    treatment_motif: str
+
+
 class VeyruStage(NamedTuple):
     """One motif within a (possibly multi-stage) Veyru case."""
 
     motif_name: str
     observable_symptoms: str
     critical_actions: str
+    treatment_motif_name: str
+    judge_expected_actions: str
 
 
 class VeyruCase(NamedTuple):
@@ -25,12 +47,15 @@ class VeyruCase(NamedTuple):
     Composite cases have multiple stages, each corresponding to a single
     failure motif. Symptoms are revealed one stage at a time — the next
     stage's symptoms appear only after the current stage is stabilized.
+    The stellar reading shifts the treatment mapping and modifies physical
+    parameters for this round.
     """
 
     case_number: int
     failure_name: str
     stages: tuple[VeyruStage, ...]
     time_budget_seconds: int
+    stellar_reading: StellarReading
 
 
 class FailureMotif(NamedTuple):
@@ -39,6 +64,7 @@ class FailureMotif(NamedTuple):
     name: str
     symptom_phrases: list[str]
     critical_actions: str
+    judge_procedure_template: str
     base_time_budget_seconds: int
     priority: int
 
@@ -65,6 +91,11 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "to stabilize into a steady tone. If flickering persists, apply "
             "sequential face-by-face pressure starting from the brightest face."
         ),
+        judge_procedure_template=(
+            "Apply sustained uniform {pressure_level} pressure to all six faces "
+            "simultaneously for {hold_duration} seconds, starting from the "
+            "{starting_face} face. Release and wait for hum to stabilize."
+        ),
         base_time_budget_seconds=60,
         priority=5,
     ),
@@ -83,6 +114,11 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "pattern. If edges remain blurred, repeat on the perpendicular "
             "face pair."
         ),
+        judge_procedure_template=(
+            "Hold two opposite faces starting from the {starting_face} face. "
+            "Apply {pressure_level} rhythmic pulses — {hold_duration} seconds on, "
+            "{hold_duration} seconds off — for five cycles."
+        ),
         base_time_budget_seconds=60,
         priority=5,
     ),
@@ -99,6 +135,11 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "for 15 seconds to open a dissipation channel. Brightness should "
             "decrease as redundant reflections clear. If faces remain frozen, "
             "tap each frozen face sharply three times to break the standing wave."
+        ),
+        judge_procedure_template=(
+            "Press and hold two adjacent edges near the {starting_face} face "
+            "with {pressure_level} pressure for {hold_duration} seconds. Then "
+            "tap each frozen face sharply three times."
         ),
         base_time_budget_seconds=70,
         priority=4,
@@ -118,6 +159,11 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "each fading edge to re-establish the boundary. The hum should fill "
             "out as energy stops escaping."
         ),
+        judge_procedure_template=(
+            "Press each dim corner with {pressure_level} pressure for "
+            "{hold_duration} seconds in sequence, starting from corners near the "
+            "{starting_face} face. Then trace each fading edge with a finger."
+        ),
         base_time_budget_seconds=70,
         priority=1,
     ),
@@ -136,6 +182,11 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "repeat for each face. The hum should grow louder and the light "
             "should return with each face treatment."
         ),
+        judge_procedure_template=(
+            "Cup both hands around the Veyru and breathe warm air onto the "
+            "{starting_face} face for {hold_duration} seconds. Rotate and "
+            "repeat for each face."
+        ),
         base_time_budget_seconds=70,
         priority=2,
     ),
@@ -152,6 +203,12 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "external light input for 20 seconds. Then remove the cloth and "
             "immediately press the two hottest faces inward for 5 seconds. "
             "The buzz should drop to a hum and brightness should normalize."
+        ),
+        judge_procedure_template=(
+            "Cover the Veyru with a cloth for {hold_duration} seconds. Remove "
+            "the cloth and press the two hottest faces inward with "
+            "{pressure_level} pressure for {hold_duration} seconds, starting "
+            "from the {starting_face} face."
         ),
         base_time_budget_seconds=80,
         priority=2,
@@ -171,6 +228,11 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "state. If oscillation resumes, rotate 90 degrees and repeat on "
             "the next pair."
         ),
+        judge_procedure_template=(
+            "Place one palm on the brightest face and the other on the darkest "
+            "face simultaneously. Hold with {pressure_level} pressure for "
+            "{hold_duration} seconds without moving."
+        ),
         base_time_budget_seconds=70,
         priority=5,
     ),
@@ -189,6 +251,11 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "redistribute energy. Remove cloth only after the whine drops to a "
             "normal hum."
         ),
+        judge_procedure_template=(
+            "Place a folded cloth against the resonating face (brightest, most "
+            "vibrating) and press with {pressure_level} pressure for "
+            "{hold_duration} seconds. Then tap each adjacent edge twice."
+        ),
         base_time_budget_seconds=70,
         priority=3,
     ),
@@ -205,6 +272,12 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "lock. Immediately after the flick, press the two edges meeting at "
             "that corner for 5 seconds to redirect flow. Repeat for each locked "
             "corner. If clicking returns, flick again harder."
+        ),
+        judge_procedure_template=(
+            "Flick the bright corner sharply. Press the two edges meeting at "
+            "that corner with {pressure_level} pressure for {hold_duration} "
+            "seconds. Repeat for each locked corner, starting near the "
+            "{starting_face} face."
         ),
         base_time_budget_seconds=60,
         priority=3,
@@ -223,6 +296,11 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "repeat for each of the three face-pairs. The hum should sharpen "
             "as each pair is treated."
         ),
+        judge_procedure_template=(
+            "Grip the Veyru along all four edges of the {starting_face} face "
+            "and squeeze inward with {pressure_level} pressure for "
+            "{hold_duration} seconds. Rotate and repeat for each face-pair."
+        ),
         base_time_budget_seconds=70,
         priority=4,
     ),
@@ -239,6 +317,11 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "slap. Wait 3 seconds between strikes. This restarts wave "
             "propagation. After all six faces are struck, cup hands around the "
             "Veyru and breathe warm air for 10 seconds to sustain the restart."
+        ),
+        judge_procedure_template=(
+            "Sharply slap the center of each face once, starting from the "
+            "{starting_face} face. Then cup hands around the Veyru and breathe "
+            "warm air for {hold_duration} seconds."
         ),
         base_time_budget_seconds=70,
         priority=1,
@@ -258,6 +341,11 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "different face — the correct face is whichever causes the hum to "
             "momentarily unify while pressing."
         ),
+        judge_procedure_template=(
+            "Place the Veyru on a soft surface with the {starting_face} face "
+            "up. Press down with {pressure_level} pressure for {hold_duration} "
+            "seconds."
+        ),
         base_time_budget_seconds=70,
         priority=5,
     ),
@@ -274,6 +362,11 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "and immediately apply sustained pressure to all six faces for 10 "
             "seconds. The heat converts back to wave energy. If the reddish "
             "tint persists, repeat the cooling cycle."
+        ),
+        judge_procedure_template=(
+            "Wrap the Veyru in a wet cloth for {hold_duration} seconds. Remove "
+            "and apply sustained {pressure_level} pressure to all six faces for "
+            "{hold_duration} seconds, starting from the {starting_face} face."
         ),
         base_time_budget_seconds=80,
         priority=1,
@@ -292,6 +385,11 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "re-draws wave paths through the center. After rotation, tap each "
             "corner once to seed convergence points. The hum should deepen as "
             "the core refills."
+        ),
+        judge_procedure_template=(
+            "Rotate the Veyru slowly over {hold_duration} seconds while "
+            "applying {pressure_level} pressure to opposite faces starting from "
+            "the {starting_face} face. After rotation, tap each corner once."
         ),
         base_time_budget_seconds=80,
         priority=3,
@@ -319,6 +417,27 @@ _LOCATIONS: list[str] = [
 # Weights for picking 1, 2, or 3 motifs per round.
 _MOTIF_COUNT_WEIGHTS: list[int] = [40, 40, 20]
 
+# Stellar parameter pools — each round draws one value from each pool.
+_HOLD_DURATIONS: list[int] = [5, 8, 10, 12, 15, 20]
+_STARTING_FACES: list[str] = ["top", "bottom", "left", "right", "front", "back"]
+_PRESSURE_LEVELS: list[str] = ["gentle", "moderate", "firm"]
+
+
+def get_stellar_treatment_mapping(stellar_offset: int) -> list[StellarMapping]:
+    """Build the full 14-entry symptom-to-treatment mapping for a given offset.
+
+    Each entry maps a symptom motif to the treatment motif whose procedure
+    should be applied under the current stellar alignment.
+    """
+    pool_size = len(_FAILURE_MOTIFS)
+    return [
+        StellarMapping(
+            symptom_motif=_FAILURE_MOTIFS[i].name,
+            treatment_motif=_FAILURE_MOTIFS[(i + stellar_offset) % pool_size].name,
+        )
+        for i in range(pool_size)
+    ]
+
 
 def _build_stage_symptoms(
     motif: FailureMotif,
@@ -344,8 +463,8 @@ def get_cases(
     """Generate unique failure cases for each round via seed-based selection.
 
     Each round gets 1-3 failure motifs drawn from the 14-motif pool, a random
-    location, and per-motif stages. Composite cases (2-3 motifs) have multiple
-    stages whose symptoms are revealed one at a time during the simulation.
+    location, per-motif stages, and a stellar reading that remaps treatment
+    procedures and modifies physical parameters.
     """
     rng = random.Random(seed)
     pool_size = len(_FAILURE_MOTIFS)
@@ -359,13 +478,26 @@ def get_cases(
         )[0]
         num_motifs = min(num_motifs, pool_size)
 
-        selected = [_FAILURE_MOTIFS[idx] for idx in rng.sample(range(pool_size), k=num_motifs)]
-        selected.sort(key=lambda m: m.priority)
+        selected_indices = rng.sample(range(pool_size), k=num_motifs)
+        selected_motifs = [_FAILURE_MOTIFS[idx] for idx in selected_indices]
+        priority_order = sorted(
+            zip(selected_indices, selected_motifs),
+            key=lambda pair: pair[1].priority,
+        )
 
         location = rng.choice(_LOCATIONS)
 
+        stellar_reading = StellarReading(
+            offset=rng.randint(1, 13),
+            hold_duration=rng.choice(_HOLD_DURATIONS),
+            starting_face=rng.choice(_STARTING_FACES),
+            pressure_level=rng.choice(_PRESSURE_LEVELS),
+        )
+
         stages: list[VeyruStage] = []
-        for stage_idx, motif in enumerate(selected):
+        for stage_idx, (motif_idx, motif) in enumerate(priority_order):
+            treatment_idx = (motif_idx + stellar_reading.offset) % pool_size
+            treatment_motif = _FAILURE_MOTIFS[treatment_idx]
             stages.append(
                 VeyruStage(
                     motif_name=motif.name,
@@ -374,16 +506,23 @@ def get_cases(
                         location=location,
                         is_first_stage=(stage_idx == 0),
                     ),
-                    critical_actions=motif.critical_actions,
+                    critical_actions=treatment_motif.critical_actions,
+                    treatment_motif_name=treatment_motif.name,
+                    judge_expected_actions=treatment_motif.judge_procedure_template.format(
+                        hold_duration=stellar_reading.hold_duration,
+                        starting_face=stellar_reading.starting_face,
+                        pressure_level=stellar_reading.pressure_level,
+                    ),
                 )
             )
 
         cases.append(
             VeyruCase(
                 case_number=i + 1,
-                failure_name=" + ".join(m.name for m in selected),
+                failure_name=" + ".join(m.name for _, m in priority_order),
                 stages=tuple(stages),
-                time_budget_seconds=int(sum(m.base_time_budget_seconds for m in selected)),
+                time_budget_seconds=int(sum(m.base_time_budget_seconds for m in selected_motifs)),
+                stellar_reading=stellar_reading,
             )
         )
 

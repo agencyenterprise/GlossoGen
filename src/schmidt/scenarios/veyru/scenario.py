@@ -24,7 +24,7 @@ from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.veyru.evaluation import LanguageEmergenceEvaluator, RoundSuccessEvaluator
 from schmidt.scenarios.veyru.knobs import VeyruKnobs
 from schmidt.scenarios.veyru.stabilization_judge import judge_stabilization
-from schmidt.scenarios.veyru.veyru_cases import VeyruCase, get_cases
+from schmidt.scenarios.veyru.veyru_cases import VeyruCase, get_cases, get_stellar_treatment_mapping
 from schmidt.scenarios.veyru.world import VeyruOutcome, VeyruWorld
 from schmidt.template_renderer import TemplateRenderer
 
@@ -251,6 +251,10 @@ class VeyruScenario(SimulationScenario):
         if len(self._world.veyru_outcomes) > 0:
             previous_outcome = self._world.veyru_outcomes[-1]
 
+        treatment_mapping = get_stellar_treatment_mapping(
+            stellar_offset=current_case.stellar_reading.offset,
+        )
+
         rendered = self._renderer.render(
             template_name=template_name,
             template_variables={
@@ -259,6 +263,8 @@ class VeyruScenario(SimulationScenario):
                 "first_stage_symptoms": current_case.stages[0].observable_symptoms,
                 "previous_outcome": previous_outcome,
                 "knobs": self._knobs,
+                "treatment_mapping": treatment_mapping,
+                "stellar_reading": current_case.stellar_reading,
             },
         )
         if not rendered:
@@ -349,8 +355,7 @@ class VeyruScenario(SimulationScenario):
 
             judgment = await judge_stabilization(
                 provider=self._judge_provider,
-                failure_name=current_stage.motif_name,
-                critical_actions=current_stage.critical_actions,
+                expected_actions=current_stage.judge_expected_actions,
                 observer_action=action,
             )
 
@@ -364,9 +369,9 @@ class VeyruScenario(SimulationScenario):
                         f"What you now observe: {next_stage.observable_symptoms} "
                         f"Report these to the specialist."
                     )
-                return f"Stabilization successful: {judgment.explanation}"
+                return "Stabilization successful."
 
-            return f"Stabilization ineffective: {judgment.explanation}"
+            return "Stabilization ineffective. Ask the specialist for guidance."
 
         return [
             ScenarioMcpTool(

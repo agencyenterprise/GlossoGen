@@ -1,5 +1,5 @@
 """LLM-based judge that evaluates whether a field observer's stabilization
-action matches the critical actions required for a Veyru failure case.
+action matches the expected procedure for a Veyru failure case.
 
 Uses ``generate_structured`` to get a validated yes/no judgment with
 an explanation from the configured judge model.
@@ -28,22 +28,27 @@ class StabilizationJudgment(BaseModel):
 
 async def judge_stabilization(
     provider: LLMProvider,
-    failure_name: str,
-    critical_actions: str,
+    expected_actions: str,
     observer_action: str,
 ) -> StabilizationJudgment:
-    """Ask the LLM judge whether the observer's action adequately stabilizes the Veyru.
+    """Ask the LLM judge whether the observer's action matches the expected procedure.
 
-    Returns a ``StabilizationJudgment`` with a boolean ``match`` and an ``explanation``.
+    ``expected_actions`` is a pre-rendered description of the correct
+    procedure with stellar parameters already baked in — no conflicting
+    numbers for the judge to resolve.
     """
     system_prompt = _renderer.render(
         template_name="stabilization_judge.jinja",
         template_variables={},
     )
     user_message = (
-        f"Veyru failure: {failure_name}\n\n"
-        f"Required stabilization actions:\n{critical_actions}\n\n"
+        f"Expected procedure:\n{expected_actions}\n\n"
         f"Field observer's reported action:\n{observer_action}"
+    )
+    logger.info(
+        "Stabilization judge input: expected=[%s] action=[%s]",
+        expected_actions,
+        observer_action,
     )
     judgment = await provider.generate_structured(
         system_prompt=system_prompt,
@@ -51,8 +56,7 @@ async def judge_stabilization(
         output_schema=StabilizationJudgment,
     )
     logger.info(
-        "Stabilization judge for %s: match=%s — %s",
-        failure_name,
+        "Stabilization judge result: match=%s — %s",
         judgment.match,
         judgment.explanation,
     )

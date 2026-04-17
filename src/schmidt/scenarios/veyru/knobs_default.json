@@ -5,6 +5,6 @@
   "model_overrides": {},
   "postmortem_enabled": true,
   "round_count": 12,
-  "seconds_per_character": 0.6,
+  "seconds_per_character": 2.0,
   "seed": 42
 }
