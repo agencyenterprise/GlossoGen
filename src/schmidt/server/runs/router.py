@@ -19,7 +19,7 @@ from schmidt.models.event import RunStatus, SimulationEnded
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.response_models import LaunchStatus
 from schmidt.server.runs.detail_reader import load_run_detail
-from schmidt.server.runs.discovery import discover_runs
+from schmidt.server.runs.discovery import discover_runs, resolve_run, scan_jsonl
 from schmidt.server.runs.models import (
     AllLabelsResponse,
     EvalLogLine,
@@ -55,16 +55,12 @@ async def list_runs(request: Request) -> RunListResponse:
 async def get_run_detail(run_id: str, request: Request) -> RunDetailResponse:
     """Get full detail for a specific simulation run."""
     runs_dir: Path = request.app.state.runs_dir
-    summaries = await discover_runs(runs_dir=runs_dir)
-
-    matching = [s for s in summaries if s.run_id == run_id]
-    if not matching:
+    try:
+        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    run_summary = matching[0]
-    run_dir = Path(run_summary.run_dir)
-    log_path = run_dir / f"{run_summary.scenario_name}.jsonl"
-
+    log_path = resolved.run_dir / f"{resolved.scenario_name}.jsonl"
     return await load_run_detail(log_path=log_path)
 
 
@@ -72,14 +68,12 @@ async def get_run_detail(run_id: str, request: Request) -> RunDetailResponse:
 async def get_eval_logs(run_id: str, request: Request) -> EvalLogsResponse:
     """Return the contents of the evaluation stdout log file."""
     runs_dir: Path = request.app.state.runs_dir
-    summaries = await discover_runs(runs_dir=runs_dir)
-
-    matching = [s for s in summaries if s.run_id == run_id]
-    if not matching:
+    try:
+        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    run_dir = Path(matching[0].run_dir)
-    eval_log_path = run_dir / "eval_stdout.log"
+    eval_log_path = resolved.run_dir / "eval_stdout.log"
 
     if not eval_log_path.exists():
         return EvalLogsResponse(lines=[])
@@ -96,13 +90,12 @@ async def get_eval_logs(run_id: str, request: Request) -> EvalLogsResponse:
 async def delete_run(run_id: str, request: Request) -> None:
     """Stop the simulation if still running, then delete the run directory."""
     runs_dir: Path = request.app.state.runs_dir
-    summaries = await discover_runs(runs_dir=runs_dir)
-
-    matching = [s for s in summaries if s.run_id == run_id]
-    if not matching:
+    try:
+        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    run_dir = Path(matching[0].run_dir)
+    run_dir = resolved.run_dir
 
     manifest = read_manifest(run_dir=run_dir)
     if manifest is not None:
@@ -121,15 +114,12 @@ async def delete_run(run_id: str, request: Request) -> None:
 async def stop_run(run_id: str, request: Request) -> None:
     """Stop a running simulation by sending SIGTERM to its process."""
     runs_dir: Path = request.app.state.runs_dir
-    summaries = await discover_runs(runs_dir=runs_dir)
-
-    matching = [s for s in summaries if s.run_id == run_id]
-    if not matching:
+    try:
+        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    run_summary = matching[0]
-    run_dir = Path(run_summary.run_dir)
-    manifest = read_manifest(run_dir=run_dir)
+    manifest = read_manifest(run_dir=resolved.run_dir)
     if manifest is None:
         raise HTTPException(status_code=409, detail="Simulation is not running")
 
@@ -139,13 +129,15 @@ async def stop_run(run_id: str, request: Request) -> None:
     except ProcessLookupError:
         logger.info("Simulation PID %d already dead for run %s", manifest.pid, run_id)
 
-    delete_manifest(run_dir=run_dir)
+    delete_manifest(run_dir=resolved.run_dir)
 
+    jsonl_path = resolved.run_dir / f"{resolved.scenario_name}.jsonl"
+    scan = await scan_jsonl(file_path=jsonl_path)
     _append_killed_event(
-        run_dir=run_dir,
-        scenario_name=run_summary.scenario_name,
-        total_messages=run_summary.total_messages,
-        total_cost_usd=run_summary.total_cost_usd,
+        run_dir=resolved.run_dir,
+        scenario_name=resolved.scenario_name,
+        total_messages=scan.message_count,
+        total_cost_usd=scan.cost_usd,
     )
 
 
@@ -184,22 +176,31 @@ async def start_evaluation(
     background process.
     """
     runs_dir: Path = request.app.state.runs_dir
-    summaries = await discover_runs(runs_dir=runs_dir)
-
-    matching = [s for s in summaries if s.run_id == run_id]
-    if not matching:
+    try:
+        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    run_summary = matching[0]
+    run_dir = resolved.run_dir
+    jsonl_path = run_dir / f"{resolved.scenario_name}.jsonl"
+    scan = await scan_jsonl(file_path=jsonl_path)
+
+    if scan.last_event is not None:
+        status = scan.last_event.reason
+    else:
+        manifest = read_manifest(run_dir=run_dir)
+        if manifest is not None:
+            status = RunStatus.IN_PROGRESS
+        else:
+            status = RunStatus.ERROR
 
     finished_statuses = {RunStatus.SCENARIO_COMPLETE, RunStatus.ERROR, RunStatus.KILLED}
-    if run_summary.status not in finished_statuses:
+    if status not in finished_statuses:
         raise HTTPException(
             status_code=422,
             detail="Evaluation requires a completed, errored, or killed run",
         )
 
-    run_dir = Path(run_summary.run_dir)
     if read_eval_manifest(run_dir=run_dir) is not None:
         raise HTTPException(
             status_code=409,
@@ -212,11 +213,11 @@ async def start_evaluation(
             detail=f"Unknown provider: {body.provider}",
         )
 
-    scenario_cls = SCENARIO_REGISTRY.get(run_summary.scenario_name)
+    scenario_cls = SCENARIO_REGISTRY.get(resolved.scenario_name)
     if scenario_cls is None:
         raise HTTPException(
             status_code=422,
-            detail=f"Unknown scenario: {run_summary.scenario_name}",
+            detail=f"Unknown scenario: {resolved.scenario_name}",
         )
 
     available = scenario_cls.get_available_evaluator_names()
@@ -232,7 +233,7 @@ async def start_evaluation(
         "-m",
         "schmidt",
         "evaluate",
-        run_summary.scenario_name,
+        resolved.scenario_name,
         "--run-dir",
         str(run_dir),
         "--evaluators",
@@ -319,13 +320,12 @@ async def stream_run_events(run_id: str, request: Request) -> StreamingResponse:
     one of the SSEEvent union members, discriminated by the ``event_type`` field.
     """
     runs_dir: Path = request.app.state.runs_dir
-    summaries = await discover_runs(runs_dir=runs_dir)
-    matching = [s for s in summaries if s.run_id == run_id]
-    if not matching:
+    try:
+        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    run_dir = Path(matching[0].run_dir)
-    manifest = read_manifest(run_dir=run_dir)
+    manifest = read_manifest(run_dir=resolved.run_dir)
     if manifest is None:
         raise HTTPException(status_code=409, detail="Simulation is not running")
 
@@ -350,11 +350,11 @@ async def stream_run_events(run_id: str, request: Request) -> StreamingResponse:
 async def _resolve_run_dir(run_id: str, request: Request) -> Path:
     """Resolve a run_id to its directory path, raising 404 if not found."""
     runs_dir: Path = request.app.state.runs_dir
-    summaries = await discover_runs(runs_dir=runs_dir)
-    matching = [s for s in summaries if s.run_id == run_id]
-    if not matching:
+    try:
+        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
-    return Path(matching[0].run_dir)
+    return resolved.run_dir
 
 
 # ---------------------------------------------------------------------------

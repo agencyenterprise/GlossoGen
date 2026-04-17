@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 from schmidt.event_parsing import parse_event_bytes
 from schmidt.models.event import SimulationStarted
 from schmidt.run_repository import RunRepository, claim_run_dir
-from schmidt.server.runs.discovery import discover_runs
+from schmidt.server.runs.discovery import discover_runs, resolve_run
 from schmidt.server.runs.models import BundleManifest, ImportBundleResponse
 
 logger = logging.getLogger(__name__)
@@ -117,27 +117,23 @@ def _build_bundle_bytes(
 async def export_run_bundle(run_id: str, request: Request) -> StreamingResponse:
     """Export a simulation run as a tar.gz bundle including git history."""
     runs_dir: Path = request.app.state.runs_dir
-    summaries = await discover_runs(runs_dir=runs_dir)
-
-    matching = [s for s in summaries if s.run_id == run_id]
-    if not matching:
+    try:
+        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    run_summary = matching[0]
-    run_dir = Path(run_summary.run_dir)
-
-    original_timestamp = int(run_dir.name.split("_")[0])
+    original_timestamp = int(resolved.run_dir.name.split("_")[0])
 
     bundle_bytes = await asyncio.to_thread(
         _build_bundle_bytes,
-        run_dir,
+        resolved.run_dir,
         run_id,
-        run_summary.scenario_name,
+        resolved.scenario_name,
         original_timestamp,
     )
 
     run_id_short = run_id[:8]
-    filename = f"{run_summary.scenario_name}_{run_id_short}_bundle.tar.gz"
+    filename = f"{resolved.scenario_name}_{run_id_short}_bundle.tar.gz"
 
     return StreamingResponse(
         content=io.BytesIO(bundle_bytes),

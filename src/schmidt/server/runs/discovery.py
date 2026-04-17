@@ -4,6 +4,7 @@ Expects the standard directory layout:
 ``runs/{scenario_name}/{unix_timestamp}/{scenario_name}.jsonl``
 """
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,49 +15,12 @@ import orjson
 
 from schmidt.eval_manifest import read_eval_manifest
 from schmidt.event_parsing import parse_event_bytes
-from schmidt.models.event import RunStatus, SimulationEnded, SimulationEvent, SimulationStarted
+from schmidt.models.event import RunStatus, SimulationEnded, SimulationStarted
 from schmidt.server.runs.models import AgentModelSummary, ForkSource, RunSummary
 from schmidt.stream_manifest import delete_manifest, read_manifest
 from schmidt.token_pricing import find_pricing
 
 logger = logging.getLogger(__name__)
-
-
-async def _read_first_line(file_path: Path) -> bytes:
-    """Read the first non-empty line from a file."""
-    async with aiofiles.open(file_path, mode="rb") as f:
-        async for line in f:
-            stripped = line.strip()
-            if stripped:
-                return stripped
-    raise ValueError(f"File is empty: {file_path}")
-
-
-async def _read_last_event(file_path: Path) -> SimulationEvent:
-    """Parse the last event from a JSONL file, preferring SimulationEnded.
-
-    When a simulation is killed, the stop endpoint appends a
-    ``SimulationEnded`` event, but the dying process may flush buffered
-    events after it. This scans the last 20 lines so the termination
-    marker is not missed.
-    """
-    tail: list[bytes] = []
-    async with aiofiles.open(file_path, mode="rb") as f:
-        async for line in f:
-            stripped = line.strip()
-            if stripped:
-                tail.append(stripped)
-                if len(tail) > 20:
-                    tail.pop(0)
-    if not tail:
-        raise ValueError(f"File is empty: {file_path}")
-
-    for candidate in reversed(tail):
-        event = parse_event_bytes(raw_bytes=candidate)
-        if isinstance(event, SimulationEnded):
-            return event
-
-    return parse_event_bytes(raw_bytes=tail[-1])
 
 
 class _AgentModelInfo(NamedTuple):
@@ -68,27 +32,50 @@ class _AgentModelInfo(NamedTuple):
     provider: str
 
 
-class _ExtractedModels(NamedTuple):
-    """Result of scanning JSONL for agent model information."""
+class _SinglePassResult(NamedTuple):
+    """All data extracted from a single pass over a JSONL file."""
 
+    first_event: SimulationStarted
+    last_event: SimulationEnded | None
     unique_models: list[str]
     agent_models: list[AgentModelSummary]
+    message_count: int
+    cost_usd: float
 
 
-async def _extract_models(file_path: Path) -> _ExtractedModels:
-    """Extract per-agent model info and unique model list from JSONL.
+async def scan_jsonl(file_path: Path) -> _SinglePassResult:
+    """Read a JSONL file once, extracting all data needed for the run summary.
 
-    Uses the last AgentRegistered event per agent_id so that forked runs
-    that re-register agents with a new model report the correct model.
+    Collects the first event, the last SimulationEnded (if present in
+    the final 20 lines), per-agent model info, message count, and
+    token-based cost estimate — all in a single sequential pass.
     """
+    first_bytes: bytes | None = None
+    tail: list[bytes] = []
     agents_by_id: dict[str, _AgentModelInfo] = {}
+    message_count = 0
+    total_input = 0
+    total_output = 0
+    total_cache_read = 0
+    total_cache_write = 0
+
     async with aiofiles.open(file_path, mode="rb") as f:
         async for line in f:
             stripped = line.strip()
             if not stripped:
                 continue
+
+            if first_bytes is None:
+                first_bytes = stripped
+
+            tail.append(stripped)
+            if len(tail) > 20:
+                tail.pop(0)
+
             raw = orjson.loads(stripped)
-            if raw.get("event_type") == "agent_registered":
+            event_type = raw.get("event_type")
+
+            if event_type == "agent_registered":
                 agent_id = raw.get("agent_id", "")
                 model = raw.get("model", "")
                 if agent_id and model:
@@ -98,6 +85,30 @@ async def _extract_models(file_path: Path) -> _ExtractedModels:
                         model=model,
                         provider=raw.get("provider", "unknown"),
                     )
+            elif event_type == "message_sent":
+                message_count += 1
+            elif event_type == "llm_response_received":
+                usage = raw.get("usage")
+                if usage is not None:
+                    total_input += usage.get("input_tokens", 0)
+                    total_output += usage.get("output_tokens", 0)
+                    total_cache_read += usage.get("cache_read_input_tokens", 0)
+                    total_cache_write += usage.get("cache_creation_input_tokens", 0)
+
+    if first_bytes is None:
+        raise ValueError(f"File is empty: {file_path}")
+
+    first_event = parse_event_bytes(raw_bytes=first_bytes)
+    if not isinstance(first_event, SimulationStarted):
+        raise ValueError(f"First event is not SimulationStarted in {file_path}")
+
+    last_ended: SimulationEnded | None = None
+    for candidate in reversed(tail):
+        event = parse_event_bytes(raw_bytes=candidate)
+        if isinstance(event, SimulationEnded):
+            last_ended = event
+            break
+
     seen: dict[str, None] = {}
     for info in agents_by_id.values():
         if info.model not in seen:
@@ -111,44 +122,11 @@ async def _extract_models(file_path: Path) -> _ExtractedModels:
         )
         for info in agents_by_id.values()
     ]
-    return _ExtractedModels(unique_models=list(seen), agent_models=agent_models)
 
-
-class _RunStats:
-    """Accumulated message count and token-based cost from a JSONL scan."""
-
-    __slots__ = ("message_count", "cost_usd")
-
-    def __init__(self, message_count: int, cost_usd: float) -> None:
-        self.message_count = message_count
-        self.cost_usd = cost_usd
-
-
-async def _scan_run_stats(file_path: Path, model: str) -> _RunStats:
-    """Scan a JSONL file to count messages and estimate cost from token usage."""
-    message_count = 0
-    total_input = 0
-    total_output = 0
-    total_cache_read = 0
-    total_cache_write = 0
-
-    async with aiofiles.open(file_path, mode="rb") as f:
-        async for line in f:
-            stripped = line.strip()
-            if not stripped:
-                continue
-            raw = orjson.loads(stripped)
-            event_type = raw.get("event_type")
-            if event_type == "message_sent":
-                message_count += 1
-            elif event_type == "llm_response_received":
-                usage = raw.get("usage")
-                if usage is not None:
-                    total_input += usage.get("input_tokens", 0)
-                    total_output += usage.get("output_tokens", 0)
-                    total_cache_read += usage.get("cache_read_input_tokens", 0)
-                    total_cache_write += usage.get("cache_creation_input_tokens", 0)
-
+    if seen:
+        model = list(seen)[0]
+    else:
+        model = "unknown"
     cost_usd = 0.0
     pricing = find_pricing(model=model)
     if pricing is not None and total_input > 0:
@@ -160,7 +138,78 @@ async def _scan_run_stats(file_path: Path, model: str) -> _RunStats:
             + total_cache_write * pricing.cache_write_per_mtok
         ) / 1_000_000
 
-    return _RunStats(message_count=message_count, cost_usd=cost_usd)
+    return _SinglePassResult(
+        first_event=first_event,
+        last_event=last_ended,
+        unique_models=list(seen),
+        agent_models=agent_models,
+        message_count=message_count,
+        cost_usd=cost_usd,
+    )
+
+
+class ResolvedRun(NamedTuple):
+    """Lightweight run location returned by resolve_run."""
+
+    run_dir: Path
+    scenario_name: str
+
+
+async def _match_run_id(
+    jsonl_path: Path,
+    target_run_id: str,
+) -> ResolvedRun | None:
+    """Read only the first line of a JSONL to check if run_id matches."""
+    async with aiofiles.open(jsonl_path, mode="rb") as f:
+        async for line in f:
+            stripped = line.strip()
+            if stripped:
+                raw = orjson.loads(stripped)
+                if raw.get("run_id") == target_run_id:
+                    return ResolvedRun(
+                        run_dir=jsonl_path.parent,
+                        scenario_name=jsonl_path.parent.parent.name,
+                    )
+                return None
+    return None
+
+
+async def resolve_run(runs_dir: Path, run_id: str) -> ResolvedRun:
+    """Resolve a run_id to its directory and scenario name.
+
+    Reads only the first line of each JSONL file concurrently, making
+    this much faster than discover_runs for single-run lookups.
+
+    Raises ValueError if the run is not found.
+    """
+    if not runs_dir.is_dir():
+        raise ValueError(f"Run not found: {run_id}")
+
+    tasks: list[asyncio.Task[ResolvedRun | None]] = []
+    for scenario_dir in runs_dir.iterdir():
+        if not scenario_dir.is_dir():
+            continue
+        scenario_name = scenario_dir.name
+        for timestamp_dir in scenario_dir.iterdir():
+            if not timestamp_dir.is_dir():
+                continue
+            jsonl_path = timestamp_dir / f"{scenario_name}.jsonl"
+            if jsonl_path.exists():
+                tasks.append(
+                    asyncio.create_task(
+                        _match_run_id(
+                            jsonl_path=jsonl_path,
+                            target_run_id=run_id,
+                        )
+                    )
+                )
+
+    results = await asyncio.gather(*tasks)
+    for result in results:
+        if result is not None:
+            return result
+
+    raise ValueError(f"Run not found: {run_id}")
 
 
 def _timestamp_from_dir(dir_name: str) -> datetime:
@@ -200,113 +249,116 @@ def _read_fork_source(run_dir: Path) -> ForkSource | None:
     )
 
 
+async def _build_summary(
+    scenario_name: str,
+    timestamp_dir: Path,
+) -> RunSummary | None:
+    """Build a RunSummary for a single run directory.
+
+    Returns None if the directory does not contain a valid run.
+    """
+    jsonl_path = timestamp_dir / f"{scenario_name}.jsonl"
+    if not jsonl_path.exists():
+        return None
+
+    try:
+        scan = await scan_jsonl(file_path=jsonl_path)
+    except Exception:
+        logger.exception("Failed to parse run at %s", timestamp_dir)
+        return None
+
+    first_event = scan.first_event
+    report_path = timestamp_dir / f"{scenario_name}_report.json"
+    fork_source = _read_fork_source(run_dir=timestamp_dir)
+    run_timestamp = _timestamp_from_dir(dir_name=timestamp_dir.name)
+    labels = _read_labels(run_dir=timestamp_dir)
+    has_note = _has_note(run_dir=timestamp_dir)
+    eval_in_progress = read_eval_manifest(run_dir=timestamp_dir) is not None
+
+    if scan.last_event is not None:
+        start_time = run_timestamp if fork_source is not None else first_event.timestamp
+        duration_seconds = (scan.last_event.timestamp - start_time).total_seconds()
+        return RunSummary(
+            run_id=first_event.run_id,
+            scenario_name=first_event.scenario_name,
+            scenario_description=first_event.scenario_description,
+            scenario_config=first_event.scenario_config,
+            timestamp=run_timestamp,
+            total_messages=scan.last_event.total_messages,
+            total_cost_usd=scan.last_event.total_cost_usd,
+            duration_seconds=duration_seconds,
+            status=scan.last_event.reason,
+            has_evaluation=report_path.exists(),
+            evaluation_in_progress=eval_in_progress,
+            run_dir=str(timestamp_dir),
+            fork_source=fork_source,
+            models=scan.unique_models,
+            provider=first_event.provider,
+            agent_models=scan.agent_models,
+            labels=labels,
+            has_note=has_note,
+        )
+
+    manifest = read_manifest(run_dir=timestamp_dir)
+    if manifest is not None:
+        status = RunStatus.IN_PROGRESS
+    else:
+        delete_manifest(run_dir=timestamp_dir)
+        fork_path = timestamp_dir / "fork_manifest.json"
+        if fork_path.exists():
+            status = RunStatus.STARTING
+        else:
+            status = RunStatus.ERROR
+    return RunSummary(
+        run_id=first_event.run_id,
+        scenario_name=first_event.scenario_name,
+        scenario_description=first_event.scenario_description,
+        scenario_config=first_event.scenario_config,
+        timestamp=run_timestamp,
+        total_messages=scan.message_count,
+        total_cost_usd=scan.cost_usd,
+        duration_seconds=0.0,
+        status=status,
+        has_evaluation=False,
+        evaluation_in_progress=eval_in_progress,
+        run_dir=str(timestamp_dir),
+        fork_source=fork_source,
+        models=scan.unique_models,
+        provider=first_event.provider,
+        agent_models=scan.agent_models,
+        labels=labels,
+        has_note=has_note,
+    )
+
+
 async def discover_runs(runs_dir: Path) -> list[RunSummary]:
     """Scan the runs directory and return a summary for each discovered run.
 
-    Iterates over ``{runs_dir}/{scenario_name}/{timestamp}/`` directories,
-    reading the first and last lines of each JSONL file to extract metadata.
+    Processes all run directories concurrently and reads each JSONL file
+    only once to extract all needed metadata.
     """
-    summaries: list[RunSummary] = []
-
     if not runs_dir.is_dir():
         logger.warning("Runs directory does not exist: %s", runs_dir)
-        return summaries
+        return []
 
+    tasks: list[asyncio.Task[RunSummary | None]] = []
     for scenario_dir in sorted(runs_dir.iterdir()):
         if not scenario_dir.is_dir():
             continue
-
         scenario_name = scenario_dir.name
-
         for timestamp_dir in sorted(scenario_dir.iterdir()):
             if not timestamp_dir.is_dir():
                 continue
-
-            jsonl_path = timestamp_dir / f"{scenario_name}.jsonl"
-            if not jsonl_path.exists():
-                continue
-
-            try:
-                first_line = await _read_first_line(file_path=jsonl_path)
-                first_event = parse_event_bytes(raw_bytes=first_line)
-                last_event = await _read_last_event(file_path=jsonl_path)
-            except Exception:
-                logger.exception("Failed to parse run at %s", timestamp_dir)
-                continue
-
-            if not isinstance(first_event, SimulationStarted):
-                logger.warning("First event is not SimulationStarted in %s", jsonl_path)
-                continue
-
-            report_path = timestamp_dir / f"{scenario_name}_report.json"
-            fork_source = _read_fork_source(run_dir=timestamp_dir)
-            run_timestamp = _timestamp_from_dir(dir_name=timestamp_dir.name)
-            extracted = await _extract_models(file_path=jsonl_path)
-            labels = _read_labels(run_dir=timestamp_dir)
-            has_note = _has_note(run_dir=timestamp_dir)
-
-            eval_in_progress = read_eval_manifest(run_dir=timestamp_dir) is not None
-
-            if isinstance(last_event, SimulationEnded):
-                start_time = run_timestamp if fork_source is not None else first_event.timestamp
-                duration_seconds = (last_event.timestamp - start_time).total_seconds()
-                summaries.append(
-                    RunSummary(
-                        run_id=first_event.run_id,
-                        scenario_name=first_event.scenario_name,
-                        scenario_description=first_event.scenario_description,
-                        scenario_config=first_event.scenario_config,
-                        timestamp=run_timestamp,
-                        total_messages=last_event.total_messages,
-                        total_cost_usd=last_event.total_cost_usd,
-                        duration_seconds=duration_seconds,
-                        status=last_event.reason,
-                        has_evaluation=report_path.exists(),
-                        evaluation_in_progress=eval_in_progress,
-                        run_dir=str(timestamp_dir),
-                        fork_source=fork_source,
-                        models=extracted.unique_models,
-                        provider=first_event.provider,
-                        agent_models=extracted.agent_models,
-                        labels=labels,
-                        has_note=has_note,
+            tasks.append(
+                asyncio.create_task(
+                    _build_summary(
+                        scenario_name=scenario_name,
+                        timestamp_dir=timestamp_dir,
                     )
                 )
-            else:
-                model = extracted.unique_models[0] if extracted.unique_models else "unknown"
-                stats = await _scan_run_stats(file_path=jsonl_path, model=model)
-                manifest = read_manifest(run_dir=timestamp_dir)
-                if manifest is not None:
-                    status = RunStatus.IN_PROGRESS
-                else:
-                    delete_manifest(run_dir=timestamp_dir)
-                    fork_path = timestamp_dir / "fork_manifest.json"
-                    if fork_path.exists():
-                        status = RunStatus.STARTING
-                    else:
-                        status = RunStatus.ERROR
-                summaries.append(
-                    RunSummary(
-                        run_id=first_event.run_id,
-                        scenario_name=first_event.scenario_name,
-                        scenario_description=first_event.scenario_description,
-                        scenario_config=first_event.scenario_config,
-                        timestamp=run_timestamp,
-                        total_messages=stats.message_count,
-                        total_cost_usd=stats.cost_usd,
-                        duration_seconds=0.0,
-                        status=status,
-                        has_evaluation=False,
-                        evaluation_in_progress=eval_in_progress,
-                        run_dir=str(timestamp_dir),
-                        fork_source=fork_source,
-                        models=extracted.unique_models,
-                        provider=first_event.provider,
-                        agent_models=extracted.agent_models,
-                        labels=labels,
-                        has_note=has_note,
-                    )
-                )
+            )
 
+    results = await asyncio.gather(*tasks)
+    summaries = [s for s in results if s is not None]
     summaries.sort(key=lambda s: s.timestamp, reverse=True)
     return summaries

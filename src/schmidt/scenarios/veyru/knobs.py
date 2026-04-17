@@ -1,8 +1,7 @@
 """Configuration knobs for the Veyru stabilization scenario.
 
-Controls epoch selection, the simulated time cost of communication, and
-the LLM judge. Each epoch applies a fixed budget multiplier so pressure
-is constant across all rounds.
+Controls the constant budget multiplier, character-based communication cost,
+case shuffling seed, round count, postmortem discussion, and the LLM judge.
 """
 
 from schmidt.scenarios.base_knobs import BaseKnobs
@@ -11,16 +10,21 @@ from schmidt.scenarios.base_knobs import BaseKnobs
 class VeyruKnobs(BaseKnobs):
     """Configuration knobs for the Veyru stabilization scenario.
 
-    ``epoch`` selects which epoch to run (1-indexed). Each epoch uses a
-    fixed budget multiplier so pressure is constant across all rounds.
-    ``seconds_per_token`` controls how many simulated seconds each word
-    costs when agents communicate. ``judge_model`` and ``judge_provider``
-    specify the LLM used to evaluate whether stabilization actions match
-    the Veyru's critical needs.
+    ``budget_multiplier`` scales all base case time budgets by a constant
+    factor across every round. ``seconds_per_character`` controls how many
+    simulated seconds each character costs when agents communicate.
+    ``seed`` controls the random shuffle of failure motifs into round cases.
+    ``postmortem_enabled`` controls whether a shared discussion phase follows
+    each round. ``postmortem_duration_seconds`` sets the time limit for the
+    discussion phase. ``judge_model`` and ``judge_provider`` specify the LLM
+    used to evaluate whether stabilization actions match the Veyru's needs.
     """
 
-    epoch: int
-    round_count: int
-    seconds_per_token: float
+    budget_multiplier: float
     judge_model: str
     judge_provider: str
+    postmortem_duration_seconds: float
+    postmortem_enabled: bool
+    round_count: int
+    seconds_per_character: float
+    seed: int

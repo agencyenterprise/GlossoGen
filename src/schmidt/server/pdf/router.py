@@ -11,7 +11,7 @@ from fastapi.responses import Response
 from schmidt.server.pdf.export_data import build_pdf_export_data
 from schmidt.server.pdf.html_renderer import render_pdf_html
 from schmidt.server.runs.detail_reader import load_run_detail
-from schmidt.server.runs.discovery import discover_runs
+from schmidt.server.runs.discovery import resolve_run
 
 logger = logging.getLogger(__name__)
 
@@ -50,15 +50,12 @@ async def export_run_pdf(
     grouped by round and turn. Optionally filters to a single channel.
     """
     runs_dir: Path = request.app.state.runs_dir
-    summaries = await discover_runs(runs_dir=runs_dir)
-
-    matching = [s for s in summaries if s.run_id == run_id]
-    if not matching:
+    try:
+        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    run_summary = matching[0]
-    run_dir = Path(run_summary.run_dir)
-    log_path = run_dir / f"{run_summary.scenario_name}.jsonl"
+    log_path = resolved.run_dir / f"{resolved.scenario_name}.jsonl"
 
     run_detail = await load_run_detail(log_path=log_path)
 
@@ -74,9 +71,9 @@ async def export_run_pdf(
 
     run_id_short = run_id[:8]
     if channel_id is not None:
-        filename = f"{run_summary.scenario_name}_{channel_id}_{run_id_short}.pdf"
+        filename = f"{resolved.scenario_name}_{channel_id}_{run_id_short}.pdf"
     else:
-        filename = f"{run_summary.scenario_name}_{run_id_short}.pdf"
+        filename = f"{resolved.scenario_name}_{run_id_short}.pdf"
 
     return Response(
         content=pdf_bytes,
