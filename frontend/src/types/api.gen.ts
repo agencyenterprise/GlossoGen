@@ -1201,6 +1201,34 @@ export interface components {
             round_number: number;
         };
         /**
+         * SSEVeyruStabilizationJudged
+         * @description SSE event carrying the veyru stabilization judge's verdict for a stabilize_veyru call.
+         */
+        SSEVeyruStabilizationJudged: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "veyru_stabilization_judged";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Round Number */
+            round_number: number;
+            /** Expected Actions */
+            expected_actions: string;
+            /** Judge Match */
+            judge_match: boolean;
+            /** Judge Explanation */
+            judge_explanation: string;
+        };
+        /**
          * ScenarioInfo
          * @description Metadata about a single scenario, including its available knobs files.
          */
@@ -1312,6 +1340,7 @@ export interface components {
             timestamp: string;
             /** Round Number */
             round_number: number;
+            stabilize_metadata?: components["schemas"]["VeyruStabilizeMetadata"] | null;
         };
         /**
          * UpdateLabelsRequest
@@ -1364,6 +1393,22 @@ export interface components {
          * @enum {string}
          */
         Verdict: "pass" | "fail" | "partial";
+        /**
+         * VeyruStabilizeMetadata
+         * @description Judge context captured for a single ``stabilize_veyru`` call.
+         *
+         *     Attached to the corresponding ``ToolUseEntry`` so the frontend can show
+         *     the expected procedure and the LLM judge's verdict alongside the raw
+         *     tool call. Present only on ``stabilize_veyru`` entries.
+         */
+        VeyruStabilizeMetadata: {
+            /** Expected Actions */
+            expected_actions: string;
+            /** Judge Match */
+            judge_match: boolean;
+            /** Judge Explanation */
+            judge_explanation: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -1565,7 +1610,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSEAgentCostUpdated"] | components["schemas"]["SSEDebugLog"];
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSEAgentCostUpdated"] | components["schemas"]["SSEDebugLog"] | components["schemas"]["SSEVeyruStabilizationJudged"];
                 };
             };
             /** @description Validation Error */

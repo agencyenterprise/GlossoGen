@@ -177,6 +177,24 @@ class SimulationEnded(EventBase):
     total_cost_usd: float
 
 
+class VeyruStabilizationJudged(EventBase):
+    """Emitted by the veyru scenario after the stabilization judge rules on a stabilize_veyru call.
+
+    Captures the expected procedure fed to the LLM judge and the judge's
+    verdict + explanation, so the frontend can show ground-truth context
+    alongside the corresponding ``ToolResultReceived``. Correlated to the
+    tool result by (agent_id, FIFO order) because MCP does not expose the
+    pydantic-ai tool_call_id inside the executor.
+    """
+
+    event_type: Literal["veyru_stabilization_judged"] = "veyru_stabilization_judged"
+    agent_id: str
+    round_number: int
+    expected_actions: str
+    judge_match: bool
+    judge_explanation: str
+
+
 SimulationEvent = Annotated[
     Union[
         SimulationStarted,
@@ -192,6 +210,7 @@ SimulationEvent = Annotated[
         ChannelMembershipChanged,
         WorldEventDelivered,
         SimulationEnded,
+        VeyruStabilizationJudged,
     ],
     Discriminator("event_type"),
 ]

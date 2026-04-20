@@ -154,6 +154,10 @@ class AutonomousSupervisor:
             event_logger=self._event_logger,
         )
 
+        # Give the scenario a handle on the event logger so its MCP tool
+        # executors can emit custom events (e.g. judge verdicts).
+        self._scenario.bind_event_logger(event_logger=self._event_logger)
+
         # Build the simulation runtime (shared state) and store for error-path access.
         runtime = SimulationRuntime(
             scenario=self._scenario,

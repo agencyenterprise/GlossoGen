@@ -21,9 +21,11 @@ from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult,
 from schmidt.evaluation.evaluator_protocol import EvaluatorFactory
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
+from schmidt.event_logger import EventLogger
 from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
+from schmidt.models.event import VeyruStabilizationJudged
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld, WorldContext
 from schmidt.scenario_protocol import SimulationScenario
@@ -148,6 +150,7 @@ class VeyruScenario(SimulationScenario):
 
     def __init__(self, knobs: VeyruKnobs) -> None:
         self._knobs = knobs
+        self._event_logger: EventLogger | None = None
         self._renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
         self._veyru_cases: list[VeyruCase] = get_cases(
             seed=knobs.seed,
@@ -501,6 +504,10 @@ class VeyruScenario(SimulationScenario):
         if display is None:
             return agent_id
         return display
+
+    def bind_event_logger(self, event_logger: EventLogger) -> None:
+        """Stash the event logger so stabilize_veyru can emit judge verdicts."""
+        self._event_logger = event_logger
 
     def _get_previous_outcome_for_agent(self, agent_id: str) -> VeyruOutcome | None:
         """Return the most recent outcome for the team the agent belongs to."""
@@ -890,6 +897,17 @@ class VeyruScenario(SimulationScenario):
                 expected_actions=current_stage.judge_expected_actions,
                 observer_action=action,
             )
+
+            if self._event_logger is not None:
+                await self._event_logger.log(
+                    event=VeyruStabilizationJudged(
+                        agent_id=agent_id,
+                        round_number=self._event_logger.current_round,
+                        expected_actions=current_stage.judge_expected_actions,
+                        judge_match=judgment.match,
+                        judge_explanation=judgment.explanation,
+                    )
+                )
 
             if judgment.match:
                 has_more = await self._world.stabilize_veyru(team_id=team_id)

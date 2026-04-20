@@ -19,6 +19,8 @@ type SSESimulationEnded = components["schemas"]["SSESimulationEnded"];
 type SSEToolResultReceived = components["schemas"]["SSEToolResultReceived"];
 type SSEAgentCostUpdated = components["schemas"]["SSEAgentCostUpdated"];
 type SSEDebugLog = components["schemas"]["SSEDebugLog"];
+type SSEVeyruStabilizationJudged = components["schemas"]["SSEVeyruStabilizationJudged"];
+type VeyruStabilizeMetadata = components["schemas"]["VeyruStabilizeMetadata"];
 
 /** State returned by the useEventStream hook. */
 export interface EventStreamState {
@@ -66,6 +68,7 @@ export function useEventStream(
 
   const agentCostsRef = useRef<Map<string, number>>(new Map());
   const seenSseIdsRef = useRef<Set<string>>(new Set());
+  const pendingStabilizeMetadataRef = useRef<Map<string, VeyruStabilizeMetadata[]>>(new Map());
   const knownIdsRef = useRef(knownEventIds);
   useEffect(() => {
     knownIdsRef.current = knownEventIds;
@@ -82,6 +85,7 @@ export function useEventStream(
     setDebugLogs([]);
     agentCostsRef.current = new Map();
     seenSseIdsRef.current = new Set();
+    pendingStabilizeMetadataRef.current = new Map();
   }, []);
 
   useEffect(() => {
@@ -194,10 +198,25 @@ export function useEventStream(
       eventSource.addEventListener("tool_result_received", (e: MessageEvent) => {
         const data: SSEToolResultReceived = JSON.parse(e.data);
         if (isDuplicate(data.event_id)) return;
+        let attachedMetadata: VeyruStabilizeMetadata | null = null;
+        if (data.tool_name === "stabilize_veyru") {
+          const queue = pendingStabilizeMetadataRef.current.get(data.agent_id);
+          if (queue && queue.length > 0) {
+            attachedMetadata = queue.shift() ?? null;
+          }
+        }
         setToolUse(prev => {
           const existing = prev.find(t => t.call_id === data.call_id);
           if (existing) {
-            return prev.map(t => (t.call_id === data.call_id ? { ...t, result: data.result } : t));
+            return prev.map(t =>
+              t.call_id === data.call_id
+                ? {
+                    ...t,
+                    result: data.result,
+                    stabilize_metadata: attachedMetadata ?? t.stabilize_metadata,
+                  }
+                : t
+            );
           }
           const entry: ToolUseEntry = {
             message_id: `${data.event_id}-${data.call_id}`,
@@ -208,9 +227,24 @@ export function useEventStream(
             result: data.result,
             timestamp: data.timestamp,
             round_number: data.round_number,
+            stabilize_metadata: attachedMetadata,
           };
           return [...prev, entry];
         });
+      });
+
+      eventSource.addEventListener("veyru_stabilization_judged", (e: MessageEvent) => {
+        const data: SSEVeyruStabilizationJudged = JSON.parse(e.data);
+        if (isDuplicate(data.event_id)) return;
+        const metadata: VeyruStabilizeMetadata = {
+          expected_actions: data.expected_actions,
+          judge_match: data.judge_match,
+          judge_explanation: data.judge_explanation,
+        };
+        const queueMap = pendingStabilizeMetadataRef.current;
+        const existing = queueMap.get(data.agent_id) ?? [];
+        existing.push(metadata);
+        queueMap.set(data.agent_id, existing);
       });
 
       eventSource.addEventListener("simulation_ended", (e: MessageEvent) => {

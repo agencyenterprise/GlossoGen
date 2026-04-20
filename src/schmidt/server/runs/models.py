@@ -106,6 +106,19 @@ class ChannelMessage(BaseModel):
     token_count: int
 
 
+class VeyruStabilizeMetadata(BaseModel):
+    """Judge context captured for a single ``stabilize_veyru`` call.
+
+    Attached to the corresponding ``ToolUseEntry`` so the frontend can show
+    the expected procedure and the LLM judge's verdict alongside the raw
+    tool call. Present only on ``stabilize_veyru`` entries.
+    """
+
+    expected_actions: str
+    judge_match: bool
+    judge_explanation: str
+
+
 class ToolUseEntry(BaseModel):
     """A scenario-specific tool invocation with its result.
 
@@ -121,6 +134,7 @@ class ToolUseEntry(BaseModel):
     result: str | None
     timestamp: datetime
     round_number: int
+    stabilize_metadata: VeyruStabilizeMetadata | None = None
 
 
 class ReasoningEntry(BaseModel):
@@ -471,6 +485,19 @@ class SSEDebugLog(BaseModel):
     message: str
 
 
+class SSEVeyruStabilizationJudged(BaseModel):
+    """SSE event carrying the veyru stabilization judge's verdict for a stabilize_veyru call."""
+
+    event_type: Literal["veyru_stabilization_judged"]
+    event_id: str
+    timestamp: datetime
+    agent_id: str
+    round_number: int
+    expected_actions: str
+    judge_match: bool
+    judge_explanation: str
+
+
 SSEEvent = Annotated[
     Union[
         SSESimulationStarted,
@@ -484,6 +511,7 @@ SSEEvent = Annotated[
         SSESimulationEnded,
         SSEAgentCostUpdated,
         SSEDebugLog,
+        SSEVeyruStabilizationJudged,
     ],
     Discriminator("event_type"),
 ]
