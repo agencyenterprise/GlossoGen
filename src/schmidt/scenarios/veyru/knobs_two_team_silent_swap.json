@@ -7,11 +7,11 @@
   "judge_provider": "anthropic",
   "max_round_duration_seconds": 300,
   "model_overrides": {},
-  "postmortem_after_swap": true,
+  "postmortem_after_swap": false,
   "postmortem_enabled": true,
-  "round_count": 12,
+  "round_count": 20,
   "seconds_per_character": 2.0,
   "seed": 42,
-  "swap_round": null,
-  "two_teams": false
+  "swap_round": 10,
+  "two_teams": true
 }

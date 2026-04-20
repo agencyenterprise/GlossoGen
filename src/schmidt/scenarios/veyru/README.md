@@ -130,32 +130,63 @@ Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only Eng
 
 ## Knobs
 
-| Knob | Default | Description |
-|------|---------|-------------|
-| `seconds_per_character` | `2.0` | Simulated seconds per character sent on the comm link |
-| `seed` | `42` | Controls case shuffling and motif selection |
-| `round_count` | `12` | Number of rounds |
-| `postmortem_enabled` | `true` | Whether the discussion phase is active |
-| `postmortem_duration_seconds` | `120` | Time limit for the discussion phase (inherited from base, only relevant when postmortem is enabled) |
-| `judge_model` | `claude-haiku-4-5-20251001` | LLM for stabilization action judgment |
-| `judge_provider` | `anthropic` | Provider for the judge model |
-| `max_round_duration_seconds` | `300` | Wall-clock timeout per round |
-| `model_overrides` | `{}` | Per-agent model/provider overrides |
+| Knob | Description |
+|------|-------------|
+| `seconds_per_character` | Simulated seconds per character sent on the comm link |
+| `seed` | Controls case shuffling and motif selection |
+| `round_count` | Number of rounds |
+| `postmortem_enabled` | Whether the discussion phase is active |
+| `postmortem_duration_seconds` | Time limit for the discussion phase (inherited from base, only relevant when postmortem is enabled) |
+| `judge_model` | LLM for stabilization action judgment |
+| `judge_provider` | Provider for the judge model |
+| `max_round_duration_seconds` | Wall-clock timeout per round |
+| `model_overrides` | Per-agent model/provider overrides |
+| `two_teams` | Opt-in toggle for the two-team parallel mode (see below). When false, the four knobs below are ignored |
+| `swap_round` | Round at which the two teams' field observers are swapped (1-indexed, must be less than `round_count`). `null` disables the swap |
+| `announce_swap` | Whether agents receive an explicit in-channel and in-injection notification that a swap happened |
+| `postmortem_after_swap` | Whether the postmortem discussion phase remains available after the swap. When false, postmortem closes for the remainder of the run. Also controls whether the intern joins postmortem after takeover in intern mode |
+| `intern_enabled` | Opt-in toggle for the single-team intern observer mode (see below). When false, `intern_join_round` and `intern_takeover_round` must be null |
+| `intern_join_round` | Round at which the intern silently joins the comm link (must be less than `intern_takeover_round`) |
+| `intern_takeover_round` | Round at which the intern replaces the field observer (must be ≤ `round_count`) |
 
-### Example
+## Two-Team Mode (opt-in)
 
-```json
-{
-  "judge_model": "claude-haiku-4-5-20251001",
-  "judge_provider": "anthropic",
-  "max_round_duration_seconds": 300,
-  "model_overrides": {},
-  "postmortem_enabled": true,
-  "round_count": 12,
-  "seconds_per_character": 2.0,
-  "seed": 42
-}
-```
+Setting `two_teams: true` enables an observer-swap study mode. Two isolated teams run in parallel:
+
+| Team A | Team B |
+|--------|--------|
+| `observer_a` + `specialist_a` on `link_a` | `observer_b` + `specialist_b` on `link_b` |
+| Postmortem: `postmortem_a` (when enabled) | Postmortem: `postmortem_b` (when enabled) |
+
+Both teams face the same Veyru case each round (identical seed, identical queue) so their outcomes are directly comparable. Channels are fully isolated — neither observer sees the other team's traffic.
+
+At `swap_round + 1`, the two observers swap teams:
+
+- Observer A takes over Team B's comm link; Observer B takes over Team A's
+- Both teams' comm link message histories are wiped (and postmortems too, if present) so new pairings cannot lurk-read their predecessor's transcript. A `channel_history_cleared` event is logged for each wiped channel, and a `channel_membership_changed` event is logged for each membership update
+- If `announce_swap=true`, every agent receives an in-channel system announcement and an injection-level `TEAM RECONFIGURATION` block in their next-round prompt. If `announce_swap=false`, the swap is silent — agents must infer the change from their partner's behavior
+- If `postmortem_enabled=true` and `postmortem_after_swap=false`, the postmortem phase is closed for the remainder of the simulation
+
+### Presets
+
+- `knobs_default.json` — single-team baseline (`two_teams: false`, `intern_enabled: false`).
+- `knobs_two_team_swap.json` — two teams, observer swap at round 10 of 20, announced.
+- `knobs_two_team_silent_swap.json` — two teams, observer swap at round 10 of 20, silent, postmortem closed after swap.
+- `knobs_intern.json` — single-team with intern observer mode, intern joins at round 3, takes over at round 8 of 12.
+
+## Intern Observer Mode (opt-in)
+
+Setting `intern_enabled: true` (single-team only) introduces a third agent — an intern observer — that joins the comm link mid-run and eventually replaces the field observer:
+
+- **Rounds 1..`intern_join_round` - 1**: Identical to the default single-team run (2 agents, 1 link channel, plus optional postmortem).
+- **Round `intern_join_round`**: The intern is added to the comm link. They cannot see the link history from before they joined. They receive no injections, have no turn prompt, and a `validate_outgoing_message` guard rejects any attempt to send a message. Their role is pure silent observation.
+- **Rounds `intern_join_round`..`intern_takeover_round` - 1**: The intern accumulates notifications on the comm link. Every `stabilize_veyru` call is broadcast to the comm link (full arguments + full result) via a world update so the intern observes the protocol directly. The specialist also sees these broadcasts (intentional: we prioritize research clarity over specialist-side fidelity).
+- **Round `intern_takeover_round`**: The intern is promoted to field observer. The original field observer is removed from the comm link (and postmortem, if present) and stops receiving injections. A `channel_membership_changed` event is logged for each update. The intern joins postmortem iff `postmortem_enabled=true` and `postmortem_after_swap=true`; otherwise they are excluded.
+- **Rounds `intern_takeover_round`..N**: The intern is the active field observer. They receive the normal field-observer injections and can call `stabilize_veyru`.
+
+The research question is whether the intern, having only observed the protocol, can continue it successfully after takeover.
+
+Intern mode requires `two_teams=false` — the validator rejects the combination.
 
 ```bash
 python -m schmidt run veyru \

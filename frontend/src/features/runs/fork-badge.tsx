@@ -1,6 +1,6 @@
 "use client";
 
-import { GitFork } from "lucide-react";
+import { ArrowLeftRight, GitFork, UserCog, UserPlus } from "lucide-react";
 import Link from "next/link";
 
 interface ForkBadgeProps {
@@ -22,20 +22,87 @@ export function ForkBadge({ sourceRunId, targetMessageId: _targetMessageId }: Fo
   );
 }
 
+const STACK_BOTTOM_CLASSES = ["bottom-6", "bottom-20", "bottom-34", "bottom-48"] as const;
+
+function bottomClass(stackIndex: number): string {
+  return STACK_BOTTOM_CLASSES[stackIndex] ?? STACK_BOTTOM_CLASSES[0];
+}
+
 interface ForkPointFabProps {
   onClick: () => void;
+  stackIndex: number;
 }
 
 /** Floating action button that scrolls to the fork point message. */
-export function ForkPointFab({ onClick }: ForkPointFabProps) {
+export function ForkPointFab({ onClick, stackIndex }: ForkPointFabProps) {
   return (
     <button
       onClick={onClick}
-      className="fixed bottom-6 right-6 z-40 flex items-center gap-1.5 rounded-full border border-blue-300/60 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 shadow-lg transition-all hover:bg-blue-100 hover:shadow-xl dark:border-blue-700/50 dark:bg-blue-950/80 dark:text-blue-300 dark:hover:bg-blue-900/80"
+      className={`fixed ${bottomClass(stackIndex)} right-6 z-40 flex items-center gap-1.5 rounded-full border border-blue-300/60 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 shadow-lg transition-all hover:bg-blue-100 hover:shadow-xl dark:border-blue-700/50 dark:bg-blue-950/80 dark:text-blue-300 dark:hover:bg-blue-900/80`}
       title="Go to fork point"
     >
       <GitFork className="h-3.5 w-3.5" />
       Go to edited message
+    </button>
+  );
+}
+
+interface SwapPointFabProps {
+  onClick: () => void;
+  roundNumber: number;
+  stackIndex: number;
+}
+
+/** Floating action button that scrolls to the first post-swap message. */
+export function SwapPointFab({ onClick, roundNumber, stackIndex }: SwapPointFabProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`fixed ${bottomClass(stackIndex)} right-6 z-40 flex items-center gap-1.5 rounded-full border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 shadow-lg transition-all hover:bg-amber-100 hover:shadow-xl dark:border-amber-700/50 dark:bg-amber-950/80 dark:text-amber-300 dark:hover:bg-amber-900/80`}
+      title={`Go to observer swap (round ${roundNumber})`}
+    >
+      <ArrowLeftRight className="h-3.5 w-3.5" />
+      Go to swap (round {roundNumber})
+    </button>
+  );
+}
+
+interface InternJoinFabProps {
+  onClick: () => void;
+  roundNumber: number;
+  stackIndex: number;
+}
+
+/** Floating action button that scrolls to the intern-join marker. */
+export function InternJoinFab({ onClick, roundNumber, stackIndex }: InternJoinFabProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`fixed ${bottomClass(stackIndex)} right-6 z-40 flex items-center gap-1.5 rounded-full border border-emerald-300/60 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 shadow-lg transition-all hover:bg-emerald-100 hover:shadow-xl dark:border-emerald-700/50 dark:bg-emerald-950/80 dark:text-emerald-300 dark:hover:bg-emerald-900/80`}
+      title={`Go to intern join (round ${roundNumber})`}
+    >
+      <UserPlus className="h-3.5 w-3.5" />
+      Go to intern join (round {roundNumber})
+    </button>
+  );
+}
+
+interface InternTakeoverFabProps {
+  onClick: () => void;
+  roundNumber: number;
+  stackIndex: number;
+}
+
+/** Floating action button that scrolls to the intern-takeover marker. */
+export function InternTakeoverFab({ onClick, roundNumber, stackIndex }: InternTakeoverFabProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`fixed ${bottomClass(stackIndex)} right-6 z-40 flex items-center gap-1.5 rounded-full border border-violet-300/60 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-700 shadow-lg transition-all hover:bg-violet-100 hover:shadow-xl dark:border-violet-700/50 dark:bg-violet-950/80 dark:text-violet-300 dark:hover:bg-violet-900/80`}
+      title={`Go to intern takeover (round ${roundNumber})`}
+    >
+      <UserCog className="h-3.5 w-3.5" />
+      Go to intern takeover (round {roundNumber})
     </button>
   );
 }

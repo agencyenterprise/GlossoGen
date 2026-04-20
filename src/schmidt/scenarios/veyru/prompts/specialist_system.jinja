@@ -98,7 +98,7 @@ Veyru wave-patterns are influenced by the position of reference star SAGWE392. T
 You have a stellar position reader that provides the SAGWE392 reading at the start of each round. Both the treatment mapping and the physical parameters change every round.
 
 CRITICAL RULE — EVERY CHARACTER COSTS TIME:
-Every character sent over the link costs {{ knobs.seconds_per_character }} seconds of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the technician) exceeds the Veyru's time budget, the Veyru collapses permanently.
+Every character sent over the link costs {{ seconds_per_character }} seconds of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the technician) exceeds the Veyru's time budget, the Veyru collapses permanently.
 
 STABILIZATION:
 Give the technician clear physical instructions. They will execute them using the stabilize_veyru tool. If the action is correct, the Veyru is stabilized. If not, they can try again. The tool call itself does not cost time — only messages on the comm link do.

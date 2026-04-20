@@ -1,3 +1,8 @@
+{% if swap_just_happened and announce_swap %}
+=== TEAM RECONFIGURATION ===
+Your field observer has been reassigned. You are now paired with {{ partner_display_name }}.
+=== END ===
+{% endif %}
 {% if previous_outcome is not none %}
 --- PREVIOUS VEYRU RESULT ---
 Veyru {{ round_number - 1 }}: {% if previous_outcome.stabilized %}STABILIZED{% elif previous_outcome.time_elapsed_seconds > previous_outcome.time_budget_seconds %}COLLAPSED — too many characters used ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s, budget was {{ previous_outcome.time_budget_seconds }}s).{% else %}NOT STABILIZED — stabilization actions were incorrect ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s of {{ previous_outcome.time_budget_seconds }}s budget).{% endif %}

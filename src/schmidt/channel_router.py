@@ -24,6 +24,18 @@ class ChannelRouter:
         """Return a copy of the message history for the given channel."""
         return list(self._messages[channel_id])
 
+    def get_visible_history(self, channel_id: str, agent_id: str) -> list[SimulationMessage]:
+        """Return the channel history visible to ``agent_id``.
+
+        Members who joined after channel creation only see messages from
+        their join index onward; members present from the start see the
+        full history.
+        """
+        channel = self._channels[channel_id]
+        full = self._messages[channel_id]
+        start = channel.member_join_index.get(agent_id, 0)
+        return list(full[start:])
+
     def get_message_count(self, channel_id: str) -> int:
         """Return the number of messages in the given channel."""
         return len(self._messages[channel_id])
@@ -80,3 +92,43 @@ class ChannelRouter:
     def get_all_messages(self) -> dict[str, list[SimulationMessage]]:
         """Return a copy of all message histories, keyed by channel ID."""
         return {k: list(v) for k, v in self._messages.items()}
+
+    def update_membership(self, channel_id: str, member_agent_ids: list[str]) -> None:
+        """Replace the member list of an existing channel.
+
+        Newly added members have their join index set to the current message
+        count, so subsequent reads for those members return only messages
+        arriving after they joined. Removed members have their join-index
+        entry discarded. Membership is re-checked on every ``send_message``
+        and ``read_channel`` call, so the change takes effect on the next
+        tool invocation. Raises KeyError if the channel does not exist.
+        """
+        channel = self._channels[channel_id]
+        old_members = set(channel.member_agent_ids)
+        new_members = set(member_agent_ids)
+        newly_added = new_members - old_members
+        removed = old_members - new_members
+        history_len = len(self._messages[channel_id])
+        for agent_id in newly_added:
+            channel.member_join_index[agent_id] = history_len
+        for agent_id in removed:
+            channel.member_join_index.pop(agent_id, None)
+        channel.member_agent_ids = list(member_agent_ids)
+        logger.info("Channel %s membership updated to %s", channel_id, channel.member_agent_ids)
+
+    def clear_history(self, channel_id: str) -> None:
+        """Wipe the in-memory message history for a channel.
+
+        Subsequent ``read_channel`` calls return no messages from before the
+        wipe. Per-agent join indices are reset to zero so members added
+        before the wipe do not remain offset into an empty history. Raises
+        KeyError if the channel does not exist.
+        """
+        if channel_id not in self._messages:
+            raise KeyError(f"Unknown channel: {channel_id}")
+        cleared_count = len(self._messages[channel_id])
+        self._messages[channel_id] = []
+        channel = self._channels[channel_id]
+        for agent_id in list(channel.member_join_index.keys()):
+            channel.member_join_index[agent_id] = 0
+        logger.info("Channel %s history cleared (%d messages removed)", channel_id, cleared_count)
