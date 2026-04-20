@@ -248,10 +248,11 @@ class SimulationScenario(ABC):
         """
         _ = round_number
 
-    def on_round_advanced(self, round_number: int) -> None:
+    async def on_round_advanced(self, round_number: int) -> None:
         """Called by the game clock after advancing to a new round.
 
         Scenarios with mutable world state override this to resolve pending
         actions (effort allocations, status updates) and advance the simulation.
         The default is a no-op for scenarios without world state.
         """
+        _ = round_number

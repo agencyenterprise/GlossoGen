@@ -716,6 +716,20 @@ export interface components {
             run_dir: string;
         };
         /**
+         * InternAnchor
+         * @description Anchor for a timeline event in the Veyru intern-mode lifecycle.
+         *
+         *     Used for both the intern-join moment and the intern-takeover moment.
+         *     ``target_message_id`` is the first ``MessageSent`` on the link channel
+         *     after the anchor fired, so the frontend can scroll to that point.
+         */
+        InternAnchor: {
+            /** Round Number */
+            round_number: number;
+            /** Target Message Id */
+            target_message_id: string;
+        };
+        /**
          * KnobsContentResponse
          * @description Response containing the parsed contents of a knobs JSON file.
          */
@@ -831,6 +845,9 @@ export interface components {
             /** Has Eval Log File */
             has_eval_log_file: boolean;
             fork_source: components["schemas"]["ForkSource"] | null;
+            swap_point: components["schemas"]["SwapPoint"] | null;
+            intern_join: components["schemas"]["InternAnchor"] | null;
+            intern_takeover: components["schemas"]["InternAnchor"] | null;
             /** Labels */
             labels: string[];
             /** Note */
@@ -1248,6 +1265,23 @@ export interface components {
          */
         StartRunResponse: {
             status: components["schemas"]["LaunchStatus"];
+        };
+        /**
+         * SwapPoint
+         * @description Anchor for the moment agents were swapped between teams.
+         *
+         *     ``target_message_id`` is the first ``MessageSent`` on a link channel
+         *     after the swap fired, used by the frontend to scroll the timeline
+         *     to that exact point. ``swapped_observer_display_names`` are the
+         *     two observers who exchanged teams, in stable order.
+         */
+        SwapPoint: {
+            /** Round Number */
+            round_number: number;
+            /** Target Message Id */
+            target_message_id: string;
+            /** Swapped Observer Display Names */
+            swapped_observer_display_names: string[];
         };
         /**
          * ToolUseEntry

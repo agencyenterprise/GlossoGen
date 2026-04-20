@@ -12,6 +12,8 @@ from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.evaluation.log_reader import load_events
 from schmidt.models.event import (
     AgentRegistered,
+    ChannelHistoryCleared,
+    ChannelMembershipChanged,
     LLMResponseReceived,
     MessageSent,
     RunStatus,
@@ -19,6 +21,11 @@ from schmidt.models.event import (
     SimulationEvent,
     SimulationStarted,
     ToolResultReceived,
+)
+from schmidt.scenarios.veyru.ids import (
+    INTERN_JOIN_REASON,
+    INTERN_TAKEOVER_REASON,
+    OBSERVER_SWAP_REASON,
 )
 from schmidt.server.runs.models import (
     AgentDetail,
@@ -28,8 +35,10 @@ from schmidt.server.runs.models import (
     EvalMetricResponse,
     EvalReportResponse,
     ForkSource,
+    InternAnchor,
     ReasoningEntry,
     RunDetailResponse,
+    SwapPoint,
     ToolUseEntry,
 )
 from schmidt.stream_manifest import delete_manifest, read_manifest
@@ -181,6 +190,12 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     total_output_tokens = 0
     total_cache_read_tokens = 0
     total_cache_write_tokens = 0
+    swap_cleared_round: int | None = None
+    swap_cleared_timestamp: datetime | None = None
+    intern_join_round: int | None = None
+    intern_join_timestamp: datetime | None = None
+    intern_takeover_round: int | None = None
+    intern_takeover_timestamp: datetime | None = None
 
     for event in events:
         if isinstance(event, SimulationStarted):
@@ -265,6 +280,19 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 )
             )
 
+        elif isinstance(event, ChannelHistoryCleared):
+            if event.reason == OBSERVER_SWAP_REASON and swap_cleared_round is None:
+                swap_cleared_round = event.round_number
+                swap_cleared_timestamp = event.timestamp
+
+        elif isinstance(event, ChannelMembershipChanged):
+            if event.reason == INTERN_JOIN_REASON and intern_join_round is None:
+                intern_join_round = event.round_number
+                intern_join_timestamp = event.timestamp
+            elif event.reason == INTERN_TAKEOVER_REASON and intern_takeover_round is None:
+                intern_takeover_round = event.round_number
+                intern_takeover_timestamp = event.timestamp
+
         elif isinstance(event, SimulationEnded):
             status = event.reason
             total_cost_usd = event.total_cost_usd
@@ -318,6 +346,22 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     debug_logs = await _load_debug_logs(debug_log_path=debug_log_path)
 
     fork_source = _read_fork_source(run_dir=run_dir)
+    swap_point = _build_swap_point(
+        swap_round=swap_cleared_round,
+        swap_timestamp=swap_cleared_timestamp,
+        messages=messages,
+        agents_by_id=agents_by_id,
+    )
+    intern_join = _build_intern_anchor(
+        round_number=intern_join_round,
+        anchor_timestamp=intern_join_timestamp,
+        messages=messages,
+    )
+    intern_takeover = _build_intern_anchor(
+        round_number=intern_takeover_round,
+        anchor_timestamp=intern_takeover_timestamp,
+        messages=messages,
+    )
     labels = await _read_labels_async(run_dir=run_dir)
     note = await _read_note(run_dir=run_dir)
 
@@ -347,8 +391,69 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         evaluation_in_progress=evaluation_in_progress,
         has_eval_log_file=has_eval_log_file,
         fork_source=fork_source,
+        swap_point=swap_point,
+        intern_join=intern_join,
+        intern_takeover=intern_takeover,
         labels=labels,
         note=note,
+    )
+
+
+OBSERVER_A_ID = "observer_a"
+OBSERVER_B_ID = "observer_b"
+
+
+def _build_swap_point(
+    swap_round: int | None,
+    swap_timestamp: datetime | None,
+    messages: list[ChannelMessage],
+    agents_by_id: dict[str, AgentDetail],
+) -> SwapPoint | None:
+    """Return a SwapPoint anchored on the first post-swap link message, or None."""
+    if swap_round is None or swap_timestamp is None:
+        return None
+    target_message_id: str | None = None
+    for msg in messages:
+        if msg.timestamp < swap_timestamp:
+            continue
+        if not msg.channel_id.startswith("link"):
+            continue
+        target_message_id = msg.message_id
+        break
+    if target_message_id is None:
+        return None
+    observer_a = agents_by_id.get(OBSERVER_A_ID)
+    observer_b = agents_by_id.get(OBSERVER_B_ID)
+    if observer_a is None or observer_b is None:
+        return None
+    return SwapPoint(
+        round_number=swap_round,
+        target_message_id=target_message_id,
+        swapped_observer_display_names=[observer_a.role_name, observer_b.role_name],
+    )
+
+
+def _build_intern_anchor(
+    round_number: int | None,
+    anchor_timestamp: datetime | None,
+    messages: list[ChannelMessage],
+) -> InternAnchor | None:
+    """Return an InternAnchor anchored on the first post-event link message, or None."""
+    if round_number is None or anchor_timestamp is None:
+        return None
+    target_message_id: str | None = None
+    for msg in messages:
+        if msg.timestamp < anchor_timestamp:
+            continue
+        if not msg.channel_id.startswith("link"):
+            continue
+        target_message_id = msg.message_id
+        break
+    if target_message_id is None:
+        return None
+    return InternAnchor(
+        round_number=round_number,
+        target_message_id=target_message_id,
     )
 
 

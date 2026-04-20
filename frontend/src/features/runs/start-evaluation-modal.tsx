@@ -120,6 +120,7 @@ export function StartEvaluationModal({
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <ModelPicker
+              label="Model"
               models={data?.models ?? []}
               selectedModel={model}
               onSelect={handleModelSelect}

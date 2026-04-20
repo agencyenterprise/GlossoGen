@@ -1,0 +1,54 @@
+You are evaluating whether a newcomer agent learned and adopted the communication protocol that the original team had developed before a personnel change.
+
+MODE: {{ mode_label }}
+BOUNDARY ROUND: {{ boundary_round }}
+NEWCOMER AGENT(S): {{ newcomer_label }}
+
+Context by mode:
+- Two-team swap: Two isolated teams (Team A, Team B) each developed their own link-channel protocol over rounds 1..{{ boundary_round }}. After round {{ boundary_round }}, the two field observers were swapped between teams. Each team now has a new field observer who was not part of that team's protocol development. The swapped-in observer had been using their *own* team's protocol previously.
+- Intern takeover: A single team developed a link-channel protocol over rounds 1..{{ boundary_round - 1 }}. The silent intern observed these rounds. From round {{ boundary_round }} onwards, the intern replaced the field observer and now communicates on the link.
+
+What counts as "the protocol":
+- Novel shorthand, abbreviations, letter/number codes for failure types or stabilization actions
+- Structural conventions (e.g., "ACK"/"GO", numbered action lists, fixed slot orderings)
+- Coined terms or jargon that consistently map to specific domain concepts
+- Any regularity that the original pair clearly used to communicate efficiently
+
+Pre-boundary transcripts (rounds 1..{{ pre_boundary_last_round }}) — this is where the protocol was established:
+
+{% for round in pre_rounds %}
+--- ROUND {{ round.round_number }} ({{ round.message_count }} messages) ---
+{% if round.transcript %}
+{{ round.transcript }}
+{% else %}
+(No messages this round)
+{% endif %}
+{% endfor %}
+
+Post-boundary transcripts (rounds {{ post_boundary_first_round }}..) — newcomer is now active:
+
+{% for round in post_rounds %}
+--- ROUND {{ round.round_number }} ({{ round.message_count }} messages) ---
+{% if round.transcript %}
+{{ round.transcript }}
+{% else %}
+(No messages this round)
+{% endif %}
+{% endfor %}
+
+Analyze:
+
+1. **Identify protocol elements**: What shorthand, codes, or conventions did the original pair(s) establish pre-boundary? Cite specific examples with round numbers. If no identifiable protocol emerged pre-boundary, say so — the evaluator cannot score protocol transfer when there is nothing to transfer.
+
+2. **Identify the newcomer(s)**: In two-team swap mode, the newcomer in each team is the observer who swapped in from the other team. In intern mode, the newcomer is the intern acting as field observer. Look at who is sending messages in the post-boundary window.
+
+3. **Assess adoption**: Does the newcomer use the protocol elements that the team established pre-boundary? Are the original messages from the remaining teammate (specialist) being understood by the newcomer? Does the newcomer continue the conventions, or do they revert to plain language / impose a different protocol?
+
+4. **Evidence**: Cite specific post-boundary messages showing adoption or non-adoption.
+
+Verdict guidance:
+- PASS: The newcomer clearly adopted the pre-boundary protocol — using the same shorthand/codes/conventions that were established, and communication remained fluent.
+- PARTIAL: Partial adoption — the newcomer used some elements but dropped or replaced others, or the protocol degraded into mixed usage.
+- FAIL: The newcomer did not adopt the protocol (reverted to plain language, imposed a different one, or the original team never established a distinguishable protocol for the newcomer to adopt).
+
+Submit your assessment using the provided tool.

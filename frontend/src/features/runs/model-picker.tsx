@@ -38,10 +38,12 @@ function groupByProvider(models: ModelOption[], filter: string): ProviderGroup[]
 }
 
 export function ModelPicker({
+  label,
   models,
   selectedModel,
   onSelect,
 }: {
+  label: string;
   models: ModelOption[];
   selectedModel: string;
   onSelect: (model: string, provider: string) => void;
@@ -52,7 +54,7 @@ export function ModelPicker({
 
   return (
     <div className="space-y-1.5">
-      <label className="block text-sm font-medium">Model</label>
+      <label className="block text-sm font-medium">{label}</label>
       <input
         type="text"
         placeholder="Filter models..."

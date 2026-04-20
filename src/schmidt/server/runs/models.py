@@ -18,6 +18,32 @@ class ForkSource(BaseModel):
     forked_at: datetime
 
 
+class SwapPoint(BaseModel):
+    """Anchor for the moment agents were swapped between teams.
+
+    ``target_message_id`` is the first ``MessageSent`` on a link channel
+    after the swap fired, used by the frontend to scroll the timeline
+    to that exact point. ``swapped_observer_display_names`` are the
+    two observers who exchanged teams, in stable order.
+    """
+
+    round_number: int
+    target_message_id: str
+    swapped_observer_display_names: list[str]
+
+
+class InternAnchor(BaseModel):
+    """Anchor for a timeline event in the Veyru intern-mode lifecycle.
+
+    Used for both the intern-join moment and the intern-takeover moment.
+    ``target_message_id`` is the first ``MessageSent`` on the link channel
+    after the anchor fired, so the frontend can scroll to that point.
+    """
+
+    round_number: int
+    target_message_id: str
+
+
 class AgentModelSummary(BaseModel):
     """Per-agent model and provider info for run summary display."""
 
@@ -174,6 +200,9 @@ class RunDetailResponse(BaseModel):
     evaluation_in_progress: bool
     has_eval_log_file: bool
     fork_source: ForkSource | None
+    swap_point: SwapPoint | None
+    intern_join: InternAnchor | None
+    intern_takeover: InternAnchor | None
     labels: list[str]
     note: str | None
 

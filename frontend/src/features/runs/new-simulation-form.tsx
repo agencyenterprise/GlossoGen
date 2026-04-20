@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, X } from "lucide-react";
 import Link from "next/link";
@@ -11,6 +11,14 @@ import { ModelPicker } from "./model-picker";
 import { ConfigValueModal } from "./config-value-modal";
 import { AgentModelOverrides, type AgentModelOverride } from "./agent-model-overrides";
 import { labelColor } from "./label-picker-modal";
+import { VeyruKnobsForm } from "./veyru/veyru-knobs-form";
+import {
+  buildPayload as buildVeyruPayload,
+  validateState as validateVeyruState,
+  type VeyruKnobsState,
+} from "./veyru/veyru-knobs-state";
+
+const VEYRU_SCENARIO = "veyru";
 
 type KnobsMap = Record<string, unknown>;
 type KnobPreview = { key: string; value: string };
@@ -139,6 +147,7 @@ export function NewSimulationForm() {
   }
   const [knobsFile, setKnobsFile] = useState("");
   const [knobs, setKnobs] = useState<KnobsMap | null>(null);
+  const [veyruState, setVeyruState] = useState<VeyruKnobsState | null>(null);
   const [labels, setLabels] = useState<string[]>([]);
   const [labelInput, setLabelInput] = useState("");
   const [note, setNote] = useState("");
@@ -162,6 +171,8 @@ export function NewSimulationForm() {
     },
   });
 
+  const isVeyru = scenario === VEYRU_SCENARIO;
+
   const knobsQuery = useQuery({
     queryKey: ["knobs", scenario, knobsFile],
     queryFn: async () => {
@@ -174,7 +185,7 @@ export function NewSimulationForm() {
       setKnobs({ ...data.knobs });
       return data;
     },
-    enabled: !!scenario && !!knobsFile,
+    enabled: !!scenario && !!knobsFile && !isVeyru,
   });
 
   const selectedScenario = data?.scenarios.find(s => s.scenario_name === scenario);
@@ -182,20 +193,37 @@ export function NewSimulationForm() {
   const needsKnobs = knobsFiles.length > 0;
   const hasSelectedModel = model !== "" && provider !== "";
 
+  const effectiveKnobsForAgents = useMemo<KnobsMap | null>(() => {
+    if (isVeyru) {
+      if (!veyruState) {
+        return null;
+      }
+      return buildVeyruPayload({ state: veyruState, modelOverrides: {} });
+    }
+    return knobs;
+  }, [isVeyru, veyruState, knobs]);
+
   const agentRolesQuery = useQuery({
-    queryKey: ["agentRoles", scenario, knobs],
+    queryKey: ["agentRoles", scenario, effectiveKnobsForAgents],
     queryFn: async () => {
       const { data, error } = await api.POST("/api/scenarios/{scenario_name}/agents", {
         params: { path: { scenario_name: scenario } },
-        body: { knobs: knobs ?? null },
+        body: { knobs: effectiveKnobsForAgents },
       });
       if (error) {
         throw new Error("Failed to fetch agent roles");
       }
       return data;
     },
-    enabled: !!scenario && (!needsKnobs || !!knobs),
+    enabled: !!scenario && (!needsKnobs || !!effectiveKnobsForAgents),
   });
+
+  const veyruErrors = useMemo(() => {
+    if (!isVeyru || !veyruState) {
+      return [];
+    }
+    return validateVeyruState(veyruState);
+  }, [isVeyru, veyruState]);
 
   const startMutation = useMutation({
     mutationFn: async () => {
@@ -203,21 +231,26 @@ export function NewSimulationForm() {
       const before = await api.GET("/api/runs");
       const existingIds = new Set((before.data?.runs ?? []).map(r => r.run_id));
 
-      const overridesPayload =
-        Object.keys(modelOverrides).length > 0
-          ? Object.fromEntries(
-              Object.entries(modelOverrides).map(([agentId, ov]) => [
-                agentId,
-                { model: ov.model, provider: ov.provider },
-              ])
-            )
-          : null;
-      let knobsPayload: KnobsMap | null = knobs ? { ...knobs } : null;
-      if (overridesPayload !== null) {
-        if (knobsPayload === null) {
-          knobsPayload = {};
+      let knobsPayload: KnobsMap | null;
+      if (isVeyru) {
+        if (!veyruState) {
+          throw new Error("Veyru settings have not loaded yet");
         }
-        knobsPayload.model_overrides = overridesPayload;
+        knobsPayload = buildVeyruPayload({ state: veyruState, modelOverrides });
+      } else {
+        knobsPayload = knobs ? { ...knobs } : null;
+        if (Object.keys(modelOverrides).length > 0) {
+          const overridesPayload = Object.fromEntries(
+            Object.entries(modelOverrides).map(([agentId, ov]) => [
+              agentId,
+              { model: ov.model, provider: ov.provider },
+            ])
+          );
+          if (knobsPayload === null) {
+            knobsPayload = {};
+          }
+          knobsPayload.model_overrides = overridesPayload;
+        }
       }
 
       const { error } = await api.POST("/api/runs/start", {
@@ -273,7 +306,15 @@ export function NewSimulationForm() {
     },
   });
 
-  const canSubmit = scenario && model && provider && (!needsKnobs || knobs);
+  const canSubmit = (() => {
+    if (!scenario || !model || !provider) {
+      return false;
+    }
+    if (isVeyru) {
+      return veyruState !== null && veyruErrors.length === 0;
+    }
+    return !needsKnobs || !!knobs;
+  })();
 
   if (isLoading) {
     return (
@@ -287,6 +328,7 @@ export function NewSimulationForm() {
     setScenario(value);
     setKnobsFile("");
     setKnobs(null);
+    setVeyruState(null);
     setModelOverrides({});
   }
 
@@ -336,52 +378,66 @@ export function NewSimulationForm() {
         </select>
       </div>
 
-      <ModelPicker models={data?.models ?? []} selectedModel={model} onSelect={handleModelSelect} />
+      <ModelPicker
+        label="Model"
+        models={data?.models ?? []}
+        selectedModel={model}
+        onSelect={handleModelSelect}
+      />
 
-      <div className="space-y-2">
-        <label htmlFor="knobs" className="block text-sm font-medium">
-          Knobs
-        </label>
-        {needsKnobs ? (
-          <select
-            id="knobs"
-            value={knobsFile}
-            onChange={e => handleKnobsFileChange(e.target.value)}
-            disabled={!hasSelectedModel}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:bg-muted disabled:text-muted-foreground"
-          >
-            <option value="">
-              {hasSelectedModel ? "Select a knobs preset..." : "Select a model first..."}
-            </option>
-            {knobsFiles.map(f => (
-              <option key={f} value={f}>
-                {humanize(f.replace("knobs_", ""))}
+      {isVeyru ? (
+        <VeyruKnobsForm
+          state={veyruState}
+          models={data?.models ?? []}
+          errors={veyruErrors}
+          onChange={setVeyruState}
+        />
+      ) : (
+        <div className="space-y-2">
+          <label htmlFor="knobs" className="block text-sm font-medium">
+            Knobs
+          </label>
+          {needsKnobs ? (
+            <select
+              id="knobs"
+              value={knobsFile}
+              onChange={e => handleKnobsFileChange(e.target.value)}
+              disabled={!hasSelectedModel}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:bg-muted disabled:text-muted-foreground"
+            >
+              <option value="">
+                {hasSelectedModel ? "Select a knobs preset..." : "Select a model first..."}
               </option>
-            ))}
-          </select>
-        ) : (
-          <select
-            id="knobs"
-            disabled
-            className="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground"
-          >
-            <option>No knobs for this scenario</option>
-          </select>
-        )}
+              {knobsFiles.map(f => (
+                <option key={f} value={f}>
+                  {humanize(f.replace("knobs_", ""))}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              id="knobs"
+              disabled
+              className="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground"
+            >
+              <option>No knobs for this scenario</option>
+            </select>
+          )}
 
-        {knobs ? (
-          <div className="pt-1">
-            <KnobsBadges knobs={knobs} onChange={setKnobs} />
-          </div>
-        ) : null}
+          {knobs ? (
+            <div className="pt-1">
+              <KnobsBadges knobs={knobs} onChange={setKnobs} />
+            </div>
+          ) : null}
 
-        {knobsQuery.isLoading ? (
-          <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Loading knobs...
-          </div>
-        ) : null}
-      </div>
+          {knobsQuery.isLoading ? (
+            <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Loading knobs...
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {agentRoles.length > 0 ? (
         <div className="space-y-2">

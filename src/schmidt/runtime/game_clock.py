@@ -181,7 +181,7 @@ class GameClock:
             trigger,
         )
 
-        self._scenario.on_round_advanced(round_number=self._current_round)
+        await self._scenario.on_round_advanced(round_number=self._current_round)
         self._world_context.signal_round_advanced(round_number=self._current_round)
 
         await self._deliver_injections(round_number=self._current_round)
@@ -197,7 +197,7 @@ class GameClock:
         self._last_message_time = time.monotonic()
 
         if self._resuming:
-            self._scenario.on_round_advanced(round_number=self._current_round)
+            await self._scenario.on_round_advanced(round_number=self._current_round)
             self._world_context.signal_round_advanced(round_number=self._current_round)
             logger.info(
                 "Game clock resumed at round %d/%d",
@@ -211,7 +211,7 @@ class GameClock:
                     trigger="simulation_start",
                 )
             )
-            self._scenario.on_round_advanced(round_number=self._current_round)
+            await self._scenario.on_round_advanced(round_number=self._current_round)
             self._world_context.signal_round_advanced(round_number=self._current_round)
             await self._deliver_injections(round_number=self._current_round)
             logger.info(

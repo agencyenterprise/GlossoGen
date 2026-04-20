@@ -1,5 +1,5 @@
 {
-  "announce_swap": false,
+  "announce_swap": true,
   "intern_enabled": false,
   "intern_join_round": null,
   "intern_takeover_round": null,
@@ -9,9 +9,9 @@
   "model_overrides": {},
   "postmortem_after_swap": true,
   "postmortem_enabled": true,
-  "round_count": 12,
+  "round_count": 20,
   "seconds_per_character": 2.0,
   "seed": 42,
-  "swap_round": null,
-  "two_teams": false
+  "swap_round": 10,
+  "two_teams": true
 }

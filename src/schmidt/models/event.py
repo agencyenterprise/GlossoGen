@@ -149,6 +149,25 @@ class PostmortemStarted(EventBase):
     round_number: int
 
 
+class ChannelHistoryCleared(EventBase):
+    """Emitted when a channel's message history is wiped mid-run."""
+
+    event_type: Literal["channel_history_cleared"] = "channel_history_cleared"
+    channel_id: str
+    round_number: int
+    reason: str
+
+
+class ChannelMembershipChanged(EventBase):
+    """Emitted when a channel's member agent list is reassigned mid-run."""
+
+    event_type: Literal["channel_membership_changed"] = "channel_membership_changed"
+    channel_id: str
+    round_number: int
+    member_agent_ids: list[str]
+    reason: str
+
+
 class SimulationEnded(EventBase):
     """Emitted when the simulation finishes, with termination reason, message count, and cost."""
 
@@ -169,6 +188,8 @@ SimulationEvent = Annotated[
         RoundAdvanced,
         InjectionDelivered,
         PostmortemStarted,
+        ChannelHistoryCleared,
+        ChannelMembershipChanged,
         WorldEventDelivered,
         SimulationEnded,
     ],

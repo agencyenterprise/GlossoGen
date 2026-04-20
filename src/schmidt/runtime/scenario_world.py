@@ -2,7 +2,7 @@
 
 Every scenario provides a ``ScenarioWorld`` that runs as its own asyncio task.
 The world receives message events and round advance signals via a ``WorldContext``,
-and can push notifications to agents via ``send_update``.
+and can push channel-scoped notifications via ``send_update_to_channel``.
 """
 
 import asyncio
@@ -10,8 +10,13 @@ import logging
 from abc import ABC, abstractmethod
 from typing import NamedTuple
 
+from schmidt.channel_router import ChannelRouter
 from schmidt.event_logger import EventLogger
-from schmidt.models.event import WorldEventDelivered
+from schmidt.models.event import (
+    ChannelHistoryCleared,
+    ChannelMembershipChanged,
+    WorldEventDelivered,
+)
 from schmidt.runtime.activity_notification import NewInfoNotification
 from schmidt.runtime.agent_session import AgentSession
 
@@ -45,6 +50,8 @@ class WorldContext:
     to broadcast notifications to all agents.
     """
 
+    _channel_router: ChannelRouter
+
     def __init__(
         self,
         agent_sessions: dict[str, AgentSession],
@@ -58,13 +65,18 @@ class WorldContext:
         """Block until the next world event (message or round advance)."""
         return await self._event_queue.get()
 
-    async def send_update(self, text: str) -> None:
-        """Broadcast a world notification to all agent sessions.
+    async def send_update_to_channel(self, channel_id: str, text: str) -> None:
+        """Push a world notification only to agents in the specified channel.
 
-        Pushes a ``NewInfoNotification`` to each agent and logs a
-        ``WorldEventDelivered`` event per agent for replay and evaluation.
+        Agents outside the channel do not receive the notification. One
+        ``WorldEventDelivered`` event is logged per delivered agent.
         """
-        for agent_id, session in self._agent_sessions.items():
+        router = self._channel_router
+        member_ids = router.get_channel_member_ids(channel_id=channel_id)
+        for agent_id in member_ids:
+            session = self._agent_sessions.get(agent_id)
+            if session is None:
+                continue
             session.push_notification(
                 notification=NewInfoNotification(text=text),
             )
@@ -75,7 +87,70 @@ class WorldContext:
                     text=text,
                 )
             )
-        logger.debug("World update broadcast to %d agents: %s", len(self._agent_sessions), text)
+        logger.debug(
+            "World update delivered to channel %s (%d agents): %s",
+            channel_id,
+            len(member_ids),
+            text,
+        )
+
+    async def update_channel_members(
+        self,
+        channel_id: str,
+        member_agent_ids: list[str],
+        reason: str,
+    ) -> None:
+        """Replace a channel's member list and log the change.
+
+        Newly added members have their session ``last_seen_count`` for this
+        channel set to the current message count so pre-join messages do
+        not trigger ``send_message`` concurrency conflicts. Membership is
+        rechecked on every ``send_message`` / ``read_channel`` call, so the
+        change takes effect immediately for all subsequent tool invocations.
+        """
+        router = self._channel_router
+        old_members = set(router.get_channel_member_ids(channel_id=channel_id))
+        new_members = set(member_agent_ids)
+        newly_added = new_members - old_members
+        history_len = router.get_message_count(channel_id=channel_id)
+        router.update_membership(
+            channel_id=channel_id,
+            member_agent_ids=member_agent_ids,
+        )
+        for agent_id in newly_added:
+            session = self._agent_sessions.get(agent_id)
+            if session is None:
+                continue
+            session.set_last_seen_count(
+                channel_id=channel_id,
+                count=history_len,
+            )
+        await self._event_logger.log(
+            event=ChannelMembershipChanged(
+                channel_id=channel_id,
+                round_number=self._event_logger.current_round,
+                member_agent_ids=list(member_agent_ids),
+                reason=reason,
+            )
+        )
+
+    async def clear_channel_history(self, channel_id: str, reason: str) -> None:
+        """Wipe a channel's message history and reset per-agent read positions.
+
+        Agents' ``last_seen_count`` for this channel is reset to zero so that
+        messages appended after the wipe are correctly flagged as new.
+        """
+        router = self._channel_router
+        router.clear_history(channel_id=channel_id)
+        for session in self._agent_sessions.values():
+            session.set_last_seen_count(channel_id=channel_id, count=0)
+        await self._event_logger.log(
+            event=ChannelHistoryCleared(
+                channel_id=channel_id,
+                round_number=self._event_logger.current_round,
+                reason=reason,
+            )
+        )
 
     def enqueue_message_event(
         self,
@@ -111,8 +186,8 @@ class ScenarioWorld(ABC):
     @abstractmethod
     async def run(self, context: WorldContext) -> None:
         """Main world loop. Process events from ``context.next_event()`` and
-        send updates via ``context.send_update()``. Handle ``CancelledError``
-        for cleanup.
+        send updates via ``context.send_update_to_channel()``. Handle
+        ``CancelledError`` for cleanup.
         """
         ...
 

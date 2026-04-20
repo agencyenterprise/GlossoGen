@@ -76,6 +76,7 @@ export function AgentModelOverrides({
             {isExpanded ? (
               <div className="mt-2">
                 <ModelPicker
+                  label="Override model"
                   models={models}
                   selectedModel=""
                   onSelect={(selectedModel, selectedProvider) =>

@@ -185,12 +185,16 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
             channel_id=channel_id,
         ):
             raise ValueError(f"You are not a member of channel '{channel_id}'")
-        history = runtime.channel_router.get_history(channel_id=channel_id)
+        visible = runtime.channel_router.get_visible_history(
+            channel_id=channel_id,
+            agent_id=agent_id,
+        )
+        absolute_count = runtime.channel_router.get_message_count(channel_id=channel_id)
         session.record_channel_read(
             channel_id=channel_id,
-            message_count=len(history),
+            message_count=absolute_count,
         )
-        recent = history[-last_n:]
+        recent = visible[-last_n:]
         display_name_fn = runtime.scenario.get_agent_display_name
         return [
             {

@@ -30,7 +30,13 @@ import { mergeEntries } from "./display-entry";
 import { LabelBadges } from "./eval-label-group";
 import { EvalLogPanel } from "./eval-log-panel";
 import { EvalPanel } from "./eval-panel";
-import { ForkBadge, ForkPointFab } from "./fork-badge";
+import {
+  ForkBadge,
+  ForkPointFab,
+  InternJoinFab,
+  InternTakeoverFab,
+  SwapPointFab,
+} from "./fork-badge";
 import { StartEvaluationModal } from "./start-evaluation-modal";
 import {
   elapsedSince,
@@ -610,6 +616,10 @@ export function RunDetail({ runId }: { runId: string }) {
             onCancelEdit={fork.cancelEdit}
             onForkFromMessage={handleForkFromMessage}
             forkPointMessageId={restData.fork_source?.target_message_id ?? null}
+            swapRoundNumber={restData.swap_point?.round_number ?? null}
+            swappedObserverDisplayNames={restData.swap_point?.swapped_observer_display_names ?? []}
+            internJoinRoundNumber={restData.intern_join?.round_number ?? null}
+            internTakeoverRoundNumber={restData.intern_takeover?.round_number ?? null}
           />
         )}
 
@@ -712,31 +722,87 @@ export function RunDetail({ runId }: { runId: string }) {
         />
       ) : null}
 
-      {restData.fork_source ? (
-        <ForkPointFab
-          onClick={() => {
-            const forkMsgId = restData.fork_source?.target_message_id;
-            if (!forkMsgId) return;
-            const entry = displayEntries.find(e => e.message_id === forkMsgId);
-            if (!entry) return;
+      {(() => {
+        let nextStackIndex = 0;
+        const forkStackIndex = restData.fork_source !== null ? nextStackIndex++ : null;
+        const swapStackIndex = restData.swap_point !== null ? nextStackIndex++ : null;
+        const internJoinStackIndex = restData.intern_join !== null ? nextStackIndex++ : null;
+        const internTakeoverStackIndex =
+          restData.intern_takeover !== null ? nextStackIndex++ : null;
 
-            const messageChannel = entry.channel_id;
-            const needsChannelSwitch =
-              selectedChannel !== null && selectedChannel !== messageChannel;
+        const scrollToDivider = (elementId: string) => {
+          flushSync(() => {
+            setSelectedAgent(null);
+            setShowLogs(false);
+            setSelectedChannel(null);
+            setHighlightedMessageId(null);
+          });
+          requestAnimationFrame(() => {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.classList.add("animate-highlight");
+            setTimeout(() => {
+              el.classList.remove("animate-highlight");
+            }, 1500);
+          });
+        };
 
-            flushSync(() => {
-              setSelectedAgent(null);
-              setShowLogs(false);
-              if (needsChannelSwitch) {
-                setSelectedChannel(null);
-              }
-              setHighlightedMessageId(null);
-            });
-            setHighlightNonce(n => n + 1);
-            setHighlightedMessageId(forkMsgId);
-          }}
-        />
-      ) : null}
+        return (
+          <>
+            {restData.fork_source && forkStackIndex !== null ? (
+              <ForkPointFab
+                stackIndex={forkStackIndex}
+                onClick={() => {
+                  const forkMsgId = restData.fork_source?.target_message_id;
+                  if (!forkMsgId) return;
+                  const entry = displayEntries.find(e => e.message_id === forkMsgId);
+                  if (!entry) return;
+
+                  const messageChannel = entry.channel_id;
+                  const needsChannelSwitch =
+                    selectedChannel !== null && selectedChannel !== messageChannel;
+
+                  flushSync(() => {
+                    setSelectedAgent(null);
+                    setShowLogs(false);
+                    if (needsChannelSwitch) {
+                      setSelectedChannel(null);
+                    }
+                    setHighlightedMessageId(null);
+                  });
+                  setHighlightNonce(n => n + 1);
+                  setHighlightedMessageId(forkMsgId);
+                }}
+              />
+            ) : null}
+
+            {restData.swap_point && swapStackIndex !== null ? (
+              <SwapPointFab
+                stackIndex={swapStackIndex}
+                roundNumber={restData.swap_point.round_number}
+                onClick={() => scrollToDivider("swap-divider")}
+              />
+            ) : null}
+
+            {restData.intern_join && internJoinStackIndex !== null ? (
+              <InternJoinFab
+                stackIndex={internJoinStackIndex}
+                roundNumber={restData.intern_join.round_number}
+                onClick={() => scrollToDivider("intern-join-divider")}
+              />
+            ) : null}
+
+            {restData.intern_takeover && internTakeoverStackIndex !== null ? (
+              <InternTakeoverFab
+                stackIndex={internTakeoverStackIndex}
+                roundNumber={restData.intern_takeover.round_number}
+                onClick={() => scrollToDivider("intern-takeover-divider")}
+              />
+            ) : null}
+          </>
+        );
+      })()}
     </div>
   );
 }
@@ -796,6 +862,7 @@ function ForkModal({
 
             <div className="mb-4">
               <ModelPicker
+                label="Model"
                 models={data?.models ?? []}
                 selectedModel={model}
                 onSelect={handleModelSelect}

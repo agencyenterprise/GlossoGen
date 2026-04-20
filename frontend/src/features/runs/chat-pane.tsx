@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Download, FolderArchive, Package, Pencil } from "lucide-react";
+import {
+  ArrowLeftRight,
+  ChevronDown,
+  Download,
+  FolderArchive,
+  Package,
+  Pencil,
+  UserCog,
+  UserPlus,
+} from "lucide-react";
 import { Tooltip } from "@/shared/components/ui/tooltip";
 import { buildApiUrlWithToken } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
@@ -43,6 +52,14 @@ interface ChatPaneProps {
   onForkFromMessage: (targetMessageId: string) => void;
   /** The message_id that was the fork point, if this is a forked run. */
   forkPointMessageId: string | null;
+  /** Round number where the first post-swap messages appear (if the run had an observer swap). */
+  swapRoundNumber: number | null;
+  /** Display names of the two observers that swapped teams. */
+  swappedObserverDisplayNames: string[];
+  /** Round number where the intern joined the link (if intern mode was enabled). */
+  internJoinRoundNumber: number | null;
+  /** Round number where the intern replaced the field observer (if intern mode was enabled). */
+  internTakeoverRoundNumber: number | null;
 }
 
 interface TurnGroup {
@@ -120,6 +137,10 @@ export function ChatPane({
   onCancelEdit,
   onForkFromMessage,
   forkPointMessageId,
+  swapRoundNumber,
+  swappedObserverDisplayNames,
+  internJoinRoundNumber,
+  internTakeoverRoundNumber,
 }: ChatPaneProps) {
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -330,6 +351,64 @@ export function ChatPane({
       >
         {rounds.map((round, roundIdx) => (
           <div key={`round-${roundIdx}-${round.roundNumber}`}>
+            {swapRoundNumber !== null && round.roundNumber === swapRoundNumber ? (
+              <div
+                id="swap-divider"
+                className="mx-4 my-4 rounded-md border-2 border-dashed border-amber-400/80 bg-amber-50 px-4 py-3 dark:border-amber-600/70 dark:bg-amber-950/50"
+              >
+                <div className="flex items-center justify-center gap-2 text-amber-800 dark:text-amber-200">
+                  <ArrowLeftRight className="h-4 w-4" />
+                  <span className="text-sm font-semibold">
+                    {swappedObserverDisplayNames.length === 2 ? (
+                      <>
+                        {swappedObserverDisplayNames[0]} <span aria-hidden="true">⇄</span>{" "}
+                        {swappedObserverDisplayNames[1]} — swapped teams
+                      </>
+                    ) : (
+                      <>Observers swapped between teams</>
+                    )}
+                  </span>
+                </div>
+                <div className="mt-1 text-center text-[11px] text-amber-700/80 dark:text-amber-300/80">
+                  Channel history was wiped. Round {round.roundNumber} begins with the new pairings.
+                </div>
+              </div>
+            ) : null}
+            {internJoinRoundNumber !== null && round.roundNumber === internJoinRoundNumber ? (
+              <div
+                id="intern-join-divider"
+                className="mx-4 my-4 rounded-md border-2 border-dashed border-emerald-400/80 bg-emerald-50 px-4 py-3 dark:border-emerald-600/70 dark:bg-emerald-950/50"
+              >
+                <div className="flex items-center justify-center gap-2 text-emerald-800 dark:text-emerald-200">
+                  <UserPlus className="h-4 w-4" />
+                  <span className="text-sm font-semibold">
+                    Intern Observer joined the comm link
+                  </span>
+                </div>
+                <div className="mt-1 text-center text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
+                  Silent observation begins at round {round.roundNumber}. The intern cannot see
+                  messages from earlier rounds.
+                </div>
+              </div>
+            ) : null}
+            {internTakeoverRoundNumber !== null &&
+            round.roundNumber === internTakeoverRoundNumber ? (
+              <div
+                id="intern-takeover-divider"
+                className="mx-4 my-4 rounded-md border-2 border-dashed border-violet-400/80 bg-violet-50 px-4 py-3 dark:border-violet-600/70 dark:bg-violet-950/50"
+              >
+                <div className="flex items-center justify-center gap-2 text-violet-800 dark:text-violet-200">
+                  <UserCog className="h-4 w-4" />
+                  <span className="text-sm font-semibold">
+                    Intern Observer took over as Field Observer
+                  </span>
+                </div>
+                <div className="mt-1 text-center text-[11px] text-violet-700/80 dark:text-violet-300/80">
+                  The previous Field Observer left the comm link. Round {round.roundNumber} begins
+                  with the new pairing.
+                </div>
+              </div>
+            ) : null}
             <div className="flex items-center gap-2.5 px-4 pb-1.5 pt-3.5">
               <div className="h-px flex-1 bg-border" />
               <span className="whitespace-nowrap text-[11px] text-muted-foreground">
