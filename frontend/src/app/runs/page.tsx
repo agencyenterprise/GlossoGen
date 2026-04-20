@@ -11,39 +11,55 @@ import { AUTH_STORAGE_KEY } from "@/features/auth/auth-gate";
 
 export default function RunsPage() {
   const [showMcpConfig, setShowMcpConfig] = useState(false);
-  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(
+    null
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length === 0) return;
+    const headers: Record<string, string> = {};
+    const password = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (password) {
+      headers["Authorization"] = `Bearer ${password}`;
+    }
+    const failures: string[] = [];
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const headers: Record<string, string> = {};
-      const password = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (password) {
-        headers["Authorization"] = `Bearer ${password}`;
+      for (const [index, file] of files.entries()) {
+        setImportProgress({ current: index + 1, total: files.length });
+        const formData = new FormData();
+        formData.append("file", file);
+        try {
+          // eslint-disable-next-line no-restricted-globals -- multipart file upload not supported by openapi-fetch
+          const resp = await fetch(`${API_URL}/api/runs/import`, {
+            method: "POST",
+            body: formData,
+            headers,
+          });
+          if (!resp.ok) {
+            const err = await resp.json();
+            failures.push(`${file.name}: ${err.detail}`);
+          }
+        } catch (err) {
+          failures.push(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
-      // eslint-disable-next-line no-restricted-globals -- multipart file upload not supported by openapi-fetch
-      const resp = await fetch(`${API_URL}/api/runs/import`, {
-        method: "POST",
-        body: formData,
-        headers,
-      });
-      if (!resp.ok) {
-        const err = await resp.json();
-        alert(`Import failed: ${err.detail}`);
-        return;
+      if (failures.length > 0) {
+        alert(`Import failed for ${failures.length} file(s):\n\n${failures.join("\n")}`);
       }
       queryClient.invalidateQueries({ queryKey: ["runs"] });
     } finally {
-      setImporting(false);
+      setImportProgress(null);
       e.target.value = "";
     }
   };
+
+  const importing = importProgress !== null;
+  const importLabel = importProgress
+    ? `Importing ${importProgress.current}/${importProgress.total}...`
+    : "Import";
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
@@ -70,11 +86,12 @@ export default function RunsPage() {
             className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
           >
             <Upload className="h-4 w-4" />
-            {importing ? "Importing..." : "Import"}
+            {importLabel}
           </button>
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept=".tar.gz,.tgz,.gz,application/gzip,application/x-gzip,application/x-tar"
             className="hidden"
             onChange={handleImport}

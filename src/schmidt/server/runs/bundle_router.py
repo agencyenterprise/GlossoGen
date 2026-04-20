@@ -69,7 +69,7 @@ def _pack_git_objects(run_dir: Path) -> None:
         cwd=str(run_dir),
         check=True,
         capture_output=True,
-        timeout=120,
+        timeout=360,
     )
 
 
