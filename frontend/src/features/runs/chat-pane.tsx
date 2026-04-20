@@ -12,7 +12,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { Tooltip } from "@/shared/components/ui/tooltip";
-import { buildApiUrlWithToken } from "@/shared/lib/api-client";
+import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
@@ -299,11 +299,11 @@ export function ChatPane({
               if (selectedChannel !== null) {
                 params.set("channel_id", selectedChannel);
               }
-              const url = buildApiUrlWithToken({
+              void downloadAuthenticatedFile({
                 path: `/api/runs/${runId}/export/pdf`,
                 searchParams: params,
+                fallbackFilename: `${runId.slice(0, 8)}_transcript.pdf`,
               });
-              window.open(url, "_blank");
             }}
           >
             <Download className="h-3.5 w-3.5" />
@@ -317,11 +317,11 @@ export function ChatPane({
             aria-label="Download artifacts"
             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             onClick={() => {
-              const url = buildApiUrlWithToken({
+              void downloadAuthenticatedFile({
                 path: `/api/runs/${runId}/export/artifacts`,
                 searchParams: new URLSearchParams(),
+                fallbackFilename: `${runId.slice(0, 8)}_artifacts.tar.gz`,
               });
-              window.open(url, "_blank");
             }}
           >
             <FolderArchive className="h-3.5 w-3.5" />
@@ -332,11 +332,11 @@ export function ChatPane({
             aria-label="Export bundle (with git history)"
             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             onClick={() => {
-              const url = buildApiUrlWithToken({
+              void downloadAuthenticatedFile({
                 path: `/api/runs/${runId}/export/bundle`,
                 searchParams: new URLSearchParams(),
+                fallbackFilename: `${runId.slice(0, 8)}_bundle.tar.gz`,
               });
-              window.open(url, "_blank");
             }}
           >
             <Package className="h-3.5 w-3.5" />
@@ -559,11 +559,11 @@ export function ChatPane({
                                       aria-label="Download artifacts at this message"
                                       className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                       onClick={() => {
-                                        const url = buildApiUrlWithToken({
+                                        void downloadAuthenticatedFile({
                                           path: `/api/runs/${runId}/export/artifacts/${entry.message_id}`,
                                           searchParams: new URLSearchParams(),
+                                          fallbackFilename: `${runId.slice(0, 8)}_${entry.message_id.slice(0, 8)}_artifacts.tar.gz`,
                                         });
-                                        window.open(url, "_blank");
                                       }}
                                     >
                                       <FolderArchive className="h-3 w-3" />

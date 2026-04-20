@@ -16,7 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { api, buildApiUrlWithToken } from "@/shared/lib/api-client";
+import { api, downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import {
@@ -517,11 +517,11 @@ export function RunList() {
                                 className="rounded p-1 text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-foreground group-hover:opacity-100"
                                 onClick={e => {
                                   e.stopPropagation();
-                                  const url = buildApiUrlWithToken({
+                                  void downloadAuthenticatedFile({
                                     path: `/api/runs/${run.run_id}/export/bundle`,
                                     searchParams: new URLSearchParams(),
+                                    fallbackFilename: `${run.run_id.slice(0, 8)}_bundle.tar.gz`,
                                   });
-                                  window.open(url, "_blank");
                                 }}
                               >
                                 <Package className="h-3.5 w-3.5" />
