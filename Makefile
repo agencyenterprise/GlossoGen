@@ -18,12 +18,15 @@ lint-server:
 	VIRTUAL_ENV= uv run --no-sync black . --exclude '\.venv|frontend|vulture_whitelist\.py|runs'
 	VIRTUAL_ENV= uv run --no-sync isort . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'vulture_whitelist.py' --skip-glob 'runs/*'
 	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude vulture_whitelist.py --exclude runs
-	VIRTUAL_ENV= uv run --no-sync mypy . --exclude '^(\.venv|frontend|vulture_whitelist\.py|runs)'
+	VIRTUAL_ENV= uv run --no-sync mypy . --exclude '^(\.venv|frontend|vulture_whitelist\.py|runs|analysis)'
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
 	VIRTUAL_ENV= uv run --no-sync vulture src/ vulture_whitelist.py --min-confidence 60
-	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs
-	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs
+	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude analysis
+	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs --exclude analysis
 	@echo "Server linting complete"
+
+results-viewer:
+	VIRTUAL_ENV= PYTHONPATH=. uv run --group analysis --no-sync streamlit run analysis/results_viewer/app.py
 
 lint-frontend:
 	@echo "Linting frontend..."
@@ -56,4 +59,4 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend export-openapi gen-api-types
+.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend results-viewer export-openapi gen-api-types

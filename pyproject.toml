@@ -42,6 +42,10 @@ dev = [
     "types-Markdown>=3.7.0.20250322",
     "types-cachetools>=6.2.0.20260408",
 ]
+analysis = [
+    "streamlit>=1.40.0",
+    "plotly>=5.24.0",
+]
 
 [tool.uv]
 required-environments = [
@@ -78,7 +82,7 @@ pythonVersion = "3.12"
 typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"
-extraPaths = ["src"]
+extraPaths = ["src", "."]
 ignore = ["vulture_whitelist.py", "runs"]
 
 [tool.vulture]

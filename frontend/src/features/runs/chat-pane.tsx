@@ -678,6 +678,7 @@ function ToolOrNotification({ entry }: { entry: DisplayEntry }) {
       toolName={entry.tool_name}
       arguments={entry.tool_arguments}
       result={entry.tool_result}
+      stabilizeMetadata={entry.stabilize_metadata}
     />
   );
 }

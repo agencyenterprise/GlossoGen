@@ -21,6 +21,7 @@ from schmidt.models.event import (
     SimulationEvent,
     SimulationStarted,
     ToolResultReceived,
+    VeyruStabilizationJudged,
 )
 from schmidt.scenarios.veyru.ids import (
     INTERN_JOIN_REASON,
@@ -40,6 +41,7 @@ from schmidt.server.runs.models import (
     RunDetailResponse,
     SwapPoint,
     ToolUseEntry,
+    VeyruStabilizeMetadata,
 )
 from schmidt.stream_manifest import delete_manifest, read_manifest
 from schmidt.token_pricing import find_pricing
@@ -186,6 +188,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
 
     tool_use_by_call_id: dict[str, ToolUseEntry] = {}
     pending_tool_results_by_call_id: dict[str, ToolResultReceived] = {}
+    pending_stabilize_metadata_by_agent: dict[str, list[VeyruStabilizeMetadata]] = {}
+    pending_stabilize_metadata_by_call_id: dict[str, VeyruStabilizeMetadata] = {}
     total_input_tokens = 0
     total_output_tokens = 0
     total_cache_read_tokens = 0
@@ -254,6 +258,9 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 pending_result = pending_tool_results_by_call_id.pop(tc.call_id, None)
                 if pending_result is not None:
                     tu_entry.result = pending_result.result
+                pending_metadata = pending_stabilize_metadata_by_call_id.pop(tc.call_id, None)
+                if pending_metadata is not None:
+                    tu_entry.stabilize_metadata = pending_metadata
                 tool_use.append(tu_entry)
                 tool_use_by_call_id[tc.call_id] = tu_entry
 
@@ -264,6 +271,24 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             else:
                 # Some runs log tool results before the parent LLM response block.
                 pending_tool_results_by_call_id[event.call_id] = event
+            if event.tool_name == "stabilize_veyru":
+                queue = pending_stabilize_metadata_by_agent.get(event.agent_id)
+                if queue:
+                    metadata = queue.pop(0)
+                    target = tool_use_by_call_id.get(event.call_id)
+                    if target is not None:
+                        target.stabilize_metadata = metadata
+                    else:
+                        pending_stabilize_metadata_by_call_id[event.call_id] = metadata
+
+        elif isinstance(event, VeyruStabilizationJudged):
+            pending_stabilize_metadata_by_agent.setdefault(event.agent_id, []).append(
+                VeyruStabilizeMetadata(
+                    expected_actions=event.expected_actions,
+                    judge_match=event.judge_match,
+                    judge_explanation=event.judge_explanation,
+                )
+            )
 
         elif isinstance(event, MessageSent):
             total_messages += 1

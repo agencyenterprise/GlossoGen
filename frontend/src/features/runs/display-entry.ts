@@ -3,6 +3,7 @@ import type { components } from "@/types/api.gen";
 type ChannelMessage = components["schemas"]["ChannelMessage"];
 type ReasoningEntry = components["schemas"]["ReasoningEntry"];
 type ToolUseEntry = components["schemas"]["ToolUseEntry"];
+type VeyruStabilizeMetadata = components["schemas"]["VeyruStabilizeMetadata"];
 
 /** Unified display type used by ChatPane and AgentDrawer to render
  *  channel messages, reasoning entries, and tool uses in a single timeline. */
@@ -22,6 +23,7 @@ export interface DisplayEntry {
   tool_name: string;
   tool_arguments: Record<string, unknown>;
   tool_result: string | null;
+  stabilize_metadata: VeyruStabilizeMetadata | null;
 }
 
 /** Merge channel messages, reasoning entries, and tool uses into a single sorted array. */
@@ -45,6 +47,7 @@ export function mergeEntries(
     tool_name: "",
     tool_arguments: {},
     tool_result: null,
+    stabilize_metadata: null,
   }));
 
   const reasoningEntries: DisplayEntry[] = reasoning.map(r => ({
@@ -62,6 +65,7 @@ export function mergeEntries(
     tool_name: "",
     tool_arguments: {},
     tool_result: null,
+    stabilize_metadata: null,
   }));
 
   const toolEntries: DisplayEntry[] = toolUse.map(t => ({
@@ -79,6 +83,7 @@ export function mergeEntries(
     tool_name: t.tool_name,
     tool_arguments: t.arguments,
     tool_result: t.result,
+    stabilize_metadata: t.stabilize_metadata ?? null,
   }));
 
   // Sort priority for entries at the same timestamp:

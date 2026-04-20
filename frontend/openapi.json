@@ -273,6 +273,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/SSEDebugLog"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SSEVeyruStabilizationJudged"
                     }
                   ],
                   "discriminator": {
@@ -288,7 +291,8 @@
                       "injection_delivered": "#/components/schemas/SSEInjectionDelivered",
                       "simulation_ended": "#/components/schemas/SSESimulationEnded",
                       "agent_cost_updated": "#/components/schemas/SSEAgentCostUpdated",
-                      "debug_log": "#/components/schemas/SSEDebugLog"
+                      "debug_log": "#/components/schemas/SSEDebugLog",
+                      "veyru_stabilization_judged": "#/components/schemas/SSEVeyruStabilizationJudged"
                     }
                   },
                   "title": "Response 200 Stream Run Events Api Runs  Run Id  Events Get"
@@ -2477,6 +2481,57 @@
         "title": "SSEToolResultReceived",
         "description": "SSE event emitted when a tool call completes and returns a result."
       },
+      "SSEVeyruStabilizationJudged": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "veyru_stabilization_judged",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "expected_actions": {
+            "type": "string",
+            "title": "Expected Actions"
+          },
+          "judge_match": {
+            "type": "boolean",
+            "title": "Judge Match"
+          },
+          "judge_explanation": {
+            "type": "string",
+            "title": "Judge Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "agent_id",
+          "round_number",
+          "expected_actions",
+          "judge_match",
+          "judge_explanation"
+        ],
+        "title": "SSEVeyruStabilizationJudged",
+        "description": "SSE event carrying the veyru stabilization judge's verdict for a stabilize_veyru call."
+      },
       "ScenarioInfo": {
         "properties": {
           "scenario_name": {
@@ -2700,6 +2755,16 @@
           "round_number": {
             "type": "integer",
             "title": "Round Number"
+          },
+          "stabilize_metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VeyruStabilizeMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -2827,6 +2892,30 @@
         ],
         "title": "Verdict",
         "description": "Three-valued outcome for a single evaluation metric."
+      },
+      "VeyruStabilizeMetadata": {
+        "properties": {
+          "expected_actions": {
+            "type": "string",
+            "title": "Expected Actions"
+          },
+          "judge_match": {
+            "type": "boolean",
+            "title": "Judge Match"
+          },
+          "judge_explanation": {
+            "type": "string",
+            "title": "Judge Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_actions",
+          "judge_match",
+          "judge_explanation"
+        ],
+        "title": "VeyruStabilizeMetadata",
+        "description": "Judge context captured for a single ``stabilize_veyru`` call.\n\nAttached to the corresponding ``ToolUseEntry`` so the frontend can show\nthe expected procedure and the LLM judge's verdict alongside the raw\ntool call. Present only on ``stabilize_veyru`` entries."
       }
     }
   }
