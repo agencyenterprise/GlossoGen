@@ -35,6 +35,20 @@ We tried variations of this pattern in several scenarios. In all of them, we ask
 
 ---
 
+### 2026-04-15 — Telephone works but doesn't sell
+
+**What we tried.** Evaluated the Telephone scenario [^4] as a client-facing option alongside Alien Patient [^2]. The Telephone setup is a minimal two-agent relay with budget pressure — deliberately stripped down so we could iterate on knobs quickly.
+
+**What happened.** Technically it works. Pressure produces compression, and the scenario iterates substantially faster than Alien Patient (shorter rounds, simpler state, fewer moving parts). But when we looked at it as a client-facing demo, it landed flat: telephone-style relay games have an extensive existing emergent-communication literature (iterated reference games, signalling games, etc.), and LLM results in that setting don't visibly differentiate from what's already been shown with smaller models or non-LLM agents. Nothing in the output screams "this required an LLM".
+
+**Why it matters.** A scenario can be technically sound and still fail the "why LLMs, why now" bar. For research outputs aimed at a paper or a grant, differentiation from prior literature matters as much as the raw result. If a scenario has strong prior art, LLM results in it will read as incremental even if the platform around them is novel.
+
+**Decision.** Dropped Telephone as a client-facing scenario. Retained it internally (for a while) as a rapid prototyping sandbox: token→character budgets and the post-mortem mechanism were both first exercised in Telephone and then ported to Alien Patient once they looked promising. Telephone was fully removed once Alien Patient stabilized and the knobs had settled.
+
+**Related.** General principle for scenario selection: prefer settings with little or no prior emergent-communication literature, so any observed emergence is clearly attributable to the LLM agents and the platform mechanics rather than to a well-known property of the game.
+
+---
+
 ### 2026-04-16 — Agents can't reason about their own token budgets
 
 **What we tried.** Our first pressure mechanism used a token-based cost function: agents had a token budget per message or per round, and communication carried a cost measured in tokens. The idea was that token pressure would force compression and, eventually, emergent shorthand.
@@ -94,3 +108,4 @@ Even if the Observer has fully memorized all 14 motif procedures and all possibl
 [^1]: **Patient-Ambulance scenario (deprecated).** A medical emergency setup with two agents. Field Observer role: a regular person or first-semester medical student present at the scene of a patient in distress, with no specialist medical knowledge. They could observe symptoms (visual, verbal reports from the patient, vitals if available) but could not diagnose. Specialist role: an experienced doctor located remotely, able to reason about diagnosis and treatment but with no direct access to the patient. The two communicated over a channel with a pressure budget. Goal: correctly identify the condition and next action. **Deprecated** after Apr 14 because LLMs could not stay in the Field Observer role; they applied full medical training regardless of the prompt and solved cases without needing the Specialist.
 [^2]: **Alien Patient / Alien Emergency scenario (current primary).** Same two-role structure as patient-ambulance, but the patient is an alien entity with invented anatomy, invented symptoms, and invented symptom-to-cause mappings. The Specialist's context includes the symptom-to-cause reference material for this alien species; the Field Observer's context does not. The Field Observer observes raw symptoms (descriptive, non-medical language) and must relay them to the Specialist, who maps them to causes and returns treatment instructions. Because the alien medical system is fabricated, no LLM has prior knowledge of it, so the knowledge asymmetry is real rather than prompted. Future enhancement: dual-render environment so the same simulation logic can be skinned as either alien or hospital terminology.
 [^3]: **Post-mortem mechanism.** An out-of-game, meta-level discussion phase inserted between rounds. Agents step out of their in-scenario roles and talk directly about their communication protocol: what worked, what didn't, what to change. This is separate from in-game communication, which stays focused on solving the current task. See the 2026-04-17 learning entry for why this phase is necessary and what it produces.
+[^4]: **Telephone scenario (deprecated as client-facing; retired internally).** A minimal two-agent relay setup where one agent receives a payload and must pass it along to another over a pressure-constrained channel. Used as the first home for budget-pressure experiments (token budgets, then character budgets) and for the post-mortem mechanism before those features were ported to Alien Patient. Deprecated as a client-facing scenario on Apr 15 because it sits inside a well-established emergent-communication literature and doesn't distinguish LLM behavior from prior results. Fully removed from the codebase after Alien Patient had absorbed the useful mechanics.
