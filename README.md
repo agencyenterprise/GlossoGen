@@ -23,10 +23,10 @@ See `.env.example` for all available variables (API keys, authentication, CORS).
 The CLI auto-generates a timestamped subdirectory under `--runs-dir`. Each round, agents communicate freely until all are idle or the round duration expires.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/telephone/knobs_default.json \
-  > ./runs/telephone_stdout.log 2>&1 &
+  --config src/schmidt/scenarios/veyru/knobs_default.json \
+  > ./runs/veyru_stdout.log 2>&1 &
 ```
 
 Flags:
@@ -73,9 +73,9 @@ runs/{scenario_name}/{unix_timestamp}/
 After a simulation completes, point `--run-dir` at the specific run directory. Evaluation uses `--provider` to select the LLM judge.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate telephone \
-  --run-dir ./runs/telephone/1742234567 \
-  --evaluators language_strangeness,compression \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  --run-dir ./runs/veyru/1742234567 \
+  --evaluators language_strangeness,language_emergence \
   --model claude-sonnet-4-6 --provider anthropic
 ```
 
@@ -88,7 +88,6 @@ Generic evaluators (available to all scenarios) focus on language emergence. Eac
 
 Scenario-specific evaluators:
 
-- **telephone**: `compression` (relay compression strategies with accuracy tracking)
 - **veyru**: `language_emergence` (novel language in a fictional domain)
 
 Output is a JSON report with per-evaluator verdicts, scores, and evidence. After evaluation, labels are automatically written to the run in the format `eval:{evaluator}:{verdict}` (where verdict is `identified`, `partial`, or `fail`), visible in the web UI for filtering.
@@ -154,9 +153,9 @@ Typical MCP run-start workflow:
 
 ## Scenarios
 
-### Telephone
+### Veyru
 
-Three agents (Sender, Relayer, Receiver) play a telephone game across 40 rounds (10 base word lists repeated across 4 shuffled epochs). The Sender receives a word list and transmits it to the Relayer, who must compress and forward it to the Receiver using as few tokens as possible. The Receiver decodes and submits an answer. The Relayer receives per-round feedback on accuracy and token cost, incentivizing the development of compressed encoding strategies. Epoch 1 introduces lists in order; epochs 2–4 shuffle them to test whether stable encodings persist. See the [scenario README](src/schmidt/scenarios/telephone/README.md).
+Two agents (Field Observer, Specialist) stabilize failing Veyru entities — fictional box-shaped entities with internal wave-patterns — across 12 budget-constrained rounds. Every character sent on the comm link costs simulated seconds; a Veyru collapses when total communication time exceeds its time budget. The position of reference star SAGWE392 remaps the symptom→treatment mapping each round and varies physical parameters (hold duration, starting face, pressure level), forcing per-round communication even if agents develop shorthand. See the [scenario README](src/schmidt/scenarios/veyru/README.md).
 
 ## Project Structure
 

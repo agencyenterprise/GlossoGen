@@ -315,25 +315,25 @@ Optional flags: `--max-agent-turns` (default: 200), `--config <path>` (base conf
 Examples:
 
 ```bash
-# Telephone with base config
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
+# Veyru with base config
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/telephone/knobs_default.json \
-  > ./runs/telephone_stdout.log 2>&1 &
+  --config src/schmidt/scenarios/veyru/knobs_default.json \
+  > ./runs/veyru_stdout.log 2>&1 &
 
-# Telephone with per-agent model overrides
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
+# Veyru with per-agent model overrides
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/telephone/knobs_default.json \
-  agents.relayer.model=gpt-4o agents.relayer.provider=openai \
-  > ./runs/telephone_stdout.log 2>&1 &
+  --config src/schmidt/scenarios/veyru/knobs_default.json \
+  agents.specialist.model=gpt-5.4 agents.specialist.provider=openai \
+  > ./runs/veyru_stdout.log 2>&1 &
 
 # Override knobs inline on top of a base config
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/telephone/knobs_default.json \
+  --config src/schmidt/scenarios/veyru/knobs_default.json \
   max_round_duration_seconds=120 round_count=20 \
-  > ./runs/telephone_stdout.log 2>&1 &
+  > ./runs/veyru_stdout.log 2>&1 &
 ```
 
 Override values are auto-parsed as JSON: `rounds=5` becomes int, `enabled=true` becomes bool, `name=alice` stays string.
@@ -382,9 +382,9 @@ Each agent uses the default `--model` and `--provider` unless overridden. Per-ag
 **CLI usage:** Pass dot-notation overrides:
 
 ```bash
-schmidt run telephone --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
+schmidt run veyru --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config knobs_default.json \
-  agents.relayer.model=gpt-5.4 agents.relayer.provider=openai
+  agents.specialist.model=gpt-5.4 agents.specialist.provider=openai
 ```
 
 Or embed in the `--config` JSON file under `model_overrides`:
@@ -393,10 +393,10 @@ Or embed in the `--config` JSON file under `model_overrides`:
 {
   "max_round_duration_seconds": 300,
   "model_overrides": {
-    "relayer": {"model": "gpt-5.4", "provider": "openai"},
-    "receiver": {"model": "claude-opus-4-6", "provider": "anthropic"}
+    "specialist": {"model": "gpt-5.4", "provider": "openai"},
+    "field_observer": {"model": "claude-opus-4-6", "provider": "anthropic"}
   },
-  "round_count": 40
+  "round_count": 12
 }
 ```
 
@@ -439,7 +439,6 @@ Generic evaluators (available to all scenarios) focus on language emergence. Eac
 
 Scenario-specific evaluators:
 
-- **telephone**: generic + `compression` (relay compression strategies with accuracy tracking)
 - **veyru**: generic + `language_emergence` (novel language in a fictional domain)
 
 After evaluation, labels are automatically written to the run's `labels.json` in the format `eval:{evaluator}:{verdict}` where verdict is `identified`, `partial`, or `fail`. Previous `eval:` labels are replaced; user-added labels are preserved.

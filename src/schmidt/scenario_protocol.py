@@ -204,10 +204,9 @@ class SimulationScenario(ABC):
     def get_primary_channel_id(self) -> str | None:
         """Return the channel ID that evaluators should focus on.
 
-        The primary channel is where the core task happens under constraints
-        (e.g. the budget-limited relay channel in telephone). Evaluators
-        prioritize language phenomena observed here. Returns None if no
-        single channel is primary.
+        The primary channel is where the core task happens under constraints.
+        Evaluators prioritize language phenomena observed here. Returns None
+        if no single channel is primary.
         """
         return None
 

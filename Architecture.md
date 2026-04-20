@@ -226,7 +226,6 @@ The user selects which evaluators to run — they are not automatically applied.
 All generic evaluators share a common flow: build per-round transcripts from `MessageSent` events via `round_transcript_builder`, render a Jinja2 prompt, call the LLM judge with a structured output schema, and return a `MetricResult`.
 
 **Scenario-specific evaluators:**
-- **telephone**: `compression` (uses `WORD_LISTS` and `submit_answer` tool results for accuracy)
 - **veyru**: `language_emergence` (uses `VEYRU_CASES` for round alignment)
 
 **Automatic labels**: After evaluation, `label_writer.write_eval_labels()` writes `eval:{evaluator}:{verdict}` labels to the run's `labels.json` (where verdict is `identified`, `partial`, or `fail`). Previous `eval:` labels are replaced; user-added labels are preserved.
