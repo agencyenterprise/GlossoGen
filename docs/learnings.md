@@ -49,6 +49,28 @@ We tried variations of this pattern in several scenarios. In all of them, we ask
 
 ---
 
+### 2026-04-15 — Progressive pressure produces emergence but confounds the measurement
+
+**What we tried.** The first mechanism that actually produced emergent communication in the Alien scenario [^2] was a progressive pressure curriculum: start agents in a relatively easy environment (generous budget), then shrink the budget across epochs within a single simulation, forcing them to iterate toward shorter and shorter messages. No post-mortem, no meta-reflection phase — just a shrinking budget over time. It worked.
+
+**What happened.** At the Apr 15 client sync, Elias asked us to drop progressive pressure as the default experimental setup. His reasoning, paraphrased from the call:
+
+> "I feel like the epochs here are actually maybe, at least initially, not necessary. It seems like this is introducing an additional variable."
+
+The proposal: treat each pressure level as its own separate environment with a fixed knob (100%, 75%, 50%, 35%), run agents only in that environment, and see what comes out. The curriculum question ("does training in an easier environment first help?") is a real question, but it's a downstream question — not the primary experiment.
+
+Simon Kirby agreed and sharpened the point: a fixed-pressure setup gives you a clean, testable hypothesis ("how does encoding vary with cost?"). You can run the sim at 75% and at 35% and directly compare them. With progressive pressure, you can't separate "the pressure is now 35%" from "the agents have been through 75% first" — every result has two causes baked into it.
+
+**Why it matters.** This is a scientific-methodology constraint, not a platform limitation. Progressive pressure is a mechanism that produces emergence, but it's not a measurement we can cleanly reason about. It confounds the knob (budget) with the history (prior training on easier budgets).
+
+It also foreshadowed the Apr 16 regression: once the team removed progressive pressure in favor of fixed levels, emergent communication disappeared entirely. That regression is what motivated the post-mortem mechanism [^3] — we needed something that produces emergence under static pressure, so that the pressure level itself remains a clean independent variable.
+
+**Decision.** Primary experiments use fixed pressure levels (100%, 75%, 50%, 35%) with default 50%. Progressive pressure retained as a fifth setting on the knob so we can still produce emergence when we need it (demos, sanity checks) and study the curriculum question later as its own experiment. The post-mortem mechanism was introduced to recover emergence under static pressure without reintroducing the confound.
+
+**Related.** Two principles worth carrying forward: (1) mechanisms that *produce* a result are not the same as mechanisms that cleanly *measure* it; scientific validity often requires sacrificing the former for the latter. (2) Every knob we add should be independently controllable — pressure level and pressure history are two different variables and should not be entangled by default.
+
+---
+
 ### 2026-04-16 — Agents can't reason about their own token budgets
 
 **What we tried.** Our first pressure mechanism used a token-based cost function: agents had a token budget per message or per round, and communication carried a cost measured in tokens. The idea was that token pressure would force compression and, eventually, emergent shorthand.
