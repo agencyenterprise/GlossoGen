@@ -84,7 +84,7 @@ typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"
 extraPaths = ["src", "."]
-ignore = ["vulture_whitelist.py", "runs"]
+ignore = ["vulture_whitelist.py", "runs", "analysis"]
 
 [tool.vulture]
 min_confidence = 80
