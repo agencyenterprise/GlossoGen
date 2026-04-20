@@ -1,9 +1,0 @@
---- ROUND {{ round_number }} DISCUSSION PHASE ---
-{% if round_result is not none %}
-Result: {% if round_result.budget_exceeded %}LOST (budget exceeded — {{ round_result.relayer_character_cost }}/{{ round_result.character_budget }} characters){% elif round_result.accuracy < 1.0 %}LOST ({{ round_result.correct_count }}/{{ round_result.total_count }} items correct){% else %}WON ({{ round_result.relayer_character_cost }}/{{ round_result.character_budget }} characters, all {{ round_result.total_count }} items correct){% endif %}
-{% if round_result.submitted_items %}
-Submitted: {{ round_result.submitted_items | join(", ") }}
-Expected: {{ round_result.original_items | join(", ") }}
-{% endif %}
-{% endif %}
-The discussion channel is now open. All players can talk in the "team discussion" channel (channel_id: postmortem).

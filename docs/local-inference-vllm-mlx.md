@@ -60,10 +60,10 @@ The `/v1` suffix is required — Pydantic AI uses the OpenAI-compatible endpoint
 ### Run a Simulation
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run telephone \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
   --model qwen2.5:14b --provider ollama --runs-dir ./runs \
-  --config src/schmidt/scenarios/telephone/knobs_default.json \
-  > ./runs/telephone_stdout.log 2>&1 &
+  --config src/schmidt/scenarios/veyru/knobs_default.json \
+  > ./runs/veyru_stdout.log 2>&1 &
 ```
 
 ### Limitations
@@ -137,9 +137,9 @@ OPENAI_API_KEY=dummy
 ### Run Evaluation
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate telephone \
-  --run-dir ./runs/telephone/<timestamp> \
-  --evaluators language_strangeness,compression \
+VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  --run-dir ./runs/veyru/<timestamp> \
+  --evaluators language_strangeness,language_emergence \
   --model mlx-community/Qwen2.5-14B-Instruct-4bit --provider openai
 ```
 
