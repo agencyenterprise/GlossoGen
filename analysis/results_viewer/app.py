@@ -56,9 +56,7 @@ def main() -> None:
         default=available_evaluators,
         key="evaluators_picker",
     )
-    fig = build_timeline_figure(
-        reports=reports, timelines=timelines, evaluators=chosen_evaluators
-    )
+    fig = build_timeline_figure(reports=reports, timelines=timelines, evaluators=chosen_evaluators)
     st.plotly_chart(fig, width="stretch")
 
     with st.expander("Selected runs — scenario config", expanded=False):

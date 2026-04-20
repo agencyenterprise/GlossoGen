@@ -27,6 +27,7 @@ dependencies = [
     "dulwich>=1.1.0",
     "aiosqlite>=0.22.1",
     "cachetools>=7.0.5",
+    "watchdog>=6.0.0",
 ]
 
 [dependency-groups]

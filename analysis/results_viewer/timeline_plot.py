@@ -40,9 +40,7 @@ _PROMINENT_STYLES: dict[TimelineEventKind, _ProminentStyle] = {
 }
 
 _GLYPH_STYLES: dict[TimelineEventKind, _GlyphStyle] = {
-    TimelineEventKind.COLLAPSE: _GlyphStyle(
-        colour="#cf222e", symbol="x", label="Veyru collapsed"
-    ),
+    TimelineEventKind.COLLAPSE: _GlyphStyle(colour="#cf222e", symbol="x", label="Veyru collapsed"),
     TimelineEventKind.STABILIZED: _GlyphStyle(
         colour="#1a7f37", symbol="star", label="Veyru stabilized"
     ),
@@ -219,9 +217,7 @@ def _add_world_glyphs(
             run_offsets[run.run_key] = 0.0
         else:
             run_offsets[run.run_key] = (index - (run_count - 1) / 2) * 0.18
-    buckets = _collect_glyph_points(
-        runs=runs, events_lane_y=events_lane_y, run_offsets=run_offsets
-    )
+    buckets = _collect_glyph_points(runs=runs, events_lane_y=events_lane_y, run_offsets=run_offsets)
     for kind, (xs, ys, hover) in buckets.items():
         if not xs:
             continue
