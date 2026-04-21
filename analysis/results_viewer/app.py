@@ -11,6 +11,7 @@ from analysis.results_viewer.run_catalog import EvaluatedRun, group_runs_by_day,
 from analysis.results_viewer.timeline_plot import (
     build_timeline_figure,
     collect_per_round_evaluators,
+    palette_color_for_index,
 )
 from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult
 
@@ -161,15 +162,41 @@ def _maybe_open_point_modal(selection_state: object, reports: dict[str, Evaluati
     )
 
 
+def _render_selected_run_links(runs: list[EvaluatedRun]) -> None:
+    """Render one row per selected run with colour swatch, run id (copy-able) and detail link.
+
+    The colour swatch matches the palette colour ``build_timeline_figure`` assigns to the
+    same run, so rows line up visually with their lines/dots on the timeline.
+    """
+    frontend_base = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    st.markdown("### Selected runs")
+    for index, run in enumerate(runs):
+        detail_url = f"{frontend_base}/runs/{run.run_id}"
+        colour = palette_color_for_index(index=index)
+        swatch_col, label_col, id_col, link_col = st.columns([0.3, 4, 2, 1])
+        swatch_col.markdown(
+            f"<div style='width:1rem;height:1rem;border-radius:50%;"
+            f"background:{colour};margin-top:0.4rem;'></div>",
+            unsafe_allow_html=True,
+        )
+        label_col.markdown(run.label)
+        id_col.code(run.run_id, language=None)
+        link_col.markdown(f"[Open ↗]({detail_url})")
+
+
+_EVALUATOR_CHECKBOXES_PER_ROW = 4
+
+
 def _render_evaluator_checkboxes(available: list[str]) -> list[str]:
-    """Render each evaluator as a horizontally-arranged checkbox."""
+    """Render evaluator checkboxes, wrapping to new rows so long names stay readable."""
     st.markdown("### Evaluators")
-    cols = st.columns(max(1, len(available)))
     chosen: list[str] = []
-    for index, name in enumerate(available):
-        col = cols[index % len(cols)]
-        if col.checkbox(label=name, value=True, key=f"eval_select::{name}"):
-            chosen.append(name)
+    for row_start in range(0, len(available), _EVALUATOR_CHECKBOXES_PER_ROW):
+        row_items = available[row_start : row_start + _EVALUATOR_CHECKBOXES_PER_ROW]
+        cols = st.columns(_EVALUATOR_CHECKBOXES_PER_ROW)
+        for col_index, name in enumerate(row_items):
+            if cols[col_index].checkbox(label=name, value=True, key=f"eval_select::{name}"):
+                chosen.append(name)
     return chosen
 
 
@@ -195,6 +222,8 @@ def main() -> None:
     if not selected:
         st.info("Pick at least one run.")
         return
+
+    _render_selected_run_links(runs=selected)
 
     reports = {run.label: run.report for run in selected}
     timelines = {run.label: load_run_timeline(run_dir=run.run_dir) for run in selected}

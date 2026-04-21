@@ -84,15 +84,16 @@ class RoundSuccessEvaluator(Evaluator):
                 events=team_b_events,
                 label="Team B",
             )
-            combined_won = team_a_result.won + team_b_result.won
-            combined_total = total_rounds * 2
-            if combined_total > 0:
-                score = combined_won / combined_total
+            joint_won_rounds = sorted(set(team_a_result.won_rounds) & set(team_b_result.won_rounds))
+            joint_won = len(joint_won_rounds)
+            if total_rounds > 0:
+                score = joint_won / total_rounds
             else:
                 score = 0.0
             verdict = _score_to_verdict(score=score)
             evidence = [
-                f"{combined_won}/{combined_total} team-rounds stabilized (both teams).",
+                f"{joint_won}/{total_rounds} rounds stabilized by BOTH teams (a round "
+                "counts only when Team A and Team B both succeed).",
                 f"Team A: {team_a_result.won}/{total_rounds} stabilized.",
                 f"Team B: {team_b_result.won}/{total_rounds} stabilized.",
             ]
@@ -100,16 +101,13 @@ class RoundSuccessEvaluator(Evaluator):
                 evidence.append("Team A losses: " + "; ".join(team_a_result.lost_details[:10]))
             if team_b_result.lost_details:
                 evidence.append("Team B losses: " + "; ".join(team_b_result.lost_details[:10]))
-            combined_won_rounds = sorted(
-                set(team_a_result.won_rounds) | set(team_b_result.won_rounds)
-            )
             return MetricResult(
                 evaluator_name=self.name,
                 verdict=verdict,
                 score=score,
                 evidence=evidence,
                 per_agent={},
-                rounds_identified=combined_won_rounds,
+                rounds_identified=joint_won_rounds,
             )
 
         solo_result = _compute_team_result(

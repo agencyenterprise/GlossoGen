@@ -22,6 +22,7 @@ class EvaluatedRun(NamedTuple):
 
     label: str
     run_dir: Path
+    run_id: str
     run_timestamp: int
     scenario_name: str
     execution_mode: str
@@ -116,6 +117,21 @@ def _compose_label(metadata: RunMetadata, run_timestamp: int) -> str:
     return f"[{time_str}] {mode}{pm_fragment}{knobs_fragment} • {metadata.primary_model}"
 
 
+def _read_run_id(jsonl_path: Path) -> str:
+    """Return the ``run_id`` UUID stamped on the first event of the log."""
+    with jsonl_path.open("rb") as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            raw = orjson.loads(stripped)
+            run_id = raw.get("run_id")
+            if isinstance(run_id, str) and run_id:
+                return run_id
+            break
+    raise ValueError(f"Could not read run_id from {jsonl_path}")
+
+
 def _load_runs_for_scenario(scenario_dir: Path, scenario_name: str) -> list[EvaluatedRun]:
     """Load every run directory under ``scenario_dir`` that has an evaluation report."""
     out: list[EvaluatedRun] = []
@@ -131,10 +147,12 @@ def _load_runs_for_scenario(scenario_dir: Path, scenario_name: str) -> list[Eval
         run_timestamp = _parse_run_timestamp(run_dir_name=entry.name)
         label = _compose_label(metadata=metadata, run_timestamp=run_timestamp)
         execution_mode = _mode_label(scenario_config=metadata.scenario_config)
+        run_id = _read_run_id(jsonl_path=jsonl_path)
         out.append(
             EvaluatedRun(
                 label=label,
                 run_dir=entry,
+                run_id=run_id,
                 run_timestamp=run_timestamp,
                 scenario_name=scenario_name,
                 execution_mode=execution_mode,
