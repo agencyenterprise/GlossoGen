@@ -213,6 +213,11 @@ def _build_run_colors(runs: list[_RunPlotData]) -> dict[str, str]:
     return {run.run_key: _RUN_PALETTE[index % len(_RUN_PALETTE)] for index, run in enumerate(runs)}
 
 
+def palette_color_for_index(index: int) -> str:
+    """Return the palette colour that ``build_timeline_figure`` assigns to run #``index``."""
+    return _RUN_PALETTE[index % len(_RUN_PALETTE)]
+
+
 def _compute_run_x_offsets(run_count: int) -> list[float]:
     """Horizontal offsets so vertical event lines from multiple runs don't overlap."""
     if run_count == 1:
