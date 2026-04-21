@@ -67,6 +67,16 @@ class VeyruKnobs(BaseKnobs):
         return self
 
     @model_validator(mode="after")
+    def _validate_postmortem_after_swap(self) -> "VeyruKnobs":
+        if self.postmortem_after_swap and not self.postmortem_enabled:
+            raise ValueError(
+                "postmortem_after_swap=true requires postmortem_enabled=true "
+                "(the post-swap knob controls how the postmortem channel is handled "
+                "across the boundary, so it has no effect when the postmortem is off)."
+            )
+        return self
+
+    @model_validator(mode="after")
     def _validate_intern_mode(self) -> "VeyruKnobs":
         if not self.intern_enabled:
             if self.intern_join_round is not None or self.intern_takeover_round is not None:
