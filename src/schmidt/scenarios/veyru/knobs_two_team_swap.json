@@ -10,7 +10,7 @@
   "postmortem_after_swap": true,
   "postmortem_enabled": true,
   "round_count": 20,
-  "seconds_per_character": 2.0,
+  "round_time_budget_seconds": 150,
   "seed": 42,
   "swap_round": 10,
   "two_teams": true

@@ -116,11 +116,9 @@ class VeyruWorld(ScenarioWorld):
 
     def __init__(
         self,
-        seconds_per_character: float,
         veyru_cases: list[VeyruCase],
         teams: dict[TeamId, TeamState],
     ) -> None:
-        self._seconds_per_character = seconds_per_character
         self._veyru_cases = veyru_cases
         self._teams = teams
         self._current_case: VeyruCase | None = None
@@ -272,7 +270,7 @@ class VeyruWorld(ScenarioWorld):
 
         case_index = (round_number - 1) % len(self._veyru_cases)
         case = self._veyru_cases[case_index]
-        time_elapsed = team.current_round_characters * self._seconds_per_character
+        time_elapsed = team.current_round_characters
 
         all_stage_outcomes = list(team.stage_outcomes)
         for i in range(len(all_stage_outcomes), len(case.stages)):
@@ -398,7 +396,7 @@ class VeyruWorld(ScenarioWorld):
         if team.veyru_stabilized:
             return
 
-        time_elapsed = team.current_round_characters * self._seconds_per_character
+        time_elapsed = team.current_round_characters
         budget = self._current_case.time_budget_seconds
         if time_elapsed > budget:
             team.veyru_alive = False
@@ -433,7 +431,7 @@ class VeyruWorld(ScenarioWorld):
             return
 
         team = self._teams[team_id]
-        time_elapsed = team.current_round_characters * self._seconds_per_character
+        time_elapsed = team.current_round_characters
         budget = self._current_case.time_budget_seconds
 
         if not team.veyru_alive and THRESHOLD_COLLAPSED not in team.notified_thresholds:

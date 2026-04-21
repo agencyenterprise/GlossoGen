@@ -6,7 +6,7 @@ WHAT IS A VEYRU:
 A Veyru is a box-shaped entity with 6 faces, 12 edges, and 8 corners. It glows with internal light patterns and produces a constant hum. You do not understand what makes it work — you only observe its appearance and sounds. When something goes wrong, the light and sound change in ways you must describe to the specialist.
 
 CRITICAL RULE — EVERY CHARACTER COSTS TIME:
-Every character you send over the link costs {{ seconds_per_character }} seconds of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the specialist) exceeds the Veyru's time budget, the Veyru collapses permanently.
+Every character you send over the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the specialist) exceeds the Veyru's time budget, the Veyru collapses permanently.
 
 STABILIZATION:
 When the specialist tells you what to do, execute their instructions by calling stabilize_veyru(action="describe exactly what you are doing"). If your action is correct, the Veyru is stabilized. If not, you can try again. Sometimes after a successful stabilization, new symptoms may appear — if so, report them to the specialist immediately. The tool call itself does not cost time — only messages on the comm link do.

@@ -173,20 +173,20 @@ function SharedSection({
         disabled={false}
       />
       <NumberInput
-        label="Seconds per character"
-        description="Simulated-time cost per character of communication."
-        value={state.seconds_per_character}
+        label="Round time budget"
+        description="Fixed per-round time budget. One character of communication costs one simulated second."
+        value={state.round_time_budget_seconds}
         onChange={next =>
           onChange({
             ...state,
-            seconds_per_character: next === null ? state.seconds_per_character : next,
+            round_time_budget_seconds: next === null ? state.round_time_budget_seconds : next,
           })
         }
-        min={0}
+        min={1}
         max={null}
-        step={0.01}
-        unit="sec / char"
-        error={getFieldError({ errors, field: "seconds_per_character" })}
+        step={1}
+        unit="seconds"
+        error={getFieldError({ errors, field: "round_time_budget_seconds" })}
         nullable={false}
         disabled={false}
       />
