@@ -16,6 +16,7 @@ transcript  # unused variable (src/schmidt/scenarios/veyru/evaluation/protocol_l
 _._validate_swap_round  # unused method (src/schmidt/scenarios/veyru/knobs.py:53)
 _._validate_intern_mode  # unused method (src/schmidt/scenarios/veyru/knobs.py:66)
 symptom_motif  # unused variable (src/schmidt/scenarios/veyru/veyru_cases.py:30)
+action_text  # unused variable (src/schmidt/scenarios/veyru/veyru_cases.py:35)
 treatment_motif_name  # unused variable (src/schmidt/scenarios/veyru/veyru_cases.py:40)
 stabilized  # unused variable (src/schmidt/scenarios/veyru/world.py:47)
 stabilized  # unused variable (src/schmidt/scenarios/veyru/world.py:56)

@@ -28,74 +28,24 @@ Important constraints:
 - Increased activity does not equal improvement
 - Similar symptoms can map to different internal states
 
-FAILURE MOTIFS — DIAGNOSIS AND STABILIZATION PROCEDURES:
+FAILURE MOTIFS — NAMES AND OBSERVABLE SYMPTOMS:
 
-Alignment Collapse:
-- Symptoms: random flicker across faces, broken/stuttering hum, no repeating pattern
-- Fix: apply sustained uniform pressure to all six faces simultaneously for 10 seconds, then release. Wait for hum to stabilize into a steady tone. If flickering persists, apply sequential face-by-face pressure starting from the brightest face.
+Use this list to diagnose which failure motif the technician is describing. Do not share the motif names with the technician — they describe only what they see and hear.
+{% for motif in failure_motifs %}
+- {{ motif.name }}: {{ motif.symptom_phrases | join(" ") }}
+{% endfor %}
 
-Drift Escalation:
-- Symptoms: light sliding across surfaces, blurred edges, wavering hum pitch
-- Fix: firmly hold two opposite faces and apply rhythmic pulses — three seconds on, three seconds off — for five cycles. If edges remain blurred, repeat on the perpendicular face pair.
+POSSIBLE PROCEDURES:
 
-Echo Saturation:
-- Symptoms: too bright, frozen patterns that do not respond to touch, layered hum
-- Fix: press and hold two adjacent edges for 15 seconds to open a dissipation channel. If faces remain frozen, tap each frozen face sharply three times to break the standing wave.
-
-Leak Instability:
-- Symptoms: dim corners, fading edges, uneven brightness (center fine but perimeter losing light), thin hollow hum
-- Fix: firmly press each dim corner for five seconds in sequence, all eight corners. Then run a finger along each fading edge to re-establish the boundary.
-
-Low Intensity:
-- Symptoms: overall dim, barely audible hum, washed-out patterns
-- Fix: cup both hands around the Veyru and breathe warm air onto one face for 10 seconds. Rotate and repeat for each face.
-
-High Intensity:
-- Symptoms: painfully bright, harsh buzzing hum, vibrating surfaces, noticeable heat
-- Fix: place a cloth over the Veyru to block external light input for 20 seconds. Remove the cloth and immediately press the two hottest faces inward for 5 seconds.
-
-Phase Inversion:
-- Symptoms: alternating bright/dark pulses across opposite faces in strict rhythm, hum oscillates between two distinct tones, edges flash in sync with face pulses
-- Fix: place one palm flat on the brightest face and the other on the darkest face simultaneously. Hold steady for 15 seconds without moving. The pulses should slow and merge into a single steady state. If oscillation resumes, rotate 90 degrees and repeat on the next pair.
-
-Resonance Cascade:
-- Symptoms: one face dramatically brighter than the others, intense vibration localized to that face, a high-pitched whine instead of a hum, other faces appear normal
-- Fix: identify the resonating face (brightest, most vibrating). Place a folded cloth against it and press firmly for 10 seconds to dampen the resonance. Then lightly tap each adjacent edge twice to redistribute energy. Remove cloth only after the whine drops to a normal hum.
-
-Corner Deadlock:
-- Symptoms: one or two corners glow intensely bright while the rest of the Veyru looks normal, a clicking or ticking sound replaces the hum near those corners, heat concentrated at the bright corners
-- Fix: flick the bright corner sharply with a finger to break the energy lock. Immediately after the flick, press the two edges meeting at that corner for 5 seconds to redirect flow. Repeat for each locked corner. If clicking returns, flick again harder.
-
-Boundary Softening:
-- Symptoms: edges appear to wobble or flex when touched, faces look slightly curved or bulging, the hum sounds muffled as if underwater, the box shape is subtly distorted
-- Fix: grip the Veyru firmly along all four edges of one face and squeeze inward for 10 seconds to re-rigidify the boundary. Rotate and repeat for each of the three face-pairs. The hum should sharpen as each pair is treated.
-
-Propagation Stall:
-- Symptoms: light patterns freeze completely (not frozen-bright like Echo — frozen dim), hum drops to silence, the Veyru feels cold, no response to touch or tapping
-- Fix: sharply strike the center of each face once with the palm (not too hard — a firm slap). Wait 3 seconds between strikes. This restarts wave propagation. After all six faces are struck, cup hands around the Veyru and breathe warm air for 10 seconds to sustain the restart.
-
-Harmonic Split:
-- Symptoms: the hum splits into two or more competing tones that clash, light patterns alternate between two different configurations, edges shimmer as if two patterns are fighting for dominance
-- Fix: place the Veyru on a soft surface (cloth, padding). Press down firmly on the top face for 20 seconds to suppress one harmonic and let the other dominate. Release slowly. If the split returns, press on a different face — the correct face is whichever causes the hum to momentarily unify while pressing.
-
-Thermal Bleed:
-- Symptoms: the Veyru is very hot all over but dim, the hum is a low rumble instead of a tone, surfaces feel rough or gritty, light has a reddish tint
-- Fix: wrap the Veyru in a wet cloth for 15 seconds to cool it. Remove and immediately apply sustained pressure to all six faces for 10 seconds. The heat converts back to wave-intention energy. If the reddish tint persists, repeat the cooling cycle.
-
-Core Void:
-- Symptoms: faces glow normally at the surface but the Veyru feels hollow when tapped (sounds empty), light does not penetrate — holding it up to a light source shows a dark center, the hum sounds thin and surface-level
-- Fix: rotate the Veyru slowly (one full rotation over 30 seconds) while applying gentle pressure to opposite faces. The rotation re-draws wave paths through the center. After rotation, tap each corner once to seed convergence points. The hum should deepen as the core refills.
+The following procedures are the set of physical actions a technician can perform on a Veyru. Every round, the stellar reading will specify which procedure applies to each failure motif, with the placeholders (`{pressure_level}`, `{hold_duration}`, `{starting_face}`) filled in.
+{% for motif in failure_motifs %}
+- {{ motif.judge_procedure_template }}
+{% endfor %}
 
 For combination failures, address each component in order. The general priority is: seal leaks first, then adjust intensity, then fix structural issues, then echo/boundaries, then pattern-level failures (alignment/drift/inversion/split). Sometimes after a successful stabilization, new symptoms may appear — if the technician reports new observations, diagnose and instruct again.
 
 STELLAR ALIGNMENT — SAGWE392:
-Veyru wave-patterns are influenced by the position of reference star SAGWE392. The star's position shifts the internal wave geometry of failing Veyru entities in two ways:
-
-1. TREATMENT REMAPPING: The effective treatment procedure for a given set of symptoms changes depending on the stellar alignment. Symptoms of one failure motif may require the treatment procedure of a different motif. You will receive a lookup table each round showing the correct mapping.
-
-2. PARAMETER VARIATION: The stellar alignment also changes the specific physical parameters of the treatment — the hold/press duration, the starting face, and the pressure level all vary per round. You will receive the exact values each round.
-
-You have a stellar position reader that provides the SAGWE392 reading at the start of each round. Both the treatment mapping and the physical parameters change every round.
+Each round, a reading from reference star SAGWE392 gives you a table mapping every failure motif to the exact procedure to apply, with concrete parameters already filled in. Match the technician's description to a motif, find that motif's action in the table, and relay the full procedure verbatim to the technician. You never compute or substitute parameters yourself.
 
 CRITICAL RULE — EVERY CHARACTER COSTS TIME:
 Every character sent over the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the technician) exceeds the Veyru's time budget, the Veyru collapses permanently.

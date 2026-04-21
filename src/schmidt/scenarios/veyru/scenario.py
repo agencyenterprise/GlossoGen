@@ -75,7 +75,12 @@ from schmidt.scenarios.veyru.ids import (
 )
 from schmidt.scenarios.veyru.knobs import VeyruKnobs
 from schmidt.scenarios.veyru.stabilization_judge import judge_stabilization
-from schmidt.scenarios.veyru.veyru_cases import VeyruCase, get_cases, get_stellar_treatment_mapping
+from schmidt.scenarios.veyru.veyru_cases import (
+    FAILURE_MOTIFS,
+    VeyruCase,
+    get_cases,
+    get_stellar_treatment_mapping,
+)
 from schmidt.scenarios.veyru.world import TeamState, VeyruOutcome, VeyruWorld
 from schmidt.template_renderer import TemplateRenderer
 
@@ -427,6 +432,7 @@ class VeyruScenario(SimulationScenario):
                             "postmortem_enabled": self._knobs.postmortem_enabled,
                             "intern_join_round": self._knobs.intern_join_round,
                             "intern_takeover_round": self._knobs.intern_takeover_round,
+                            "failure_motifs": FAILURE_MOTIFS,
                         },
                     ),
                     channel_ids=d.channel_ids,
@@ -571,7 +577,7 @@ class VeyruScenario(SimulationScenario):
         previous_outcome = self._get_previous_outcome_for_agent(agent_id=agent_id)
 
         treatment_mapping = get_stellar_treatment_mapping(
-            stellar_offset=current_case.stellar_reading.offset,
+            stellar_reading=current_case.stellar_reading,
         )
 
         swap_just_happened = self._world.peek_swap_just_happened()
@@ -587,7 +593,6 @@ class VeyruScenario(SimulationScenario):
                 "previous_outcome": previous_outcome,
                 "knobs": self._knobs,
                 "treatment_mapping": treatment_mapping,
-                "stellar_reading": current_case.stellar_reading,
                 "swap_just_happened": swap_just_happened,
                 "announce_swap": self._knobs.announce_swap,
                 "partner_display_name": partner_display_name,
