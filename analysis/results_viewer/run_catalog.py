@@ -97,24 +97,37 @@ def _knob_fragments(scenario_config: dict[str, Any]) -> list[str]:
     return fragments
 
 
-def _compose_label(metadata: RunMetadata, run_timestamp: int) -> str:
-    """Readable picker label: [HH:MM:SS] mode • pm • knobs • model."""
-    mode = _mode_label(scenario_config=metadata.scenario_config)
+def _postmortem_fragment(scenario_config: dict[str, Any], mode: str) -> str:
+    """Describe postmortem state in words.
+
+    Emits one of: "no postmortem", "postmortem", or (for modes with a boundary)
+    "postmortem kept after boundary" / "postmortem dropped after boundary".
+    """
+    postmortem_enabled = bool(scenario_config.get("postmortem_enabled", False))
+    if not postmortem_enabled:
+        return "no postmortem"
     if mode == "single":
-        pm_fragment = ""
-    else:
-        pm_value = bool(metadata.scenario_config.get("postmortem_after_swap", False))
-        if pm_value:
-            pm_fragment = " • pm=on"
-        else:
-            pm_fragment = " • pm=off"
+        return "postmortem"
+    postmortem_after_swap = bool(scenario_config.get("postmortem_after_swap", False))
+    if postmortem_after_swap:
+        return "postmortem kept after boundary"
+    return "postmortem dropped after boundary"
+
+
+def _compose_label(metadata: RunMetadata, run_timestamp: int) -> str:
+    """Readable picker label: [HH:MM:SS] mode • postmortem-state • knobs • model."""
+    mode = _mode_label(scenario_config=metadata.scenario_config)
+    postmortem_fragment = _postmortem_fragment(scenario_config=metadata.scenario_config, mode=mode)
     knob_fragments = _knob_fragments(scenario_config=metadata.scenario_config)
     if knob_fragments:
         knobs_fragment = " • " + " ".join(knob_fragments)
     else:
         knobs_fragment = ""
     time_str = datetime.fromtimestamp(run_timestamp).strftime("%H:%M:%S")
-    return f"[{time_str}] {mode}{pm_fragment}{knobs_fragment} • {metadata.primary_model}"
+    return (
+        f"[{time_str}] {mode} • {postmortem_fragment}{knobs_fragment} • "
+        f"{metadata.primary_model}"
+    )
 
 
 def _read_run_id(jsonl_path: Path) -> str:

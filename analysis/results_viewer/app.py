@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import pyperclip
 import streamlit as st
 
 from analysis.results_viewer.event_extractor import load_run_timeline
@@ -162,6 +163,23 @@ def _maybe_open_point_modal(selection_state: object, reports: dict[str, Evaluati
     )
 
 
+def _render_run_id_copy_chip(run_id: str) -> None:
+    """Button showing the run id's first 8 chars; click copies the full UUID via pyperclip.
+
+    ``pyperclip`` writes to the machine running the Streamlit server, which — in this
+    local-only viewer — is the same machine the user is on, so the UUID lands in the
+    user's clipboard.
+    """
+    short = run_id[:8]
+    if st.button(
+        label=f"{short} ⧉",
+        key=f"copy_run_id::{run_id}",
+        help=f"Copy run id: {run_id}",
+    ):
+        pyperclip.copy(run_id)
+        st.toast(f"Copied {run_id}")
+
+
 def _render_selected_run_links(runs: list[EvaluatedRun]) -> None:
     """Render one row per selected run with colour swatch, run id (copy-able) and detail link.
 
@@ -180,7 +198,8 @@ def _render_selected_run_links(runs: list[EvaluatedRun]) -> None:
             unsafe_allow_html=True,
         )
         label_col.markdown(run.label)
-        id_col.code(run.run_id, language=None)
+        with id_col:
+            _render_run_id_copy_chip(run_id=run.run_id)
         link_col.markdown(f"[Open ↗]({detail_url})")
 
 
