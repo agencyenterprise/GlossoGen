@@ -13,10 +13,10 @@ Veyru {{ round_number }}
 Time budget: {{ current_case.time_budget_seconds }}s (one character = one second; this is the total for both of you)
 
 SAGWE392 STELLAR READING:
-Treatment mapping (symptoms on the left → apply procedure on the right):
-{% for entry in treatment_mapping %}- {{ entry.symptom_motif }} → {{ entry.treatment_motif }}
+The star's current position dictates the following action for each failure motif this round:
+{% for entry in treatment_mapping %}
+- {{ entry.symptom_motif }}: {{ entry.action_text }}
 {% endfor %}
-Parameters: hold {{ stellar_reading.hold_duration }}s, start from {{ stellar_reading.starting_face }} face, {{ stellar_reading.pressure_level }} pressure.
 
-The field technician will report observations. Diagnose the failure, look up the remapped treatment, apply the stellar parameters, and give stabilization instructions.
+The field technician will describe symptoms. Match them to a motif above and give the technician the exact procedure verbatim.
 {% endif %}

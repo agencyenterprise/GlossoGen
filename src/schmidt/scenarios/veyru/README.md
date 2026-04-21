@@ -81,29 +81,28 @@ Cases are generated procedurally using a seed for reproducibility. Most rounds g
 
 ## Stellar Alignment — SAGWE392
 
-Each round, the position of reference star SAGWE392 changes the treatment in two ways:
+Each round the specialist receives a reading that maps every failure motif directly to a fully-parameterized procedure. The underlying stellar position still rotates which procedure each motif gets and which parameters apply, but the specialist never sees the offset or raw parameters — only 14 rendered procedures.
 
-### Treatment Remapping
+### What the Specialist Sees
 
-A stellar offset (1-13) shifts the mapping between failure symptoms and correct treatment. The observer sees symptoms of motif X, but the correct procedure comes from a different motif Y. The specialist receives a 14-entry lookup table each round showing the full symptom→treatment mapping. The offset changes every round.
+- **System prompt** lists two orthogonal sets: (a) all 14 failure motifs with their observable symptoms, and (b) all 14 procedure templates with visible placeholders (`{hold_duration}`, `{starting_face}`, `{pressure_level}`) — no pre-baked mapping between motif and procedure.
+- **Round injection** contains a 14-row table mapping each failure motif to the fully-rendered procedure for this round (placeholders already substituted). The specialist just matches the observer's description to a motif, finds its action in the table, and relays the full procedure verbatim.
 
-### Parameter Variation
+### Parameter Pools
 
-Each round also generates unique physical parameters for the treatment:
+Each round draws one value from each pool (hidden from both agents):
 
 - **Hold/press duration** — chosen from [5, 8, 10, 12, 15, 20] seconds
 - **Starting face** — one of [top, bottom, left, right, front, back]
 - **Pressure level** — one of [gentle, moderate, firm]
 
-The specialist receives these values in their round injection and must communicate them to the observer along with the remapped procedure.
-
 ### Information Asymmetry
 
-Only the specialist has the stellar reader instrument. The field observer is told that treatments depend on SAGWE392 but receives no stellar data. This prevents the observer from self-diagnosing and self-treating even if they learn all 14 motif procedures during postmortem discussions — the treatment mapping and parameters change every round.
+Only the specialist has the stellar reader. The field observer is told that treatments depend on SAGWE392 but receives no stellar data. This prevents the observer from self-diagnosing and self-treating even if they learn all 14 motif procedures during postmortem discussions — the symptom→procedure pairing and parameters change every round.
 
 ### Stabilization Judge
 
-The LLM judge evaluates each `stabilize_veyru` call against the remapped treatment motif's procedure with the stellar parameters. The judge receives the treatment motif name, the base procedure text, and the stellar parameters (hold duration, starting face, pressure level) as separate structured inputs.
+The LLM judge evaluates each `stabilize_veyru` call against the expected procedure (the same fully-rendered text the specialist received in the stellar reading). The judge checks action type, duration, face, and pressure — lenient on wording, strict on physical parameters.
 
 ## Budget and Collapse Mechanics
 
