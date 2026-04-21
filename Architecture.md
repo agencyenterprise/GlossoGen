@@ -316,3 +316,14 @@ The frontend includes an MCP integration modal (accessible via the **MCP** butto
 - **Type generation**: `openapi-typescript` generates TypeScript types from the backend's OpenAPI schema. CI enforces that generated types stay in sync with the backend.
 - **Lint enforcement**: ESLint forbids raw `fetch()` — all API calls must go through the typed client at `@/shared/lib/api-client`. This ensures compile-time validation of request paths, parameters, and response types.
 - **Fork UI**: Completed runs show per-message edit buttons (on hover). Editing a message and clicking play opens a modal to select model/provider, then calls the fork API and navigates to the new run. Forked runs display a lineage badge linking to the source. Fork state is managed by the `useFork` hook (`use-fork.ts`).
+
+## Results Viewer (Streamlit)
+
+A separate Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round evaluator scores across multiple evaluated runs. It is a read-only consumer of the standard run output (`runs/{scenario}/{ts}/veyru_report.json` plus the JSONL event log) — no API or backend coupling.
+
+- `run_catalog.py` — discovers runs that have an evaluator report.
+- `event_extractor.py` — derives a per-round timeline from the JSONL events.
+- `timeline_plot.py` — builds a Plotly figure overlaying multiple runs' evaluator scores per round.
+- `app.py` — Streamlit entrypoint; reads `SCHMIDT_RUNS_DIR`, lets the user multiselect runs.
+
+Streamlit and Plotly live behind the optional `analysis` uv dependency group so a server-only install (`uv sync`) does not pull them in. Launched with `make results-viewer`.

@@ -4,13 +4,23 @@ A platform for testing agent communication through real-life simulations. LLM-ba
 
 ## Setup
 
+### Prerequisites
+
+- **Python 3.12**
+- **Node.js ≥ 22** (for the frontend)
+- **[uv](https://docs.astral.sh/uv/)** — Python package manager
+- **make**, **git**
+- **System libraries for weasyprint** (PDF export). On macOS: `brew install pango cairo gdk-pixbuf libffi`. On Debian/Ubuntu: `apt-get install libpango-1.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0`.
+
+### Install dependencies
+
 ```bash
-make install
+make install            # both backend and frontend
+make install-server     # backend only (uv sync)
+make install-frontend   # frontend only (npm ci)
 ```
 
-This installs both the Python server dependencies (`uv sync`) and the frontend dependencies (`npm ci`).
-
-Copy `.env.example` to `.env` and fill in the values:
+### Configure environment
 
 ```bash
 cp .env.example .env
@@ -92,6 +102,17 @@ Scenario-specific evaluators:
 
 Output is a JSON report with per-evaluator verdicts, scores, and evidence. After evaluation, labels are automatically written to the run in the format `eval:{evaluator}:{verdict}` (where verdict is `identified`, `partial`, or `fail`), visible in the web UI for filtering.
 
+## Results Viewer (Streamlit)
+
+A Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round evaluator scores across multiple evaluated runs — useful for comparing models or knob configurations.
+
+```bash
+uv sync --group analysis    # one-time, installs streamlit + plotly
+make results-viewer         # opens the viewer in a browser
+```
+
+It reads from `SCHMIDT_RUNS_DIR` (defaults to `./runs`) and lists all runs that have a `veyru_report.json`.
+
 ## Web UI
 
 A FastAPI backend + Next.js frontend for browsing simulation runs. The frontend streams events in real time via SSE for in-progress runs.
@@ -104,10 +125,14 @@ The MCP endpoint at `/mcp` uses OAuth 2.0 with PKCE for authentication (see MCP 
 
 ### Starting the Servers
 
+The backend and frontend run as separate processes — start each in its own terminal:
+
 ```bash
-make dev            # FastAPI backend on port 8000 (reads from ./runs/)
-make dev-frontend   # Next.js dev server on port 3000
+make dev            # terminal 1: FastAPI backend on port 8000 (reads from ./runs/)
+make dev-frontend   # terminal 2: Next.js dev server on port 3000
 ```
+
+Open <http://localhost:3000> once both are running.
 
 The frontend displays a list of all simulation runs with scenario name, timestamp, message count, status (including in-progress runs), evaluation status, and fork badges. Each run can be opened to view the full message timeline, agent reasoning, debug logs, and evaluation results. Completed runs support message-level editing and forking — hover over any message to edit it and launch a new simulation from that point.
 
