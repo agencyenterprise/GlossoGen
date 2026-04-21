@@ -29,7 +29,7 @@ The comm link is the primary channel where character costs apply. The postmortem
 
 ## Tools
 
-**`send_message(channel_id: str, text: str)`** — Both agents. Sends a message to a channel. On the comm link, every character costs `seconds_per_character` simulated seconds against the current Veyru's time budget.
+**`send_message(channel_id: str, text: str)`** — Both agents. Sends a message to a channel. On the comm link, every character costs one simulated second against the current Veyru's time budget.
 
 **`stabilize_veyru(action: str)`** — Field Observer only. Describes the physical stabilization action being performed (e.g., "pressing all six faces inward for ten seconds"). An LLM judge evaluates whether the action matches the required procedure. If correct, the Veyru is stabilized. If incorrect, the observer can retry (but communication to coordinate costs more time).
 
@@ -48,34 +48,36 @@ The comm link is the primary channel where character costs apply. The postmortem
 
 ## Failure Motifs
 
-Fourteen failure motifs are available. Each round combines 1-3 motifs into a unique case:
+Fourteen failure motifs are available. Each round combines 1-5 motifs into a unique case:
 
 ### Single Motifs
 
-| Motif | Key Symptoms | Base Budget |
-|-------|-------------|-------------|
-| Alignment Collapse | Random flickering, broken hum | 60s |
-| Drift Escalation | Sliding light, blurred edges | 60s |
-| Echo Saturation | Too bright, frozen patterns, layered hum | 70s |
-| Leak Instability | Dim corners, fading edges, hollow hum | 70s |
-| Low Intensity | Overall dim, barely audible hum | 70s |
-| High Intensity | Painfully bright, harsh buzz, hot | 80s |
-| Phase Inversion | Alternating bright/dark pulses, two tones | 70s |
-| Resonance Cascade | One face brighter, localized vibration, whine | 70s |
-| Corner Deadlock | Bright corners, clicking/ticking, heat | 60s |
-| Boundary Softening | Wobbly edges, bulging faces, muffled hum | 70s |
-| Propagation Stall | Frozen dim, silence, cold, no response | 70s |
-| Harmonic Split | Competing tones, alternating patterns | 70s |
-| Thermal Bleed | Hot but dim, low rumble, gritty, reddish | 80s |
-| Core Void | Hollow when tapped, dark center, thin hum | 80s |
+| Motif | Key Symptoms | Priority |
+|-------|-------------|----------|
+| Alignment Collapse | Random flickering, broken hum | 5 |
+| Drift Escalation | Sliding light, blurred edges | 5 |
+| Echo Saturation | Too bright, frozen patterns, layered hum | 4 |
+| Leak Instability | Dim corners, fading edges, hollow hum | 1 |
+| Low Intensity | Overall dim, barely audible hum | 2 |
+| High Intensity | Painfully bright, harsh buzz, hot | 2 |
+| Phase Inversion | Alternating bright/dark pulses, two tones | 5 |
+| Resonance Cascade | One face brighter, localized vibration, whine | 3 |
+| Corner Deadlock | Bright corners, clicking/ticking, heat | 3 |
+| Boundary Softening | Wobbly edges, bulging faces, muffled hum | 4 |
+| Propagation Stall | Frozen dim, silence, cold, no response | 1 |
+| Harmonic Split | Competing tones, alternating patterns | 5 |
+| Thermal Bleed | Hot but dim, low rumble, gritty, reddish | 1 |
+| Core Void | Hollow when tapped, dark center, thin hum | 3 |
+
+Priority-1/2 motifs are marked `# easy` in the source and are used in the forced easy rounds.
 
 ### Composite Failures
 
-Composite cases combine two or three motifs per round. Procedure order matters — agents must address motifs in priority sequence (seal leaks first, then adjust intensity, then fix pattern-level issues). Composite budgets are the sum of component base budgets.
+Composite cases combine two to five motifs per round. Procedure order matters — agents must address motifs in priority sequence (seal leaks first, then adjust intensity, then fix pattern-level issues). Every round uses the same fixed time budget regardless of motif count, so multi-motif rounds impose more per-message pressure.
 
 ### Case Generation
 
-Cases are generated procedurally using a seed for reproducibility. Each round gets a random combination of 1-3 motifs (40% singles, 40% doubles, 20% triples) and a random location.
+Cases are generated procedurally using a seed for reproducibility. Most rounds get a random combination of 1-5 motifs (weights: 20% singles, 25% doubles, 25% triples, 20% quads, 10% quints) and a random location. Rounds 1, 2, 3, 6, and 13 are forced to a single priority-≤2 motif so early-simulation pressure is low.
 
 ## Stellar Alignment — SAGWE392
 
@@ -107,8 +109,8 @@ The LLM judge evaluates each `stabilize_veyru` call against the remapped treatme
 
 Communication cost is tracked per round on the comm link:
 
-1. Each character in a `send_message` call costs `seconds_per_character` simulated seconds (default: 0.6)
-2. Both agents' messages count toward the shared budget
+1. Each character in a `send_message` call costs one simulated second
+2. Both agents' messages count toward the shared budget (`round_time_budget_seconds`, fixed per round)
 3. At 75% of budget: critical notification ("destabilizing rapidly")
 4. At 100%+ of budget: Veyru collapses permanently
 
@@ -132,7 +134,7 @@ Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only Eng
 
 | Knob | Description |
 |------|-------------|
-| `seconds_per_character` | Simulated seconds per character sent on the comm link |
+| `round_time_budget_seconds` | Fixed per-round time budget (one character = one simulated second) |
 | `seed` | Controls case shuffling and motif selection |
 | `round_count` | Number of rounds |
 | `postmortem_enabled` | Whether the discussion phase is active |

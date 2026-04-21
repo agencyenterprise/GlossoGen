@@ -2,9 +2,9 @@
 
 Defines 14 failure motifs (matching the specialist's training) and generates
 unique cases per round by combining motifs with seed-based randomisation.
-Each round gets 1-3 motifs and a random location. Composite cases (2-3
-motifs) are staged: symptoms are revealed one motif at a time, requiring
-iterative diagnosis and stabilization.
+Each round gets 1-5 motifs and a random location. Composite cases (2 or
+more motifs) are staged: symptoms are revealed one motif at a time,
+requiring iterative diagnosis and stabilization.
 """
 
 import random
@@ -65,7 +65,6 @@ class FailureMotif(NamedTuple):
     symptom_phrases: list[str]
     critical_actions: str
     judge_procedure_template: str
-    base_time_budget_seconds: int
     priority: int
 
 
@@ -96,7 +95,6 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "simultaneously for {hold_duration} seconds, starting from the "
             "{starting_face} face. Release and wait for hum to stabilize."
         ),
-        base_time_budget_seconds=60,
         priority=5,
     ),
     # --- 1: Drift Escalation ---
@@ -119,7 +117,6 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "Apply {pressure_level} rhythmic pulses — {hold_duration} seconds on, "
             "{hold_duration} seconds off — for five cycles."
         ),
-        base_time_budget_seconds=60,
         priority=5,
     ),
     # --- 2: Echo Saturation ---
@@ -141,7 +138,6 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "with {pressure_level} pressure for {hold_duration} seconds. Then "
             "tap each frozen face sharply three times."
         ),
-        base_time_budget_seconds=70,
         priority=4,
     ),
     # --- 3: Leak Instability ---
@@ -164,8 +160,7 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "{hold_duration} seconds in sequence, starting from corners near the "
             "{starting_face} face. Then trace each fading edge with a finger."
         ),
-        base_time_budget_seconds=70,
-        priority=1,
+        priority=1,  # easy
     ),
     # --- 4: Low Intensity ---
     FailureMotif(
@@ -187,8 +182,7 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "{starting_face} face for {hold_duration} seconds. Rotate and "
             "repeat for each face."
         ),
-        base_time_budget_seconds=70,
-        priority=2,
+        priority=2,  # easy
     ),
     # --- 5: High Intensity ---
     FailureMotif(
@@ -210,8 +204,7 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "{pressure_level} pressure for {hold_duration} seconds, starting "
             "from the {starting_face} face."
         ),
-        base_time_budget_seconds=80,
-        priority=2,
+        priority=2,  # easy
     ),
     # --- 6: Phase Inversion ---
     FailureMotif(
@@ -233,7 +226,6 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "face simultaneously. Hold with {pressure_level} pressure for "
             "{hold_duration} seconds without moving."
         ),
-        base_time_budget_seconds=70,
         priority=5,
     ),
     # --- 7: Resonance Cascade ---
@@ -256,7 +248,6 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "vibrating) and press with {pressure_level} pressure for "
             "{hold_duration} seconds. Then tap each adjacent edge twice."
         ),
-        base_time_budget_seconds=70,
         priority=3,
     ),
     # --- 8: Corner Deadlock ---
@@ -279,7 +270,6 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "seconds. Repeat for each locked corner, starting near the "
             "{starting_face} face."
         ),
-        base_time_budget_seconds=60,
         priority=3,
     ),
     # --- 9: Boundary Softening ---
@@ -301,7 +291,6 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "and squeeze inward with {pressure_level} pressure for "
             "{hold_duration} seconds. Rotate and repeat for each face-pair."
         ),
-        base_time_budget_seconds=70,
         priority=4,
     ),
     # --- 10: Propagation Stall ---
@@ -323,8 +312,7 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "{starting_face} face. Then cup hands around the Veyru and breathe "
             "warm air for {hold_duration} seconds."
         ),
-        base_time_budget_seconds=70,
-        priority=1,
+        priority=1,  # easy
     ),
     # --- 11: Harmonic Split ---
     FailureMotif(
@@ -346,7 +334,6 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "up. Press down with {pressure_level} pressure for {hold_duration} "
             "seconds."
         ),
-        base_time_budget_seconds=70,
         priority=5,
     ),
     # --- 12: Thermal Bleed ---
@@ -368,8 +355,7 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "and apply sustained {pressure_level} pressure to all six faces for "
             "{hold_duration} seconds, starting from the {starting_face} face."
         ),
-        base_time_budget_seconds=80,
-        priority=1,
+        priority=1,  # easy
     ),
     # --- 13: Core Void ---
     FailureMotif(
@@ -391,7 +377,6 @@ _FAILURE_MOTIFS: list[FailureMotif] = [
             "applying {pressure_level} pressure to opposite faces starting from "
             "the {starting_face} face. After rotation, tap each corner once."
         ),
-        base_time_budget_seconds=80,
         priority=3,
     ),
 ]
@@ -414,8 +399,13 @@ _LOCATIONS: list[str] = [
     "on a metal rack",
 ]
 
-# Weights for picking 1, 2, or 3 motifs per round.
-_MOTIF_COUNT_WEIGHTS: list[int] = [40, 40, 20]
+# Weights for picking 1, 2, 3, 4, or 5 motifs per round.
+_MOTIF_COUNT_WEIGHTS: list[int] = [20, 25, 25, 20, 10]
+
+# Round numbers that are forced to be single-motif, priority-<=2 cases.
+# These give the agents slack early (rounds 1-3), a breather mid-run
+# (round 6), and one more before the final pressure (round 13).
+_EASY_ROUND_NUMBERS: frozenset[int] = frozenset({1, 2, 3, 6, 13})
 
 # Stellar parameter pools — each round draws one value from each pool.
 _HOLD_DURATIONS: list[int] = [5, 8, 10, 12, 15, 20]
@@ -456,37 +446,87 @@ def _build_stage_symptoms(
     return " ".join(parts)
 
 
+def _build_stages(
+    priority_order: list[tuple[int, FailureMotif]],
+    location: str,
+    stellar_reading: StellarReading,
+) -> list[VeyruStage]:
+    """Construct per-motif stages for one case under a given stellar reading."""
+    pool_size = len(_FAILURE_MOTIFS)
+    stages: list[VeyruStage] = []
+    for stage_idx, (motif_idx, motif) in enumerate(priority_order):
+        treatment_motif = _FAILURE_MOTIFS[(motif_idx + stellar_reading.offset) % pool_size]
+        stages.append(
+            VeyruStage(
+                motif_name=motif.name,
+                observable_symptoms=_build_stage_symptoms(
+                    motif=motif,
+                    location=location,
+                    is_first_stage=(stage_idx == 0),
+                ),
+                critical_actions=treatment_motif.critical_actions,
+                treatment_motif_name=treatment_motif.name,
+                judge_expected_actions=treatment_motif.judge_procedure_template.format(
+                    hold_duration=stellar_reading.hold_duration,
+                    starting_face=stellar_reading.starting_face,
+                    pressure_level=stellar_reading.pressure_level,
+                ),
+            )
+        )
+    return stages
+
+
+def _select_motif_indices(
+    rng: random.Random,
+    round_number: int,
+    easy_motif_indices: list[int],
+) -> list[int]:
+    """Draw motif indices for one round, forcing easy rounds to a single motif.
+
+    Always consumes the same RNG calls in the same order so that non-easy
+    rounds under a given seed reproduce their pre-easy case content. For
+    easy rounds the drawn selection is discarded and replaced with one
+    priority-<=2 motif chosen from the drawn value (seed-dependent).
+    """
+    pool_size = len(_FAILURE_MOTIFS)
+    num_motifs = min(
+        rng.choices(population=[1, 2, 3, 4, 5], weights=_MOTIF_COUNT_WEIGHTS, k=1)[0],
+        pool_size,
+    )
+    selected_indices = rng.sample(range(pool_size), k=num_motifs)
+    if round_number in _EASY_ROUND_NUMBERS:
+        return [easy_motif_indices[selected_indices[0] % len(easy_motif_indices)]]
+    return selected_indices
+
+
 def get_cases(
     seed: int,
     round_count: int,
+    round_time_budget_seconds: int,
 ) -> list[VeyruCase]:
     """Generate unique failure cases for each round via seed-based selection.
 
-    Each round gets 1-3 failure motifs drawn from the 14-motif pool, a random
-    location, per-motif stages, and a stellar reading that remaps treatment
-    procedures and modifies physical parameters.
+    Most rounds get 1-5 failure motifs drawn from the 14-motif pool, with a
+    random location and stellar reading. Rounds in _EASY_ROUND_NUMBERS are
+    forced to a single priority-<=2 motif. Every round uses the same fixed
+    time budget.
     """
     rng = random.Random(seed)
-    pool_size = len(_FAILURE_MOTIFS)
+    easy_motif_indices = [idx for idx, m in enumerate(_FAILURE_MOTIFS) if m.priority <= 2]
     cases: list[VeyruCase] = []
 
     for i in range(round_count):
-        num_motifs = rng.choices(
-            population=[1, 2, 3],
-            weights=_MOTIF_COUNT_WEIGHTS,
-            k=1,
-        )[0]
-        num_motifs = min(num_motifs, pool_size)
-
-        selected_indices = rng.sample(range(pool_size), k=num_motifs)
-        selected_motifs = [_FAILURE_MOTIFS[idx] for idx in selected_indices]
+        selected_indices = _select_motif_indices(
+            rng=rng,
+            round_number=i + 1,
+            easy_motif_indices=easy_motif_indices,
+        )
         priority_order = sorted(
-            zip(selected_indices, selected_motifs),
+            ((idx, _FAILURE_MOTIFS[idx]) for idx in selected_indices),
             key=lambda pair: pair[1].priority,
         )
 
         location = rng.choice(_LOCATIONS)
-
         stellar_reading = StellarReading(
             offset=rng.randint(1, 13),
             hold_duration=rng.choice(_HOLD_DURATIONS),
@@ -494,34 +534,18 @@ def get_cases(
             pressure_level=rng.choice(_PRESSURE_LEVELS),
         )
 
-        stages: list[VeyruStage] = []
-        for stage_idx, (motif_idx, motif) in enumerate(priority_order):
-            treatment_idx = (motif_idx + stellar_reading.offset) % pool_size
-            treatment_motif = _FAILURE_MOTIFS[treatment_idx]
-            stages.append(
-                VeyruStage(
-                    motif_name=motif.name,
-                    observable_symptoms=_build_stage_symptoms(
-                        motif=motif,
-                        location=location,
-                        is_first_stage=(stage_idx == 0),
-                    ),
-                    critical_actions=treatment_motif.critical_actions,
-                    treatment_motif_name=treatment_motif.name,
-                    judge_expected_actions=treatment_motif.judge_procedure_template.format(
-                        hold_duration=stellar_reading.hold_duration,
-                        starting_face=stellar_reading.starting_face,
-                        pressure_level=stellar_reading.pressure_level,
-                    ),
-                )
-            )
+        stages = _build_stages(
+            priority_order=priority_order,
+            location=location,
+            stellar_reading=stellar_reading,
+        )
 
         cases.append(
             VeyruCase(
                 case_number=i + 1,
                 failure_name=" + ".join(m.name for _, m in priority_order),
                 stages=tuple(stages),
-                time_budget_seconds=int(sum(m.base_time_budget_seconds for m in selected_motifs)),
+                time_budget_seconds=round_time_budget_seconds,
                 stellar_reading=stellar_reading,
             )
         )

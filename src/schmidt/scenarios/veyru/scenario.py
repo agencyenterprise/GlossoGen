@@ -155,6 +155,7 @@ class VeyruScenario(SimulationScenario):
         self._veyru_cases: list[VeyruCase] = get_cases(
             seed=knobs.seed,
             round_count=knobs.round_count,
+            round_time_budget_seconds=knobs.round_time_budget_seconds,
         )
         self._agent_display_names: dict[str, str] = self._build_agent_display_names(
             two_teams=knobs.two_teams,
@@ -165,7 +166,6 @@ class VeyruScenario(SimulationScenario):
             intern_enabled=knobs.intern_enabled,
         )
         self._world = VeyruWorld(
-            seconds_per_character=knobs.seconds_per_character,
             veyru_cases=self._veyru_cases,
             teams=self._build_teams(knobs=knobs),
         )
@@ -305,7 +305,7 @@ class VeyruScenario(SimulationScenario):
         return self._renderer.render(
             template_name="description.jinja",
             template_variables={
-                "seconds_per_character": self._knobs.seconds_per_character,
+                "round_time_budget_seconds": self._knobs.round_time_budget_seconds,
                 "round_count": self._knobs.round_count,
                 "veyru_cases": self._veyru_cases,
                 "two_teams": self._knobs.two_teams,
@@ -424,7 +424,6 @@ class VeyruScenario(SimulationScenario):
                             "channels": self._channel_template_data(
                                 agent_id=d.agent_id, channel_ids=d.channel_ids
                             ),
-                            "seconds_per_character": self._knobs.seconds_per_character,
                             "postmortem_enabled": self._knobs.postmortem_enabled,
                             "intern_join_round": self._knobs.intern_join_round,
                             "intern_takeover_round": self._knobs.intern_takeover_round,

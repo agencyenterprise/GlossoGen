@@ -1,8 +1,9 @@
 """Configuration knobs for the Veyru stabilization scenario.
 
-Controls character-based communication cost, case shuffling seed, round count,
-postmortem discussion, two-team mode, observer swap timing, swap announcement,
-post-swap postmortem availability, intern observer mode, and the LLM judge.
+Controls the per-round time budget, case shuffling seed, round count,
+postmortem discussion, two-team mode, observer swap timing, swap
+announcement, post-swap postmortem availability, intern observer mode, and
+the LLM judge.
 """
 
 from pydantic import model_validator
@@ -13,9 +14,11 @@ from schmidt.scenarios.base_knobs import BaseKnobs
 class VeyruKnobs(BaseKnobs):
     """Configuration knobs for the Veyru stabilization scenario.
 
-    ``seconds_per_character`` controls how many simulated seconds each
-    character costs when agents communicate. ``seed`` controls the random
-    shuffle of failure motifs into round cases. ``postmortem_enabled``
+    ``round_time_budget_seconds`` is the fixed per-round budget applied to
+    every case: every character sent on the comm link costs one simulated
+    second, and if the running total exceeds the budget the Veyru
+    collapses. ``seed`` controls the random shuffle of failure motifs into
+    round cases. ``postmortem_enabled``
     controls whether a shared discussion phase follows each round.
     ``two_teams`` is an opt-in toggle that runs two isolated observer/
     specialist teams in parallel on identical cases each round.
@@ -40,7 +43,7 @@ class VeyruKnobs(BaseKnobs):
     judge_provider: str
     postmortem_enabled: bool
     round_count: int
-    seconds_per_character: float
+    round_time_budget_seconds: int
     seed: int
     two_teams: bool
     swap_round: int | None

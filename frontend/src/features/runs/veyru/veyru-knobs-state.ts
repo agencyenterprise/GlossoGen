@@ -5,7 +5,7 @@ export type VeyruMode = "single" | "swap" | "intern";
 export type VeyruKnobsState = {
   mode: VeyruMode;
   round_count: number;
-  seconds_per_character: number;
+  round_time_budget_seconds: number;
   seed: number;
   postmortem_enabled: boolean;
   max_round_duration_seconds: number;
@@ -70,8 +70,8 @@ export function detectMode(knobs: Record<string, unknown>): VeyruMode {
 export function knobsToState(knobs: Record<string, unknown>): VeyruKnobsState {
   return {
     mode: detectMode(knobs),
-    round_count: coerceNumber(knobs.round_count, 12),
-    seconds_per_character: coerceNumber(knobs.seconds_per_character, 2.0),
+    round_count: coerceNumber(knobs.round_count, 15),
+    round_time_budget_seconds: coerceNumber(knobs.round_time_budget_seconds, 150),
     seed: coerceNumber(knobs.seed, 42),
     postmortem_enabled: coerceBool(knobs.postmortem_enabled, true),
     max_round_duration_seconds: coerceNumber(knobs.max_round_duration_seconds, 300),
@@ -95,7 +95,7 @@ export function mergePresetIntoState({
   return {
     mode: preset.mode,
     round_count: previous.round_count,
-    seconds_per_character: previous.seconds_per_character,
+    round_time_budget_seconds: previous.round_time_budget_seconds,
     seed: previous.seed,
     postmortem_enabled: previous.postmortem_enabled,
     max_round_duration_seconds: previous.max_round_duration_seconds,
@@ -120,10 +120,10 @@ export function validateState(state: VeyruKnobsState): VeyruFieldError[] {
       message: "Round duration must be at least 1 second.",
     });
   }
-  if (state.seconds_per_character < 0) {
+  if (state.round_time_budget_seconds < 1) {
     errors.push({
-      field: "seconds_per_character",
-      message: "Seconds per character must be non-negative.",
+      field: "round_time_budget_seconds",
+      message: "Round time budget must be at least 1 second.",
     });
   }
   if (state.mode === "swap") {
@@ -217,7 +217,7 @@ export function buildPayload({
     postmortem_after_swap: state.postmortem_after_swap,
     postmortem_enabled: state.postmortem_enabled,
     round_count: state.round_count,
-    seconds_per_character: state.seconds_per_character,
+    round_time_budget_seconds: state.round_time_budget_seconds,
     seed: state.seed,
     swap_round: swapRound,
     two_teams: twoTeams,

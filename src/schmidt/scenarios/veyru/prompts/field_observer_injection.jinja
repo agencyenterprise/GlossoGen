@@ -15,7 +15,7 @@ Veyru {{ round_number - 1 }}: {% if previous_outcome.stabilized %}STABILIZED{% e
 {% if current_case is not none %}
 --- NEW VEYRU ---
 Veyru {{ round_number }}
-Time budget: {{ current_case.time_budget_seconds }}s (~{{ (current_case.time_budget_seconds / knobs.seconds_per_character) | int }} characters total for both of you)
+Time budget: {{ current_case.time_budget_seconds }}s (one character = one second; this is the total for both of you)
 
 What you observe:
 {{ first_stage_symptoms }}
