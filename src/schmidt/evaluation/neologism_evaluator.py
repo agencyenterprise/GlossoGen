@@ -80,6 +80,7 @@ class NeologismEvaluator(Evaluator):
                 score=0.0,
                 evidence=["No messages found in the simulation"],
                 per_agent={},
+                rounds_identified=[],
             )
 
         agent_prompts = [
@@ -113,8 +114,6 @@ class NeologismEvaluator(Evaluator):
             score = 0.5
 
         evidence: list[str] = [result.explanation]
-        if result.rounds_identified:
-            evidence.append(f"Rounds: {', '.join(str(r) for r in result.rounds_identified)}")
         if result.novel_terms:
             evidence.append(f"Novel terms found: {len(result.novel_terms)}")
         if result.semantically_stable:
@@ -127,4 +126,5 @@ class NeologismEvaluator(Evaluator):
             score=score,
             evidence=evidence,
             per_agent={},
+            rounds_identified=result.rounds_identified,
         )

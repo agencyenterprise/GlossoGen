@@ -84,6 +84,7 @@ class SlangEmergenceEvaluator(Evaluator):
                 score=0.0,
                 evidence=["No messages found in the simulation"],
                 per_agent={},
+                rounds_identified=[],
             )
 
         judge_prompt = render_evaluator_prompt(
@@ -109,8 +110,6 @@ class SlangEmergenceEvaluator(Evaluator):
             score = 0.5
 
         evidence: list[str] = [result.explanation]
-        if result.rounds_identified:
-            evidence.append(f"Rounds: {', '.join(str(r) for r in result.rounds_identified)}")
         if result.slang_instances:
             evidence.append(f"Slang instances found: {len(result.slang_instances)}")
         if result.shared_slang:
@@ -124,4 +123,5 @@ class SlangEmergenceEvaluator(Evaluator):
             score=score,
             evidence=evidence,
             per_agent={},
+            rounds_identified=result.rounds_identified,
         )
