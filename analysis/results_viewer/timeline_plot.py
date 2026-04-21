@@ -5,7 +5,6 @@ from typing import NamedTuple
 import plotly.graph_objects as go
 
 from analysis.results_viewer.event_extractor import RunTimeline, TimelineEventKind
-from analysis.results_viewer.evidence_parser import extract_rounds_identified
 from schmidt.evaluation.evaluation_report import EvaluationReport
 
 
@@ -73,13 +72,16 @@ class _RunPlotData(NamedTuple):
 
 
 def collect_per_round_evaluators(reports: list[EvaluationReport]) -> list[str]:
-    """Return the sorted union of evaluator names that produced per-round data."""
+    """Return the sorted union of evaluator names present in the reports.
+
+    Every evaluator now reports ``rounds_identified`` as a structured field on
+    ``MetricResult``; lanes appear for all evaluators that ran, even when a run
+    produced zero round hits.
+    """
     names: set[str] = set()
     for report in reports:
         for metric in report.metrics:
-            rounds = extract_rounds_identified(evidence=metric.evidence)
-            if rounds:
-                names.add(metric.evaluator_name)
+            names.add(metric.evaluator_name)
     return sorted(names)
 
 
@@ -91,15 +93,50 @@ def _build_run_plot_data(
     """Build the per-evaluator rounds mapping for one run."""
     per_evaluator: dict[str, list[int]] = {}
     for metric in report.metrics:
-        rounds = extract_rounds_identified(evidence=metric.evidence)
-        if rounds:
-            per_evaluator[metric.evaluator_name] = rounds
+        if metric.rounds_identified:
+            per_evaluator[metric.evaluator_name] = sorted(metric.rounds_identified)
     return _RunPlotData(
         run_key=run_key,
         total_rounds=timeline.total_rounds,
         per_evaluator_rounds=per_evaluator,
         timeline=timeline,
     )
+
+
+def _run_vertical_offset(run_index: int, run_count: int) -> float:
+    """Vertical jitter so overlapping run markers remain visible."""
+    if run_count == 1:
+        return 0.0
+    return (run_index - (run_count - 1) / 2) * 0.18
+
+
+_INTERMEDIATE_STEPS_PER_UNIT = 8
+
+
+def _nearest_round(value: float, rounds: list[int]) -> int:
+    """Return the round in ``rounds`` that is closest to ``value``."""
+    return min(rounds, key=lambda r: abs(r - value))
+
+
+def _build_click_overlay(
+    run_key: str, evaluator_name: str, sorted_rounds: list[int], y: float
+) -> tuple[list[float], list[float], list[list[object]]]:
+    """Dense transparent markers along the line so clicks on the line open the modal."""
+    overlay_xs: list[float] = []
+    overlay_ys: list[float] = []
+    overlay_cd: list[list[object]] = []
+    for index in range(len(sorted_rounds) - 1):
+        start_round = sorted_rounds[index]
+        end_round = sorted_rounds[index + 1]
+        gap = end_round - start_round
+        steps = max(1, int(gap * _INTERMEDIATE_STEPS_PER_UNIT))
+        for step in range(1, steps):
+            x = start_round + gap * (step / steps)
+            nearest = _nearest_round(value=x, rounds=sorted_rounds)
+            overlay_xs.append(x)
+            overlay_ys.append(y)
+            overlay_cd.append([run_key, evaluator_name, nearest])
+    return overlay_xs, overlay_ys, overlay_cd
 
 
 def _add_run_trace(
@@ -110,35 +147,77 @@ def _add_run_trace(
     run_count: int,
     colour: str,
 ) -> None:
-    """Add one marker trace per run, offset vertically so overlapping runs don't hide dots."""
-    if run_count == 1:
-        offset = 0.0
-    else:
-        offset = (run_index - (run_count - 1) / 2) * 0.18
-    xs: list[int] = []
-    ys: list[float] = []
-    hover: list[str] = []
-    for eval_name, rounds in run.per_evaluator_rounds.items():
-        if eval_name not in evaluators:
+    """Add one dots+lines trace per (run, evaluator lane); legend shows the run once.
+
+    Each visible dot carries ``customdata = [run_key, evaluator_name, round]``. Transparent
+    intermediate markers are added along the connecting line so clicks on the line segment
+    also open the modal (mapped to the nearest real round).
+    """
+    offset = _run_vertical_offset(run_index=run_index, run_count=run_count)
+    legend_shown = False
+    for eval_name in evaluators:
+        rounds = run.per_evaluator_rounds.get(eval_name)
+        if not rounds:
             continue
         base_y = evaluators.index(eval_name)
-        for rnd in rounds:
-            xs.append(rnd)
-            ys.append(base_y + offset)
-            hover.append(f"<b>{run.run_key}</b><br>{eval_name}<br>round {rnd}")
-    fig.add_trace(
-        go.Scatter(
-            x=xs,
-            y=ys,
-            mode="markers",
-            marker=dict(color=colour, size=13, line=dict(width=1, color="white")),
-            name=run.run_key,
-            legendgroup="runs",
-            legendgrouptitle=dict(text="Runs"),
-            hovertext=hover,
-            hoverinfo="text",
+        y = base_y + offset
+        sorted_rounds = sorted(rounds)
+        ys = [y] * len(sorted_rounds)
+        customdata = [[run.run_key, eval_name, r] for r in sorted_rounds]
+        show_legend = not legend_shown
+        legend_shown = True
+        fig.add_trace(
+            go.Scatter(
+                x=sorted_rounds,
+                y=ys,
+                mode="markers+lines",
+                marker=dict(color=colour, size=13, line=dict(width=1, color="white")),
+                line=dict(color=colour, width=2),
+                name=run.run_key,
+                legendgroup=f"run::{run.run_key}",
+                legendgrouptitle=dict(text="Runs"),
+                showlegend=show_legend,
+                hoverinfo="none",
+                customdata=customdata,
+                selected=dict(marker=dict(opacity=1, size=13, color=colour)),
+                unselected=dict(marker=dict(opacity=1, size=13, color=colour)),
+            )
         )
-    )
+        overlay_xs, overlay_ys, overlay_cd = _build_click_overlay(
+            run_key=run.run_key,
+            evaluator_name=eval_name,
+            sorted_rounds=sorted_rounds,
+            y=y,
+        )
+        if not overlay_xs:
+            continue
+        fig.add_trace(
+            go.Scatter(
+                x=overlay_xs,
+                y=overlay_ys,
+                mode="markers",
+                marker=dict(color=colour, size=14, opacity=0.0001),
+                name=f"{run.run_key} click overlay",
+                legendgroup=f"run::{run.run_key}",
+                showlegend=False,
+                hoverinfo="none",
+                customdata=overlay_cd,
+                selected=dict(marker=dict(opacity=0.0001, size=14, color=colour)),
+                unselected=dict(marker=dict(opacity=0.0001, size=14, color=colour)),
+            )
+        )
+
+
+def _build_run_colors(runs: list[_RunPlotData]) -> dict[str, str]:
+    """Assign each run a stable colour from the run palette."""
+    return {run.run_key: _RUN_PALETTE[index % len(_RUN_PALETTE)] for index, run in enumerate(runs)}
+
+
+def _compute_run_x_offsets(run_count: int) -> list[float]:
+    """Horizontal offsets so vertical event lines from multiple runs don't overlap."""
+    if run_count == 1:
+        return [0.0]
+    return [(index - (run_count - 1) / 2) * 0.12 for index in range(run_count)]
 
 
 def _dedup_prominent_events(
@@ -155,89 +234,108 @@ def _dedup_prominent_events(
     return grouped
 
 
-def _add_prominent_events(fig: go.Figure, runs: list[_RunPlotData]) -> None:
-    """Render swap/intern events as vertical lines with a single annotation per round."""
-    grouped = _dedup_prominent_events(runs=runs)
-    for (kind, rnd), run_keys in grouped.items():
-        style = _PROMINENT_STYLES[kind]
-        fig.add_vrect(
-            x0=rnd - 0.22,
-            x1=rnd + 0.22,
-            fillcolor=style.colour,
-            opacity=0.12,
-            line_width=0,
-        )
-        fig.add_vline(
-            x=rnd,
-            line=dict(color=style.colour, dash=style.dash, width=style.width),
-            opacity=0.9,
-            annotation_text=f"<b>{style.icon} {style.label_short}</b>",
-            annotation_position="top",
-            annotation=dict(
-                font=dict(size=13, color=style.colour, family="sans-serif"),
-                bgcolor="rgba(255,255,255,0.9)",
-                bordercolor=style.colour,
-                borderwidth=1,
-                hovertext="Runs: " + ", ".join(run_keys),
-            ),
-        )
-
-
-def _collect_glyph_points(
+def _add_prominent_events(
+    fig: go.Figure,
     runs: list[_RunPlotData],
-    events_lane_y: float,
-    run_offsets: dict[str, float],
-) -> dict[TimelineEventKind, tuple[list[float], list[float], list[str]]]:
-    """Bucket world-state events by kind, with hover text listing the originating run."""
-    buckets: dict[TimelineEventKind, tuple[list[float], list[float], list[str]]] = {
-        kind: ([], [], []) for kind in _GLYPH_STYLES.keys()
-    }
-    for run in runs:
-        offset = run_offsets[run.run_key]
+    run_colors: dict[str, str],
+) -> None:
+    """Vertical swap/intern lines coloured per run; one top annotation per (kind, round)."""
+    x_offsets = _compute_run_x_offsets(run_count=len(runs))
+    for run_index, run in enumerate(runs):
+        x_off = x_offsets[run_index]
+        run_colour = run_colors[run.run_key]
         for event in run.timeline.events:
-            if event.kind not in _GLYPH_STYLES:
+            style = _PROMINENT_STYLES.get(event.kind)
+            if style is None:
                 continue
-            xs, ys, hover = buckets[event.kind]
-            xs.append(event.round_number)
-            ys.append(events_lane_y + offset)
-            hover.append(f"<b>{run.run_key}</b><br>{_GLYPH_STYLES[event.kind].label}")
-    return buckets
+            fig.add_vline(
+                x=event.round_number + x_off,
+                line=dict(color=run_colour, dash=style.dash, width=style.width),
+                opacity=0.9,
+            )
+    for (kind, rnd), run_keys in _dedup_prominent_events(runs=runs).items():
+        style = _PROMINENT_STYLES[kind]
+        fig.add_annotation(
+            x=rnd,
+            y=1.0,
+            xref="x",
+            yref="paper",
+            text=f"<b>{style.icon} {style.label_short}</b>",
+            showarrow=False,
+            yshift=6,
+            font=dict(size=12, color=style.colour, family="sans-serif"),
+            bgcolor="rgba(255,255,255,0.9)",
+            bordercolor=style.colour,
+            borderwidth=1,
+            hovertext="Runs: " + ", ".join(run_keys),
+        )
 
 
 def _add_world_glyphs(
     fig: go.Figure,
     runs: list[_RunPlotData],
     events_lane_y: float,
+    run_colors: dict[str, str],
 ) -> None:
-    """Render world-state events on the dedicated events lane as shaped glyphs."""
+    """Render world-state events as per-run markers: colour = run, symbol = event kind."""
     run_count = len(runs)
-    run_offsets: dict[str, float] = {}
     for index, run in enumerate(runs):
         if run_count == 1:
-            run_offsets[run.run_key] = 0.0
+            offset = 0.0
         else:
-            run_offsets[run.run_key] = (index - (run_count - 1) / 2) * 0.18
-    buckets = _collect_glyph_points(runs=runs, events_lane_y=events_lane_y, run_offsets=run_offsets)
-    for kind, (xs, ys, hover) in buckets.items():
+            offset = (index - (run_count - 1) / 2) * 0.18
+        xs: list[float] = []
+        ys: list[float] = []
+        symbols: list[str] = []
+        hover: list[str] = []
+        for event in run.timeline.events:
+            style = _GLYPH_STYLES.get(event.kind)
+            if style is None:
+                continue
+            xs.append(event.round_number)
+            ys.append(events_lane_y + offset)
+            symbols.append(style.symbol)
+            hover.append(f"<b>{run.run_key}</b><br>{style.label}")
         if not xs:
             continue
-        style = _GLYPH_STYLES[kind]
+        colour = run_colors[run.run_key]
         fig.add_trace(
             go.Scatter(
                 x=xs,
                 y=ys,
                 mode="markers",
                 marker=dict(
-                    color=style.colour,
+                    color=colour,
+                    symbol=symbols,
+                    size=14,
+                    line=dict(width=1.5, color=colour),
+                ),
+                name=f"{run.run_key} events",
+                legendgroup="runs",
+                showlegend=False,
+                hovertext=hover,
+                hoverinfo="text",
+                selected=dict(marker=dict(opacity=1, size=14, color=colour)),
+                unselected=dict(marker=dict(opacity=1, size=14, color=colour)),
+            )
+        )
+    for style in _GLYPH_STYLES.values():
+        fig.add_trace(
+            go.Scatter(
+                x=[None],
+                y=[None],
+                mode="markers",
+                marker=dict(
+                    color="rgba(80,80,80,0.85)",
                     symbol=style.symbol,
                     size=14,
-                    line=dict(width=1.5, color=style.colour),
+                    line=dict(width=1.5, color="rgba(80,80,80,0.85)"),
                 ),
                 name=style.label,
                 legendgroup="events",
                 legendgrouptitle=dict(text="World events"),
-                hovertext=hover,
-                hoverinfo="text",
+                hoverinfo="skip",
+                showlegend=True,
             )
         )
 
@@ -247,49 +345,38 @@ def build_timeline_figure(
     timelines: dict[str, RunTimeline],
     evaluators: list[str],
 ) -> go.Figure:
-    """Build the overlay timeline figure.
+    """Build the overlay timeline figure (per-evaluator lanes, per-run colours, dots + lines).
 
     ``reports`` and ``timelines`` are keyed by the same short run identifier.
     ``evaluators`` is the ordered list of evaluator names to render as lanes.
     """
     run_keys = list(reports.keys())
     if not evaluators:
-        fig = go.Figure()
-        fig.update_layout(
-            annotations=[
-                dict(
-                    text="No evaluators selected (or none have per-round evidence).",
-                    showarrow=False,
-                    x=0.5,
-                    y=0.5,
-                    xref="paper",
-                    yref="paper",
-                )
-            ]
-        )
-        return fig
+        return _empty_figure(message="No evaluators selected (or none have per-round evidence).")
 
     run_plot_data = [
         _build_run_plot_data(run_key=key, report=reports[key], timeline=timelines[key])
         for key in run_keys
     ]
     max_round = max((r.total_rounds for r in run_plot_data), default=1)
+    run_colors = _build_run_colors(runs=run_plot_data)
 
     fig = go.Figure()
     for index, run in enumerate(run_plot_data):
-        colour = _RUN_PALETTE[index % len(_RUN_PALETTE)]
         _add_run_trace(
             fig=fig,
             run=run,
             evaluators=evaluators,
             run_index=index,
             run_count=len(run_plot_data),
-            colour=colour,
+            colour=run_colors[run.run_key],
         )
 
     events_lane_y = -1.2
-    _add_world_glyphs(fig=fig, runs=run_plot_data, events_lane_y=events_lane_y)
-    _add_prominent_events(fig=fig, runs=run_plot_data)
+    _add_world_glyphs(
+        fig=fig, runs=run_plot_data, events_lane_y=events_lane_y, run_colors=run_colors
+    )
+    _add_prominent_events(fig=fig, runs=run_plot_data, run_colors=run_colors)
 
     tickvals = [events_lane_y, *range(len(evaluators))]
     ticktext = [_EVENTS_LANE_LABEL, *evaluators]
@@ -315,6 +402,7 @@ def build_timeline_figure(
         ),
         height=220 + 90 * len(evaluators),
         hovermode="closest",
+        dragmode=False,
         legend=dict(
             orientation="v",
             yanchor="top",
@@ -325,5 +413,16 @@ def build_timeline_figure(
         ),
         margin=dict(l=160, r=260, t=110, b=60),
         plot_bgcolor="white",
+    )
+    return fig
+
+
+def _empty_figure(message: str) -> go.Figure:
+    """Placeholder figure used when there is nothing to plot."""
+    fig = go.Figure()
+    fig.update_layout(
+        annotations=[
+            dict(text=message, showarrow=False, x=0.5, y=0.5, xref="paper", yref="paper"),
+        ]
     )
     return fig

@@ -1,23 +1,176 @@
-"""Streamlit entrypoint: pick evaluated Veyru runs, render an overlay timeline."""
+"""Streamlit entrypoint: pick evaluated Veyru runs, render overlay or compact timelines."""
 
 import os
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
 
 from analysis.results_viewer.event_extractor import load_run_timeline
-from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
+from analysis.results_viewer.run_catalog import EvaluatedRun, group_runs_by_day, list_evaluated_runs
 from analysis.results_viewer.timeline_plot import (
     build_timeline_figure,
     collect_per_round_evaluators,
 )
+from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult
 
 st.set_page_config(page_title="Veyru Timeline", layout="wide")
 
 
-def _describe(run: EvaluatedRun) -> str:
-    """Multiselect label combining timestamp, run_id, and mode."""
-    return run.label
+def _render_checkbox_filter(
+    container: st.delta_generator.DeltaGenerator,
+    title: str,
+    options_with_counts: list[tuple[str, int]],
+    key_prefix: str,
+) -> set[str]:
+    """Render a vertical checkbox list inside ``container``; return the checked option names."""
+    container.markdown(f"**{title}**")
+    if not options_with_counts:
+        container.caption("None available.")
+        return set()
+    selected: set[str] = set()
+    for name, count in options_with_counts:
+        checked = container.checkbox(
+            label=f"{name} ({count})",
+            value=True,
+            key=f"{key_prefix}::{name}",
+        )
+        if checked:
+            selected.add(name)
+    return selected
+
+
+def _render_prefilters(runs: list[EvaluatedRun]) -> tuple[set[str], set[str]]:
+    """Side-by-side pre-filters for execution mode and model, above the run picker."""
+    mode_counts: dict[str, int] = {}
+    model_counts: dict[str, int] = {}
+    for run in runs:
+        mode_counts[run.execution_mode] = mode_counts.get(run.execution_mode, 0) + 1
+        model = run.metadata.primary_model
+        model_counts[model] = model_counts.get(model, 0) + 1
+    modes_sorted = sorted(mode_counts.items())
+    models_sorted = sorted(model_counts.items())
+    mode_col, model_col = st.columns(2)
+    selected_modes = _render_checkbox_filter(
+        container=mode_col,
+        title="Execution mode",
+        options_with_counts=modes_sorted,
+        key_prefix="execution_mode_filter",
+    )
+    selected_models = _render_checkbox_filter(
+        container=model_col,
+        title="Model",
+        options_with_counts=models_sorted,
+        key_prefix="model_filter",
+    )
+    return selected_modes, selected_models
+
+
+def _format_run_option(run: EvaluatedRun) -> str:
+    """Dropdown label with the day prefix so runs visually cluster by date."""
+    day_prefix = datetime.fromtimestamp(run.run_timestamp).strftime("%a %b %d")
+    return f"{day_prefix} · {run.label}"
+
+
+def _render_run_picker(runs: list[EvaluatedRun]) -> list[EvaluatedRun]:
+    """Single multiselect dropdown; options are ordered by day (newest first)."""
+    if not runs:
+        st.info("No runs match the current model filter.")
+        return []
+    grouped = group_runs_by_day(runs=runs)
+    ordered: list[EvaluatedRun] = []
+    for group in grouped:
+        ordered.extend(group.runs)
+    st.markdown("### Runs to overlay")
+    return st.multiselect(
+        label="Pick runs to overlay (grouped by day)",
+        options=ordered,
+        default=[],
+        format_func=_format_run_option,
+        key="runs_picker",
+        label_visibility="collapsed",
+        max_selections=10,
+    )
+
+
+def _find_metric(report: EvaluationReport, evaluator_name: str) -> MetricResult | None:
+    """Return the first metric matching ``evaluator_name`` in ``report``."""
+    for metric in report.metrics:
+        if metric.evaluator_name == evaluator_name:
+            return metric
+    return None
+
+
+@st.dialog("Evaluator output", width="large", on_dismiss="rerun")
+def _show_evaluator_dialog(
+    run_label: str, evaluator_name: str, round_number: int, report: EvaluationReport
+) -> None:
+    """Modal showing the evaluator's verdict/score/evidence for a clicked point."""
+    metric = _find_metric(report=report, evaluator_name=evaluator_name)
+    st.markdown(f"**Run** · {run_label}")
+    st.markdown(f"**Evaluator** · {evaluator_name}")
+    st.markdown(f"**Round** · {round_number}")
+    if metric is None:
+        st.warning("No metric found for this evaluator in the selected run.")
+        return
+    st.markdown(f"**Verdict** · `{metric.verdict.value}`")
+    st.markdown(f"**Score** · {metric.score}")
+    st.markdown("**Evidence**")
+    if metric.evidence:
+        for line in metric.evidence:
+            st.markdown(f"- {line}")
+    else:
+        st.caption("No evidence recorded.")
+    if metric.per_agent:
+        st.markdown("**Per-agent verdicts**")
+        for agent_id, verdict in metric.per_agent.items():
+            st.markdown(f"- `{agent_id}` · {verdict.value}")
+
+
+def _timeline_chart_key() -> str:
+    """Chart key whose revision suffix flips after every click.
+
+    Bumping the revision after showing the modal remounts the widget on the next rerun,
+    discarding Plotly's retained selection so the very next click — even on the same
+    point — fires a fresh selection event and reopens the modal.
+    """
+    return f"timeline_chart::{st.session_state.get('timeline_chart_rev', 0)}"
+
+
+def _maybe_open_point_modal(selection_state: object, reports: dict[str, EvaluationReport]) -> None:
+    """Open the evaluator dialog on a click; bump the chart revision to reset selection."""
+    points = getattr(getattr(selection_state, "selection", None), "points", None)
+    if not points:
+        return
+    first = points[0]
+    customdata = first.get("customdata")
+    if not customdata or len(customdata) < 3:
+        return
+    run_label = str(customdata[0])
+    evaluator_name = str(customdata[1])
+    round_number = int(customdata[2])
+    report = reports.get(run_label)
+    if report is None:
+        return
+    st.session_state["timeline_chart_rev"] = st.session_state.get("timeline_chart_rev", 0) + 1
+    _show_evaluator_dialog(
+        run_label=run_label,
+        evaluator_name=evaluator_name,
+        round_number=round_number,
+        report=report,
+    )
+
+
+def _render_evaluator_checkboxes(available: list[str]) -> list[str]:
+    """Render each evaluator as a horizontally-arranged checkbox."""
+    st.markdown("### Evaluators")
+    cols = st.columns(max(1, len(available)))
+    chosen: list[str] = []
+    for index, name in enumerate(available):
+        col = cols[index % len(cols)]
+        if col.checkbox(label=name, value=True, key=f"eval_select::{name}"):
+            chosen.append(name)
+    return chosen
 
 
 def main() -> None:
@@ -31,14 +184,14 @@ def main() -> None:
         st.info("No evaluated Veyru runs found. Run `schmidt evaluate veyru --run-dir ...` first.")
         return
 
-    default_selection = evaluated[: min(2, len(evaluated))]
-    selected = st.multiselect(
-        label="Runs to overlay",
-        options=evaluated,
-        default=default_selection,
-        format_func=_describe,
-        key="runs_picker",
-    )
+    selected_modes, selected_models = _render_prefilters(runs=evaluated)
+    filtered = [
+        run
+        for run in evaluated
+        if run.execution_mode in selected_modes and run.metadata.primary_model in selected_models
+    ]
+
+    selected = _render_run_picker(runs=filtered)
     if not selected:
         st.info("Pick at least one run.")
         return
@@ -50,14 +203,25 @@ def main() -> None:
     if not available_evaluators:
         st.info("None of the selected runs have evaluators that report per-round evidence.")
         return
-    chosen_evaluators = st.multiselect(
-        label="Evaluators to show",
-        options=available_evaluators,
-        default=available_evaluators,
-        key="evaluators_picker",
+
+    chosen_evaluators = _render_evaluator_checkboxes(available=available_evaluators)
+    if not chosen_evaluators:
+        st.info("Select at least one evaluator.")
+        return
+
+    fig = build_timeline_figure(
+        reports=reports,
+        timelines=timelines,
+        evaluators=chosen_evaluators,
     )
-    fig = build_timeline_figure(reports=reports, timelines=timelines, evaluators=chosen_evaluators)
-    st.plotly_chart(fig, width="stretch")
+    selection_state = st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode=("points",),
+        key=_timeline_chart_key(),
+    )
+    _maybe_open_point_modal(selection_state=selection_state, reports=reports)
 
     with st.expander("Selected runs — scenario config", expanded=False):
         for run in selected:

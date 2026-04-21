@@ -7,6 +7,7 @@ as a separate opportunity and success is reported per team.
 """
 
 import logging
+from typing import NamedTuple
 
 from schmidt.evaluation.evaluation_report import MetricResult, Verdict
 from schmidt.evaluation.evaluator_protocol import Evaluator
@@ -99,12 +100,16 @@ class RoundSuccessEvaluator(Evaluator):
                 evidence.append("Team A losses: " + "; ".join(team_a_result.lost_details[:10]))
             if team_b_result.lost_details:
                 evidence.append("Team B losses: " + "; ".join(team_b_result.lost_details[:10]))
+            combined_won_rounds = sorted(
+                set(team_a_result.won_rounds) | set(team_b_result.won_rounds)
+            )
             return MetricResult(
                 evaluator_name=self.name,
                 verdict=verdict,
                 score=score,
                 evidence=evidence,
                 per_agent={},
+                rounds_identified=combined_won_rounds,
             )
 
         solo_result = _compute_team_result(
@@ -126,15 +131,16 @@ class RoundSuccessEvaluator(Evaluator):
             score=score,
             evidence=evidence,
             per_agent={},
+            rounds_identified=solo_result.won_rounds,
         )
 
 
-class _TeamResult:
+class _TeamResult(NamedTuple):
     """Accumulated per-team round outcomes."""
 
-    def __init__(self, won: int, lost_details: list[str]) -> None:
-        self.won = won
-        self.lost_details = lost_details
+    won: int
+    won_rounds: list[int]
+    lost_details: list[str]
 
 
 def _compute_team_result(
@@ -148,10 +154,12 @@ def _compute_team_result(
     partial_rounds = _find_partial_rounds(events=events)
 
     won = 0
+    won_rounds: list[int] = []
     lost_details: list[str] = []
     for rnd in range(1, total_rounds + 1):
         if rnd in stabilized_rounds:
             won += 1
+            won_rounds.append(rnd)
             continue
         if rnd in collapsed_rounds:
             if rnd in partial_rounds:
@@ -163,7 +171,7 @@ def _compute_team_result(
             lost_details.append(f"{label} R{rnd}: partial stages, not fully stabilized")
         else:
             lost_details.append(f"{label} R{rnd}: no successful stabilization")
-    return _TeamResult(won=won, lost_details=lost_details)
+    return _TeamResult(won=won, won_rounds=won_rounds, lost_details=lost_details)
 
 
 def _is_two_team_mode(agent_configs: list[AgentConfig]) -> bool:

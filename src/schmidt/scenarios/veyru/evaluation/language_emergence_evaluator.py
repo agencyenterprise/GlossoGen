@@ -91,6 +91,7 @@ class LanguageEmergenceEvaluator(Evaluator):
                 score=0.0,
                 evidence=["No messages found in the simulation"],
                 per_agent={},
+                rounds_identified=[],
             )
 
         judge_prompt = render_veyru_prompt(
@@ -118,8 +119,6 @@ class LanguageEmergenceEvaluator(Evaluator):
             score = 0.5
 
         evidence: list[str] = [result.explanation]
-        if result.rounds_identified:
-            evidence.append(f"Rounds: {', '.join(str(r) for r in result.rounds_identified)}")
         if result.novel_patterns:
             evidence.append(f"Novel patterns found: {', '.join(result.novel_patterns)}")
         if result.compression_observed:
@@ -133,6 +132,7 @@ class LanguageEmergenceEvaluator(Evaluator):
             score=score,
             evidence=evidence,
             per_agent={},
+            rounds_identified=result.rounds_identified,
         )
 
     def _build_round_transcripts(

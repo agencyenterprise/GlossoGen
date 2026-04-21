@@ -32,6 +32,9 @@ class MetricResult(BaseModel):
         score: Numeric score assigned by the evaluator.
         evidence: Supporting text fragments that justify the verdict.
         per_agent: Mapping of agent identifiers to their individual verdict.
+        rounds_identified: Round numbers this metric flagged. Semantics depend on the
+            evaluator (e.g. rounds where an anomaly was observed, rounds that were won).
+            Empty when the evaluator has nothing to report at the round level.
     """
 
     evaluator_name: str
@@ -39,6 +42,7 @@ class MetricResult(BaseModel):
     score: float
     evidence: list[str]
     per_agent: dict[str, Verdict]
+    rounds_identified: list[int]
 
 
 class EvaluationReport(BaseModel):

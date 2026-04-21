@@ -84,6 +84,7 @@ class LanguageStrangenessEvaluator(Evaluator):
                 score=0.0,
                 evidence=["No messages found in the simulation"],
                 per_agent={},
+                rounds_identified=[],
             )
 
         judge_prompt = render_evaluator_prompt(
@@ -109,8 +110,6 @@ class LanguageStrangenessEvaluator(Evaluator):
             score = 0.5
 
         evidence: list[str] = [result.explanation]
-        if result.rounds_identified:
-            evidence.append(f"Rounds: {', '.join(str(r) for r in result.rounds_identified)}")
         if result.anomalies_found:
             evidence.append(f"Anomalies found: {len(result.anomalies_found)}")
         if result.anomaly_categories:
@@ -124,4 +123,5 @@ class LanguageStrangenessEvaluator(Evaluator):
             score=score,
             evidence=evidence,
             per_agent={},
+            rounds_identified=result.rounds_identified,
         )

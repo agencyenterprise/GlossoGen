@@ -68,6 +68,14 @@ class ProtocolLearnedOutput(BaseModel):
             "inferred from the transcripts."
         ),
     )
+    rounds_identified: list[int] = Field(
+        description=(
+            "Post-boundary round numbers where the newcomer used (or failed to use) "
+            "the pre-established protocol. These are the rounds cited in "
+            "``newcomer_adoption_examples``; include every round where there is "
+            "observable evidence of adoption or non-adoption."
+        ),
+    )
     protocol_established: bool = Field(
         description=(
             "Whether the original pair(s) established an identifiable protocol "
@@ -120,6 +128,7 @@ class ProtocolLearnedAfterSwapEvaluator(Evaluator):
                     "no personnel change boundary to evaluate."
                 ],
                 per_agent={},
+                rounds_identified=[],
             )
 
         pre_rounds, post_rounds = _split_transcripts(
@@ -138,6 +147,7 @@ class ProtocolLearnedAfterSwapEvaluator(Evaluator):
                     f"post={len(post_rounds)}). Cannot evaluate protocol transfer."
                 ],
                 per_agent={},
+                rounds_identified=[],
             )
 
         judge_prompt = render_veyru_prompt(
@@ -184,6 +194,7 @@ class ProtocolLearnedAfterSwapEvaluator(Evaluator):
             score=score,
             evidence=evidence,
             per_agent={},
+            rounds_identified=sorted(set(result.rounds_identified)),
         )
 
 
