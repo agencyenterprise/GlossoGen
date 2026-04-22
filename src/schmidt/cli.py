@@ -18,7 +18,6 @@ import json
 import logging
 import os
 from pathlib import Path
-from uuid import uuid4
 
 import uvicorn
 from dotenv import load_dotenv
@@ -343,7 +342,7 @@ async def _run_simulation(
         )
 
     max_turns = args.max_agent_turns
-    run_id = str(uuid4())
+    run_id = f"{scenario.name()}/{run_dir.name}"
 
     def _make_runner() -> PydanticAIRunner:
         return PydanticAIRunner(

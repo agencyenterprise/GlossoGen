@@ -183,8 +183,8 @@ and supported models.
 2. `list_runs` — browse runs with optional filters (scenario, model, \
 status, is_forked). Paginate with offset/limit.
 3. `get_run_metadata` — inspect a single run's config, agents, and \
-evaluation results without loading messages. Pass a run_id prefix \
-(first 8 chars is usually enough).
+evaluation results without loading messages. Pass a full run_id \
+(e.g. `veyru/1776801080`) or a unique prefix of it.
 4. `get_run` — load messages (paginated). Add flags for extra sections:
    - `with_reasoning=true` — LLM thinking/reasoning text
    - `with_tool_use=true` — tool invocations and results
@@ -202,7 +202,7 @@ evaluation results without loading messages. Pass a run_id prefix \
 
 ## Tips
 
-- Run IDs accept unique prefixes (e.g. "cdd6" instead of the full UUID).
+- Run IDs accept unique prefixes (e.g. "veyru/17" instead of the full id).
 - `list_runs` returns newest runs first.
 - `get_run` messages are paginated: use `message_offset` and \
 `message_limit` to page through.
@@ -512,8 +512,8 @@ async def _tool_export_run_artifacts(run_id: str) -> McpExportArtifactsResult:
     """Return a download URL for exporting all run artifacts as a zip archive."""
     run_summary = await _find_run_by_prefix(run_id_prefix=run_id)
     full_run_id = run_summary.run_id
-    run_id_short = full_run_id[:8]
-    filename = f"{run_summary.scenario_name}_{run_id_short}_artifacts.zip"
+    run_dir_name = full_run_id.split("/", 1)[1]
+    filename = f"{run_summary.scenario_name}_{run_dir_name}_artifacts.zip"
     download_url = f"/api/runs/{full_run_id}/export/artifacts"
     return McpExportArtifactsResult(
         run_id=full_run_id,

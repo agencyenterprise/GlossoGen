@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
+import { splitRunId } from "@/shared/lib/run-id";
 import { formatConfigValueFull, humanize } from "./format";
 import { ModelPicker } from "./model-picker";
 import { ConfigValueModal } from "./config-value-modal";
@@ -287,14 +288,14 @@ export function NewSimulationForm() {
 
       // Apply labels and note if provided.
       if (labels.length > 0) {
-        await api.PUT("/api/runs/{run_id}/labels", {
-          params: { path: { run_id: newRunId } },
+        await api.PUT("/api/runs/{scenario}/{run_dir_name}/labels", {
+          params: { path: splitRunId(newRunId) },
           body: { labels },
         });
       }
       if (note.trim()) {
-        await api.PUT("/api/runs/{run_id}/note", {
-          params: { path: { run_id: newRunId } },
+        await api.PUT("/api/runs/{scenario}/{run_dir_name}/note", {
+          params: { path: splitRunId(newRunId) },
           body: { content: note.trim() },
         });
       }

@@ -39,7 +39,7 @@ export function ForkBranchCard({ forks, targetMessageId }: ForkBranchCardProps) 
         >
           <GitFork className="h-3 w-3 shrink-0 text-violet-600 dark:text-violet-400" />
           <span className="font-mono text-violet-700 dark:text-violet-300">
-            {fork.runId.slice(0, 8)}
+            {fork.runId.split("/").pop()}
           </span>
           <span
             className={`text-[10px] font-medium ${

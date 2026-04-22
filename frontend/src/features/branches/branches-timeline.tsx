@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2, Search, X, XCircle } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
+import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
 import { buildAgentColorMap, buildChannelColorMap, deriveInitials } from "../runs/agent-colors";
 import { formatTime, humanize } from "../runs/format";
@@ -58,8 +59,8 @@ export function BranchesTimeline({ runId }: { runId: string }) {
   } = useQuery({
     queryKey: ["run", runId],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/runs/{run_id}", {
-        params: { path: { run_id: runId } },
+      const { data, error } = await api.GET("/api/runs/{scenario}/{run_dir_name}", {
+        params: { path: splitRunId(runId) },
       });
       if (error) {
         throw new Error("Failed to fetch run detail");

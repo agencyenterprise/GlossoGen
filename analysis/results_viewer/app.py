@@ -164,13 +164,15 @@ def _maybe_open_point_modal(selection_state: object, reports: dict[str, Evaluati
 
 
 def _render_run_id_copy_chip(run_id: str) -> None:
-    """Button showing the run id's first 8 chars; click copies the full UUID via pyperclip.
+    """Button showing the run's directory name; click copies the full run id.
 
-    ``pyperclip`` writes to the machine running the Streamlit server, which — in this
-    local-only viewer — is the same machine the user is on, so the UUID lands in the
-    user's clipboard.
+    Run IDs have the form ``{scenario}/{dir_name}``; the chip shows just the
+    directory name since the scenario is already implied by the enclosing UI
+    context. ``pyperclip`` writes to the machine running the Streamlit server,
+    which — in this local-only viewer — is the same machine the user is on, so
+    the id lands in the user's clipboard.
     """
-    short = run_id[:8]
+    short = run_id.split("/")[-1]
     if st.button(
         label=f"{short} ⧉",
         key=f"copy_run_id::{run_id}",

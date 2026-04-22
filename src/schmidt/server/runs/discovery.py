@@ -155,61 +155,21 @@ class ResolvedRun(NamedTuple):
     scenario_name: str
 
 
-async def _match_run_id(
-    jsonl_path: Path,
-    target_run_id: str,
-) -> ResolvedRun | None:
-    """Read only the first line of a JSONL to check if run_id matches."""
-    async with aiofiles.open(jsonl_path, mode="rb") as f:
-        async for line in f:
-            stripped = line.strip()
-            if stripped:
-                raw = orjson.loads(stripped)
-                if raw.get("run_id") == target_run_id:
-                    return ResolvedRun(
-                        run_dir=jsonl_path.parent,
-                        scenario_name=jsonl_path.parent.parent.name,
-                    )
-                return None
-    return None
+def compose_run_id(scenario_name: str, run_dir_name: str) -> str:
+    """Build the canonical run identifier from its two path components."""
+    return f"{scenario_name}/{run_dir_name}"
 
 
-async def resolve_run(runs_dir: Path, run_id: str) -> ResolvedRun:
-    """Resolve a run_id to its directory and scenario name.
+def resolve_run(runs_dir: Path, scenario_name: str, run_dir_name: str) -> ResolvedRun:
+    """Resolve a run directory from its scenario and directory name.
 
-    Reads only the first line of each JSONL file concurrently, making
-    this much faster than discover_runs for single-run lookups.
-
-    Raises ValueError if the run is not found.
+    Raises ValueError if the directory does not exist or contains no JSONL.
     """
-    if not runs_dir.is_dir():
-        raise ValueError(f"Run not found: {run_id}")
-
-    tasks: list[asyncio.Task[ResolvedRun | None]] = []
-    for scenario_dir in runs_dir.iterdir():
-        if not scenario_dir.is_dir():
-            continue
-        scenario_name = scenario_dir.name
-        for timestamp_dir in scenario_dir.iterdir():
-            if not timestamp_dir.is_dir():
-                continue
-            jsonl_path = timestamp_dir / f"{scenario_name}.jsonl"
-            if jsonl_path.exists():
-                tasks.append(
-                    asyncio.create_task(
-                        _match_run_id(
-                            jsonl_path=jsonl_path,
-                            target_run_id=run_id,
-                        )
-                    )
-                )
-
-    results = await asyncio.gather(*tasks)
-    for result in results:
-        if result is not None:
-            return result
-
-    raise ValueError(f"Run not found: {run_id}")
+    run_dir = runs_dir / scenario_name / run_dir_name
+    jsonl_path = run_dir / f"{scenario_name}.jsonl"
+    if not run_dir.is_dir() or not jsonl_path.exists():
+        raise ValueError(f"Run not found: {compose_run_id(scenario_name, run_dir_name)}")
+    return ResolvedRun(run_dir=run_dir, scenario_name=scenario_name)
 
 
 def _timestamp_from_dir(dir_name: str) -> datetime:
@@ -281,11 +241,13 @@ async def _build_summary(
     has_note = _has_note(run_dir=timestamp_dir)
     eval_in_progress = read_eval_manifest(run_dir=timestamp_dir) is not None
 
+    run_id = compose_run_id(scenario_name=scenario_name, run_dir_name=timestamp_dir.name)
+
     if scan.last_event is not None:
         start_time = run_timestamp if fork_source is not None else first_event.timestamp
         duration_seconds = (scan.last_event.timestamp - start_time).total_seconds()
         return RunSummary(
-            run_id=first_event.run_id,
+            run_id=run_id,
             scenario_name=first_event.scenario_name,
             scenario_description=first_event.scenario_description,
             scenario_config=first_event.scenario_config,
@@ -316,7 +278,7 @@ async def _build_summary(
         else:
             status = RunStatus.ERROR
     return RunSummary(
-        run_id=first_event.run_id,
+        run_id=run_id,
         scenario_name=first_event.scenario_name,
         scenario_description=first_event.scenario_description,
         scenario_config=first_event.scenario_config,

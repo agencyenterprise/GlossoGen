@@ -19,7 +19,13 @@ from schmidt.models.event import RunStatus, SimulationEnded
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.response_models import LaunchStatus
 from schmidt.server.runs.detail_reader import load_run_detail
-from schmidt.server.runs.discovery import discover_runs, resolve_run, scan_jsonl
+from schmidt.server.runs.discovery import (
+    ResolvedRun,
+    compose_run_id,
+    discover_runs,
+    resolve_run,
+    scan_jsonl,
+)
 from schmidt.server.runs.models import (
     AllLabelsResponse,
     EvalLogLine,
@@ -51,28 +57,39 @@ async def list_runs(request: Request) -> RunListResponse:
     return RunListResponse(runs=summaries)
 
 
-@router.get("/runs/{run_id}", response_model=RunDetailResponse)
-async def get_run_detail(run_id: str, request: Request) -> RunDetailResponse:
-    """Get full detail for a specific simulation run."""
-    runs_dir: Path = request.app.state.runs_dir
+def _resolve_or_404(runs_dir: Path, scenario: str, run_dir_name: str) -> ResolvedRun:
     try:
-        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+        return resolve_run(
+            runs_dir=runs_dir,
+            scenario_name=scenario,
+            run_dir_name=run_dir_name,
+        )
     except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
+
+@router.get("/runs/{scenario}/{run_dir_name}", response_model=RunDetailResponse)
+async def get_run_detail(
+    scenario: str,
+    run_dir_name: str,
+    request: Request,
+) -> RunDetailResponse:
+    """Get full detail for a specific simulation run."""
+    runs_dir: Path = request.app.state.runs_dir
+    resolved = _resolve_or_404(runs_dir=runs_dir, scenario=scenario, run_dir_name=run_dir_name)
     log_path = resolved.run_dir / f"{resolved.scenario_name}.jsonl"
     return await load_run_detail(log_path=log_path)
 
 
-@router.get("/runs/{run_id}/eval-logs", response_model=EvalLogsResponse)
-async def get_eval_logs(run_id: str, request: Request) -> EvalLogsResponse:
+@router.get("/runs/{scenario}/{run_dir_name}/eval-logs", response_model=EvalLogsResponse)
+async def get_eval_logs(
+    scenario: str,
+    run_dir_name: str,
+    request: Request,
+) -> EvalLogsResponse:
     """Return the contents of the evaluation stdout log file."""
     runs_dir: Path = request.app.state.runs_dir
-    try:
-        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Run not found")
-
+    resolved = _resolve_or_404(runs_dir=runs_dir, scenario=scenario, run_dir_name=run_dir_name)
     eval_log_path = resolved.run_dir / "eval_stdout.log"
 
     if not eval_log_path.exists():
@@ -86,14 +103,12 @@ async def get_eval_logs(run_id: str, request: Request) -> EvalLogsResponse:
     return EvalLogsResponse(lines=lines)
 
 
-@router.delete("/runs/{run_id}", status_code=204)
-async def delete_run(run_id: str, request: Request) -> None:
+@router.delete("/runs/{scenario}/{run_dir_name}", status_code=204)
+async def delete_run(scenario: str, run_dir_name: str, request: Request) -> None:
     """Stop the simulation if still running, then delete the run directory."""
     runs_dir: Path = request.app.state.runs_dir
-    try:
-        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Run not found")
+    resolved = _resolve_or_404(runs_dir=runs_dir, scenario=scenario, run_dir_name=run_dir_name)
+    run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
 
     run_dir = resolved.run_dir
 
@@ -110,14 +125,12 @@ async def delete_run(run_id: str, request: Request) -> None:
     logger.info("Deleted run directory: %s", run_dir)
 
 
-@router.post("/runs/{run_id}/stop", status_code=204)
-async def stop_run(run_id: str, request: Request) -> None:
+@router.post("/runs/{scenario}/{run_dir_name}/stop", status_code=204)
+async def stop_run(scenario: str, run_dir_name: str, request: Request) -> None:
     """Stop a running simulation by sending SIGTERM to its process."""
     runs_dir: Path = request.app.state.runs_dir
-    try:
-        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Run not found")
+    resolved = _resolve_or_404(runs_dir=runs_dir, scenario=scenario, run_dir_name=run_dir_name)
+    run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
 
     manifest = read_manifest(run_dir=resolved.run_dir)
     if manifest is None:
@@ -160,11 +173,12 @@ def _append_killed_event(
 
 
 @router.post(
-    "/runs/{run_id}/evaluate",
+    "/runs/{scenario}/{run_dir_name}/evaluate",
     response_model=StartEvaluationResponse,
 )
 async def start_evaluation(
-    run_id: str,
+    scenario: str,
+    run_dir_name: str,
     body: StartEvaluationRequest,
     request: Request,
 ) -> StartEvaluationResponse:
@@ -176,10 +190,7 @@ async def start_evaluation(
     background process.
     """
     runs_dir: Path = request.app.state.runs_dir
-    try:
-        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Run not found")
+    resolved = _resolve_or_404(runs_dir=runs_dir, scenario=scenario, run_dir_name=run_dir_name)
 
     run_dir = resolved.run_dir
     jsonl_path = run_dir / f"{resolved.scenario_name}.jsonl"
@@ -300,7 +311,7 @@ async def _proxy_simulation_sse(
 
 
 @router.get(
-    "/runs/{run_id}/events",
+    "/runs/{scenario}/{run_dir_name}/events",
     responses={
         200: {
             "description": "SSE event stream. Each SSE frame has an `event` field matching "
@@ -309,7 +320,11 @@ async def _proxy_simulation_sse(
         },
     },
 )
-async def stream_run_events(run_id: str, request: Request) -> StreamingResponse:
+async def stream_run_events(
+    scenario: str,
+    run_dir_name: str,
+    request: Request,
+) -> StreamingResponse:
     """Stream simulation events as Server-Sent Events.
 
     Only available for live simulations (detected via stream.json manifest).
@@ -320,10 +335,8 @@ async def stream_run_events(run_id: str, request: Request) -> StreamingResponse:
     one of the SSEEvent union members, discriminated by the ``event_type`` field.
     """
     runs_dir: Path = request.app.state.runs_dir
-    try:
-        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Run not found")
+    resolved = _resolve_or_404(runs_dir=runs_dir, scenario=scenario, run_dir_name=run_dir_name)
+    run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
 
     manifest = read_manifest(run_dir=resolved.run_dir)
     if manifest is None:
@@ -347,54 +360,51 @@ async def stream_run_events(run_id: str, request: Request) -> StreamingResponse:
     )
 
 
-async def _resolve_run_dir(run_id: str, request: Request) -> Path:
-    """Resolve a run_id to its directory path, raising 404 if not found."""
-    runs_dir: Path = request.app.state.runs_dir
-    try:
-        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return resolved.run_dir
-
-
 # ---------------------------------------------------------------------------
 # Labels and notes endpoints
 # ---------------------------------------------------------------------------
 
 
-@router.put("/runs/{run_id}/labels", response_model=UpdateLabelsResponse)
+@router.put("/runs/{scenario}/{run_dir_name}/labels", response_model=UpdateLabelsResponse)
 async def update_labels(
-    run_id: str,
+    scenario: str,
+    run_dir_name: str,
     body: UpdateLabelsRequest,
     request: Request,
 ) -> UpdateLabelsResponse:
     """Set labels for a simulation run, replacing any existing labels."""
-    run_dir = await _resolve_run_dir(run_id=run_id, request=request)
-    labels_path = run_dir / "labels.json"
+    runs_dir: Path = request.app.state.runs_dir
+    resolved = _resolve_or_404(runs_dir=runs_dir, scenario=scenario, run_dir_name=run_dir_name)
+    run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
+    labels_path = resolved.run_dir / "labels.json"
     labels_path.write_bytes(orjson.dumps(body.labels))
     logger.info("Updated labels for run %s: %s", run_id, body.labels)
     return UpdateLabelsResponse(labels=body.labels)
 
 
-@router.put("/runs/{run_id}/note", response_model=UpdateNoteResponse)
+@router.put("/runs/{scenario}/{run_dir_name}/note", response_model=UpdateNoteResponse)
 async def update_note(
-    run_id: str,
+    scenario: str,
+    run_dir_name: str,
     body: UpdateNoteRequest,
     request: Request,
 ) -> UpdateNoteResponse:
     """Set or update the note for a simulation run."""
-    run_dir = await _resolve_run_dir(run_id=run_id, request=request)
-    note_path = run_dir / "note.md"
+    runs_dir: Path = request.app.state.runs_dir
+    resolved = _resolve_or_404(runs_dir=runs_dir, scenario=scenario, run_dir_name=run_dir_name)
+    run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
+    note_path = resolved.run_dir / "note.md"
     note_path.write_text(body.content, encoding="utf-8")
     logger.info("Updated note for run %s (%d chars)", run_id, len(body.content))
     return UpdateNoteResponse(content=body.content)
 
 
-@router.get("/runs/{run_id}/note", response_model=NoteResponse)
-async def get_note(run_id: str, request: Request) -> NoteResponse:
+@router.get("/runs/{scenario}/{run_dir_name}/note", response_model=NoteResponse)
+async def get_note(scenario: str, run_dir_name: str, request: Request) -> NoteResponse:
     """Get the note content for a simulation run."""
-    run_dir = await _resolve_run_dir(run_id=run_id, request=request)
-    note_path = run_dir / "note.md"
+    runs_dir: Path = request.app.state.runs_dir
+    resolved = _resolve_or_404(runs_dir=runs_dir, scenario=scenario, run_dir_name=run_dir_name)
+    note_path = resolved.run_dir / "note.md"
     if not note_path.exists():
         return NoteResponse(content=None)
     content = note_path.read_text(encoding="utf-8")

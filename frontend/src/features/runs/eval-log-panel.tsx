@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/shared/lib/cn";
 import { api } from "@/shared/lib/api-client";
+import { splitRunId } from "@/shared/lib/run-id";
 
 /** Threshold in pixels for considering the user "at the bottom" of the scroll area. */
 const SCROLL_BOTTOM_THRESHOLD = 80;
@@ -23,8 +24,8 @@ export function EvalLogPanel({ runId, evaluationInProgress }: EvalLogPanelProps)
   const { data } = useQuery({
     queryKey: ["eval-logs", runId],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/runs/{run_id}/eval-logs", {
-        params: { path: { run_id: runId } },
+      const { data, error } = await api.GET("/api/runs/{scenario}/{run_dir_name}/eval-logs", {
+        params: { path: splitRunId(runId) },
       });
       if (error) throw new Error("Failed to fetch eval logs");
       return data;

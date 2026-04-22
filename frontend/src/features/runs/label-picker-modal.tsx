@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, Plus, X } from "lucide-react";
 import { api } from "@/shared/lib/api-client";
+import { splitRunId } from "@/shared/lib/run-id";
 
 const LABEL_COLORS = [
   { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-400" },
@@ -75,8 +76,8 @@ export function LabelPickerModal({
 
   const mutation = useMutation({
     mutationFn: async (labels: string[]) => {
-      await api.PUT("/api/runs/{run_id}/labels", {
-        params: { path: { run_id: runId } },
+      await api.PUT("/api/runs/{scenario}/{run_dir_name}/labels", {
+        params: { path: splitRunId(runId) },
         body: { labels },
       });
     },

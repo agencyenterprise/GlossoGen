@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/shared/lib/api-client";
+import { splitRunId } from "@/shared/lib/run-id";
 
 export interface PendingEdit {
   messageId: string;
@@ -52,8 +53,8 @@ export function useFork(runId: string) {
         new_text: e.newText,
       }));
 
-      const { data, error } = await api.POST("/api/runs/{run_id}/fork", {
-        params: { path: { run_id: runId } },
+      const { data, error } = await api.POST("/api/runs/{scenario}/{run_dir_name}/fork", {
+        params: { path: splitRunId(runId) },
         body: {
           target_message_id: targetMessageId,
           message_edits: edits,

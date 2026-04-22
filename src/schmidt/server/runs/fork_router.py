@@ -10,7 +10,6 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 import orjson
 from fastapi import APIRouter, HTTPException, Request
@@ -21,7 +20,7 @@ from schmidt.models.event import SimulationStarted
 from schmidt.run_config_validation import validate_run_config
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.scenarios import SCENARIO_REGISTRY
-from schmidt.server.runs.discovery import resolve_run
+from schmidt.server.runs.discovery import compose_run_id, resolve_run
 from schmidt.server.runs.models import ForkRequest, ForkResponse
 from schmidt.token_pricing import list_providers
 
@@ -45,8 +44,13 @@ def _build_fork_config(
     return config_path, []
 
 
-@router.post("/runs/{run_id}/fork", response_model=ForkResponse)
-async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResponse:
+@router.post("/runs/{scenario}/{run_dir_name}/fork", response_model=ForkResponse)
+async def fork_run(
+    scenario: str,
+    run_dir_name: str,
+    body: ForkRequest,
+    request: Request,
+) -> ForkResponse:
     """Create a forked simulation run from a specific message.
 
     Clones the source run's git repository at the target message's commit,
@@ -55,12 +59,17 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
     """
     runs_dir: Path = request.app.state.runs_dir
     try:
-        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+        resolved = resolve_run(
+            runs_dir=runs_dir,
+            scenario_name=scenario,
+            run_dir_name=run_dir_name,
+        )
     except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
     source_run_dir = resolved.run_dir
     scenario_name = resolved.scenario_name
+    source_run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
     message_edits = {edit.message_id: edit.new_text for edit in body.message_edits}
 
     if body.provider not in list_providers():
@@ -82,12 +91,15 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
     forked_repo = await source_repo.clone_to(target_dir=new_run_dir)
     await forked_repo.checkout(sha=target_sha)
 
+    fork_run_id = compose_run_id(scenario_name=scenario_name, run_dir_name=new_run_dir.name)
+
     # The JSONL and all workspace files are now at the correct state.
-    # Apply message edits and assign a new run ID.
+    # Apply message edits and update the run ID in the first event.
     new_log_path = new_run_dir / f"{scenario_name}.jsonl"
-    fork_run_id = _apply_edits_and_new_run_id(
+    _apply_edits_and_new_run_id(
         log_path=new_log_path,
         message_edits=message_edits,
+        fork_run_id=fork_run_id,
     )
 
     # Verify the target message exists in the truncated log.
@@ -100,7 +112,7 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
 
     # Write fork manifest for provenance tracking.
     manifest = {
-        "source_run_id": run_id,
+        "source_run_id": source_run_id,
         "source_run_dir": str(source_run_dir),
         "target_message_id": body.target_message_id,
         "forked_at": time.time(),
@@ -174,17 +186,15 @@ async def fork_run(run_id: str, body: ForkRequest, request: Request) -> ForkResp
 def _apply_edits_and_new_run_id(
     log_path: Path,
     message_edits: dict[str, str],
-) -> str:
+    fork_run_id: str,
+) -> None:
     """Rewrite the JSONL in-place, applying message edits and a new run ID.
 
     Strips ``llm_response_received``, ``tool_call_invoked``, and
     ``tool_result_received`` events so that agents start fresh on resume
     instead of replaying a conversation history that still contains
     pre-edit text in tool arguments or results.
-
-    Returns the new fork run ID.
     """
-    fork_run_id = str(uuid4())
     raw_bytes = log_path.read_bytes()
     lines = raw_bytes.split(b"\n")
     output_lines: list[bytes] = []
@@ -225,7 +235,6 @@ def _apply_edits_and_new_run_id(
         fork_run_id,
         len(message_edits),
     )
-    return fork_run_id
 
 
 def _launch_subprocess(cmd: list[str], log_file: Any) -> None:

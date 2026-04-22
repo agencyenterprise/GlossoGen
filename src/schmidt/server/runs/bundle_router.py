@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 from schmidt.event_parsing import parse_event_bytes
 from schmidt.models.event import SimulationStarted
 from schmidt.run_repository import RunRepository, claim_run_dir
-from schmidt.server.runs.discovery import discover_runs, resolve_run
+from schmidt.server.runs.discovery import compose_run_id, discover_runs, resolve_run
 from schmidt.server.runs.models import BundleManifest, ImportBundleResponse
 
 logger = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ def _build_bundle_bytes(
 
 
 @router.get(
-    "/runs/{run_id}/export/bundle",
+    "/runs/{scenario}/{run_dir_name}/export/bundle",
     responses={
         200: {
             "description": "Tar.gz bundle of the simulation run with git history.",
@@ -114,14 +114,23 @@ def _build_bundle_bytes(
         },
     },
 )
-async def export_run_bundle(run_id: str, request: Request) -> StreamingResponse:
+async def export_run_bundle(
+    scenario: str,
+    run_dir_name: str,
+    request: Request,
+) -> StreamingResponse:
     """Export a simulation run as a tar.gz bundle including git history."""
     runs_dir: Path = request.app.state.runs_dir
     try:
-        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+        resolved = resolve_run(
+            runs_dir=runs_dir,
+            scenario_name=scenario,
+            run_dir_name=run_dir_name,
+        )
     except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
+    run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
     original_timestamp = int(resolved.run_dir.name.split("_")[0])
 
     bundle_bytes = await asyncio.to_thread(
@@ -132,8 +141,7 @@ async def export_run_bundle(run_id: str, request: Request) -> StreamingResponse:
         original_timestamp,
     )
 
-    run_id_short = run_id[:8]
-    filename = f"{resolved.scenario_name}_{run_id_short}_bundle.tar.gz"
+    filename = f"{resolved.scenario_name}_{run_dir_name}_bundle.tar.gz"
 
     return StreamingResponse(
         content=io.BytesIO(bundle_bytes),

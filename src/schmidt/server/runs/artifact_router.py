@@ -113,7 +113,7 @@ def _build_zip_bytes(run_dir: Path) -> bytes:
 
 
 @router.get(
-    "/runs/{run_id}/export/artifacts",
+    "/runs/{scenario}/{run_dir_name}/export/artifacts",
     responses={
         200: {
             "description": "Zip archive of the simulation run artifacts.",
@@ -121,18 +121,25 @@ def _build_zip_bytes(run_dir: Path) -> bytes:
         },
     },
 )
-async def export_run_artifacts(run_id: str, request: Request) -> StreamingResponse:
+async def export_run_artifacts(
+    scenario: str,
+    run_dir_name: str,
+    request: Request,
+) -> StreamingResponse:
     """Export all artifacts from a simulation run as a zip archive."""
     runs_dir: Path = request.app.state.runs_dir
     try:
-        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+        resolved = resolve_run(
+            runs_dir=runs_dir,
+            scenario_name=scenario,
+            run_dir_name=run_dir_name,
+        )
     except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
     zip_bytes = _build_zip_bytes(run_dir=resolved.run_dir)
 
-    run_id_short = run_id[:8]
-    filename = f"{resolved.scenario_name}_{run_id_short}_artifacts.zip"
+    filename = f"{resolved.scenario_name}_{run_dir_name}_artifacts.zip"
 
     return StreamingResponse(
         content=io.BytesIO(zip_bytes),
@@ -144,7 +151,7 @@ async def export_run_artifacts(run_id: str, request: Request) -> StreamingRespon
 
 
 @router.get(
-    "/runs/{run_id}/export/artifacts/{message_id}",
+    "/runs/{scenario}/{run_dir_name}/export/artifacts/{message_id}",
     responses={
         200: {
             "description": "Zip archive of artifacts at a specific message commit.",
@@ -153,14 +160,19 @@ async def export_run_artifacts(run_id: str, request: Request) -> StreamingRespon
     },
 )
 async def export_run_artifacts_at_message(
-    run_id: str,
+    scenario: str,
+    run_dir_name: str,
     message_id: str,
     request: Request,
 ) -> StreamingResponse:
     """Export artifacts from a simulation run as they existed at a specific message."""
     runs_dir: Path = request.app.state.runs_dir
     try:
-        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+        resolved = resolve_run(
+            runs_dir=runs_dir,
+            scenario_name=scenario,
+            run_dir_name=run_dir_name,
+        )
     except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
@@ -178,10 +190,9 @@ async def export_run_artifacts_at_message(
         commit_sha,
     )
 
-    run_id_short = run_id[:8]
     message_id_short = message_id[:8]
     filename = (
-        f"{resolved.scenario_name}_{run_id_short}_{message_id_short}_artifacts.zip"
+        f"{resolved.scenario_name}_{run_dir_name}_{message_id_short}_artifacts.zip"
     )
 
     return StreamingResponse(

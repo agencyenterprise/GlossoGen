@@ -31,7 +31,7 @@ def _generate_pdf_bytes(html: str) -> bytes:
 
 
 @router.get(
-    "/runs/{run_id}/export/pdf",
+    "/runs/{scenario}/{run_dir_name}/export/pdf",
     responses={
         200: {
             "description": "PDF document of the simulation run.",
@@ -40,7 +40,8 @@ def _generate_pdf_bytes(html: str) -> bytes:
     },
 )
 async def export_run_pdf(
-    run_id: str,
+    scenario: str,
+    run_dir_name: str,
     request: Request,
     channel_id: str | None = Query(default=None),
 ) -> Response:
@@ -51,7 +52,11 @@ async def export_run_pdf(
     """
     runs_dir: Path = request.app.state.runs_dir
     try:
-        resolved = await resolve_run(runs_dir=runs_dir, run_id=run_id)
+        resolved = resolve_run(
+            runs_dir=runs_dir,
+            scenario_name=scenario,
+            run_dir_name=run_dir_name,
+        )
     except ValueError:
         raise HTTPException(status_code=404, detail="Run not found")
 
@@ -69,11 +74,10 @@ async def export_run_pdf(
     html = render_pdf_html(export_data=export_data)
     pdf_bytes = await asyncio.to_thread(_generate_pdf_bytes, html)
 
-    run_id_short = run_id[:8]
     if channel_id is not None:
-        filename = f"{resolved.scenario_name}_{channel_id}_{run_id_short}.pdf"
+        filename = f"{resolved.scenario_name}_{channel_id}_{run_dir_name}.pdf"
     else:
-        filename = f"{resolved.scenario_name}_{run_id_short}.pdf"
+        filename = f"{resolved.scenario_name}_{run_dir_name}.pdf"
 
     return Response(
         content=pdf_bytes,

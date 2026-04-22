@@ -130,19 +130,9 @@ def _compose_label(metadata: RunMetadata, run_timestamp: int) -> str:
     )
 
 
-def _read_run_id(jsonl_path: Path) -> str:
-    """Return the ``run_id`` UUID stamped on the first event of the log."""
-    with jsonl_path.open("rb") as f:
-        for line in f:
-            stripped = line.strip()
-            if not stripped:
-                continue
-            raw = orjson.loads(stripped)
-            run_id = raw.get("run_id")
-            if isinstance(run_id, str) and run_id:
-                return run_id
-            break
-    raise ValueError(f"Could not read run_id from {jsonl_path}")
+def _derive_run_id(scenario_name: str, run_dir: Path) -> str:
+    """Compose the canonical run identifier from the on-disk path."""
+    return f"{scenario_name}/{run_dir.name}"
 
 
 def _load_runs_for_scenario(scenario_dir: Path, scenario_name: str) -> list[EvaluatedRun]:
@@ -160,7 +150,7 @@ def _load_runs_for_scenario(scenario_dir: Path, scenario_name: str) -> list[Eval
         run_timestamp = _parse_run_timestamp(run_dir_name=entry.name)
         label = _compose_label(metadata=metadata, run_timestamp=run_timestamp)
         execution_mode = _mode_label(scenario_config=metadata.scenario_config)
-        run_id = _read_run_id(jsonl_path=jsonl_path)
+        run_id = _derive_run_id(scenario_name=scenario_name, run_dir=entry)
         out.append(
             EvaluatedRun(
                 label=label,
