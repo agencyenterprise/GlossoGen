@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
   ArrowLeftRight,
   ChevronDown,
@@ -25,7 +17,7 @@ import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
-import type { DisplayEntry } from "./display-entry";
+import { hueFromCallId, type DisplayEntry } from "./display-entry";
 import { formatTime, humanize } from "./format";
 import { ProseMarkdown } from "./prose-markdown";
 import { NotificationDisplay } from "./notification-display";
@@ -255,13 +247,16 @@ export function ChatPane({
   }, [messages, selectedChannel]);
 
   const notificationPairs = useMemo(() => {
-    const out: Array<{ callMessageId: string; resultMessageId: string; callId: string }> = [];
+    const out: NotificationPair[] = [];
     for (const e of filtered) {
       if (e.is_notification_result && e.paired_message_id !== "") {
+        const laneIdx = e.active_pair_call_ids.indexOf(e.call_id);
+        const lane = laneIdx === -1 ? 0 : (e.active_pair_lanes[laneIdx] ?? 0);
         out.push({
           callMessageId: e.paired_message_id,
           resultMessageId: e.message_id,
           callId: e.call_id,
+          lane,
         });
       }
     }
@@ -799,31 +794,31 @@ interface NotificationPair {
   callMessageId: string;
   resultMessageId: string;
   callId: string;
+  lane: number;
 }
 
 interface WireShape {
   callId: string;
-  startX: number;
+  lane: number;
   startY: number;
-  endX: number;
   endY: number;
   color: string;
 }
 
-/** Deterministic hue from a call_id so each wire gets a stable unique color. */
-function hueFromCallId(callId: string): number {
-  let h = 0;
-  for (let i = 0; i < callId.length; i += 1) {
-    h = (h * 31 + callId.charCodeAt(i)) >>> 0;
-  }
-  return h % 360;
-}
-
-/** Renders curved SVG wires inside the scrollable content connecting each
- *  read_notifications call pill to its response chip. Each wire is a cubic
- *  bezier that bulges out to the left of the column. Wires re-measure on
- *  layout changes via ResizeObserver + MutationObserver so they stay aligned
- *  as entries expand or new messages arrive. */
+/** SVG overlay drawing one straight vertical line per notification pair from
+ *  the call entry's vertical midpoint to the result entry's vertical midpoint.
+ *
+ *  Measures Y positions with getBoundingClientRect relative to the scroll-
+ *  content container (scroll-invariant: both shift by the same amount on
+ *  scroll). X position is fixed per pair — `lane` is assigned deterministically
+ *  at merge time so overlapping pairs never collide.
+ *
+ *  Initial recompute runs synchronously. If fewer wires are measured than
+ *  expected (refs not yet attached on a large, progressively-mounting run),
+ *  the recompute reschedules itself via requestAnimationFrame up to a small
+ *  cap — a self-terminating loop that stops as soon as measurement matches
+ *  the authoritative count from `mergeEntries`. A `ResizeObserver` handles
+ *  layout shifts after the initial mount (entry expansion, window resize). */
 function ConnectionWires({
   pairs,
   messageRefs,
@@ -837,13 +832,16 @@ function ConnectionWires({
 }) {
   const [wires, setWires] = useState<WireShape[]>([]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const container = containerRef.current;
     if (container === null) {
       return undefined;
     }
+    let rafId: number | null = null;
+    let attemptsLeft = 30;
 
     function recompute() {
+      rafId = null;
       const containerEl = containerRef.current;
       if (containerEl === null) return;
       const containerRect = containerEl.getBoundingClientRect();
@@ -854,95 +852,62 @@ function ConnectionWires({
         if (callEl === undefined || resultEl === undefined) continue;
         const callRect = callEl.getBoundingClientRect();
         const resultRect = resultEl.getBoundingClientRect();
-        const callMid = callRect.top + callRect.height / 2 - containerRect.top;
-        const resultMid = resultRect.top + resultRect.height / 2 - containerRect.top;
-        const callX = callRect.left - containerRect.left;
-        const resultX = resultRect.left - containerRect.left;
         next.push({
           callId: pair.callId,
-          startX: callX,
-          startY: callMid,
-          endX: resultX,
-          endY: resultMid,
+          lane: pair.lane,
+          startY: callRect.top + callRect.height / 2 - containerRect.top,
+          endY: resultRect.top + resultRect.height / 2 - containerRect.top,
           color: `hsl(${hueFromCallId(pair.callId)}, 72%, 55%)`,
         });
       }
-      setWires(prev => {
-        if (prev.length !== next.length) return next;
-        for (let i = 0; i < prev.length; i += 1) {
-          const a = prev[i];
-          const b = next[i];
-          if (a === undefined || b === undefined) return next;
-          if (
-            a.callId !== b.callId ||
-            Math.abs(a.startY - b.startY) > 0.5 ||
-            Math.abs(a.endY - b.endY) > 0.5 ||
-            Math.abs(a.startX - b.startX) > 0.5 ||
-            Math.abs(a.endX - b.endX) > 0.5
-          ) {
-            return next;
-          }
-        }
-        return prev;
-      });
+      setWires(next);
+      if (next.length < pairs.length && attemptsLeft > 0) {
+        attemptsLeft -= 1;
+        rafId = requestAnimationFrame(recompute);
+      }
     }
 
     recompute();
-    // Entry refs can attach across multiple paints on large runs.
-    // Schedule several staggered recomputes so wires appear even if
-    // the MutationObserver debounces or the first frames miss refs.
-    const rafs: number[] = [];
-    const timeouts: ReturnType<typeof setTimeout>[] = [];
-    for (let i = 1; i <= 4; i += 1) {
-      rafs.push(requestAnimationFrame(recompute));
-    }
-    for (const delay of [50, 150, 400, 1000]) {
-      timeouts.push(setTimeout(recompute, delay));
-    }
     const ro = new ResizeObserver(recompute);
     ro.observe(container);
-    const mo = new MutationObserver(recompute);
-    mo.observe(container, { childList: true, subtree: true, characterData: true });
     return () => {
-      for (const r of rafs) cancelAnimationFrame(r);
-      for (const t of timeouts) clearTimeout(t);
+      if (rafId !== null) cancelAnimationFrame(rafId);
       ro.disconnect();
-      mo.disconnect();
     };
   }, [pairs, messageRefs, containerRef]);
 
   return (
     <svg
-      className="pointer-events-none absolute inset-0 h-full w-full"
-      style={{ overflow: "visible" }}
+      className="pointer-events-none absolute top-0 left-0 h-full"
+      style={{ width: GUTTER_MAX_WIDTH, overflow: "visible" }}
       aria-hidden="true"
     >
       {wires.map(w => {
-        const dy = Math.abs(w.endY - w.startY);
-        // Bulge leftward; proportional to vertical distance, capped.
-        const bulge = Math.min(80, Math.max(24, dy * 0.25));
-        const c1x = w.startX - bulge;
-        const c2x = w.endX - bulge;
-        const d = `M ${w.startX} ${w.startY} C ${c1x} ${w.startY}, ${c2x} ${w.endY}, ${w.endX} ${w.endY}`;
+        const x = w.lane * GUTTER_LANE_WIDTH + GUTTER_LANE_WIDTH / 2;
         const isHovered = hoveredCallId === w.callId;
         return (
           <g key={w.callId}>
-            <path
-              d={d}
+            <line
+              x1={x}
+              y1={w.startY}
+              x2={x}
+              y2={w.endY}
               stroke={w.color}
               strokeWidth={isHovered ? 2.5 : 1.5}
-              strokeOpacity={isHovered ? 0.95 : 0.55}
+              strokeOpacity={isHovered ? 0.95 : 0.6}
               strokeLinecap="round"
-              fill="none"
             />
-            <circle cx={w.startX} cy={w.startY} r={isHovered ? 3.5 : 2.5} fill={w.color} />
-            <circle cx={w.endX} cy={w.endY} r={isHovered ? 3.5 : 2.5} fill={w.color} />
+            <circle cx={x} cy={w.startY} r={isHovered ? 3.5 : 2.5} fill={w.color} />
+            <circle cx={x} cy={w.endY} r={isHovered ? 3.5 : 2.5} fill={w.color} />
           </g>
         );
       })}
     </svg>
   );
 }
+
+const GUTTER_LANE_WIDTH = 6;
+const GUTTER_MAX_WIDTH = 32;
 
 /** Renders either the notification chip (for split notification-result entries)
  *  or the generic tool-call pill. The split between read_notifications call and
