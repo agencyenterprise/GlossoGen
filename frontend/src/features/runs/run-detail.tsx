@@ -45,6 +45,7 @@ import {
   formatConfigValue,
   formatConfigValueFull,
   formatCost,
+  formatDayHeader,
   formatDuration,
   humanize,
   sortConfigEntries,
@@ -435,8 +436,8 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
           </span>
         </span>
         <span className="text-[13px] text-muted-foreground">
-          {maxRound} rounds · {channelMessages} messages · {timelineEntries} events ·{" "}
-          {allAgents.length} agents
+          {formatDayHeader(restData.timestamp)} · {maxRound} rounds · {channelMessages} messages ·{" "}
+          {timelineEntries} events · {allAgents.length} agents
           {totalCostUsd > 0 ? <> · {formatCost(totalCostUsd)}</> : null}
           {durationSeconds > 0 ? <> · {formatDuration(durationSeconds)}</> : null}
           {" · "}

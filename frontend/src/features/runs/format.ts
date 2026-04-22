@@ -28,6 +28,15 @@ export function formatConfigValueFull(value: unknown): string {
   return String(value);
 }
 
+export function formatDayHeader(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", {
     hour: "2-digit",

@@ -24,6 +24,7 @@ import {
   formatConfigValue,
   formatConfigValueFull,
   formatCost,
+  formatDayHeader,
   formatDuration,
   formatTime,
   humanize,
@@ -38,15 +39,6 @@ import { LabelBadges } from "./eval-label-group";
 import { labelColor } from "./label-picker-modal";
 
 type RunSummary = components["schemas"]["RunSummary"];
-
-function formatDayHeader(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 function dayKey(iso: string): string {
   return new Date(iso).toDateString();
