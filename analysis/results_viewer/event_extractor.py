@@ -144,7 +144,7 @@ def load_run_timeline(run_dir: Path) -> RunTimeline:
     scenario_config, total_rounds, events = _scan_jsonl(jsonl_path=jsonl_path)
     events.extend(_config_events(scenario_config=scenario_config))
     events.sort(key=lambda e: (e.round_number, e.kind.value))
-    run_id = _extract_run_id(jsonl_path=jsonl_path)
+    run_id = f"{run_dir.parent.name}/{run_dir.name}"
     return RunTimeline(
         run_id=run_id,
         run_dir=str(run_dir),
@@ -152,16 +152,3 @@ def load_run_timeline(run_dir: Path) -> RunTimeline:
         total_rounds=total_rounds,
         events=events,
     )
-
-
-def _extract_run_id(jsonl_path: Path) -> str:
-    """Read the first event to pick up the run_id field."""
-    with jsonl_path.open("rb") as f:
-        first_line = f.readline()
-    if not first_line.strip():
-        return jsonl_path.parent.name
-    raw = orjson.loads(first_line)
-    run_id = raw.get("run_id")
-    if isinstance(run_id, str):
-        return run_id
-    return jsonl_path.parent.name

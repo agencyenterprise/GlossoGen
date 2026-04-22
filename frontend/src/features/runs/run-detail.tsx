@@ -116,7 +116,8 @@ function deriveInitialForkModelOverrides(args: {
   return inferred;
 }
 
-export function RunDetail({ runId }: { runId: string }) {
+export function RunDetail({ scenario, runDirName }: { scenario: string; runDirName: string }) {
+  const runId = `${scenario}/${runDirName}`;
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
@@ -164,8 +165,8 @@ export function RunDetail({ runId }: { runId: string }) {
   } = useQuery({
     queryKey: ["run", runId],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/runs/{run_id}", {
-        params: { path: { run_id: runId } },
+      const { data, error } = await api.GET("/api/runs/{scenario}/{run_dir_name}", {
+        params: { path: { scenario, run_dir_name: runDirName } },
       });
       if (error) {
         throw new Error("Failed to fetch run detail");
@@ -189,8 +190,8 @@ export function RunDetail({ runId }: { runId: string }) {
 
   const stopMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await api.POST("/api/runs/{run_id}/stop", {
-        params: { path: { run_id: runId } },
+      const { error } = await api.POST("/api/runs/{scenario}/{run_dir_name}/stop", {
+        params: { path: { scenario, run_dir_name: runDirName } },
       });
       if (error) {
         throw new Error("Failed to stop simulation");

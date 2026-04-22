@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, X } from "lucide-react";
 import { api } from "@/shared/lib/api-client";
+import { splitRunId } from "@/shared/lib/run-id";
 
 export function NoteEditorModal({
   runId,
@@ -20,8 +21,8 @@ export function NoteEditorModal({
 
   const mutation = useMutation({
     mutationFn: async (text: string) => {
-      await api.PUT("/api/runs/{run_id}/note", {
-        params: { path: { run_id: runId } },
+      await api.PUT("/api/runs/{scenario}/{run_dir_name}/note", {
+        params: { path: splitRunId(runId) },
         body: { content: text },
       });
     },

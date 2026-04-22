@@ -24,7 +24,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}": {
+    "/api/runs/{scenario}/{run_dir_name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -35,20 +35,20 @@ export interface paths {
          * Get Run Detail
          * @description Get full detail for a specific simulation run.
          */
-        get: operations["get_run_detail_api_runs__run_id__get"];
+        get: operations["get_run_detail_api_runs__scenario___run_dir_name__get"];
         put?: never;
         post?: never;
         /**
          * Delete Run
          * @description Stop the simulation if still running, then delete the run directory.
          */
-        delete: operations["delete_run_api_runs__run_id__delete"];
+        delete: operations["delete_run_api_runs__scenario___run_dir_name__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/eval-logs": {
+    "/api/runs/{scenario}/{run_dir_name}/eval-logs": {
         parameters: {
             query?: never;
             header?: never;
@@ -59,7 +59,7 @@ export interface paths {
          * Get Eval Logs
          * @description Return the contents of the evaluation stdout log file.
          */
-        get: operations["get_eval_logs_api_runs__run_id__eval_logs_get"];
+        get: operations["get_eval_logs_api_runs__scenario___run_dir_name__eval_logs_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -68,7 +68,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/stop": {
+    "/api/runs/{scenario}/{run_dir_name}/stop": {
         parameters: {
             query?: never;
             header?: never;
@@ -81,14 +81,14 @@ export interface paths {
          * Stop Run
          * @description Stop a running simulation by sending SIGTERM to its process.
          */
-        post: operations["stop_run_api_runs__run_id__stop_post"];
+        post: operations["stop_run_api_runs__scenario___run_dir_name__stop_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/evaluate": {
+    "/api/runs/{scenario}/{run_dir_name}/evaluate": {
         parameters: {
             query?: never;
             header?: never;
@@ -106,14 +106,14 @@ export interface paths {
          *     are valid. Launches ``python -m schmidt evaluate`` as a detached
          *     background process.
          */
-        post: operations["start_evaluation_api_runs__run_id__evaluate_post"];
+        post: operations["start_evaluation_api_runs__scenario___run_dir_name__evaluate_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/events": {
+    "/api/runs/{scenario}/{run_dir_name}/events": {
         parameters: {
             query?: never;
             header?: never;
@@ -131,7 +131,7 @@ export interface paths {
          *     The SSE ``data`` field of each frame contains a JSON object conforming to
          *     one of the SSEEvent union members, discriminated by the ``event_type`` field.
          */
-        get: operations["stream_run_events_api_runs__run_id__events_get"];
+        get: operations["stream_run_events_api_runs__scenario___run_dir_name__events_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -140,7 +140,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/labels": {
+    "/api/runs/{scenario}/{run_dir_name}/labels": {
         parameters: {
             query?: never;
             header?: never;
@@ -152,7 +152,7 @@ export interface paths {
          * Update Labels
          * @description Set labels for a simulation run, replacing any existing labels.
          */
-        put: operations["update_labels_api_runs__run_id__labels_put"];
+        put: operations["update_labels_api_runs__scenario___run_dir_name__labels_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -160,7 +160,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/note": {
+    "/api/runs/{scenario}/{run_dir_name}/note": {
         parameters: {
             query?: never;
             header?: never;
@@ -171,12 +171,12 @@ export interface paths {
          * Get Note
          * @description Get the note content for a simulation run.
          */
-        get: operations["get_note_api_runs__run_id__note_get"];
+        get: operations["get_note_api_runs__scenario___run_dir_name__note_get"];
         /**
          * Update Note
          * @description Set or update the note for a simulation run.
          */
-        put: operations["update_note_api_runs__run_id__note_put"];
+        put: operations["update_note_api_runs__scenario___run_dir_name__note_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -204,7 +204,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/fork": {
+    "/api/runs/{scenario}/{run_dir_name}/fork": {
         parameters: {
             query?: never;
             header?: never;
@@ -221,14 +221,14 @@ export interface paths {
          *     applies text edits to the JSONL, and launches the simulation as a
          *     background subprocess with ``--resume``.
          */
-        post: operations["fork_run_api_runs__run_id__fork_post"];
+        post: operations["fork_run_api_runs__scenario___run_dir_name__fork_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/export/pdf": {
+    "/api/runs/{scenario}/{run_dir_name}/export/pdf": {
         parameters: {
             query?: never;
             header?: never;
@@ -242,7 +242,7 @@ export interface paths {
          *     Generates a PDF containing messages, reasoning, and tool calls
          *     grouped by round and turn. Optionally filters to a single channel.
          */
-        get: operations["export_run_pdf_api_runs__run_id__export_pdf_get"];
+        get: operations["export_run_pdf_api_runs__scenario___run_dir_name__export_pdf_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -251,7 +251,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/export/artifacts": {
+    "/api/runs/{scenario}/{run_dir_name}/export/artifacts": {
         parameters: {
             query?: never;
             header?: never;
@@ -262,7 +262,7 @@ export interface paths {
          * Export Run Artifacts
          * @description Export all artifacts from a simulation run as a zip archive.
          */
-        get: operations["export_run_artifacts_api_runs__run_id__export_artifacts_get"];
+        get: operations["export_run_artifacts_api_runs__scenario___run_dir_name__export_artifacts_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -271,7 +271,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/export/artifacts/{message_id}": {
+    "/api/runs/{scenario}/{run_dir_name}/export/artifacts/{message_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -282,7 +282,7 @@ export interface paths {
          * Export Run Artifacts At Message
          * @description Export artifacts from a simulation run as they existed at a specific message.
          */
-        get: operations["export_run_artifacts_at_message_api_runs__run_id__export_artifacts__message_id__get"];
+        get: operations["export_run_artifacts_at_message_api_runs__scenario___run_dir_name__export_artifacts__message_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -291,7 +291,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/export/bundle": {
+    "/api/runs/{scenario}/{run_dir_name}/export/bundle": {
         parameters: {
             query?: never;
             header?: never;
@@ -302,7 +302,7 @@ export interface paths {
          * Export Run Bundle
          * @description Export a simulation run as a tar.gz bundle including git history.
          */
-        get: operations["export_run_bundle_api_runs__run_id__export_bundle_get"];
+        get: operations["export_run_bundle_api_runs__scenario___run_dir_name__export_bundle_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1473,12 +1473,13 @@ export interface operations {
             };
         };
     };
-    get_run_detail_api_runs__run_id__get: {
+    get_run_detail_api_runs__scenario___run_dir_name__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };
@@ -1504,12 +1505,13 @@ export interface operations {
             };
         };
     };
-    delete_run_api_runs__run_id__delete: {
+    delete_run_api_runs__scenario___run_dir_name__delete: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };
@@ -1533,12 +1535,13 @@ export interface operations {
             };
         };
     };
-    get_eval_logs_api_runs__run_id__eval_logs_get: {
+    get_eval_logs_api_runs__scenario___run_dir_name__eval_logs_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };
@@ -1564,12 +1567,13 @@ export interface operations {
             };
         };
     };
-    stop_run_api_runs__run_id__stop_post: {
+    stop_run_api_runs__scenario___run_dir_name__stop_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };
@@ -1593,12 +1597,13 @@ export interface operations {
             };
         };
     };
-    start_evaluation_api_runs__run_id__evaluate_post: {
+    start_evaluation_api_runs__scenario___run_dir_name__evaluate_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };
@@ -1628,12 +1633,13 @@ export interface operations {
             };
         };
     };
-    stream_run_events_api_runs__run_id__events_get: {
+    stream_run_events_api_runs__scenario___run_dir_name__events_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };
@@ -1659,12 +1665,13 @@ export interface operations {
             };
         };
     };
-    update_labels_api_runs__run_id__labels_put: {
+    update_labels_api_runs__scenario___run_dir_name__labels_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };
@@ -1694,12 +1701,13 @@ export interface operations {
             };
         };
     };
-    get_note_api_runs__run_id__note_get: {
+    get_note_api_runs__scenario___run_dir_name__note_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };
@@ -1725,12 +1733,13 @@ export interface operations {
             };
         };
     };
-    update_note_api_runs__run_id__note_put: {
+    update_note_api_runs__scenario___run_dir_name__note_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };
@@ -1780,12 +1789,13 @@ export interface operations {
             };
         };
     };
-    fork_run_api_runs__run_id__fork_post: {
+    fork_run_api_runs__scenario___run_dir_name__fork_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };
@@ -1815,14 +1825,15 @@ export interface operations {
             };
         };
     };
-    export_run_pdf_api_runs__run_id__export_pdf_get: {
+    export_run_pdf_api_runs__scenario___run_dir_name__export_pdf_get: {
         parameters: {
             query?: {
                 channel_id?: string | null;
             };
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };
@@ -1849,12 +1860,13 @@ export interface operations {
             };
         };
     };
-    export_run_artifacts_api_runs__run_id__export_artifacts_get: {
+    export_run_artifacts_api_runs__scenario___run_dir_name__export_artifacts_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };
@@ -1881,12 +1893,13 @@ export interface operations {
             };
         };
     };
-    export_run_artifacts_at_message_api_runs__run_id__export_artifacts__message_id__get: {
+    export_run_artifacts_at_message_api_runs__scenario___run_dir_name__export_artifacts__message_id__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
                 message_id: string;
             };
             cookie?: never;
@@ -1914,12 +1927,13 @@ export interface operations {
             };
         };
     };
-    export_run_bundle_api_runs__run_id__export_bundle_get: {
+    export_run_bundle_api_runs__scenario___run_dir_name__export_bundle_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                run_id: string;
+                scenario: string;
+                run_dir_name: string;
             };
             cookie?: never;
         };

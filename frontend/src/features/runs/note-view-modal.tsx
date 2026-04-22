@@ -5,14 +5,15 @@ import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, X } from "lucide-react";
 import { api } from "@/shared/lib/api-client";
+import { splitRunId } from "@/shared/lib/run-id";
 import { ProseMarkdown } from "./prose-markdown";
 
 export function NoteViewModal({ runId, onClose }: { runId: string; onClose: () => void }) {
   const { data, isLoading } = useQuery({
     queryKey: ["run-note", runId],
     queryFn: async () => {
-      const { data: resp } = await api.GET("/api/runs/{run_id}/note", {
-        params: { path: { run_id: runId } },
+      const { data: resp } = await api.GET("/api/runs/{scenario}/{run_dir_name}/note", {
+        params: { path: splitRunId(runId) },
       });
       return resp;
     },

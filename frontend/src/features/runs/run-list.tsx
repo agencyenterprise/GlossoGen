@@ -17,6 +17,7 @@ import {
 import { useRouter } from "next/navigation";
 import { api, downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
+import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
 import {
   elapsedSince,
@@ -177,8 +178,8 @@ export function RunList() {
 
   const deleteMutation = useMutation({
     mutationFn: async (runId: string) => {
-      const { error } = await api.DELETE("/api/runs/{run_id}", {
-        params: { path: { run_id: runId } },
+      const { error } = await api.DELETE("/api/runs/{scenario}/{run_dir_name}", {
+        params: { path: splitRunId(runId) },
       });
       if (error) {
         throw new Error("Failed to delete run");
@@ -191,8 +192,8 @@ export function RunList() {
 
   const stopMutation = useMutation({
     mutationFn: async (runId: string) => {
-      const { error } = await api.POST("/api/runs/{run_id}/stop", {
-        params: { path: { run_id: runId } },
+      const { error } = await api.POST("/api/runs/{scenario}/{run_dir_name}/stop", {
+        params: { path: splitRunId(runId) },
       });
       if (error) {
         throw new Error("Failed to stop simulation");
@@ -597,7 +598,7 @@ export function RunList() {
                                   void downloadAuthenticatedFile({
                                     path: `/api/runs/${run.run_id}/export/bundle`,
                                     searchParams: new URLSearchParams(),
-                                    fallbackFilename: `${run.run_id.slice(0, 8)}_bundle.tar.gz`,
+                                    fallbackFilename: `${run.run_id.replace("/", "_")}_bundle.tar.gz`,
                                   });
                                 }}
                               >

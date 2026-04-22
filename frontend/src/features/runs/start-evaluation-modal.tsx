@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { api } from "@/shared/lib/api-client";
+import { splitRunId } from "@/shared/lib/run-id";
 import { humanize } from "./format";
 import { ModelPicker } from "./model-picker";
 
@@ -76,8 +77,8 @@ export function StartEvaluationModal({
 
   const startMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await api.POST("/api/runs/{run_id}/evaluate", {
-        params: { path: { run_id: runId } },
+      const { error } = await api.POST("/api/runs/{scenario}/{run_dir_name}/evaluate", {
+        params: { path: splitRunId(runId) },
         body: {
           model,
           provider,
