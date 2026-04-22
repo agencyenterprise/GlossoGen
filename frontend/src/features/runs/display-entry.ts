@@ -32,6 +32,23 @@ export interface DisplayEntry {
   /** Paired entry's message_id for click-to-scroll (empty when there is no pair). */
   paired_message_id: string;
   stabilize_metadata: VeyruStabilizeMetadata | null;
+  /** call_ids of notification pairs whose span covers this entry (call seen,
+   *  result not yet). Includes the pair's own endpoints — the call entry and
+   *  the result entry each list their own call_id. Used to render the gutter
+   *  thread in ChatPane / AgentDrawer. */
+  active_pair_call_ids: string[];
+  /** Horizontal lane index per active pair. Same length/order as active_pair_call_ids. */
+  active_pair_lanes: number[];
+}
+
+/** Deterministic hue (0–359) from a call_id so each notification pair gets a
+ *  stable, unique color across re-renders. */
+export function hueFromCallId(callId: string): number {
+  let h = 0;
+  for (let i = 0; i < callId.length; i += 1) {
+    h = (h * 31 + callId.charCodeAt(i)) >>> 0;
+  }
+  return h % 360;
 }
 
 /** Merge channel messages, reasoning entries, and tool uses into a single sorted array. */
@@ -59,6 +76,8 @@ export function mergeEntries(
     call_id: "",
     paired_message_id: "",
     stabilize_metadata: null,
+    active_pair_call_ids: [],
+    active_pair_lanes: [],
   }));
 
   const reasoningEntries: DisplayEntry[] = reasoning.map(r => ({
@@ -80,6 +99,8 @@ export function mergeEntries(
     call_id: "",
     paired_message_id: "",
     stabilize_metadata: null,
+    active_pair_call_ids: [],
+    active_pair_lanes: [],
   }));
 
   const toolEntries: DisplayEntry[] = [];
@@ -108,6 +129,8 @@ export function mergeEntries(
       call_id: t.call_id,
       paired_message_id: split ? resultMessageId : "",
       stabilize_metadata: t.stabilize_metadata ?? null,
+      active_pair_call_ids: [],
+      active_pair_lanes: [],
     });
     if (split && t.result_timestamp !== null) {
       toolEntries.push({
@@ -129,6 +152,8 @@ export function mergeEntries(
         call_id: t.call_id,
         paired_message_id: callMessageId,
         stabilize_metadata: null,
+        active_pair_call_ids: [],
+        active_pair_lanes: [],
       });
     }
   }
@@ -143,7 +168,7 @@ export function mergeEntries(
     return 0;
   }
 
-  return [...channelEntries, ...reasoningEntries, ...toolEntries].sort((a, b) => {
+  const sorted = [...channelEntries, ...reasoningEntries, ...toolEntries].sort((a, b) => {
     if (a.round_number !== b.round_number) {
       return a.round_number - b.round_number;
     }
@@ -151,6 +176,50 @@ export function mergeEntries(
     if (ts !== 0) return ts;
     return sortRank(a) - sortRank(b);
   });
+
+  annotateActivePairs(sorted);
+  return sorted;
+}
+
+/** Populate active_pair_call_ids and active_pair_lanes on each entry so the
+ *  ChatPane gutter-thread renderer knows which colored bars to draw in which
+ *  lane, with no runtime DOM measurement. Single linear pass: open a lane
+ *  when a call entry is seen, close and free it when the matching result
+ *  entry is seen. Both endpoints and all intervening entries report the pair
+ *  as active (the renderer picks half-height vs full-height based on whether
+ *  the current entry is an endpoint for that call_id). */
+function annotateActivePairs(entries: DisplayEntry[]): void {
+  const openLanes = new Map<string, number>();
+  const freeLanes: number[] = [];
+  let nextLane = 0;
+
+  for (const entry of entries) {
+    // Open a new lane for each notification-splitting call.
+    if (entry.is_tool_use && entry.paired_message_id !== "" && entry.call_id !== "") {
+      let lane: number;
+      if (freeLanes.length > 0) {
+        freeLanes.sort((a, b) => a - b);
+        lane = freeLanes.shift() as number;
+      } else {
+        lane = nextLane;
+        nextLane += 1;
+      }
+      openLanes.set(entry.call_id, lane);
+    }
+
+    // Snapshot the currently-open pairs onto this entry.
+    entry.active_pair_call_ids = Array.from(openLanes.keys());
+    entry.active_pair_lanes = entry.active_pair_call_ids.map(id => openLanes.get(id) as number);
+
+    // Close the pair AFTER snapshotting so the result entry still reports it.
+    if (entry.is_notification_result && entry.call_id !== "") {
+      const lane = openLanes.get(entry.call_id);
+      if (lane !== undefined) {
+        freeLanes.push(lane);
+        openLanes.delete(entry.call_id);
+      }
+    }
+  }
 }
 
 /** True when a read_notifications tool entry has a parseable result and a
