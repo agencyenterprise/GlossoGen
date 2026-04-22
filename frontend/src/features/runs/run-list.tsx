@@ -3,7 +3,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  CheckCircle,
   GitFork,
   HelpCircle,
   Inbox,
@@ -28,6 +27,8 @@ import {
   formatTime,
   humanize,
 } from "./format";
+import { CollapsibleConfigBadges } from "./collapsible-config-badges";
+import { EvalVerdictSummary, groupEvalLabels, partitionLabels } from "./eval-verdict-summary";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
 import { ConfigValueModal } from "./config-value-modal";
 import { NoteViewModal } from "./note-view-modal";
@@ -224,7 +225,12 @@ export function RunList() {
   });
 
   const allRuns = useMemo(() => data?.runs ?? [], [data]);
-  const allLabels = labelsData?.labels ?? [];
+  const allLabels = useMemo(() => labelsData?.labels ?? [], [labelsData]);
+  const { regularLabels: regularFilterLabels, evalLabels: evalFilterLabels } = useMemo(
+    () => partitionLabels(allLabels),
+    [allLabels]
+  );
+  const evalFilterGroups = useMemo(() => groupEvalLabels(evalFilterLabels), [evalFilterLabels]);
   const allScenarios = useMemo(() => {
     const seen = new Set<string>();
     for (const run of allRuns) {
@@ -309,10 +315,10 @@ export function RunList() {
         </div>
       ) : null}
 
-      {allLabels.length > 0 ? (
+      {regularFilterLabels.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5">
           <Tag className="h-3.5 w-3.5 text-muted-foreground" />
-          {allLabels.map(label => {
+          {regularFilterLabels.map(label => {
             const active = selectedLabels.has(label);
             const color = labelColor(label);
             return (
@@ -331,11 +337,82 @@ export function RunList() {
               </button>
             );
           })}
-          {selectedLabels.size > 0 ? (
+          {selectedLabels.size > 0 && regularFilterLabels.some(l => selectedLabels.has(l)) ? (
             <button
               type="button"
-              onClick={() => setSelectedLabels(new Set())}
+              onClick={() => {
+                setSelectedLabels(prev => {
+                  const next = new Set(prev);
+                  for (const label of regularFilterLabels) {
+                    next.delete(label);
+                  }
+                  return next;
+                });
+              }}
               className="ml-1 inline-flex items-center gap-0.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <XCircle className="h-3 w-3" />
+              Clear
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {evalFilterGroups.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-muted-foreground">
+          <span className="font-semibold uppercase tracking-wider opacity-70">Eval</span>
+          {evalFilterGroups.map(group => {
+            const verdictColor =
+              group.verdict === "identified"
+                ? "text-emerald-600 dark:text-emerald-400"
+                : group.verdict === "partial"
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-rose-600 dark:text-rose-400";
+            const verdictLabel =
+              group.verdict === "identified"
+                ? "Identified"
+                : group.verdict === "partial"
+                  ? "Partial"
+                  : "Fail";
+            return (
+              <span key={group.verdict} className="inline-flex items-center gap-2">
+                <span className={`font-semibold ${verdictColor}`}>{verdictLabel}:</span>
+                <span className="flex flex-wrap items-center gap-x-2">
+                  {group.evaluators.map(entry => {
+                    const active = selectedLabels.has(entry.raw);
+                    return (
+                      <button
+                        key={entry.raw}
+                        type="button"
+                        onClick={() => toggleLabel(entry.raw)}
+                        className={cn(
+                          "transition-colors hover:text-foreground",
+                          active
+                            ? `font-semibold underline underline-offset-4 ${verdictColor}`
+                            : "text-foreground/70"
+                        )}
+                      >
+                        {entry.evaluator}
+                      </button>
+                    );
+                  })}
+                </span>
+              </span>
+            );
+          })}
+          {selectedLabels.size > 0 && evalFilterLabels.some(e => selectedLabels.has(e.raw)) ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedLabels(prev => {
+                  const next = new Set(prev);
+                  for (const entry of evalFilterLabels) {
+                    next.delete(entry.raw);
+                  }
+                  return next;
+                });
+              }}
+              className="inline-flex items-center gap-0.5 text-[11px] normal-case text-muted-foreground transition-colors hover:text-foreground"
             >
               <XCircle className="h-3 w-3" />
               Clear
@@ -556,17 +633,16 @@ export function RunList() {
                           }}
                         >
                           <td colSpan={8} className="pb-2 pl-4 pr-4">
+                            <EvalVerdictSummary
+                              labels={run.labels}
+                              size="sm"
+                              containerClassName="mb-1"
+                            />
                             <div className="flex flex-wrap items-center gap-1.5">
                               {run.fork_source ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
                                   <GitFork className="h-2.5 w-2.5" />
                                   Fork
-                                </span>
-                              ) : null}
-                              {run.has_evaluation ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                  <CheckCircle className="h-3 w-3" />
-                                  Evaluated
                                 </span>
                               ) : null}
                               <LabelBadges labels={run.labels} size="sm" />
@@ -584,31 +660,34 @@ export function RunList() {
                                 </button>
                               ) : null}
                             </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                              {run.scenario_config && Object.keys(run.scenario_config).length > 0
-                                ? Object.entries(run.scenario_config).map(([key, value]) => (
-                                    <button
-                                      key={key}
-                                      type="button"
-                                      onClick={e => {
-                                        e.stopPropagation();
-                                        setConfigPreview({
-                                          key,
-                                          value: formatConfigValueFull(value),
-                                        });
-                                      }}
-                                      className="inline-flex max-w-full items-center gap-0.5 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px] transition-colors hover:border-primary hover:bg-primary/5"
-                                    >
-                                      <span className="shrink-0 text-muted-foreground">
-                                        {humanize(key)}
-                                      </span>
-                                      <span className="max-w-48 truncate font-medium">
-                                        {formatConfigValue(value)}
-                                      </span>
-                                    </button>
-                                  ))
-                                : null}
-                            </div>
+                            {run.scenario_config && Object.keys(run.scenario_config).length > 0 ? (
+                              <CollapsibleConfigBadges
+                                containerClassName="mt-1"
+                                entries={Object.entries(run.scenario_config)}
+                                toggleClassName="inline-flex items-center rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary/5"
+                                renderBadge={([key, value]) => (
+                                  <button
+                                    key={key}
+                                    type="button"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      setConfigPreview({
+                                        key,
+                                        value: formatConfigValueFull(value),
+                                      });
+                                    }}
+                                    className="inline-flex max-w-full items-center gap-0.5 rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px] transition-colors hover:border-primary hover:bg-primary/5"
+                                  >
+                                    <span className="shrink-0 text-muted-foreground">
+                                      {humanize(key)}
+                                    </span>
+                                    <span className="max-w-48 truncate font-medium">
+                                      {formatConfigValue(value)}
+                                    </span>
+                                  </button>
+                                )}
+                              />
+                            ) : null}
                           </td>
                         </tr>
                       ) : null}
