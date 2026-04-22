@@ -1,0 +1,11 @@
+{
+  "directive_space_size": 6,
+  "inquisitor_guesses_per_round": 3,
+  "max_round_duration_seconds": 300,
+  "model_overrides": {},
+  "postmortem_duration_seconds": 180,
+  "postmortem_enabled": true,
+  "primer_figure_count": 8,
+  "round_count": 12,
+  "seed": 42
+}
