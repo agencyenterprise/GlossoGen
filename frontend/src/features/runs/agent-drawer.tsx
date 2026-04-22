@@ -8,6 +8,7 @@ import { deriveInitials, type AgentColor } from "./agent-colors";
 import type { DisplayEntry } from "./display-entry";
 import { EvidenceModal } from "./evidence-modal";
 import { formatTime, humanize } from "./format";
+import { NotificationDisplay } from "./notification-display";
 import { ProseMarkdown } from "./prose-markdown";
 import { ToolCallDisplay } from "./tool-call-display";
 import { VerdictPill } from "./verdict-pill";
@@ -143,15 +144,16 @@ export function AgentDrawer({
                             "ml-4 rounded-md border border-border/60 bg-muted/35 px-2 py-1.5 text-muted-foreground dark:bg-muted/20",
                           !entry.is_reasoning &&
                             !entry.is_tool_use &&
+                            !entry.is_notification_result &&
                             "rounded-md border border-border/70 bg-background px-2 py-1.5 shadow-sm",
-                          entry.is_tool_use && "ml-4"
+                          (entry.is_tool_use || entry.is_notification_result) && "ml-4"
                         )}
                       >
                         {entry.is_reasoning ? (
                           <span className="mb-1 inline-block rounded-full border border-border/70 bg-background/80 px-1.5 py-px text-[10px] font-medium text-muted-foreground">
                             reasoning
                           </span>
-                        ) : entry.is_tool_use ? null : (
+                        ) : entry.is_tool_use || entry.is_notification_result ? null : (
                           <span className="mb-0.5 flex items-baseline gap-1.5">
                             <button
                               className={cn(
@@ -173,7 +175,9 @@ export function AgentDrawer({
                             </button>
                           </span>
                         )}
-                        {entry.is_tool_use ? (
+                        {entry.is_notification_result ? (
+                          <NotificationDisplay result={entry.tool_result} />
+                        ) : entry.is_tool_use ? (
                           <ToolCallDisplay
                             toolName={entry.tool_name}
                             arguments={entry.tool_arguments}

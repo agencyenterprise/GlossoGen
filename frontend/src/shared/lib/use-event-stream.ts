@@ -16,6 +16,7 @@ type SSEAgentRegistered = components["schemas"]["SSEAgentRegistered"];
 type SSEMessageSent = components["schemas"]["SSEMessageSent"];
 type SSELLMResponseReceived = components["schemas"]["SSELLMResponseReceived"];
 type SSESimulationEnded = components["schemas"]["SSESimulationEnded"];
+type SSEToolCallInvoked = components["schemas"]["SSEToolCallInvoked"];
 type SSEToolResultReceived = components["schemas"]["SSEToolResultReceived"];
 type SSEAgentCostUpdated = components["schemas"]["SSEAgentCostUpdated"];
 type SSEDebugLog = components["schemas"]["SSEDebugLog"];
@@ -195,6 +196,29 @@ export function useEventStream(
         }
       });
 
+      eventSource.addEventListener("tool_call_invoked", (e: MessageEvent) => {
+        const data: SSEToolCallInvoked = JSON.parse(e.data);
+        if (isDuplicate(data.event_id)) return;
+        setToolUse(prev => {
+          if (prev.some(t => t.call_id === data.call_id)) {
+            return prev;
+          }
+          const entry: ToolUseEntry = {
+            message_id: `${data.event_id}-${data.call_id}`,
+            sender_agent_id: data.agent_id,
+            tool_name: data.tool_name,
+            call_id: data.call_id,
+            arguments: data.arguments,
+            result: null,
+            timestamp: data.timestamp,
+            result_timestamp: null,
+            round_number: data.round_number,
+            stabilize_metadata: null,
+          };
+          return [...prev, entry];
+        });
+      });
+
       eventSource.addEventListener("tool_result_received", (e: MessageEvent) => {
         const data: SSEToolResultReceived = JSON.parse(e.data);
         if (isDuplicate(data.event_id)) return;
@@ -213,11 +237,14 @@ export function useEventStream(
                 ? {
                     ...t,
                     result: data.result,
+                    result_timestamp: data.timestamp,
                     stabilize_metadata: attachedMetadata ?? t.stabilize_metadata,
                   }
                 : t
             );
           }
+          // Safety fallback: tool_call_invoked did not arrive first. Create
+          // the entry now so the tool result still shows in the UI.
           const entry: ToolUseEntry = {
             message_id: `${data.event_id}-${data.call_id}`,
             sender_agent_id: data.agent_id,
@@ -226,6 +253,7 @@ export function useEventStream(
             arguments: data.arguments,
             result: data.result,
             timestamp: data.timestamp,
+            result_timestamp: data.timestamp,
             round_number: data.round_number,
             stabilize_metadata: attachedMetadata,
           };

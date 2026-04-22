@@ -94,6 +94,20 @@ class LLMResponseReceived(EventBase):
     round_number: int
 
 
+class ToolCallInvoked(EventBase):
+    """Emitted when an agent invokes a tool, before it executes. Provides the
+    authoritative timestamp for the ToolUseEntry rendered in the UI, since the
+    enclosing LLMResponseReceived is only logged after the full turn completes.
+    """
+
+    event_type: Literal["tool_call_invoked"] = "tool_call_invoked"
+    agent_id: str
+    call_id: str
+    tool_name: str
+    arguments: dict[str, Any]
+    round_number: int
+
+
 class ToolResultReceived(EventBase):
     """Emitted when a tool call completes and the result is returned to the agent."""
 
@@ -202,6 +216,7 @@ SimulationEvent = Annotated[
         AgentConnected,
         MessageSent,
         LLMResponseReceived,
+        ToolCallInvoked,
         ToolResultReceived,
         RoundAdvanced,
         InjectionDelivered,

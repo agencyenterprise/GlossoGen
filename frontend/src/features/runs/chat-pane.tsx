@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   ArrowLeftRight,
   ChevronDown,
@@ -19,11 +27,7 @@ import { deriveInitials, type AgentColor } from "./agent-colors";
 import type { DisplayEntry } from "./display-entry";
 import { formatTime, humanize } from "./format";
 import { ProseMarkdown } from "./prose-markdown";
-import {
-  NotificationDisplay,
-  parseNotificationResult,
-  TOOL_NAME_READ_NOTIFICATIONS,
-} from "./notification-display";
+import { NotificationDisplay } from "./notification-display";
 import { ToolCallDisplay } from "./tool-call-display";
 import type { PendingEdit } from "./use-fork";
 
@@ -144,9 +148,29 @@ export function ChatPane({
 }: ChatPaneProps) {
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const innerContentRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const prevScrollHeightRef = useRef(0);
+  const [hoveredCallId, setHoveredCallId] = useState<string | null>(null);
+  const [linkedHighlightId, setLinkedHighlightId] = useState<string | null>(null);
+  const [linkedHighlightNonce, setLinkedHighlightNonce] = useState(0);
+
+  useEffect(() => {
+    if (!linkedHighlightId) {
+      return undefined;
+    }
+    const el = messageRefs.current.get(linkedHighlightId);
+    if (!el) {
+      return undefined;
+    }
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("animate-highlight");
+    const timeout = setTimeout(() => {
+      el.classList.remove("animate-highlight");
+    }, 1500);
+    return () => clearTimeout(timeout);
+  }, [linkedHighlightId, linkedHighlightNonce]);
 
   // Scroll to bottom on initial render so the user sees the latest messages
   useEffect(() => {
@@ -226,6 +250,20 @@ export function ChatPane({
     }
     return messages.filter(m => m.channel_ids.includes(selectedChannel));
   }, [messages, selectedChannel]);
+
+  const notificationPairs = useMemo(() => {
+    const out: Array<{ callMessageId: string; resultMessageId: string; callId: string }> = [];
+    for (const e of filtered) {
+      if (e.is_notification_result && e.paired_message_id !== "") {
+        out.push({
+          callMessageId: e.paired_message_id,
+          resultMessageId: e.message_id,
+          callId: e.call_id,
+        });
+      }
+    }
+    return out;
+  }, [filtered]);
 
   const showChannelBadge = selectedChannel === null;
 
@@ -349,239 +387,281 @@ export function ChatPane({
         className="flex-1 overflow-y-auto px-0 py-1"
         onScroll={handleScroll}
       >
-        {rounds.map((round, roundIdx) => (
-          <div key={`round-${roundIdx}-${round.roundNumber}`}>
-            {swapRoundNumber !== null && round.roundNumber === swapRoundNumber ? (
-              <div
-                id="swap-divider"
-                className="mx-4 my-4 rounded-md border-2 border-dashed border-amber-400/80 bg-amber-50 px-4 py-3 dark:border-amber-600/70 dark:bg-amber-950/50"
-              >
-                <div className="flex items-center justify-center gap-2 text-amber-800 dark:text-amber-200">
-                  <ArrowLeftRight className="h-4 w-4" />
-                  <span className="text-sm font-semibold">
-                    {swappedObserverDisplayNames.length === 2 ? (
-                      <>
-                        {swappedObserverDisplayNames[0]} <span aria-hidden="true">⇄</span>{" "}
-                        {swappedObserverDisplayNames[1]} — swapped teams
-                      </>
-                    ) : (
-                      <>Observers swapped between teams</>
-                    )}
-                  </span>
-                </div>
-                <div className="mt-1 text-center text-[11px] text-amber-700/80 dark:text-amber-300/80">
-                  Channel history was wiped. Round {round.roundNumber} begins with the new pairings.
-                </div>
-              </div>
-            ) : null}
-            {internJoinRoundNumber !== null && round.roundNumber === internJoinRoundNumber ? (
-              <div
-                id="intern-join-divider"
-                className="mx-4 my-4 rounded-md border-2 border-dashed border-emerald-400/80 bg-emerald-50 px-4 py-3 dark:border-emerald-600/70 dark:bg-emerald-950/50"
-              >
-                <div className="flex items-center justify-center gap-2 text-emerald-800 dark:text-emerald-200">
-                  <UserPlus className="h-4 w-4" />
-                  <span className="text-sm font-semibold">
-                    Intern Observer joined the comm link
-                  </span>
-                </div>
-                <div className="mt-1 text-center text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
-                  Silent observation begins at round {round.roundNumber}. The intern cannot see
-                  messages from earlier rounds.
-                </div>
-              </div>
-            ) : null}
-            {internTakeoverRoundNumber !== null &&
-            round.roundNumber === internTakeoverRoundNumber ? (
-              <div
-                id="intern-takeover-divider"
-                className="mx-4 my-4 rounded-md border-2 border-dashed border-violet-400/80 bg-violet-50 px-4 py-3 dark:border-violet-600/70 dark:bg-violet-950/50"
-              >
-                <div className="flex items-center justify-center gap-2 text-violet-800 dark:text-violet-200">
-                  <UserCog className="h-4 w-4" />
-                  <span className="text-sm font-semibold">
-                    Intern Observer took over as Field Observer
-                  </span>
-                </div>
-                <div className="mt-1 text-center text-[11px] text-violet-700/80 dark:text-violet-300/80">
-                  The previous Field Observer left the comm link. Round {round.roundNumber} begins
-                  with the new pairing.
-                </div>
-              </div>
-            ) : null}
-            <div className="flex items-center gap-2.5 px-4 pb-1.5 pt-3.5">
-              <div className="h-px flex-1 bg-border" />
-              <span className="whitespace-nowrap text-[11px] text-muted-foreground">
-                Round {round.roundNumber}
-              </span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-
-            {round.turns.map((turn, turnIdx) => {
-              const agent = agentMap.get(turn.agentId);
-              const color = agentColorMap.get(turn.agentId);
-
-              return (
+        <div ref={innerContentRef} className="relative">
+          <ConnectionWires
+            pairs={notificationPairs}
+            messageRefs={messageRefs}
+            containerRef={innerContentRef}
+            hoveredCallId={hoveredCallId}
+          />
+          {rounds.map((round, roundIdx) => (
+            <div key={`round-${roundIdx}-${round.roundNumber}`}>
+              {swapRoundNumber !== null && round.roundNumber === swapRoundNumber ? (
                 <div
-                  key={`${roundIdx}-${turnIdx}-${turn.agentId}`}
-                  className="flex gap-2.5 px-4 py-1 transition-colors hover:bg-muted/50"
+                  id="swap-divider"
+                  className="mx-4 my-4 rounded-md border-2 border-dashed border-amber-400/80 bg-amber-50 px-4 py-3 dark:border-amber-600/70 dark:bg-amber-950/50"
                 >
-                  <div className="flex w-7 shrink-0 flex-col items-start">
-                    <button
-                      aria-label={`Open agent ${agent?.role_name ?? turn.agentId}`}
-                      className={cn(
-                        "flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[10px] font-semibold transition-opacity hover:opacity-75",
-                        color?.bg,
-                        color?.fg
+                  <div className="flex items-center justify-center gap-2 text-amber-800 dark:text-amber-200">
+                    <ArrowLeftRight className="h-4 w-4" />
+                    <span className="text-sm font-semibold">
+                      {swappedObserverDisplayNames.length === 2 ? (
+                        <>
+                          {swappedObserverDisplayNames[0]} <span aria-hidden="true">⇄</span>{" "}
+                          {swappedObserverDisplayNames[1]} — swapped teams
+                        </>
+                      ) : (
+                        <>Observers swapped between teams</>
                       )}
-                      onClick={() => onSelectAgent(turn.agentId)}
-                    >
-                      {agent ? deriveInitials(agent.role_name) : "??"}
-                    </button>
-                    <div className="flex flex-1 items-center justify-center self-stretch">
-                      <span className="text-[10px] font-medium leading-none text-muted-foreground/50">
-                        {turnIdx + 1}
-                      </span>
-                    </div>
+                    </span>
                   </div>
-                  <div className="min-w-0 flex-1 pr-4">
-                    <div className="mb-0.5 flex flex-wrap items-baseline gap-1.5">
+                  <div className="mt-1 text-center text-[11px] text-amber-700/80 dark:text-amber-300/80">
+                    Channel history was wiped. Round {round.roundNumber} begins with the new
+                    pairings.
+                  </div>
+                </div>
+              ) : null}
+              {internJoinRoundNumber !== null && round.roundNumber === internJoinRoundNumber ? (
+                <div
+                  id="intern-join-divider"
+                  className="mx-4 my-4 rounded-md border-2 border-dashed border-emerald-400/80 bg-emerald-50 px-4 py-3 dark:border-emerald-600/70 dark:bg-emerald-950/50"
+                >
+                  <div className="flex items-center justify-center gap-2 text-emerald-800 dark:text-emerald-200">
+                    <UserPlus className="h-4 w-4" />
+                    <span className="text-sm font-semibold">
+                      Intern Observer joined the comm link
+                    </span>
+                  </div>
+                  <div className="mt-1 text-center text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
+                    Silent observation begins at round {round.roundNumber}. The intern cannot see
+                    messages from earlier rounds.
+                  </div>
+                </div>
+              ) : null}
+              {internTakeoverRoundNumber !== null &&
+              round.roundNumber === internTakeoverRoundNumber ? (
+                <div
+                  id="intern-takeover-divider"
+                  className="mx-4 my-4 rounded-md border-2 border-dashed border-violet-400/80 bg-violet-50 px-4 py-3 dark:border-violet-600/70 dark:bg-violet-950/50"
+                >
+                  <div className="flex items-center justify-center gap-2 text-violet-800 dark:text-violet-200">
+                    <UserCog className="h-4 w-4" />
+                    <span className="text-sm font-semibold">
+                      Intern Observer took over as Field Observer
+                    </span>
+                  </div>
+                  <div className="mt-1 text-center text-[11px] text-violet-700/80 dark:text-violet-300/80">
+                    The previous Field Observer left the comm link. Round {round.roundNumber} begins
+                    with the new pairing.
+                  </div>
+                </div>
+              ) : null}
+              <div className="flex items-center gap-2.5 px-4 pb-1.5 pt-3.5">
+                <div className="h-px flex-1 bg-border" />
+                <span className="whitespace-nowrap text-[11px] text-muted-foreground">
+                  Round {round.roundNumber}
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              {round.turns.map((turn, turnIdx) => {
+                const agent = agentMap.get(turn.agentId);
+                const color = agentColorMap.get(turn.agentId);
+
+                return (
+                  <div
+                    key={`${roundIdx}-${turnIdx}-${turn.agentId}`}
+                    className="flex gap-2.5 px-4 py-1 transition-colors hover:bg-muted/50"
+                  >
+                    <div className="flex w-7 shrink-0 flex-col items-start">
                       <button
-                        className="text-[13px] font-medium hover:underline"
+                        aria-label={`Open agent ${agent?.role_name ?? turn.agentId}`}
+                        className={cn(
+                          "flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[10px] font-semibold transition-opacity hover:opacity-75",
+                          color?.bg,
+                          color?.fg
+                        )}
                         onClick={() => onSelectAgent(turn.agentId)}
                       >
-                        {agent?.role_name ?? turn.agentId}
+                        {agent ? deriveInitials(agent.role_name) : "??"}
                       </button>
-                      <span className="text-[10px] text-muted-foreground">
-                        {formatTime(turn.timestamp)}
-                      </span>
+                      <div className="flex flex-1 items-center justify-center self-stretch">
+                        <span className="text-[10px] font-medium leading-none text-muted-foreground/50">
+                          {turnIdx + 1}
+                        </span>
+                      </div>
                     </div>
-                    {turn.entries.map((entry, entryIdx) => {
-                      const entryChColor = channelColorMap.get(entry.channel_id);
-                      const isEditing = editingMessageId === entry.message_id;
-                      const pendingEdit = pendingEdits.get(entry.message_id);
-                      const displayText = pendingEdit ? pendingEdit.newText : entry.text;
-                      const canEdit = forkEnabled && !entry.is_reasoning && !entry.is_tool_use;
-
-                      const entryKey = `${entry.message_id}-${entry.is_reasoning ? "r" : entry.is_tool_use ? "t" : "m"}-${entryIdx}`;
-
-                      return (
-                        <div
-                          key={entryKey}
-                          ref={el => {
-                            if (el) {
-                              messageRefs.current.set(entry.message_id, el);
-                            } else {
-                              messageRefs.current.delete(entry.message_id);
-                            }
-                          }}
-                          className={cn(
-                            "group/entry relative",
-                            entry.is_reasoning &&
-                              "ml-4 rounded-md border border-border/60 bg-muted/35 px-2 py-1.5 text-muted-foreground dark:bg-muted/20",
-                            !entry.is_reasoning &&
-                              !entry.is_tool_use &&
-                              "rounded-md border border-border/70 bg-background px-2 py-1.5 shadow-sm",
-                            entry.is_tool_use && "ml-4",
-                            pendingEdit &&
-                              "rounded-md bg-amber-50/50 ring-1 ring-amber-200/50 dark:bg-amber-950/20 dark:ring-amber-800/30",
-                            forkPointMessageId === entry.message_id &&
-                              "rounded-md bg-blue-50/60 px-2 py-1.5 ring-1 ring-blue-300/50 dark:bg-blue-950/30 dark:ring-blue-700/40"
-                          )}
+                    <div className="min-w-0 flex-1 pr-4">
+                      <div className="mb-0.5 flex flex-wrap items-baseline gap-1.5">
+                        <button
+                          className="text-[13px] font-medium hover:underline"
+                          onClick={() => onSelectAgent(turn.agentId)}
                         >
-                          {forkPointMessageId === entry.message_id ? (
-                            <span className="mb-0.5 inline-block rounded-full bg-blue-100 px-1.5 py-px text-[10px] font-medium leading-relaxed text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-                              fork point (edited)
-                            </span>
-                          ) : null}
+                          {agent?.role_name ?? turn.agentId}
+                        </button>
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatTime(turn.timestamp)}
+                        </span>
+                      </div>
+                      {turn.entries.map((entry, entryIdx) => {
+                        const entryChColor = channelColorMap.get(entry.channel_id);
+                        const isEditing = editingMessageId === entry.message_id;
+                        const pendingEdit = pendingEdits.get(entry.message_id);
+                        const displayText = pendingEdit ? pendingEdit.newText : entry.text;
+                        const canEdit =
+                          forkEnabled &&
+                          !entry.is_reasoning &&
+                          !entry.is_tool_use &&
+                          !entry.is_notification_result;
 
-                          {entry.is_reasoning ? (
-                            <span className="mb-1 inline-block rounded-full border border-border/70 bg-background/80 px-1.5 py-px text-[10px] font-medium text-muted-foreground">
-                              reasoning
-                            </span>
-                          ) : entry.is_tool_use ? null : showChannelBadge ? (
-                            <span
-                              className={cn(
-                                "mb-0.5 inline-block rounded-full px-1.5 py-px text-[10px] font-medium leading-relaxed",
-                                entryChColor?.bg,
-                                entryChColor?.fg
-                              )}
-                            >
-                              #{entry.channel_id}
-                            </span>
-                          ) : null}
+                        const entryKindKey = entry.is_reasoning
+                          ? "r"
+                          : entry.is_tool_use
+                            ? "t"
+                            : entry.is_notification_result
+                              ? "n"
+                              : "m";
+                        const entryKey = `${entry.message_id}-${entryKindKey}-${entryIdx}`;
+                        const hasLinkedPair = entry.paired_message_id !== "";
+                        const isLinkHovered = hasLinkedPair && hoveredCallId === entry.call_id;
 
-                          {entry.is_tool_use ? (
-                            <ToolOrNotification entry={entry} />
-                          ) : isEditing ? (
-                            <MessageEditor
-                              initialText={displayText}
-                              onFork={newText => {
-                                onSaveEdit(entry.message_id, newText);
-                                onForkFromMessage(entry.message_id);
-                              }}
-                              onCancel={onCancelEdit}
-                            />
-                          ) : (
-                            <>
-                              {displayText ? (
-                                <ProseMarkdown
-                                  className={cn(
-                                    !entry.is_reasoning && "text-foreground",
-                                    "[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]"
-                                  )}
-                                >
-                                  {displayText}
-                                </ProseMarkdown>
-                              ) : null}
-                              {!entry.is_reasoning &&
-                              !entry.is_tool_use &&
-                              entry.character_count > 0 ? (
-                                <span className="mt-0.5 block text-[10px] text-muted-foreground/60">
-                                  {entry.character_count.toLocaleString()} characters
-                                </span>
-                              ) : null}
-                              {!entry.is_reasoning && !entry.is_tool_use ? (
-                                <span className="absolute right-1 top-1 z-10 flex items-center gap-0.5 rounded-md bg-background/90 p-1 shadow-sm opacity-0 transition-opacity group-hover/entry:opacity-100">
-                                  {canEdit ? (
-                                    <Tooltip label="Edit &amp; fork">
+                        return (
+                          <div
+                            key={entryKey}
+                            ref={el => {
+                              if (el) {
+                                messageRefs.current.set(entry.message_id, el);
+                              } else {
+                                messageRefs.current.delete(entry.message_id);
+                              }
+                            }}
+                            onMouseEnter={
+                              hasLinkedPair ? () => setHoveredCallId(entry.call_id) : undefined
+                            }
+                            onMouseLeave={hasLinkedPair ? () => setHoveredCallId(null) : undefined}
+                            onClick={
+                              hasLinkedPair
+                                ? () => {
+                                    setLinkedHighlightId(entry.paired_message_id);
+                                    setLinkedHighlightNonce(n => n + 1);
+                                  }
+                                : undefined
+                            }
+                            className={cn(
+                              "group/entry relative",
+                              entry.is_reasoning &&
+                                "ml-4 rounded-md border border-border/60 bg-muted/35 px-2 py-1.5 text-muted-foreground dark:bg-muted/20",
+                              !entry.is_reasoning &&
+                                !entry.is_tool_use &&
+                                !entry.is_notification_result &&
+                                "rounded-md border border-border/70 bg-background px-2 py-1.5 shadow-sm",
+                              (entry.is_tool_use || entry.is_notification_result) && "ml-4",
+                              hasLinkedPair && "cursor-pointer",
+                              isLinkHovered &&
+                                "rounded-md ring-2 ring-blue-400/40 dark:ring-blue-500/40",
+                              pendingEdit &&
+                                "rounded-md bg-amber-50/50 ring-1 ring-amber-200/50 dark:bg-amber-950/20 dark:ring-amber-800/30",
+                              forkPointMessageId === entry.message_id &&
+                                "rounded-md bg-blue-50/60 px-2 py-1.5 ring-1 ring-blue-300/50 dark:bg-blue-950/30 dark:ring-blue-700/40"
+                            )}
+                          >
+                            {forkPointMessageId === entry.message_id ? (
+                              <span className="mb-0.5 inline-block rounded-full bg-blue-100 px-1.5 py-px text-[10px] font-medium leading-relaxed text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                                fork point (edited)
+                              </span>
+                            ) : null}
+
+                            {entry.is_reasoning ? (
+                              <span className="mb-1 inline-block rounded-full border border-border/70 bg-background/80 px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                                reasoning
+                              </span>
+                            ) : entry.is_tool_use ||
+                              entry.is_notification_result ? null : showChannelBadge ? (
+                              <span
+                                className={cn(
+                                  "mb-0.5 inline-block rounded-full px-1.5 py-px text-[10px] font-medium leading-relaxed",
+                                  entryChColor?.bg,
+                                  entryChColor?.fg
+                                )}
+                              >
+                                #{entry.channel_id}
+                              </span>
+                            ) : null}
+
+                            {entry.is_tool_use || entry.is_notification_result ? (
+                              <ToolOrNotification entry={entry} />
+                            ) : isEditing ? (
+                              <MessageEditor
+                                initialText={displayText}
+                                onFork={newText => {
+                                  onSaveEdit(entry.message_id, newText);
+                                  onForkFromMessage(entry.message_id);
+                                }}
+                                onCancel={onCancelEdit}
+                              />
+                            ) : (
+                              <>
+                                {displayText ? (
+                                  <ProseMarkdown
+                                    className={cn(
+                                      !entry.is_reasoning && "text-foreground",
+                                      "[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]"
+                                    )}
+                                  >
+                                    {displayText}
+                                  </ProseMarkdown>
+                                ) : null}
+                                {!entry.is_reasoning &&
+                                !entry.is_tool_use &&
+                                !entry.is_notification_result &&
+                                entry.character_count > 0 ? (
+                                  <span className="mt-0.5 block text-[10px] text-muted-foreground/60">
+                                    {entry.character_count.toLocaleString()} characters
+                                  </span>
+                                ) : null}
+                                {!entry.is_reasoning &&
+                                !entry.is_tool_use &&
+                                !entry.is_notification_result ? (
+                                  <span className="absolute right-1 top-1 z-10 flex items-center gap-0.5 rounded-md bg-background/90 p-1 shadow-sm opacity-0 transition-opacity group-hover/entry:opacity-100">
+                                    {canEdit ? (
+                                      <Tooltip label="Edit &amp; fork">
+                                        <button
+                                          aria-label="Edit and fork from this message"
+                                          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                          onClick={() => onStartEdit(entry.message_id)}
+                                        >
+                                          <Pencil className="h-3 w-3" />
+                                        </button>
+                                      </Tooltip>
+                                    ) : null}
+                                    <Tooltip label="Download artifacts up to this point">
                                       <button
-                                        aria-label="Edit and fork from this message"
+                                        aria-label="Download artifacts at this message"
                                         className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                        onClick={() => onStartEdit(entry.message_id)}
+                                        onClick={() => {
+                                          void downloadAuthenticatedFile({
+                                            path: `/api/runs/${runId}/export/artifacts/${entry.message_id}`,
+                                            searchParams: new URLSearchParams(),
+                                            fallbackFilename: `${runId.slice(0, 8)}_${entry.message_id.slice(0, 8)}_artifacts.tar.gz`,
+                                          });
+                                        }}
                                       >
-                                        <Pencil className="h-3 w-3" />
+                                        <FolderArchive className="h-3 w-3" />
                                       </button>
                                     </Tooltip>
-                                  ) : null}
-                                  <Tooltip label="Download artifacts up to this point">
-                                    <button
-                                      aria-label="Download artifacts at this message"
-                                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                      onClick={() => {
-                                        void downloadAuthenticatedFile({
-                                          path: `/api/runs/${runId}/export/artifacts/${entry.message_id}`,
-                                          searchParams: new URLSearchParams(),
-                                          fallbackFilename: `${runId.slice(0, 8)}_${entry.message_id.slice(0, 8)}_artifacts.tar.gz`,
-                                        });
-                                      }}
-                                    >
-                                      <FolderArchive className="h-3 w-3" />
-                                    </button>
-                                  </Tooltip>
-                                </span>
-                              ) : null}
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Status bar */}
@@ -664,14 +744,148 @@ function MessageEditor({
   );
 }
 
-/** Renders a tool call as either a notification display or a generic tool call.
- *  Falls back to ToolCallDisplay when the result is not a parseable notification. */
-function ToolOrNotification({ entry }: { entry: DisplayEntry }) {
-  if (entry.tool_name === TOOL_NAME_READ_NOTIFICATIONS) {
-    const payload = parseNotificationResult(entry.tool_result);
-    if (payload) {
-      return <NotificationDisplay result={entry.tool_result} />;
+interface NotificationPair {
+  callMessageId: string;
+  resultMessageId: string;
+  callId: string;
+}
+
+interface WireShape {
+  callId: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  color: string;
+}
+
+/** Deterministic hue from a call_id so each wire gets a stable unique color. */
+function hueFromCallId(callId: string): number {
+  let h = 0;
+  for (let i = 0; i < callId.length; i += 1) {
+    h = (h * 31 + callId.charCodeAt(i)) >>> 0;
+  }
+  return h % 360;
+}
+
+/** Renders curved SVG wires inside the scrollable content connecting each
+ *  read_notifications call pill to its response chip. Each wire is a cubic
+ *  bezier that bulges out to the left of the column. Wires re-measure on
+ *  layout changes via ResizeObserver + MutationObserver so they stay aligned
+ *  as entries expand or new messages arrive. */
+function ConnectionWires({
+  pairs,
+  messageRefs,
+  containerRef,
+  hoveredCallId,
+}: {
+  pairs: NotificationPair[];
+  messageRefs: RefObject<Map<string, HTMLDivElement>>;
+  containerRef: RefObject<HTMLDivElement | null>;
+  hoveredCallId: string | null;
+}) {
+  const [wires, setWires] = useState<WireShape[]>([]);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (container === null) {
+      return undefined;
     }
+
+    function recompute() {
+      const containerEl = containerRef.current;
+      if (containerEl === null) return;
+      const containerRect = containerEl.getBoundingClientRect();
+      const next: WireShape[] = [];
+      for (const pair of pairs) {
+        const callEl = messageRefs.current.get(pair.callMessageId);
+        const resultEl = messageRefs.current.get(pair.resultMessageId);
+        if (callEl === undefined || resultEl === undefined) continue;
+        const callRect = callEl.getBoundingClientRect();
+        const resultRect = resultEl.getBoundingClientRect();
+        const callMid = callRect.top + callRect.height / 2 - containerRect.top;
+        const resultMid = resultRect.top + resultRect.height / 2 - containerRect.top;
+        const callX = callRect.left - containerRect.left;
+        const resultX = resultRect.left - containerRect.left;
+        next.push({
+          callId: pair.callId,
+          startX: callX,
+          startY: callMid,
+          endX: resultX,
+          endY: resultMid,
+          color: `hsl(${hueFromCallId(pair.callId)}, 72%, 55%)`,
+        });
+      }
+      setWires(prev => {
+        if (prev.length !== next.length) return next;
+        for (let i = 0; i < prev.length; i += 1) {
+          const a = prev[i];
+          const b = next[i];
+          if (a === undefined || b === undefined) return next;
+          if (
+            a.callId !== b.callId ||
+            Math.abs(a.startY - b.startY) > 0.5 ||
+            Math.abs(a.endY - b.endY) > 0.5 ||
+            Math.abs(a.startX - b.startX) > 0.5 ||
+            Math.abs(a.endX - b.endX) > 0.5
+          ) {
+            return next;
+          }
+        }
+        return prev;
+      });
+    }
+
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    ro.observe(container);
+    const mo = new MutationObserver(recompute);
+    mo.observe(container, { childList: true, subtree: true, characterData: true });
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, [pairs, messageRefs, containerRef]);
+
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      style={{ overflow: "visible" }}
+      aria-hidden="true"
+    >
+      {wires.map(w => {
+        const dy = Math.abs(w.endY - w.startY);
+        // Bulge leftward; proportional to vertical distance, capped.
+        const bulge = Math.min(80, Math.max(24, dy * 0.25));
+        const c1x = w.startX - bulge;
+        const c2x = w.endX - bulge;
+        const d = `M ${w.startX} ${w.startY} C ${c1x} ${w.startY}, ${c2x} ${w.endY}, ${w.endX} ${w.endY}`;
+        const isHovered = hoveredCallId === w.callId;
+        return (
+          <g key={w.callId}>
+            <path
+              d={d}
+              stroke={w.color}
+              strokeWidth={isHovered ? 2.5 : 1.5}
+              strokeOpacity={isHovered ? 0.95 : 0.55}
+              strokeLinecap="round"
+              fill="none"
+            />
+            <circle cx={w.startX} cy={w.startY} r={isHovered ? 3.5 : 2.5} fill={w.color} />
+            <circle cx={w.endX} cy={w.endY} r={isHovered ? 3.5 : 2.5} fill={w.color} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/** Renders either the notification chip (for split notification-result entries)
+ *  or the generic tool-call pill. The split between read_notifications call and
+ *  its response happens upstream in mergeEntries; here we only pick a renderer. */
+function ToolOrNotification({ entry }: { entry: DisplayEntry }) {
+  if (entry.is_notification_result) {
+    return <NotificationDisplay result={entry.tool_result} />;
   }
   return (
     <ToolCallDisplay

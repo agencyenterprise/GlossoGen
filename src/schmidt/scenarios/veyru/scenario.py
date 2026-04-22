@@ -540,6 +540,18 @@ class VeyruScenario(SimulationScenario):
             return False
         return self._world.teams[TEAM_SOLO_ID].current_observer_id == INTERN_ID
 
+    def _is_intern_in_observer_state(self) -> bool:
+        """Whether the intern has joined the link channel but has not yet taken over."""
+        if not self._knobs.intern_enabled:
+            return False
+        if self._knobs.intern_join_round is None:
+            return False
+        if self._event_logger is None:
+            return False
+        if self._event_logger.current_round < self._knobs.intern_join_round:
+            return False
+        return not self._has_intern_taken_over()
+
     def _is_observer_agent(self, agent_id: str) -> bool:
         """Whether this agent is acting as a field observer in the current round."""
         if agent_id in (OBSERVER_A_ID, OBSERVER_B_ID):
@@ -868,8 +880,7 @@ class VeyruScenario(SimulationScenario):
 
             if not self._world.is_veyru_alive(team_id=team_id):
                 result_text = "Cannot stabilize: Veyru has already collapsed."
-                await self._maybe_broadcast_stabilize(
-                    channel_id=team.link_channel_id,
+                await self._maybe_notify_intern_stabilize(
                     caller_id=agent_id,
                     action=action,
                     result=result_text,
@@ -877,8 +888,7 @@ class VeyruScenario(SimulationScenario):
                 return result_text
             if self._world.is_veyru_stabilized(team_id=team_id):
                 result_text = "Veyru has already been stabilized."
-                await self._maybe_broadcast_stabilize(
-                    channel_id=team.link_channel_id,
+                await self._maybe_notify_intern_stabilize(
                     caller_id=agent_id,
                     action=action,
                     result=result_text,
@@ -888,8 +898,7 @@ class VeyruScenario(SimulationScenario):
             current_stage = self._world.get_current_stage(team_id=team_id)
             if current_stage is None:
                 result_text = "No Veyru to stabilize."
-                await self._maybe_broadcast_stabilize(
-                    channel_id=team.link_channel_id,
+                await self._maybe_notify_intern_stabilize(
                     caller_id=agent_id,
                     action=action,
                     result=result_text,
@@ -923,16 +932,14 @@ class VeyruScenario(SimulationScenario):
                         f"What you now observe: {next_stage.observable_symptoms} "
                         f"Report these to the specialist."
                     )
-                    await self._maybe_broadcast_stabilize(
-                        channel_id=team.link_channel_id,
+                    await self._maybe_notify_intern_stabilize(
                         caller_id=agent_id,
                         action=action,
                         result=result_text,
                     )
                     return result_text
                 result_text = f"{STABILIZATION_SUCCESS_MARKER}."
-                await self._maybe_broadcast_stabilize(
-                    channel_id=team.link_channel_id,
+                await self._maybe_notify_intern_stabilize(
                     caller_id=agent_id,
                     action=action,
                     result=result_text,
@@ -940,8 +947,7 @@ class VeyruScenario(SimulationScenario):
                 return result_text
 
             result_text = "Stabilization ineffective. Ask the specialist for guidance."
-            await self._maybe_broadcast_stabilize(
-                channel_id=team.link_channel_id,
+            await self._maybe_notify_intern_stabilize(
                 caller_id=agent_id,
                 action=action,
                 result=result_text,
@@ -959,26 +965,24 @@ class VeyruScenario(SimulationScenario):
             ),
         ]
 
-    async def _maybe_broadcast_stabilize(
+    async def _maybe_notify_intern_stabilize(
         self,
-        channel_id: str,
         caller_id: str,
         action: str,
         result: str,
     ) -> None:
-        """Broadcast a stabilize_veyru call + result to the link channel in intern mode.
+        """Notify the intern of a stabilize_veyru call + result while they observe.
 
-        Only fires when ``intern_enabled=true`` so non-intern runs keep the
-        existing terse world-outcome banner behavior. The intern relies on
-        this broadcast to observe the calls and outcomes of the protocol.
+        Fires only while the intern is in the observer state (after
+        ``intern_join_round`` and before ``intern_takeover_round``). Delivered
+        to the intern alone so the specialist never sees the tool-call trace.
         """
-        if not self._knobs.intern_enabled:
+        if not self._is_intern_in_observer_state():
             return
-        context = self._world.context
         caller_display = self.get_agent_display_name(agent_id=caller_id)
-        text = f'[stabilize_veyru] {caller_display} action="{action}"\n' f"result: {result}"
-        await context.send_update_to_channel(
-            channel_id=channel_id,
+        text = f'[stabilize_veyru] {caller_display} action="{action}"\nresult: {result}'
+        await self._world.context.send_update_to_agent(
+            agent_id=INTERN_ID,
             text=text,
         )
 

@@ -177,9 +177,10 @@ def _apply_edits_and_new_run_id(
 ) -> str:
     """Rewrite the JSONL in-place, applying message edits and a new run ID.
 
-    Strips ``llm_response_received`` and ``tool_result_received`` events so
-    that agents start fresh on resume instead of replaying a conversation
-    history that still contains the pre-edit text in tool results.
+    Strips ``llm_response_received``, ``tool_call_invoked``, and
+    ``tool_result_received`` events so that agents start fresh on resume
+    instead of replaying a conversation history that still contains
+    pre-edit text in tool arguments or results.
 
     Returns the new fork run ID.
     """
@@ -198,7 +199,11 @@ def _apply_edits_and_new_run_id(
         # Strip LLM responses and tool results so agents start fresh on
         # resume. These events contain pre-edit text that would conflict
         # with the edited message content injected into the fork.
-        if event_type in ("llm_response_received", "tool_result_received"):
+        if event_type in (
+            "llm_response_received",
+            "tool_call_invoked",
+            "tool_result_received",
+        ):
             continue
 
         if event_type == "simulation_started":

@@ -20,6 +20,7 @@ from schmidt.models.event import (
     SimulationEnded,
     SimulationEvent,
     SimulationStarted,
+    ToolCallInvoked,
     ToolResultReceived,
     VeyruStabilizationJudged,
 )
@@ -222,6 +223,29 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 system_prompt=event.system_prompt,
             )
 
+        elif isinstance(event, ToolCallInvoked):
+            total_messages += 1
+            tu_entry = ToolUseEntry(
+                message_id=f"{event.event_id}-{event.call_id}",
+                sender_agent_id=event.agent_id,
+                tool_name=event.tool_name,
+                call_id=event.call_id,
+                arguments=event.arguments,
+                result=None,
+                timestamp=event.timestamp,
+                result_timestamp=None,
+                round_number=event.round_number,
+            )
+            pending_result = pending_tool_results_by_call_id.pop(event.call_id, None)
+            if pending_result is not None:
+                tu_entry.result = pending_result.result
+                tu_entry.result_timestamp = pending_result.timestamp
+            pending_metadata = pending_stabilize_metadata_by_call_id.pop(event.call_id, None)
+            if pending_metadata is not None:
+                tu_entry.stabilize_metadata = pending_metadata
+            tool_use.append(tu_entry)
+            tool_use_by_call_id[event.call_id] = tu_entry
+
         elif isinstance(event, LLMResponseReceived):
             total_input_tokens += event.usage.input_tokens
             total_output_tokens += event.usage.output_tokens
@@ -242,8 +266,11 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     )
                 )
 
-            # Create separate tool use entries for tool calls
+            # Fallback for runs predating ToolCallInvoked: create tool_use
+            # entries from the LLMResponseReceived when none was created yet.
             for tc in event.tool_calls:
+                if tc.call_id in tool_use_by_call_id:
+                    continue
                 total_messages += 1
                 tu_entry = ToolUseEntry(
                     message_id=f"{event.event_id}-{tc.call_id}",
@@ -253,11 +280,13 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     arguments=tc.arguments,
                     result=None,
                     timestamp=event.timestamp,
+                    result_timestamp=None,
                     round_number=event.round_number,
                 )
                 pending_result = pending_tool_results_by_call_id.pop(tc.call_id, None)
                 if pending_result is not None:
                     tu_entry.result = pending_result.result
+                    tu_entry.result_timestamp = pending_result.timestamp
                 pending_metadata = pending_stabilize_metadata_by_call_id.pop(tc.call_id, None)
                 if pending_metadata is not None:
                     tu_entry.stabilize_metadata = pending_metadata
@@ -268,6 +297,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             matched = tool_use_by_call_id.get(event.call_id)
             if matched is not None:
                 matched.result = event.result
+                matched.result_timestamp = event.timestamp
             else:
                 # Some runs log tool results before the parent LLM response block.
                 pending_tool_results_by_call_id[event.call_id] = event

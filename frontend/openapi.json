@@ -257,6 +257,9 @@
                       "$ref": "#/components/schemas/SSELLMResponseReceived"
                     },
                     {
+                      "$ref": "#/components/schemas/SSEToolCallInvoked"
+                    },
+                    {
                       "$ref": "#/components/schemas/SSEToolResultReceived"
                     },
                     {
@@ -286,6 +289,7 @@
                       "agent_connected": "#/components/schemas/SSEAgentConnected",
                       "message_sent": "#/components/schemas/SSEMessageSent",
                       "llm_response_received": "#/components/schemas/SSELLMResponseReceived",
+                      "tool_call_invoked": "#/components/schemas/SSEToolCallInvoked",
                       "tool_result_received": "#/components/schemas/SSEToolResultReceived",
                       "round_advanced": "#/components/schemas/SSERoundAdvanced",
                       "injection_delivered": "#/components/schemas/SSEInjectionDelivered",
@@ -2424,6 +2428,58 @@
         "title": "SSESimulationStarted",
         "description": "SSE event emitted once when a simulation begins."
       },
+      "SSEToolCallInvoked": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "tool_call_invoked",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "call_id": {
+            "type": "string",
+            "title": "Call Id"
+          },
+          "tool_name": {
+            "type": "string",
+            "title": "Tool Name"
+          },
+          "arguments": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Arguments"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "agent_id",
+          "call_id",
+          "tool_name",
+          "arguments",
+          "round_number"
+        ],
+        "title": "SSEToolCallInvoked",
+        "description": "SSE event emitted when an agent invokes a tool, before execution."
+      },
       "SSEToolResultReceived": {
         "properties": {
           "event_type": {
@@ -2752,6 +2808,18 @@
             "format": "date-time",
             "title": "Timestamp"
           },
+          "result_timestamp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Timestamp"
+          },
           "round_number": {
             "type": "integer",
             "title": "Round Number"
@@ -2776,10 +2844,11 @@
           "arguments",
           "result",
           "timestamp",
+          "result_timestamp",
           "round_number"
         ],
         "title": "ToolUseEntry",
-        "description": "A scenario-specific tool invocation with its result.\n\nEach entry represents one tool call made by an agent. The ``result``\nfield is filled once the tool execution completes."
+        "description": "A scenario-specific tool invocation with its result.\n\nEach entry represents one tool call made by an agent. The ``result``\nfield is filled once the tool execution completes. ``timestamp``\nanchors to ``tool_call_invoked``; ``result_timestamp`` anchors to\n``tool_result_received`` so the UI can render call and result at\ntheir true chronological positions."
       },
       "UpdateLabelsRequest": {
         "properties": {

@@ -34,7 +34,12 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import LLMResponseReceived, TokenUsage, ToolResultReceived
+from schmidt.models.event import (
+    LLMResponseReceived,
+    TokenUsage,
+    ToolCallInvoked,
+    ToolResultReceived,
+)
 from schmidt.models.tool_definition import ToolCallRequest
 from schmidt.runners.agent_run_result import AgentRunResult
 from schmidt.runners.agent_runner_base import AgentRunner
@@ -443,6 +448,17 @@ class PydanticAIRunner(AgentRunner):
             )
             state.accumulated_tool_calls.append(tc_req)
             state.pending_tool_calls[event.part.tool_call_id] = tc_req
+            state.spawn_log_task(
+                event_logger.log(
+                    ToolCallInvoked(
+                        agent_id=agent_id,
+                        call_id=tc_req.call_id,
+                        tool_name=tc_req.tool_name,
+                        arguments=tc_req.arguments,
+                        round_number=round_number,
+                    )
+                )
+            )
             logger.info(
                 "Agent %s tool call: %s(%s)",
                 agent_id,
