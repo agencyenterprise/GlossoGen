@@ -14,6 +14,8 @@ What counts as "the protocol":
 - Coined terms or jargon that consistently map to specific domain concepts
 - Any regularity that the original pair clearly used to communicate efficiently
 
+Extending the convention counts as adoption: if the pre-boundary pattern was "two-letter state codes" and the newcomer introduces new two-letter codes that the specialist accepts without clarification, that is the newcomer using the protocol productively, not deviating from it.
+
 Pre-boundary transcripts (rounds 1..{{ pre_boundary_last_round }}) — this is where the protocol was established:
 
 {% for round in pre_rounds %}
@@ -48,9 +50,9 @@ Analyze:
 
 5. **Round identification**: In ``rounds_identified``, list every post-boundary round number where there is observable evidence of the newcomer either using the pre-established protocol or conspicuously failing to use it (these should match the rounds cited in ``newcomer_adoption_examples``).
 
-Verdict guidance:
-- PASS: The newcomer clearly adopted the pre-boundary protocol — using the same shorthand/codes/conventions that were established, and communication remained fluent.
-- PARTIAL: Partial adoption — the newcomer used some elements but dropped or replaced others, or the protocol degraded into mixed usage.
-- FAIL: The newcomer did not adopt the protocol (reverted to plain language, imposed a different one, or the original team never established a distinguishable protocol for the newcomer to adopt).
+Verdict guidance (grade functional protocol acquisition, not verbatim imitation):
+- PASS: The newcomer used the pre-boundary conventions (grammar, structure, shorthand style) and the specialist continued to understand them well enough to keep collaborating. Coining new terms that follow the same convention (e.g., new two-letter state codes when that was the established pattern) counts as PASS if the specialist accepts them without clarification. Isolated lapses that are self-corrected within the same round also count as PASS — the success criterion is whether the newcomer can do the job using the emerged protocol, not whether every message is flawless.
+- PARTIAL: The newcomer used the conventions in some rounds but frequently reverted to plain language, imposed a different structure, or caused repeated clarification requests from the specialist that were not quickly resolved. Mixed usage that visibly degrades the collaboration.
+- FAIL: The newcomer did not adopt the protocol — reverted to plain language throughout, imposed a different protocol, or no distinguishable protocol was established pre-boundary for the newcomer to adopt.
 
 Submit your assessment using the provided tool.

@@ -297,7 +297,9 @@ export function RunDetail({ runId }: { runId: string }) {
     });
   }, [highlightParam, didAutoHighlight, displayEntries.length]);
 
-  const channelMessages = displayEntries.filter(e => !e.is_reasoning && !e.is_tool_use).length;
+  const channelMessages = displayEntries.filter(
+    e => !e.is_reasoning && !e.is_tool_use && !e.is_notification_result
+  ).length;
   const timelineEntries = displayEntries.length;
   const restCost = restData?.total_cost_usd ?? 0;
   const totalCostUsd = Math.max(sse.totalCostUsd, restCost);

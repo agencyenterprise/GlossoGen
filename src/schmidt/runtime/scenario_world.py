@@ -94,6 +94,29 @@ class WorldContext:
             text,
         )
 
+    async def send_update_to_agent(self, agent_id: str, text: str) -> None:
+        """Push a world notification to a single agent.
+
+        Mirrors ``send_update_to_channel`` but targets one session. One
+        ``WorldEventDelivered`` event is logged for the delivered agent.
+        """
+        session = self._agent_sessions.get(agent_id)
+        if session is None:
+            return
+        session.push_notification(notification=NewInfoNotification(text=text))
+        await self._event_logger.log(
+            event=WorldEventDelivered(
+                agent_id=agent_id,
+                round_number=self._event_logger.current_round,
+                text=text,
+            )
+        )
+        logger.debug(
+            "World update delivered to agent %s: %s",
+            agent_id,
+            text,
+        )
+
     async def update_channel_members(
         self,
         channel_id: str,

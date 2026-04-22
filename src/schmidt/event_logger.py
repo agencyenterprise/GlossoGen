@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 _NON_COMMITTABLE_TYPES: frozenset[str] = frozenset(
     {
         "llm_response_received",
+        "tool_call_invoked",
         "agent_connected",
     }
 )

@@ -123,7 +123,10 @@ class ToolUseEntry(BaseModel):
     """A scenario-specific tool invocation with its result.
 
     Each entry represents one tool call made by an agent. The ``result``
-    field is filled once the tool execution completes.
+    field is filled once the tool execution completes. ``timestamp``
+    anchors to ``tool_call_invoked``; ``result_timestamp`` anchors to
+    ``tool_result_received`` so the UI can render call and result at
+    their true chronological positions.
     """
 
     message_id: str
@@ -133,6 +136,7 @@ class ToolUseEntry(BaseModel):
     arguments: dict[str, Any]
     result: str | None
     timestamp: datetime
+    result_timestamp: datetime | None
     round_number: int
     stabilize_metadata: VeyruStabilizeMetadata | None = None
 
@@ -416,6 +420,19 @@ class SSELLMResponseReceived(BaseModel):
     round_number: int
 
 
+class SSEToolCallInvoked(BaseModel):
+    """SSE event emitted when an agent invokes a tool, before execution."""
+
+    event_type: Literal["tool_call_invoked"]
+    event_id: str
+    timestamp: datetime
+    agent_id: str
+    call_id: str
+    tool_name: str
+    arguments: dict[str, Any]
+    round_number: int
+
+
 class SSEToolResultReceived(BaseModel):
     """SSE event emitted when a tool call completes and returns a result."""
 
@@ -505,6 +522,7 @@ SSEEvent = Annotated[
         SSEAgentConnected,
         SSEMessageSent,
         SSELLMResponseReceived,
+        SSEToolCallInvoked,
         SSEToolResultReceived,
         SSERoundAdvanced,
         SSEInjectionDelivered,
