@@ -33,7 +33,7 @@ export function Toggle({
           onChange={e => onChange(e.target.checked)}
           className="h-4 w-4 rounded border-input accent-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
-        <span className="text-muted-foreground">{value ? "Enabled" : "Disabled"}</span>
+        <span className="text-muted-foreground">{value ? "On" : "Off"}</span>
       </label>
     </LabelledRow>
   );
