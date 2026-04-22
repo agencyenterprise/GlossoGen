@@ -837,11 +837,15 @@ function ConnectionWires({
     }
 
     recompute();
+    // Entry refs attach during the same paint; run again on next frame so any
+    // late-mounted pair endpoints are picked up even if MutationObserver misses.
+    const raf = requestAnimationFrame(recompute);
     const ro = new ResizeObserver(recompute);
     ro.observe(container);
     const mo = new MutationObserver(recompute);
     mo.observe(container, { childList: true, subtree: true, characterData: true });
     return () => {
+      cancelAnimationFrame(raf);
       ro.disconnect();
       mo.disconnect();
     };
