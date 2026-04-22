@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Download,
   FolderArchive,
+  Hash,
   Package,
   Pencil,
   UserCog,
@@ -149,8 +150,10 @@ export function ChatPane({
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerContentRef = useRef<HTMLDivElement>(null);
+  const roundMarkerRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const isAtBottomRef = useRef(true);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [currentVisibleRound, setCurrentVisibleRound] = useState<number | null>(null);
   const prevScrollHeightRef = useRef(0);
   const [hoveredCallId, setHoveredCallId] = useState<string | null>(null);
   const [linkedHighlightId, setLinkedHighlightId] = useState<string | null>(null);
@@ -301,6 +304,35 @@ export function ChatPane({
 
   const rounds = useMemo(() => groupByRoundAndTurn(visibleFiltered), [visibleFiltered]);
 
+  // Track which round's separator is nearest the top of the scroll viewport
+  // so the floating indicator reflects what the user is currently reading.
+  useEffect(() => {
+    const scrollEl = scrollContainerRef.current;
+    if (!scrollEl) return undefined;
+    const updateCurrent = () => {
+      const scrollTop = scrollEl.scrollTop;
+      let current: number | null = null;
+      for (const [round, el] of roundMarkerRefs.current.entries()) {
+        if (el.offsetTop <= scrollTop + 24) {
+          if (current === null || round > current) {
+            current = round;
+          }
+        }
+      }
+      if (current === null && roundMarkerRefs.current.size > 0) {
+        current = Math.min(...roundMarkerRefs.current.keys());
+      }
+      setCurrentVisibleRound(current);
+    };
+
+    const raf = requestAnimationFrame(updateCurrent);
+    scrollEl.addEventListener("scroll", updateCurrent, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      scrollEl.removeEventListener("scroll", updateCurrent);
+    };
+  }, [rounds]);
+
   return (
     <div className="relative flex min-h-0 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
@@ -382,6 +414,15 @@ export function ChatPane({
         </Tooltip>
       </div>
 
+      {currentVisibleRound !== null ? (
+        <div className="pointer-events-none absolute left-1/2 top-12 z-30 -translate-x-1/2">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/90 px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur">
+            <Hash className="h-3 w-3" />
+            Round {currentVisibleRound}
+          </div>
+        </div>
+      ) : null}
+
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-0 py-1"
@@ -455,7 +496,17 @@ export function ChatPane({
                   </div>
                 </div>
               ) : null}
-              <div className="flex items-center gap-2.5 px-4 pb-1.5 pt-3.5">
+              <div
+                ref={el => {
+                  if (el === null) {
+                    roundMarkerRefs.current.delete(round.roundNumber);
+                  } else {
+                    roundMarkerRefs.current.set(round.roundNumber, el);
+                  }
+                }}
+                data-round-marker={round.roundNumber}
+                className="flex items-center gap-2.5 px-4 pb-1.5 pt-3.5"
+              >
                 <div className="h-px flex-1 bg-border" />
                 <span className="whitespace-nowrap text-[11px] text-muted-foreground">
                   Round {round.roundNumber}
