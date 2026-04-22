@@ -36,7 +36,7 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 ## Simulation Flow
 
 1. **CLI** parses arguments in two passes (first to identify the scenario, then to parse known flags plus `key=value` overrides). Builds the scenario, agent configs, event logger, and agent runner. Passes everything into the `AutonomousSupervisor`.
-2. **AutonomousSupervisor.run()** opens the event logger, builds per-agent `AgentSession` objects (with scenario-defined reaction delay ranges), creates the `SimulationRuntime` (FastMCP server), and wires a `GameClock`. Logs `SimulationStarted` and one `AgentRegistered` event per agent.
+2. **AutonomousSupervisor.run()** opens the event logger, builds per-agent `AgentSession` objects, creates the `SimulationRuntime` (FastMCP server), and wires a `GameClock`. Logs `SimulationStarted` and one `AgentRegistered` event per agent.
 3. **MCP server starts** on a configured port, exposing the `comms` MCP server. Agent runners are launched as concurrent asyncio tasks, each starting an external Claude Code process connected to the MCP server URL.
 4. **Game clock delivers round-1 injections** as `NewInfoNotification` messages pushed to agent session queues. Agents receive these via the `read_notifications` MCP tool and begin interacting.
 5. **Agents act autonomously** by calling MCP tools: `read_notifications` (blocks until a notification arrives), `read_channel` (fetches recent messages), `send_message` (posts to a channel), `list_channels` (discovers available channels), and `get_channel_members` (sees who is in a channel). There is no central turn controller.
@@ -49,7 +49,7 @@ The `SimulationRuntime` registers five MCP tools on a FastMCP server named `comm
 
 | Tool                 | Parameters                          | Behavior                                                                                                    |
 | -------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `read_notifications`     | *(none)*                   | Blocks until a notification arrives in the agent's queue. Applies a random reaction delay before returning.  |
+| `read_notifications`     | *(none)*                   | Blocks until a notification arrives in the agent's queue, or returns a `no_activity` notification after a 120s timeout.  |
 | `read_channel`       | `channel_id`, `last_n`     | Returns the last N messages from a channel the agent belongs to. Validates membership.                      |
 | `send_message`       | `channel_id`, `text`       | Posts a message under a per-channel write lock, notifies other channel members, fires on-message callbacks.  |
 | `list_channels`      | *(none)*                   | Returns channels the agent belongs to with scenario-defined display names.                                  |
@@ -89,7 +89,6 @@ Each agent has an `AgentSession` that tracks:
 
 - **Notification queue**: An `asyncio.Queue` of `ActivityNotification` objects (new messages, new info, done).
 - **Idle flag**: Set to `True` when the agent is blocked on `wait_for_notification()`, `False` when a notification arrives or is pushed.
-- **Reaction delay**: A `(min, max)` range (configured per-agent by the scenario). When `read_notifications` returns, the runtime sleeps for a random duration in this range before delivering the notification.
 
 The idle flag is how the game clock determines whether all agents have finished processing.
 
@@ -103,10 +102,7 @@ Three notification types flow through agent session queues:
 
 ## Coordination Mechanisms
 
-Two mechanisms prevent message collisions and produce realistic timing:
-
-1. **Per-channel write locks**: Each channel has an `asyncio.Lock`. The `send_message` tool acquires the lock before appending a message and notifying other members. This serializes writes to the same channel.
-2. **Reaction delays**: After an agent receives a notification via `read_notifications`, the runtime applies a random delay (sampled from the agent's configured range) before returning the result. This staggers agent responses and prevents simultaneous reactions.
+**Per-channel write locks**: Each channel has an `asyncio.Lock`. The `send_message` tool acquires the lock before appending a message and notifying other members, serializing writes to the same channel.
 
 ## Channel and Message Routing
 
@@ -269,17 +265,18 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 
 An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data and run launch flows for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport, mounted via `app.mount("/mcp", mcp.streamable_http_app())`. Requires `OAUTH_ISSUER_URL` to be set; the MCP endpoint is disabled if unset.
 
-The MCP server exposes seven tools:
+The MCP server exposes eight tools:
 
-| Tool               | Description                                                                                      |
-| ------------------ | ------------------------------------------------------------------------------------------------ |
-| `list_scenarios`   | Lists available scenarios with knobs files, evaluators, and supported models/providers           |
-| `list_runs`        | Paginated run listing with filtering by scenario, model, fork status, and run status             |
-| `get_run_metadata` | Lightweight metadata for a single run: agents, channels, configuration, evaluation summary       |
-| `get_run`          | Full run content with messages; opt-in sections for reasoning, tool use, debug logs, system prompts; filtering by agent or channel |
-| `get_knobs_schema` | Returns a scenario knobs JSON Schema (field types, enums, descriptions) and available presets    |
-| `get_knobs_preset` | Loads a knobs preset JSON payload for a scenario                                                  |
-| `start_run`        | Launches a simulation subprocess with scenario, model, provider, and optional knobs               |
+| Tool                   | Description                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------ |
+| `list_scenarios`       | Lists available scenarios with knobs files, evaluators, and supported models/providers           |
+| `list_runs`            | Paginated run listing with filtering by scenario, model, fork status, and run status             |
+| `get_run_metadata`     | Lightweight metadata for a single run: agents, channels, configuration, evaluation summary       |
+| `get_run`              | Full run content with messages; opt-in sections for reasoning, tool use, debug logs, system prompts; filtering by agent or channel |
+| `get_knobs_schema`     | Returns a scenario knobs JSON Schema (field types, enums, descriptions) and available presets    |
+| `get_knobs_preset`     | Loads a knobs preset JSON payload for a scenario                                                  |
+| `start_run`            | Launches a simulation subprocess with scenario, model, provider, and optional knobs               |
+| `export_run_artifacts` | Returns a download URL for a zip archive of the run's artifacts                                   |
 
 All tools return structured JSON via Pydantic response models. `list_runs` and `get_run` support pagination. `get_run` uses flags (`with_reasoning`, `with_tool_use`, `with_debug_logs`, `with_system_prompts`) to control which sections are included.
 
@@ -319,7 +316,7 @@ The frontend includes an MCP integration modal (accessible via the **MCP** butto
 
 ## Results Viewer (Streamlit)
 
-A separate Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round evaluator scores across multiple evaluated runs. It is a read-only consumer of the standard run output (`runs/{scenario}/{ts}/veyru_report.json` plus the JSONL event log) — no API or backend coupling.
+A separate Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round evaluator scores across multiple evaluated runs. It is a read-only consumer of the standard run output (`runs/{scenario}/{ts}/{scenario}_report.json` plus the JSONL event log) — no API or backend coupling.
 
 - `run_catalog.py` — discovers runs that have an evaluator report.
 - `event_extractor.py` — derives a per-round timeline from the JSONL events.

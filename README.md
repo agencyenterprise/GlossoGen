@@ -111,7 +111,7 @@ uv sync --group analysis    # one-time, installs streamlit + plotly
 make results-viewer         # opens the viewer in a browser
 ```
 
-It reads from `SCHMIDT_RUNS_DIR` (defaults to `./runs`) and lists all runs that have a `veyru_report.json`.
+It reads from `SCHMIDT_RUNS_DIR` (defaults to `./runs`) and lists all runs that have a `{scenario}_report.json`.
 
 ## Web UI
 

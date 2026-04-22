@@ -1,8 +1,8 @@
 """Per-agent session state tracked by the simulation runtime.
 
 Each agent connected to the runtime gets an ``AgentSession`` that holds its
-notification queue, reaction delay configuration, idle-tracking flag,
-per-channel read position, and termination state.
+notification queue, idle-tracking flag, per-channel read position, and
+termination state.
 """
 
 import asyncio
