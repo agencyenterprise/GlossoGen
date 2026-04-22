@@ -27,6 +27,7 @@ import {
   formatDuration,
   formatTime,
   humanize,
+  sortConfigEntries,
 } from "./format";
 import { CollapsibleConfigBadges } from "./collapsible-config-badges";
 import { EvalVerdictSummary, groupEvalLabels, partitionLabels } from "./eval-verdict-summary";
@@ -664,7 +665,7 @@ export function RunList() {
                             {run.scenario_config && Object.keys(run.scenario_config).length > 0 ? (
                               <CollapsibleConfigBadges
                                 containerClassName="mt-1"
-                                entries={Object.entries(run.scenario_config)}
+                                entries={sortConfigEntries(Object.entries(run.scenario_config))}
                                 toggleClassName="inline-flex items-center rounded border border-border bg-muted/50 px-1.5 py-0 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary/5"
                                 renderBadge={([key, value]) => (
                                   <button

@@ -65,3 +65,32 @@ export function formatDuration(seconds: number): string {
 export function elapsedSince(isoTimestamp: string): number {
   return (Date.now() - new Date(isoTimestamp).getTime()) / 1000;
 }
+
+const PRIORITY_CONFIG_KEYS = [
+  "two_teams",
+  "swap_round",
+  "announce_swap",
+  "postmortem_enabled",
+  "postmortem_after_swap",
+  "intern_enabled",
+  "intern_join_round",
+  "intern_takeover_round",
+];
+
+/** Sort scenario_config entries with mode-defining intern/swap knobs first, then the rest in insertion order. */
+export function sortConfigEntries(entries: Array<[string, unknown]>): Array<[string, unknown]> {
+  const priorityIndex = new Map<string, number>();
+  PRIORITY_CONFIG_KEYS.forEach((key, index) => priorityIndex.set(key, index));
+
+  const priority: Array<[string, unknown]> = [];
+  const rest: Array<[string, unknown]> = [];
+  for (const entry of entries) {
+    if (priorityIndex.has(entry[0])) {
+      priority.push(entry);
+    } else {
+      rest.push(entry);
+    }
+  }
+  priority.sort((a, b) => priorityIndex.get(a[0])! - priorityIndex.get(b[0])!);
+  return [...priority, ...rest];
+}
