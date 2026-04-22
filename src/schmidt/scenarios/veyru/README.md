@@ -2,6 +2,8 @@
 
 Two agents — a field technician observing a Veyru and a remote specialist — communicate over a single link to stabilize failing Veyru entities. Every character sent costs simulated seconds. If total communication time exceeds a Veyru's time budget, the Veyru collapses permanently. Fourteen failure motifs are combined into unique cases (singles, doubles, triples), encouraging the development of compressed communication patterns. The position of reference star SAGWE392 changes each round, remapping which treatment procedure is correct for a given set of symptoms and varying the physical parameters (hold duration, starting face, pressure level). Only the specialist has the stellar reader, ensuring per-round communication is always required.
 
+![Scenario overview](../../../../images/veyru_overview.png)
+
 ## Domain
 
 Veyru are non-organic, rigid, box-shaped entities with 6 faces, 12 edges, and 8 corners. Internally circulating wave-intentions maintain structural integrity through propagation, reflection, reinforcement, and cancellation. When this balance breaks, a Veyru destabilizes and must be physically stabilized before it collapses.
@@ -152,6 +154,8 @@ Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only Eng
 
 ## Two-Team Mode (opt-in)
 
+![Team swap](../../../../images/veyru_team_swap.png)
+
 Setting `two_teams: true` enables an observer-swap study mode. Two isolated teams run in parallel:
 
 | Team A | Team B |
@@ -176,6 +180,8 @@ At `swap_round + 1`, the two observers swap teams:
 - `knobs_intern.json` — single-team with intern observer mode, intern joins at round 3, takes over at round 8 of 12.
 
 ## Intern Observer Mode (opt-in)
+
+![Intern mode](../../../../images/veyru_intern_mode.png)
 
 Setting `intern_enabled: true` (single-team only) introduces a third agent — an intern observer — that joins the comm link mid-run and eventually replaces the field observer:
 
