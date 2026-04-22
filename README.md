@@ -2,6 +2,8 @@
 
 A platform for testing agent communication through real-life simulations. LLM-based agents run as independent Claude Code processes connected via MCP. Agents decide when to speak; a game clock manages round progression and injects scenario events. All interactions are logged for post-hoc evaluation. A web UI displays simulation runs and evaluation results.
 
+![Platform overview](images/platform_overview.png)
+
 ## Setup
 
 ### Prerequisites
@@ -182,6 +184,14 @@ Typical MCP run-start workflow:
 ### Veyru
 
 Two agents (Field Observer, Specialist) stabilize failing Veyru entities — fictional box-shaped entities with internal wave-patterns — across a series of budget-constrained rounds. Every character sent on the comm link costs one simulated second against a fixed per-round time budget; a Veyru collapses when total communication time exceeds that budget. Selected early/mid rounds (1, 2, 3, 6, 13) are forced to a single priority-≤2 motif so pressure ramps up gradually over the run. The position of reference star SAGWE392 remaps the symptom→treatment mapping each round and varies physical parameters (hold duration, starting face, pressure level), forcing per-round communication even if agents develop shorthand. See the [scenario README](src/schmidt/scenarios/veyru/README.md).
+
+![Veyru scenario overview](images/veyru_overview.png)
+
+Variants:
+
+![Intern variant](images/veyru_intern_mode.png)
+
+![Team swap variant](images/veyru_team_swap.png)
 
 ## Project Structure
 

@@ -132,9 +132,9 @@ class PydanticAIRunner(AgentRunner):
 
         if provider == "anthropic":
             default_settings: ModelSettings = AnthropicModelSettings(
-                anthropic_cache_instructions=False,
-                anthropic_cache_tool_definitions=False,
-                anthropic_cache_messages=False,
+                anthropic_cache_instructions=True,
+                anthropic_cache_tool_definitions=True,
+                anthropic_cache_messages=True,
             )
         elif provider == "openai":
             default_settings = OpenAIResponsesModelSettings(
