@@ -40,7 +40,7 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 3. **MCP server starts** on a configured port, exposing the `comms` MCP server. Agent runners are launched as concurrent asyncio tasks, each starting an external Claude Code process connected to the MCP server URL.
 4. **Game clock delivers round-1 injections** as `NewInfoNotification` messages pushed to agent session queues. Agents receive these via the `read_notifications` MCP tool and begin interacting.
 5. **Agents act autonomously** by calling MCP tools: `read_notifications` (blocks until a notification arrives), `read_channel` (fetches recent messages), `send_message` (posts to a channel), `list_channels` (discovers available channels), and `get_channel_members` (sees who is in a channel). There is no central turn controller.
-6. **Round advancement** uses a hybrid condition. The game clock polls at 500ms intervals and advances the round when either (a) all agents are idle (blocked on `read_notifications` with empty queues) or (b) the round duration exceeds `max_round_duration_seconds` since the last message. When a round advances, the game clock delivers injections for the new round to the appropriate agents.
+6. **Round advancement** uses a hybrid condition. The game clock polls at 500ms intervals and advances the round when either (a) all agents are idle (blocked on `read_notifications` with empty queues) *and* at least 5 seconds have passed since the last message, or (b) the round duration exceeds `max_round_duration_seconds` since the last message. When a round advances, the game clock delivers injections for the new round to the appropriate agents.
 7. **Termination** occurs when the game clock reaches `max_rounds`. The runtime broadcasts a `DoneNotification` to all agents, waits up to 120 seconds for agent tasks to finish, and logs `SimulationEnded` with total message count.
 
 ## MCP Tools
@@ -126,12 +126,15 @@ The `SimulationScenario` ABC defines a contract for scenario plug-ins.
 - `get_channel_display_name()`, `get_agent_display_name()`, `get_injection()`
 - `run_evaluation(log_path, evaluator_names, report_path, model, provider_name, inference_provider, reasoning_effort)`
 
-**Timing and coordination methods:**
+**Timing and round structure:**
 - `get_round_count()` — total number of rounds
 - `get_max_round_duration_seconds()` — max wall-clock seconds per round
+
+**Runtime extensions:**
+- `get_world()` — scenario world (state, world-event delivery, tool handlers)
 - `get_mcp_tools()` — scenario-specific MCP tools (agent_id injected automatically)
 
-Scenarios define timing parameters and round structure. The game clock uses these to manage round progression, injection delivery, and termination.
+The game clock uses the timing methods to manage round progression, injection delivery, and termination.
 
 ## Agent Prompt Framing
 
@@ -222,7 +225,7 @@ The user selects which evaluators to run — they are not automatically applied.
 All generic evaluators share a common flow: build per-round transcripts from `MessageSent` events via `round_transcript_builder`, render a Jinja2 prompt, call the LLM judge with a structured output schema, and return a `MetricResult`.
 
 **Scenario-specific evaluators:**
-- **veyru**: `language_emergence` (uses `VEYRU_CASES` for round alignment)
+- **veyru**: `language_emergence` (novel language in the Veyru domain), `protocol_learned_after_swap` (whether a newcomer adopted the pre-established protocol after a personnel change), `round_success` (per-round stabilization success)
 
 **Automatic labels**: After evaluation, `label_writer.write_eval_labels()` writes `eval:{evaluator}:{verdict}` labels to the run's `labels.json` (where verdict is `identified`, `partial`, or `fail`). Previous `eval:` labels are replaced; user-added labels are preserved.
 

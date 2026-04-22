@@ -170,6 +170,7 @@ Available tools:
 - `get_knobs_schema` (JSON Schema for scenario knobs + available preset files)
 - `get_knobs_preset` (load a preset knobs file)
 - `start_run` (launch a simulation with model/provider/knobs)
+- `export_run_artifacts` (download URL for a zip of the run's artifacts)
 
 Typical MCP run-start workflow:
 1. `get_knobs_schema` to inspect available fields and preset names.

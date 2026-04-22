@@ -26,6 +26,8 @@ import { useEventStream } from "@/shared/lib/use-event-stream";
 import { buildAgentColorMap, buildChannelColorMap } from "./agent-colors";
 import { AgentDrawer } from "./agent-drawer";
 import { ChatPane } from "./chat-pane";
+import { CollapsibleConfigBadges } from "./collapsible-config-badges";
+import { EvalVerdictSummary } from "./eval-verdict-summary";
 import { mergeEntries } from "./display-entry";
 import { LabelBadges } from "./eval-label-group";
 import { EvalLogPanel } from "./eval-log-panel";
@@ -489,27 +491,29 @@ export function RunDetail({ runId }: { runId: string }) {
 
       {/* Scenario config */}
       {restData.scenario_config && Object.keys(restData.scenario_config).length > 0 ? (
-        <div className="mb-3 flex shrink-0 flex-wrap gap-1.5">
-          {Object.entries(restData.scenario_config).map(([key, value]) => {
-            const displayValue = formatConfigValue(value);
-            const fullValue = formatConfigValueFull(value);
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setConfigPreview({ key, value: fullValue })}
-                className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px] transition-colors hover:border-primary hover:bg-primary/5"
-              >
-                <span className="shrink-0 text-muted-foreground">{humanize(key)}</span>
-                <span className="max-w-64 truncate font-medium">{displayValue}</span>
-              </button>
-            );
-          })}
-        </div>
+        <CollapsibleConfigBadges
+          containerClassName="mb-3 shrink-0"
+          entries={Object.entries(restData.scenario_config)}
+          toggleClassName="inline-flex items-center rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary/5"
+          renderBadge={([key, value]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setConfigPreview({ key, value: formatConfigValueFull(value) })}
+              className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px] transition-colors hover:border-primary hover:bg-primary/5"
+            >
+              <span className="shrink-0 text-muted-foreground">{humanize(key)}</span>
+              <span className="max-w-64 truncate font-medium">{formatConfigValue(value)}</span>
+            </button>
+          )}
+        />
       ) : null}
 
-      {/* Labels */}
-      {restData.labels.length > 0 ? (
+      {/* Eval verdict summary (plain text, separated from labels) */}
+      <EvalVerdictSummary labels={restData.labels} size="md" containerClassName="mb-3 shrink-0" />
+
+      {/* Regular labels */}
+      {restData.labels.some(label => !label.startsWith("eval:")) ? (
         <div className="mb-3 flex shrink-0 flex-wrap gap-1.5">
           <LabelBadges labels={restData.labels} size="md" />
         </div>
