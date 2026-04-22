@@ -888,15 +888,24 @@ function ConnectionWires({
     }
 
     recompute();
-    // Entry refs attach during the same paint; run again on next frame so any
-    // late-mounted pair endpoints are picked up even if MutationObserver misses.
-    const raf = requestAnimationFrame(recompute);
+    // Entry refs can attach across multiple paints on large runs.
+    // Schedule several staggered recomputes so wires appear even if
+    // the MutationObserver debounces or the first frames miss refs.
+    const rafs: number[] = [];
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    for (let i = 1; i <= 4; i += 1) {
+      rafs.push(requestAnimationFrame(recompute));
+    }
+    for (const delay of [50, 150, 400, 1000]) {
+      timeouts.push(setTimeout(recompute, delay));
+    }
     const ro = new ResizeObserver(recompute);
     ro.observe(container);
     const mo = new MutationObserver(recompute);
     mo.observe(container, { childList: true, subtree: true, characterData: true });
     return () => {
-      cancelAnimationFrame(raf);
+      for (const r of rafs) cancelAnimationFrame(r);
+      for (const t of timeouts) clearTimeout(t);
       ro.disconnect();
       mo.disconnect();
     };
