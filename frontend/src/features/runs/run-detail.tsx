@@ -47,6 +47,7 @@ import {
   formatCost,
   formatDuration,
   humanize,
+  sortConfigEntries,
 } from "./format";
 import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
@@ -494,7 +495,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
       {restData.scenario_config && Object.keys(restData.scenario_config).length > 0 ? (
         <CollapsibleConfigBadges
           containerClassName="mb-3 shrink-0"
-          entries={Object.entries(restData.scenario_config)}
+          entries={sortConfigEntries(Object.entries(restData.scenario_config))}
           toggleClassName="inline-flex items-center rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[12px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary/5"
           renderBadge={([key, value]) => (
             <button
