@@ -805,8 +805,14 @@ interface WireShape {
   color: string;
 }
 
-/** SVG overlay drawing one straight vertical line per notification pair from
- *  the call entry's vertical midpoint to the result entry's vertical midpoint.
+/** Overlay drawing one straight vertical line per notification pair from the
+ *  call entry's vertical midpoint to the result entry's vertical midpoint.
+ *
+ *  Each wire is a separately-positioned <div> rather than part of one big SVG
+ *  because, on long runs, a single SVG spanning tens of thousands of pixels
+ *  exceeds the browser's compositor layer size limit and causes tile eviction
+ *  during scroll (visible as "blank then fills in"). Per-wire divs stay within
+ *  per-tile compositor budgets.
  *
  *  Measures Y positions with getBoundingClientRect relative to the scroll-
  *  content container (scroll-invariant: both shift by the same amount on
@@ -877,32 +883,58 @@ function ConnectionWires({
   }, [pairs, messageRefs, containerRef]);
 
   return (
-    <svg
-      className="pointer-events-none absolute top-0 left-0 h-full"
-      style={{ width: GUTTER_MAX_WIDTH, overflow: "visible" }}
+    <div
+      className="pointer-events-none absolute top-0 left-0"
+      style={{ width: GUTTER_MAX_WIDTH, height: 0 }}
       aria-hidden="true"
     >
       {wires.map(w => {
         const x = w.lane * GUTTER_LANE_WIDTH + GUTTER_LANE_WIDTH / 2;
         const isHovered = hoveredCallId === w.callId;
+        const top = Math.min(w.startY, w.endY);
+        const height = Math.abs(w.endY - w.startY);
+        const lineWidth = isHovered ? 2.5 : 1.5;
+        const dotSize = isHovered ? 7 : 5;
         return (
-          <g key={w.callId}>
-            <line
-              x1={x}
-              y1={w.startY}
-              x2={x}
-              y2={w.endY}
-              stroke={w.color}
-              strokeWidth={isHovered ? 2.5 : 1.5}
-              strokeOpacity={isHovered ? 0.95 : 0.6}
-              strokeLinecap="round"
+          <div key={w.callId}>
+            <div
+              style={{
+                position: "absolute",
+                left: x - lineWidth / 2,
+                top,
+                width: lineWidth,
+                height,
+                background: w.color,
+                opacity: isHovered ? 0.95 : 0.6,
+                borderRadius: lineWidth,
+              }}
             />
-            <circle cx={x} cy={w.startY} r={isHovered ? 3.5 : 2.5} fill={w.color} />
-            <circle cx={x} cy={w.endY} r={isHovered ? 3.5 : 2.5} fill={w.color} />
-          </g>
+            <div
+              style={{
+                position: "absolute",
+                left: x - dotSize / 2,
+                top: w.startY - dotSize / 2,
+                width: dotSize,
+                height: dotSize,
+                background: w.color,
+                borderRadius: "50%",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                left: x - dotSize / 2,
+                top: w.endY - dotSize / 2,
+                width: dotSize,
+                height: dotSize,
+                background: w.color,
+                borderRadius: "50%",
+              }}
+            />
+          </div>
         );
       })}
-    </svg>
+    </div>
   );
 }
 
