@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   ArrowLeftRight,
   ChevronDown,
@@ -17,7 +25,7 @@ import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
-import { hueFromCallId, type DisplayEntry } from "./display-entry";
+import type { DisplayEntry } from "./display-entry";
 import { formatTime, humanize } from "./format";
 import { ProseMarkdown } from "./prose-markdown";
 import { NotificationDisplay } from "./notification-display";
@@ -148,24 +156,24 @@ export function ChatPane({
   const [currentVisibleRound, setCurrentVisibleRound] = useState<number | null>(null);
   const prevScrollHeightRef = useRef(0);
   const [hoveredCallId, setHoveredCallId] = useState<string | null>(null);
-  const [linkedHighlightId, setLinkedHighlightId] = useState<string | null>(null);
-  const [linkedHighlightNonce, setLinkedHighlightNonce] = useState(0);
 
-  useEffect(() => {
-    if (!linkedHighlightId) {
-      return undefined;
-    }
-    const el = messageRefs.current.get(linkedHighlightId);
-    if (!el) {
-      return undefined;
-    }
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  // Imperative jump — does NOT go through React state. On large runs the
+  // entry list (and wire SVG) is fully mounted in the DOM, so any state
+  // update would force a full reconciliation before useEffect could scroll,
+  // adding ~1–2s of pre-scroll latency. Acting directly on the DOM keeps
+  // the click-to-scroll instant.
+  const jumpToMessage = useCallback((messageId: string) => {
+    const el = messageRefs.current.get(messageId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "instant", block: "center" });
+    el.classList.remove("animate-highlight");
+    // Force reflow so the animation restarts even if the class was just removed.
+    void el.offsetWidth;
     el.classList.add("animate-highlight");
-    const timeout = setTimeout(() => {
+    window.setTimeout(() => {
       el.classList.remove("animate-highlight");
     }, 1500);
-    return () => clearTimeout(timeout);
-  }, [linkedHighlightId, linkedHighlightNonce]);
+  }, []);
 
   // Scroll to bottom on initial render so the user sees the latest messages
   useEffect(() => {
@@ -223,7 +231,10 @@ export function ChatPane({
     if (!el) {
       return undefined;
     }
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Instant jump, not smooth — smooth-scroll duration scales with distance
+    // and becomes very slow on long runs. The highlight flash draws the eye to
+    // the landing spot.
+    el.scrollIntoView({ behavior: "instant", block: "center" });
     el.classList.add("animate-highlight");
     const timeout = setTimeout(() => {
       el.classList.remove("animate-highlight");
@@ -247,16 +258,13 @@ export function ChatPane({
   }, [messages, selectedChannel]);
 
   const notificationPairs = useMemo(() => {
-    const out: NotificationPair[] = [];
+    const out: Array<{ callMessageId: string; resultMessageId: string; callId: string }> = [];
     for (const e of filtered) {
       if (e.is_notification_result && e.paired_message_id !== "") {
-        const laneIdx = e.active_pair_call_ids.indexOf(e.call_id);
-        const lane = laneIdx === -1 ? 0 : (e.active_pair_lanes[laneIdx] ?? 0);
         out.push({
           callMessageId: e.paired_message_id,
           resultMessageId: e.message_id,
           callId: e.call_id,
-          lane,
         });
       }
     }
@@ -586,10 +594,7 @@ export function ChatPane({
                             onMouseLeave={hasLinkedPair ? () => setHoveredCallId(null) : undefined}
                             onClick={
                               hasLinkedPair
-                                ? () => {
-                                    setLinkedHighlightId(entry.paired_message_id);
-                                    setLinkedHighlightNonce(n => n + 1);
-                                  }
+                                ? () => jumpToMessage(entry.paired_message_id)
                                 : undefined
                             }
                             className={cn(
@@ -794,37 +799,31 @@ interface NotificationPair {
   callMessageId: string;
   resultMessageId: string;
   callId: string;
-  lane: number;
 }
 
 interface WireShape {
   callId: string;
-  lane: number;
+  startX: number;
   startY: number;
+  endX: number;
   endY: number;
   color: string;
 }
 
-/** Overlay drawing one straight vertical line per notification pair from the
- *  call entry's vertical midpoint to the result entry's vertical midpoint.
- *
- *  Each wire is a separately-positioned <div> rather than part of one big SVG
- *  because, on long runs, a single SVG spanning tens of thousands of pixels
- *  exceeds the browser's compositor layer size limit and causes tile eviction
- *  during scroll (visible as "blank then fills in"). Per-wire divs stay within
- *  per-tile compositor budgets.
- *
- *  Measures Y positions with getBoundingClientRect relative to the scroll-
- *  content container (scroll-invariant: both shift by the same amount on
- *  scroll). X position is fixed per pair — `lane` is assigned deterministically
- *  at merge time so overlapping pairs never collide.
- *
- *  Initial recompute runs synchronously. If fewer wires are measured than
- *  expected (refs not yet attached on a large, progressively-mounting run),
- *  the recompute reschedules itself via requestAnimationFrame up to a small
- *  cap — a self-terminating loop that stops as soon as measurement matches
- *  the authoritative count from `mergeEntries`. A `ResizeObserver` handles
- *  layout shifts after the initial mount (entry expansion, window resize). */
+/** Deterministic hue from a call_id so each wire gets a stable unique color. */
+function hueFromCallId(callId: string): number {
+  let h = 0;
+  for (let i = 0; i < callId.length; i += 1) {
+    h = (h * 31 + callId.charCodeAt(i)) >>> 0;
+  }
+  return h % 360;
+}
+
+/** Renders curved SVG wires inside the scrollable content connecting each
+ *  read_notifications call pill to its response chip. Each wire is a cubic
+ *  bezier that bulges out to the left of the column. Wires re-measure on
+ *  layout changes via ResizeObserver + MutationObserver so they stay aligned
+ *  as entries expand or new messages arrive. */
 function ConnectionWires({
   pairs,
   messageRefs,
@@ -838,18 +837,40 @@ function ConnectionWires({
 }) {
   const [wires, setWires] = useState<WireShape[]>([]);
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (container === null) {
-      return undefined;
-    }
+  useLayoutEffect(() => {
     let rafId: number | null = null;
-    let attemptsLeft = 30;
+    let attemptsLeft = 60;
+    let ro: ResizeObserver | null = null;
+    let mo: MutationObserver | null = null;
+
+    function schedule() {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(recompute);
+    }
 
     function recompute() {
       rafId = null;
       const containerEl = containerRef.current;
-      if (containerEl === null) return;
+      if (containerEl === null) {
+        // Container not yet mounted — retry next frame.
+        if (attemptsLeft > 0) {
+          attemptsLeft -= 1;
+          rafId = requestAnimationFrame(recompute);
+        }
+        return;
+      }
+      // Attach observers once, as soon as the container exists. The
+      // ResizeObserver catches layout shifts (entry expansion, window resize).
+      // The MutationObserver catches late-mounting entries on huge runs
+      // streamed in after our initial rAF retry budget is exhausted.
+      if (ro === null) {
+        ro = new ResizeObserver(schedule);
+        ro.observe(containerEl);
+      }
+      if (mo === null) {
+        mo = new MutationObserver(schedule);
+        mo.observe(containerEl, { childList: true, subtree: true });
+      }
       const containerRect = containerEl.getBoundingClientRect();
       const next: WireShape[] = [];
       for (const pair of pairs) {
@@ -858,15 +879,40 @@ function ConnectionWires({
         if (callEl === undefined || resultEl === undefined) continue;
         const callRect = callEl.getBoundingClientRect();
         const resultRect = resultEl.getBoundingClientRect();
+        const callMid = callRect.top + callRect.height / 2 - containerRect.top;
+        const resultMid = resultRect.top + resultRect.height / 2 - containerRect.top;
+        const callX = callRect.left - containerRect.left;
+        const resultX = resultRect.left - containerRect.left;
         next.push({
           callId: pair.callId,
-          lane: pair.lane,
-          startY: callRect.top + callRect.height / 2 - containerRect.top,
-          endY: resultRect.top + resultRect.height / 2 - containerRect.top,
+          startX: callX,
+          startY: callMid,
+          endX: resultX,
+          endY: resultMid,
           color: `hsl(${hueFromCallId(pair.callId)}, 72%, 55%)`,
         });
       }
-      setWires(next);
+      setWires(prev => {
+        if (prev.length !== next.length) return next;
+        for (let i = 0; i < prev.length; i += 1) {
+          const a = prev[i];
+          const b = next[i];
+          if (a === undefined || b === undefined) return next;
+          if (
+            a.callId !== b.callId ||
+            Math.abs(a.startY - b.startY) > 0.5 ||
+            Math.abs(a.endY - b.endY) > 0.5 ||
+            Math.abs(a.startX - b.startX) > 0.5 ||
+            Math.abs(a.endX - b.endX) > 0.5
+          ) {
+            return next;
+          }
+        }
+        return prev;
+      });
+      // Refs on large runs can attach across many paints. Keep retrying on
+      // animation frames until every pair is measured, then stop. Further
+      // updates come from the ResizeObserver for layout shifts.
       if (next.length < pairs.length && attemptsLeft > 0) {
         attemptsLeft -= 1;
         rafId = requestAnimationFrame(recompute);
@@ -874,72 +920,45 @@ function ConnectionWires({
     }
 
     recompute();
-    const ro = new ResizeObserver(recompute);
-    ro.observe(container);
     return () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
-      ro.disconnect();
+      if (ro !== null) ro.disconnect();
+      if (mo !== null) mo.disconnect();
     };
   }, [pairs, messageRefs, containerRef]);
 
   return (
-    <div
-      className="pointer-events-none absolute top-0 left-0"
-      style={{ width: GUTTER_MAX_WIDTH, height: 0 }}
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      style={{ overflow: "visible" }}
       aria-hidden="true"
     >
       {wires.map(w => {
-        const x = w.lane * GUTTER_LANE_WIDTH + GUTTER_LANE_WIDTH / 2;
+        const dy = Math.abs(w.endY - w.startY);
+        // Bulge leftward; proportional to vertical distance, capped.
+        const bulge = Math.min(80, Math.max(24, dy * 0.25));
+        const c1x = w.startX - bulge;
+        const c2x = w.endX - bulge;
+        const d = `M ${w.startX} ${w.startY} C ${c1x} ${w.startY}, ${c2x} ${w.endY}, ${w.endX} ${w.endY}`;
         const isHovered = hoveredCallId === w.callId;
-        const top = Math.min(w.startY, w.endY);
-        const height = Math.abs(w.endY - w.startY);
-        const lineWidth = isHovered ? 2.5 : 1.5;
-        const dotSize = isHovered ? 7 : 5;
         return (
-          <div key={w.callId}>
-            <div
-              style={{
-                position: "absolute",
-                left: x - lineWidth / 2,
-                top,
-                width: lineWidth,
-                height,
-                background: w.color,
-                opacity: isHovered ? 0.95 : 0.6,
-                borderRadius: lineWidth,
-              }}
+          <g key={w.callId}>
+            <path
+              d={d}
+              stroke={w.color}
+              strokeWidth={isHovered ? 2.5 : 1.5}
+              strokeOpacity={isHovered ? 0.95 : 0.55}
+              strokeLinecap="round"
+              fill="none"
             />
-            <div
-              style={{
-                position: "absolute",
-                left: x - dotSize / 2,
-                top: w.startY - dotSize / 2,
-                width: dotSize,
-                height: dotSize,
-                background: w.color,
-                borderRadius: "50%",
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                left: x - dotSize / 2,
-                top: w.endY - dotSize / 2,
-                width: dotSize,
-                height: dotSize,
-                background: w.color,
-                borderRadius: "50%",
-              }}
-            />
-          </div>
+            <circle cx={w.startX} cy={w.startY} r={isHovered ? 3.5 : 2.5} fill={w.color} />
+            <circle cx={w.endX} cy={w.endY} r={isHovered ? 3.5 : 2.5} fill={w.color} />
+          </g>
         );
       })}
-    </div>
+    </svg>
   );
 }
-
-const GUTTER_LANE_WIDTH = 6;
-const GUTTER_MAX_WIDTH = 32;
 
 /** Renders either the notification chip (for split notification-result entries)
  *  or the generic tool-call pill. The split between read_notifications call and
