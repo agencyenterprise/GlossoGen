@@ -230,11 +230,13 @@ def _rename_to_original_timestamp(run_dir: Path, original_timestamp: int) -> Pat
 def _extract_and_validate_bundle(
     tar_bytes: bytes,
     runs_dir: Path,
-    existing_run_ids: set[str],
+    existing_run_dirs: dict[str, str],
 ) -> ImportBundleResponse:
     """Validate and extract a bundle tar.gz into the runs directory.
 
     Performs all validation before extraction, and cleans up on failure.
+    Import is idempotent: if a run with the same run_id already exists, returns
+    the existing run without re-extracting.
     """
     with tarfile.open(fileobj=io.BytesIO(tar_bytes), mode="r:gz") as tar:
         _validate_tar_members(tar=tar)
@@ -270,10 +272,17 @@ def _extract_and_validate_bundle(
                 detail="Bundle is missing git history (.git/ directory)",
             )
 
-        if manifest.run_id in existing_run_ids:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Run {manifest.run_id} already exists",
+        existing_dir = existing_run_dirs.get(manifest.run_id)
+        if existing_dir is not None:
+            logger.info(
+                "Run %s already exists at %s — skipping extraction (idempotent import)",
+                manifest.run_id,
+                existing_dir,
+            )
+            return ImportBundleResponse(
+                run_id=manifest.run_id,
+                scenario_name=manifest.scenario_name,
+                run_dir=existing_dir,
             )
 
         run_dir = claim_run_dir(
@@ -309,7 +318,6 @@ def _extract_and_validate_bundle(
     "/runs/import",
     response_model=ImportBundleResponse,
     responses={
-        409: {"description": "Run with this ID already exists."},
         422: {"description": "Invalid or incomplete bundle."},
     },
 )
@@ -317,7 +325,11 @@ async def import_run_bundle(
     file: UploadFile,
     request: Request,
 ) -> ImportBundleResponse:
-    """Import a simulation run from an exported bundle tar.gz."""
+    """Import a simulation run from an exported bundle tar.gz.
+
+    Idempotent: if a run with the same run_id already exists, returns the
+    existing run without re-importing.
+    """
     runs_dir: Path = request.app.state.runs_dir
 
     tar_bytes = await file.read()
@@ -330,13 +342,13 @@ async def import_run_bundle(
         raise HTTPException(status_code=422, detail="File is not a valid tar.gz archive")
 
     summaries = await discover_runs(runs_dir=runs_dir)
-    existing_run_ids = {s.run_id for s in summaries}
+    existing_run_dirs = {s.run_id: s.run_dir for s in summaries}
 
     result = await asyncio.to_thread(
         _extract_and_validate_bundle,
         tar_bytes,
         runs_dir,
-        existing_run_ids,
+        existing_run_dirs,
     )
 
     run_dir = Path(result.run_dir)
