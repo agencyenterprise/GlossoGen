@@ -323,6 +323,9 @@ export interface paths {
         /**
          * Import Run Bundle
          * @description Import a simulation run from an exported bundle tar.gz.
+         *
+         *     Idempotent: if a run with the same run_id already exists, returns the
+         *     existing run without re-importing.
          */
         post: operations["import_run_bundle_api_runs_import_post"];
         delete?: never;
@@ -1981,13 +1984,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ImportBundleResponse"];
                 };
-            };
-            /** @description Run with this ID already exists. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Invalid or incomplete bundle. */
             422: {

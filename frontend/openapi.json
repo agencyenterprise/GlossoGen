@@ -834,7 +834,7 @@
     "/api/runs/import": {
       "post": {
         "summary": "Import Run Bundle",
-        "description": "Import a simulation run from an exported bundle tar.gz.",
+        "description": "Import a simulation run from an exported bundle tar.gz.\n\nIdempotent: if a run with the same run_id already exists, returns the\nexisting run without re-importing.",
         "operationId": "import_run_bundle_api_runs_import_post",
         "requestBody": {
           "content": {
@@ -856,9 +856,6 @@
                 }
               }
             }
-          },
-          "409": {
-            "description": "Run with this ID already exists."
           },
           "422": {
             "description": "Invalid or incomplete bundle."

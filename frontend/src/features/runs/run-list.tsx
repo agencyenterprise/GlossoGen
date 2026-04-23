@@ -548,7 +548,10 @@ export function RunList() {
                               : "—"}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right text-muted-foreground">
-                          {formatTime(run.timestamp)}
+                          <div>{formatTime(run.timestamp)}</div>
+                          <div className="font-mono text-[10px] opacity-60">
+                            {splitRunId(run.run_id).run_dir_name}
+                          </div>
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right">
                           <span
