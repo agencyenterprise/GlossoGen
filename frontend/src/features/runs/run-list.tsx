@@ -490,8 +490,13 @@ export function RunList() {
                     <Fragment key={run.run_id}>
                       <tr
                         className={`group cursor-pointer transition-colors hover:bg-accent/50 ${bgClass} ${borderClass}`}
-                        onClick={() => {
-                          router.push(`/runs/${run.run_id}`);
+                        onClick={e => {
+                          const url = `/runs/${run.run_id}`;
+                          if (e.metaKey || e.ctrlKey) {
+                            window.open(url, "_blank");
+                          } else {
+                            router.push(url);
+                          }
                         }}
                       >
                         <td className="whitespace-nowrap py-2 pl-4 font-medium">
@@ -625,8 +630,13 @@ export function RunList() {
                       {hasBadges ? (
                         <tr
                           className={`cursor-pointer transition-colors hover:bg-accent/50 ${bgClass}`}
-                          onClick={() => {
-                            router.push(`/runs/${run.run_id}`);
+                          onClick={e => {
+                            const url = `/runs/${run.run_id}`;
+                            if (e.metaKey || e.ctrlKey) {
+                              window.open(url, "_blank");
+                            } else {
+                              router.push(url);
+                            }
                           }}
                         >
                           <td colSpan={8} className="pb-2 pl-4 pr-4">
