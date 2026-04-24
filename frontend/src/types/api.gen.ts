@@ -524,6 +524,32 @@ export interface components {
             agents: components["schemas"]["AgentRoleInfo"][];
         };
         /**
+         * AgentRunCycleFailedEntry
+         * @description A single agent-run-cycle failure extracted from the event log.
+         *
+         *     One entry per ``AgentRunCycleFailed`` event. ``error_type`` is the
+         *     exception class name (e.g. ``"ContentFilterError"``).
+         */
+        AgentRunCycleFailedEntry: {
+            /** Message Id */
+            message_id: string;
+            /** Agent Id */
+            agent_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Round Number */
+            round_number: number;
+            /** Cycle */
+            cycle: number;
+            /** Error Type */
+            error_type: string;
+            /** Message */
+            message: string;
+        };
+        /**
          * AllLabelsResponse
          * @description Response containing all unique labels across all runs.
          */
@@ -842,6 +868,8 @@ export interface components {
             tool_use: components["schemas"]["ToolUseEntry"][];
             /** Debug Logs */
             debug_logs: components["schemas"]["DebugLogEntry"][];
+            /** Run Cycle Failures */
+            run_cycle_failures: components["schemas"]["AgentRunCycleFailedEntry"][];
             evaluation: components["schemas"]["EvalReportResponse"] | null;
             /** Evaluation In Progress */
             evaluation_in_progress: boolean;
@@ -986,6 +1014,34 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
+        };
+        /**
+         * SSEAgentRunCycleFailed
+         * @description SSE event emitted when agent.run() raised an exception in the runner's retry loop.
+         */
+        SSEAgentRunCycleFailed: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "agent_run_cycle_failed";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Round Number */
+            round_number: number;
+            /** Cycle */
+            cycle: number;
+            /** Error Type */
+            error_type: string;
+            /** Message */
+            message: string;
         };
         /**
          * SSEDebugLog
@@ -1656,7 +1712,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolCallInvoked"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSEAgentCostUpdated"] | components["schemas"]["SSEDebugLog"] | components["schemas"]["SSEVeyruStabilizationJudged"];
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolCallInvoked"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSEAgentCostUpdated"] | components["schemas"]["SSEDebugLog"] | components["schemas"]["SSEAgentRunCycleFailed"] | components["schemas"]["SSEVeyruStabilizationJudged"];
                 };
             };
             /** @description Validation Error */

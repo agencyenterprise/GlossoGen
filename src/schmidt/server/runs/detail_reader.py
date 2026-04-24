@@ -12,6 +12,7 @@ from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.evaluation.log_reader import load_events
 from schmidt.models.event import (
     AgentRegistered,
+    AgentRunCycleFailed,
     ChannelHistoryCleared,
     ChannelMembershipChanged,
     LLMResponseReceived,
@@ -31,6 +32,7 @@ from schmidt.scenarios.veyru.ids import (
 )
 from schmidt.server.runs.models import (
     AgentDetail,
+    AgentRunCycleFailedEntry,
     ChannelMessage,
     DebugLogEntry,
     EvalCostResponse,
@@ -182,6 +184,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     messages: list[ChannelMessage] = []
     reasoning: list[ReasoningEntry] = []
     tool_use: list[ToolUseEntry] = []
+    run_cycle_failures: list[AgentRunCycleFailedEntry] = []
     total_messages = 0
     total_cost_usd = 0.0
     duration_seconds = 0.0
@@ -310,6 +313,19 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                         target.stabilize_metadata = metadata
                     else:
                         pending_stabilize_metadata_by_call_id[event.call_id] = metadata
+
+        elif isinstance(event, AgentRunCycleFailed):
+            run_cycle_failures.append(
+                AgentRunCycleFailedEntry(
+                    message_id=event.event_id,
+                    agent_id=event.agent_id,
+                    timestamp=event.timestamp,
+                    round_number=event.round_number,
+                    cycle=event.cycle,
+                    error_type=event.error_type,
+                    message=event.message,
+                )
+            )
 
         elif isinstance(event, VeyruStabilizationJudged):
             pending_stabilize_metadata_by_agent.setdefault(event.agent_id, []).append(
@@ -442,6 +458,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         reasoning=reasoning,
         tool_use=tool_use,
         debug_logs=debug_logs,
+        run_cycle_failures=run_cycle_failures,
         evaluation=evaluation,
         evaluation_in_progress=evaluation_in_progress,
         has_eval_log_file=has_eval_log_file,

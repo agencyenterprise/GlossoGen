@@ -1,20 +1,30 @@
 """Evaluator that measures how transparent the specialist's instructions were.
 
 For each stage of each round's case (ground-truth data emitted via
-``VeyruCaseStarted`` events), this evaluator presents a neutral simulated
-field observer with the stage's ``observable_symptoms`` plus the specialist's
-messages from that round, forces an invocation of the real ``stabilize_veyru``
-tool, and judges the resulting action against the ground-truth
+``VeyruCaseStarted`` events), this evaluator replays the real simulation up to
+the moment just before the field observer invoked ``stabilize_veyru`` for that
+stage, shows the full chronological transcript to a fresh LLM, forces a new
+``stabilize_veyru`` invocation, and judges the resulting action against
 ``judge_expected_actions`` using the existing ``judge_stabilization`` function.
 
-Specialist messages are split across stages using ``STABILIZATION_SUCCESS_MARKER``
-timestamps in ``ToolResultReceived`` events as stage boundaries: stage k gets
-every specialist message sent through the k-th success. When a round collapses
-before reaching stage k, the full round's specialist transcript is used instead.
+The transcript is the exact context the real observer had: every round's
+boundary, every ``veyru_case_started`` symptom reveal, every message on the
+link channel from both the specialist and the real observer, and every prior
+``stabilize_veyru`` tool call with its result. That includes cross-round
+history, so the simulated observer can resolve references like "same technique
+as round 2" the same way the real observer could.
 
-Per-round accuracy = matches / stages. Run score = mean across all rounds.
+Stage k's cutoff is the timestamp of the real observer's k-th
+``stabilize_veyru`` invocation within that round; entries with strictly
+earlier timestamps form the prompt. Rounds with fewer invocations than the
+case has stages are scored only on the stages the real observer actually
+attempted.
+
+Per-round accuracy = matches / stages_attempted. Run score = mean across all
+rounds that attempted at least one stage.
 """
 
+import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -26,7 +36,14 @@ from schmidt.evaluation.evaluation_report import MetricResult, Verdict
 from schmidt.evaluation.evaluator_protocol import Evaluator
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import MessageSent, SimulationEvent, ToolResultReceived, VeyruCaseStarted
+from schmidt.models.event import (
+    MessageSent,
+    RoundAdvanced,
+    SimulationEvent,
+    ToolCallInvoked,
+    ToolResultReceived,
+    VeyruCaseStarted,
+)
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.veyru.evaluation.prompt_renderer import render_veyru_prompt
 from schmidt.scenarios.veyru.ids import (
@@ -35,7 +52,6 @@ from schmidt.scenarios.veyru.ids import (
     OBSERVER_A_ID,
     OBSERVER_B_ID,
     SPECIALIST_ID,
-    STABILIZATION_SUCCESS_MARKER,
     STABILIZE_VEYRU_TOOL,
 )
 from schmidt.scenarios.veyru.stabilization_judge import judge_stabilization
@@ -55,13 +71,19 @@ Describe exactly what you are doing to stabilize it."""
 StabilizeVeyruInvocation.__name__ = STABILIZE_VEYRU_TOOL
 
 
+class TranscriptEntry(NamedTuple):
+    """One chronological line in the replayed observer transcript."""
+
+    timestamp: datetime
+    text: str
+
+
 class RoundInputs(NamedTuple):
-    """Everything needed to evaluate a single round."""
+    """Per-round ground truth plus the real observer's stage-boundary timestamps."""
 
     round_number: int
     case: VeyruCaseStarted
-    specialist_messages: list[tuple[datetime, str]]
-    success_timestamps: list[datetime]
+    invocation_timestamps: list[datetime]
 
 
 class StageResult(NamedTuple):
@@ -76,9 +98,13 @@ class StageResult(NamedTuple):
 
 
 class FieldObserverTransparencyEvaluator(Evaluator):
-    """Measures whether the specialist's instructions were clear enough that
-    a naive observer could execute them correctly from the channel transcript
-    alone, without the real observer's own contributions.
+    """Replays the real observer's context per stage and scores LLM action accuracy.
+
+    The score measures how likely a fresh observer placed in the exact
+    conversational context the real observer had would have performed the
+    correct stabilization — i.e., how transparent the specialist's
+    instructions actually were in practice, given everything the observer
+    already knew.
     """
 
     name = "field_observer_transparency"
@@ -91,7 +117,7 @@ class FieldObserverTransparencyEvaluator(Evaluator):
         llm_provider: LLMProvider,
         run_dir: Path,
     ) -> MetricResult:
-        """Simulate a neutral observer per case stage and score accuracy."""
+        """Replay the transcript per stage and score the simulated observer's action."""
         _ = scenario, run_dir
         if _is_two_team_mode(agent_configs=agent_configs):
             logger.info("field_observer_transparency: two-team mode detected, returning FAIL")
@@ -123,48 +149,36 @@ class FieldObserverTransparencyEvaluator(Evaluator):
                 rounds_identified=[],
             )
 
-        total_stages = sum(len(r.case.stages) for r in round_inputs)
+        transcript_entries = _build_transcript_entries(events=events)
+        total_stages = sum(
+            min(len(r.case.stages), len(r.invocation_timestamps)) for r in round_inputs
+        )
         logger.info(
-            "field_observer_transparency: %d round(s), %d stage(s) total to evaluate",
+            "field_observer_transparency: %d round(s), %d scoreable stage(s), "
+            "%d transcript entries",
             len(round_inputs),
             total_stages,
+            len(transcript_entries),
         )
-        for r in round_inputs:
-            logger.info(
-                "Round %d plan: case_number=%d failure=%r stages=%d "
-                "specialist_messages=%d success_markers=%d",
-                r.round_number,
-                r.case.case_number,
-                r.case.failure_name,
-                len(r.case.stages),
-                len(r.specialist_messages),
-                len(r.success_timestamps),
-            )
 
-        stage_results: list[StageResult] = []
-        stage_counter = 0
-        for r in round_inputs:
-            for stage_index in range(len(r.case.stages)):
-                stage_counter += 1
-                logger.info(
-                    "=== Evaluating stage %d/%d (round %d, stage_index %d) ===",
-                    stage_counter,
-                    total_stages,
-                    r.round_number,
-                    stage_index,
-                )
-                stage_result = await _score_stage(
-                    llm_provider=llm_provider,
-                    round_inputs=r,
-                    stage_index=stage_index,
-                )
-                stage_results.append(stage_result)
-                logger.info(
-                    "Round %d stage %d verdict: match=%s",
-                    stage_result.round_number,
-                    stage_result.stage_index,
-                    stage_result.match,
-                )
+        stage_coros = [
+            _score_stage(
+                llm_provider=llm_provider,
+                round_inputs=r,
+                stage_index=stage_index,
+                transcript_entries=transcript_entries,
+            )
+            for r in round_inputs
+            for stage_index in range(min(len(r.case.stages), len(r.invocation_timestamps)))
+        ]
+        stage_results: list[StageResult] = list(await asyncio.gather(*stage_coros))
+        for stage_result in stage_results:
+            logger.info(
+                "Round %d stage %d verdict: match=%s",
+                stage_result.round_number,
+                stage_result.stage_index,
+                stage_result.match,
+            )
 
         return _aggregate(
             evaluator_name=self.name,
@@ -177,34 +191,19 @@ async def _score_stage(
     llm_provider: LLMProvider,
     round_inputs: RoundInputs,
     stage_index: int,
+    transcript_entries: list[TranscriptEntry],
 ) -> StageResult:
-    """Render the prompts, force a stabilize_veyru tool call, then judge the action."""
+    """Render the replayed transcript, force a stabilize_veyru call, then judge it."""
     stage = round_inputs.case.stages[stage_index]
-    specialist_lines = _specialist_messages_for_stage(
-        messages=round_inputs.specialist_messages,
-        success_timestamps=round_inputs.success_timestamps,
-        stage_index=stage_index,
-    )
+    cutoff = round_inputs.invocation_timestamps[stage_index]
+    transcript_text = _render_transcript(entries=transcript_entries, cutoff=cutoff)
     logger.info(
-        "Round %d stage %d input — observed symptoms:\n%s",
+        "Round %d stage %d cutoff=%s transcript_lines=%d",
         round_inputs.round_number,
         stage_index,
-        stage.observable_symptoms,
+        cutoff.isoformat(),
+        transcript_text.count("\n") + 1 if transcript_text else 0,
     )
-    if specialist_lines:
-        logger.info(
-            "Round %d stage %d input — %d specialist message(s) on link:\n%s",
-            round_inputs.round_number,
-            stage_index,
-            len(specialist_lines),
-            "\n".join(specialist_lines),
-        )
-    else:
-        logger.info(
-            "Round %d stage %d input — specialist sent no messages in this round",
-            round_inputs.round_number,
-            stage_index,
-        )
     logger.info(
         "Round %d stage %d ground truth expected_actions: %s",
         round_inputs.round_number,
@@ -219,8 +218,7 @@ async def _score_stage(
         template_name="field_observer_transparency_user.jinja",
         template_variables={
             "round_number": round_inputs.round_number,
-            "observed_symptoms": stage.observable_symptoms,
-            "specialist_messages": specialist_lines,
+            "transcript": transcript_text,
         },
     )
     logger.debug(
@@ -255,42 +253,77 @@ async def _score_stage(
     )
 
 
-def _specialist_messages_for_stage(
-    messages: list[tuple[datetime, str]],
-    success_timestamps: list[datetime],
-    stage_index: int,
-) -> list[str]:
-    """Return the specialist message strings that belong to this stage's window.
+def _render_transcript(entries: list[TranscriptEntry], cutoff: datetime) -> str:
+    """Return a newline-joined transcript of entries with timestamp strictly before ``cutoff``."""
+    return "\n".join(entry.text for entry in entries if entry.timestamp < cutoff)
 
-    Stage k is bounded by the k-th ``STABILIZATION_SUCCESS_MARKER`` timestamp:
-    all specialist messages with ``ts <= successes[k]`` are included. When the
-    round collapsed before reaching stage k (``k >= len(successes)``), the full
-    round's specialist transcript is used so the simulated observer still has
-    whatever the specialist actually said to work with.
+
+def _build_transcript_entries(events: list[SimulationEvent]) -> list[TranscriptEntry]:
+    """Build the chronological transcript the real field observer would have seen.
+
+    Covers cross-round history: round boundaries, each case's initial symptom
+    reveal, every link-channel message (both sides), every ``stabilize_veyru``
+    tool call by the observer with its verbatim action argument, and every
+    ``stabilize_veyru`` tool result returned to the observer.
     """
-    if stage_index < len(success_timestamps):
-        cutoff = success_timestamps[stage_index]
-        return [f"- {text}" for ts, text in messages if ts <= cutoff]
-    return [f"- {text}" for _, text in messages]
-
-
-def _extract_round_inputs(events: list[SimulationEvent]) -> list[RoundInputs]:
-    """Group ground-truth case events with per-round message + success data."""
-    cases_by_round: dict[int, VeyruCaseStarted] = {}
-    specialist_by_round: dict[int, list[tuple[datetime, str]]] = {}
-    successes_by_round: dict[int, list[datetime]] = {}
-
+    entries: list[TranscriptEntry] = []
     for event in events:
+        if isinstance(event, RoundAdvanced):
+            entries.append(
+                TranscriptEntry(
+                    timestamp=event.timestamp,
+                    text=f"[Round {event.round_number} started — trigger: {event.trigger}]",
+                )
+            )
+            continue
         if isinstance(event, VeyruCaseStarted):
-            cases_by_round[event.round_number] = event
+            first_stage = event.stages[0] if event.stages else None
+            if first_stage is None:
+                continue
+            entries.append(
+                TranscriptEntry(
+                    timestamp=event.timestamp,
+                    text=(
+                        f"[Round {event.round_number}] New Veyru presented. "
+                        f"Initial observable symptoms:\n{first_stage.observable_symptoms}"
+                    ),
+                )
+            )
             continue
         if isinstance(event, MessageSent):
             if event.message.channel_id != LINK_CHANNEL_ID:
                 continue
-            if event.message.sender_agent_id != SPECIALIST_ID:
+            sender = event.message.sender_agent_id
+            if sender == SPECIALIST_ID:
+                label = "specialist"
+            elif sender == FIELD_OBSERVER_ID:
+                label = "you (field observer)"
+            else:
+                label = sender
+            entries.append(
+                TranscriptEntry(
+                    timestamp=event.message.timestamp,
+                    text=(
+                        f'[Round {event.round_number}] {label} (link): '
+                        f'"{event.message.text}"'
+                    ),
+                )
+            )
+            continue
+        if isinstance(event, ToolCallInvoked):
+            if event.tool_name != STABILIZE_VEYRU_TOOL:
                 continue
-            specialist_by_round.setdefault(event.round_number, []).append(
-                (event.message.timestamp, event.message.text)
+            if event.agent_id != FIELD_OBSERVER_ID:
+                continue
+            action = event.arguments.get("action", "")
+            entries.append(
+                TranscriptEntry(
+                    timestamp=event.timestamp,
+                    text=(
+                        f'[Round {event.round_number}] you invoked '
+                        f'stabilize_veyru(action="{action}")'
+                    ),
+                )
             )
             continue
         if isinstance(event, ToolResultReceived):
@@ -298,20 +331,48 @@ def _extract_round_inputs(events: list[SimulationEvent]) -> list[RoundInputs]:
                 continue
             if event.agent_id != FIELD_OBSERVER_ID:
                 continue
-            if STABILIZATION_SUCCESS_MARKER not in event.result:
+            entries.append(
+                TranscriptEntry(
+                    timestamp=event.timestamp,
+                    text=(
+                        f"[Round {event.round_number}] stabilize_veyru tool "
+                        f"result: {event.result}"
+                    ),
+                )
+            )
+            continue
+    entries.sort(key=lambda entry: entry.timestamp)
+    return entries
+
+
+def _extract_round_inputs(events: list[SimulationEvent]) -> list[RoundInputs]:
+    """Group ground-truth cases with the real observer's per-round stabilize timestamps."""
+    cases_by_round: dict[int, VeyruCaseStarted] = {}
+    invocations_by_round: dict[int, list[datetime]] = {}
+
+    for event in events:
+        if isinstance(event, VeyruCaseStarted):
+            cases_by_round[event.round_number] = event
+            continue
+        if isinstance(event, ToolCallInvoked):
+            if event.tool_name != STABILIZE_VEYRU_TOOL:
                 continue
-            successes_by_round.setdefault(event.round_number, []).append(event.timestamp)
+            if event.agent_id != FIELD_OBSERVER_ID:
+                continue
+            invocations_by_round.setdefault(event.round_number, []).append(event.timestamp)
             continue
 
-    return [
-        RoundInputs(
-            round_number=rn,
-            case=cases_by_round[rn],
-            specialist_messages=specialist_by_round.get(rn, []),
-            success_timestamps=successes_by_round.get(rn, []),
+    out: list[RoundInputs] = []
+    for rn in sorted(cases_by_round.keys()):
+        timestamps = sorted(invocations_by_round.get(rn, []))
+        out.append(
+            RoundInputs(
+                round_number=rn,
+                case=cases_by_round[rn],
+                invocation_timestamps=timestamps,
+            )
         )
-        for rn in sorted(cases_by_round.keys())
-    ]
+    return out
 
 
 def _aggregate(

@@ -20,8 +20,10 @@ type SSEToolCallInvoked = components["schemas"]["SSEToolCallInvoked"];
 type SSEToolResultReceived = components["schemas"]["SSEToolResultReceived"];
 type SSEAgentCostUpdated = components["schemas"]["SSEAgentCostUpdated"];
 type SSEDebugLog = components["schemas"]["SSEDebugLog"];
+type SSEAgentRunCycleFailed = components["schemas"]["SSEAgentRunCycleFailed"];
 type SSEVeyruStabilizationJudged = components["schemas"]["SSEVeyruStabilizationJudged"];
 type VeyruStabilizeMetadata = components["schemas"]["VeyruStabilizeMetadata"];
+type AgentRunCycleFailedEntry = components["schemas"]["AgentRunCycleFailedEntry"];
 
 /** State returned by the useEventStream hook. */
 export interface EventStreamState {
@@ -35,6 +37,8 @@ export interface EventStreamState {
   isConnected: boolean;
   /** Debug log entries received via SSE. */
   debugLogs: DebugLogEntry[];
+  /** Agent run-cycle failures received via SSE. */
+  runCycleFailures: AgentRunCycleFailedEntry[];
   /** Total cost in USD from the simulation_ended event. */
   totalCostUsd: number;
   /** Duration in seconds from the simulation_ended event. */
@@ -66,6 +70,7 @@ export function useEventStream(
   const [status, setStatus] = useState<RunStatus | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
+  const [runCycleFailures, setRunCycleFailures] = useState<AgentRunCycleFailedEntry[]>([]);
 
   const agentCostsRef = useRef<Map<string, number>>(new Map());
   const seenSseIdsRef = useRef<Set<string>>(new Set());
@@ -84,6 +89,7 @@ export function useEventStream(
     setTotalMessages(0);
     setStatus(null);
     setDebugLogs([]);
+    setRunCycleFailures([]);
     agentCostsRef.current = new Map();
     seenSseIdsRef.current = new Set();
     pendingStabilizeMetadataRef.current = new Map();
@@ -296,6 +302,21 @@ export function useEventStream(
         setTotalCostUsd(sum);
       });
 
+      eventSource.addEventListener("agent_run_cycle_failed", (e: MessageEvent) => {
+        const data: SSEAgentRunCycleFailed = JSON.parse(e.data);
+        if (isDuplicate(data.event_id)) return;
+        const entry: AgentRunCycleFailedEntry = {
+          message_id: data.event_id,
+          agent_id: data.agent_id,
+          timestamp: data.timestamp,
+          round_number: data.round_number,
+          cycle: data.cycle,
+          error_type: data.error_type,
+          message: data.message,
+        };
+        setRunCycleFailures(prev => [...prev, entry]);
+      });
+
       eventSource.addEventListener("debug_log", (e: MessageEvent) => {
         const data: SSEDebugLog = JSON.parse(e.data);
         const entry: DebugLogEntry = {
@@ -332,6 +353,7 @@ export function useEventStream(
     status,
     isConnected,
     debugLogs,
+    runCycleFailures,
     totalCostUsd,
     durationSeconds,
   };
