@@ -31,9 +31,12 @@ import { ProseMarkdown } from "./prose-markdown";
 import { NotificationDisplay } from "./notification-display";
 import { ToolCallDisplay } from "./tool-call-display";
 import { RunCycleFailureDisplay } from "./run-cycle-failure-display";
+import { RoundTimelineModal } from "./round-timeline-modal";
 import type { PendingEdit } from "./use-fork";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
+type VeyruCaseSummary = components["schemas"]["VeyruCaseSummary"];
+type RoundEnding = components["schemas"]["RoundEnding"];
 
 interface ChatPaneProps {
   runId: string;
@@ -66,6 +69,10 @@ interface ChatPaneProps {
   internJoinRoundNumber: number | null;
   /** Round number where the intern replaced the field observer (if intern mode was enabled). */
   internTakeoverRoundNumber: number | null;
+  /** Per-round Veyru case metadata (empty for non-Veyru scenarios). */
+  veyruCases: VeyruCaseSummary[];
+  /** One entry per completed round describing why its main phase ended. */
+  roundEndings: RoundEnding[];
 }
 
 interface TurnGroup {
@@ -147,6 +154,8 @@ export function ChatPane({
   swappedObserverDisplayNames,
   internJoinRoundNumber,
   internTakeoverRoundNumber,
+  veyruCases,
+  roundEndings,
 }: ChatPaneProps) {
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -157,6 +166,36 @@ export function ChatPane({
   const [currentVisibleRound, setCurrentVisibleRound] = useState<number | null>(null);
   const prevScrollHeightRef = useRef(0);
   const [hoveredCallId, setHoveredCallId] = useState<string | null>(null);
+  const [timelineRound, setTimelineRound] = useState<number | null>(null);
+
+  const messagesByRound = useMemo(() => {
+    const byRound = new Map<number, DisplayEntry[]>();
+    for (const msg of messages) {
+      const list = byRound.get(msg.round_number);
+      if (list) {
+        list.push(msg);
+      } else {
+        byRound.set(msg.round_number, [msg]);
+      }
+    }
+    return byRound;
+  }, [messages]);
+
+  const caseByRound = useMemo(() => {
+    const byRound = new Map<number, VeyruCaseSummary>();
+    for (const c of veyruCases) {
+      byRound.set(c.round_number, c);
+    }
+    return byRound;
+  }, [veyruCases]);
+
+  const endingByRound = useMemo(() => {
+    const byRound = new Map<number, RoundEnding>();
+    for (const e of roundEndings) {
+      byRound.set(e.round_number, e);
+    }
+    return byRound;
+  }, [roundEndings]);
 
   // Imperative jump — does NOT go through React state. On large runs the
   // entry list (and wire SVG) is fully mounted in the DOM, so any state
@@ -419,12 +458,27 @@ export function ChatPane({
       </div>
 
       {currentVisibleRound !== null ? (
-        <div className="pointer-events-none absolute left-1/2 top-12 z-30 -translate-x-1/2">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/90 px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur">
+        <div className="absolute left-1/2 top-12 z-30 -translate-x-1/2">
+          <button
+            type="button"
+            aria-label={`Open round ${currentVisibleRound} timeline`}
+            onClick={() => setTimelineRound(currentVisibleRound)}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-border bg-background/90 px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur transition-colors hover:border-foreground/30 hover:bg-background hover:text-foreground"
+          >
             <Hash className="h-3 w-3" />
             Round {currentVisibleRound}
-          </div>
+          </button>
         </div>
+      ) : null}
+
+      {timelineRound !== null ? (
+        <RoundTimelineModal
+          roundNumber={timelineRound}
+          messages={messagesByRound.get(timelineRound) ?? []}
+          veyruCase={caseByRound.get(timelineRound) ?? null}
+          roundEnding={endingByRound.get(timelineRound) ?? null}
+          onClose={() => setTimelineRound(null)}
+        />
       ) : null}
 
       <div

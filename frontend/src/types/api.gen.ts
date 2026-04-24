@@ -828,6 +828,25 @@ export interface components {
             channel_ids: string[];
         };
         /**
+         * RoundEnding
+         * @description Reason a round's main phase ended.
+         *
+         *     One entry per round end, across all scenarios. ``trigger`` matches the
+         *     ``RoundEnded.trigger`` field (e.g. ``veyru_stabilized``,
+         *     ``all_agents_idle``, ``veyru_collapsed``, ``round_timeout``).
+         */
+        RoundEnding: {
+            /** Round Number */
+            round_number: number;
+            /** Trigger */
+            trigger: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+        };
+        /**
          * RunDetailResponse
          * @description Full detail of a simulation run including agents, messages, and evaluation.
          */
@@ -883,6 +902,10 @@ export interface components {
             labels: string[];
             /** Note */
             note: string | null;
+            /** Veyru Cases */
+            veyru_cases: components["schemas"]["VeyruCaseSummary"][];
+            /** Round Endings */
+            round_endings: components["schemas"]["RoundEnding"][];
         };
         /**
          * RunListResponse
@@ -1490,6 +1513,40 @@ export interface components {
          */
         Verdict: "pass" | "fail" | "partial";
         /**
+         * VeyruCaseStageDTO
+         * @description One stage of a Veyru case with symptoms and the expected procedure.
+         */
+        VeyruCaseStageDTO: {
+            /** Motif Name */
+            motif_name: string;
+            /** Observable Symptoms */
+            observable_symptoms: string;
+            /** Treatment Motif Name */
+            treatment_motif_name: string;
+            /** Judge Expected Actions */
+            judge_expected_actions: string;
+        };
+        /**
+         * VeyruCaseSummary
+         * @description Per-round Veyru case metadata used by the round timeline modal.
+         *
+         *     One entry per round when the scenario is Veyru. Mirrors the
+         *     ``VeyruCaseStarted`` event emitted at each round start.
+         */
+        VeyruCaseSummary: {
+            /** Round Number */
+            round_number: number;
+            /** Case Number */
+            case_number: number;
+            /** Failure Name */
+            failure_name: string;
+            /** Time Budget Seconds */
+            time_budget_seconds: number;
+            /** Stages */
+            stages: components["schemas"]["VeyruCaseStageDTO"][];
+            stellar_reading: components["schemas"]["VeyruStellarReadingDTO"];
+        };
+        /**
          * VeyruStabilizeMetadata
          * @description Judge context captured for a single ``stabilize_veyru`` call.
          *
@@ -1504,6 +1561,20 @@ export interface components {
             judge_match: boolean;
             /** Judge Explanation */
             judge_explanation: string;
+        };
+        /**
+         * VeyruStellarReadingDTO
+         * @description Per-round stellar parameters shaping the Veyru procedure mapping.
+         */
+        VeyruStellarReadingDTO: {
+            /** Offset */
+            offset: number;
+            /** Hold Duration */
+            hold_duration: number;
+            /** Starting Face */
+            starting_face: string;
+            /** Intensity Level */
+            intensity_level: string;
         };
     };
     responses: never;

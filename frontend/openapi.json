@@ -1805,6 +1805,31 @@
         "title": "ReasoningEntry",
         "description": "An LLM reasoning/thinking entry from an agent's turn.\n\n``channel_ids`` links this reasoning to the channels of the surrounding\nsend_message calls from the same agent, so the frontend can show only\nreasoning relevant to the selected channel."
       },
+      "RoundEnding": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "trigger": {
+            "type": "string",
+            "title": "Trigger"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "trigger",
+          "timestamp"
+        ],
+        "title": "RoundEnding",
+        "description": "Reason a round's main phase ended.\n\nOne entry per round end, across all scenarios. ``trigger`` matches the\n``RoundEnded.trigger`` field (e.g. ``veyru_stabilized``,\n``all_agents_idle``, ``veyru_collapsed``, ``round_timeout``)."
+      },
       "RunDetailResponse": {
         "properties": {
           "run_id": {
@@ -1972,6 +1997,20 @@
               }
             ],
             "title": "Note"
+          },
+          "veyru_cases": {
+            "items": {
+              "$ref": "#/components/schemas/VeyruCaseSummary"
+            },
+            "type": "array",
+            "title": "Veyru Cases"
+          },
+          "round_endings": {
+            "items": {
+              "$ref": "#/components/schemas/RoundEnding"
+            },
+            "type": "array",
+            "title": "Round Endings"
           }
         },
         "type": "object",
@@ -2001,7 +2040,9 @@
           "intern_join",
           "intern_takeover",
           "labels",
-          "note"
+          "note",
+          "veyru_cases",
+          "round_endings"
         ],
         "title": "RunDetailResponse",
         "description": "Full detail of a simulation run including agents, messages, and evaluation."
@@ -3198,6 +3239,76 @@
         "title": "Verdict",
         "description": "Three-valued outcome for a single evaluation metric."
       },
+      "VeyruCaseStageDTO": {
+        "properties": {
+          "motif_name": {
+            "type": "string",
+            "title": "Motif Name"
+          },
+          "observable_symptoms": {
+            "type": "string",
+            "title": "Observable Symptoms"
+          },
+          "treatment_motif_name": {
+            "type": "string",
+            "title": "Treatment Motif Name"
+          },
+          "judge_expected_actions": {
+            "type": "string",
+            "title": "Judge Expected Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "motif_name",
+          "observable_symptoms",
+          "treatment_motif_name",
+          "judge_expected_actions"
+        ],
+        "title": "VeyruCaseStageDTO",
+        "description": "One stage of a Veyru case with symptoms and the expected procedure."
+      },
+      "VeyruCaseSummary": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "case_number": {
+            "type": "integer",
+            "title": "Case Number"
+          },
+          "failure_name": {
+            "type": "string",
+            "title": "Failure Name"
+          },
+          "time_budget_seconds": {
+            "type": "integer",
+            "title": "Time Budget Seconds"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/VeyruCaseStageDTO"
+            },
+            "type": "array",
+            "title": "Stages"
+          },
+          "stellar_reading": {
+            "$ref": "#/components/schemas/VeyruStellarReadingDTO"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "case_number",
+          "failure_name",
+          "time_budget_seconds",
+          "stages",
+          "stellar_reading"
+        ],
+        "title": "VeyruCaseSummary",
+        "description": "Per-round Veyru case metadata used by the round timeline modal.\n\nOne entry per round when the scenario is Veyru. Mirrors the\n``VeyruCaseStarted`` event emitted at each round start."
+      },
       "VeyruStabilizeMetadata": {
         "properties": {
           "expected_actions": {
@@ -3221,6 +3332,35 @@
         ],
         "title": "VeyruStabilizeMetadata",
         "description": "Judge context captured for a single ``stabilize_veyru`` call.\n\nAttached to the corresponding ``ToolUseEntry`` so the frontend can show\nthe expected procedure and the LLM judge's verdict alongside the raw\ntool call. Present only on ``stabilize_veyru`` entries."
+      },
+      "VeyruStellarReadingDTO": {
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "hold_duration": {
+            "type": "integer",
+            "title": "Hold Duration"
+          },
+          "starting_face": {
+            "type": "string",
+            "title": "Starting Face"
+          },
+          "intensity_level": {
+            "type": "string",
+            "title": "Intensity Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "offset",
+          "hold_duration",
+          "starting_face",
+          "intensity_level"
+        ],
+        "title": "VeyruStellarReadingDTO",
+        "description": "Per-round stellar parameters shaping the Veyru procedure mapping."
       }
     }
   }

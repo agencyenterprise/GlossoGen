@@ -356,6 +356,8 @@ async def _tool_get_run(
             intern_takeover=detail.intern_takeover,
             labels=detail.labels,
             note=detail.note,
+            veyru_cases=detail.veyru_cases,
+            round_endings=detail.round_endings,
         )
 
     # Filter messages by channel
