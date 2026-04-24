@@ -3,6 +3,7 @@ or vocabulary during their communication.
 """
 
 import logging
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -65,8 +66,10 @@ class NeologismEvaluator(Evaluator):
         agent_configs: list[AgentConfig],
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
+        run_dir: Path,
     ) -> MetricResult:
         """Evaluate whether agents invented new vocabulary."""
+        _ = agent_configs, scenario, llm_provider, run_dir
         round_transcripts = build_round_transcripts(
             events=events,
             scenario=scenario,

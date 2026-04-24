@@ -570,6 +570,17 @@ export function RunList() {
                           >
                             {STATUS_LABELS[run.status] ?? run.status}
                           </span>
+                          {run.status === "in_progress" && run.current_round > 0 ? (
+                            <div className="font-mono text-[10px] text-muted-foreground">
+                              {(() => {
+                                const totalRound = run.scenario_config?.round_count;
+                                if (typeof totalRound === "number") {
+                                  return `Round ${run.current_round} / ${totalRound}`;
+                                }
+                                return `Round ${run.current_round}`;
+                              })()}
+                            </div>
+                          ) : null}
                         </td>
                         <td className="w-16 py-2 pr-4 text-right">
                           <span className="inline-flex items-center gap-1">

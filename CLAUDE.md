@@ -53,6 +53,9 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `slang_emergence_evaluator.py` — detects informal register shifts and colloquial expressions
   - `neologism_evaluator.py` — detects genuinely invented words (not abbreviations or codes)
   - `shorthand_codes_evaluator.py` — detects abbreviation systems and symbol-to-meaning mappings
+  - `round_ended_idle_evaluator.py` — flags rounds ending via the `all_agents_idle` trigger
+  - `round_ended_timeout_evaluator.py` — flags rounds ending via the `round_timeout` trigger
+  - `round_end_trigger_detection.py` — shared helpers for reading `RoundEnded` events
   - `prompts/` — Jinja2 templates for LLM judge prompts
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
   - `password_auth_middleware.py` — pure ASGI middleware for shared-password authentication
@@ -430,16 +433,22 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
 
 Available evaluators per scenario:
 
-Generic evaluators (available to all scenarios) focus on language emergence. Each evaluator is scoped to a specific phenomenon — their prompts explicitly list what the other evaluators cover, so they do not overlap:
+Generic evaluators (available to all scenarios). Language-emergence evaluators are each scoped to a specific phenomenon — their prompts explicitly list what the other evaluators cover, so they do not overlap:
 
 - `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style (NOT codes, slang, or new words)
 - `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames (NOT codes or new words)
 - `neologism` — genuinely invented words with new meanings (NOT abbreviations or code mappings)
 - `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding (NOT new words or slang)
+- `round_ended_idle` — flags rounds whose main phase ended because all agents went idle on `read_notifications` (deterministic, no LLM). Requires `round_ended` events in the log.
+- `round_ended_timeout` — flags rounds whose main phase ended because the wall-clock duration limit was reached (deterministic, no LLM). Requires `round_ended` events in the log.
 
 Scenario-specific evaluators:
 
-- **veyru**: generic + `language_emergence` (novel language in a fictional domain)
+- **veyru**: generic + the following veyru-specific evaluators:
+  - `language_emergence` — novel compressed language in the fictional domain (LLM judge)
+  - `round_success` — fraction of rounds the team stabilized the Veyru before collapse (deterministic, no LLM)
+  - `protocol_learned_after_swap` — whether two-team mode teams re-established a working protocol after an observer swap (LLM judge)
+  - `field_observer_transparency` — how clear the specialist's instructions were. Simulates a naive field observer per case stage: given only the specialist's messages on the `link` channel and the stage's `observable_symptoms`, force the LLM to invoke the real `stabilize_veyru` tool and judge the proposed action against `judge_expected_actions` via `judge_stabilization()`. Score = mean per-round accuracy (matches / stages). Single-team only; two-team runs return FAIL. Requires `veyru_case_started` events in the log.
 
 After evaluation, labels are automatically written to the run's `labels.json` in the format `eval:{evaluator}:{verdict}` where verdict is `identified`, `partial`, or `fail`. Previous `eval:` labels are replaced; user-added labels are preserved.
 

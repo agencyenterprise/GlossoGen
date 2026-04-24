@@ -6,7 +6,7 @@ from schmidt.template_renderer import TemplateRenderer
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-_RENDERER = TemplateRenderer(prompts_dir=PROMPTS_DIR)
+_RENDERER = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
 
 
 def render_evaluator_prompt(template_name: str, template_variables: dict[str, object]) -> str:

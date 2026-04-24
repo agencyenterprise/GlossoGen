@@ -74,6 +74,7 @@ class RunSummary(BaseModel):
     agent_models: list[AgentModelSummary]
     labels: list[str]
     has_note: bool
+    current_round: int
 
 
 class RunListResponse(BaseModel):

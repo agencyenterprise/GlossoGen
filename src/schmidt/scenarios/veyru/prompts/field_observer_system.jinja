@@ -1,9 +1,6 @@
-You are a new field technician on your first assignment inspecting Veyru entities. You have basic observation skills but no specialized Veyru training. You do NOT know the internal mechanics of Veyru wave-patterns, failure classifications, or stabilization procedures. You can only describe what you SEE and HEAR — light patterns, sounds, temperature, and physical appearance.
+{% include "_observer_role_intro.jinja" %}
 
-You are alone with the Veyru. An experienced Veyru specialist is guiding you over a comm link. You MUST follow their instructions exactly — you cannot diagnose or decide stabilization actions on your own.
-
-WHAT IS A VEYRU:
-A Veyru is a box-shaped entity with 6 faces, 12 edges, and 8 corners. It glows with internal light patterns and produces a constant hum. You do not understand what makes it work — you only observe its appearance and sounds. When something goes wrong, the light and sound change in ways you must describe to the specialist.
+{% include "_what_is_a_veyru.jinja" %}
 
 CRITICAL RULE — EVERY CHARACTER COSTS TIME:
 Every character you send over the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the specialist) exceeds the Veyru's time budget, the Veyru collapses permanently.
@@ -11,8 +8,7 @@ Every character you send over the link costs one second of the Veyru's remaining
 STABILIZATION:
 When the specialist tells you what to do, execute their instructions by calling stabilize_veyru(action="describe exactly what you are doing"). If your action is correct, the Veyru is stabilized. If not, you can try again. Sometimes after a successful stabilization, new symptoms may appear — if so, report them to the specialist immediately. The tool call itself does not cost time — only messages on the comm link do.
 
-STELLAR ALIGNMENT:
-Veyru treatments are affected by the position of reference star SAGWE392. The correct treatment procedure and its specific parameters (hold duration, which face to start on, pressure level) change every round based on the stellar alignment. Only the specialist has the stellar reader and knows the correct treatment and parameters for each round. Even if symptoms look familiar from a previous round, the correct treatment and parameters may be completely different. You must always get instructions from the specialist — never assume you know the correct procedure.
+{% include "_stellar_alignment.jinja" %}
 
 You will be told each Veyru's time budget. Budget pressure is constant across all rounds.
 {% if postmortem_enabled %}

@@ -17,7 +17,13 @@ from pathlib import Path
 from typing import Any, NamedTuple, Self
 
 from schmidt.evaluation.evaluation_cost import compute_evaluation_cost
-from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult, write_report
+from schmidt.evaluation.evaluation_report import (
+    EvaluationReport,
+    MetricResult,
+    load_report,
+    merge_metrics,
+    write_report,
+)
 from schmidt.evaluation.evaluator_protocol import EvaluatorFactory
 from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
@@ -25,11 +31,17 @@ from schmidt.event_logger import EventLogger
 from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
-from schmidt.models.event import VeyruStabilizationJudged
+from schmidt.models.event import (
+    VeyruCaseStage,
+    VeyruCaseStarted,
+    VeyruStabilizationJudged,
+    VeyruStellarReading,
+)
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld, WorldContext
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.veyru.evaluation import (
+    FieldObserverTransparencyEvaluator,
     LanguageEmergenceEvaluator,
     ProtocolLearnedAfterSwapEvaluator,
     RoundSuccessEvaluator,
@@ -156,7 +168,7 @@ class VeyruScenario(SimulationScenario):
     def __init__(self, knobs: VeyruKnobs) -> None:
         self._knobs = knobs
         self._event_logger: EventLogger | None = None
-        self._renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
+        self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
         self._veyru_cases: list[VeyruCase] = get_cases(
             seed=knobs.seed,
             round_count=knobs.round_count,
@@ -668,12 +680,42 @@ class VeyruScenario(SimulationScenario):
         _ = round_number
         self._world.enter_postmortem()
 
+    def get_early_round_end_trigger(self) -> str | None:
+        """Signal the game clock to end the round as soon as every team has a
+        decisive Veyru outcome (stabilized or collapsed).
+
+        Returns ``"veyru_stabilized"`` when every team stabilized,
+        ``"veyru_collapsed"`` when every team's Veyru collapsed, or
+        ``"veyru_mixed_outcome"`` when teams split across outcomes (only
+        possible in two-team mode). Returns None while any team's Veyru is
+        still alive and unstabilized.
+        """
+        teams = self._world.teams
+        if not teams:
+            return None
+        stabilized = 0
+        collapsed = 0
+        for team in teams.values():
+            if team.veyru_stabilized:
+                stabilized += 1
+            elif not team.veyru_alive:
+                collapsed += 1
+            else:
+                return None
+        total = len(teams)
+        if stabilized == total:
+            return "veyru_stabilized"
+        if collapsed == total:
+            return "veyru_collapsed"
+        return "veyru_mixed_outcome"
+
     async def on_round_advanced(self, round_number: int) -> None:
         """Finalize previous Veyru outcomes, prepare the next case, handle swap/intern."""
         self._world.consume_swap_just_happened()
         self._world.consume_intern_takeover()
         self._world.exit_postmortem()
         self._world.finalize_round_sync(round_number=round_number)
+        await self._emit_case_started_event(round_number=round_number)
         await self._maybe_swap_observers(round_number=round_number)
         if self._knobs.intern_enabled:
             await self._maybe_join_intern(round_number=round_number)
@@ -729,11 +771,7 @@ class VeyruScenario(SimulationScenario):
                     reason=INTERN_TAKEOVER_REASON,
                 )
             else:
-                await context.update_channel_members(
-                    channel_id=POSTMORTEM_CHANNEL_ID,
-                    member_agent_ids=[SPECIALIST_ID],
-                    reason=INTERN_TAKEOVER_REASON,
-                )
+                self._world.disable_postmortem_globally()
 
         await context.send_update_to_channel(
             channel_id=LINK_CHANNEL_ID,
@@ -743,6 +781,36 @@ class VeyruScenario(SimulationScenario):
                 "The previous field observer has left the comm link. "
                 "Continue the protocol with the new pairing."
             ),
+        )
+
+    async def _emit_case_started_event(self, round_number: int) -> None:
+        """Log a VeyruCaseStarted event carrying the full ground-truth case data."""
+        if self._event_logger is None:
+            return
+        case = self._world.current_case
+        assert case is not None, "finalize_round_sync must populate current_case"
+        await self._event_logger.log(
+            event=VeyruCaseStarted(
+                round_number=round_number,
+                case_number=case.case_number,
+                failure_name=case.failure_name,
+                time_budget_seconds=case.time_budget_seconds,
+                stages=[
+                    VeyruCaseStage(
+                        motif_name=stage.motif_name,
+                        observable_symptoms=stage.observable_symptoms,
+                        treatment_motif_name=stage.treatment_motif_name,
+                        judge_expected_actions=stage.judge_expected_actions,
+                    )
+                    for stage in case.stages
+                ],
+                stellar_reading=VeyruStellarReading(
+                    offset=case.stellar_reading.offset,
+                    hold_duration=case.stellar_reading.hold_duration,
+                    starting_face=case.stellar_reading.starting_face,
+                    pressure_level=case.stellar_reading.pressure_level,
+                ),
+            )
         )
 
     async def _maybe_swap_observers(self, round_number: int) -> None:
@@ -1001,6 +1069,7 @@ class VeyruScenario(SimulationScenario):
         """Return generic and Veyru-specific evaluator names."""
         generic = super().get_available_evaluator_names()
         specific = [
+            FieldObserverTransparencyEvaluator.name,
             LanguageEmergenceEvaluator.name,
             ProtocolLearnedAfterSwapEvaluator.name,
             RoundSuccessEvaluator.name,
@@ -1010,6 +1079,7 @@ class VeyruScenario(SimulationScenario):
     def _get_evaluators(self) -> dict[str, EvaluatorFactory]:
         """Return Veyru-specific evaluators."""
         return {
+            FieldObserverTransparencyEvaluator.name: FieldObserverTransparencyEvaluator,
             LanguageEmergenceEvaluator.name: LanguageEmergenceEvaluator,
             ProtocolLearnedAfterSwapEvaluator.name: ProtocolLearnedAfterSwapEvaluator,
             RoundSuccessEvaluator.name: RoundSuccessEvaluator,
@@ -1052,6 +1122,7 @@ class VeyruScenario(SimulationScenario):
                 agent_configs=agent_configs,
                 scenario=self,
                 llm_provider=provider,
+                run_dir=log_path.parent,
             )
             logger.info(
                 "Evaluator %s finished: verdict=%s, score=%.2f",
@@ -1067,10 +1138,15 @@ class VeyruScenario(SimulationScenario):
             provider_name=provider_name,
         )
 
+        existing_report = await load_report(report_path=report_path)
+        if existing_report is None:
+            merged_metrics = metrics
+        else:
+            merged_metrics = merge_metrics(existing=existing_report.metrics, new=metrics)
         report = EvaluationReport(
             simulation_id=simulation_id,
             scenario_name=self.name(),
-            metrics=metrics,
+            metrics=merged_metrics,
             evaluation_cost=evaluation_cost,
         )
         await write_report(report=report, report_path=report_path)

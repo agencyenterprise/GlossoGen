@@ -10,7 +10,13 @@ import logging
 import time
 
 from schmidt.event_logger import EventLogger
-from schmidt.models.event import InjectionDelivered, PostmortemStarted, RoundAdvanced, RunStatus
+from schmidt.models.event import (
+    InjectionDelivered,
+    PostmortemStarted,
+    RoundAdvanced,
+    RoundEnded,
+    RunStatus,
+)
 from schmidt.runtime.activity_notification import NewInfoNotification
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.scenario_world import WorldContext
@@ -239,7 +245,17 @@ class GameClock:
                 return RunStatus.SCENARIO_COMPLETE
 
             round_age = time.monotonic() - self._last_message_time
-            if self._all_agents_idle() and round_age >= MIN_ROUND_DURATION_SECONDS:
+            early_trigger = None
+            if not self._in_postmortem:
+                early_trigger = self._scenario.get_early_round_end_trigger()
+            if early_trigger is not None:
+                trigger = early_trigger
+                logger.info(
+                    "Round %d ending early via scenario trigger: %s",
+                    self._current_round,
+                    trigger,
+                )
+            elif self._all_agents_idle() and round_age >= MIN_ROUND_DURATION_SECONDS:
                 trigger = "all_agents_idle"
             elif self._phase_timed_out():
                 elapsed = time.monotonic() - self._last_message_time
@@ -264,6 +280,12 @@ class GameClock:
                     return RunStatus.SCENARIO_COMPLETE
                 await self._advance_round(trigger=trigger)
             else:
+                await self._event_logger.log(
+                    event=RoundEnded(
+                        round_number=self._current_round,
+                        trigger=trigger,
+                    ),
+                )
                 if self._has_postmortem(round_number=self._current_round):
                     await self._deliver_postmortem_injections(
                         round_number=self._current_round,

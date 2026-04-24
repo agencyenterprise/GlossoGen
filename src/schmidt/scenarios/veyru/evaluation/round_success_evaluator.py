@@ -7,6 +7,7 @@ as a separate opportunity and success is reported per team.
 """
 
 import logging
+from pathlib import Path
 from typing import NamedTuple
 
 from schmidt.evaluation.evaluation_report import MetricResult, Verdict
@@ -57,9 +58,10 @@ class RoundSuccessEvaluator(Evaluator):
         agent_configs: list[AgentConfig],
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
+        run_dir: Path,
     ) -> MetricResult:
         """Count successful stabilizations from tool results and world events."""
-        _ = scenario, llm_provider
+        _ = scenario, llm_provider, run_dir
         is_two_team = _is_two_team_mode(agent_configs=agent_configs)
         total_rounds = _count_rounds(events=events)
 
@@ -223,15 +225,18 @@ def _count_rounds(events: list[SimulationEvent]) -> int:
 
 
 def _find_stabilized_rounds(events: list[SimulationEvent]) -> set[int]:
-    """Return the set of rounds where stabilize_veyru succeeded."""
+    """Return the set of rounds fully stabilized (final stage completed)."""
     rounds: set[int] = set()
     for event in events:
         if not isinstance(event, ToolResultReceived):
             continue
         if event.tool_name != STABILIZE_VEYRU_TOOL:
             continue
-        if STABILIZATION_SUCCESS_MARKER in event.result:
-            rounds.add(event.round_number)
+        if STABILIZATION_SUCCESS_MARKER not in event.result:
+            continue
+        if NEW_SYMPTOMS_MARKER in event.result:
+            continue
+        rounds.add(event.round_number)
     return rounds
 
 
@@ -247,10 +252,11 @@ def _find_collapsed_rounds(events: list[SimulationEvent]) -> set[int]:
 
 
 def _find_partial_rounds(events: list[SimulationEvent]) -> set[int]:
-    """Return the set of rounds where at least one stage was stabilized.
+    """Return rounds where at least one intermediate stage was stabilized.
 
-    Detects intermediate stage completions from tool results that contain
-    the stage marker but not the full-success marker.
+    Intermediate-stage tool results contain both ``STABILIZATION_SUCCESS_MARKER``
+    and ``NEW_SYMPTOMS_MARKER``; the scenario emits that combined phrasing when a
+    stage clears but more stages remain.
     """
     rounds: set[int] = set()
     for event in events:
@@ -258,6 +264,6 @@ def _find_partial_rounds(events: list[SimulationEvent]) -> set[int]:
             continue
         if event.tool_name != STABILIZE_VEYRU_TOOL:
             continue
-        if NEW_SYMPTOMS_MARKER in event.result and STABILIZATION_SUCCESS_MARKER not in event.result:
+        if STABILIZATION_SUCCESS_MARKER in event.result and NEW_SYMPTOMS_MARKER in event.result:
             rounds.add(event.round_number)
     return rounds

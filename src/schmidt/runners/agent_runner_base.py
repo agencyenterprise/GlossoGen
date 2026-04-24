@@ -25,6 +25,12 @@ class AgentRunner(ABC):
         agent_config: AgentConfig,
         mcp_server_url: str,
         event_logger: EventLogger,
+        cost_tracker: dict[str, float],
     ) -> AgentRunResult:
-        """Start the agent. Blocks until the agent finishes."""
+        """Start the agent. Blocks until the agent finishes.
+
+        ``cost_tracker`` is a shared dict keyed by ``agent_id`` that the runner
+        must update after each completed cycle so the supervisor can recover
+        the agent's last known cost even if its task is cancelled on shutdown.
+        """
         ...

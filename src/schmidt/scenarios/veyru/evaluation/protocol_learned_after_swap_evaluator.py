@@ -9,6 +9,7 @@ post-boundary window is where the newcomer must continue using it.
 """
 
 import logging
+from pathlib import Path
 from typing import Literal, NamedTuple
 
 from pydantic import BaseModel, Field
@@ -113,9 +114,10 @@ class ProtocolLearnedAfterSwapEvaluator(Evaluator):
         agent_configs: list[AgentConfig],
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
+        run_dir: Path,
     ) -> MetricResult:
         """Score newcomer adoption of the pre-boundary protocol."""
-        _ = agent_configs, scenario
+        _ = agent_configs, scenario, run_dir
         config = extract_scenario_config(events=events)
         window = _detect_boundary_window(config=config)
         if window is None:

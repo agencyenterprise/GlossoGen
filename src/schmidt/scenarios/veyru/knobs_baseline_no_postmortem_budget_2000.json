@@ -1,0 +1,17 @@
+{
+  "announce_swap": false,
+  "intern_enabled": false,
+  "intern_join_round": null,
+  "intern_takeover_round": null,
+  "judge_model": "claude-haiku-4-5-20251001",
+  "judge_provider": "anthropic",
+  "max_round_duration_seconds": 300,
+  "model_overrides": {},
+  "postmortem_after_swap": false,
+  "postmortem_enabled": false,
+  "round_count": 15,
+  "round_time_budget_seconds": 2000,
+  "seed": 42,
+  "swap_round": null,
+  "two_teams": false
+}

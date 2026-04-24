@@ -128,6 +128,20 @@ class RoundAdvanced(EventBase):
     trigger: str
 
 
+class RoundEnded(EventBase):
+    """Emitted when a round's main phase ends, before any postmortem phase begins.
+
+    Captures why the round's main phase terminated (``all_agents_idle`` or
+    ``round_timeout``). Distinct from ``RoundAdvanced.trigger``, which describes
+    why the most recent phase (round OR postmortem) ended immediately before
+    the clock advances to the next round.
+    """
+
+    event_type: Literal["round_ended"] = "round_ended"
+    round_number: int
+    trigger: str
+
+
 class InjectionDelivered(EventBase):
     """Emitted when a scenario injection is delivered to an agent."""
 
@@ -191,6 +205,41 @@ class SimulationEnded(EventBase):
     total_cost_usd: float
 
 
+class VeyruStellarReading(BaseModel):
+    """Per-round stellar parameters derived from the position of star SAGWE392."""
+
+    offset: int
+    hold_duration: int
+    starting_face: str
+    pressure_level: str
+
+
+class VeyruCaseStage(BaseModel):
+    """One stage of a Veyru case, with ground-truth symptoms and procedure."""
+
+    motif_name: str
+    observable_symptoms: str
+    treatment_motif_name: str
+    judge_expected_actions: str
+
+
+class VeyruCaseStarted(EventBase):
+    """Emitted once at round start with full ground-truth case data.
+
+    Evaluators read per-stage `observable_symptoms` and `judge_expected_actions`
+    directly from this event, decoupling them from the real observer's
+    stabilize_veyru tool calls.
+    """
+
+    event_type: Literal["veyru_case_started"] = "veyru_case_started"
+    round_number: int
+    case_number: int
+    failure_name: str
+    time_budget_seconds: int
+    stages: list[VeyruCaseStage]
+    stellar_reading: VeyruStellarReading
+
+
 class VeyruStabilizationJudged(EventBase):
     """Emitted by the veyru scenario after the stabilization judge rules on a stabilize_veyru call.
 
@@ -219,6 +268,7 @@ SimulationEvent = Annotated[
         ToolCallInvoked,
         ToolResultReceived,
         RoundAdvanced,
+        RoundEnded,
         InjectionDelivered,
         PostmortemStarted,
         ChannelHistoryCleared,
@@ -226,6 +276,7 @@ SimulationEvent = Annotated[
         WorldEventDelivered,
         SimulationEnded,
         VeyruStabilizationJudged,
+        VeyruCaseStarted,
     ],
     Discriminator("event_type"),
 ]

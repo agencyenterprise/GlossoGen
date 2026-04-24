@@ -20,7 +20,6 @@ from schmidt.models.event import (
     SimulationEnded,
     SimulationStarted,
 )
-from schmidt.runners.agent_run_result import AgentRunResult
 from schmidt.runners.agent_runner_base import AgentRunner
 from schmidt.runtime.activity_notification import NewMessagesNotification
 from schmidt.runtime.agent_session import AgentSession
@@ -270,7 +269,11 @@ class AutonomousSupervisor:
         # so no events are recorded with round_number=0.
         await game_clock.start_initial_round()
 
-        # Launch one agent runner per agent as concurrent tasks.
+        # Launch one agent runner per agent as concurrent tasks. ``cost_tracker``
+        # is updated by each runner after every cycle so the supervisor can
+        # still recover the agent's last known cost if its task gets cancelled
+        # on shutdown before it can return an AgentRunResult.
+        cost_tracker: dict[str, float] = {}
         agent_tasks = []
         for config in self._agent_configs:
             runner = self._runner_factory()
@@ -279,6 +282,7 @@ class AutonomousSupervisor:
                     agent_config=config,
                     mcp_server_url=mcp_server_url,
                     event_logger=self._event_logger,
+                    cost_tracker=cost_tracker,
                 ),
                 name=f"agent-{config.agent_id}",
             )
@@ -323,12 +327,12 @@ class AutonomousSupervisor:
         # Broadcast done to all agents.
         runtime.broadcast_done(reason=termination_status.value)
 
-        # Wait for agent tasks to finish and collect their cost results.
-        agent_results: list[AgentRunResult] = []
+        # Wait for each agent task to finish. We don't consume the returned
+        # AgentRunResult for cost — cost_tracker is the source of truth so
+        # that cancelled agents still contribute their last recorded value.
         for task in agent_tasks:
             try:
-                result = await asyncio.wait_for(task, timeout=30.0)
-                agent_results.append(result)
+                await asyncio.wait_for(task, timeout=30.0)
             except asyncio.TimeoutError:
                 logger.warning("Agent task %s did not finish in 30s, cancelling", task.get_name())
                 task.cancel()
@@ -339,7 +343,7 @@ class AutonomousSupervisor:
             except Exception:
                 logger.exception("Agent task %s failed", task.get_name())
 
-        total_cost_usd = sum(r.total_cost_usd for r in agent_results)
+        total_cost_usd = sum(cost_tracker.values())
 
         # Stop the world simulation.
         logger.info("Stopping world simulation")

@@ -41,6 +41,7 @@ class _SinglePassResult(NamedTuple):
     agent_models: list[AgentModelSummary]
     message_count: int
     cost_usd: float
+    current_round: int
 
 
 async def scan_jsonl(file_path: Path) -> _SinglePassResult:
@@ -58,6 +59,7 @@ async def scan_jsonl(file_path: Path) -> _SinglePassResult:
     total_output = 0
     total_cache_read = 0
     total_cache_write = 0
+    current_round = 0
 
     async with aiofiles.open(file_path, mode="rb") as f:
         async for line in f:
@@ -94,6 +96,10 @@ async def scan_jsonl(file_path: Path) -> _SinglePassResult:
                     total_output += usage.get("output_tokens", 0)
                     total_cache_read += usage.get("cache_read_input_tokens", 0)
                     total_cache_write += usage.get("cache_creation_input_tokens", 0)
+            elif event_type == "round_advanced":
+                round_number = raw.get("round_number", 0)
+                if round_number > current_round:
+                    current_round = round_number
 
     if first_bytes is None:
         raise ValueError(f"File is empty: {file_path}")
@@ -145,6 +151,7 @@ async def scan_jsonl(file_path: Path) -> _SinglePassResult:
         agent_models=agent_models,
         message_count=message_count,
         cost_usd=cost_usd,
+        current_round=current_round,
     )
 
 
@@ -265,6 +272,7 @@ async def _build_summary(
             agent_models=scan.agent_models,
             labels=labels,
             has_note=has_note,
+            current_round=scan.current_round,
         )
 
     manifest = read_manifest(run_dir=timestamp_dir)
@@ -296,6 +304,7 @@ async def _build_summary(
         agent_models=scan.agent_models,
         labels=labels,
         has_note=has_note,
+        current_round=scan.current_round,
     )
 
 

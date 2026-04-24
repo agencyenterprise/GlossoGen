@@ -2067,6 +2067,10 @@
           "has_note": {
             "type": "boolean",
             "title": "Has Note"
+          },
+          "current_round": {
+            "type": "integer",
+            "title": "Current Round"
           }
         },
         "type": "object",
@@ -2088,7 +2092,8 @@
           "provider",
           "agent_models",
           "labels",
-          "has_note"
+          "has_note",
+          "current_round"
         ],
         "title": "RunSummary",
         "description": "Summary of a single simulation run for the runs list endpoint."
