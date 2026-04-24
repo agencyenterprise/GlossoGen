@@ -21,7 +21,7 @@ class VeyruKnobs(BaseKnobs):
     round cases. ``postmortem_enabled``
     controls whether a shared discussion phase follows each round.
     ``two_teams`` is an opt-in toggle that runs two isolated observer/
-    specialist teams in parallel on identical cases each round.
+    stabilization engineer teams in parallel on identical cases each round.
     ``swap_round`` (only meaningful when ``two_teams`` is true) is the last
     round before the two teams' field observers are swapped between teams.
     ``announce_swap`` controls whether agents are explicitly notified that

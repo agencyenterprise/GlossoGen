@@ -65,7 +65,7 @@ class VeyruOutcome(NamedTuple):
 class TeamState:
     """Mutable per-team state tracked by the Veyru world.
 
-    A team owns a communication channel, a specialist, and a (possibly
+    A team owns a communication channel, a stabilization engineer, and a (possibly
     swappable) field observer. Per-round character usage, stabilization
     progress, and historical outcomes are all team-scoped.
     """
@@ -74,13 +74,13 @@ class TeamState:
         self,
         team_id: TeamId,
         current_observer_id: str,
-        specialist_id: str,
+        stabilization_engineer_id: str,
         link_channel_id: str,
         postmortem_channel_id: str | None,
     ) -> None:
         self.team_id = team_id
         self.current_observer_id = current_observer_id
-        self.specialist_id = specialist_id
+        self.stabilization_engineer_id = stabilization_engineer_id
         self.link_channel_id = link_channel_id
         self.postmortem_channel_id = postmortem_channel_id
         self.current_round_characters: int = 0
@@ -239,13 +239,13 @@ class VeyruWorld(ScenarioWorld):
     def get_team_for_agent(self, agent_id: str) -> TeamId:
         """Look up which team an agent currently belongs to.
 
-        Observers are resolved by their current assignment; specialists by
+        Observers are resolved by their current assignment; stabilization engineers by
         their fixed assignment. Raises ValueError for unknown agents.
         """
         for team_id, state in self._teams.items():
             if state.current_observer_id == agent_id:
                 return team_id
-            if state.specialist_id == agent_id:
+            if state.stabilization_engineer_id == agent_id:
                 return team_id
         raise ValueError(f"Unknown agent: {agent_id}")
 

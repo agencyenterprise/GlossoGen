@@ -1,4 +1,4 @@
-"""Evaluator that measures how transparent the specialist's instructions were.
+"""Evaluator that measures how transparent the stabilization engineer's instructions were.
 
 For each stage of each round's case (ground-truth data emitted via
 ``VeyruCaseStarted`` events), this evaluator replays the real simulation up to
@@ -9,7 +9,7 @@ stage, shows the full chronological transcript to a fresh LLM, forces a new
 
 The transcript is the exact context the real observer had: every round's
 boundary, every ``veyru_case_started`` symptom reveal, every message on the
-link channel from both the specialist and the real observer, and every prior
+link channel from both the stabilization engineer and the real observer, and every prior
 ``stabilize_veyru`` tool call with its result. That includes cross-round
 history, so the simulated observer can resolve references like "same technique
 as round 2" the same way the real observer could.
@@ -51,7 +51,7 @@ from schmidt.scenarios.veyru.ids import (
     LINK_CHANNEL_ID,
     OBSERVER_A_ID,
     OBSERVER_B_ID,
-    SPECIALIST_ID,
+    STABILIZATION_ENGINEER_ID,
     STABILIZE_VEYRU_TOOL,
 )
 from schmidt.scenarios.veyru.stabilization_judge import judge_stabilization
@@ -102,7 +102,7 @@ class FieldObserverTransparencyEvaluator(Evaluator):
 
     The score measures how likely a fresh observer placed in the exact
     conversational context the real observer had would have performed the
-    correct stabilization — i.e., how transparent the specialist's
+    correct stabilization — i.e., how transparent the stabilization engineer's
     instructions actually were in practice, given everything the observer
     already knew.
     """
@@ -294,8 +294,8 @@ def _build_transcript_entries(events: list[SimulationEvent]) -> list[TranscriptE
             if event.message.channel_id != LINK_CHANNEL_ID:
                 continue
             sender = event.message.sender_agent_id
-            if sender == SPECIALIST_ID:
-                label = "specialist"
+            if sender == STABILIZATION_ENGINEER_ID:
+                label = "engineer"
             elif sender == FIELD_OBSERVER_ID:
                 label = "you (field observer)"
             else:

@@ -328,7 +328,7 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config src/schmidt/scenarios/veyru/knobs_default.json \
-  agents.specialist.model=gpt-5.4 agents.specialist.provider=openai \
+  agents.stabilization_engineer.model=gpt-5.4 agents.stabilization_engineer.provider=openai \
   > ./runs/veyru_stdout.log 2>&1 &
 
 # Override knobs inline on top of a base config
@@ -387,7 +387,7 @@ Each agent uses the default `--model` and `--provider` unless overridden. Per-ag
 ```bash
 schmidt run veyru --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config knobs_default.json \
-  agents.specialist.model=gpt-5.4 agents.specialist.provider=openai
+  agents.stabilization_engineer.model=gpt-5.4 agents.stabilization_engineer.provider=openai
 ```
 
 Or embed in the `--config` JSON file under `model_overrides`:
@@ -396,7 +396,7 @@ Or embed in the `--config` JSON file under `model_overrides`:
 {
   "max_round_duration_seconds": 300,
   "model_overrides": {
-    "specialist": {"model": "gpt-5.4", "provider": "openai"},
+    "stabilization_engineer": {"model": "gpt-5.4", "provider": "openai"},
     "field_observer": {"model": "claude-opus-4-6", "provider": "anthropic"}
   },
   "round_count": 12
@@ -448,7 +448,7 @@ Scenario-specific evaluators:
   - `language_emergence` — novel compressed language in the fictional domain (LLM judge)
   - `round_success` — fraction of rounds the team stabilized the Veyru before collapse (deterministic, no LLM)
   - `protocol_learned_after_swap` — whether two-team mode teams re-established a working protocol after an observer swap (LLM judge)
-  - `field_observer_transparency` — how clear the specialist's instructions were. Simulates a naive field observer per case stage: given only the specialist's messages on the `link` channel and the stage's `observable_symptoms`, force the LLM to invoke the real `stabilize_veyru` tool and judge the proposed action against `judge_expected_actions` via `judge_stabilization()`. Score = mean per-round accuracy (matches / stages). Single-team only; two-team runs return FAIL. Requires `veyru_case_started` events in the log.
+  - `field_observer_transparency` — how clear the stabilization engineer's instructions were. Simulates a naive field observer per case stage: given only the stabilization engineer's messages on the `link` channel and the stage's `observable_symptoms`, force the LLM to invoke the real `stabilize_veyru` tool and judge the proposed action against `judge_expected_actions` via `judge_stabilization()`. Score = mean per-round accuracy (matches / stages). Single-team only; two-team runs return FAIL. Requires `veyru_case_started` events in the log.
 
 After evaluation, labels are automatically written to the run's `labels.json` in the format `eval:{evaluator}:{verdict}` where verdict is `identified`, `partial`, or `fail`. Previous `eval:` labels are replaced; user-added labels are preserved.
 

@@ -3,10 +3,10 @@
 {% include "_what_is_a_veyru.jinja" %}
 
 CRITICAL RULE — EVERY CHARACTER COSTS TIME:
-Every character you send over the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the specialist) exceeds the Veyru's time budget, the Veyru collapses permanently.
+Every character you send over the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the engineer) exceeds the Veyru's time budget, the Veyru collapses permanently.
 
 STABILIZATION:
-When the specialist tells you what to do, execute their instructions by calling stabilize_veyru(action="describe exactly what you are doing"). If your action is correct, the Veyru is stabilized. If not, you can try again. Sometimes after a successful stabilization, new symptoms may appear — if so, report them to the specialist immediately. The tool call itself does not cost time — only messages on the comm link do.
+When the engineer tells you what to do, execute their instructions by calling stabilize_veyru(action="describe exactly what you are doing"). If your action is correct, the Veyru is stabilized. If not, you can try again. Sometimes after a successful stabilization, new symptoms may appear — if so, report them to the engineer immediately. The tool call itself does not cost time — only messages on the comm link do.
 
 {% include "_stellar_alignment.jinja" %}
 
@@ -14,7 +14,7 @@ You will be told each Veyru's time budget. Budget pressure is constant across al
 {% if postmortem_enabled %}
 
 DISCUSSION PHASE:
-After each round, there is a discussion phase where both you and the specialist can talk in the "team discussion" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.
+After each round, there is a discussion phase where both you and the engineer can talk in the "team discussion" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.
 {% endif %}
 
 You have access to the following communication channels. Use the exact channel_id when sending messages:

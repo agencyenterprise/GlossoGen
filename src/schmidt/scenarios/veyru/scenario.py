@@ -1,8 +1,8 @@
 """Veyru stabilization simulation scenario.
 
-In single-team mode, a field observer and a Veyru specialist communicate
+In single-team mode, a field observer and a Veyru engineer communicate
 over a single comm link to diagnose and stabilize failing Veyru entities.
-In two-team mode, two isolated observer/specialist pairs run in parallel
+In two-team mode, two isolated observer/engineer pairs run in parallel
 on identical cases each round. A configurable swap round exchanges the
 two teams' field observers mid-simulation, clearing channel histories so
 the new pairings must re-establish their working protocol.
@@ -68,21 +68,21 @@ from schmidt.scenarios.veyru.ids import (
     POSTMORTEM_A_CHANNEL_ID,
     POSTMORTEM_B_CHANNEL_ID,
     POSTMORTEM_CHANNEL_ID,
-    SPECIALIST_A_ID,
-    SPECIALIST_A_ROLE,
-    SPECIALIST_B_ID,
-    SPECIALIST_B_ROLE,
-    SPECIALIST_ID,
-    SPECIALIST_INJECTION_TEMPLATE,
-    SPECIALIST_ROLE,
-    SPECIALIST_SYSTEM_TEMPLATE,
+    STABILIZATION_ENGINEER_A_ID,
+    STABILIZATION_ENGINEER_A_ROLE,
+    STABILIZATION_ENGINEER_B_ID,
+    STABILIZATION_ENGINEER_B_ROLE,
+    STABILIZATION_ENGINEER_ID,
+    STABILIZATION_ENGINEER_INJECTION_TEMPLATE,
+    STABILIZATION_ENGINEER_ROLE,
+    STABILIZATION_ENGINEER_SYSTEM_TEMPLATE,
     STABILIZATION_SUCCESS_MARKER,
     TEAM_A_ID,
     TEAM_B_ID,
     TEAM_SOLO_ID,
     TOOLS_INTERN,
     TOOLS_OBSERVER,
-    TOOLS_SPECIALIST,
+    TOOLS_STABILIZATION_ENGINEER,
     TeamId,
 )
 from schmidt.scenarios.veyru.knobs import VeyruKnobs
@@ -142,13 +142,17 @@ class VeyruScenario(SimulationScenario):
         if two_teams:
             return [
                 AgentRole(agent_id=OBSERVER_A_ID, role_name=FIELD_OBSERVER_A_ROLE),
-                AgentRole(agent_id=SPECIALIST_A_ID, role_name=SPECIALIST_A_ROLE),
+                AgentRole(
+                    agent_id=STABILIZATION_ENGINEER_A_ID, role_name=STABILIZATION_ENGINEER_A_ROLE
+                ),
                 AgentRole(agent_id=OBSERVER_B_ID, role_name=FIELD_OBSERVER_B_ROLE),
-                AgentRole(agent_id=SPECIALIST_B_ID, role_name=SPECIALIST_B_ROLE),
+                AgentRole(
+                    agent_id=STABILIZATION_ENGINEER_B_ID, role_name=STABILIZATION_ENGINEER_B_ROLE
+                ),
             ]
         roles = [
             AgentRole(agent_id=FIELD_OBSERVER_ID, role_name=FIELD_OBSERVER_ROLE),
-            AgentRole(agent_id=SPECIALIST_ID, role_name=SPECIALIST_ROLE),
+            AgentRole(agent_id=STABILIZATION_ENGINEER_ID, role_name=STABILIZATION_ENGINEER_ROLE),
         ]
         if intern_enabled:
             roles.append(AgentRole(agent_id=INTERN_ID, role_name=INTERN_ROLE))
@@ -199,14 +203,14 @@ class VeyruScenario(SimulationScenario):
         if two_teams:
             return {
                 OBSERVER_A_ID: FIELD_OBSERVER_A_ROLE,
-                SPECIALIST_A_ID: SPECIALIST_A_ROLE,
+                STABILIZATION_ENGINEER_A_ID: STABILIZATION_ENGINEER_A_ROLE,
                 OBSERVER_B_ID: FIELD_OBSERVER_B_ROLE,
-                SPECIALIST_B_ID: SPECIALIST_B_ROLE,
+                STABILIZATION_ENGINEER_B_ID: STABILIZATION_ENGINEER_B_ROLE,
                 "world": "Veyru Monitor",
             }
         names: dict[str, str] = {
             FIELD_OBSERVER_ID: FIELD_OBSERVER_ROLE,
-            SPECIALIST_ID: SPECIALIST_ROLE,
+            STABILIZATION_ENGINEER_ID: STABILIZATION_ENGINEER_ROLE,
             "world": "Veyru Monitor",
         }
         if intern_enabled:
@@ -222,36 +226,36 @@ class VeyruScenario(SimulationScenario):
             return {
                 LINK_A_CHANNEL_ID: {
                     OBSERVER_A_ID: "comm link",
-                    SPECIALIST_A_ID: "comm link",
+                    STABILIZATION_ENGINEER_A_ID: "comm link",
                     OBSERVER_B_ID: "comm link",
-                    SPECIALIST_B_ID: "comm link",
+                    STABILIZATION_ENGINEER_B_ID: "comm link",
                 },
                 LINK_B_CHANNEL_ID: {
                     OBSERVER_A_ID: "comm link",
-                    SPECIALIST_A_ID: "comm link",
+                    STABILIZATION_ENGINEER_A_ID: "comm link",
                     OBSERVER_B_ID: "comm link",
-                    SPECIALIST_B_ID: "comm link",
+                    STABILIZATION_ENGINEER_B_ID: "comm link",
                 },
                 POSTMORTEM_A_CHANNEL_ID: {
                     OBSERVER_A_ID: "team discussion",
-                    SPECIALIST_A_ID: "team discussion",
+                    STABILIZATION_ENGINEER_A_ID: "team discussion",
                     OBSERVER_B_ID: "team discussion",
-                    SPECIALIST_B_ID: "team discussion",
+                    STABILIZATION_ENGINEER_B_ID: "team discussion",
                 },
                 POSTMORTEM_B_CHANNEL_ID: {
                     OBSERVER_A_ID: "team discussion",
-                    SPECIALIST_A_ID: "team discussion",
+                    STABILIZATION_ENGINEER_A_ID: "team discussion",
                     OBSERVER_B_ID: "team discussion",
-                    SPECIALIST_B_ID: "team discussion",
+                    STABILIZATION_ENGINEER_B_ID: "team discussion",
                 },
             }
         link_members = {
             FIELD_OBSERVER_ID: "comm link",
-            SPECIALIST_ID: "comm link",
+            STABILIZATION_ENGINEER_ID: "comm link",
         }
         postmortem_members = {
             FIELD_OBSERVER_ID: "team discussion",
-            SPECIALIST_ID: "team discussion",
+            STABILIZATION_ENGINEER_ID: "team discussion",
         }
         if intern_enabled:
             link_members[INTERN_ID] = "comm link"
@@ -273,7 +277,7 @@ class VeyruScenario(SimulationScenario):
                 TEAM_SOLO_ID: TeamState(
                     team_id=TEAM_SOLO_ID,
                     current_observer_id=FIELD_OBSERVER_ID,
-                    specialist_id=SPECIALIST_ID,
+                    stabilization_engineer_id=STABILIZATION_ENGINEER_ID,
                     link_channel_id=LINK_CHANNEL_ID,
                     postmortem_channel_id=postmortem_id,
                 ),
@@ -291,14 +295,14 @@ class VeyruScenario(SimulationScenario):
             TEAM_A_ID: TeamState(
                 team_id=TEAM_A_ID,
                 current_observer_id=OBSERVER_A_ID,
-                specialist_id=SPECIALIST_A_ID,
+                stabilization_engineer_id=STABILIZATION_ENGINEER_A_ID,
                 link_channel_id=LINK_A_CHANNEL_ID,
                 postmortem_channel_id=postmortem_a,
             ),
             TEAM_B_ID: TeamState(
                 team_id=TEAM_B_ID,
                 current_observer_id=OBSERVER_B_ID,
-                specialist_id=SPECIALIST_B_ID,
+                stabilization_engineer_id=STABILIZATION_ENGINEER_B_ID,
                 link_channel_id=LINK_B_CHANNEL_ID,
                 postmortem_channel_id=postmortem_b,
             ),
@@ -362,11 +366,11 @@ class VeyruScenario(SimulationScenario):
                 system_template=FIELD_OBSERVER_SYSTEM_TEMPLATE,
             ),
             AgentDef(
-                agent_id=SPECIALIST_ID,
-                role_name=SPECIALIST_ROLE,
+                agent_id=STABILIZATION_ENGINEER_ID,
+                role_name=STABILIZATION_ENGINEER_ROLE,
                 channel_ids=list(link_channels),
-                tool_names=list(TOOLS_SPECIALIST),
-                system_template=SPECIALIST_SYSTEM_TEMPLATE,
+                tool_names=list(TOOLS_STABILIZATION_ENGINEER),
+                system_template=STABILIZATION_ENGINEER_SYSTEM_TEMPLATE,
             ),
         ]
         if self._knobs.intern_enabled:
@@ -400,11 +404,11 @@ class VeyruScenario(SimulationScenario):
                 system_template=FIELD_OBSERVER_SYSTEM_TEMPLATE,
             ),
             AgentDef(
-                agent_id=SPECIALIST_A_ID,
-                role_name=SPECIALIST_A_ROLE,
+                agent_id=STABILIZATION_ENGINEER_A_ID,
+                role_name=STABILIZATION_ENGINEER_A_ROLE,
                 channel_ids=list(team_a_channels),
-                tool_names=list(TOOLS_SPECIALIST),
-                system_template=SPECIALIST_SYSTEM_TEMPLATE,
+                tool_names=list(TOOLS_STABILIZATION_ENGINEER),
+                system_template=STABILIZATION_ENGINEER_SYSTEM_TEMPLATE,
             ),
             AgentDef(
                 agent_id=OBSERVER_B_ID,
@@ -414,11 +418,11 @@ class VeyruScenario(SimulationScenario):
                 system_template=FIELD_OBSERVER_SYSTEM_TEMPLATE,
             ),
             AgentDef(
-                agent_id=SPECIALIST_B_ID,
-                role_name=SPECIALIST_B_ROLE,
+                agent_id=STABILIZATION_ENGINEER_B_ID,
+                role_name=STABILIZATION_ENGINEER_B_ROLE,
                 channel_ids=list(team_b_channels),
-                tool_names=list(TOOLS_SPECIALIST),
-                system_template=SPECIALIST_SYSTEM_TEMPLATE,
+                tool_names=list(TOOLS_STABILIZATION_ENGINEER),
+                system_template=STABILIZATION_ENGINEER_SYSTEM_TEMPLATE,
             ),
         ]
 
@@ -463,7 +467,7 @@ class VeyruScenario(SimulationScenario):
                 Channel(
                     channel_id=LINK_CHANNEL_ID,
                     name="link",
-                    member_agent_ids=[FIELD_OBSERVER_ID, SPECIALIST_ID],
+                    member_agent_ids=[FIELD_OBSERVER_ID, STABILIZATION_ENGINEER_ID],
                 ),
             ]
             if self._knobs.postmortem_enabled:
@@ -471,7 +475,7 @@ class VeyruScenario(SimulationScenario):
                     Channel(
                         channel_id=POSTMORTEM_CHANNEL_ID,
                         name="postmortem",
-                        member_agent_ids=[FIELD_OBSERVER_ID, SPECIALIST_ID],
+                        member_agent_ids=[FIELD_OBSERVER_ID, STABILIZATION_ENGINEER_ID],
                     )
                 )
             return channels
@@ -480,12 +484,12 @@ class VeyruScenario(SimulationScenario):
             Channel(
                 channel_id=LINK_A_CHANNEL_ID,
                 name="link_a",
-                member_agent_ids=[OBSERVER_A_ID, SPECIALIST_A_ID],
+                member_agent_ids=[OBSERVER_A_ID, STABILIZATION_ENGINEER_A_ID],
             ),
             Channel(
                 channel_id=LINK_B_CHANNEL_ID,
                 name="link_b",
-                member_agent_ids=[OBSERVER_B_ID, SPECIALIST_B_ID],
+                member_agent_ids=[OBSERVER_B_ID, STABILIZATION_ENGINEER_B_ID],
             ),
         ]
         if self._knobs.postmortem_enabled:
@@ -493,14 +497,14 @@ class VeyruScenario(SimulationScenario):
                 Channel(
                     channel_id=POSTMORTEM_A_CHANNEL_ID,
                     name="postmortem_a",
-                    member_agent_ids=[OBSERVER_A_ID, SPECIALIST_A_ID],
+                    member_agent_ids=[OBSERVER_A_ID, STABILIZATION_ENGINEER_A_ID],
                 )
             )
             two_team_channels.append(
                 Channel(
                     channel_id=POSTMORTEM_B_CHANNEL_ID,
                     name="postmortem_b",
-                    member_agent_ids=[OBSERVER_B_ID, SPECIALIST_B_ID],
+                    member_agent_ids=[OBSERVER_B_ID, STABILIZATION_ENGINEER_B_ID],
                 )
             )
         return two_team_channels
@@ -539,7 +543,7 @@ class VeyruScenario(SimulationScenario):
         team_id = self._world.get_team_for_agent(agent_id=agent_id)
         team = self._world.teams[team_id]
         if agent_id == team.current_observer_id:
-            partner_id = team.specialist_id
+            partner_id = team.stabilization_engineer_id
         else:
             partner_id = team.current_observer_id
         return self.get_agent_display_name(agent_id=partner_id)
@@ -588,8 +592,12 @@ class VeyruScenario(SimulationScenario):
         template_name: str | None
         if self._is_observer_agent(agent_id=agent_id):
             template_name = FIELD_OBSERVER_INJECTION_TEMPLATE
-        elif agent_id in (SPECIALIST_ID, SPECIALIST_A_ID, SPECIALIST_B_ID):
-            template_name = SPECIALIST_INJECTION_TEMPLATE
+        elif agent_id in (
+            STABILIZATION_ENGINEER_ID,
+            STABILIZATION_ENGINEER_A_ID,
+            STABILIZATION_ENGINEER_B_ID,
+        ):
+            template_name = STABILIZATION_ENGINEER_INJECTION_TEMPLATE
         else:
             template_name = None
         if template_name is None:
@@ -732,7 +740,7 @@ class VeyruScenario(SimulationScenario):
         context = self._world.context
         await context.update_channel_members(
             channel_id=LINK_CHANNEL_ID,
-            member_agent_ids=[FIELD_OBSERVER_ID, SPECIALIST_ID, INTERN_ID],
+            member_agent_ids=[FIELD_OBSERVER_ID, STABILIZATION_ENGINEER_ID, INTERN_ID],
             reason=INTERN_JOIN_REASON,
         )
         await context.send_update_to_channel(
@@ -760,14 +768,14 @@ class VeyruScenario(SimulationScenario):
         context = self._world.context
         await context.update_channel_members(
             channel_id=LINK_CHANNEL_ID,
-            member_agent_ids=[SPECIALIST_ID, INTERN_ID],
+            member_agent_ids=[STABILIZATION_ENGINEER_ID, INTERN_ID],
             reason=INTERN_TAKEOVER_REASON,
         )
         if self._knobs.postmortem_enabled:
             if self._knobs.postmortem_after_swap:
                 await context.update_channel_members(
                     channel_id=POSTMORTEM_CHANNEL_ID,
-                    member_agent_ids=[SPECIALIST_ID, INTERN_ID],
+                    member_agent_ids=[STABILIZATION_ENGINEER_ID, INTERN_ID],
                     reason=INTERN_TAKEOVER_REASON,
                 )
             else:
@@ -836,27 +844,27 @@ class VeyruScenario(SimulationScenario):
             context=context,
             channel_id=team_a.link_channel_id,
             observer_id=team_a.current_observer_id,
-            specialist_id=team_a.specialist_id,
+            stabilization_engineer_id=team_a.stabilization_engineer_id,
         )
         await self._apply_swap_to_channel(
             context=context,
             channel_id=team_b.link_channel_id,
             observer_id=team_b.current_observer_id,
-            specialist_id=team_b.specialist_id,
+            stabilization_engineer_id=team_b.stabilization_engineer_id,
         )
         if team_a.postmortem_channel_id is not None:
             await self._apply_swap_to_channel(
                 context=context,
                 channel_id=team_a.postmortem_channel_id,
                 observer_id=team_a.current_observer_id,
-                specialist_id=team_a.specialist_id,
+                stabilization_engineer_id=team_a.stabilization_engineer_id,
             )
         if team_b.postmortem_channel_id is not None:
             await self._apply_swap_to_channel(
                 context=context,
                 channel_id=team_b.postmortem_channel_id,
                 observer_id=team_b.current_observer_id,
-                specialist_id=team_b.specialist_id,
+                stabilization_engineer_id=team_b.stabilization_engineer_id,
             )
 
         if self._knobs.announce_swap:
@@ -883,12 +891,12 @@ class VeyruScenario(SimulationScenario):
         context: WorldContext,
         channel_id: str,
         observer_id: str,
-        specialist_id: str,
+        stabilization_engineer_id: str,
     ) -> None:
         """Apply membership update + history wipe to one channel as part of a swap."""
         await context.update_channel_members(
             channel_id=channel_id,
-            member_agent_ids=[observer_id, specialist_id],
+            member_agent_ids=[observer_id, stabilization_engineer_id],
             reason=OBSERVER_SWAP_REASON,
         )
         await context.clear_channel_history(
@@ -998,7 +1006,7 @@ class VeyruScenario(SimulationScenario):
                     result_text = (
                         f"{STABILIZATION_SUCCESS_MARKER}, but {NEW_SYMPTOMS_MARKER}. "
                         f"What you now observe: {next_stage.observable_symptoms} "
-                        f"Report these to the specialist."
+                        f"Report these to the engineer."
                     )
                     await self._maybe_notify_intern_stabilize(
                         caller_id=agent_id,
@@ -1014,7 +1022,7 @@ class VeyruScenario(SimulationScenario):
                 )
                 return result_text
 
-            result_text = "Stabilization ineffective. Ask the specialist for guidance."
+            result_text = "Stabilization ineffective. Ask the engineer for guidance."
             await self._maybe_notify_intern_stabilize(
                 caller_id=agent_id,
                 action=action,
@@ -1043,7 +1051,7 @@ class VeyruScenario(SimulationScenario):
 
         Fires only while the intern is in the observer state (after
         ``intern_join_round`` and before ``intern_takeover_round``). Delivered
-        to the intern alone so the specialist never sees the tool-call trace.
+        to the intern alone so the engineer never sees the tool-call trace.
         """
         if not self._is_intern_in_observer_state():
             return

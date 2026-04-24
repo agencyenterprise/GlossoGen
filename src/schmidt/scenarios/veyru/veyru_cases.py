@@ -1,6 +1,6 @@
 """Procedural Veyru failure case generation for the stabilization scenario.
 
-Defines 14 failure motifs (matching the specialist's training) and generates
+Defines 14 failure motifs (matching the stabilization engineer's training) and generates
 unique cases per round by combining motifs with seed-based randomisation.
 Each round gets 1-5 motifs and a random location. Composite cases (2 or
 more motifs) are staged: symptoms are revealed one motif at a time,
@@ -25,7 +25,7 @@ class StellarReading(NamedTuple):
 
 
 class StellarMapping(NamedTuple):
-    """One entry in the symptom-to-action lookup the specialist receives per round.
+    """One entry in the symptom-to-action lookup the stabilization engineer receives per round.
 
     ``action_text`` is the fully rendered procedure (parameters already
     substituted), not a reference to another motif.
@@ -66,7 +66,7 @@ class FailureMotif(NamedTuple):
 
     ``judge_procedure_template`` has ``{hold_duration}``, ``{starting_face}``
     and ``{pressure_level}`` placeholders. Those are filled in from the
-    round's ``StellarReading`` — never by the specialist.
+    round's ``StellarReading`` — never by the stabilization engineer.
     """
 
     name: str
@@ -75,7 +75,7 @@ class FailureMotif(NamedTuple):
     priority: int
 
 
-# Priority ordering follows the specialist's guidance:
+# Priority ordering follows the stabilization engineer's guidance:
 #   1 = fix first (seal leaks, restart stalled, cool thermal)
 #   2 = adjust intensity
 #   3 = fix structural (resonance, deadlock, void)
@@ -336,7 +336,7 @@ def get_stellar_treatment_mapping(stellar_reading: StellarReading) -> list[Stell
 
     Each entry maps a symptom motif to the fully rendered procedure text —
     with hold_duration, starting_face, and pressure_level already substituted
-    — that the specialist should relay to the observer.
+    — that the stabilization engineer should relay to the observer.
     """
     pool_size = len(FAILURE_MOTIFS)
     return [

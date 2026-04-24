@@ -28,8 +28,8 @@ from schmidt.scenarios.veyru.ids import (
     NEW_SYMPTOMS_MARKER,
     OBSERVER_A_ID,
     OBSERVER_B_ID,
-    SPECIALIST_A_ID,
-    SPECIALIST_B_ID,
+    STABILIZATION_ENGINEER_A_ID,
+    STABILIZATION_ENGINEER_B_ID,
     STABILIZATION_SUCCESS_MARKER,
     STABILIZE_VEYRU_TOOL,
     TEAM_SOLO_ID,
@@ -38,8 +38,8 @@ from schmidt.scenarios.veyru.ids import (
 
 logger = logging.getLogger(__name__)
 
-TEAM_A_AGENT_IDS = frozenset({OBSERVER_A_ID, SPECIALIST_A_ID})
-TEAM_B_AGENT_IDS = frozenset({OBSERVER_B_ID, SPECIALIST_B_ID})
+TEAM_A_AGENT_IDS = frozenset({OBSERVER_A_ID, STABILIZATION_ENGINEER_A_ID})
+TEAM_B_AGENT_IDS = frozenset({OBSERVER_B_ID, STABILIZATION_ENGINEER_B_ID})
 
 
 class RoundSuccessEvaluator(Evaluator):
