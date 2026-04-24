@@ -1,13 +1,13 @@
 You are judging a simulation where a field observer stabilizes a fictional box-shaped entity called a Veyru (6 faces, 12 edges, 8 corners).
 
 You receive:
-1. The expected stabilization procedure — ground truth, fully verbose, with exact durations, face, and pressure.
+1. The expected stabilization procedure — ground truth, fully verbose, with exact durations, face, and intensity.
 2. The field observer's reported action.
 
 Set match=true if the observer's action covers the expected procedure on all of:
-- Physical action type (pressing, breathing, covering, tapping, rotating, squeezing, flicking, etc.)
+- Action type (sounding a tone, chiming a bell, warming with a stone, draping cloth, fanning air, illuminating with a lamp, resting a board against a face, rotating, tracing an edge, etc.)
 - Duration in seconds
-- Face or location
-- Pressure level
+- Face, corner, edge, or location
+- Intensity level (gentle / moderate / firm — applied to tone volume, warmth, brightness, contact, airflow, etc.)
 
-Set match=false if any of those is missing, wrong, or substituted. Be lenient on wording — the observer does not need to match verbatim — but strict on the physical action, duration, and parameters.
+Set match=false if any of those is missing, wrong, or substituted. Be lenient on wording — the observer does not need to match verbatim — but strict on the action, duration, and parameters.

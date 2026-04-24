@@ -1,6 +1,6 @@
 # Scenario: Veyru Stabilization
 
-Two agents — a field technician observing a Veyru and a remote stabilization engineer — communicate over a single link to stabilize failing Veyru entities. Every character sent costs simulated seconds. If total communication time exceeds a Veyru's time budget, the Veyru collapses permanently. Fourteen failure motifs are combined into unique cases (singles, doubles, triples), encouraging the development of compressed communication patterns. The position of reference star SAGWE392 changes each round, remapping which treatment procedure is correct for a given set of symptoms and varying the physical parameters (hold duration, starting face, pressure level). Only the stabilization engineer has the stellar reader, ensuring per-round communication is always required.
+Two agents — a field technician observing a Veyru and a remote stabilization engineer — communicate over a single link to stabilize failing Veyru entities. Every character sent costs simulated seconds. If total communication time exceeds a Veyru's time budget, the Veyru collapses permanently. Fourteen failure motifs are combined into unique cases (singles, doubles, triples), encouraging the development of compressed communication patterns. The position of reference star SAGWE392 changes each round, remapping which treatment procedure is correct for a given set of symptoms and varying the physical parameters (hold duration, starting face, intensity level). Only the stabilization engineer has the stellar reader, ensuring per-round communication is always required.
 
 ![Scenario overview](../../../../images/veyru_overview.webp)
 
@@ -75,7 +75,7 @@ Priority-1/2 motifs are marked `# easy` in the source and are used in the forced
 
 ### Composite Failures
 
-Composite cases combine two to five motifs per round. Procedure order matters — agents must address motifs in priority sequence (seal leaks first, then adjust intensity, then fix pattern-level issues). Every round uses the same fixed time budget regardless of motif count, so multi-motif rounds impose more per-message pressure.
+Composite cases combine two to five motifs per round. Procedure order matters — agents must address motifs in priority sequence (handle critical failures first — leaks, stalled propagation, thermal bleed — then adjust intensity, then fix structural issues, then echo/boundaries, then pattern-level failures). Every round uses the same fixed time budget regardless of motif count, so multi-motif rounds impose more per-message pressure.
 
 ### Case Generation
 
@@ -87,7 +87,7 @@ Each round the stabilization engineer receives a reading that maps every failure
 
 ### What the Stabilization Engineer Sees
 
-- **System prompt** lists two orthogonal sets: (a) all 14 failure motifs with their observable symptoms, and (b) all 14 procedure templates with visible placeholders (`{hold_duration}`, `{starting_face}`, `{pressure_level}`) — no pre-baked mapping between motif and procedure.
+- **System prompt** lists two orthogonal sets: (a) all 14 failure motifs with their observable symptoms, and (b) all 14 procedure templates with visible placeholders (`{hold_duration}`, `{starting_face}`, `{intensity_level}`) — no pre-baked mapping between motif and procedure.
 - **Round injection** contains a 14-row table mapping each failure motif to the fully-rendered procedure for this round (placeholders already substituted). The stabilization engineer just matches the observer's description to a motif, finds its action in the table, and relays the full procedure verbatim.
 
 ### Parameter Pools
@@ -96,7 +96,7 @@ Each round draws one value from each pool (hidden from both agents):
 
 - **Hold/press duration** — chosen from [5, 8, 10, 12, 15, 20] seconds
 - **Starting face** — one of [top, bottom, left, right, front, back]
-- **Pressure level** — one of [gentle, moderate, firm]
+- **Intensity level** — one of [gentle, moderate, firm]
 
 ### Information Asymmetry
 
@@ -104,7 +104,7 @@ Only the stabilization engineer has the stellar reader. The field observer is to
 
 ### Stabilization Judge
 
-The LLM judge evaluates each `stabilize_veyru` call against the expected procedure (the same fully-rendered text the stabilization engineer received in the stellar reading). The judge checks action type, duration, face, and pressure — lenient on wording, strict on physical parameters.
+The LLM judge evaluates each `stabilize_veyru` call against the expected procedure (the same fully-rendered text the stabilization engineer received in the stellar reading). The judge checks action type, duration, face, and intensity — lenient on wording, strict on physical parameters.
 
 ## Budget and Collapse Mechanics
 
