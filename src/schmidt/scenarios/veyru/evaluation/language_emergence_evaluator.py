@@ -3,6 +3,7 @@ during the Veyru stabilization simulation.
 """
 
 import logging
+from pathlib import Path
 from typing import Literal, NamedTuple
 
 from pydantic import BaseModel, Field
@@ -75,9 +76,10 @@ class LanguageEmergenceEvaluator(Evaluator):
         agent_configs: list[AgentConfig],
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
+        run_dir: Path,
     ) -> MetricResult:
         """Evaluate whether novel compressed language emerged across rounds."""
-        _ = agent_configs
+        _ = agent_configs, run_dir
         round_transcripts = self._build_round_transcripts(
             events=events,
             scenario=scenario,

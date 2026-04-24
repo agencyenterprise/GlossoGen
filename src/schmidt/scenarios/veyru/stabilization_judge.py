@@ -16,7 +16,7 @@ from schmidt.template_renderer import TemplateRenderer
 logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
-_renderer = TemplateRenderer(prompts_dir=PROMPTS_DIR)
+_renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
 
 
 class StabilizationJudgment(BaseModel):

@@ -202,6 +202,23 @@ class SimulationScenario(ABC):
         """
         return False
 
+    def get_early_round_end_trigger(self) -> str | None:
+        """Return a trigger string when the current round has decisively ended,
+        or None if the round should continue.
+
+        The game clock checks this each iteration (outside the postmortem phase)
+        and, when a non-None value is returned, immediately emits a
+        ``RoundEnded`` event with that trigger and advances (entering a
+        postmortem phase if one is defined for the round). This lets a
+        scenario end a round as soon as the world reaches a terminal outcome,
+        instead of waiting for ``all_agents_idle`` or ``round_timeout``.
+
+        Scenarios should return a descriptive trigger value (e.g.
+        ``"veyru_stabilized"``, ``"veyru_collapsed"``). The default returns
+        None so rounds only end via the generic idle / timeout mechanisms.
+        """
+        return None
+
     def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
         """Validate whether an agent is allowed to send to a channel right now.
 

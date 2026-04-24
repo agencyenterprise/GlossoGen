@@ -914,6 +914,8 @@ export interface components {
             labels: string[];
             /** Has Note */
             has_note: boolean;
+            /** Current Round */
+            current_round: number;
         };
         /**
          * SSEAgentConnected

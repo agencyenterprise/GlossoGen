@@ -67,3 +67,26 @@ async def write_report(report: EvaluationReport, report_path: Path) -> None:
     async with aiofiles.open(report_path, mode="wb") as f:
         await f.write(orjson.dumps(report.model_dump(mode="json"), option=orjson.OPT_INDENT_2))
     logger.info("Evaluation report written to %s", report_path)
+
+
+async def load_report(report_path: Path) -> EvaluationReport | None:
+    """Load an existing evaluation report, or return None if the file does not exist."""
+    if not report_path.exists():
+        return None
+    async with aiofiles.open(report_path, mode="rb") as f:
+        raw = await f.read()
+    return EvaluationReport.model_validate(orjson.loads(raw))
+
+
+def merge_metrics(
+    existing: list[MetricResult],
+    new: list[MetricResult],
+) -> list[MetricResult]:
+    """Combine prior and new metric results, letting new entries replace existing ones by name.
+
+    The merge preserves any existing metric whose evaluator_name is not present in the new
+    list, so partial re-runs do not wipe unrelated results.
+    """
+    new_names = {metric.evaluator_name for metric in new}
+    preserved = [metric for metric in existing if metric.evaluator_name not in new_names]
+    return preserved + new

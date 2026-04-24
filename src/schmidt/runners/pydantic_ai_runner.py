@@ -109,6 +109,7 @@ class PydanticAIRunner(AgentRunner):
         agent_config: AgentConfig,
         mcp_server_url: str,
         event_logger: EventLogger,
+        cost_tracker: dict[str, float],
     ) -> AgentRunResult:
         """Launch a Pydantic AI agent that loops until it receives a done notification."""
         agent_id = agent_config.agent_id
@@ -259,6 +260,7 @@ class PydanticAIRunner(AgentRunner):
                                 cumulative_cost_usd=cumulative_cost,
                             ).model_dump(mode="json")
                         )
+                        cost_tracker[agent_id] = cumulative_cost
 
                     # Log any remaining reasoning + tool calls from the final response
                     self._flush_response_block(

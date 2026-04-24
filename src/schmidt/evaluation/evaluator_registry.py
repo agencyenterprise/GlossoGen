@@ -4,15 +4,21 @@ Generic evaluators are scenario-agnostic and available to all scenarios.
 They focus on detecting language emergence phenomena in agent communication.
 """
 
+from schmidt.evaluation.content_filter_refusal_evaluator import ContentFilterRefusalEvaluator
 from schmidt.evaluation.evaluator_protocol import Evaluator, EvaluatorFactory
 from schmidt.evaluation.language_strangeness_evaluator import LanguageStrangenessEvaluator
 from schmidt.evaluation.neologism_evaluator import NeologismEvaluator
+from schmidt.evaluation.round_ended_idle_evaluator import RoundEndedIdleEvaluator
+from schmidt.evaluation.round_ended_timeout_evaluator import RoundEndedTimeoutEvaluator
 from schmidt.evaluation.shorthand_codes_evaluator import ShorthandCodesEvaluator
 from schmidt.evaluation.slang_emergence_evaluator import SlangEmergenceEvaluator
 
 _GENERIC_EVALUATORS: list[type[Evaluator]] = [
+    ContentFilterRefusalEvaluator,
     LanguageStrangenessEvaluator,
     NeologismEvaluator,
+    RoundEndedIdleEvaluator,
+    RoundEndedTimeoutEvaluator,
     ShorthandCodesEvaluator,
     SlangEmergenceEvaluator,
 ]

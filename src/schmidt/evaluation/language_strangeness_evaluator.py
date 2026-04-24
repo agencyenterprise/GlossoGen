@@ -3,6 +3,7 @@ patterns in agent communication across rounds.
 """
 
 import logging
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -68,9 +69,10 @@ class LanguageStrangenessEvaluator(Evaluator):
         agent_configs: list[AgentConfig],
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
+        run_dir: Path,
     ) -> MetricResult:
         """Evaluate whether any non-standard language patterns emerged."""
-        _ = agent_configs
+        _ = agent_configs, run_dir
         round_transcripts = build_round_transcripts(
             events=events,
             scenario=scenario,

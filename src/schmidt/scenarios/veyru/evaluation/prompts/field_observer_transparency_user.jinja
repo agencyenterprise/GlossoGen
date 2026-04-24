@@ -1,0 +1,14 @@
+Round {{ round_number }}.
+
+--- WHAT YOU OBSERVE ---
+{{ observed_symptoms }}
+
+--- SPECIALIST MESSAGES ON THE COMM LINK (in order) ---
+{% if specialist_messages %}
+{% for line in specialist_messages %}{{ line }}
+{% endfor %}
+{% else %}
+(The specialist has not said anything yet on the comm link.)
+{% endif %}
+
+Based only on the symptoms above and the specialist's instructions, decide what you will do next and invoke stabilize_veyru(action="describe exactly what you are doing").

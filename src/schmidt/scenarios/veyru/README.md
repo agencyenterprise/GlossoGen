@@ -131,6 +131,18 @@ When `postmortem_enabled` is true, a discussion phase follows each round. Both a
 
 Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only English compression, FAIL (0.0) if no compression.
 
+**`round_success`** — How many rounds did the team stabilize the Veyru before collapse? Deterministic (no LLM): scans `ToolResultReceived` and `WorldEventDelivered` events for success and collapse markers. In two-team mode, a round counts only when both teams succeed, and per-team results are also reported.
+
+**`protocol_learned_after_swap`** — Two-team mode only. Measures whether the new pairings re-established a working comm protocol after the observer swap. Compares post-swap round transcripts and outcomes to pre-swap baselines via an LLM judge.
+
+**`field_observer_transparency`** — How clear was the specialist's guidance? Simulates a naive field observer for each stage of each round's case: given only the specialist's messages on the `link` channel and the stage's `observable_symptoms` (both sourced from the `veyru_case_started` event), forces the LLM to invoke the real `stabilize_veyru` tool and judges the proposed action against the stage's `judge_expected_actions` using the same `judge_stabilization()` function the live scenario uses. Specialist messages are split across stages by `STABILIZATION_SUCCESS_MARKER` timestamps (stage k gets messages through the k-th success; if a round collapsed before that boundary, later stages fall back to the full round's specialist transcript). Score = mean per-round accuracy (matches / stages). Single-team only — two-team runs return FAIL with a clear evidence line. Runs that predate the `veyru_case_started` event (old logs) also return FAIL with an explicit "re-run the scenario" evidence line.
+
+The generic `round_ended_idle` and `round_ended_timeout` evaluators are also useful for veyru runs: they flag rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger respectively, using the `round_ended` events emitted by the game clock.
+
+The generic `content_filter_refusal` evaluator counts LLM content-filter refusals encountered during the run. It reads `{scenario}_debug.jsonl` for ERROR entries from `schmidt.runners.pydantic_ai_runner` whose message contains `ContentFilterError`, correlates each refusal's timestamp with `RoundAdvanced` events to bucket by round, and emits a per-agent breakdown. Score is total refusals divided by total rounds; PASS when zero refusals, PARTIAL otherwise. Useful on the Veyru specialist role, whose system prompt — detailing physical-manipulation instructions on a fictional box-shaped entity — sometimes triggers Claude's safety classifier.
+
+The `veyru_case_started` event is emitted once per round at round start by `VeyruScenario.on_round_advanced` and carries the full case payload: `case_number`, `failure_name`, `time_budget_seconds`, `stellar_reading`, and per-stage `(motif_name, observable_symptoms, treatment_motif_name, judge_expected_actions)`. It enables evaluators to read ground truth directly from the log without needing `VeyruStabilizationJudged` events or `scenario.veyru_cases` attribute access.
+
 ## Knobs
 
 | Knob | Description |

@@ -6,8 +6,11 @@ from this list instead of depending on each other.
 """
 
 GENERIC_EVALUATOR_NAMES: list[str] = [
+    "content_filter_refusal",
     "language_strangeness",
     "neologism",
+    "round_ended_idle",
+    "round_ended_timeout",
     "shorthand_codes",
     "slang_emergence",
 ]

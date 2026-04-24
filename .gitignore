@@ -158,6 +158,9 @@ cython_debug/
 .vscode/
 *.DS_Store
 
+# Claude Code
+.claude/scheduled_tasks.lock
+
 # Ruff
 .ruff_cache/
 
