@@ -21,7 +21,7 @@ class StellarReading(NamedTuple):
     offset: int
     hold_duration: int
     starting_face: str
-    pressure_level: str
+    intensity_level: str
 
 
 class StellarMapping(NamedTuple):
@@ -65,7 +65,7 @@ class FailureMotif(NamedTuple):
     """A single failure motif with observer-perspective symptoms and procedure template.
 
     ``judge_procedure_template`` has ``{hold_duration}``, ``{starting_face}``
-    and ``{pressure_level}`` placeholders. Those are filled in from the
+    and ``{intensity_level}`` placeholders. Those are filled in from the
     round's ``StellarReading`` — never by the stabilization engineer.
     """
 
@@ -92,9 +92,10 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "Edges look normal but the face surfaces keep shifting chaotically.",
         ],
         judge_procedure_template=(
-            "Apply sustained uniform {pressure_level} pressure to all six faces "
-            "simultaneously for {hold_duration} seconds, starting from the "
-            "{starting_face} face. Release and wait for hum to stabilize."
+            "Sound a sustained {intensity_level} tone near all six "
+            "faces simultaneously for {hold_duration} seconds, starting "
+            "from the {starting_face} face. Let the tone fade naturally "
+            "and wait for the hum to stabilize."
         ),
         priority=5,
     ),
@@ -107,9 +108,10 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "The hum is wavering up and down in pitch without settling.",
         ],
         judge_procedure_template=(
-            "Hold two opposite faces starting from the {starting_face} face. "
-            "Apply {pressure_level} rhythmic pulses — {hold_duration} seconds on, "
-            "{hold_duration} seconds off — for five cycles."
+            "Chime a bell near two opposite faces, starting from the "
+            "{starting_face} face. Alternate the chime between the two "
+            "faces — {hold_duration} seconds pause between chimes — for "
+            "five cycles at {intensity_level} tone."
         ),
         priority=5,
     ),
@@ -122,9 +124,10 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "Some faces show frozen patterns that do not change or respond when touched.",
         ],
         judge_procedure_template=(
-            "Press and hold two adjacent edges near the {starting_face} face "
-            "with {pressure_level} pressure for {hold_duration} seconds. Then "
-            "tap each frozen face sharply three times."
+            "Drape a cloth over two adjacent edges near the "
+            "{starting_face} face for {hold_duration} seconds at "
+            "{intensity_level} coverage. Then chime a bell three times "
+            "near the {starting_face} face."
         ),
         priority=4,
     ),
@@ -138,9 +141,10 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "The hum sounds thin and hollow at the edges.",
         ],
         judge_procedure_template=(
-            "Press each dim corner with {pressure_level} pressure for "
-            "{hold_duration} seconds in sequence, starting from corners near the "
-            "{starting_face} face. Then trace each fading edge with a finger."
+            "Warm each corner of the {starting_face} face by holding a "
+            "heated stone nearby for {hold_duration} seconds at "
+            "{intensity_level} warmth, in sequence. Then trace each "
+            "edge of the {starting_face} face with a finger."
         ),
         priority=1,  # easy
     ),
@@ -154,9 +158,9 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "like the whole thing is running low.",
         ],
         judge_procedure_template=(
-            "Cup both hands around the Veyru and breathe warm air onto the "
-            "{starting_face} face for {hold_duration} seconds. Rotate and "
-            "repeat for each face."
+            "Place a warm stone beside the {starting_face} face at "
+            "{intensity_level} warmth for {hold_duration} seconds. "
+            "Rotate and repeat for each face."
         ),
         priority=2,  # easy
     ),
@@ -169,10 +173,10 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "There is noticeable heat radiating from the faces.",
         ],
         judge_procedure_template=(
-            "Cover the Veyru with a cloth for {hold_duration} seconds. Remove "
-            "the cloth and press the two hottest faces inward with "
-            "{pressure_level} pressure for {hold_duration} seconds, starting "
-            "from the {starting_face} face."
+            "Drape a cool cloth over the Veyru for {hold_duration} "
+            "seconds. Remove the cloth and fan {intensity_level} cool "
+            "air across the {starting_face} face and the opposite "
+            "face for {hold_duration} seconds."
         ),
         priority=2,  # easy
     ),
@@ -185,9 +189,10 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "Edges flash in time with the face pulses.",
         ],
         judge_procedure_template=(
-            "Place one palm on the brightest face and the other on the darkest "
-            "face simultaneously. Hold with {pressure_level} pressure for "
-            "{hold_duration} seconds without moving."
+            "Illuminate the {starting_face} face with a dim lamp and "
+            "the opposite face with a bright lamp simultaneously at "
+            "{intensity_level} brightness for {hold_duration} seconds, "
+            "without moving the lamps."
         ),
         priority=5,
     ),
@@ -200,9 +205,10 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "The other faces appear normal by comparison.",
         ],
         judge_procedure_template=(
-            "Place a folded cloth against the resonating face (brightest, most "
-            "vibrating) and press with {pressure_level} pressure for "
-            "{hold_duration} seconds. Then tap each adjacent edge twice."
+            "Drape a folded cloth over the {starting_face} face for "
+            "{hold_duration} seconds at {intensity_level} coverage. "
+            "Then chime a bell near each edge of the {starting_face} "
+            "face twice."
         ),
         priority=3,
     ),
@@ -215,10 +221,10 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "Heat is concentrated at the bright corners.",
         ],
         judge_procedure_template=(
-            "Flick the bright corner sharply. Press the two edges meeting at "
-            "that corner with {pressure_level} pressure for {hold_duration} "
-            "seconds. Repeat for each locked corner, starting near the "
-            "{starting_face} face."
+            "At each corner of the {starting_face} face, chime a bell "
+            "briefly at {intensity_level} tone, then warm the two edges "
+            "meeting at that corner with a heated stone for "
+            "{hold_duration} seconds."
         ),
         priority=3,
     ),
@@ -231,9 +237,9 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "The hum sounds muffled as if underwater.",
         ],
         judge_procedure_template=(
-            "Grip the Veyru along all four edges of the {starting_face} face "
-            "and squeeze inward with {pressure_level} pressure for "
-            "{hold_duration} seconds. Rotate and repeat for each face-pair."
+            "Rest a flat board against the {starting_face} face at "
+            "{intensity_level} contact for {hold_duration} seconds. "
+            "Rotate and repeat for each face-pair."
         ),
         priority=4,
     ),
@@ -246,9 +252,10 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "The surface feels cold and does not respond to touch or tapping.",
         ],
         judge_procedure_template=(
-            "Sharply slap the center of each face once, starting from the "
-            "{starting_face} face. Then cup hands around the Veyru and breathe "
-            "warm air for {hold_duration} seconds."
+            "Chime a bell near the center of each face once at "
+            "{intensity_level} tone, starting from the {starting_face} "
+            "face. Then place a warm stone beside the Veyru for "
+            "{hold_duration} seconds."
         ),
         priority=1,  # easy
     ),
@@ -261,9 +268,9 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "Edges shimmer as if two patterns are fighting for dominance.",
         ],
         judge_procedure_template=(
-            "Place the Veyru on a soft surface with the {starting_face} face "
-            "up. Press down with {pressure_level} pressure for {hold_duration} "
-            "seconds."
+            "Place the Veyru on a soft surface with the {starting_face} "
+            "face up at {intensity_level} contact. Let it rest "
+            "undisturbed for {hold_duration} seconds."
         ),
         priority=5,
     ),
@@ -276,9 +283,10 @@ FAILURE_MOTIFS: list[FailureMotif] = [
             "Surfaces feel rough or gritty, and the light has a reddish tint.",
         ],
         judge_procedure_template=(
-            "Wrap the Veyru in a wet cloth for {hold_duration} seconds. Remove "
-            "and apply sustained {pressure_level} pressure to all six faces for "
-            "{hold_duration} seconds, starting from the {starting_face} face."
+            "Drape a cool cloth over the Veyru for {hold_duration} "
+            "seconds. Remove and fan {intensity_level} cool air across "
+            "all six faces for {hold_duration} seconds, starting from "
+            "the {starting_face} face."
         ),
         priority=1,  # easy
     ),
@@ -292,8 +300,9 @@ FAILURE_MOTIFS: list[FailureMotif] = [
         ],
         judge_procedure_template=(
             "Rotate the Veyru slowly over {hold_duration} seconds while "
-            "applying {pressure_level} pressure to opposite faces starting from "
-            "the {starting_face} face. After rotation, tap each corner once."
+            "sounding a steady tone at {intensity_level} volume near "
+            "opposite faces, starting from the {starting_face} face. "
+            "After rotation, chime a bell once near each corner."
         ),
         priority=3,
     ),
@@ -328,14 +337,14 @@ _EASY_ROUND_NUMBERS: frozenset[int] = frozenset({1, 2, 3, 6, 13})
 # Stellar parameter pools — each round draws one value from each pool.
 _HOLD_DURATIONS: list[int] = [5, 8, 10, 12, 15, 20]
 _STARTING_FACES: list[str] = ["top", "bottom", "left", "right", "front", "back"]
-_PRESSURE_LEVELS: list[str] = ["gentle", "moderate", "firm"]
+_INTENSITY_LEVELS: list[str] = ["gentle", "moderate", "firm"]
 
 
 def get_stellar_treatment_mapping(stellar_reading: StellarReading) -> list[StellarMapping]:
     """Build the full 14-entry symptom-to-action lookup for one round.
 
     Each entry maps a symptom motif to the fully rendered procedure text —
-    with hold_duration, starting_face, and pressure_level already substituted
+    with hold_duration, starting_face, and intensity_level already substituted
     — that the stabilization engineer should relay to the observer.
     """
     pool_size = len(FAILURE_MOTIFS)
@@ -347,7 +356,7 @@ def get_stellar_treatment_mapping(stellar_reading: StellarReading) -> list[Stell
             ].judge_procedure_template.format(
                 hold_duration=stellar_reading.hold_duration,
                 starting_face=stellar_reading.starting_face,
-                pressure_level=stellar_reading.pressure_level,
+                intensity_level=stellar_reading.intensity_level,
             ),
         )
         for i in range(pool_size)
@@ -393,7 +402,7 @@ def _build_stages(
                 judge_expected_actions=treatment_motif.judge_procedure_template.format(
                     hold_duration=stellar_reading.hold_duration,
                     starting_face=stellar_reading.starting_face,
-                    pressure_level=stellar_reading.pressure_level,
+                    intensity_level=stellar_reading.intensity_level,
                 ),
             )
         )
@@ -455,7 +464,7 @@ def get_cases(
             offset=rng.randint(1, 13),
             hold_duration=rng.choice(_HOLD_DURATIONS),
             starting_face=rng.choice(_STARTING_FACES),
-            pressure_level=rng.choice(_PRESSURE_LEVELS),
+            intensity_level=rng.choice(_INTENSITY_LEVELS),
         )
 
         stages = _build_stages(

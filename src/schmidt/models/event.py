@@ -228,7 +228,7 @@ class VeyruStellarReading(BaseModel):
     offset: int
     hold_duration: int
     starting_face: str
-    pressure_level: str
+    intensity_level: str
 
 
 class VeyruCaseStage(BaseModel):

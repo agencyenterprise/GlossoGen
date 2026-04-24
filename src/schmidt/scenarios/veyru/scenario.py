@@ -816,7 +816,7 @@ class VeyruScenario(SimulationScenario):
                     offset=case.stellar_reading.offset,
                     hold_duration=case.stellar_reading.hold_duration,
                     starting_face=case.stellar_reading.starting_face,
-                    pressure_level=case.stellar_reading.pressure_level,
+                    intensity_level=case.stellar_reading.intensity_level,
                 ),
             )
         )
