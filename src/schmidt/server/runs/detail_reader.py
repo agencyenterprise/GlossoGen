@@ -17,12 +17,14 @@ from schmidt.models.event import (
     ChannelMembershipChanged,
     LLMResponseReceived,
     MessageSent,
+    RoundEnded,
     RunStatus,
     SimulationEnded,
     SimulationEvent,
     SimulationStarted,
     ToolCallInvoked,
     ToolResultReceived,
+    VeyruCaseStarted,
     VeyruStabilizationJudged,
 )
 from schmidt.scenarios.veyru.ids import (
@@ -41,10 +43,14 @@ from schmidt.server.runs.models import (
     ForkSource,
     InternAnchor,
     ReasoningEntry,
+    RoundEnding,
     RunDetailResponse,
     SwapPoint,
     ToolUseEntry,
+    VeyruCaseStageDTO,
+    VeyruCaseSummary,
     VeyruStabilizeMetadata,
+    VeyruStellarReadingDTO,
 )
 from schmidt.stream_manifest import delete_manifest, read_manifest
 from schmidt.token_pricing import find_pricing
@@ -185,6 +191,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     reasoning: list[ReasoningEntry] = []
     tool_use: list[ToolUseEntry] = []
     run_cycle_failures: list[AgentRunCycleFailedEntry] = []
+    veyru_cases: list[VeyruCaseSummary] = []
+    round_endings: list[RoundEnding] = []
     total_messages = 0
     total_cost_usd = 0.0
     duration_seconds = 0.0
@@ -364,6 +372,40 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 intern_takeover_round = event.round_number
                 intern_takeover_timestamp = event.timestamp
 
+        elif isinstance(event, VeyruCaseStarted):
+            veyru_cases.append(
+                VeyruCaseSummary(
+                    round_number=event.round_number,
+                    case_number=event.case_number,
+                    failure_name=event.failure_name,
+                    time_budget_seconds=event.time_budget_seconds,
+                    stages=[
+                        VeyruCaseStageDTO(
+                            motif_name=stage.motif_name,
+                            observable_symptoms=stage.observable_symptoms,
+                            treatment_motif_name=stage.treatment_motif_name,
+                            judge_expected_actions=stage.judge_expected_actions,
+                        )
+                        for stage in event.stages
+                    ],
+                    stellar_reading=VeyruStellarReadingDTO(
+                        offset=event.stellar_reading.offset,
+                        hold_duration=event.stellar_reading.hold_duration,
+                        starting_face=event.stellar_reading.starting_face,
+                        intensity_level=event.stellar_reading.intensity_level,
+                    ),
+                )
+            )
+
+        elif isinstance(event, RoundEnded):
+            round_endings.append(
+                RoundEnding(
+                    round_number=event.round_number,
+                    trigger=event.trigger,
+                    timestamp=event.timestamp,
+                )
+            )
+
         elif isinstance(event, SimulationEnded):
             status = event.reason
             total_cost_usd = event.total_cost_usd
@@ -468,6 +510,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         intern_takeover=intern_takeover,
         labels=labels,
         note=note,
+        veyru_cases=veyru_cases,
+        round_endings=round_endings,
     )
 
 

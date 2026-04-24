@@ -120,6 +120,52 @@ class VeyruStabilizeMetadata(BaseModel):
     judge_explanation: str
 
 
+class VeyruStellarReadingDTO(BaseModel):
+    """Per-round stellar parameters shaping the Veyru procedure mapping."""
+
+    offset: int
+    hold_duration: int
+    starting_face: str
+    intensity_level: str
+
+
+class VeyruCaseStageDTO(BaseModel):
+    """One stage of a Veyru case with symptoms and the expected procedure."""
+
+    motif_name: str
+    observable_symptoms: str
+    treatment_motif_name: str
+    judge_expected_actions: str
+
+
+class VeyruCaseSummary(BaseModel):
+    """Per-round Veyru case metadata used by the round timeline modal.
+
+    One entry per round when the scenario is Veyru. Mirrors the
+    ``VeyruCaseStarted`` event emitted at each round start.
+    """
+
+    round_number: int
+    case_number: int
+    failure_name: str
+    time_budget_seconds: int
+    stages: list[VeyruCaseStageDTO]
+    stellar_reading: VeyruStellarReadingDTO
+
+
+class RoundEnding(BaseModel):
+    """Reason a round's main phase ended.
+
+    One entry per round end, across all scenarios. ``trigger`` matches the
+    ``RoundEnded.trigger`` field (e.g. ``veyru_stabilized``,
+    ``all_agents_idle``, ``veyru_collapsed``, ``round_timeout``).
+    """
+
+    round_number: int
+    trigger: str
+    timestamp: datetime
+
+
 class ToolUseEntry(BaseModel):
     """A scenario-specific tool invocation with its result.
 
@@ -241,6 +287,8 @@ class RunDetailResponse(BaseModel):
     intern_takeover: InternAnchor | None
     labels: list[str]
     note: str | None
+    veyru_cases: list[VeyruCaseSummary]
+    round_endings: list[RoundEnding]
 
 
 class StartEvaluationRequest(BaseModel):

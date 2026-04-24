@@ -300,6 +300,8 @@ Use `git log --oneline` in a run directory to see the simulation timeline.
 
 Agents connect to a shared MCP server via the Pydantic AI framework. A game clock manages round progression. Always run simulations as a background process, piping all output to a log file.
 
+**Canonical seed: `seed=42`.** Always use `seed=42` when launching comparison runs so results are comparable against the baseline. Do not vary the seed across replications — the seed fixes the case set, so running multiple times with the same seed measures LLM stochasticity on an identical workload. Only change the seed if the user explicitly asks for it.
+
 ### Hydra-Style Config & Overrides
 
 The `run` subcommand uses a unified config system inspired by Hydra. A base config file (`--config`) provides scenario knobs, and trailing `key=value` arguments override individual fields using dot-notation. The `agents.*` namespace is reserved for per-agent model/provider overrides.

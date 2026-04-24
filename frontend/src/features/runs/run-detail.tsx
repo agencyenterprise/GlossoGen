@@ -634,6 +634,8 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             swappedObserverDisplayNames={restData.swap_point?.swapped_observer_display_names ?? []}
             internJoinRoundNumber={restData.intern_join?.round_number ?? null}
             internTakeoverRoundNumber={restData.intern_takeover?.round_number ?? null}
+            veyruCases={restData.veyru_cases}
+            roundEndings={restData.round_endings}
           />
         )}
 
