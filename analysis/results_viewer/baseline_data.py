@@ -272,7 +272,7 @@ def _std(values: list[float], mean: float) -> float:
     if len(values) == 0:
         return 0.0
     variance = sum((value - mean) ** 2 for value in values) / len(values)
-    return variance**0.5
+    return float(variance**0.5)
 
 
 def aggregate_by_budget(

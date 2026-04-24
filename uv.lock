@@ -2391,6 +2391,15 @@ wheels = [
 ]
 
 [[package]]
+name = "plotly-stubs"
+version = "0.1.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f9/81/d5c11003990432c57e5e12b22a7f4388691ec67deeb5c8a13b0e775870bd/plotly_stubs-0.1.3.tar.gz", hash = "sha256:258b40a9099459cf526c587be12c7098376a144fb6c9de4442363a7d30fb118b", size = 169845, upload-time = "2026-04-11T14:56:01.059Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ba/70/dbd075a1d475b7e253f48a808cc1670f574a808ee1b13f42650bb355eee0/plotly_stubs-0.1.3-py3-none-any.whl", hash = "sha256:dfc69c2777e10236a56fa715d0155727f80086ca5f67d36bc65ba18569b3e761", size = 106211, upload-time = "2026-04-11T14:55:59.748Z" },
+]
+
+[[package]]
 name = "pluggy"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3371,18 +3380,21 @@ dependencies = [
 [package.dev-dependencies]
 analysis = [
     { name = "plotly" },
+    { name = "pyperclip" },
     { name = "streamlit" },
 ]
 dev = [
     { name = "black" },
     { name = "isort" },
     { name = "mypy" },
+    { name = "plotly-stubs" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "types-aiofiles" },
     { name = "types-cachetools" },
     { name = "types-markdown" },
+    { name = "types-pyperclip" },
     { name = "vulture" },
 ]
 
@@ -3414,18 +3426,21 @@ requires-dist = [
 [package.metadata.requires-dev]
 analysis = [
     { name = "plotly", specifier = ">=5.24.0" },
+    { name = "pyperclip", specifier = ">=1.9.0" },
     { name = "streamlit", specifier = ">=1.40.0" },
 ]
 dev = [
     { name = "black", specifier = "==25.9.0" },
     { name = "isort", specifier = "==5.13.2" },
     { name = "mypy", specifier = "==1.11.2" },
+    { name = "plotly-stubs", specifier = ">=0.1.3" },
     { name = "pyright", specifier = ">=1.1.407" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "ruff", specifier = ">=0.14.3" },
     { name = "types-aiofiles", specifier = ">=25.1.0.20251011" },
     { name = "types-cachetools", specifier = ">=6.2.0.20260408" },
     { name = "types-markdown", specifier = ">=3.7.0.20250322" },
+    { name = "types-pyperclip", specifier = ">=1.11.0.20260408" },
     { name = "vulture", specifier = ">=2.14" },
 ]
 
@@ -3745,6 +3760,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5f/e2/9aa4a3b2469508bd7b4e2ae11cbedaf419222a09a1b94daffcd5efca4023/types_protobuf-6.32.1.20260221.tar.gz", hash = "sha256:6d5fb060a616bfb076cbb61b4b3c3969f5fc8bec5810f9a2f7e648ee5cbcbf6e", size = 64408, upload-time = "2026-02-21T03:55:13.916Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2e/e8/1fd38926f9cf031188fbc5a96694203ea6f24b0e34bd64a225ec6f6291ba/types_protobuf-6.32.1.20260221-py3-none-any.whl", hash = "sha256:da7cdd947975964a93c30bfbcc2c6841ee646b318d3816b033adc2c4eb6448e4", size = 77956, upload-time = "2026-02-21T03:55:12.894Z" },
+]
+
+[[package]]
+name = "types-pyperclip"
+version = "1.11.0.20260408"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/37/69/e3b6e85843b4b87a6ce165ace29631a76faa6438ef5b032a6a789cf9d36c/types_pyperclip-1.11.0.20260408.tar.gz", hash = "sha256:bee46a28fb7d0280f401c91dacd5c0a72b430580361955b263466bf65832a138", size = 7291, upload-time = "2026-04-08T04:30:33.596Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4b/4a/89d0e4ac8b24e97f8008ffac6c2d37c6f7db931becb26ec70c170cb47191/types_pyperclip-1.11.0.20260408-py3-none-any.whl", hash = "sha256:37fdeae3b2d51cc6915da58034020e31f05bc43899699d07c998f7dacb1b2a16", size = 7635, upload-time = "2026-04-08T04:30:32.825Z" },
 ]
 
 [[package]]
