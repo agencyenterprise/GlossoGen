@@ -304,8 +304,7 @@ def _build_transcript_entries(events: list[SimulationEvent]) -> list[TranscriptE
                 TranscriptEntry(
                     timestamp=event.message.timestamp,
                     text=(
-                        f'[Round {event.round_number}] {label} (link): '
-                        f'"{event.message.text}"'
+                        f"[Round {event.round_number}] {label} (link): " f'"{event.message.text}"'
                     ),
                 )
             )
@@ -320,7 +319,7 @@ def _build_transcript_entries(events: list[SimulationEvent]) -> list[TranscriptE
                 TranscriptEntry(
                     timestamp=event.timestamp,
                     text=(
-                        f'[Round {event.round_number}] you invoked '
+                        f"[Round {event.round_number}] you invoked "
                         f'stabilize_veyru(action="{action}")'
                     ),
                 )

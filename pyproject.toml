@@ -42,10 +42,13 @@ dev = [
     "types-aiofiles>=25.1.0.20251011",
     "types-Markdown>=3.7.0.20250322",
     "types-cachetools>=6.2.0.20260408",
+    "types-pyperclip>=1.11.0.20260408",
+    "plotly-stubs>=0.1.3",
 ]
 analysis = [
     "streamlit>=1.40.0",
     "plotly>=5.24.0",
+    "pyperclip>=1.9.0",
 ]
 
 [tool.uv]
