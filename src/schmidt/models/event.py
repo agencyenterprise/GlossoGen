@@ -128,6 +128,23 @@ class RoundAdvanced(EventBase):
     trigger: str
 
 
+class AgentRunCycleFailed(EventBase):
+    """Emitted when agent.run() raised an exception in the runner's retry loop.
+
+    Covers every pydantic_ai exception class (ContentFilterError, ModelHTTPError,
+    UsageLimitExceeded, UnexpectedModelBehavior, etc.) and any other exception
+    raised by the underlying agent.run() call. The runner retries after emission,
+    so each event represents one wasted cycle, not a fatal simulation error.
+    """
+
+    event_type: Literal["agent_run_cycle_failed"] = "agent_run_cycle_failed"
+    agent_id: str
+    round_number: int
+    cycle: int
+    error_type: str
+    message: str
+
+
 class RoundEnded(EventBase):
     """Emitted when a round's main phase ends, before any postmortem phase begins.
 
@@ -268,6 +285,7 @@ SimulationEvent = Annotated[
         ToolCallInvoked,
         ToolResultReceived,
         RoundAdvanced,
+        AgentRunCycleFailed,
         RoundEnded,
         InjectionDelivered,
         PostmortemStarted,

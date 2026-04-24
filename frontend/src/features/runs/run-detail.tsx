@@ -270,6 +270,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     const restMessages = restData?.messages ?? [];
     const restReasoning = restData?.reasoning ?? [];
     const restToolUse = restData?.tool_use ?? [];
+    const restRunCycleFailures = restData?.run_cycle_failures ?? [];
 
     // Dedup messages by message_id (REST and SSE may overlap)
     const seenMessageIds = new Set(restMessages.map(m => m.message_id));
@@ -281,12 +282,16 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     const seenToolCallIds = new Set(restToolUse.map(t => t.call_id));
     const newToolUse = sse.toolUse.filter(t => !seenToolCallIds.has(t.call_id));
 
+    const seenFailureIds = new Set(restRunCycleFailures.map(f => f.message_id));
+    const newFailures = sse.runCycleFailures.filter(f => !seenFailureIds.has(f.message_id));
+
     return mergeEntries(
       [...restMessages, ...newMessages],
       [...restReasoning, ...newReasoning],
-      [...restToolUse, ...newToolUse]
+      [...restToolUse, ...newToolUse],
+      [...restRunCycleFailures, ...newFailures]
     );
-  }, [restData, sse.messages, sse.reasoning, sse.toolUse]);
+  }, [restData, sse.messages, sse.reasoning, sse.toolUse, sse.runCycleFailures]);
 
   // Auto-highlight a message from ?highlight= query param (e.g. from branches viewer)
   const highlightParam = searchParams.get("highlight");

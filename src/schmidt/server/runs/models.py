@@ -167,6 +167,22 @@ class DebugLogEntry(BaseModel):
     message: str
 
 
+class AgentRunCycleFailedEntry(BaseModel):
+    """A single agent-run-cycle failure extracted from the event log.
+
+    One entry per ``AgentRunCycleFailed`` event. ``error_type`` is the
+    exception class name (e.g. ``"ContentFilterError"``).
+    """
+
+    message_id: str
+    agent_id: str
+    timestamp: datetime
+    round_number: int
+    cycle: int
+    error_type: str
+    message: str
+
+
 class EvalMetricResponse(BaseModel):
     """Result of a single evaluator for the run detail endpoint."""
 
@@ -215,6 +231,7 @@ class RunDetailResponse(BaseModel):
     reasoning: list[ReasoningEntry]
     tool_use: list[ToolUseEntry]
     debug_logs: list[DebugLogEntry]
+    run_cycle_failures: list[AgentRunCycleFailedEntry]
     evaluation: EvalReportResponse | None
     evaluation_in_progress: bool
     has_eval_log_file: bool
@@ -503,6 +520,19 @@ class SSEDebugLog(BaseModel):
     message: str
 
 
+class SSEAgentRunCycleFailed(BaseModel):
+    """SSE event emitted when agent.run() raised an exception in the runner's retry loop."""
+
+    event_type: Literal["agent_run_cycle_failed"]
+    event_id: str
+    timestamp: datetime
+    agent_id: str
+    round_number: int
+    cycle: int
+    error_type: str
+    message: str
+
+
 class SSEVeyruStabilizationJudged(BaseModel):
     """SSE event carrying the veyru stabilization judge's verdict for a stabilize_veyru call."""
 
@@ -530,6 +560,7 @@ SSEEvent = Annotated[
         SSESimulationEnded,
         SSEAgentCostUpdated,
         SSEDebugLog,
+        SSEAgentRunCycleFailed,
         SSEVeyruStabilizationJudged,
     ],
     Discriminator("event_type"),

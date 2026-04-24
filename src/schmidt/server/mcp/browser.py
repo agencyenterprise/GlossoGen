@@ -346,6 +346,7 @@ async def _tool_get_run(
             reasoning=[r for r in detail.reasoning if r.sender_agent_id == agent_id],
             tool_use=[t for t in detail.tool_use if t.sender_agent_id == agent_id],
             debug_logs=detail.debug_logs,
+            run_cycle_failures=[f for f in detail.run_cycle_failures if f.agent_id == agent_id],
             evaluation=detail.evaluation,
             evaluation_in_progress=detail.evaluation_in_progress,
             has_eval_log_file=detail.has_eval_log_file,

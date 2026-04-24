@@ -30,6 +30,7 @@ import { formatTime, humanize } from "./format";
 import { ProseMarkdown } from "./prose-markdown";
 import { NotificationDisplay } from "./notification-display";
 import { ToolCallDisplay } from "./tool-call-display";
+import { RunCycleFailureDisplay } from "./run-cycle-failure-display";
 import type { PendingEdit } from "./use-fork";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
@@ -565,7 +566,8 @@ export function ChatPane({
                           forkEnabled &&
                           !entry.is_reasoning &&
                           !entry.is_tool_use &&
-                          !entry.is_notification_result;
+                          !entry.is_notification_result &&
+                          !entry.is_run_cycle_failure;
 
                         const entryKindKey = entry.is_reasoning
                           ? "r"
@@ -573,7 +575,9 @@ export function ChatPane({
                             ? "t"
                             : entry.is_notification_result
                               ? "n"
-                              : "m";
+                              : entry.is_run_cycle_failure
+                                ? "f"
+                                : "m";
                         const entryKey = `${entry.message_id}-${entryKindKey}-${entryIdx}`;
                         const hasLinkedPair = entry.paired_message_id !== "";
                         const isLinkHovered = hasLinkedPair && hoveredCallId === entry.call_id;
@@ -604,8 +608,12 @@ export function ChatPane({
                               !entry.is_reasoning &&
                                 !entry.is_tool_use &&
                                 !entry.is_notification_result &&
+                                !entry.is_run_cycle_failure &&
                                 "rounded-md border border-border/70 bg-background px-2 py-1.5 shadow-sm",
-                              (entry.is_tool_use || entry.is_notification_result) && "ml-4",
+                              (entry.is_tool_use ||
+                                entry.is_notification_result ||
+                                entry.is_run_cycle_failure) &&
+                                "ml-4",
                               hasLinkedPair && "cursor-pointer",
                               isLinkHovered &&
                                 "rounded-md ring-2 ring-blue-400/40 dark:ring-blue-500/40",
@@ -626,7 +634,8 @@ export function ChatPane({
                                 reasoning
                               </span>
                             ) : entry.is_tool_use ||
-                              entry.is_notification_result ? null : showChannelBadge ? (
+                              entry.is_notification_result ||
+                              entry.is_run_cycle_failure ? null : showChannelBadge ? (
                               <span
                                 className={cn(
                                   "mb-0.5 inline-block rounded-full px-1.5 py-px text-[10px] font-medium leading-relaxed",
@@ -640,6 +649,12 @@ export function ChatPane({
 
                             {entry.is_tool_use || entry.is_notification_result ? (
                               <ToolOrNotification entry={entry} />
+                            ) : entry.is_run_cycle_failure ? (
+                              <RunCycleFailureDisplay
+                                errorType={entry.error_type}
+                                message={entry.text}
+                                cycle={entry.cycle}
+                              />
                             ) : isEditing ? (
                               <MessageEditor
                                 initialText={displayText}
@@ -664,6 +679,7 @@ export function ChatPane({
                                 {!entry.is_reasoning &&
                                 !entry.is_tool_use &&
                                 !entry.is_notification_result &&
+                                !entry.is_run_cycle_failure &&
                                 entry.character_count > 0 ? (
                                   <span className="mt-0.5 block text-[10px] text-muted-foreground/60">
                                     {entry.character_count.toLocaleString()} characters
@@ -671,7 +687,8 @@ export function ChatPane({
                                 ) : null}
                                 {!entry.is_reasoning &&
                                 !entry.is_tool_use &&
-                                !entry.is_notification_result ? (
+                                !entry.is_notification_result &&
+                                !entry.is_run_cycle_failure ? (
                                   <span className="absolute right-1 top-1 z-10 flex items-center gap-0.5 rounded-md bg-background/90 p-1 shadow-sm opacity-0 transition-opacity group-hover/entry:opacity-100">
                                     {canEdit ? (
                                       <Tooltip label="Edit &amp; fork">

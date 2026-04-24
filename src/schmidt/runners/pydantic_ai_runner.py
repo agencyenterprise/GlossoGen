@@ -35,6 +35,7 @@ from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import (
+    AgentRunCycleFailed,
     LLMResponseReceived,
     TokenUsage,
     ToolCallInvoked,
@@ -208,11 +209,22 @@ class PydanticAIRunner(AgentRunner):
                                 max_tokens=agent_config.max_tokens,
                             ),
                         )
-                    except Exception:
+                    except Exception as exc:
                         logger.exception(
                             "Agent %s run cycle %d failed, retrying",
                             agent_id,
                             total_turns + 1,
+                        )
+                        state.spawn_log_task(
+                            event_logger.log(
+                                event=AgentRunCycleFailed(
+                                    agent_id=agent_id,
+                                    round_number=event_logger.current_round,
+                                    cycle=total_turns + 1,
+                                    error_type=type(exc).__name__,
+                                    message=str(exc),
+                                )
+                            )
                         )
                         all_background_tasks.extend(state.background_tasks)
                         total_turns += 1

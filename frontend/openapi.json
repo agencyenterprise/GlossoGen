@@ -332,6 +332,9 @@
                       "$ref": "#/components/schemas/SSEDebugLog"
                     },
                     {
+                      "$ref": "#/components/schemas/SSEAgentRunCycleFailed"
+                    },
+                    {
                       "$ref": "#/components/schemas/SSEVeyruStabilizationJudged"
                     }
                   ],
@@ -350,6 +353,7 @@
                       "simulation_ended": "#/components/schemas/SSESimulationEnded",
                       "agent_cost_updated": "#/components/schemas/SSEAgentCostUpdated",
                       "debug_log": "#/components/schemas/SSEDebugLog",
+                      "agent_run_cycle_failed": "#/components/schemas/SSEAgentRunCycleFailed",
                       "veyru_stabilization_judged": "#/components/schemas/SSEVeyruStabilizationJudged"
                     }
                   },
@@ -1198,6 +1202,51 @@
         "title": "AgentRolesResponse",
         "description": "Response listing agents that would participate in a scenario."
       },
+      "AgentRunCycleFailedEntry": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "title": "Message Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "cycle": {
+            "type": "integer",
+            "title": "Cycle"
+          },
+          "error_type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "agent_id",
+          "timestamp",
+          "round_number",
+          "cycle",
+          "error_type",
+          "message"
+        ],
+        "title": "AgentRunCycleFailedEntry",
+        "description": "A single agent-run-cycle failure extracted from the event log.\n\nOne entry per ``AgentRunCycleFailed`` event. ``error_type`` is the\nexception class name (e.g. ``\"ContentFilterError\"``)."
+      },
       "AllLabelsResponse": {
         "properties": {
           "labels": {
@@ -1841,6 +1890,13 @@
             "type": "array",
             "title": "Debug Logs"
           },
+          "run_cycle_failures": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRunCycleFailedEntry"
+            },
+            "type": "array",
+            "title": "Run Cycle Failures"
+          },
           "evaluation": {
             "anyOf": [
               {
@@ -1936,6 +1992,7 @@
           "reasoning",
           "tool_use",
           "debug_logs",
+          "run_cycle_failures",
           "evaluation",
           "evaluation_in_progress",
           "has_eval_log_file",
@@ -2220,6 +2277,57 @@
         ],
         "title": "SSEAgentRegistered",
         "description": "SSE event emitted when an agent joins the simulation."
+      },
+      "SSEAgentRunCycleFailed": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "agent_run_cycle_failed",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "cycle": {
+            "type": "integer",
+            "title": "Cycle"
+          },
+          "error_type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "agent_id",
+          "round_number",
+          "cycle",
+          "error_type",
+          "message"
+        ],
+        "title": "SSEAgentRunCycleFailed",
+        "description": "SSE event emitted when agent.run() raised an exception in the runner's retry loop."
       },
       "SSEDebugLog": {
         "properties": {
