@@ -15,7 +15,7 @@ const MODE_CARDS: ModeCard[] = [
   {
     mode: "single",
     title: "Single team",
-    description: "One field observer + one specialist work together across all rounds.",
+    description: "One field observer + one stabilization engineer work together across all rounds.",
     icon: Users,
   },
   {

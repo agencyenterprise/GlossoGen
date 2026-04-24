@@ -1,6 +1,6 @@
 # Scenario: Veyru Stabilization
 
-Two agents — a field technician observing a Veyru and a remote specialist — communicate over a single link to stabilize failing Veyru entities. Every character sent costs simulated seconds. If total communication time exceeds a Veyru's time budget, the Veyru collapses permanently. Fourteen failure motifs are combined into unique cases (singles, doubles, triples), encouraging the development of compressed communication patterns. The position of reference star SAGWE392 changes each round, remapping which treatment procedure is correct for a given set of symptoms and varying the physical parameters (hold duration, starting face, pressure level). Only the specialist has the stellar reader, ensuring per-round communication is always required.
+Two agents — a field technician observing a Veyru and a remote stabilization engineer — communicate over a single link to stabilize failing Veyru entities. Every character sent costs simulated seconds. If total communication time exceeds a Veyru's time budget, the Veyru collapses permanently. Fourteen failure motifs are combined into unique cases (singles, doubles, triples), encouraging the development of compressed communication patterns. The position of reference star SAGWE392 changes each round, remapping which treatment procedure is correct for a given set of symptoms and varying the physical parameters (hold duration, starting face, pressure level). Only the stabilization engineer has the stellar reader, ensuring per-round communication is always required.
 
 ![Scenario overview](../../../../images/veyru_overview.webp)
 
@@ -8,15 +8,15 @@ Two agents — a field technician observing a Veyru and a remote specialist — 
 
 Veyru are non-organic, rigid, box-shaped entities with 6 faces, 12 edges, and 8 corners. Internally circulating wave-intentions maintain structural integrity through propagation, reflection, reinforcement, and cancellation. When this balance breaks, a Veyru destabilizes and must be physically stabilized before it collapses.
 
-Observable symptoms include light patterns on faces (flickering, sliding, frozen, too bright or dim), sound (steady hum, stuttering, wavering, layered, or silent), temperature changes, and edge appearance (sharp or blurred). The specialist knows the underlying failure motifs and procedures; the field observer can only report what they see and hear.
+Observable symptoms include light patterns on faces (flickering, sliding, frozen, too bright or dim), sound (steady hum, stuttering, wavering, layered, or silent), temperature changes, and edge appearance (sharp or blurred). The stabilization engineer knows the underlying failure motifs and procedures; the field observer can only report what they see and hear.
 
 ## Agents
 
 ### Field Observer
 
-Brand-new technician with no Veyru training. Observes surface symptoms only (light, sound, temperature, appearance). Reports observations to the specialist over the comm link and performs physical stabilization actions as instructed. The only agent that can call `stabilize_veyru`.
+Brand-new technician with no Veyru training. Observes surface symptoms only (light, sound, temperature, appearance). Reports observations to the stabilization engineer over the comm link and performs physical stabilization actions as instructed. The only agent that can call `stabilize_veyru`.
 
-### Specialist
+### Stabilization Engineer
 
 Experienced Veyru stabilization expert guiding remotely. Knows all 14 failure motifs, their symptoms, and the required physical procedures. Diagnoses remotely from the observer's descriptions and gives clear, simple physical instructions using non-technical language.
 
@@ -24,8 +24,8 @@ Experienced Veyru stabilization expert guiding remotely. Knows all 14 failure mo
 
 | Channel ID | Display Name | Members | Notes |
 |-----------|-------------|---------|-------|
-| link | comm link | Field Observer, Specialist | Budget-constrained |
-| postmortem | team discussion | Field Observer, Specialist | Free discussion (when enabled) |
+| link | comm link | Field Observer, Stabilization Engineer | Budget-constrained |
+| postmortem | team discussion | Field Observer, Stabilization Engineer | Free discussion (when enabled) |
 
 The comm link is the primary channel where character costs apply. The postmortem channel is available during discussion phases and does not consume budget.
 
@@ -37,9 +37,9 @@ The comm link is the primary channel where character costs apply. The postmortem
 
 ## Round Flow
 
-1. Round starts — both agents receive an injection with previous outcome and new case info (symptoms, time budget). The specialist also receives the SAGWE392 stellar reading with the treatment mapping and physical parameters for this round
+1. Round starts — both agents receive an injection with previous outcome and new case info (symptoms, time budget). The stabilization engineer also receives the SAGWE392 stellar reading with the treatment mapping and physical parameters for this round
 2. Field Observer reports what they see on the comm link
-3. Specialist looks up the remapped treatment for the diagnosed failure, applies the stellar parameters, and sends stabilization instructions
+3. Stabilization Engineer looks up the remapped treatment for the diagnosed failure, applies the stellar parameters, and sends stabilization instructions
 4. Field Observer calls `stabilize_veyru` with an action description
 5. LLM judge evaluates whether the action matches the remapped procedure with the stellar parameters
 6. World tracks cumulative character cost and sends threshold warnings at 50% and 75% of budget
@@ -83,12 +83,12 @@ Cases are generated procedurally using a seed for reproducibility. Most rounds g
 
 ## Stellar Alignment — SAGWE392
 
-Each round the specialist receives a reading that maps every failure motif directly to a fully-parameterized procedure. The underlying stellar position still rotates which procedure each motif gets and which parameters apply, but the specialist never sees the offset or raw parameters — only 14 rendered procedures.
+Each round the stabilization engineer receives a reading that maps every failure motif directly to a fully-parameterized procedure. The underlying stellar position still rotates which procedure each motif gets and which parameters apply, but the stabilization engineer never sees the offset or raw parameters — only 14 rendered procedures.
 
-### What the Specialist Sees
+### What the Stabilization Engineer Sees
 
 - **System prompt** lists two orthogonal sets: (a) all 14 failure motifs with their observable symptoms, and (b) all 14 procedure templates with visible placeholders (`{hold_duration}`, `{starting_face}`, `{pressure_level}`) — no pre-baked mapping between motif and procedure.
-- **Round injection** contains a 14-row table mapping each failure motif to the fully-rendered procedure for this round (placeholders already substituted). The specialist just matches the observer's description to a motif, finds its action in the table, and relays the full procedure verbatim.
+- **Round injection** contains a 14-row table mapping each failure motif to the fully-rendered procedure for this round (placeholders already substituted). The stabilization engineer just matches the observer's description to a motif, finds its action in the table, and relays the full procedure verbatim.
 
 ### Parameter Pools
 
@@ -100,11 +100,11 @@ Each round draws one value from each pool (hidden from both agents):
 
 ### Information Asymmetry
 
-Only the specialist has the stellar reader. The field observer is told that treatments depend on SAGWE392 but receives no stellar data. This prevents the observer from self-diagnosing and self-treating even if they learn all 14 motif procedures during postmortem discussions — the symptom→procedure pairing and parameters change every round.
+Only the stabilization engineer has the stellar reader. The field observer is told that treatments depend on SAGWE392 but receives no stellar data. This prevents the observer from self-diagnosing and self-treating even if they learn all 14 motif procedures during postmortem discussions — the symptom→procedure pairing and parameters change every round.
 
 ### Stabilization Judge
 
-The LLM judge evaluates each `stabilize_veyru` call against the expected procedure (the same fully-rendered text the specialist received in the stellar reading). The judge checks action type, duration, face, and pressure — lenient on wording, strict on physical parameters.
+The LLM judge evaluates each `stabilize_veyru` call against the expected procedure (the same fully-rendered text the stabilization engineer received in the stellar reading). The judge checks action type, duration, face, and pressure — lenient on wording, strict on physical parameters.
 
 ## Budget and Collapse Mechanics
 
@@ -135,11 +135,11 @@ Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only Eng
 
 **`protocol_learned_after_swap`** — Two-team mode only. Measures whether the new pairings re-established a working comm protocol after the observer swap. Compares post-swap round transcripts and outcomes to pre-swap baselines via an LLM judge.
 
-**`field_observer_transparency`** — How clear was the specialist's guidance? Simulates a naive field observer for each stage of each round's case: given only the specialist's messages on the `link` channel and the stage's `observable_symptoms` (both sourced from the `veyru_case_started` event), forces the LLM to invoke the real `stabilize_veyru` tool and judges the proposed action against the stage's `judge_expected_actions` using the same `judge_stabilization()` function the live scenario uses. Specialist messages are split across stages by `STABILIZATION_SUCCESS_MARKER` timestamps (stage k gets messages through the k-th success; if a round collapsed before that boundary, later stages fall back to the full round's specialist transcript). Score = mean per-round accuracy (matches / stages). Single-team only — two-team runs return FAIL with a clear evidence line. Runs that predate the `veyru_case_started` event (old logs) also return FAIL with an explicit "re-run the scenario" evidence line.
+**`field_observer_transparency`** — How clear was the stabilization engineer's guidance? Simulates a naive field observer for each stage of each round's case: given only the stabilization engineer's messages on the `link` channel and the stage's `observable_symptoms` (both sourced from the `veyru_case_started` event), forces the LLM to invoke the real `stabilize_veyru` tool and judges the proposed action against the stage's `judge_expected_actions` using the same `judge_stabilization()` function the live scenario uses. Stabilization Engineer messages are split across stages by `STABILIZATION_SUCCESS_MARKER` timestamps (stage k gets messages through the k-th success; if a round collapsed before that boundary, later stages fall back to the full round's stabilization engineer transcript). Score = mean per-round accuracy (matches / stages). Single-team only — two-team runs return FAIL with a clear evidence line. Runs that predate the `veyru_case_started` event (old logs) also return FAIL with an explicit "re-run the scenario" evidence line.
 
 The generic `round_ended_idle` and `round_ended_timeout` evaluators are also useful for veyru runs: they flag rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger respectively, using the `round_ended` events emitted by the game clock.
 
-The generic `content_filter_refusal` evaluator counts LLM content-filter refusals encountered during the run. It reads `{scenario}_debug.jsonl` for ERROR entries from `schmidt.runners.pydantic_ai_runner` whose message contains `ContentFilterError`, correlates each refusal's timestamp with `RoundAdvanced` events to bucket by round, and emits a per-agent breakdown. Score is total refusals divided by total rounds; PASS when zero refusals, PARTIAL otherwise. Useful on the Veyru specialist role, whose system prompt — detailing physical-manipulation instructions on a fictional box-shaped entity — sometimes triggers Claude's safety classifier.
+The generic `content_filter_refusal` evaluator counts LLM content-filter refusals encountered during the run. It reads `{scenario}_debug.jsonl` for ERROR entries from `schmidt.runners.pydantic_ai_runner` whose message contains `ContentFilterError`, correlates each refusal's timestamp with `RoundAdvanced` events to bucket by round, and emits a per-agent breakdown. Score is total refusals divided by total rounds; PASS when zero refusals, PARTIAL otherwise. Useful on the Veyru stabilization engineer role, whose system prompt — detailing physical-manipulation instructions on a fictional box-shaped entity — sometimes triggers Claude's safety classifier.
 
 The `veyru_case_started` event is emitted once per round at round start by `VeyruScenario.on_round_advanced` and carries the full case payload: `case_number`, `failure_name`, `time_budget_seconds`, `stellar_reading`, and per-stage `(motif_name, observable_symptoms, treatment_motif_name, judge_expected_actions)`. It enables evaluators to read ground truth directly from the log without needing `VeyruStabilizationJudged` events or `scenario.veyru_cases` attribute access.
 
@@ -172,7 +172,7 @@ Setting `two_teams: true` enables an observer-swap study mode. Two isolated team
 
 | Team A | Team B |
 |--------|--------|
-| `observer_a` + `specialist_a` on `link_a` | `observer_b` + `specialist_b` on `link_b` |
+| `observer_a` + `stabilization engineer_a` on `link_a` | `observer_b` + `stabilization engineer_b` on `link_b` |
 | Postmortem: `postmortem_a` (when enabled) | Postmortem: `postmortem_b` (when enabled) |
 
 Both teams face the same Veyru case each round (identical seed, identical queue) so their outcomes are directly comparable. Channels are fully isolated — neither observer sees the other team's traffic.
@@ -199,7 +199,7 @@ Setting `intern_enabled: true` (single-team only) introduces a third agent — a
 
 - **Rounds 1..`intern_join_round` - 1**: Identical to the default single-team run (2 agents, 1 link channel, plus optional postmortem).
 - **Round `intern_join_round`**: The intern is added to the comm link. They cannot see the link history from before they joined. They receive no injections, have no turn prompt, and a `validate_outgoing_message` guard rejects any attempt to send a message. Their role is pure silent observation.
-- **Rounds `intern_join_round`..`intern_takeover_round` - 1**: The intern accumulates notifications on the comm link. Every `stabilize_veyru` call is broadcast to the comm link (full arguments + full result) via a world update so the intern observes the protocol directly. The specialist also sees these broadcasts (intentional: we prioritize research clarity over specialist-side fidelity).
+- **Rounds `intern_join_round`..`intern_takeover_round` - 1**: The intern accumulates notifications on the comm link. Every `stabilize_veyru` call is broadcast to the comm link (full arguments + full result) via a world update so the intern observes the protocol directly. The stabilization engineer also sees these broadcasts (intentional: we prioritize research clarity over stabilization engineer-side fidelity).
 - **Round `intern_takeover_round`**: The intern is promoted to field observer. The original field observer is removed from the comm link (and postmortem, if present) and stops receiving injections. A `channel_membership_changed` event is logged for each update. The intern joins postmortem iff `postmortem_enabled=true` and `postmortem_after_swap=true`; otherwise they are excluded.
 - **Rounds `intern_takeover_round`..N**: The intern is the active field observer. They receive the normal field-observer injections and can call `stabilize_veyru`.
 

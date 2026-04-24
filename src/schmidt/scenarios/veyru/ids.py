@@ -14,12 +14,12 @@ TEAM_A_ID: TeamId = "a"
 TEAM_B_ID: TeamId = "b"
 
 FIELD_OBSERVER_ID = "field_observer"
-SPECIALIST_ID = "specialist"
+STABILIZATION_ENGINEER_ID = "stabilization_engineer"
 INTERN_ID = "intern"
 OBSERVER_A_ID = "observer_a"
 OBSERVER_B_ID = "observer_b"
-SPECIALIST_A_ID = "specialist_a"
-SPECIALIST_B_ID = "specialist_b"
+STABILIZATION_ENGINEER_A_ID = "stabilization_engineer_a"
+STABILIZATION_ENGINEER_B_ID = "stabilization_engineer_b"
 
 LINK_CHANNEL_ID = "link"
 POSTMORTEM_CHANNEL_ID = "postmortem"
@@ -29,12 +29,12 @@ POSTMORTEM_A_CHANNEL_ID = "postmortem_a"
 POSTMORTEM_B_CHANNEL_ID = "postmortem_b"
 
 FIELD_OBSERVER_ROLE = "Field Observer"
-SPECIALIST_ROLE = "Specialist"
+STABILIZATION_ENGINEER_ROLE = "Stabilization Engineer"
 INTERN_ROLE = "Intern Observer"
 FIELD_OBSERVER_A_ROLE = "Field Observer Alpha"
 FIELD_OBSERVER_B_ROLE = "Field Observer Beta"
-SPECIALIST_A_ROLE = "Specialist Alpha"
-SPECIALIST_B_ROLE = "Specialist Beta"
+STABILIZATION_ENGINEER_A_ROLE = "Stabilization Engineer Alpha"
+STABILIZATION_ENGINEER_B_ROLE = "Stabilization Engineer Beta"
 
 INTERN_JOIN_REASON = "veyru_intern_join"
 INTERN_TAKEOVER_REASON = "veyru_intern_takeover"
@@ -44,13 +44,13 @@ SEND_MESSAGE_TOOL = "send_message"
 STABILIZE_VEYRU_TOOL = "stabilize_veyru"
 
 FIELD_OBSERVER_SYSTEM_TEMPLATE = "field_observer_system.jinja"
-SPECIALIST_SYSTEM_TEMPLATE = "specialist_system.jinja"
+STABILIZATION_ENGINEER_SYSTEM_TEMPLATE = "stabilization_engineer_system.jinja"
 INTERN_SYSTEM_TEMPLATE = "intern_system.jinja"
 FIELD_OBSERVER_INJECTION_TEMPLATE = "field_observer_injection.jinja"
-SPECIALIST_INJECTION_TEMPLATE = "specialist_injection.jinja"
+STABILIZATION_ENGINEER_INJECTION_TEMPLATE = "stabilization_engineer_injection.jinja"
 
 TOOLS_OBSERVER = [SEND_MESSAGE_TOOL, STABILIZE_VEYRU_TOOL]
-TOOLS_SPECIALIST = [SEND_MESSAGE_TOOL]
+TOOLS_STABILIZATION_ENGINEER = [SEND_MESSAGE_TOOL]
 TOOLS_INTERN = [SEND_MESSAGE_TOOL, STABILIZE_VEYRU_TOOL]
 
 STABILIZATION_SUCCESS_MARKER = "Stabilization successful"
