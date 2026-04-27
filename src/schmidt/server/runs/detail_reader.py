@@ -1,5 +1,6 @@
 """Loads and parses a full JSONL simulation log into a RunDetailResponse."""
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
@@ -110,14 +111,11 @@ async def _load_evaluation_report(report_path: Path) -> EvalReportResponse | Non
     return EvalReportResponse(metrics=metrics, evaluation_cost=eval_cost)
 
 
-async def load_debug_logs(debug_log_path: Path) -> list[DebugLogEntry]:
-    """Load debug log entries from a JSONL file, returning an empty list if it does not exist."""
-    if not debug_log_path.exists():
-        return []
-
+def _load_debug_logs_sync(debug_log_path: Path) -> list[DebugLogEntry]:
+    """Parse debug JSONL synchronously; intended to be called via asyncio.to_thread."""
     entries: list[DebugLogEntry] = []
-    async with aiofiles.open(debug_log_path, mode="rb") as f:
-        async for line in f:
+    with open(debug_log_path, mode="rb") as f:
+        for line in f:
             stripped = line.strip()
             if not stripped:
                 continue
@@ -134,6 +132,13 @@ async def load_debug_logs(debug_log_path: Path) -> list[DebugLogEntry]:
             except (KeyError, orjson.JSONDecodeError):
                 logger.exception("Skipping malformed debug log entry in %s", debug_log_path)
     return entries
+
+
+async def load_debug_logs(debug_log_path: Path) -> list[DebugLogEntry]:
+    """Load debug log entries from a JSONL file, returning an empty list if it does not exist."""
+    if not debug_log_path.exists():
+        return []
+    return await asyncio.to_thread(_load_debug_logs_sync, debug_log_path)
 
 
 def _link_reasoning_to_channels(

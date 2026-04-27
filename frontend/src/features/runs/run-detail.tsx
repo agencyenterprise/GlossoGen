@@ -241,10 +241,9 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const { data: debugLogsData } = useQuery({
     queryKey: ["run-debug-logs", runId],
     queryFn: async () => {
-      const { data, error } = await api.GET(
-        "/api/runs/{scenario}/{run_dir_name}/debug-logs",
-        { params: { path: { scenario, run_dir_name: runDirName } } }
-      );
+      const { data, error } = await api.GET("/api/runs/{scenario}/{run_dir_name}/debug-logs", {
+        params: { path: { scenario, run_dir_name: runDirName } },
+      });
       if (error) {
         throw new Error("Failed to fetch debug logs");
       }
