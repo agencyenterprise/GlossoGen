@@ -23,9 +23,24 @@ from pydantic_ai.messages import (
 )
 
 from schmidt.models.event import LLMResponseReceived, SimulationEvent, ToolResultReceived
+from schmidt.models.tool_definition import ToolCallRequest
 from schmidt.runners.communication_protocol import CONTINUE_PROMPT, INITIAL_PROMPT
 
 logger = logging.getLogger(__name__)
+
+
+CHANNEL_SCOPED_TOOLS: frozenset[str] = frozenset({"send_message", "read_channel"})
+
+
+def _tool_call_targets_blocked_channel(
+    tool_call: ToolCallRequest,
+    blocked_channel_ids: frozenset[str],
+) -> bool:
+    """Return True when the tool call targets a channel in the blocked set."""
+    if tool_call.tool_name not in CHANNEL_SCOPED_TOOLS:
+        return False
+    channel_id = tool_call.arguments.get("channel_id")
+    return isinstance(channel_id, str) and channel_id in blocked_channel_ids
 
 
 def build_message_history(
@@ -33,6 +48,8 @@ def build_message_history(
     agent_id: str,
     system_prompt: str,
     target_timestamp: datetime,
+    tool_calls_only: bool,
+    blocked_channel_ids: frozenset[str],
 ) -> list[ModelMessage]:
     """Build a pydantic-ai message history for an agent from JSONL events.
 
@@ -41,14 +58,14 @@ def build_message_history(
     alternating ``ModelRequest`` / ``ModelResponse`` messages matching
     the structure pydantic-ai creates during a live run.
 
-    Event ordering in JSONL: tool results are logged individually as they
-    complete, while the LLM response containing the tool calls is logged
-    after all calls finish. So for a single cycle the JSONL order is:
-    ``ToolResultReceived, ..., ToolResultReceived, LLMResponseReceived``.
-    The builder reorders these into the correct pydantic-ai conversation
-    structure: ``ModelResponse(ToolCallParts) → ModelRequest(ToolReturnParts)``.
+    When ``tool_calls_only`` is True, ``TextPart`` and ``ThinkingPart``
+    are stripped from each ``ModelResponse``; only ``ToolCallPart``
+    instances survive. When ``blocked_channel_ids`` is non-empty, every
+    ``send_message`` and ``read_channel`` call targeting one of those
+    channels is dropped along with its matching tool return — used by
+    the replace-agent flow to hide e.g. postmortem traffic from the
+    new agent while exposing the rest of the prior tool history.
     """
-    # Collect agent events up to the target timestamp.
     llm_responses: list[LLMResponseReceived] = []
     tool_results_by_call_id: dict[str, ToolResultReceived] = {}
 
@@ -63,30 +80,36 @@ def build_message_history(
     if not llm_responses:
         return []
 
-    messages: list[ModelMessage] = []
-
-    # First request: system prompt + initial user prompt.
-    messages.append(
+    messages: list[ModelMessage] = [
         ModelRequest(
             parts=[
                 SystemPromptPart(content=system_prompt),
                 UserPromptPart(content=INITIAL_PROMPT),
             ],
         )
-    )
+    ]
 
     for llm_resp in llm_responses:
-        # Build response parts from the LLM response.
+        kept_tool_calls = [
+            tc
+            for tc in llm_resp.tool_calls
+            if not _tool_call_targets_blocked_channel(
+                tool_call=tc,
+                blocked_channel_ids=blocked_channel_ids,
+            )
+        ]
+
         response_parts: list[ThinkingPart | TextPart | ToolCallPart] = []
 
-        thinking = getattr(llm_resp, "thinking", None)
-        if thinking:
-            response_parts.append(ThinkingPart(content=thinking))
+        if not tool_calls_only:
+            thinking = getattr(llm_resp, "thinking", None)
+            if thinking:
+                response_parts.append(ThinkingPart(content=thinking))
 
-        if llm_resp.text:
-            response_parts.append(TextPart(content=llm_resp.text))
+            if llm_resp.text:
+                response_parts.append(TextPart(content=llm_resp.text))
 
-        for tc in llm_resp.tool_calls:
+        for tc in kept_tool_calls:
             response_parts.append(
                 ToolCallPart(
                     tool_name=tc.tool_name,
@@ -95,7 +118,8 @@ def build_message_history(
                 )
             )
 
-        if response_parts:
+        cycle_kept = bool(response_parts)
+        if cycle_kept:
             messages.append(
                 ModelResponse(
                     parts=response_parts,
@@ -103,9 +127,8 @@ def build_message_history(
                 )
             )
 
-        # Build tool return request from matching tool results.
         tool_return_parts: list[ToolReturnPart] = []
-        for tc in llm_resp.tool_calls:
+        for tc in kept_tool_calls:
             result_event = tool_results_by_call_id.get(tc.call_id)
             if result_event is not None:
                 tool_return_parts.append(
@@ -120,9 +143,7 @@ def build_message_history(
         if tool_return_parts:
             messages.append(ModelRequest(parts=tool_return_parts))
 
-        # At cycle boundaries (end_turn), insert continue prompt — but not
-        # after the last response, since the runner will supply it as user_prompt.
-        if llm_resp.stop_reason == "end_turn" and llm_resp is not llm_responses[-1]:
+        if cycle_kept and llm_resp.stop_reason == "end_turn" and llm_resp is not llm_responses[-1]:
             messages.append(
                 ModelRequest(
                     parts=[UserPromptPart(content=CONTINUE_PROMPT)],

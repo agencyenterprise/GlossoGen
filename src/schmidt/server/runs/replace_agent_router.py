@@ -46,6 +46,7 @@ async def replace_agent(
         source_run_dir=resolved.run_dir,
         scenario_name=resolved.scenario_name,
         round_start=body.round_start,
+        rounds_after_swap=body.rounds_after_swap,
         replaced_agent_id=body.replaced_agent_id,
         model=body.model,
         provider=body.provider,

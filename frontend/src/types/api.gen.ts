@@ -885,12 +885,17 @@ export interface components {
          *
          *     ``channels_with_visible_history`` lists channel IDs whose prior history
          *     remains visible to the replaced agent on resume; every other channel
-         *     they're a member of has its history wiped (current behavior is
-         *     equivalent to passing an empty list).
+         *     they're a member of has its history wiped.
+         *
+         *     ``rounds_after_swap`` controls how many rounds the resumed simulation
+         *     plays following the replacement: ``round_count`` is set to
+         *     ``round_start + rounds_after_swap``.
          */
         ReplaceAgentRequest: {
             /** Round Start */
             round_start: number;
+            /** Rounds After Swap */
+            rounds_after_swap: number;
             /** Replaced Agent Id */
             replaced_agent_id: string;
             /** Model */

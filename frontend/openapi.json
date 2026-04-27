@@ -1936,6 +1936,10 @@
             "type": "integer",
             "title": "Round Start"
           },
+          "rounds_after_swap": {
+            "type": "integer",
+            "title": "Rounds After Swap"
+          },
           "replaced_agent_id": {
             "type": "string",
             "title": "Replaced Agent Id"
@@ -1972,6 +1976,7 @@
         "type": "object",
         "required": [
           "round_start",
+          "rounds_after_swap",
           "replaced_agent_id",
           "model",
           "provider",
@@ -1979,7 +1984,7 @@
           "channels_with_visible_history"
         ],
         "title": "ReplaceAgentRequest",
-        "description": "Request body for replacing one agent in a finished run at the start of a round.\n\n``channels_with_visible_history`` lists channel IDs whose prior history\nremains visible to the replaced agent on resume; every other channel\nthey're a member of has its history wiped (current behavior is\nequivalent to passing an empty list)."
+        "description": "Request body for replacing one agent in a finished run at the start of a round.\n\n``channels_with_visible_history`` lists channel IDs whose prior history\nremains visible to the replaced agent on resume; every other channel\nthey're a member of has its history wiped.\n\n``rounds_after_swap`` controls how many rounds the resumed simulation\nplays following the replacement: ``round_count`` is set to\n``round_start + rounds_after_swap``."
       },
       "ReplaceAgentResponse": {
         "properties": {

@@ -83,14 +83,3 @@ def drop_all_agent_history(event_dict: dict[str, Any]) -> bool:
     edits invalidate prior tool args and results.
     """
     return event_dict.get("event_type") in _FRESH_AGENT_EVENT_TYPES
-
-
-def drop_single_agent_history(event_dict: dict[str, Any], agent_id: str) -> bool:
-    """Drop predicate: only one agent's LLM history events.
-
-    Used by replace-agent — the chosen agent restarts with empty history
-    while every other agent's reconstructed history stays intact.
-    """
-    if event_dict.get("event_type") not in _FRESH_AGENT_EVENT_TYPES:
-        return False
-    return event_dict.get("agent_id") == agent_id

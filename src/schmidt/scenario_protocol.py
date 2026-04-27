@@ -284,3 +284,16 @@ class SimulationScenario(ABC):
         The default is a no-op for scenarios without world state.
         """
         _ = round_number
+
+    @classmethod
+    def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:
+        """Return channel IDs whose ``send_message``/``read_channel`` traffic
+        should be stripped from a replaced agent's reconstructed tool history.
+
+        Used by the replace-agent flow to hide scenario-private channels
+        (e.g. a discussion/postmortem channel) from the new agent so it
+        cannot read protocol-defining content from the prior agent's
+        tool returns. The default is empty (= no scenario-specific
+        filtering).
+        """
+        return frozenset()

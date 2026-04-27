@@ -26,6 +26,25 @@ from schmidt.runners.communication_protocol import build_full_system_prompt
 logger = logging.getLogger(__name__)
 
 
+class AgentHistoryFilter(NamedTuple):
+    """Per-agent filter applied while reconstructing pydantic-ai history.
+
+    ``tool_calls_only`` strips text and thinking parts from the agent's
+    prior responses; only tool call parts survive. ``blocked_channel_ids``
+    drops every ``send_message``/``read_channel`` call targeting one of
+    those channels along with its matching tool return.
+    """
+
+    tool_calls_only: bool
+    blocked_channel_ids: frozenset[str]
+
+
+_PASS_THROUGH_FILTER = AgentHistoryFilter(
+    tool_calls_only=False,
+    blocked_channel_ids=frozenset(),
+)
+
+
 class RewindState(NamedTuple):
     """Everything needed to resume a simulation from a specific message.
 
@@ -56,16 +75,13 @@ def build_rewind_state(
     events: list[SimulationEvent],
     target_message_id: str,
     message_edits: dict[str, str],
+    agent_filters: dict[str, AgentHistoryFilter],
 ) -> RewindState:
     """Build state at a specific message, optionally applying text edits.
 
-    Args:
-        events: Full event log from the simulation JSONL.
-        target_message_id: The ``message_id`` of the ``MessageSent`` event
-            to rewind to. All events up to and including this message are
-            included in the reconstructed state.
-        message_edits: Mapping of ``message_id`` to replacement text.
-            Matched messages have their ``text`` field replaced.
+    ``agent_filters`` lets callers customize each agent's reconstructed
+    pydantic-ai history. Agents not in the dict get the default
+    pass-through filter (full history).
 
     Raises:
         ValueError: If no ``MessageSent`` event with the target ID is found.
@@ -122,11 +138,14 @@ def build_rewind_state(
             base_prompt=reg.system_prompt,
             role_name=reg.role_name,
         )
+        history_filter = agent_filters.get(reg.agent_id, _PASS_THROUGH_FILTER)
         agent_message_histories[reg.agent_id] = build_message_history(
             events=events,
             agent_id=reg.agent_id,
             system_prompt=system_prompt,
             target_timestamp=target_timestamp,
+            tool_calls_only=history_filter.tool_calls_only,
+            blocked_channel_ids=history_filter.blocked_channel_ids,
         )
 
     logger.info(
@@ -152,6 +171,7 @@ def build_rewind_state(
 
 def build_rewind_state_from_last_message(
     events: list[SimulationEvent],
+    agent_filters: dict[str, AgentHistoryFilter],
 ) -> RewindState:
     """Build rewind state targeting the last MessageSent event in the log.
 
@@ -172,6 +192,7 @@ def build_rewind_state_from_last_message(
         events=events,
         target_message_id=last_message_id,
         message_edits={},
+        agent_filters=agent_filters,
     )
 
 

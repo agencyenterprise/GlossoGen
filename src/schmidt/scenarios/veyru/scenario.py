@@ -172,6 +172,9 @@ class VeyruScenario(SimulationScenario):
         self._knobs = knobs
         self._event_logger: EventLogger | None = None
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
+        self._postmortem_active: bool = (
+            knobs.postmortem_enabled and not knobs.postmortem_disabled_at_start
+        )
         self._veyru_cases: list[VeyruCase] = get_cases(
             seed=knobs.seed,
             round_count=knobs.round_count,
@@ -355,7 +358,7 @@ class VeyruScenario(SimulationScenario):
     def _agent_defs_single_team(self) -> list[AgentDef]:
         """Return agent definitions for single-team mode."""
         link_channels: list[str] = [LINK_CHANNEL_ID]
-        if self._knobs.postmortem_enabled:
+        if self._postmortem_active:
             link_channels.append(POSTMORTEM_CHANNEL_ID)
         defs = [
             AgentDef(
@@ -392,7 +395,7 @@ class VeyruScenario(SimulationScenario):
         """Return agent definitions for two-team mode."""
         team_a_channels: list[str] = [LINK_A_CHANNEL_ID]
         team_b_channels: list[str] = [LINK_B_CHANNEL_ID]
-        if self._knobs.postmortem_enabled:
+        if self._postmortem_active:
             team_a_channels.append(POSTMORTEM_A_CHANNEL_ID)
             team_b_channels.append(POSTMORTEM_B_CHANNEL_ID)
         return [
@@ -445,7 +448,7 @@ class VeyruScenario(SimulationScenario):
                             "channels": self._channel_template_data(
                                 agent_id=d.agent_id, channel_ids=d.channel_ids
                             ),
-                            "postmortem_enabled": self._knobs.postmortem_enabled,
+                            "postmortem_enabled": self._postmortem_active,
                             "intern_join_round": self._knobs.intern_join_round,
                             "intern_takeover_round": self._knobs.intern_takeover_round,
                             "failure_motifs": FAILURE_MOTIFS,
@@ -470,7 +473,7 @@ class VeyruScenario(SimulationScenario):
                     member_agent_ids=[FIELD_OBSERVER_ID, STABILIZATION_ENGINEER_ID],
                 ),
             ]
-            if self._knobs.postmortem_enabled:
+            if self._postmortem_active:
                 channels.append(
                     Channel(
                         channel_id=POSTMORTEM_CHANNEL_ID,
@@ -492,7 +495,7 @@ class VeyruScenario(SimulationScenario):
                 member_agent_ids=[OBSERVER_B_ID, STABILIZATION_ENGINEER_B_ID],
             ),
         ]
-        if self._knobs.postmortem_enabled:
+        if self._postmortem_active:
             two_team_channels.append(
                 Channel(
                     channel_id=POSTMORTEM_A_CHANNEL_ID,
@@ -1069,6 +1072,16 @@ class VeyruScenario(SimulationScenario):
     def get_max_round_duration_seconds(self) -> float:
         """Return the maximum wall-clock seconds a round may last."""
         return self._knobs.max_round_duration_seconds
+
+    @classmethod
+    def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:
+        """Hide every postmortem channel from the replaced agent's tool history.
+
+        The protocol the new agent is meant to learn is the *comm-link*
+        protocol; postmortem traffic is where agents discuss the protocol
+        out-of-band, so it is stripped to keep the experiment honest.
+        """
+        return frozenset({POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID})
 
     # --- Evaluation ---
 
