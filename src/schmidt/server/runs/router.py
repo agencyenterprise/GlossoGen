@@ -97,10 +97,7 @@ async def get_eval_logs(
         return EvalLogsResponse(lines=[])
 
     text = eval_log_path.read_text(encoding="utf-8", errors="replace")
-    lines = [
-        EvalLogLine(line_number=i + 1, text=line)
-        for i, line in enumerate(text.splitlines())
-    ]
+    lines = [EvalLogLine(line_number=i + 1, text=line) for i, line in enumerate(text.splitlines())]
     return EvalLogsResponse(lines=lines)
 
 
@@ -132,7 +129,9 @@ async def delete_run(scenario: str, run_dir_name: str, request: Request) -> None
     if manifest is not None:
         try:
             os.kill(manifest.pid, signal.SIGTERM)
-            logger.info("Sent SIGTERM to simulation PID %d before deleting run %s", manifest.pid, run_id)
+            logger.info(
+                "Sent SIGTERM to simulation PID %d before deleting run %s", manifest.pid, run_id
+            )
         except ProcessLookupError:
             logger.info("Simulation PID %d already dead for run %s", manifest.pid, run_id)
         delete_manifest(run_dir=run_dir)
