@@ -12,6 +12,8 @@ import logging
 from collections.abc import AsyncIterable
 
 from pydantic_ai import Agent
+from pydantic_ai.agent import AgentRunResult as PydanticAIAgentRunResult
+from pydantic_ai.agent.abstract import EventStreamHandler
 from pydantic_ai.mcp import MCPServerStreamableHTTP
 from pydantic_ai.messages import (
     AgentStreamEvent,
@@ -30,6 +32,7 @@ from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage, UsageLimits
+from tenacity import RetryCallState, retry, stop_after_attempt
 
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
@@ -53,6 +56,42 @@ from schmidt.server.runs.streaming_event import AgentCostUpdated
 from schmidt.token_pricing import find_pricing
 
 logger = logging.getLogger(__name__)
+
+AGENT_RUN_RETRY_ATTEMPTS = 3
+
+
+def _log_agent_run_retry(retry_state: RetryCallState) -> None:
+    """Log each failed agent.run() attempt before tenacity retries."""
+    exc = retry_state.outcome.exception() if retry_state.outcome else None
+    logger.warning(
+        "agent.run() attempt %d/%d failed with %s, retrying",
+        retry_state.attempt_number,
+        AGENT_RUN_RETRY_ATTEMPTS,
+        type(exc).__name__ if exc else "unknown",
+    )
+
+
+@retry(
+    stop=stop_after_attempt(AGENT_RUN_RETRY_ATTEMPTS),
+    reraise=True,
+    before_sleep=_log_agent_run_retry,
+)
+async def _run_agent_call(
+    *,
+    agent: Agent[None, str],
+    prompt: str,
+    message_history: list[ModelMessage] | None,
+    event_stream_handler: EventStreamHandler[None],
+    max_tokens: int,
+) -> PydanticAIAgentRunResult[str]:
+    """Call agent.run() with tenacity retries on any exception."""
+    return await agent.run(
+        user_prompt=prompt,
+        message_history=message_history,
+        event_stream_handler=event_stream_handler,
+        usage_limits=UsageLimits(request_limit=None),
+        model_settings=ModelSettings(max_tokens=max_tokens),
+    )
 
 
 def _log_task_exception(task: asyncio.Task[None]) -> None:
@@ -200,14 +239,12 @@ class PydanticAIRunner(AgentRunner):
                     )
 
                     try:
-                        result = await agent.run(
-                            user_prompt=prompt,
+                        result = await _run_agent_call(
+                            agent=agent,
+                            prompt=prompt,
                             message_history=message_history,
                             event_stream_handler=_handle_events,
-                            usage_limits=UsageLimits(request_limit=None),
-                            model_settings=ModelSettings(
-                                max_tokens=agent_config.max_tokens,
-                            ),
+                            max_tokens=agent_config.max_tokens,
                         )
                     except Exception as exc:
                         logger.exception(
