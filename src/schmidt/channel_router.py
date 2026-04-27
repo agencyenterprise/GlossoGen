@@ -116,6 +116,29 @@ class ChannelRouter:
         channel.member_agent_ids = list(member_agent_ids)
         logger.info("Channel %s membership updated to %s", channel_id, channel.member_agent_ids)
 
+    def apply_replacement_visibility(
+        self,
+        agent_id: str,
+        channels_with_visible_history: list[str],
+    ) -> None:
+        """Selectively wipe channel-history visibility for a replaced agent.
+
+        For every channel ``agent_id`` is a member of: if the channel is in
+        ``channels_with_visible_history`` the existing ``member_join_index``
+        is preserved (history visible to the replaced agent on subsequent
+        ``read_channel`` calls); otherwise the index is bumped to the
+        current message count, making prior messages invisible while every
+        other agent's view of the channel is unchanged.
+        """
+        visible = set(channels_with_visible_history)
+        for channel_id, channel in self._channels.items():
+            if agent_id not in channel.member_agent_ids:
+                continue
+            if channel_id in visible:
+                continue
+            history_len = len(self._messages[channel_id])
+            channel.member_join_index[agent_id] = history_len
+
     def clear_history(self, channel_id: str) -> None:
         """Wipe the in-memory message history for a channel.
 

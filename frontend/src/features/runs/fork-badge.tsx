@@ -106,3 +106,27 @@ export function InternTakeoverFab({ onClick, roundNumber, stackIndex }: InternTa
     </button>
   );
 }
+
+interface ReplaceAgentPointFabProps {
+  onClick: () => void;
+  roundNumber: number;
+  stackIndex: number;
+}
+
+/** Floating action button that scrolls to the replace-agent marker. */
+export function ReplaceAgentPointFab({
+  onClick,
+  roundNumber,
+  stackIndex,
+}: ReplaceAgentPointFabProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`fixed ${bottomClass(stackIndex)} right-6 z-40 flex items-center gap-1.5 rounded-full border border-sky-300/60 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700 shadow-lg transition-all hover:bg-sky-100 hover:shadow-xl dark:border-sky-700/50 dark:bg-sky-950/80 dark:text-sky-300 dark:hover:bg-sky-900/80`}
+      title={`Go to agent replacement (round ${roundNumber})`}
+    >
+      <UserCog className="h-3.5 w-3.5" />
+      Go to agent replacement (round {roundNumber})
+    </button>
+  );
+}

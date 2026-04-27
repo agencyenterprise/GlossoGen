@@ -41,7 +41,6 @@ from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, reso
 from schmidt.runtime.scenario_world import ScenarioWorld, WorldContext
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.veyru.evaluation import (
-    FieldObserverTransparencyEvaluator,
     LanguageEmergenceEvaluator,
     ProtocolLearnedAfterSwapEvaluator,
     RoundSuccessEvaluator,
@@ -189,6 +188,7 @@ class VeyruScenario(SimulationScenario):
         self._world = VeyruWorld(
             veyru_cases=self._veyru_cases,
             teams=self._build_teams(knobs=knobs),
+            postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
         )
         self._judge_provider = create_provider(
             provider_name=knobs.judge_provider,
@@ -1077,7 +1077,6 @@ class VeyruScenario(SimulationScenario):
         """Return generic and Veyru-specific evaluator names."""
         generic = super().get_available_evaluator_names()
         specific = [
-            FieldObserverTransparencyEvaluator.name,
             LanguageEmergenceEvaluator.name,
             ProtocolLearnedAfterSwapEvaluator.name,
             RoundSuccessEvaluator.name,
@@ -1087,7 +1086,6 @@ class VeyruScenario(SimulationScenario):
     def _get_evaluators(self) -> dict[str, EvaluatorFactory]:
         """Return Veyru-specific evaluators."""
         return {
-            FieldObserverTransparencyEvaluator.name: FieldObserverTransparencyEvaluator,
             LanguageEmergenceEvaluator.name: LanguageEmergenceEvaluator,
             ProtocolLearnedAfterSwapEvaluator.name: ProtocolLearnedAfterSwapEvaluator,
             RoundSuccessEvaluator.name: RoundSuccessEvaluator,

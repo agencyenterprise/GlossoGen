@@ -23,6 +23,7 @@ from schmidt.server.response_models import AuthVerifyResponse, HealthResponse, H
 from schmidt.server.runs.artifact_router import router as artifact_export_router
 from schmidt.server.runs.bundle_router import router as bundle_router
 from schmidt.server.runs.fork_router import router as fork_router
+from schmidt.server.runs.replace_agent_router import router as replace_agent_router
 from schmidt.server.runs.router import router as runs_router
 from schmidt.server.scenarios.router import router as scenarios_router
 
@@ -96,6 +97,7 @@ app.add_middleware(
 
 app.include_router(runs_router)
 app.include_router(fork_router)
+app.include_router(replace_agent_router)
 app.include_router(pdf_export_router)
 app.include_router(artifact_export_router)
 app.include_router(bundle_router)

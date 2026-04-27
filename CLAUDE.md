@@ -380,6 +380,32 @@ Agents receive the conversation history (channel messages, scenario injections, 
 
 The fork API endpoint is `POST /api/runs/{run_id}/fork`. Forked runs appear in the run list with a "Fork" badge and show a lineage link in the run detail header.
 
+### Replacing an Agent (Round-Level Rewind)
+
+Replay a finished run from the start of a chosen round with one specific agent restarted on a fresh history while every other agent keeps its full reconstructed history. Useful for asking "could a fresh agent follow the engineer from here on?" — a direct, empirical alternative to a judge.
+
+```bash
+schmidt replace-agent veyru \
+  --source-run-dir ./runs/veyru/<timestamp> \
+  --round-start 5 \
+  --replaced-agent-id field_observer \
+  --model claude-sonnet-4-6 --provider anthropic \
+  --runs-dir ./runs \
+  [--visible-history-channel CHANNEL ...] \
+  [--knobs path/to/overrides.json]
+```
+
+Internals: clones the source run's git repo at the last `MessageSent` whose `round_number < --round-start`, drops the chosen agent's `llm_response_received` / `tool_call_invoked` / `tool_result_received` events from the JSONL, and resumes the simulation. Cannot be used with `--round-start 1`. Non-replaced agents stay on their exact original models.
+
+**Per-channel history visibility (platform feature).** The replace-agent flow chooses, per channel the replaced agent is a member of, whether that channel's prior messages remain visible after resume.
+
+- `--visible-history-channel CHANNEL` (repeatable): channels listed here keep their pre-resume history visible to the replaced agent. All other channels they belong to have `member_join_index` bumped to the current message count, so `read_channel` returns only post-resume messages there.
+- When the flag is omitted, the CLI consults the source run's `replace_agent_default_channel_visibility: dict[str, bool]` knob (defined on `BaseKnobs`). Channels not listed in that map default to visible. Scenarios encode their per-channel defaults in the preset knob JSON files; no scenario code is required.
+
+**Per-scenario knob overrides.** `--knobs <file.json>` is merged onto the source's `scenario_config` before validation. Veyru exposes `postmortem_disabled_at_start: bool` for this flow: setting it to `true` flips `world.disable_postmortem_globally()` at world construction, dropping the postmortem channel for the rest of the resumed simulation (no postmortem injections, no postmortem phase, sends to postmortem are rejected).
+
+The replace-agent API endpoint is `POST /api/runs/{scenario}/{run_dir_name}/replace-agent`. Replace-agent runs appear in the run list with a "Replaced" badge.
+
 ### Per-Agent Model Overrides
 
 Each agent uses the default `--model` and `--provider` unless overridden. Per-agent overrides live in `model_overrides` inside scenario knobs/config. The CLI also supports `agents.*` dot-notation overrides, which are normalized into `model_overrides`.
@@ -450,7 +476,6 @@ Scenario-specific evaluators:
   - `language_emergence` — novel compressed language in the fictional domain (LLM judge)
   - `round_success` — fraction of rounds the team stabilized the Veyru before collapse (deterministic, no LLM)
   - `protocol_learned_after_swap` — whether two-team mode teams re-established a working protocol after an observer swap (LLM judge)
-  - `field_observer_transparency` — how clear the stabilization engineer's instructions were. Simulates a naive field observer per case stage: given only the stabilization engineer's messages on the `link` channel and the stage's `observable_symptoms`, force the LLM to invoke the real `stabilize_veyru` tool and judge the proposed action against `judge_expected_actions` via `judge_stabilization()`. Score = mean per-round accuracy (matches / stages). Single-team only; two-team runs return FAIL. Requires `veyru_case_started` events in the log.
 
 After evaluation, labels are automatically written to the run's `labels.json` in the format `eval:{evaluator}:{verdict}` where verdict is `identified`, `partial`, or `fail`. Previous `eval:` labels are replaced; user-added labels are preserved.
 

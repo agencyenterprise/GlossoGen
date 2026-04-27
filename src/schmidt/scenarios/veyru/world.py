@@ -118,12 +118,13 @@ class VeyruWorld(ScenarioWorld):
         self,
         veyru_cases: list[VeyruCase],
         teams: dict[TeamId, TeamState],
+        postmortem_globally_disabled: bool,
     ) -> None:
         self._veyru_cases = veyru_cases
         self._teams = teams
         self._current_case: VeyruCase | None = None
         self._in_postmortem: bool = False
-        self._postmortem_globally_disabled: bool = False
+        self._postmortem_globally_disabled: bool = postmortem_globally_disabled
         self._swap_just_happened: bool = False
         self._intern_takeover_just_happened: bool = False
         self._channels_by_team: dict[str, TeamId] = self._build_channel_to_team_lookup(

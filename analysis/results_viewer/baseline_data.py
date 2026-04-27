@@ -23,7 +23,6 @@ _ROUND_SUCCESS_EVALUATOR = "round_success"
 _ROUND_ENDED_IDLE_EVALUATOR = "round_ended_idle"
 _ROUND_ENDED_TIMEOUT_EVALUATOR = "round_ended_timeout"
 _CONTENT_FILTER_REFUSAL_EVALUATOR = "content_filter_refusal"
-_FIELD_OBSERVER_TRANSPARENCY_EVALUATOR = "field_observer_transparency"
 
 
 class BaselineRun(NamedTuple):
@@ -47,7 +46,6 @@ class BaselineRun(NamedTuple):
     round_ended_timeout: int
     content_filter_refusal_rounds: int
     content_filter_refusal_total: int
-    field_observer_transparency: float
     labels: list[str]
 
     @property
@@ -62,18 +60,12 @@ class MetricOption(NamedTuple):
 
     ``attr`` is the ``BaselineRun`` field to aggregate; the plot shows the
     per-bucket mean and std of that value. ``display_name`` is what the
-    selector shows; ``y_axis_label`` is the wording shown on the chart's Y
-    axis. ``y_max`` and ``y_dtick`` let a metric override the figure's Y-axis
-    range — set them for fraction-valued metrics (e.g., 0..1 accuracy) and
-    leave them ``None`` for round-count metrics that should use the run's
-    ``total_rounds`` as the upper bound.
+    selector shows; ``y_axis_label`` is the wording shown on the chart's Y axis.
     """
 
     display_name: str
     attr: str
     y_axis_label: str
-    y_max: float | None
-    y_dtick: float | None
 
     def extract(self, run: "BaselineRun") -> float:
         """Pull this metric's value out of ``run`` as a float for aggregation."""
@@ -85,29 +77,16 @@ METRIC_OPTIONS: list[MetricOption] = [
         display_name="round_success",
         attr="round_success",
         y_axis_label="round_success (# of rounds stabilized)",
-        y_max=None,
-        y_dtick=None,
     ),
     MetricOption(
         display_name="round_ended_idle",
         attr="round_ended_idle",
         y_axis_label="round_ended_idle (# of rounds ended via all_agents_idle)",
-        y_max=None,
-        y_dtick=None,
     ),
     MetricOption(
         display_name="round_ended_timeout",
         attr="round_ended_timeout",
         y_axis_label="round_ended_timeout (# of rounds ended via round_timeout)",
-        y_max=None,
-        y_dtick=None,
-    ),
-    MetricOption(
-        display_name="field_observer_transparency",
-        attr="field_observer_transparency",
-        y_axis_label="field_observer_transparency (mean per-round accuracy)",
-        y_max=1.0,
-        y_dtick=0.1,
     ),
 ]
 
@@ -116,8 +95,6 @@ REFUSAL_METRIC = MetricOption(
     display_name="content_filter_refusal",
     attr="content_filter_refusal_total",
     y_axis_label="content_filter refusals (total per run)",
-    y_max=None,
-    y_dtick=None,
 )
 """Metric definition for the dedicated refusal plot.
 
@@ -160,14 +137,6 @@ def _metric_round_count(evaluated: EvaluatedRun, evaluator_name: str) -> int | N
     return None
 
 
-def _metric_score(evaluated: EvaluatedRun, evaluator_name: str) -> float | None:
-    """Return the ``score`` float of ``evaluator_name``'s metric, or None if missing."""
-    for metric in evaluated.report.metrics:
-        if metric.evaluator_name == evaluator_name:
-            return float(metric.score)
-    return None
-
-
 def _refusal_total(evaluated: EvaluatedRun, total_rounds: int) -> int:
     """Return the total number of refusals recorded for the run.
 
@@ -207,11 +176,6 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
     refusal_rounds = _metric_round_count(
         evaluated=evaluated, evaluator_name=_CONTENT_FILTER_REFUSAL_EVALUATOR
     )
-    transparency_score = _metric_score(
-        evaluated=evaluated, evaluator_name=_FIELD_OBSERVER_TRANSPARENCY_EVALUATOR
-    )
-    if transparency_score is None:
-        transparency_score = 0.0
     postmortem_enabled = bool(evaluated.metadata.scenario_config.get("postmortem_enabled", False))
     total_rounds = int(evaluated.metadata.scenario_config.get("round_count", 0))
     refusal_total = _refusal_total(evaluated=evaluated, total_rounds=total_rounds)
@@ -227,7 +191,6 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
         round_ended_timeout=timeout if timeout is not None else 0,
         content_filter_refusal_rounds=refusal_rounds if refusal_rounds is not None else 0,
         content_filter_refusal_total=refusal_total,
-        field_observer_transparency=transparency_score,
         labels=labels,
     )
 

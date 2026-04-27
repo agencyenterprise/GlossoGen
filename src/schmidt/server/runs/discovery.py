@@ -16,7 +16,7 @@ import orjson
 from schmidt.eval_manifest import read_eval_manifest
 from schmidt.event_parsing import parse_event_bytes
 from schmidt.models.event import RunStatus, SimulationEnded, SimulationStarted
-from schmidt.server.runs.models import AgentModelSummary, ForkSource, RunSummary
+from schmidt.server.runs.models import AgentModelSummary, ForkSource, ReplaceAgentSource, RunSummary
 from schmidt.stream_manifest import delete_manifest, read_manifest
 from schmidt.token_pricing import find_pricing
 
@@ -222,6 +222,24 @@ def _read_fork_source(run_dir: Path) -> ForkSource | None:
     )
 
 
+def _read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:
+    """Read replace-agent provenance from replace_manifest.json if it exists."""
+    manifest_path = run_dir / "replace_manifest.json"
+    if not manifest_path.exists():
+        return None
+    raw = orjson.loads(manifest_path.read_bytes())
+    replaced_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
+    return ReplaceAgentSource(
+        source_run_id=raw["source_run_id"],
+        round_start=raw["round_start"],
+        target_message_id=raw["target_message_id"],
+        replaced_agent_id=raw["replaced_agent_id"],
+        replacement_model=raw["replacement_model"],
+        replacement_provider=raw["replacement_provider"],
+        replaced_at=replaced_at,
+    )
+
+
 async def _build_summary(
     scenario_name: str,
     timestamp_dir: Path,
@@ -243,6 +261,7 @@ async def _build_summary(
     first_event = scan.first_event
     report_path = timestamp_dir / f"{scenario_name}_report.json"
     fork_source = _read_fork_source(run_dir=timestamp_dir)
+    replace_agent_source = _read_replace_agent_source(run_dir=timestamp_dir)
     run_timestamp = _timestamp_from_dir(dir_name=timestamp_dir.name)
     labels = _read_labels(run_dir=timestamp_dir)
     has_note = _has_note(run_dir=timestamp_dir)
@@ -251,7 +270,8 @@ async def _build_summary(
     run_id = compose_run_id(scenario_name=scenario_name, run_dir_name=timestamp_dir.name)
 
     if scan.last_event is not None:
-        start_time = run_timestamp if fork_source is not None else first_event.timestamp
+        derived = fork_source is not None or replace_agent_source is not None
+        start_time = run_timestamp if derived else first_event.timestamp
         duration_seconds = (scan.last_event.timestamp - start_time).total_seconds()
         return RunSummary(
             run_id=run_id,
@@ -267,6 +287,7 @@ async def _build_summary(
             evaluation_in_progress=eval_in_progress,
             run_dir=str(timestamp_dir),
             fork_source=fork_source,
+            replace_agent_source=replace_agent_source,
             models=scan.unique_models,
             provider=first_event.provider,
             agent_models=scan.agent_models,
@@ -281,7 +302,8 @@ async def _build_summary(
     else:
         delete_manifest(run_dir=timestamp_dir)
         fork_path = timestamp_dir / "fork_manifest.json"
-        if fork_path.exists():
+        replace_path = timestamp_dir / "replace_manifest.json"
+        if fork_path.exists() or replace_path.exists():
             status = RunStatus.STARTING
         else:
             status = RunStatus.ERROR
@@ -299,6 +321,7 @@ async def _build_summary(
         evaluation_in_progress=eval_in_progress,
         run_dir=str(timestamp_dir),
         fork_source=fork_source,
+        replace_agent_source=replace_agent_source,
         models=scan.unique_models,
         provider=first_event.provider,
         agent_models=scan.agent_models,

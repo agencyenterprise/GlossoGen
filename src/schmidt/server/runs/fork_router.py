@@ -18,6 +18,7 @@ from schmidt.evaluation.log_reader import load_events
 from schmidt.message_rewind import build_rewind_state
 from schmidt.models.event import SimulationStarted
 from schmidt.run_config_validation import validate_run_config
+from schmidt.run_jsonl_rewriter import drop_all_agent_history, rewrite_run_jsonl
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.runs.discovery import compose_run_id, resolve_run
@@ -96,10 +97,11 @@ async def fork_run(
     # The JSONL and all workspace files are now at the correct state.
     # Apply message edits and update the run ID in the first event.
     new_log_path = new_run_dir / f"{scenario_name}.jsonl"
-    _apply_edits_and_new_run_id(
+    rewrite_run_jsonl(
         log_path=new_log_path,
+        new_run_id=fork_run_id,
         message_edits=message_edits,
-        fork_run_id=fork_run_id,
+        should_drop_event=drop_all_agent_history,
     )
 
     # Verify the target message exists in the truncated log.
@@ -180,60 +182,6 @@ async def fork_run(
     return ForkResponse(
         fork_run_id=fork_run_id,
         fork_run_dir=str(new_run_dir),
-    )
-
-
-def _apply_edits_and_new_run_id(
-    log_path: Path,
-    message_edits: dict[str, str],
-    fork_run_id: str,
-) -> None:
-    """Rewrite the JSONL in-place, applying message edits and a new run ID.
-
-    Strips ``llm_response_received``, ``tool_call_invoked``, and
-    ``tool_result_received`` events so that agents start fresh on resume
-    instead of replaying a conversation history that still contains
-    pre-edit text in tool arguments or results.
-    """
-    raw_bytes = log_path.read_bytes()
-    lines = raw_bytes.split(b"\n")
-    output_lines: list[bytes] = []
-
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        event_dict = orjson.loads(stripped)
-        event_type = event_dict.get("event_type")
-
-        # Strip LLM responses and tool results so agents start fresh on
-        # resume. These events contain pre-edit text that would conflict
-        # with the edited message content injected into the fork.
-        if event_type in (
-            "llm_response_received",
-            "tool_call_invoked",
-            "tool_result_received",
-        ):
-            continue
-
-        if event_type == "simulation_started":
-            event_dict["run_id"] = fork_run_id
-
-        if event_type == "message_sent":
-            msg = event_dict.get("message", {})
-            msg_id = msg.get("message_id", "")
-            if msg_id in message_edits:
-                msg["text"] = message_edits[msg_id]
-
-        output_lines.append(orjson.dumps(event_dict))
-
-    log_path.write_bytes(b"\n".join(output_lines) + b"\n")
-
-    logger.info(
-        "Fork edits applied: %d lines, run_id=%s, %d message edits",
-        len(output_lines),
-        fork_run_id,
-        len(message_edits),
     )
 
 

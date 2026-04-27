@@ -228,6 +228,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{scenario}/{run_dir_name}/replace-agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace Agent
+         * @description Replace one agent in a finished run with a fresh agent from a target message.
+         *
+         *     The new agent has no message history; every other agent resumes from
+         *     its full reconstructed history. Optionally swaps the replaced agent's
+         *     model/provider.
+         */
+        post: operations["replace_agent_api_runs__scenario___run_dir_name__replace_agent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{scenario}/{run_dir_name}/export/pdf": {
         parameters: {
             query?: never;
@@ -828,6 +852,68 @@ export interface components {
             channel_ids: string[];
         };
         /**
+         * ReplaceAgentRequest
+         * @description Request body for replacing one agent in a finished run at the start of a round.
+         *
+         *     ``channels_with_visible_history`` lists channel IDs whose prior history
+         *     remains visible to the replaced agent on resume; every other channel
+         *     they're a member of has its history wiped (current behavior is
+         *     equivalent to passing an empty list).
+         */
+        ReplaceAgentRequest: {
+            /** Round Start */
+            round_start: number;
+            /** Replaced Agent Id */
+            replaced_agent_id: string;
+            /** Model */
+            model: string;
+            /** Provider */
+            provider: string;
+            /** Knobs */
+            knobs: {
+                [key: string]: unknown;
+            } | null;
+            /** Channels With Visible History */
+            channels_with_visible_history: string[];
+        };
+        /**
+         * ReplaceAgentResponse
+         * @description Response returned after a replace-agent run is launched.
+         */
+        ReplaceAgentResponse: {
+            /** New Run Id */
+            new_run_id: string;
+            /** New Run Dir */
+            new_run_dir: string;
+        };
+        /**
+         * ReplaceAgentSource
+         * @description Provenance for a run created via the replace-agent endpoint.
+         *
+         *     The replacement boundary is the start of round ``round_start``.
+         *     ``target_message_id`` is the resolved anchor inside the source
+         *     run's git history, kept for traceability.
+         */
+        ReplaceAgentSource: {
+            /** Source Run Id */
+            source_run_id: string;
+            /** Round Start */
+            round_start: number;
+            /** Target Message Id */
+            target_message_id: string;
+            /** Replaced Agent Id */
+            replaced_agent_id: string;
+            /** Replacement Model */
+            replacement_model: string;
+            /** Replacement Provider */
+            replacement_provider: string;
+            /**
+             * Replaced At
+             * Format: date-time
+             */
+            replaced_at: string;
+        };
+        /**
          * RoundEnding
          * @description Reason a round's main phase ended.
          *
@@ -895,6 +981,7 @@ export interface components {
             /** Has Eval Log File */
             has_eval_log_file: boolean;
             fork_source: components["schemas"]["ForkSource"] | null;
+            replace_agent_source: components["schemas"]["ReplaceAgentSource"] | null;
             swap_point: components["schemas"]["SwapPoint"] | null;
             intern_join: components["schemas"]["InternAnchor"] | null;
             intern_takeover: components["schemas"]["InternAnchor"] | null;
@@ -955,6 +1042,7 @@ export interface components {
             /** Run Dir */
             run_dir: string;
             fork_source: components["schemas"]["ForkSource"] | null;
+            replace_agent_source: components["schemas"]["ReplaceAgentSource"] | null;
             /** Models */
             models: string[];
             /** Provider */
@@ -1944,6 +2032,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ForkResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_agent_api_runs__scenario___run_dir_name__replace_agent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario: string;
+                run_dir_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceAgentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplaceAgentResponse"];
                 };
             };
             /** @description Validation Error */

@@ -177,12 +177,27 @@ class AutonomousSupervisor:
             runtime.channel_router.restore_messages(
                 messages_by_channel=self._resume_state.messages_by_channel,
             )
+            replaced_ids = self._resume_state.replaced_agent_ids
+            visibility_map = self._resume_state.replaced_agent_channels_with_visible_history
+            for agent_id in replaced_ids:
+                # Selectively wipe channel-history visibility for replace-agent:
+                # channels listed in the visibility map keep prior history visible
+                # to the replaced agent; every other channel they're a member of
+                # has member_join_index bumped to the current message count so
+                # read_channel returns only post-replacement messages there.
+                runtime.channel_router.apply_replacement_visibility(
+                    agent_id=agent_id,
+                    channels_with_visible_history=visibility_map.get(agent_id, []),
+                )
             for agent_id, session in agent_sessions.items():
                 has_history = bool(self._resume_state.agent_message_histories.get(agent_id))
-                # Only mark channels as seen for agents that had prior conversation
-                # history. Agents without history should see all restored messages
-                # as new so they don't silently skip them on resume.
-                if has_history:
+                was_replaced = agent_id in replaced_ids
+                # Mark channels as seen for agents that either had prior
+                # conversation history (plain --resume) or whose channel view
+                # was just wiped (replace-agent). Agents in neither bucket —
+                # e.g. all agents on a fork — should see restored messages as
+                # new so they don't silently skip them on resume.
+                if has_history or was_replaced:
                     for ch_id in runtime.channel_router.get_agent_channel_ids(
                         agent_id=agent_id,
                     ):
