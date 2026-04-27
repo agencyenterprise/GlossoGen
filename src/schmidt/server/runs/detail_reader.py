@@ -110,7 +110,7 @@ async def _load_evaluation_report(report_path: Path) -> EvalReportResponse | Non
     return EvalReportResponse(metrics=metrics, evaluation_cost=eval_cost)
 
 
-async def _load_debug_logs(debug_log_path: Path) -> list[DebugLogEntry]:
+async def load_debug_logs(debug_log_path: Path) -> list[DebugLogEntry]:
     """Load debug log entries from a JSONL file, returning an empty list if it does not exist."""
     if not debug_log_path.exists():
         return []
@@ -457,9 +457,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     evaluation_in_progress = eval_manifest is not None
     has_eval_log_file = (run_dir / "eval_stdout.log").exists()
 
-    debug_log_path = log_path.with_name(f"{scenario_name}_debug.jsonl")
-    debug_logs = await _load_debug_logs(debug_log_path=debug_log_path)
-
     fork_source = _read_fork_source(run_dir=run_dir)
     replace_agent_source = _read_replace_agent_source(run_dir=run_dir)
     swap_point = _build_swap_point(
@@ -504,7 +501,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         messages=messages,
         reasoning=reasoning,
         tool_use=tool_use,
-        debug_logs=debug_logs,
         run_cycle_failures=run_cycle_failures,
         evaluation=evaluation,
         evaluation_in_progress=evaluation_in_progress,
@@ -519,6 +515,11 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         veyru_cases=veyru_cases,
         round_endings=round_endings,
     )
+
+
+def debug_log_path_for(log_path: Path, scenario_name: str) -> Path:
+    """Return the debug JSONL path corresponding to the main event log."""
+    return log_path.with_name(f"{scenario_name}_debug.jsonl")
 
 
 OBSERVER_A_ID = "observer_a"

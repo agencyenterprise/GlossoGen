@@ -162,6 +162,55 @@
         }
       }
     },
+    "/api/runs/{scenario}/{run_dir_name}/debug-logs": {
+      "get": {
+        "summary": "Get Debug Logs",
+        "description": "Return the debug log entries for a simulation run.",
+        "operationId": "get_debug_logs_api_runs__scenario___run_dir_name__debug_logs_get",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "run_dir_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Dir Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DebugLogsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs/{scenario}/{run_dir_name}/stop": {
       "post": {
         "summary": "Stop Run",
@@ -1425,6 +1474,23 @@
         "title": "DebugLogEntry",
         "description": "A single debug log entry from the simulation run."
       },
+      "DebugLogsResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DebugLogEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries"
+        ],
+        "title": "DebugLogsResponse",
+        "description": "Response containing debug log entries for a simulation run."
+      },
       "EvalCostResponse": {
         "properties": {
           "input_tokens": {
@@ -2082,13 +2148,6 @@
             "type": "array",
             "title": "Tool Use"
           },
-          "debug_logs": {
-            "items": {
-              "$ref": "#/components/schemas/DebugLogEntry"
-            },
-            "type": "array",
-            "title": "Debug Logs"
-          },
           "run_cycle_failures": {
             "items": {
               "$ref": "#/components/schemas/AgentRunCycleFailedEntry"
@@ -2214,7 +2273,6 @@
           "messages",
           "reasoning",
           "tool_use",
-          "debug_logs",
           "run_cycle_failures",
           "evaluation",
           "evaluation_in_progress",

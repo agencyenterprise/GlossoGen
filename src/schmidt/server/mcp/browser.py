@@ -46,7 +46,7 @@ from schmidt.server.mcp.models import (
 )
 from schmidt.server.mcp.oauth_provider import SchmidtOAuthProvider
 from schmidt.server.run_launcher import launch_simulation
-from schmidt.server.runs.detail_reader import load_run_detail
+from schmidt.server.runs.detail_reader import debug_log_path_for, load_debug_logs, load_run_detail
 from schmidt.server.runs.discovery import discover_runs
 from schmidt.server.runs.models import RunDetailResponse, RunSummary
 from schmidt.token_pricing import list_models, list_providers
@@ -345,7 +345,6 @@ async def _tool_get_run(
             messages=[m for m in detail.messages if m.sender_agent_id == agent_id],
             reasoning=[r for r in detail.reasoning if r.sender_agent_id == agent_id],
             tool_use=[t for t in detail.tool_use if t.sender_agent_id == agent_id],
-            debug_logs=detail.debug_logs,
             run_cycle_failures=[f for f in detail.run_cycle_failures if f.agent_id == agent_id],
             evaluation=detail.evaluation,
             evaluation_in_progress=detail.evaluation_in_progress,
@@ -416,6 +415,13 @@ async def _tool_get_run(
 
     debug_logs: list[McpDebugLog] | None = None
     if with_debug_logs:
+        run_dir = Path(run_summary.run_dir)
+        jsonl_path = run_dir / f"{run_summary.scenario_name}.jsonl"
+        raw_debug_logs = await load_debug_logs(
+            debug_log_path=debug_log_path_for(
+                log_path=jsonl_path, scenario_name=run_summary.scenario_name
+            )
+        )
         debug_logs = [
             McpDebugLog(
                 timestamp=d.timestamp,
@@ -423,7 +429,7 @@ async def _tool_get_run(
                 level=d.level,
                 message=d.message,
             )
-            for d in detail.debug_logs[-100:]
+            for d in raw_debug_logs[-100:]
         ]
 
     return McpGetRunResult(

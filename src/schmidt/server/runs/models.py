@@ -294,7 +294,6 @@ class RunDetailResponse(BaseModel):
     messages: list[ChannelMessage]
     reasoning: list[ReasoningEntry]
     tool_use: list[ToolUseEntry]
-    debug_logs: list[DebugLogEntry]
     run_cycle_failures: list[AgentRunCycleFailedEntry]
     evaluation: EvalReportResponse | None
     evaluation_in_progress: bool
@@ -308,6 +307,12 @@ class RunDetailResponse(BaseModel):
     note: str | None
     veyru_cases: list[VeyruCaseSummary]
     round_endings: list[RoundEnding]
+
+
+class DebugLogsResponse(BaseModel):
+    """Response containing debug log entries for a simulation run."""
+
+    entries: list[DebugLogEntry]
 
 
 class StartEvaluationRequest(BaseModel):
