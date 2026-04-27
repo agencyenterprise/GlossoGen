@@ -226,15 +226,32 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const sseEnabled = restData?.status === "in_progress" || restData?.status === "starting";
   const sse = useEventStream(runId, sseEnabled, knownEventIds, true);
 
-  // When SSE reports simulation ended, refetch REST for evaluation + debug logs
+  // When SSE reports simulation ended, refetch REST for evaluation status
   const sseStatus = sse.status;
   const hasSimEnded =
     sseStatus === "scenario_complete" || sseStatus === "error" || sseStatus === "killed";
   useEffect(() => {
     if (hasSimEnded) {
       queryClient.invalidateQueries({ queryKey: ["run", runId] });
+      queryClient.invalidateQueries({ queryKey: ["run-debug-logs", runId] });
     }
   }, [hasSimEnded, queryClient, runId]);
+
+  // Debug logs fetched separately to keep the main response small
+  const { data: debugLogsData } = useQuery({
+    queryKey: ["run-debug-logs", runId],
+    queryFn: async () => {
+      const { data, error } = await api.GET(
+        "/api/runs/{scenario}/{run_dir_name}/debug-logs",
+        { params: { path: { scenario, run_dir_name: runDirName } } }
+      );
+      if (error) {
+        throw new Error("Failed to fetch debug logs");
+      }
+      return data;
+    },
+    refetchInterval: false,
+  });
 
   // If SSE was enabled (REST said in_progress) but failed to connect,
   // the simulation likely ended between the REST fetch and SSE attempt.
@@ -328,12 +345,12 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const channelColorMap = useMemo(() => buildChannelColorMap(allChannelIds), [allChannelIds]);
 
   const allDebugLogs = useMemo(() => {
-    const restLogs = restData?.debug_logs ?? [];
+    const restLogs = debugLogsData?.entries ?? [];
     if (sse.debugLogs.length === 0) return restLogs;
     const seen = new Set(restLogs.map(l => `${l.timestamp}|${l.message}`));
     const newLogs = sse.debugLogs.filter(l => !seen.has(`${l.timestamp}|${l.message}`));
     return [...restLogs, ...newLogs];
-  }, [restData?.debug_logs, sse.debugLogs]);
+  }, [debugLogsData?.entries, sse.debugLogs]);
 
   const handleForkFromMessage = useCallback((targetMessageId: string) => {
     setForkModalMessageId(targetMessageId);

@@ -68,6 +68,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{scenario}/{run_dir_name}/debug-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Debug Logs
+         * @description Return the debug log entries for a simulation run.
+         */
+        get: operations["get_debug_logs_api_runs__scenario___run_dir_name__debug_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{scenario}/{run_dir_name}/stop": {
         parameters: {
             query?: never;
@@ -632,6 +652,14 @@ export interface components {
             message: string;
         };
         /**
+         * DebugLogsResponse
+         * @description Response containing debug log entries for a simulation run.
+         */
+        DebugLogsResponse: {
+            /** Entries */
+            entries: components["schemas"]["DebugLogEntry"][];
+        };
+        /**
          * EvalCostResponse
          * @description Evaluation cost summary for the run detail endpoint.
          */
@@ -971,8 +999,6 @@ export interface components {
             reasoning: components["schemas"]["ReasoningEntry"][];
             /** Tool Use */
             tool_use: components["schemas"]["ToolUseEntry"][];
-            /** Debug Logs */
-            debug_logs: components["schemas"]["DebugLogEntry"][];
             /** Run Cycle Failures */
             run_cycle_failures: components["schemas"]["AgentRunCycleFailedEntry"][];
             evaluation: components["schemas"]["EvalReportResponse"] | null;
@@ -1774,6 +1800,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvalLogsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_debug_logs_api_runs__scenario___run_dir_name__debug_logs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario: string;
+                run_dir_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DebugLogsResponse"];
                 };
             };
             /** @description Validation Error */

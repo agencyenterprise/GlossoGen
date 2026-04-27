@@ -18,7 +18,7 @@ from schmidt.eval_manifest import read_eval_manifest
 from schmidt.models.event import RunStatus, SimulationEnded
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.response_models import LaunchStatus
-from schmidt.server.runs.detail_reader import load_run_detail
+from schmidt.server.runs.detail_reader import debug_log_path_for, load_debug_logs, load_run_detail
 from schmidt.server.runs.discovery import (
     ResolvedRun,
     compose_run_id,
@@ -28,6 +28,7 @@ from schmidt.server.runs.discovery import (
 )
 from schmidt.server.runs.models import (
     AllLabelsResponse,
+    DebugLogsResponse,
     EvalLogLine,
     EvalLogsResponse,
     NoteResponse,
@@ -101,6 +102,21 @@ async def get_eval_logs(
         for i, line in enumerate(text.splitlines())
     ]
     return EvalLogsResponse(lines=lines)
+
+
+@router.get("/runs/{scenario}/{run_dir_name}/debug-logs", response_model=DebugLogsResponse)
+async def get_debug_logs(
+    scenario: str,
+    run_dir_name: str,
+    request: Request,
+) -> DebugLogsResponse:
+    """Return the debug log entries for a simulation run."""
+    runs_dir: Path = request.app.state.runs_dir
+    resolved = _resolve_or_404(runs_dir=runs_dir, scenario=scenario, run_dir_name=run_dir_name)
+    log_path = resolved.run_dir / f"{resolved.scenario_name}.jsonl"
+    debug_path = debug_log_path_for(log_path=log_path, scenario_name=resolved.scenario_name)
+    entries = await load_debug_logs(debug_log_path=debug_path)
+    return DebugLogsResponse(entries=entries)
 
 
 @router.delete("/runs/{scenario}/{run_dir_name}", status_code=204)
