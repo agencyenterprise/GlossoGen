@@ -6,6 +6,7 @@ import { splitRunId } from "@/shared/lib/run-id";
 
 interface ReplaceAgentArgs {
   roundStart: number;
+  roundsAfterSwap: number;
   replacedAgentId: string;
   model: string;
   provider: string;
@@ -20,6 +21,7 @@ export function useReplaceAgent(runId: string) {
         params: { path: splitRunId(runId) },
         body: {
           round_start: args.roundStart,
+          rounds_after_swap: args.roundsAfterSwap,
           replaced_agent_id: args.replacedAgentId,
           model: args.model,
           provider: args.provider,

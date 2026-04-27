@@ -18,7 +18,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import uvicorn
 from dotenv import load_dotenv
@@ -37,7 +37,11 @@ from schmidt.evaluation.log_reader import extract_scenario_config, load_events
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
-from schmidt.message_rewind import RewindState, build_rewind_state_from_last_message
+from schmidt.message_rewind import (
+    AgentHistoryFilter,
+    RewindState,
+    build_rewind_state_from_last_message,
+)
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import AgentRegistered, SimulationStarted
 from schmidt.port_allocator import find_free_port
@@ -210,6 +214,17 @@ def _build_parser() -> argparse.ArgumentParser:
             "that map to false get wiped; the rest stay visible)."
         ),
     )
+    replace_parser.add_argument(
+        "--rounds-after-swap",
+        dest="rounds_after_swap",
+        type=int,
+        default=10,
+        help=(
+            "Number of rounds the resumed simulation will play after the "
+            "replacement boundary. round_count is set to round_start + "
+            "rounds_after_swap. Default: 10."
+        ),
+    )
 
     return parser
 
@@ -376,6 +391,38 @@ def _teardown_logging(
     logging.getLogger().removeHandler(bus_log_handler)
 
 
+class _ReplaceManifestInfo(NamedTuple):
+    """Replace-agent manifest fields needed to configure resume."""
+
+    replaced_agent_id: str
+    visible_channels: list[str]
+    blocked_channel_ids: frozenset[str]
+
+
+def _read_replace_manifest(run_dir: Path) -> _ReplaceManifestInfo | None:
+    """Read ``replace_manifest.json`` if present and extract resume fields."""
+    manifest_path = run_dir / "replace_manifest.json"
+    if not manifest_path.exists():
+        return None
+    manifest = json.loads(manifest_path.read_text())
+    replaced = manifest.get("replaced_agent_id")
+    if not isinstance(replaced, str):
+        return None
+    raw_visible = manifest.get("channels_with_visible_history", [])
+    visible_channels: list[str] = []
+    if isinstance(raw_visible, list):
+        visible_channels = [str(channel_id) for channel_id in raw_visible]
+    raw_blocked = manifest.get("blocked_tool_call_channels", [])
+    blocked_channel_ids: frozenset[str] = frozenset()
+    if isinstance(raw_blocked, list):
+        blocked_channel_ids = frozenset(str(channel_id) for channel_id in raw_blocked)
+    return _ReplaceManifestInfo(
+        replaced_agent_id=replaced,
+        visible_channels=visible_channels,
+        blocked_channel_ids=blocked_channel_ids,
+    )
+
+
 async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
@@ -414,25 +461,31 @@ async def _run_simulation(
     if resuming:
         logger.info("Loading rewind state from %s", log_path)
         events = await load_events(log_path=log_path)
-        resume_state = build_rewind_state_from_last_message(events=events)
-        replace_manifest_path = run_dir / "replace_manifest.json"
-        if replace_manifest_path.exists():
-            manifest = json.loads(replace_manifest_path.read_text())
-            replaced = manifest.get("replaced_agent_id")
-            if isinstance(replaced, str):
-                raw_visible = manifest.get("channels_with_visible_history", [])
-                visible_channels: list[str] = []
-                if isinstance(raw_visible, list):
-                    visible_channels = [str(channel_id) for channel_id in raw_visible]
-                resume_state = resume_state._replace(
-                    replaced_agent_ids=frozenset({replaced}),
-                    replaced_agent_channels_with_visible_history={replaced: visible_channels},
-                )
-                logger.info(
-                    "Replace-agent run detected: %s resuming with visible channels %s",
-                    replaced,
-                    visible_channels,
-                )
+        replace_info = _read_replace_manifest(run_dir=run_dir)
+        agent_filters: dict[str, AgentHistoryFilter] = {}
+        if replace_info is not None:
+            agent_filters[replace_info.replaced_agent_id] = AgentHistoryFilter(
+                tool_calls_only=True,
+                blocked_channel_ids=replace_info.blocked_channel_ids,
+            )
+        resume_state = build_rewind_state_from_last_message(
+            events=events,
+            agent_filters=agent_filters,
+        )
+        if replace_info is not None:
+            resume_state = resume_state._replace(
+                replaced_agent_ids=frozenset({replace_info.replaced_agent_id}),
+                replaced_agent_channels_with_visible_history={
+                    replace_info.replaced_agent_id: replace_info.visible_channels,
+                },
+            )
+            logger.info(
+                "Replace-agent run detected: %s resuming with visible channels %s, "
+                "blocked tool-call channels %s",
+                replace_info.replaced_agent_id,
+                replace_info.visible_channels,
+                sorted(replace_info.blocked_channel_ids),
+            )
         logger.info(
             "Rewind state loaded: resuming from round %d",
             resume_state.round_number,
@@ -574,6 +627,7 @@ async def _run_replace_agent(args: argparse.Namespace) -> None:
         source_run_dir=source_run_dir,
         scenario_name=args.scenario_name,
         round_start=args.round_start,
+        rounds_after_swap=args.rounds_after_swap,
         replaced_agent_id=args.replaced_agent_id,
         model=args.model,
         provider=args.provider,

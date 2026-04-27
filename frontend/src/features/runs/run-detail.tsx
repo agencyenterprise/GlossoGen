@@ -364,12 +364,14 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
       replacedAgentId: string,
       model: string,
       provider: string,
+      roundsAfterSwap: number,
       channelsWithVisibleHistory: string[],
       knobs: Record<string, unknown> | null
     ) => {
       if (replaceAgentRound === null) return;
       replaceAgent.mutate({
         roundStart: replaceAgentRound,
+        roundsAfterSwap,
         replacedAgentId,
         model,
         provider,
@@ -776,7 +778,6 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
           errorMessage={replaceAgent.error?.message ?? null}
           roundStart={replaceAgentRound}
           scenarioName={restData.scenario_name}
-          scenarioConfig={restData.scenario_config}
           sourceAgents={restData.agents.map(agent => ({
             agent_id: agent.agent_id,
             role_name: agent.role_name,
@@ -1026,13 +1027,14 @@ type ReplaceAgentSourceAgent = {
   channel_ids: string[];
 };
 
+const DEFAULT_ROUNDS_AFTER_SWAP = 10;
+
 function ReplaceAgentModal({
   isPending,
   isSuccess,
   errorMessage,
   roundStart,
   scenarioName,
-  scenarioConfig,
   sourceAgents,
   onConfirm,
   onCancel,
@@ -1042,12 +1044,12 @@ function ReplaceAgentModal({
   errorMessage: string | null;
   roundStart: number;
   scenarioName: string;
-  scenarioConfig: { [key: string]: unknown };
   sourceAgents: ReplaceAgentSourceAgent[];
   onConfirm: (
     replacedAgentId: string,
     model: string,
     provider: string,
+    roundsAfterSwap: number,
     channelsWithVisibleHistory: string[],
     knobs: Record<string, unknown> | null
   ) => void;
@@ -1058,36 +1060,9 @@ function ReplaceAgentModal({
   const initialAgent = sourceAgents.find(a => a.agent_id === replacedAgentId) ?? defaultAgent;
   const [model, setModel] = useState(initialAgent?.model ?? "");
   const [provider, setProvider] = useState(initialAgent?.provider ?? "");
-
-  const defaultVisibilityMap = useMemo<Record<string, boolean>>(() => {
-    const raw = scenarioConfig["replace_agent_default_channel_visibility"];
-    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return {};
-    const out: Record<string, boolean> = {};
-    for (const [k, v] of Object.entries(raw)) {
-      out[k] = Boolean(v);
-    }
-    return out;
-  }, [scenarioConfig]);
-
-  const computeDefaultVisibility = useCallback(
-    (channelIds: string[]): Record<string, boolean> => {
-      const out: Record<string, boolean> = {};
-      for (const channelId of channelIds) {
-        const declared = defaultVisibilityMap[channelId];
-        out[channelId] = declared === undefined ? true : declared;
-      }
-      return out;
-    },
-    [defaultVisibilityMap]
-  );
-
-  const initialChannels = initialAgent?.channel_ids ?? [];
-  const [channelVisibility, setChannelVisibility] = useState<Record<string, boolean>>(() =>
-    computeDefaultVisibility(initialChannels)
-  );
+  const [roundsAfterSwap, setRoundsAfterSwap] = useState<number>(DEFAULT_ROUNDS_AFTER_SWAP);
 
   const isVeyru = scenarioName === "veyru";
-  const [dropPostmortem, setDropPostmortem] = useState<boolean>(isVeyru);
 
   const { data } = useQuery({
     queryKey: ["scenarios"],
@@ -1106,7 +1081,6 @@ function ReplaceAgentModal({
     if (next) {
       setModel(next.model);
       setProvider(next.provider);
-      setChannelVisibility(computeDefaultVisibility(next.channel_ids));
     }
   }
 
@@ -1115,19 +1089,15 @@ function ReplaceAgentModal({
     setProvider(selectedProvider);
   }
 
-  function handleConfirmClick() {
-    const visibleChannels = Object.entries(channelVisibility)
-      .filter(([, visible]) => visible)
-      .map(([channelId]) => channelId);
-    let knobs: Record<string, unknown> | null = null;
-    if (isVeyru && dropPostmortem) {
-      knobs = { postmortem_disabled_at_start: true };
-    }
-    onConfirm(replacedAgentId, model, provider, visibleChannels, knobs);
-  }
-
   const currentAgent = sourceAgents.find(a => a.agent_id === replacedAgentId);
-  const currentChannelIds = currentAgent?.channel_ids ?? [];
+
+  function handleConfirmClick() {
+    const visibleChannels = currentAgent?.channel_ids ?? [];
+    const knobs: Record<string, unknown> | null = isVeyru
+      ? { postmortem_disabled_at_start: true }
+      : null;
+    onConfirm(replacedAgentId, model, provider, roundsAfterSwap, visibleChannels, knobs);
+  }
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-4">
@@ -1138,8 +1108,9 @@ function ReplaceAgentModal({
               Replace agent at start of round {roundStart}
             </h3>
             <p className="mb-3 text-xs text-muted-foreground">
-              The chosen agent will re-enter round {roundStart} with no LLM message history. Every
-              other agent keeps its full reconstructed history.
+              The chosen agent re-enters round {roundStart} with only the prior agent&apos;s tool
+              call history (text and reasoning are stripped, postmortem tool calls are dropped).
+              Every other agent keeps its full reconstructed history.
             </p>
 
             <div className="mb-4 space-y-1">
@@ -1167,50 +1138,23 @@ function ReplaceAgentModal({
               />
             </div>
 
-            {currentChannelIds.length > 0 ? (
-              <div className="mb-4 space-y-1">
-                <label className="block text-sm font-medium">History visibility</label>
-                <p className="text-[11px] text-muted-foreground">
-                  Channels for which the replaced agent retains visibility of prior messages.
-                </p>
-                <div className="space-y-1">
-                  {currentChannelIds.map(channelId => (
-                    <label
-                      key={channelId}
-                      className="flex items-center gap-2 text-xs text-foreground"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={channelVisibility[channelId] ?? true}
-                        onChange={e =>
-                          setChannelVisibility(prev => ({
-                            ...prev,
-                            [channelId]: e.target.checked,
-                          }))
-                        }
-                        disabled={isPending}
-                      />
-                      <span>Replaced agent can read #{channelId} history</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {isVeyru ? (
-              <div className="mb-4 space-y-1">
-                <label className="block text-sm font-medium">Scenario options</label>
-                <label className="flex items-center gap-2 text-xs text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={dropPostmortem}
-                    onChange={e => setDropPostmortem(e.target.checked)}
-                    disabled={isPending}
-                  />
-                  <span>Drop #postmortem channel after replacement (for everyone)</span>
-                </label>
-              </div>
-            ) : null}
+            <div className="mb-4 space-y-1">
+              <label className="block text-sm font-medium" htmlFor="rounds-after-swap">
+                Rounds after replacement
+              </label>
+              <p className="text-[11px] text-muted-foreground">
+                The resumed simulation plays this many rounds following round {roundStart}.
+              </p>
+              <input
+                id="rounds-after-swap"
+                type="number"
+                min={1}
+                className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
+                value={roundsAfterSwap}
+                onChange={e => setRoundsAfterSwap(Math.max(1, Number(e.target.value) || 1))}
+                disabled={isPending}
+              />
+            </div>
 
             {isPending ? (
               <div className="mt-4 flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">

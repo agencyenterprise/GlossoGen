@@ -20,7 +20,7 @@ from schmidt.evaluation.log_reader import load_events
 from schmidt.message_rewind import build_rewind_state
 from schmidt.models.event import AgentRegistered, MessageSent, SimulationEvent, SimulationStarted
 from schmidt.run_config_validation import validate_run_config
-from schmidt.run_jsonl_rewriter import drop_single_agent_history, rewrite_run_jsonl
+from schmidt.run_jsonl_rewriter import rewrite_run_jsonl
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.token_pricing import list_providers
@@ -32,14 +32,22 @@ class ReplaceAgentRequest(NamedTuple):
     """Input parameters for a replace-agent operation.
 
     The replacement boundary is the *start* of round ``round_start``: the
-    resumed simulation enters that round with the chosen agent on a
-    fresh history. The exact ``MessageSent`` that anchors the git
-    rewind is resolved internally.
+    resumed simulation enters that round with the chosen agent reusing
+    only the prior agent's tool-call history (text and thinking are
+    stripped, postmortem tool calls/results are dropped). The exact
+    ``MessageSent`` that anchors the git rewind is resolved internally.
+
+    ``rounds_after_swap`` controls how many rounds the resumed
+    simulation will play following the replacement: round_count is set
+    to ``round_start + rounds_after_swap``, so rounds ``round_start +
+    1`` through ``round_start + rounds_after_swap`` play after the
+    replacement and the replacement itself enters at ``round_start``.
     """
 
     source_run_dir: Path
     scenario_name: str
     round_start: int
+    rounds_after_swap: int
     replaced_agent_id: str
     model: str
     provider: str
@@ -187,10 +195,7 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         log_path=new_log_path,
         new_run_id=new_run_id,
         message_edits={},
-        should_drop_event=lambda event_dict: drop_single_agent_history(
-            event_dict=event_dict,
-            agent_id=request.replaced_agent_id,
-        ),
+        should_drop_event=lambda _event_dict: False,
     )
 
     rewritten_events = await load_events(log_path=new_log_path)
@@ -198,14 +203,19 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         events=rewritten_events,
         target_message_id=target_message_id,
         message_edits={},
+        agent_filters={},
     )
 
     first_event = rewritten_events[0]
     if not isinstance(first_event, SimulationStarted):
         raise ValueError("First event in rewritten JSONL is not SimulationStarted")
+
+    scenario_cls = SCENARIO_REGISTRY[request.scenario_name]
+
     merged_scenario_config: dict[str, Any] = dict(first_event.scenario_config)
     if request.knobs is not None:
         merged_scenario_config.update(request.knobs)
+    merged_scenario_config["round_count"] = request.round_start + request.rounds_after_swap
     merged_scenario_config["model_overrides"] = _build_model_overrides(
         source_agents=source_agents,
         replaced_agent_id=request.replaced_agent_id,
@@ -213,7 +223,6 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         replacement_provider=request.provider,
     )
 
-    scenario_cls = SCENARIO_REGISTRY[request.scenario_name]
     validated = validate_run_config(
         scenario_cls=scenario_cls,
         scenario_config=merged_scenario_config,
@@ -228,15 +237,18 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         scenario_name=request.scenario_name,
         run_dir_name=request.source_run_dir.name,
     )
+    blocked_tool_call_channels = sorted(scenario_cls.get_replace_agent_blocked_tool_call_channels())
     manifest = {
         "source_run_id": source_run_id,
         "source_run_dir": str(request.source_run_dir),
         "round_start": request.round_start,
+        "rounds_after_swap": request.rounds_after_swap,
         "target_message_id": target_message_id,
         "replaced_agent_id": request.replaced_agent_id,
         "replacement_model": request.model,
         "replacement_provider": request.provider,
         "channels_with_visible_history": list(request.channels_with_visible_history),
+        "blocked_tool_call_channels": blocked_tool_call_channels,
         "replaced_at": time.time(),
     }
     manifest_path = new_run_dir / "replace_manifest.json"
