@@ -191,9 +191,7 @@ async def export_run_artifacts_at_message(
     )
 
     message_id_short = message_id[:8]
-    filename = (
-        f"{resolved.scenario_name}_{run_dir_name}_{message_id_short}_artifacts.zip"
-    )
+    filename = f"{resolved.scenario_name}_{run_dir_name}_{message_id_short}_artifacts.zip"
 
     return StreamingResponse(
         content=io.BytesIO(zip_bytes),
