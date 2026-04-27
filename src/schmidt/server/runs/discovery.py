@@ -8,10 +8,10 @@ import asyncio
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
-import aiofiles
 import orjson
+from pydantic import BaseModel
 
 from schmidt.eval_manifest import read_eval_manifest
 from schmidt.event_parsing import parse_event_bytes
@@ -44,12 +44,15 @@ class _SinglePassResult(NamedTuple):
     current_round: int
 
 
-async def scan_jsonl(file_path: Path) -> _SinglePassResult:
+def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     """Read a JSONL file once, extracting all data needed for the run summary.
 
     Collects the first event, the last SimulationEnded (if present in
     the final 20 lines), per-agent model info, message count, and
     token-based cost estimate — all in a single sequential pass.
+
+    Intended to be called via ``asyncio.to_thread`` so CPU and IO run in
+    a worker thread, enabling true parallelism across concurrent requests.
     """
     first_bytes: bytes | None = None
     tail: list[bytes] = []
@@ -61,8 +64,8 @@ async def scan_jsonl(file_path: Path) -> _SinglePassResult:
     total_cache_write = 0
     current_round = 0
 
-    async with aiofiles.open(file_path, mode="rb") as f:
-        async for line in f:
+    with open(file_path, mode="rb") as f:
+        for line in f:
             stripped = line.strip()
             if not stripped:
                 continue
@@ -155,6 +158,53 @@ async def scan_jsonl(file_path: Path) -> _SinglePassResult:
     )
 
 
+async def scan_jsonl(file_path: Path) -> _SinglePassResult:
+    """Run ``_scan_jsonl_sync`` in a worker thread for true IO and CPU parallelism."""
+    return await asyncio.to_thread(_scan_jsonl_sync, file_path)
+
+
+_SUMMARY_CACHE_FILENAME = "run_summary_cache.json"
+
+
+class _SummaryCache(BaseModel):
+    """Immutable fields of a completed run, persisted to avoid re-scanning JSONL."""
+
+    scenario_name: str
+    scenario_description: str
+    scenario_config: dict[str, Any]
+    provider: str
+    total_messages: int
+    total_cost_usd: float
+    duration_seconds: float
+    status: RunStatus
+    models: list[str]
+    agent_models: list[AgentModelSummary]
+    current_round: int
+    fork_source: ForkSource | None
+    replace_agent_source: ReplaceAgentSource | None
+
+
+def _read_summary_cache(run_dir: Path) -> _SummaryCache | None:
+    """Read the summary cache for a run directory, returning None if absent or invalid."""
+    cache_path = run_dir / _SUMMARY_CACHE_FILENAME
+    if not cache_path.exists():
+        return None
+    try:
+        return _SummaryCache.model_validate(orjson.loads(cache_path.read_bytes()))
+    except Exception:
+        logger.exception("Failed to read summary cache at %s", cache_path)
+        return None
+
+
+def _write_summary_cache(run_dir: Path, cache: _SummaryCache) -> None:
+    """Write the summary cache for a completed run. Logs and swallows exceptions."""
+    cache_path = run_dir / _SUMMARY_CACHE_FILENAME
+    try:
+        cache_path.write_bytes(orjson.dumps(cache.model_dump(mode="json")))
+    except Exception:
+        logger.exception("Failed to write summary cache at %s", cache_path)
+
+
 class ResolvedRun(NamedTuple):
     """Lightweight run location returned by resolve_run."""
 
@@ -240,6 +290,22 @@ def _read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:
     )
 
 
+def _live_fields(
+    scenario_name: str,
+    timestamp_dir: Path,
+) -> tuple[list[str], bool, bool, bool]:
+    """Read the four fields that can change after a run completes.
+
+    Returns (labels, has_note, has_evaluation, evaluation_in_progress).
+    """
+    report_path = timestamp_dir / f"{scenario_name}_report.json"
+    labels = _read_labels(run_dir=timestamp_dir)
+    has_note = _has_note(run_dir=timestamp_dir)
+    has_evaluation = report_path.exists()
+    eval_in_progress = read_eval_manifest(run_dir=timestamp_dir) is not None
+    return labels, has_note, has_evaluation, eval_in_progress
+
+
 async def _build_summary(
     scenario_name: str,
     timestamp_dir: Path,
@@ -247,10 +313,44 @@ async def _build_summary(
     """Build a RunSummary for a single run directory.
 
     Returns None if the directory does not contain a valid run.
+    For completed runs, reads from ``run_summary_cache.json`` when present,
+    skipping the JSONL scan entirely.
     """
     jsonl_path = timestamp_dir / f"{scenario_name}.jsonl"
     if not jsonl_path.exists():
         return None
+
+    run_id = compose_run_id(scenario_name=scenario_name, run_dir_name=timestamp_dir.name)
+    run_timestamp = _timestamp_from_dir(dir_name=timestamp_dir.name)
+
+    cache = _read_summary_cache(run_dir=timestamp_dir)
+    if cache is not None:
+        labels, has_note, has_evaluation, eval_in_progress = _live_fields(
+            scenario_name=scenario_name,
+            timestamp_dir=timestamp_dir,
+        )
+        return RunSummary(
+            run_id=run_id,
+            scenario_name=cache.scenario_name,
+            scenario_description=cache.scenario_description,
+            scenario_config=cache.scenario_config,
+            timestamp=run_timestamp,
+            total_messages=cache.total_messages,
+            total_cost_usd=cache.total_cost_usd,
+            duration_seconds=cache.duration_seconds,
+            status=cache.status,
+            has_evaluation=has_evaluation,
+            evaluation_in_progress=eval_in_progress,
+            run_dir=str(timestamp_dir),
+            fork_source=cache.fork_source,
+            replace_agent_source=cache.replace_agent_source,
+            models=cache.models,
+            provider=cache.provider,
+            agent_models=cache.agent_models,
+            labels=labels,
+            has_note=has_note,
+            current_round=cache.current_round,
+        )
 
     try:
         scan = await scan_jsonl(file_path=jsonl_path)
@@ -259,20 +359,35 @@ async def _build_summary(
         return None
 
     first_event = scan.first_event
-    report_path = timestamp_dir / f"{scenario_name}_report.json"
     fork_source = _read_fork_source(run_dir=timestamp_dir)
     replace_agent_source = _read_replace_agent_source(run_dir=timestamp_dir)
-    run_timestamp = _timestamp_from_dir(dir_name=timestamp_dir.name)
-    labels = _read_labels(run_dir=timestamp_dir)
-    has_note = _has_note(run_dir=timestamp_dir)
-    eval_in_progress = read_eval_manifest(run_dir=timestamp_dir) is not None
-
-    run_id = compose_run_id(scenario_name=scenario_name, run_dir_name=timestamp_dir.name)
+    labels, has_note, has_evaluation, eval_in_progress = _live_fields(
+        scenario_name=scenario_name,
+        timestamp_dir=timestamp_dir,
+    )
 
     if scan.last_event is not None:
         derived = fork_source is not None or replace_agent_source is not None
         start_time = run_timestamp if derived else first_event.timestamp
         duration_seconds = (scan.last_event.timestamp - start_time).total_seconds()
+        _write_summary_cache(
+            run_dir=timestamp_dir,
+            cache=_SummaryCache(
+                scenario_name=first_event.scenario_name,
+                scenario_description=first_event.scenario_description,
+                scenario_config=first_event.scenario_config,
+                provider=first_event.provider,
+                total_messages=scan.last_event.total_messages,
+                total_cost_usd=scan.last_event.total_cost_usd,
+                duration_seconds=duration_seconds,
+                status=scan.last_event.reason,
+                models=scan.unique_models,
+                agent_models=scan.agent_models,
+                current_round=scan.current_round,
+                fork_source=fork_source,
+                replace_agent_source=replace_agent_source,
+            ),
+        )
         return RunSummary(
             run_id=run_id,
             scenario_name=first_event.scenario_name,
@@ -283,7 +398,7 @@ async def _build_summary(
             total_cost_usd=scan.last_event.total_cost_usd,
             duration_seconds=duration_seconds,
             status=scan.last_event.reason,
-            has_evaluation=report_path.exists(),
+            has_evaluation=has_evaluation,
             evaluation_in_progress=eval_in_progress,
             run_dir=str(timestamp_dir),
             fork_source=fork_source,
