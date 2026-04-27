@@ -43,6 +43,7 @@ from schmidt.server.runs.models import (
     ForkSource,
     InternAnchor,
     ReasoningEntry,
+    ReplaceAgentSource,
     RoundEnding,
     RunDetailResponse,
     SwapPoint,
@@ -445,7 +446,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         else:
             delete_manifest(run_dir=run_dir)
             fork_path = run_dir / "fork_manifest.json"
-            if fork_path.exists():
+            replace_path = run_dir / "replace_manifest.json"
+            if fork_path.exists() or replace_path.exists():
                 status = RunStatus.STARTING
             else:
                 status = RunStatus.ERROR
@@ -459,6 +461,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     debug_logs = await _load_debug_logs(debug_log_path=debug_log_path)
 
     fork_source = _read_fork_source(run_dir=run_dir)
+    replace_agent_source = _read_replace_agent_source(run_dir=run_dir)
     swap_point = _build_swap_point(
         swap_round=swap_cleared_round,
         swap_timestamp=swap_cleared_timestamp,
@@ -478,10 +481,12 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     labels = await _read_labels_async(run_dir=run_dir)
     note = await _read_note(run_dir=run_dir)
 
-    # For forked runs, the displayed start time is when the fork was created,
-    # not when the original parent simulation started.
+    # For forked / replace-agent runs, the displayed start time is when
+    # the derived run was created, not when the original parent started.
     if fork_source is not None:
         timestamp = fork_source.forked_at
+    elif replace_agent_source is not None:
+        timestamp = replace_agent_source.replaced_at
 
     return RunDetailResponse(
         run_id=run_id,
@@ -505,6 +510,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         evaluation_in_progress=evaluation_in_progress,
         has_eval_log_file=has_eval_log_file,
         fork_source=fork_source,
+        replace_agent_source=replace_agent_source,
         swap_point=swap_point,
         intern_join=intern_join,
         intern_takeover=intern_takeover,
@@ -608,4 +614,22 @@ def _read_fork_source(run_dir: Path) -> ForkSource | None:
         source_run_id=raw["source_run_id"],
         target_message_id=raw["target_message_id"],
         forked_at=forked_at,
+    )
+
+
+def _read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:
+    """Read replace-agent provenance from replace_manifest.json if it exists."""
+    manifest_path = run_dir / "replace_manifest.json"
+    if not manifest_path.exists():
+        return None
+    raw = orjson.loads(manifest_path.read_bytes())
+    replaced_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
+    return ReplaceAgentSource(
+        source_run_id=raw["source_run_id"],
+        round_start=raw["round_start"],
+        target_message_id=raw["target_message_id"],
+        replaced_agent_id=raw["replaced_agent_id"],
+        replacement_model=raw["replacement_model"],
+        replacement_provider=raw["replacement_provider"],
+        replaced_at=replaced_at,
     )

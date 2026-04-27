@@ -37,6 +37,7 @@ import {
   ForkPointFab,
   InternJoinFab,
   InternTakeoverFab,
+  ReplaceAgentPointFab,
   SwapPointFab,
 } from "./fork-badge";
 import { StartEvaluationModal } from "./start-evaluation-modal";
@@ -55,6 +56,8 @@ import { RunSidebar } from "./run-sidebar";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
 import { ModelPicker } from "./model-picker";
 import { useFork } from "./use-fork";
+import { useReplaceAgent } from "./use-replace-agent";
+import { ReplaceAgentBadge } from "./replace-agent-badge";
 import { ConfigValueModal } from "./config-value-modal";
 import { AgentModelOverrides, type AgentModelOverride } from "./agent-model-overrides";
 import { LabelPickerModal } from "./label-picker-modal";
@@ -130,6 +133,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const [showEvalLogs, setShowEvalLogs] = useState(false);
   const [showEvalPanel, setShowEvalPanel] = useState(true);
   const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
+  const [replaceAgentRound, setReplaceAgentRound] = useState<number | null>(null);
   const [showEvalModal, setShowEvalModal] = useState(false);
   const [evalJustLaunched, setEvalJustLaunched] = useState(false);
   const [copiedRunId, setCopiedRunId] = useState(false);
@@ -139,6 +143,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const fork = useFork(runId);
+  const replaceAgent = useReplaceAgent(runId);
 
   const handleSelectChannel = useCallback((ch: string | null) => {
     setSelectedChannel(ch);
@@ -334,6 +339,39 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     setForkModalMessageId(targetMessageId);
   }, []);
 
+  const handleReplaceAgentFromRound = useCallback((roundNumber: number) => {
+    setReplaceAgentRound(roundNumber);
+  }, []);
+
+  const handleConfirmReplaceAgent = useCallback(
+    (
+      replacedAgentId: string,
+      model: string,
+      provider: string,
+      channelsWithVisibleHistory: string[],
+      knobs: Record<string, unknown> | null
+    ) => {
+      if (replaceAgentRound === null) return;
+      replaceAgent.mutate({
+        roundStart: replaceAgentRound,
+        replacedAgentId,
+        model,
+        provider,
+        channelsWithVisibleHistory,
+        knobs,
+      });
+      // Keep the modal open so the user sees the "Launching..." state.
+      // onSuccess navigates the page; onError leaves the modal open with
+      // the inline error message until the user dismisses it.
+    },
+    [replaceAgentRound, replaceAgent]
+  );
+
+  const handleCloseReplaceAgent = useCallback(() => {
+    replaceAgent.reset();
+    setReplaceAgentRound(null);
+  }, [replaceAgent]);
+
   const handleConfirmFork = useCallback(
     (model: string, provider: string, modelOverrides: Record<string, AgentModelOverride>) => {
       if (!forkModalMessageId) return;
@@ -405,6 +443,14 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             <ForkBadge
               sourceRunId={restData.fork_source.source_run_id}
               targetMessageId={restData.fork_source.target_message_id}
+            />
+          ) : null}
+          {restData.replace_agent_source ? (
+            <ReplaceAgentBadge
+              sourceRunId={restData.replace_agent_source.source_run_id}
+              replacedAgentId={restData.replace_agent_source.replaced_agent_id}
+              replacementModel={restData.replace_agent_source.replacement_model}
+              roundStart={restData.replace_agent_source.round_start}
             />
           ) : null}
           <span className="group/help relative">
@@ -629,11 +675,15 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             onSaveEdit={fork.saveEdit}
             onCancelEdit={fork.cancelEdit}
             onForkFromMessage={handleForkFromMessage}
+            onReplaceAgentFromRound={handleReplaceAgentFromRound}
             forkPointMessageId={restData.fork_source?.target_message_id ?? null}
             swapRoundNumber={restData.swap_point?.round_number ?? null}
             swappedObserverDisplayNames={restData.swap_point?.swapped_observer_display_names ?? []}
             internJoinRoundNumber={restData.intern_join?.round_number ?? null}
             internTakeoverRoundNumber={restData.intern_takeover?.round_number ?? null}
+            replaceAgentRoundStart={restData.replace_agent_source?.round_start ?? null}
+            replaceAgentReplacedAgentId={restData.replace_agent_source?.replaced_agent_id ?? null}
+            replaceAgentReplacementModel={restData.replace_agent_source?.replacement_model ?? null}
             veyruCases={restData.veyru_cases}
             roundEndings={restData.round_endings}
           />
@@ -702,6 +752,27 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
         />
       ) : null}
 
+      {/* Replace-agent confirmation modal */}
+      {replaceAgentRound !== null ? (
+        <ReplaceAgentModal
+          isPending={replaceAgent.isPending}
+          isSuccess={replaceAgent.isSuccess}
+          errorMessage={replaceAgent.error?.message ?? null}
+          roundStart={replaceAgentRound}
+          scenarioName={restData.scenario_name}
+          scenarioConfig={restData.scenario_config}
+          sourceAgents={restData.agents.map(agent => ({
+            agent_id: agent.agent_id,
+            role_name: agent.role_name,
+            model: agent.model,
+            provider: agent.provider,
+            channel_ids: agent.channel_ids,
+          }))}
+          onConfirm={handleConfirmReplaceAgent}
+          onCancel={handleCloseReplaceAgent}
+        />
+      ) : null}
+
       {/* Fork confirmation modal */}
       {forkModalMessageId ? (
         <ForkModal
@@ -745,6 +816,8 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
         const internJoinStackIndex = restData.intern_join !== null ? nextStackIndex++ : null;
         const internTakeoverStackIndex =
           restData.intern_takeover !== null ? nextStackIndex++ : null;
+        const replaceAgentStackIndex =
+          restData.replace_agent_source !== null ? nextStackIndex++ : null;
 
         const scrollToDivider = (elementId: string) => {
           flushSync(() => {
@@ -814,6 +887,14 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
                 stackIndex={internTakeoverStackIndex}
                 roundNumber={restData.intern_takeover.round_number}
                 onClick={() => scrollToDivider("intern-takeover-divider")}
+              />
+            ) : null}
+
+            {restData.replace_agent_source && replaceAgentStackIndex !== null ? (
+              <ReplaceAgentPointFab
+                stackIndex={replaceAgentStackIndex}
+                roundNumber={restData.replace_agent_source.round_start}
+                onClick={() => scrollToDivider("replace-agent-divider")}
               />
             ) : null}
           </>
@@ -913,6 +994,255 @@ function ForkModal({
               disabled={isPending || !model}
             >
               {isPending ? "Launching..." : "Launch fork"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type ReplaceAgentSourceAgent = {
+  agent_id: string;
+  role_name: string;
+  model: string;
+  provider: string;
+  channel_ids: string[];
+};
+
+function ReplaceAgentModal({
+  isPending,
+  isSuccess,
+  errorMessage,
+  roundStart,
+  scenarioName,
+  scenarioConfig,
+  sourceAgents,
+  onConfirm,
+  onCancel,
+}: {
+  isPending: boolean;
+  isSuccess: boolean;
+  errorMessage: string | null;
+  roundStart: number;
+  scenarioName: string;
+  scenarioConfig: { [key: string]: unknown };
+  sourceAgents: ReplaceAgentSourceAgent[];
+  onConfirm: (
+    replacedAgentId: string,
+    model: string,
+    provider: string,
+    channelsWithVisibleHistory: string[],
+    knobs: Record<string, unknown> | null
+  ) => void;
+  onCancel: () => void;
+}) {
+  const defaultAgent = sourceAgents[0];
+  const [replacedAgentId, setReplacedAgentId] = useState<string>(defaultAgent?.agent_id ?? "");
+  const initialAgent = sourceAgents.find(a => a.agent_id === replacedAgentId) ?? defaultAgent;
+  const [model, setModel] = useState(initialAgent?.model ?? "");
+  const [provider, setProvider] = useState(initialAgent?.provider ?? "");
+
+  const defaultVisibilityMap = useMemo<Record<string, boolean>>(() => {
+    const raw = scenarioConfig["replace_agent_default_channel_visibility"];
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return {};
+    const out: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      out[k] = Boolean(v);
+    }
+    return out;
+  }, [scenarioConfig]);
+
+  const computeDefaultVisibility = useCallback(
+    (channelIds: string[]): Record<string, boolean> => {
+      const out: Record<string, boolean> = {};
+      for (const channelId of channelIds) {
+        const declared = defaultVisibilityMap[channelId];
+        out[channelId] = declared === undefined ? true : declared;
+      }
+      return out;
+    },
+    [defaultVisibilityMap]
+  );
+
+  const initialChannels = initialAgent?.channel_ids ?? [];
+  const [channelVisibility, setChannelVisibility] = useState<Record<string, boolean>>(() =>
+    computeDefaultVisibility(initialChannels)
+  );
+
+  const isVeyru = scenarioName === "veyru";
+  const [dropPostmortem, setDropPostmortem] = useState<boolean>(isVeyru);
+
+  const { data } = useQuery({
+    queryKey: ["scenarios"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/scenarios");
+      if (error) {
+        throw new Error("Failed to fetch scenarios");
+      }
+      return data;
+    },
+  });
+
+  function handleAgentChange(nextAgentId: string) {
+    setReplacedAgentId(nextAgentId);
+    const next = sourceAgents.find(a => a.agent_id === nextAgentId);
+    if (next) {
+      setModel(next.model);
+      setProvider(next.provider);
+      setChannelVisibility(computeDefaultVisibility(next.channel_ids));
+    }
+  }
+
+  function handleModelSelect(selectedModel: string, selectedProvider: string) {
+    setModel(selectedModel);
+    setProvider(selectedProvider);
+  }
+
+  function handleConfirmClick() {
+    const visibleChannels = Object.entries(channelVisibility)
+      .filter(([, visible]) => visible)
+      .map(([channelId]) => channelId);
+    let knobs: Record<string, unknown> | null = null;
+    if (isVeyru && dropPostmortem) {
+      knobs = { postmortem_disabled_at_start: true };
+    }
+    onConfirm(replacedAgentId, model, provider, visibleChannels, knobs);
+  }
+
+  const currentAgent = sourceAgents.find(a => a.agent_id === replacedAgentId);
+  const currentChannelIds = currentAgent?.channel_ids ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-4">
+      <div className="flex min-h-full items-center justify-center">
+        <div className="flex w-full max-w-md max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-xl">
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <h3 className="mb-3 text-sm font-medium">
+              Replace agent at start of round {roundStart}
+            </h3>
+            <p className="mb-3 text-xs text-muted-foreground">
+              The chosen agent will re-enter round {roundStart} with no LLM message history. Every
+              other agent keeps its full reconstructed history.
+            </p>
+
+            <div className="mb-4 space-y-1">
+              <label className="block text-sm font-medium">Agent to replace</label>
+              <select
+                className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
+                value={replacedAgentId}
+                onChange={e => handleAgentChange(e.target.value)}
+                disabled={isPending}
+              >
+                {sourceAgents.map(agent => (
+                  <option key={agent.agent_id} value={agent.agent_id}>
+                    {agent.agent_id} — {agent.role_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-4">
+              <ModelPicker
+                label="Replacement model"
+                models={data?.models ?? []}
+                selectedModel={model}
+                onSelect={handleModelSelect}
+              />
+            </div>
+
+            {currentChannelIds.length > 0 ? (
+              <div className="mb-4 space-y-1">
+                <label className="block text-sm font-medium">History visibility</label>
+                <p className="text-[11px] text-muted-foreground">
+                  Channels for which the replaced agent retains visibility of prior messages.
+                </p>
+                <div className="space-y-1">
+                  {currentChannelIds.map(channelId => (
+                    <label
+                      key={channelId}
+                      className="flex items-center gap-2 text-xs text-foreground"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={channelVisibility[channelId] ?? true}
+                        onChange={e =>
+                          setChannelVisibility(prev => ({
+                            ...prev,
+                            [channelId]: e.target.checked,
+                          }))
+                        }
+                        disabled={isPending}
+                      />
+                      <span>Replaced agent can read #{channelId} history</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {isVeyru ? (
+              <div className="mb-4 space-y-1">
+                <label className="block text-sm font-medium">Scenario options</label>
+                <label className="flex items-center gap-2 text-xs text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={dropPostmortem}
+                    onChange={e => setDropPostmortem(e.target.checked)}
+                    disabled={isPending}
+                  />
+                  <span>Drop #postmortem channel after replacement (for everyone)</span>
+                </label>
+              </div>
+            ) : null}
+
+            {isPending ? (
+              <div className="mt-4 flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+                <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" />
+                <div className="space-y-0.5">
+                  <p className="font-medium text-foreground">Launching replacement…</p>
+                  <p>
+                    Cloning the source run, rewriting the JSONL, and starting the resumed
+                    simulation. Usually 10–20 seconds. Redirecting when ready.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {isSuccess ? (
+              <div className="mt-4 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-700 dark:text-emerald-300">
+                Launched. Redirecting to the new run…
+              </div>
+            ) : null}
+
+            {errorMessage !== null ? (
+              <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+                <p className="font-medium">Replace-agent failed</p>
+                <p className="mt-0.5 wrap-break-word">{errorMessage}</p>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-3">
+            <button
+              className="rounded-md border border-border px-3 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={onCancel}
+              disabled={isPending}
+            >
+              {errorMessage !== null ? "Close" : "Cancel"}
+            </button>
+            <button
+              className="rounded-md bg-foreground px-3 py-1 text-[12px] font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
+              onClick={handleConfirmClick}
+              disabled={isPending || isSuccess || !model || !replacedAgentId || !provider}
+            >
+              {isPending
+                ? "Launching..."
+                : isSuccess
+                  ? "Redirecting…"
+                  : errorMessage !== null
+                    ? "Retry"
+                    : "Launch replacement"}
             </button>
           </div>
         </div>

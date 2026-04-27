@@ -29,6 +29,9 @@ class VeyruKnobs(BaseKnobs):
     system update). ``postmortem_after_swap`` controls whether the
     postmortem channel remains available after the swap (reused by intern
     mode to control intern postmortem access after takeover).
+    ``postmortem_disabled_at_start`` disables the postmortem phase from
+    the very first round; used by the replace-agent flow to drop the
+    postmortem channel for the rest of a resumed simulation.
     ``intern_enabled`` is an opt-in toggle (single-team only) that adds a
     silent intern observer who joins the link at ``intern_join_round``,
     observes the field observer work, then replaces the field observer at
@@ -49,6 +52,7 @@ class VeyruKnobs(BaseKnobs):
     swap_round: int | None
     announce_swap: bool
     postmortem_after_swap: bool
+    postmortem_disabled_at_start: bool = False
     intern_enabled: bool
     intern_join_round: int | None
     intern_takeover_round: int | None

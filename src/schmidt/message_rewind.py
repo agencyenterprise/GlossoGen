@@ -27,7 +27,19 @@ logger = logging.getLogger(__name__)
 
 
 class RewindState(NamedTuple):
-    """Everything needed to resume a simulation from a specific message."""
+    """Everything needed to resume a simulation from a specific message.
+
+    ``replaced_agent_ids`` lists agents whose channel-history visibility
+    must be wiped on resume (replace-agent flow). Empty for plain
+    `--resume` and fork.
+
+    ``replaced_agent_channels_with_visible_history`` maps agent_id to a
+    list of channel IDs whose prior history should remain visible to that
+    replaced agent. Channels of the replaced agent that are not in the
+    list have their ``member_join_index`` bumped to the current message
+    count on resume. Defaults to an empty mapping (= wipe every channel
+    the agent is in, for callers that don't supply explicit visibility).
+    """
 
     round_number: int
     messages_by_channel: dict[str, list[SimulationMessage]]
@@ -36,6 +48,8 @@ class RewindState(NamedTuple):
     scenario_config: dict[str, Any]
     agent_registrations: list[AgentRegistered]
     agent_message_histories: dict[str, list[ModelMessage]]
+    replaced_agent_ids: frozenset[str]
+    replaced_agent_channels_with_visible_history: dict[str, list[str]]
 
 
 def build_rewind_state(
@@ -131,6 +145,8 @@ def build_rewind_state(
         scenario_config=scenario_config,
         agent_registrations=agent_registrations,
         agent_message_histories=agent_message_histories,
+        replaced_agent_ids=frozenset(),
+        replaced_agent_channels_with_visible_history={},
     )
 
 

@@ -18,6 +18,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 from dotenv import load_dotenv
@@ -38,7 +39,10 @@ from schmidt.event_logger import EventLogger
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.message_rewind import RewindState, build_rewind_state_from_last_message
 from schmidt.models.agent_config import AgentConfig
+from schmidt.models.event import AgentRegistered, SimulationStarted
 from schmidt.port_allocator import find_free_port
+from schmidt.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
+from schmidt.replace_agent import replace_agent_in_run
 from schmidt.run_config_validation import validate_run_config
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.runners.pydantic_ai_runner import PydanticAIRunner
@@ -137,6 +141,76 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     serve_parser.add_argument("--port", type=int, required=True, help="Port to listen on")
 
+    replace_parser = subparsers.add_parser(
+        "replace-agent",
+        help="Replace one agent in a finished run from a target message and re-run",
+    )
+    replace_parser.add_argument(
+        "scenario_name",
+        type=str,
+        choices=scenario_names,
+        help="Name of the scenario the source run belongs to",
+    )
+    replace_parser.add_argument(
+        "--source-run-dir",
+        type=str,
+        required=True,
+        help="Path to the source run directory (e.g. runs/veyru/1742234567)",
+    )
+    replace_parser.add_argument(
+        "--round-start",
+        dest="round_start",
+        type=int,
+        required=True,
+        help=(
+            "Round number that the resumed simulation should re-enter "
+            "fresh. Rewinds to the last message before this round began."
+        ),
+    )
+    replace_parser.add_argument(
+        "--replaced-agent-id",
+        type=str,
+        required=True,
+        help="agent_id of the agent to restart with empty history",
+    )
+    replace_parser.add_argument(
+        "--model",
+        type=str,
+        required=True,
+        help="Model identifier for the replacement agent",
+    )
+    replace_parser.add_argument(
+        "--provider",
+        type=str,
+        required=True,
+        choices=["anthropic", "openai", "google-gla", "ollama"],
+        help="Provider for the replacement agent",
+    )
+    replace_parser.add_argument(
+        "--runs-dir",
+        type=str,
+        required=True,
+        help="Root directory where the new run is written",
+    )
+    replace_parser.add_argument(
+        "--knobs",
+        type=str,
+        help="Optional path to a JSON file with scenario knob overrides",
+    )
+    replace_parser.add_argument(
+        "--visible-history-channel",
+        dest="visible_history_channels",
+        action="append",
+        default=None,
+        help=(
+            "Channel ID for which the replaced agent retains visibility of prior "
+            "messages on resume. Repeatable. When the flag is omitted entirely, "
+            "the per-channel defaults from the source run's "
+            "`replace_agent_default_channel_visibility` knob are used (channels "
+            "that map to false get wiped; the rest stay visible)."
+        ),
+    )
+
     return parser
 
 
@@ -157,6 +231,11 @@ def main() -> None:
     if known_args.command == "serve":
         args = parser.parse_args()
         _run_serve(args=args)
+        return
+
+    if known_args.command == "replace-agent":
+        args = parser.parse_args()
+        asyncio.run(_run_replace_agent(args=args))
         return
 
     scenario_cls = get_scenario_class(name=known_args.scenario_name)
@@ -336,6 +415,24 @@ async def _run_simulation(
         logger.info("Loading rewind state from %s", log_path)
         events = await load_events(log_path=log_path)
         resume_state = build_rewind_state_from_last_message(events=events)
+        replace_manifest_path = run_dir / "replace_manifest.json"
+        if replace_manifest_path.exists():
+            manifest = json.loads(replace_manifest_path.read_text())
+            replaced = manifest.get("replaced_agent_id")
+            if isinstance(replaced, str):
+                raw_visible = manifest.get("channels_with_visible_history", [])
+                visible_channels: list[str] = []
+                if isinstance(raw_visible, list):
+                    visible_channels = [str(channel_id) for channel_id in raw_visible]
+                resume_state = resume_state._replace(
+                    replaced_agent_ids=frozenset({replaced}),
+                    replaced_agent_channels_with_visible_history={replaced: visible_channels},
+                )
+                logger.info(
+                    "Replace-agent run detected: %s resuming with visible channels %s",
+                    replaced,
+                    visible_channels,
+                )
         logger.info(
             "Rewind state loaded: resuming from round %d",
             resume_state.round_number,
@@ -442,3 +539,82 @@ def _run_serve(args: argparse.Namespace) -> None:
         proxy_headers=True,
         forwarded_allow_ips="*",
     )
+
+
+async def _run_replace_agent(args: argparse.Namespace) -> None:
+    """Drive the replace-agent operation from the CLI.
+
+    Loads optional knob overrides from ``--knobs`` and resolves the
+    visible-history channel list (explicit ``--visible-history-channel``
+    flags, or the source run's per-channel defaults), calls the shared
+    helper, and prints the new run ID and run dir on success.
+    """
+    knobs: dict[str, Any] | None = None
+    if args.knobs is not None:
+        knobs = json.loads(Path(args.knobs).read_text())
+
+    source_run_dir = Path(args.source_run_dir).resolve()
+
+    if args.visible_history_channels is None:
+        visible_channels = await _resolve_default_visible_channels(
+            source_run_dir=source_run_dir,
+            scenario_name=args.scenario_name,
+            replaced_agent_id=args.replaced_agent_id,
+        )
+    else:
+        visible_channels = list(args.visible_history_channels)
+
+    logger.info(
+        "Replace-agent: replaced=%s visible_channels=%s",
+        args.replaced_agent_id,
+        visible_channels,
+    )
+
+    request = ReplaceAgentCoreRequest(
+        source_run_dir=source_run_dir,
+        scenario_name=args.scenario_name,
+        round_start=args.round_start,
+        replaced_agent_id=args.replaced_agent_id,
+        model=args.model,
+        provider=args.provider,
+        knobs=knobs,
+        channels_with_visible_history=visible_channels,
+        runs_dir=Path(args.runs_dir).resolve(),
+    )
+    try:
+        result = await replace_agent_in_run(request=request)
+    except ValueError as exc:
+        raise SystemExit(f"replace-agent failed: {exc}") from exc
+
+    print(f"new_run_id={result.new_run_id}")
+    print(f"new_run_dir={result.new_run_dir}")
+
+
+async def _resolve_default_visible_channels(
+    source_run_dir: Path,
+    scenario_name: str,
+    replaced_agent_id: str,
+) -> list[str]:
+    """Compute the default visible-history channel list from source-run state.
+
+    Combines the source run's ``replace_agent_default_channel_visibility``
+    knob (channel_id → bool) with the replaced agent's actual channel
+    memberships taken from its ``AgentRegistered`` event. A channel is
+    visible by default unless the knob explicitly maps it to ``False``.
+    """
+    log_path = source_run_dir / f"{scenario_name}.jsonl"
+    events = await load_events(log_path=log_path)
+
+    visibility_map: dict[str, bool] = {}
+    agent_channels: list[str] = []
+    for event in events:
+        if isinstance(event, SimulationStarted):
+            raw = event.scenario_config.get("replace_agent_default_channel_visibility", {})
+            if isinstance(raw, dict):
+                visibility_map = {
+                    str(channel_id): bool(visible) for channel_id, visible in raw.items()
+                }
+        elif isinstance(event, AgentRegistered) and event.agent_id == replaced_agent_id:
+            agent_channels = list(event.channel_ids)
+
+    return [channel_id for channel_id in agent_channels if visibility_map.get(channel_id, True)]

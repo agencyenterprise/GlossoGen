@@ -618,6 +618,65 @@
         }
       }
     },
+    "/api/runs/{scenario}/{run_dir_name}/replace-agent": {
+      "post": {
+        "summary": "Replace Agent",
+        "description": "Replace one agent in a finished run with a fresh agent from a target message.\n\nThe new agent has no message history; every other agent resumes from\nits full reconstructed history. Optionally swaps the replaced agent's\nmodel/provider.",
+        "operationId": "replace_agent_api_runs__scenario___run_dir_name__replace_agent_post",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "run_dir_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Dir Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaceAgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs/{scenario}/{run_dir_name}/export/pdf": {
       "get": {
         "summary": "Export Run Pdf",
@@ -1805,6 +1864,121 @@
         "title": "ReasoningEntry",
         "description": "An LLM reasoning/thinking entry from an agent's turn.\n\n``channel_ids`` links this reasoning to the channels of the surrounding\nsend_message calls from the same agent, so the frontend can show only\nreasoning relevant to the selected channel."
       },
+      "ReplaceAgentRequest": {
+        "properties": {
+          "round_start": {
+            "type": "integer",
+            "title": "Round Start"
+          },
+          "replaced_agent_id": {
+            "type": "string",
+            "title": "Replaced Agent Id"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "knobs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knobs"
+          },
+          "channels_with_visible_history": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channels With Visible History"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "round_start",
+          "replaced_agent_id",
+          "model",
+          "provider",
+          "knobs",
+          "channels_with_visible_history"
+        ],
+        "title": "ReplaceAgentRequest",
+        "description": "Request body for replacing one agent in a finished run at the start of a round.\n\n``channels_with_visible_history`` lists channel IDs whose prior history\nremains visible to the replaced agent on resume; every other channel\nthey're a member of has its history wiped (current behavior is\nequivalent to passing an empty list)."
+      },
+      "ReplaceAgentResponse": {
+        "properties": {
+          "new_run_id": {
+            "type": "string",
+            "title": "New Run Id"
+          },
+          "new_run_dir": {
+            "type": "string",
+            "title": "New Run Dir"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_run_id",
+          "new_run_dir"
+        ],
+        "title": "ReplaceAgentResponse",
+        "description": "Response returned after a replace-agent run is launched."
+      },
+      "ReplaceAgentSource": {
+        "properties": {
+          "source_run_id": {
+            "type": "string",
+            "title": "Source Run Id"
+          },
+          "round_start": {
+            "type": "integer",
+            "title": "Round Start"
+          },
+          "target_message_id": {
+            "type": "string",
+            "title": "Target Message Id"
+          },
+          "replaced_agent_id": {
+            "type": "string",
+            "title": "Replaced Agent Id"
+          },
+          "replacement_model": {
+            "type": "string",
+            "title": "Replacement Model"
+          },
+          "replacement_provider": {
+            "type": "string",
+            "title": "Replacement Provider"
+          },
+          "replaced_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Replaced At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_run_id",
+          "round_start",
+          "target_message_id",
+          "replaced_agent_id",
+          "replacement_model",
+          "replacement_provider",
+          "replaced_at"
+        ],
+        "title": "ReplaceAgentSource",
+        "description": "Provenance for a run created via the replace-agent endpoint.\n\nThe replacement boundary is the start of round ``round_start``.\n``target_message_id`` is the resolved anchor inside the source\nrun's git history, kept for traceability."
+      },
       "RoundEnding": {
         "properties": {
           "round_number": {
@@ -1950,6 +2124,16 @@
               }
             ]
           },
+          "replace_agent_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplaceAgentSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "swap_point": {
             "anyOf": [
               {
@@ -2036,6 +2220,7 @@
           "evaluation_in_progress",
           "has_eval_log_file",
           "fork_source",
+          "replace_agent_source",
           "swap_point",
           "intern_join",
           "intern_takeover",
@@ -2137,6 +2322,16 @@
               }
             ]
           },
+          "replace_agent_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplaceAgentSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "models": {
             "items": {
               "type": "string"
@@ -2186,6 +2381,7 @@
           "evaluation_in_progress",
           "run_dir",
           "fork_source",
+          "replace_agent_source",
           "models",
           "provider",
           "agent_models",

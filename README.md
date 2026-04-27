@@ -68,6 +68,27 @@ The web UI supports forking a completed simulation from any message. In the run 
 
 Forked runs appear in the run list with a "Fork" badge and link back to the source run. The fork API is also available programmatically via `POST /api/runs/{run_id}/fork`.
 
+### Replacing an Agent (Round-Level Rewind)
+
+Replay a finished run from the start of a chosen round with one specific agent restarted on a fresh history while every other agent keeps its full reconstructed history. Useful for asking "could a fresh agent follow the engineer from here on?" — a direct, empirical alternative to a judge.
+
+```bash
+VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
+  --source-run-dir ./runs/veyru/<timestamp> \
+  --round-start 5 \
+  --replaced-agent-id field_observer \
+  --model claude-sonnet-4-6 --provider anthropic \
+  --runs-dir ./runs
+```
+
+Internals: clones the source run's git repo at the last `MessageSent` before round `--round-start` began, strips only the chosen agent's `llm_response_received` / `tool_call_invoked` / `tool_result_received` events from the JSONL, and resumes the simulation. The replaced agent's model/provider can differ from the original; non-replaced agents stay on their exact original models. Cannot be used with `--round-start 1` (no prior message to anchor to).
+
+**Per-channel history visibility for the replaced agent.** Pass `--visible-history-channel CHANNEL` (repeatable) to control which channels keep their prior message history visible to the replaced agent. When omitted, the CLI reads the `replace_agent_default_channel_visibility` knob from the source run's `scenario_config` (a `dict[str, bool]` defined on `BaseKnobs`; channels not in the map default to visible) and combines it with the agent's actual channel memberships. Channels marked invisible (or not in `--visible-history-channel`) have the replaced agent's `member_join_index` bumped to the current message count, so its `read_channel` calls only see post-resumption messages there.
+
+**Per-scenario knob overrides on resume.** The `--knobs` flag accepts a JSON file whose entries are merged onto the source's `scenario_config` before validation. Veyru exposes `postmortem_disabled_at_start: bool` for this flow: setting it to `true` flips `world.disable_postmortem_globally()` at world construction, dropping the postmortem channel for the rest of the resumed simulation (no postmortem injections, no postmortem phase, sends to postmortem are rejected).
+
+Derived runs appear in the run list with a "Replaced" badge linking to the source. The same operation is available via `POST /api/runs/{run_id}/replace-agent`, which accepts `channels_with_visible_history: list[str]` and `knobs: dict | null` in the body.
+
 ## Run Output Directory Structure
 
 All simulation outputs use a standard directory layout under `runs/`:
@@ -77,7 +98,8 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── {scenario_name}.jsonl          # Event log
 ├── {scenario_name}_debug.jsonl    # Debug log (JSON lines, visible in FE Logs tab)
 ├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
-└── fork_manifest.json             # (forked runs only) provenance tracking
+├── fork_manifest.json             # (forked runs only) provenance tracking
+└── replace_manifest.json          # (replace-agent runs only) provenance tracking
 ```
 
 ## Running Evaluation
@@ -97,10 +119,12 @@ Generic evaluators (available to all scenarios) focus on language emergence. Eac
 - `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames
 - `neologism` — genuinely invented words with new meanings (not abbreviations or codes)
 - `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding
+- `round_ended_idle` / `round_ended_timeout` — flag rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger (deterministic, no LLM)
+- `content_filter_refusal` — counts LLM content-filter refusals during the run
 
 Scenario-specific evaluators:
 
-- **veyru**: `language_emergence` (novel language in a fictional domain)
+- **veyru**: `language_emergence` (novel language in a fictional domain), `round_success` (per-round stabilization rate), `protocol_learned_after_swap` (two-team mode only)
 
 Output is a JSON report with per-evaluator verdicts, scores, and evidence. After evaluation, labels are automatically written to the run in the format `eval:{evaluator}:{verdict}` (where verdict is `identified`, `partial`, or `fail`), visible in the web UI for filtering.
 
@@ -191,11 +215,13 @@ Two agents (Field Observer, Stabilization Engineer) stabilize failing Veyru enti
 
 ```
 src/schmidt/
-  cli.py                       # CLI: run, evaluate, serve
+  cli.py                       # CLI: run, evaluate, serve, replace-agent
   autonomous_supervisor.py     # Round progression, event injection, resume
   channel_router.py            # Message storage + membership validation
   message_rewind.py            # State reconstruction at any message (fork/resume)
   message_history_builder.py   # Builds per-agent transcript history for fork/resume context
+  replace_agent.py             # Round-boundary agent replacement (shared by API + CLI)
+  run_jsonl_rewriter.py        # Shared JSONL rewriter for fork + replace-agent flows
   event_logger.py              # JSONL event writer
   event_bus.py                 # In-process pub/sub for SSE streaming
   simulation_server.py         # Embedded SSE server per simulation
@@ -219,6 +245,7 @@ src/schmidt/
   server/                      # FastAPI web server (schmidt serve)
     password_auth_middleware.py # Shared-password ASGI middleware
     runs/fork_router.py        # POST /api/runs/{run_id}/fork endpoint
+    runs/replace_agent_router.py # POST /api/runs/{run_id}/replace-agent endpoint
     run_launcher.py            # Shared run-launch utilities for REST and MCP start endpoints
     mcp/                       # MCP server at /mcp with OAuth
       browser.py               # FastMCP tools for run browsing and launching

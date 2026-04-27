@@ -21,7 +21,7 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 | Observability       | Structured JSONL log (one file per run)                      |
 | Run Storage         | Filesystem: `runs/{scenario}/{unix_timestamp}/`              |
 | End Conditions      | Scenario-defined round count + max round duration            |
-| Entrypoint          | CLI (`python -m schmidt run|evaluate|serve`)                 |
+| Entrypoint          | CLI (`python -m schmidt run|evaluate|serve|replace-agent`)   |
 | Metrics             | Post-hoc LLM-as-judge, user-selected evaluators, JSON report |
 | Web Server          | FastAPI with structured Pydantic response models             |
 | Frontend            | Next.js 16, React 19, TypeScript (strict), Tailwind CSS v4   |
@@ -176,12 +176,13 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── {scenario_name}.jsonl          # Event log (one JSON object per line)
 ├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, visible in FE)
 ├── {scenario_name}_report.json    # Evaluation report (written by evaluate command)
-└── fork_manifest.json             # (forked runs only) provenance tracking
+├── fork_manifest.json             # (forked runs only) provenance tracking
+└── replace_manifest.json          # (replace-agent runs only) provenance tracking
 ```
 
 The CLI `run` command computes the output path automatically from `--runs-dir`, the scenario name, and the current unix timestamp. The `evaluate` command takes `--run-dir` pointing to a specific run directory and writes the report as a sibling to the JSONL file.
 
-The web server scans this directory tree to discover runs, reading the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total messages, end reason) without loading the full log. Forked runs are identified by the presence of `fork_manifest.json`.
+The web server scans this directory tree to discover runs, reading the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total messages, end reason) without loading the full log. Forked and replace-agent runs are identified by the presence of `fork_manifest.json` or `replace_manifest.json`.
 
 ## Fork System (Message-Level Rewind)
 
@@ -201,11 +202,52 @@ The fork system allows rewinding a completed simulation to any message, editing 
 
 - `message_rewind.py` — `RewindState` and rewind state reconstruction helpers
 - `message_history_builder.py` — builds per-agent transcript history from events
+- `run_jsonl_rewriter.py` — shared JSONL rewriter (used by both fork and replace-agent) that walks the cloned log once and applies a caller-supplied drop predicate plus run-id / message-text edits
 - `server/runs/fork_router.py` — `POST /api/runs/{run_id}/fork` API endpoint
 
 ### Provenance
 
 Forked runs store a `fork_manifest.json` containing `source_run_id` and `target_message_id`. The run discovery and detail endpoints expose this as `fork_source` on the response models. The frontend shows a "Fork" badge in the run list and a lineage link in the run detail header.
+
+## Replace-Agent System (Round-Level Rewind)
+
+The replace-agent system rewinds a finished simulation to the start of a chosen round and re-runs from there with one specific agent restarted on a fresh history. Every other agent resumes from its full reconstructed history. The replacement agent's model/provider can differ from the original. Like fork, replace-agent creates a new run directory — the original is preserved.
+
+This shares the fork primitives (git clone + checkout, JSONL rewrite, `--resume` subprocess) but differs in two ways: (1) the user picks a **round number** instead of a message ID — the system resolves it to the last `MessageSent` whose `round_number < round_start`; (2) the JSONL rewriter strips `llm_response_received` / `tool_call_invoked` / `tool_result_received` events **only** when their `agent_id` matches the replaced agent, so reconstructed message history for non-replaced agents stays intact.
+
+### Replace-Agent Flow
+
+1. **Entry**: User invokes `python -m schmidt replace-agent <scenario> --source-run-dir <dir> --round-start <N> --replaced-agent-id <id> --model <model> --provider <provider> --runs-dir <dir>`, or `POST /api/runs/{run_id}/replace-agent` with the same payload. Both surfaces call the shared core helper `replace_agent.replace_agent_in_run`.
+2. **Round resolution**: `resolve_round_start_message(events, round_start)` finds the last `MessageSent` whose `round_number < round_start`. Round 1 is rejected (no prior message to anchor to).
+3. **Clone + checkout**: Same as fork — `find_commit_for_message` → SHA, `clone_to` + `checkout`.
+4. **JSONL rewrite**: `run_jsonl_rewriter.rewrite_run_jsonl` walks the cloned log once with predicate `drop_single_agent_history(event_dict, agent_id=replaced_agent_id)` — only the chosen agent's LLM history events are dropped.
+5. **Per-agent model overrides**: An explicit `model_overrides` dict is built that pins every source agent to its original `(model, provider)` pair (read from `AgentRegistered` events) and overwrites just the replaced agent's entry with the new model/provider. This guarantees non-replaced agents stay on their exact original models even if the top-level CLI defaults differ.
+6. **Manifest + commit**: `replace_manifest.json` records `source_run_id`, `round_start`, `target_message_id` (the resolved anchor, kept for traceability), `replaced_agent_id`, `replacement_model`, `replacement_provider`, `channels_with_visible_history`, `replaced_at`. Committed as `replace: agent <id> → <model>/<provider>`.
+7. **Resume**: Launches `schmidt run --resume <new_dir> --config replace_config.json` as a background subprocess.
+8. **Supervisor resume**: When the resumed simulation rebuilds `RewindState`, the replaced agent's `agent_message_histories[agent_id]` comes back empty (no LLM history events left for it), while every other agent's history is fully reconstructed. The supervisor calls `ChannelRouter.apply_replacement_visibility(agent_id, channels_with_visible_history)` so `read_channel` returns prior messages only for whitelisted channels; all others have the agent's `member_join_index` bumped to the current message count, hiding pre-resume history without affecting any other agent's view.
+
+### Per-Channel History Visibility (Platform Feature)
+
+The replace-agent flow lets the caller choose, per channel, whether the replaced agent retains visibility of pre-resume messages on that channel. This is generic across scenarios.
+
+- **Request field**: `ReplaceAgentRequest.channels_with_visible_history: list[str]` (CLI flag `--visible-history-channel CHANNEL`, repeatable; HTTP body field of the same name). Empty list = wipe history visibility on every channel the agent is in.
+- **Default policy**: `BaseKnobs.replace_agent_default_channel_visibility: dict[str, bool]` (channel ID → visible). Channels absent from the map default to visible. The CLI consults this knob when no `--visible-history-channel` flag is passed; the FE consults it to pre-populate the modal checkboxes. New scenarios opt in by setting the map in their preset JSONs — no code change required.
+- **Persistence**: stored on `replace_manifest.json`; the CLI's `--resume` path reads it and threads it onto `RewindState.replaced_agent_channels_with_visible_history` (a `dict[str, list[str]]` keyed by `agent_id`).
+
+### Veyru-Specific Knob: Drop Postmortem After Replacement
+
+Setting `postmortem_disabled_at_start: true` in the merged `knobs` payload makes `VeyruWorld.__init__` flip `_postmortem_globally_disabled = True` immediately. From resume onward `validate_outgoing_message`, `get_postmortem_injection`, and `get_max_postmortem_duration_seconds` all short-circuit, so the postmortem channel exists but is inert (no sends, no injections, no postmortem phase). The FE replace-agent modal exposes this as a Veyru-only "Drop #postmortem channel after replacement" checkbox; other scenarios use the generic `knobs` field directly.
+
+### Key Modules
+
+- `replace_agent.py` — `ReplaceAgentRequest`/`ReplaceAgentResult` named tuples, `resolve_round_start_message`, and `replace_agent_in_run` (shared core called by both CLI and HTTP layers)
+- `run_jsonl_rewriter.py` — `rewrite_run_jsonl` plus the two drop predicates (`drop_all_agent_history` for fork, `drop_single_agent_history` for replace-agent)
+- `server/runs/replace_agent_router.py` — `POST /api/runs/{scenario}/{run_dir_name}/replace-agent` thin HTTP wrapper
+- `cli.py` `_run_replace_agent` — CLI subcommand implementation
+
+### Provenance
+
+Replace-agent runs store a `replace_manifest.json`. The run discovery and detail endpoints expose this as `replace_agent_source` on the response models alongside `fork_source`. The frontend shows a "Replaced X → model @ round N" badge in the run detail header.
 
 ## Evaluation System
 

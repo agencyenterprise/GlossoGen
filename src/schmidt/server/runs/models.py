@@ -18,6 +18,23 @@ class ForkSource(BaseModel):
     forked_at: datetime
 
 
+class ReplaceAgentSource(BaseModel):
+    """Provenance for a run created via the replace-agent endpoint.
+
+    The replacement boundary is the start of round ``round_start``.
+    ``target_message_id`` is the resolved anchor inside the source
+    run's git history, kept for traceability.
+    """
+
+    source_run_id: str
+    round_start: int
+    target_message_id: str
+    replaced_agent_id: str
+    replacement_model: str
+    replacement_provider: str
+    replaced_at: datetime
+
+
 class SwapPoint(BaseModel):
     """Anchor for the moment agents were swapped between teams.
 
@@ -69,6 +86,7 @@ class RunSummary(BaseModel):
     evaluation_in_progress: bool
     run_dir: str
     fork_source: ForkSource | None
+    replace_agent_source: ReplaceAgentSource | None
     models: list[str]
     provider: str
     agent_models: list[AgentModelSummary]
@@ -282,6 +300,7 @@ class RunDetailResponse(BaseModel):
     evaluation_in_progress: bool
     has_eval_log_file: bool
     fork_source: ForkSource | None
+    replace_agent_source: ReplaceAgentSource | None
     swap_point: SwapPoint | None
     intern_join: InternAnchor | None
     intern_takeover: InternAnchor | None
@@ -347,6 +366,37 @@ class ForkResponse(BaseModel):
 
     fork_run_id: str
     fork_run_dir: str
+
+
+# ---------------------------------------------------------------------------
+# Replace-agent request/response models
+# ---------------------------------------------------------------------------
+
+
+class ReplaceAgentRequest(BaseModel):
+    """Request body for replacing one agent in a finished run at the start of a round.
+
+    ``channels_with_visible_history`` lists channel IDs whose prior history
+    remains visible to the replaced agent on resume; every other channel
+    they're a member of has its history wiped (current behavior is
+    equivalent to passing an empty list).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    round_start: int
+    replaced_agent_id: str
+    model: str
+    provider: str
+    knobs: dict[str, Any] | None
+    channels_with_visible_history: list[str]
+
+
+class ReplaceAgentResponse(BaseModel):
+    """Response returned after a replace-agent run is launched."""
+
+    new_run_id: str
+    new_run_dir: str
 
 
 # ---------------------------------------------------------------------------

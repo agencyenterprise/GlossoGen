@@ -58,6 +58,8 @@ _.stabilize_metadata  # unused attribute (src/schmidt/server/runs/detail_reader.
 _.result_timestamp  # unused attribute (src/schmidt/server/runs/detail_reader.py:300)
 _.stabilize_metadata  # unused attribute (src/schmidt/server/runs/detail_reader.py:310)
 fork_run  # unused function (src/schmidt/server/runs/fork_router.py:48)
+replace_agent  # unused function (src/schmidt/server/runs/replace_agent_router.py:90)
+replace_agent_default_channel_visibility  # unused variable (src/schmidt/scenarios/base_knobs.py:36)
 swapped_observer_display_names  # unused variable (src/schmidt/server/runs/models.py:32)
 runs  # unused variable (src/schmidt/server/runs/models.py:82)
 result_timestamp  # unused variable (src/schmidt/server/runs/models.py:139)

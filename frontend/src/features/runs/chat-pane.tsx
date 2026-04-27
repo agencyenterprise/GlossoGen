@@ -59,6 +59,8 @@ interface ChatPaneProps {
   onSaveEdit: (messageId: string, newText: string) => void;
   onCancelEdit: () => void;
   onForkFromMessage: (targetMessageId: string) => void;
+  /** Open the replace-agent modal pre-filled with the given round_start. Null disables the trigger. */
+  onReplaceAgentFromRound: ((roundNumber: number) => void) | null;
   /** The message_id that was the fork point, if this is a forked run. */
   forkPointMessageId: string | null;
   /** Round number where the first post-swap messages appear (if the run had an observer swap). */
@@ -69,6 +71,12 @@ interface ChatPaneProps {
   internJoinRoundNumber: number | null;
   /** Round number where the intern replaced the field observer (if intern mode was enabled). */
   internTakeoverRoundNumber: number | null;
+  /** Round at which an agent was replaced via replace-agent (if this run was derived). */
+  replaceAgentRoundStart: number | null;
+  /** Agent ID that was replaced (only set when replaceAgentRoundStart is set). */
+  replaceAgentReplacedAgentId: string | null;
+  /** Replacement model identifier (only set when replaceAgentRoundStart is set). */
+  replaceAgentReplacementModel: string | null;
   /** Per-round Veyru case metadata (empty for non-Veyru scenarios). */
   veyruCases: VeyruCaseSummary[];
   /** One entry per completed round describing why its main phase ended. */
@@ -149,11 +157,15 @@ export function ChatPane({
   onSaveEdit,
   onCancelEdit,
   onForkFromMessage,
+  onReplaceAgentFromRound,
   forkPointMessageId,
   swapRoundNumber,
   swappedObserverDisplayNames,
   internJoinRoundNumber,
   internTakeoverRoundNumber,
+  replaceAgentRoundStart,
+  replaceAgentReplacedAgentId,
+  replaceAgentReplacementModel,
   veyruCases,
   roundEndings,
 }: ChatPaneProps) {
@@ -167,6 +179,8 @@ export function ChatPane({
   const prevScrollHeightRef = useRef(0);
   const [hoveredCallId, setHoveredCallId] = useState<string | null>(null);
   const [timelineRound, setTimelineRound] = useState<number | null>(null);
+  const [showRoundJumper, setShowRoundJumper] = useState(false);
+  const roundJumperRef = useRef<HTMLDivElement>(null);
 
   const messagesByRound = useMemo(() => {
     const byRound = new Map<number, DisplayEntry[]>();
@@ -225,6 +239,38 @@ export function ChatPane({
       });
     }
   }, []);
+
+  const sortedRoundNumbers = useMemo(
+    () => [...messagesByRound.keys()].sort((a, b) => a - b),
+    [messagesByRound]
+  );
+
+  const jumpToRound = useCallback((roundNumber: number) => {
+    const el = roundMarkerRefs.current.get(roundNumber);
+    if (el) {
+      el.scrollIntoView({ behavior: "instant", block: "start" });
+    }
+    setShowRoundJumper(false);
+  }, []);
+
+  // Close the round jumper on outside click or Escape.
+  useEffect(() => {
+    if (!showRoundJumper) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (roundJumperRef.current && !roundJumperRef.current.contains(e.target as Node)) {
+        setShowRoundJumper(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowRoundJumper(false);
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showRoundJumper]);
 
   // Track scroll position to determine if user is at the bottom.
   // When the user scrolls up to read history we stop auto-scrolling;
@@ -458,7 +504,7 @@ export function ChatPane({
       </div>
 
       {currentVisibleRound !== null ? (
-        <div className="absolute left-1/2 top-12 z-30 -translate-x-1/2">
+        <div className="absolute left-1/2 top-12 z-30 flex -translate-x-1/2 items-center gap-1.5">
           <button
             type="button"
             aria-label={`Open round ${currentVisibleRound} timeline`}
@@ -468,6 +514,49 @@ export function ChatPane({
             <Hash className="h-3 w-3" />
             Round {currentVisibleRound}
           </button>
+          {sortedRoundNumbers.length > 1 ? (
+            <div ref={roundJumperRef} className="relative">
+              <Tooltip label="Jump to round">
+                <button
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded={showRoundJumper}
+                  aria-label="Jump to round"
+                  onClick={() => setShowRoundJumper(v => !v)}
+                  className="inline-flex cursor-pointer items-center justify-center rounded-full border border-border bg-background/90 p-1 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:border-foreground/30 hover:bg-background hover:text-foreground"
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              </Tooltip>
+              {showRoundJumper ? (
+                <div
+                  role="listbox"
+                  aria-label="Rounds"
+                  className="absolute right-0 top-full z-40 mt-1 w-32 overflow-hidden rounded-md border border-border bg-background shadow-lg"
+                >
+                  <div className="max-h-64 overflow-y-auto py-1">
+                    {sortedRoundNumbers.map(n => (
+                      <button
+                        key={n}
+                        type="button"
+                        role="option"
+                        aria-selected={n === currentVisibleRound}
+                        onClick={() => jumpToRound(n)}
+                        className={cn(
+                          "block w-full px-3 py-1 text-left text-[11px] transition-colors hover:bg-muted",
+                          n === currentVisibleRound
+                            ? "font-medium text-foreground"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        Round {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -536,6 +625,30 @@ export function ChatPane({
                   </div>
                 </div>
               ) : null}
+              {replaceAgentRoundStart !== null && round.roundNumber === replaceAgentRoundStart ? (
+                <div
+                  id="replace-agent-divider"
+                  className="mx-4 my-4 rounded-md border-2 border-dashed border-sky-400/80 bg-sky-50 px-4 py-3 dark:border-sky-600/70 dark:bg-sky-950/50"
+                >
+                  <div className="flex items-center justify-center gap-2 text-sky-800 dark:text-sky-200">
+                    <UserCog className="h-4 w-4" />
+                    <span className="text-sm font-semibold">
+                      {replaceAgentReplacedAgentId !== null &&
+                      replaceAgentReplacementModel !== null ? (
+                        <>
+                          {replaceAgentReplacedAgentId} replaced with {replaceAgentReplacementModel}
+                        </>
+                      ) : (
+                        <>Agent replaced</>
+                      )}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-center text-[11px] text-sky-700/80 dark:text-sky-300/80">
+                    Round {round.roundNumber} begins with the replacement on a fresh history. Other
+                    agents continue from their full reconstructed history.
+                  </div>
+                </div>
+              ) : null}
               {internTakeoverRoundNumber !== null &&
               round.roundNumber === internTakeoverRoundNumber ? (
                 <div
@@ -569,6 +682,17 @@ export function ChatPane({
                 <span className="whitespace-nowrap text-[11px] text-muted-foreground">
                   Round {round.roundNumber}
                 </span>
+                {forkEnabled && onReplaceAgentFromRound !== null && round.roundNumber >= 2 ? (
+                  <Tooltip label={`Replace an agent at start of round ${round.roundNumber}`}>
+                    <button
+                      aria-label={`Replace an agent at start of round ${round.roundNumber}`}
+                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      onClick={() => onReplaceAgentFromRound(round.roundNumber)}
+                    >
+                      <UserCog className="h-3 w-3" />
+                    </button>
+                  </Tooltip>
+                ) : null}
                 <div className="h-px flex-1 bg-border" />
               </div>
 

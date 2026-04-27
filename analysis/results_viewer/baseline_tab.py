@@ -55,6 +55,45 @@ def _series_checkbox_filter(runs: list[BaselineRun]) -> set[str]:
     return selected
 
 
+_CORE_LABEL_PREFIXES = ("baseline", "budget=", "eval:", "postmortem=", "single_team", "two_team")
+
+
+def _batch_label_filter(runs: list[BaselineRun]) -> list[BaselineRun]:
+    """Render checkboxes for non-core batch labels; return runs matching all selected labels.
+
+    Detects labels that aren't part of the standard baseline metadata (budget,
+    eval results, model, postmortem variant, team structure) and surfaces them
+    as opt-in checkboxes. Runs that carry none of the detected batch labels are
+    always included — they predate sub-batch tagging.
+    """
+    batch_labels: set[str] = set()
+    for run in runs:
+        for label in run.labels:
+            if not any(label.startswith(prefix) for prefix in _CORE_LABEL_PREFIXES):
+                if label not in (run.model,):
+                    batch_labels.add(label)
+    if not batch_labels:
+        return runs
+    st.markdown("**Batch labels**")
+    selected: set[str] = set()
+    for label in sorted(batch_labels):
+        count = sum(1 for r in runs if label in r.labels)
+        if st.checkbox(
+            label=f"{label} ({count})",
+            value=True,
+            key=f"baseline_batch_filter::{label}",
+        ):
+            selected.add(label)
+    if not selected:
+        return []
+    return [
+        r
+        for r in runs
+        if any(label in r.labels for label in selected)
+        or not any(label in r.labels for label in batch_labels)
+    ]
+
+
 def _series_color_map(series_keys: list[str]) -> dict[str, str]:
     """Assign a palette colour to each series, stable across reruns."""
     return {key: palette_color_for_index(index=i) for i, key in enumerate(series_keys)}
@@ -307,11 +346,15 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         )
         return
     metric = _render_metric_selector()
-    selected_series = _series_checkbox_filter(runs=all_baseline)
+    batch_filtered = _batch_label_filter(runs=all_baseline)
+    if not batch_filtered:
+        st.info("Select at least one batch label.")
+        return
+    selected_series = _series_checkbox_filter(runs=batch_filtered)
     if not selected_series:
         st.info("Select at least one series.")
         return
-    filtered = [run for run in all_baseline if run.series_key in selected_series]
+    filtered = [run for run in batch_filtered if run.series_key in selected_series]
     if not filtered:
         st.info("No baseline runs for the selected series.")
         return
