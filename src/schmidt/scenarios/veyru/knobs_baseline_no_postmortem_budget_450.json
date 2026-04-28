@@ -8,7 +8,13 @@
   "max_round_duration_seconds": 300,
   "model_overrides": {},
   "postmortem_after_swap": false,
+  "postmortem_disabled_at_start": false,
   "postmortem_enabled": false,
+  "replace_agent_default_channel_visibility": {
+    "postmortem": false,
+    "postmortem_a": false,
+    "postmortem_b": false
+  },
   "round_count": 15,
   "round_time_budget_seconds": 450,
   "seed": 42,
