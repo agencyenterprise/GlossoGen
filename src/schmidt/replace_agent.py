@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 import orjson
+from pydantic import BaseModel
 
 from schmidt.evaluation.log_reader import load_events
 from schmidt.message_rewind import build_rewind_state
@@ -26,6 +27,39 @@ from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)
+
+
+REPLACE_MANIFEST_FILENAME = "replace_manifest.json"
+
+
+class ReplaceManifest(BaseModel):
+    """Persisted record of a replace-agent operation.
+
+    Written once at replace-agent time into ``replace_manifest.json`` inside
+    the new run directory. The resume code path, evaluators, and inspection
+    scripts read it to reconstruct what the replacement saw and which rounds
+    were played after the swap.
+    """
+
+    source_run_id: str
+    source_run_dir: str
+    round_start: int
+    rounds_after_swap: int
+    target_message_id: str
+    replaced_agent_id: str
+    replacement_model: str
+    replacement_provider: str
+    channels_with_visible_history: list[str]
+    blocked_tool_call_channels: list[str]
+    replaced_at: float
+
+
+def read_replace_manifest(run_dir: Path) -> ReplaceManifest | None:
+    """Load ``replace_manifest.json`` from ``run_dir`` or return ``None`` if absent."""
+    manifest_path = run_dir / REPLACE_MANIFEST_FILENAME
+    if not manifest_path.exists():
+        return None
+    return ReplaceManifest.model_validate_json(manifest_path.read_bytes())
 
 
 class ReplaceAgentRequest(NamedTuple):
@@ -238,21 +272,21 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         run_dir_name=request.source_run_dir.name,
     )
     blocked_tool_call_channels = sorted(scenario_cls.get_replace_agent_blocked_tool_call_channels())
-    manifest = {
-        "source_run_id": source_run_id,
-        "source_run_dir": str(request.source_run_dir),
-        "round_start": request.round_start,
-        "rounds_after_swap": request.rounds_after_swap,
-        "target_message_id": target_message_id,
-        "replaced_agent_id": request.replaced_agent_id,
-        "replacement_model": request.model,
-        "replacement_provider": request.provider,
-        "channels_with_visible_history": list(request.channels_with_visible_history),
-        "blocked_tool_call_channels": blocked_tool_call_channels,
-        "replaced_at": time.time(),
-    }
-    manifest_path = new_run_dir / "replace_manifest.json"
-    manifest_path.write_bytes(orjson.dumps(manifest))
+    manifest = ReplaceManifest(
+        source_run_id=source_run_id,
+        source_run_dir=str(request.source_run_dir),
+        round_start=request.round_start,
+        rounds_after_swap=request.rounds_after_swap,
+        target_message_id=target_message_id,
+        replaced_agent_id=request.replaced_agent_id,
+        replacement_model=request.model,
+        replacement_provider=request.provider,
+        channels_with_visible_history=list(request.channels_with_visible_history),
+        blocked_tool_call_channels=blocked_tool_call_channels,
+        replaced_at=time.time(),
+    )
+    manifest_path = new_run_dir / REPLACE_MANIFEST_FILENAME
+    manifest_path.write_bytes(orjson.dumps(manifest.model_dump()))
 
     await new_repo.commit(
         message=(

@@ -46,7 +46,8 @@ from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import AgentRegistered, SimulationStarted
 from schmidt.port_allocator import find_free_port
 from schmidt.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
-from schmidt.replace_agent import replace_agent_in_run
+from schmidt.replace_agent import read_replace_manifest, replace_agent_in_run
+from schmidt.resume_context_writer import write_resume_context_files
 from schmidt.run_config_validation import validate_run_config
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.runners.pydantic_ai_runner import PydanticAIRunner
@@ -400,26 +401,14 @@ class _ReplaceManifestInfo(NamedTuple):
 
 
 def _read_replace_manifest(run_dir: Path) -> _ReplaceManifestInfo | None:
-    """Read ``replace_manifest.json`` if present and extract resume fields."""
-    manifest_path = run_dir / "replace_manifest.json"
-    if not manifest_path.exists():
+    """Read ``replace_manifest.json`` if present and project to resume fields."""
+    manifest = read_replace_manifest(run_dir=run_dir)
+    if manifest is None:
         return None
-    manifest = json.loads(manifest_path.read_text())
-    replaced = manifest.get("replaced_agent_id")
-    if not isinstance(replaced, str):
-        return None
-    raw_visible = manifest.get("channels_with_visible_history", [])
-    visible_channels: list[str] = []
-    if isinstance(raw_visible, list):
-        visible_channels = [str(channel_id) for channel_id in raw_visible]
-    raw_blocked = manifest.get("blocked_tool_call_channels", [])
-    blocked_channel_ids: frozenset[str] = frozenset()
-    if isinstance(raw_blocked, list):
-        blocked_channel_ids = frozenset(str(channel_id) for channel_id in raw_blocked)
     return _ReplaceManifestInfo(
-        replaced_agent_id=replaced,
-        visible_channels=visible_channels,
-        blocked_channel_ids=blocked_channel_ids,
+        replaced_agent_id=manifest.replaced_agent_id,
+        visible_channels=list(manifest.channels_with_visible_history),
+        blocked_channel_ids=frozenset(manifest.blocked_tool_call_channels),
     )
 
 
@@ -489,6 +478,10 @@ async def _run_simulation(
         logger.info(
             "Rewind state loaded: resuming from round %d",
             resume_state.round_number,
+        )
+        write_resume_context_files(
+            run_dir=run_dir,
+            agent_message_histories=resume_state.agent_message_histories,
         )
 
     max_turns = args.max_agent_turns

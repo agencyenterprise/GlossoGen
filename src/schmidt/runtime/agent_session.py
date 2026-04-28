@@ -6,7 +6,10 @@ termination state.
 """
 
 import asyncio
+import contextlib
 import logging
+import time
+from collections.abc import AsyncIterator
 
 from schmidt.runtime.activity_notification import ActivityNotification, DoneNotification
 
@@ -24,8 +27,30 @@ class AgentSession:
         self._queue: asyncio.Queue[ActivityNotification] = asyncio.Queue()
         self._last_seen_counts: dict[str, int] = {}
         self.is_idle = False
+        self.active_non_blocking_calls = 0
+        self.read_notifications_in_flight = False
+        self.last_non_blocking_dispatch_ts: float | None = None
         self._terminated = False
         self._done_reason = ""
+
+    @contextlib.asynccontextmanager
+    async def track_active_call(self) -> AsyncIterator[None]:
+        """Mark the agent busy for the duration of a non-blocking tool call.
+
+        Use this around every tool body except ``read_notifications`` so
+        the game clock cannot mistake an in-flight ``send_message`` /
+        ``read_channel`` / scenario tool for genuine idleness when it
+        runs in parallel with a ``read_notifications`` call. Also stamps
+        ``last_non_blocking_dispatch_ts`` so ``read_notifications`` can
+        detect sibling dispatches that already finished by the time the
+        parallelism check runs.
+        """
+        self.active_non_blocking_calls += 1
+        self.last_non_blocking_dispatch_ts = time.monotonic()
+        try:
+            yield
+        finally:
+            self.active_non_blocking_calls -= 1
 
     def record_channel_read(self, channel_id: str, message_count: int) -> None:
         """Record that this agent has seen all messages up to the given count."""
