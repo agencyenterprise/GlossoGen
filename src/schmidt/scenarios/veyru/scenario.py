@@ -43,6 +43,7 @@ from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.veyru.evaluation import (
     LanguageEmergenceEvaluator,
     ProtocolLearnedAfterSwapEvaluator,
+    RoundSuccessAfterResumeEvaluator,
     RoundSuccessEvaluator,
 )
 from schmidt.scenarios.veyru.ids import (
@@ -1092,6 +1093,7 @@ class VeyruScenario(SimulationScenario):
         specific = [
             LanguageEmergenceEvaluator.name,
             ProtocolLearnedAfterSwapEvaluator.name,
+            RoundSuccessAfterResumeEvaluator.name,
             RoundSuccessEvaluator.name,
         ]
         return sorted(set(generic + specific))
@@ -1101,6 +1103,7 @@ class VeyruScenario(SimulationScenario):
         return {
             LanguageEmergenceEvaluator.name: LanguageEmergenceEvaluator,
             ProtocolLearnedAfterSwapEvaluator.name: ProtocolLearnedAfterSwapEvaluator,
+            RoundSuccessAfterResumeEvaluator.name: RoundSuccessAfterResumeEvaluator,
             RoundSuccessEvaluator.name: RoundSuccessEvaluator,
         }
 

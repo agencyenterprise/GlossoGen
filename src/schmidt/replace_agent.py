@@ -15,11 +15,11 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 import orjson
-from pydantic import BaseModel
 
 from schmidt.evaluation.log_reader import load_events
 from schmidt.message_rewind import build_rewind_state
 from schmidt.models.event import AgentRegistered, MessageSent, SimulationEvent, SimulationStarted
+from schmidt.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
 from schmidt.run_config_validation import validate_run_config
 from schmidt.run_jsonl_rewriter import rewrite_run_jsonl
 from schmidt.run_repository import RunRepository, claim_run_dir
@@ -27,39 +27,6 @@ from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)
-
-
-REPLACE_MANIFEST_FILENAME = "replace_manifest.json"
-
-
-class ReplaceManifest(BaseModel):
-    """Persisted record of a replace-agent operation.
-
-    Written once at replace-agent time into ``replace_manifest.json`` inside
-    the new run directory. The resume code path, evaluators, and inspection
-    scripts read it to reconstruct what the replacement saw and which rounds
-    were played after the swap.
-    """
-
-    source_run_id: str
-    source_run_dir: str
-    round_start: int
-    rounds_after_swap: int
-    target_message_id: str
-    replaced_agent_id: str
-    replacement_model: str
-    replacement_provider: str
-    channels_with_visible_history: list[str]
-    blocked_tool_call_channels: list[str]
-    replaced_at: float
-
-
-def read_replace_manifest(run_dir: Path) -> ReplaceManifest | None:
-    """Load ``replace_manifest.json`` from ``run_dir`` or return ``None`` if absent."""
-    manifest_path = run_dir / REPLACE_MANIFEST_FILENAME
-    if not manifest_path.exists():
-        return None
-    return ReplaceManifest.model_validate_json(manifest_path.read_bytes())
 
 
 class ReplaceAgentRequest(NamedTuple):
