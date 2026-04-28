@@ -13,6 +13,7 @@ exceeds the case's time budget.
 """
 
 import logging
+import random
 from pathlib import Path
 from typing import Any, NamedTuple, Self
 
@@ -181,6 +182,7 @@ class VeyruScenario(SimulationScenario):
             round_count=knobs.round_count,
             round_time_budget_seconds=knobs.round_time_budget_seconds,
         )
+        self._noise_rng = random.Random(knobs.seed)
         self._agent_display_names: dict[str, str] = self._build_agent_display_names(
             two_teams=knobs.two_teams,
             intern_enabled=knobs.intern_enabled,
@@ -453,6 +455,7 @@ class VeyruScenario(SimulationScenario):
                             "intern_join_round": self._knobs.intern_join_round,
                             "intern_takeover_round": self._knobs.intern_takeover_round,
                             "failure_motifs": FAILURE_MOTIFS,
+                            "channel_noise_level": self._knobs.channel_noise_level,
                         },
                     ),
                     channel_ids=d.channel_ids,
@@ -934,6 +937,22 @@ class VeyruScenario(SimulationScenario):
                     "discussion phase. Wait for the discussion phase to begin."
                 )
         return None
+
+    def transform_outgoing_message(self, agent_id: str, channel_id: str, text: str) -> str:
+        """Apply per-character drop noise to messages on link channels.
+
+        Postmortem and any other channels are returned unchanged. Dropped
+        characters are replaced with ``_`` so agents can see where loss
+        occurred. Sampling uses the scenario-owned seeded RNG for run
+        reproducibility.
+        """
+        _ = agent_id
+        if channel_id not in {LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNEL_ID}:
+            return text
+        noise_level = self._knobs.channel_noise_level
+        if noise_level == 0.0:
+            return text
+        return "".join("_" if self._noise_rng.random() < noise_level else ch for ch in text)
 
     # --- World, MCP tools, timing ---
 

@@ -49,6 +49,7 @@ Each round, a reading from reference star SAGWE392 gives you a table mapping eve
 
 CRITICAL RULE — EVERY CHARACTER COSTS TIME:
 Every character sent over the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the technician) exceeds the Veyru's time budget, the Veyru collapses permanently.
+{% include "_unreliable_link.jinja" %}
 
 STABILIZATION:
 Give the technician clear instructions naming the tool, target, duration, and intensity. They will execute them using the stabilize_veyru tool. If the action is correct, the Veyru is stabilized. If not, they can try again. The tool call itself does not cost time — only messages on the comm link do.
