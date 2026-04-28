@@ -67,7 +67,7 @@ It also foreshadowed the Apr 16 regression: once the team removed progressive pr
 
 **Decision.** Primary experiments use fixed pressure levels (100%, 75%, 50%, 35%) with default 50%. Progressive pressure retained as a fifth setting on the knob so we can still produce emergence when we need it (demos, sanity checks) and study the curriculum question later as its own experiment. The post-mortem mechanism was introduced to recover emergence under static pressure without reintroducing the confound.
 
-**Related.** Two principles worth carrying forward: (1) mechanisms that *produce* a result are not the same as mechanisms that cleanly *measure* it; scientific validity often requires sacrificing the former for the latter. (2) Every knob we add should be independently controllable — pressure level and pressure history are two different variables and should not be entangled by default.
+**Related.** Two principles worth carrying forward: (1) mechanisms that _produce_ a result are not the same as mechanisms that cleanly _measure_ it; scientific validity often requires sacrificing the former for the latter. (2) Every knob we add should be independently controllable — pressure level and pressure history are two different variables and should not be entangled by default.
 
 ---
 
@@ -111,7 +111,7 @@ This makes sense in hindsight: agents stayed in-character trying to save the pat
 
 **What happened.** The codebook shorthand emerged as hoped (see the earlier 2026-04-17 entry above), but a second failure mode surfaced: because post-mortem discussion is unconstrained and cumulative across rounds, the Field Observer could learn the symptom→treatment mapping directly from the Specialist over time. Once the Observer had seen enough rounds, they could in principle self-diagnose and self-treat without needing the Specialist at all — exactly the collapse the Apr 14 learning warned about, re-introduced through the back door by the very mechanism we added to fix compression.
 
-**Why it matters.** Structural asymmetry is not a one-time property of a scenario. Any mechanism that lets information flow between agents — and the post-mortem is explicitly designed to do that — can leak the asymmetric information over time and dissolve the constraint. Knowledge gaps need to be maintained *per round*, not just set up once at scenario start.
+**Why it matters.** Structural asymmetry is not a one-time property of a scenario. Any mechanism that lets information flow between agents — and the post-mortem is explicitly designed to do that — can leak the asymmetric information over time and dissolve the constraint. Knowledge gaps need to be maintained _per round_, not just set up once at scenario start.
 
 **Decision.** Added a per-round "stellar alignment" mechanic. Each round:
 
@@ -121,7 +121,23 @@ This makes sense in hindsight: agents stayed in-character trying to save the pat
 
 Even if the Observer has fully memorized all 14 motif procedures and all possible parameter values through post-mortem, they cannot act without the Specialist's per-round stellar reading. Per-round communication stays necessary by construction.
 
-**Related.** This is a refinement of the Apr 14 structural-asymmetry principle: the asymmetry must be *renewable*, not just present. It also shows that mechanisms interact — post-mortem and fixed-table knowledge asymmetry are each defensible in isolation but combine badly.
+**Related.** This is a refinement of the Apr 14 structural-asymmetry principle: the asymmetry must be _renewable_, not just present. It also shows that mechanisms interact — post-mortem and fixed-table knowledge asymmetry are each defensible in isolation but combine badly.
+
+---
+
+### 2026-04-27 — Provider safety filters silently corrupt baselines
+
+**What we tried.** Ran Alien Patient baselines across model families. Sonnet was expected to behave consistently with itself across runs.
+
+**What happened.** Sonnet baselines were wildly inconsistent — identical setups produced round-success rates from 0.17 to 0.73. The cause wasn't protocol variance: Anthropic's safety filter was refusing model calls. Two triggers — the role name "specialist", and aggressive procedural verbs in the alien-patient prompts ("tap firmly", "press"). Refused calls returned silently as no-ops, so corrupted runs looked like idle agents rather than failed API calls. Refusals were happening \~15 times per 20-round run before we knew to look.
+
+**Why it matters.** Provider-side safety filters can silently substitute no-ops into a run, and the corruption is indistinguishable from a real behavioral signal. Every baseline before this fix was contaminated — the apparent "Sonnet is weaker than GPT-4" gap was an artifact of refusals, not capability.
+
+**Decision.** Two-pronged fix shipped together: (1) replaced aggressive verbs in scenario prompts with neutral alternatives, audited the rest for similar triggers (the earlier "specialist alpha" rename workaround is subsumed); (2) added a `tenacity`\-based retry around `agent.run()` so refused calls fail loudly and re-attempt instead of producing silent no-ops.
+
+**Result.** Refusal rate down from \~15 to 1–2 per 20-round run. A 50-round stress run completed with zero refusals. Sonnet's baseline now closely tracks GPT-4 — the first cross-family data point supporting the central thesis that **protocol design, not raw model capability, is the dominant variable.**
+
+**Related.** Two principles to carry forward: refusals must be observable (no provider-injected silence), and scenario prompt audits for filter triggers are part of platform hygiene before each cross-model baseline sweep.
 
 ---
 
