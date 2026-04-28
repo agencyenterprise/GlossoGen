@@ -46,7 +46,8 @@ from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import AgentRegistered, SimulationStarted
 from schmidt.port_allocator import find_free_port
 from schmidt.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
-from schmidt.replace_agent import read_replace_manifest, replace_agent_in_run
+from schmidt.replace_agent import replace_agent_in_run
+from schmidt.replace_manifest import read_replace_manifest
 from schmidt.resume_context_writer import write_resume_context_files
 from schmidt.run_config_validation import validate_run_config
 from schmidt.run_repository import RunRepository, claim_run_dir

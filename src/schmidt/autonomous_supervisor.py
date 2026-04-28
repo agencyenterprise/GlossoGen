@@ -209,6 +209,7 @@ class AutonomousSupervisor:
                         )
             start_round = self._resume_state.round_number
             last_injected = self._resume_state.injected_rounds
+            self._event_logger.initialize_round_number(round_number=start_round)
             logger.info(
                 "Resumed autonomous simulation at round %d",
                 self._resume_state.round_number,

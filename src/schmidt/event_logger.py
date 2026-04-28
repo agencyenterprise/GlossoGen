@@ -93,6 +93,17 @@ class EventLogger:
         """The most recent round number, updated automatically when RoundAdvanced is logged."""
         return self._current_round
 
+    def initialize_round_number(self, round_number: int) -> None:
+        """Seed ``current_round`` from a resumed run's rewind state.
+
+        On resume, the next ``RoundAdvanced`` is not logged until the game
+        phase of the resumed round ends, so any tool-call events emitted in
+        the meantime would otherwise be tagged with the default round
+        number. Callers must invoke this once before the runtime starts so
+        every event recorded after resume carries the correct round.
+        """
+        self._current_round = round_number
+
     async def open(self) -> None:
         """Create parent directories if needed and open the log file for writing.
 
