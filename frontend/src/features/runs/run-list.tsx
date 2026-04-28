@@ -8,10 +8,13 @@ import {
   Inbox,
   Loader2,
   Package,
+  Repeat,
   StickyNote,
   Sword,
   Tag,
   Trash2,
+  UserPlus,
+  Users,
   XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -558,29 +561,92 @@ export function RunList() {
                             {splitRunId(run.run_id).run_dir_name}
                           </div>
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right">
-                          <span
-                            className={`text-xs font-medium ${
-                              run.status === "in_progress"
-                                ? "text-green-600 dark:text-green-400"
-                                : run.status === "error"
-                                  ? "text-destructive"
-                                  : "text-muted-foreground"
-                            }`}
-                          >
-                            {STATUS_LABELS[run.status] ?? run.status}
-                          </span>
-                          {run.status === "in_progress" && run.current_round > 0 ? (
-                            <div className="font-mono text-[10px] text-muted-foreground">
-                              {(() => {
-                                const totalRound = run.scenario_config?.round_count;
-                                if (typeof totalRound === "number") {
-                                  return `Round ${run.current_round} / ${totalRound}`;
-                                }
-                                return `Round ${run.current_round}`;
-                              })()}
-                            </div>
-                          ) : null}
+                        <td className="whitespace-nowrap px-3 py-2 text-right align-middle">
+                          {(() => {
+                            const cfg = run.scenario_config ?? {};
+                            const badges: React.ReactNode[] = [];
+                            if (run.replace_agent_source) {
+                              badges.push(
+                                <span
+                                  key="replaced"
+                                  title={`Replaced ${run.replace_agent_source.replaced_agent_id} at round ${run.replace_agent_source.round_start}`}
+                                  className="inline-flex items-center gap-0.5 text-sky-700 dark:text-sky-400"
+                                >
+                                  <Repeat className="h-2.5 w-2.5" />R
+                                  {run.replace_agent_source.round_start}
+                                </span>
+                              );
+                            }
+                            if (cfg.intern_enabled === true) {
+                              const round = cfg.intern_takeover_round;
+                              badges.push(
+                                <span
+                                  key="intern"
+                                  title={
+                                    typeof round === "number"
+                                      ? `Intern takeover at round ${round}`
+                                      : "Intern enabled"
+                                  }
+                                  className="inline-flex items-center gap-0.5 text-amber-700 dark:text-amber-400"
+                                >
+                                  <UserPlus className="h-2.5 w-2.5" />
+                                  {typeof round === "number" ? `R${round}` : ""}
+                                </span>
+                              );
+                            }
+                            if (cfg.two_teams === true) {
+                              const round = cfg.swap_round;
+                              badges.push(
+                                <span
+                                  key="swap"
+                                  title={
+                                    typeof round === "number"
+                                      ? `Observer swap at round ${round}`
+                                      : "Two-team mode"
+                                  }
+                                  className="inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-400"
+                                >
+                                  <Users className="h-2.5 w-2.5" />
+                                  {typeof round === "number" ? `R${round}` : ""}
+                                </span>
+                              );
+                            }
+                            return (
+                              <div className="inline-flex flex-col items-end gap-0">
+                                <span
+                                  className={`text-xs font-medium ${
+                                    run.status === "in_progress"
+                                      ? "text-green-600 dark:text-green-400"
+                                      : run.status === "error"
+                                        ? "text-destructive"
+                                        : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {STATUS_LABELS[run.status] ?? run.status}
+                                </span>
+                                {run.current_round > 0 || badges.length > 0 ? (
+                                  <div className="flex items-center justify-end gap-2 font-mono text-[10px] text-muted-foreground">
+                                    {badges.length > 0 ? (
+                                      <span className="inline-flex items-center gap-2">
+                                        {badges}
+                                      </span>
+                                    ) : null}
+                                    {run.current_round > 0
+                                      ? (() => {
+                                          const totalRound = run.scenario_config?.round_count;
+                                          if (typeof totalRound === "number") {
+                                            return (
+                                              <span>{`Round ${run.current_round} / ${totalRound}`}</span>
+                                            );
+                                          }
+                                          return <span>{`Round ${run.current_round}`}</span>;
+                                        })()
+                                      : null}
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="w-16 py-2 pr-4 text-right">
                           <span className="inline-flex items-center gap-1">

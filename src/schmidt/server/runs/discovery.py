@@ -290,6 +290,26 @@ def _read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:
     )
 
 
+def _resolve_scenario_config(
+    run_dir: Path,
+    base_config: dict[str, Any],
+) -> dict[str, Any]:
+    """Overlay ``replace_config.json`` onto ``base_config`` for replace-agent runs.
+
+    Resumed runs do not re-log ``SimulationStarted``, so the JSONL's first event
+    carries the source run's scenario config — including its original
+    ``round_count``. The replace-agent flow writes the merged config (with
+    ``round_count = round_start + rounds_after_swap``) to ``replace_config.json``
+    in the new run directory; this helper reads that file when present so
+    summaries and downstream consumers see the post-swap round budget.
+    """
+    replace_config_path = run_dir / "replace_config.json"
+    if not replace_config_path.exists():
+        return base_config
+    overlay = orjson.loads(replace_config_path.read_bytes())
+    return {**base_config, **overlay}
+
+
 def _live_fields(
     scenario_name: str,
     timestamp_dir: Path,
@@ -333,7 +353,10 @@ async def _build_summary(
             run_id=run_id,
             scenario_name=cache.scenario_name,
             scenario_description=cache.scenario_description,
-            scenario_config=cache.scenario_config,
+            scenario_config=_resolve_scenario_config(
+                run_dir=timestamp_dir,
+                base_config=cache.scenario_config,
+            ),
             timestamp=run_timestamp,
             total_messages=cache.total_messages,
             total_cost_usd=cache.total_cost_usd,
@@ -361,6 +384,10 @@ async def _build_summary(
     first_event = scan.first_event
     fork_source = _read_fork_source(run_dir=timestamp_dir)
     replace_agent_source = _read_replace_agent_source(run_dir=timestamp_dir)
+    resolved_scenario_config = _resolve_scenario_config(
+        run_dir=timestamp_dir,
+        base_config=first_event.scenario_config,
+    )
     labels, has_note, has_evaluation, eval_in_progress = _live_fields(
         scenario_name=scenario_name,
         timestamp_dir=timestamp_dir,
@@ -375,7 +402,7 @@ async def _build_summary(
             cache=_SummaryCache(
                 scenario_name=first_event.scenario_name,
                 scenario_description=first_event.scenario_description,
-                scenario_config=first_event.scenario_config,
+                scenario_config=resolved_scenario_config,
                 provider=first_event.provider,
                 total_messages=scan.last_event.total_messages,
                 total_cost_usd=scan.last_event.total_cost_usd,
@@ -392,7 +419,7 @@ async def _build_summary(
             run_id=run_id,
             scenario_name=first_event.scenario_name,
             scenario_description=first_event.scenario_description,
-            scenario_config=first_event.scenario_config,
+            scenario_config=resolved_scenario_config,
             timestamp=run_timestamp,
             total_messages=scan.last_event.total_messages,
             total_cost_usd=scan.last_event.total_cost_usd,

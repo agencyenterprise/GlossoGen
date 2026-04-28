@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Annotated, Any, Literal, Union
 from uuid import uuid4
 
-from pydantic import BaseModel, Discriminator, Field
+from pydantic import AliasChoices, BaseModel, Discriminator, Field
 
 from schmidt.models.message import SimulationMessage
 from schmidt.models.tool_definition import ToolCallRequest
@@ -228,7 +228,7 @@ class VeyruStellarReading(BaseModel):
     offset: int
     hold_duration: int
     starting_face: str
-    intensity_level: str
+    intensity_level: str = Field(validation_alias=AliasChoices("intensity_level", "pressure_level"))
 
 
 class VeyruCaseStage(BaseModel):
