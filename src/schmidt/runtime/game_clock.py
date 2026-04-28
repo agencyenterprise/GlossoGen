@@ -63,9 +63,19 @@ class GameClock:
         self._last_message_time = time.monotonic()
 
     def _all_agents_idle(self) -> bool:
-        """True when every agent is blocked on read_notifications with empty queues."""
+        """True when every agent is blocked on read_notifications with empty queues.
+
+        Also requires that no agent has any non-blocking tool call in
+        flight (``active_non_blocking_calls == 0``) — pydantic-ai
+        dispatches parallel tool calls, so a ``read_notifications`` can
+        flip ``is_idle`` to True while the same agent's parallel
+        ``send_message`` is still mid-execution; ending the round in
+        that window drops the in-flight message into the next round.
+        """
         for session in self._agent_sessions.values():
             if not session.is_idle:
+                return False
+            if session.active_non_blocking_calls > 0:
                 return False
             if session.has_pending_notifications():
                 return False

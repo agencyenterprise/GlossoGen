@@ -170,3 +170,4 @@ cython_debug/
 /logs/
 /runs/*
 !/runs/.gitkeep
+/scripts/
