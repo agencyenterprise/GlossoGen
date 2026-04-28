@@ -38,11 +38,14 @@ def _render_metric_selector() -> MetricOption:
     return METRIC_OPTIONS[0]
 
 
-def _series_checkbox_filter(runs: list[BaselineRun]) -> set[str]:
+def _series_checkbox_filter(
+    runs: list[BaselineRun], selected_batch_labels: frozenset[str]
+) -> set[str]:
     """Render one checkbox per distinct series; return the set of selected series keys."""
     counts: dict[str, int] = {}
     for run in runs:
-        counts[run.series_key] = counts.get(run.series_key, 0) + 1
+        key = run.series_key(selected_batch_labels=selected_batch_labels)
+        counts[key] = counts.get(key, 0) + 1
     st.markdown("**Series (model · postmortem variant)**")
     selected: set[str] = set()
     for name in sorted(counts):
@@ -58,7 +61,9 @@ def _series_checkbox_filter(runs: list[BaselineRun]) -> set[str]:
 _CORE_LABEL_PREFIXES = ("baseline", "budget=", "eval:", "postmortem=", "single_team", "two_team")
 
 
-def _batch_label_filter(runs: list[BaselineRun]) -> list[BaselineRun]:
+def _batch_label_filter(
+    runs: list[BaselineRun],
+) -> tuple[list[BaselineRun], frozenset[str]]:
     """Render checkboxes for non-core batch labels; return runs matching all selected labels.
 
     Detects labels that aren't part of the standard baseline metadata (budget,
@@ -73,7 +78,7 @@ def _batch_label_filter(runs: list[BaselineRun]) -> list[BaselineRun]:
                 if label not in (run.model,):
                     batch_labels.add(label)
     if not batch_labels:
-        return runs
+        return runs, frozenset()
     st.markdown("**Batch labels**")
     selected: set[str] = set()
     for label in sorted(batch_labels):
@@ -84,14 +89,9 @@ def _batch_label_filter(runs: list[BaselineRun]) -> list[BaselineRun]:
             key=f"baseline_batch_filter::{label}",
         ):
             selected.add(label)
-    if not selected:
-        return []
-    return [
-        r
-        for r in runs
-        if any(label in r.labels for label in selected)
-        or not any(label in r.labels for label in batch_labels)
-    ]
+    unselected = batch_labels - selected
+    filtered = [r for r in runs if not any(label in r.labels for label in unselected)]
+    return filtered, frozenset(selected)
 
 
 def _series_color_map(series_keys: list[str]) -> dict[str, str]:
@@ -172,12 +172,15 @@ def _build_figure(
     stats: list[BudgetStats],
     colour_by_series: dict[str, str],
     metric: MetricOption,
+    selected_batch_labels: frozenset[str],
 ) -> go.Figure:
     """Assemble the budget → metric figure with mean ± std and replica dots."""
     fig = go.Figure()
     runs_by_series: dict[str, list[BaselineRun]] = {}
     for run in runs:
-        runs_by_series.setdefault(run.series_key, []).append(run)
+        runs_by_series.setdefault(
+            run.series_key(selected_batch_labels=selected_batch_labels), []
+        ).append(run)
     stats_by_series: dict[str, list[BudgetStats]] = {}
     for stat in stats:
         stats_by_series.setdefault(stat.series, []).append(stat)
@@ -240,6 +243,7 @@ def _build_refusal_figure(
     runs: list[BaselineRun],
     stats: list[BudgetStats],
     colour_by_series: dict[str, str],
+    selected_batch_labels: frozenset[str],
 ) -> go.Figure:
     """Dedicated plot for total content-filter refusals per run.
 
@@ -249,7 +253,9 @@ def _build_refusal_figure(
     fig = go.Figure()
     runs_by_series: dict[str, list[BaselineRun]] = {}
     for run in runs:
-        runs_by_series.setdefault(run.series_key, []).append(run)
+        runs_by_series.setdefault(
+            run.series_key(selected_batch_labels=selected_batch_labels), []
+        ).append(run)
     stats_by_series: dict[str, list[BudgetStats]] = {}
     for stat in stats:
         stats_by_series.setdefault(stat.series, []).append(stat)
@@ -293,6 +299,7 @@ def _build_refusal_figure(
 def _render_refusal_section(
     runs: list[BaselineRun],
     colour_by_series: dict[str, str],
+    selected_batch_labels: frozenset[str],
 ) -> None:
     """Render the dedicated Content-filter refusal chart + stats table."""
     st.markdown("---")
@@ -303,8 +310,17 @@ def _render_refusal_section(
         "Separate chart because magnitude (dozens to hundreds) doesn't share a Y "
         "axis with the round-count metrics above."
     )
-    stats = aggregate_by_budget(runs=runs, value_of=REFUSAL_METRIC.extract)
-    fig = _build_refusal_figure(runs=runs, stats=stats, colour_by_series=colour_by_series)
+    stats = aggregate_by_budget(
+        runs=runs,
+        value_of=REFUSAL_METRIC.extract,
+        selected_batch_labels=selected_batch_labels,
+    )
+    fig = _build_refusal_figure(
+        runs=runs,
+        stats=stats,
+        colour_by_series=colour_by_series,
+        selected_batch_labels=selected_batch_labels,
+    )
     st.plotly_chart(fig, width="stretch", key="baseline_refusal_chart")
     rows = [
         {
@@ -321,16 +337,27 @@ def _render_refusal_section(
     st.dataframe(rows, width="stretch", hide_index=True)
 
 
-def _render_included_runs(runs: list[BaselineRun], metric: MetricOption) -> None:
+def _render_included_runs(
+    runs: list[BaselineRun],
+    metric: MetricOption,
+    selected_batch_labels: frozenset[str],
+) -> None:
     """Per-replica audit listing inside an expander."""
     rows = [
         {
-            "series": r.series_key,
+            "series": r.series_key(selected_batch_labels=selected_batch_labels),
             "budget": r.budget,
             metric.display_name: round(metric.extract(run=r), 4),
             "run_id": r.run_id,
         }
-        for r in sorted(runs, key=lambda r: (r.series_key, r.budget, r.run_id))
+        for r in sorted(
+            runs,
+            key=lambda r: (
+                r.series_key(selected_batch_labels=selected_batch_labels),
+                r.budget,
+                r.run_id,
+            ),
+        )
     ]
     with st.expander(f"Included runs ({len(rows)})", expanded=False):
         st.dataframe(rows, width="stretch", hide_index=True)
@@ -346,28 +373,47 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         )
         return
     metric = _render_metric_selector()
-    batch_filtered = _batch_label_filter(runs=all_baseline)
+    batch_filtered, selected_batch_labels = _batch_label_filter(runs=all_baseline)
     if not batch_filtered:
         st.info("Select at least one batch label.")
         return
-    selected_series = _series_checkbox_filter(runs=batch_filtered)
+    selected_series = _series_checkbox_filter(
+        runs=batch_filtered, selected_batch_labels=selected_batch_labels
+    )
     if not selected_series:
         st.info("Select at least one series.")
         return
-    filtered = [run for run in batch_filtered if run.series_key in selected_series]
+    filtered = [
+        run
+        for run in batch_filtered
+        if run.series_key(selected_batch_labels=selected_batch_labels) in selected_series
+    ]
     if not filtered:
         st.info("No baseline runs for the selected series.")
         return
-    series_ordered = sorted({r.series_key for r in filtered})
+    series_ordered = sorted(
+        {r.series_key(selected_batch_labels=selected_batch_labels) for r in filtered}
+    )
     colour_by_series = _series_color_map(series_keys=series_ordered)
-    stats = aggregate_by_budget(runs=filtered, value_of=metric.extract)
+    stats = aggregate_by_budget(
+        runs=filtered,
+        value_of=metric.extract,
+        selected_batch_labels=selected_batch_labels,
+    )
     fig = _build_figure(
         runs=filtered,
         stats=stats,
         colour_by_series=colour_by_series,
         metric=metric,
+        selected_batch_labels=selected_batch_labels,
     )
     st.plotly_chart(fig, width="stretch", key="baseline_chart")
     _render_stats_table(stats=stats, metric=metric)
-    _render_refusal_section(runs=filtered, colour_by_series=colour_by_series)
-    _render_included_runs(runs=filtered, metric=metric)
+    _render_refusal_section(
+        runs=filtered,
+        colour_by_series=colour_by_series,
+        selected_batch_labels=selected_batch_labels,
+    )
+    _render_included_runs(
+        runs=filtered, metric=metric, selected_batch_labels=selected_batch_labels
+    )
