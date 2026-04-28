@@ -28,6 +28,13 @@ _PRICING_TABLE: dict[str, TokenPricing] = {
     # Anthropic — keys use dashes (matching actual API model IDs).
     # Longer prefixes first so "claude-opus-4-6-*" doesn't accidentally
     # match the cheaper "claude-opus-4" entry.
+    "claude-opus-4-7": TokenPricing(
+        provider="anthropic",
+        input_per_mtok=5.0,
+        output_per_mtok=25.0,
+        cache_read_per_mtok=0.50,
+        cache_write_per_mtok=6.25,
+    ),
     "claude-opus-4-6": TokenPricing(
         provider="anthropic",
         input_per_mtok=5.0,
