@@ -851,7 +851,7 @@ export function ChatPane({
                                       "[&_em]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[11px]"
                                     )}
                                   >
-                                    {displayText}
+                                    {displayText.replace(/_/g, "\\_")}
                                   </ProseMarkdown>
                                 ) : null}
                                 {!entry.is_reasoning &&
