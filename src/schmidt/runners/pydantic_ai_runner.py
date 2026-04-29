@@ -9,9 +9,9 @@ reasoning text and detecting tool call results.
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterable
+from collections.abc import AsyncIterable, Callable
 
-from pydantic_ai import Agent
+from pydantic_ai import Agent, _agent_graph
 from pydantic_ai.agent import AgentRunResult as PydanticAIAgentRunResult
 from pydantic_ai.agent.abstract import EventStreamHandler
 from pydantic_ai.mcp import MCPServerStreamableHTTP
@@ -32,6 +32,7 @@ from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage, UsageLimits
+from pydantic_graph import End
 from tenacity import RetryCallState, retry, stop_after_attempt
 
 from schmidt.event_bus import EventBus
@@ -83,15 +84,34 @@ async def _run_agent_call(
     message_history: list[ModelMessage] | None,
     event_stream_handler: EventStreamHandler[None],
     max_tokens: int,
+    record_usage: Callable[[RunUsage], None],
 ) -> PydanticAIAgentRunResult[str]:
-    """Call agent.run() with tenacity retries on any exception."""
-    return await agent.run(
+    """Drive ``agent.iter`` so cumulative usage is captured even on cancellation.
+
+    The supplied ``record_usage`` callback is invoked exactly once per call —
+    on success, error, or cancellation — with the cumulative ``RunUsage`` for
+    that attempt. This lets the caller flush a usage event for cycles that
+    never reach a clean completion (e.g. when the supervisor cancels the
+    agent task at scenario end).
+    """
+    async with agent.iter(
         user_prompt=prompt,
         message_history=message_history,
-        event_stream_handler=event_stream_handler,
         usage_limits=UsageLimits(request_limit=None),
         model_settings=ModelSettings(max_tokens=max_tokens),
-    )
+    ) as agent_run:
+        try:
+            node = agent_run.next_node
+            while not isinstance(node, End):
+                if Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
+                    run_ctx = _agent_graph.build_run_context(agent_run.ctx)
+                    async with node.stream(agent_run.ctx) as stream:
+                        await event_stream_handler(run_ctx, stream)
+                node = await agent_run.next(node)
+            assert agent_run.result is not None
+            return agent_run.result
+        finally:
+            record_usage(agent_run.usage())
 
 
 def _log_task_exception(task: asyncio.Task[None]) -> None:
@@ -206,6 +226,8 @@ class PydanticAIRunner(AgentRunner):
             prompt = INITIAL_PROMPT
         bus = self._event_bus
         all_background_tasks: list[asyncio.Task[None]] = []
+        cycle_pricing = find_pricing(model=agent_config.model)
+        last_recorded_usage: RunUsage = RunUsage()
 
         try:
             async with mcp_server:
@@ -231,6 +253,18 @@ class PydanticAIRunner(AgentRunner):
                                 round_number=event_logger.current_round,
                             )
 
+                    last_recorded_usage = RunUsage()
+
+                    def _record_usage(snapshot: RunUsage) -> None:
+                        """Capture the per-cycle cumulative usage into the outer scope.
+
+                        Called from ``_run_agent_call``'s finally block so cancellation
+                        and errors still surface the partial usage that was accrued
+                        before termination.
+                        """
+                        nonlocal last_recorded_usage
+                        last_recorded_usage = snapshot
+
                     logger.debug(
                         "Agent %s starting cycle %d with prompt: %.100s",
                         agent_id,
@@ -238,6 +272,8 @@ class PydanticAIRunner(AgentRunner):
                         prompt,
                     )
 
+                    cycle_succeeded = False
+                    result: PydanticAIAgentRunResult[str] | None = None
                     try:
                         result = await _run_agent_call(
                             agent=agent,
@@ -245,7 +281,9 @@ class PydanticAIRunner(AgentRunner):
                             message_history=message_history,
                             event_stream_handler=_handle_events,
                             max_tokens=agent_config.max_tokens,
+                            record_usage=_record_usage,
                         )
+                        cycle_succeeded = True
                     except Exception as exc:
                         logger.exception(
                             "Agent %s run cycle %d failed, retrying",
@@ -263,6 +301,41 @@ class PydanticAIRunner(AgentRunner):
                                 )
                             )
                         )
+                    finally:
+                        # Always accumulate whatever usage was captured during this
+                        # attempt — successful, errored, or cancelled — so cost is
+                        # tracked even when the agent task is killed mid-cycle by
+                        # the supervisor at scenario end.
+                        cycle_usage = last_recorded_usage
+                        total_input_tokens += cycle_usage.input_tokens
+                        total_output_tokens += cycle_usage.output_tokens
+                        total_cache_read_tokens += cycle_usage.cache_read_tokens
+                        total_cache_write_tokens += cycle_usage.cache_write_tokens
+                        if cycle_pricing is not None:
+                            # pydantic-ai (via genai-prices) includes cache tokens
+                            # in input_tokens, so subtract them before applying
+                            # the base input rate to avoid double-counting.
+                            non_cached_input = max(
+                                0,
+                                total_input_tokens
+                                - total_cache_read_tokens
+                                - total_cache_write_tokens,
+                            )
+                            cumulative_cost = (
+                                non_cached_input * cycle_pricing.input_per_mtok
+                                + total_output_tokens * cycle_pricing.output_per_mtok
+                                + total_cache_read_tokens * cycle_pricing.cache_read_per_mtok
+                                + total_cache_write_tokens * cycle_pricing.cache_write_per_mtok
+                            ) / 1_000_000
+                            bus.publish(
+                                event=AgentCostUpdated(
+                                    agent_id=agent_id,
+                                    cumulative_cost_usd=cumulative_cost,
+                                ).model_dump(mode="json")
+                            )
+                            cost_tracker[agent_id] = cumulative_cost
+
+                    if not cycle_succeeded or result is None:
                         all_background_tasks.extend(state.background_tasks)
                         total_turns += 1
                         prompt = CONTINUE_PROMPT
@@ -271,45 +344,16 @@ class PydanticAIRunner(AgentRunner):
                     message_history = result.all_messages()
                     total_turns += 1
 
-                    usage: RunUsage = result.usage()
-                    total_input_tokens += usage.input_tokens
-                    total_output_tokens += usage.output_tokens
-                    total_cache_read_tokens += usage.cache_read_tokens
-                    total_cache_write_tokens += usage.cache_write_tokens
-
                     logger.info(
                         "Agent %s cycle %d complete: in=%d out=%d "
                         "cache_read=%d cache_write=%d tokens",
                         agent_id,
                         total_turns,
-                        usage.input_tokens,
-                        usage.output_tokens,
-                        usage.cache_read_tokens,
-                        usage.cache_write_tokens,
+                        cycle_usage.input_tokens,
+                        cycle_usage.output_tokens,
+                        cycle_usage.cache_read_tokens,
+                        cycle_usage.cache_write_tokens,
                     )
-
-                    cycle_pricing = find_pricing(model=agent_config.model)
-                    if cycle_pricing is not None:
-                        # pydantic-ai (via genai-prices) includes cache tokens
-                        # in input_tokens, so subtract them before applying
-                        # the base input rate to avoid double-counting.
-                        non_cached_input = max(
-                            0,
-                            total_input_tokens - total_cache_read_tokens - total_cache_write_tokens,
-                        )
-                        cumulative_cost = (
-                            non_cached_input * cycle_pricing.input_per_mtok
-                            + total_output_tokens * cycle_pricing.output_per_mtok
-                            + total_cache_read_tokens * cycle_pricing.cache_read_per_mtok
-                            + total_cache_write_tokens * cycle_pricing.cache_write_per_mtok
-                        ) / 1_000_000
-                        bus.publish(
-                            event=AgentCostUpdated(
-                                agent_id=agent_id,
-                                cumulative_cost_usd=cumulative_cost,
-                            ).model_dump(mode="json")
-                        )
-                        cost_tracker[agent_id] = cumulative_cost
 
                     # Log any remaining reasoning + tool calls from the final response
                     self._flush_response_block(
@@ -319,10 +363,10 @@ class PydanticAIRunner(AgentRunner):
                         stop_reason="end_turn",
                         round_number=event_logger.current_round,
                         usage=TokenUsage(
-                            input_tokens=usage.input_tokens,
-                            output_tokens=usage.output_tokens,
-                            cache_read_input_tokens=usage.cache_read_tokens,
-                            cache_creation_input_tokens=usage.cache_write_tokens,
+                            input_tokens=cycle_usage.input_tokens,
+                            output_tokens=cycle_usage.output_tokens,
+                            cache_read_input_tokens=cycle_usage.cache_read_tokens,
+                            cache_creation_input_tokens=cycle_usage.cache_write_tokens,
                         ),
                     )
 

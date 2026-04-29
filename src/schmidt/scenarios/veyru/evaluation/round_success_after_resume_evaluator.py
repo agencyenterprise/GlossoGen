@@ -10,6 +10,13 @@ under-performed the agents it replaced. Runs without a manifest are
 not applicable: the evaluator emits a ``FAIL`` verdict with an
 explanatory evidence string (matching the convention used by
 ``ProtocolLearnedAfterSwapEvaluator``).
+
+Evidence format contract — these two lines are parsed by the Streamlit
+resume tab (``analysis/results_viewer/resume_data.py``). Keep the
+prefixes and the ``W/T (P%)`` shape stable when editing this module:
+
+    Resumed: <won>/<total> (<pct>%) stabilized in post-resume rounds (...)
+    Source <source_run_id> over the same window: <won>/<total> (<pct>%).
 """
 
 import logging

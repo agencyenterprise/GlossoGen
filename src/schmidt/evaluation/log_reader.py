@@ -21,18 +21,27 @@ logger = logging.getLogger(__name__)
 async def load_events(log_path: Path) -> list[SimulationEvent]:
     """Read a JSONL log file and parse each line into a typed SimulationEvent.
 
-    For old JSONL files where ``MessageSent``, ``LLMResponseReceived``, and
-    ``ToolResultReceived`` lack ``round_number``, the field is backfilled from
-    the most recent ``RoundAdvanced`` event so every consumer receives correct
-    data without needing fallback logic.
+    Older JSONL files were written before ``round_number`` was promoted to
+    ``EventBase``. This loader backfills the field for every event that
+    lacks it, tracking the most recent ``RoundAdvanced`` while walking the
+    log so each event receives the round it was emitted in. Lifecycle
+    events emitted before round 1 (``simulation_started``,
+    ``agent_registered``) get ``round_number=0``.
     """
     events: list[SimulationEvent] = []
+    running_round = 0
     async with aiofiles.open(log_path, mode="rb") as f:
         async for line in f:
             line = line.strip()
             if not line:
                 continue
             raw = orjson.loads(line)
+            if raw.get("event_type") == "round_advanced":
+                advanced = raw.get("round_number")
+                if isinstance(advanced, int):
+                    running_round = advanced
+            if "round_number" not in raw:
+                raw["round_number"] = running_round
             event = parse_event(raw=raw)
             events.append(event)
     logger.info("Loaded %d events from %s", len(events), log_path)

@@ -55,7 +55,7 @@ from schmidt.server.runs.models import (
     VeyruStellarReadingDTO,
 )
 from schmidt.stream_manifest import delete_manifest, read_manifest
-from schmidt.token_pricing import find_pricing
+from schmidt.token_pricing import TokenPricing, find_pricing
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +185,10 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     """Parse all events from a JSONL log and assemble a RunDetailResponse."""
     events: list[SimulationEvent] = await load_events(log_path=log_path)
 
+    run_dir = log_path.parent
+    fork_source = _read_fork_source(run_dir=run_dir)
+    replace_agent_source = _read_replace_agent_source(run_dir=run_dir)
+
     run_id = ""
     scenario_name = ""
     scenario_description = ""
@@ -212,6 +216,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     total_output_tokens = 0
     total_cache_read_tokens = 0
     total_cache_write_tokens = 0
+    pricing_by_agent: dict[str, TokenPricing | None] = {}
+    cost_from_tokens = 0.0
     swap_cleared_round: int | None = None
     swap_cleared_timestamp: datetime | None = None
     intern_join_round: int | None = None
@@ -239,6 +245,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 provider=event.provider,
                 system_prompt=event.system_prompt,
             )
+            pricing_by_agent[event.agent_id] = find_pricing(model=event.model)
 
         elif isinstance(event, ToolCallInvoked):
             total_messages += 1
@@ -268,6 +275,23 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             total_output_tokens += event.usage.output_tokens
             total_cache_read_tokens += event.usage.cache_read_input_tokens
             total_cache_write_tokens += event.usage.cache_creation_input_tokens
+
+            event_pricing = pricing_by_agent.get(event.agent_id)
+            if event_pricing is not None:
+                non_cached_input = max(
+                    0,
+                    event.usage.input_tokens
+                    - event.usage.cache_read_input_tokens
+                    - event.usage.cache_creation_input_tokens,
+                )
+                cost_from_tokens += (
+                    non_cached_input * event_pricing.input_per_mtok
+                    + event.usage.output_tokens * event_pricing.output_per_mtok
+                    + event.usage.cache_read_input_tokens
+                    * event_pricing.cache_read_per_mtok
+                    + event.usage.cache_creation_input_tokens
+                    * event_pricing.cache_write_per_mtok
+                ) / 1_000_000
 
             # Create reasoning entry for text content
             if event.text is not None and event.text.strip():
@@ -420,29 +444,19 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
 
     agents = list(agents_by_id.values())
 
-    # Compute cost from token usage when the simulation hasn't ended yet
-    # (or when the ended event reported zero cost).
-    if total_cost_usd <= 0 and total_input_tokens > 0:
-        model = agents[0].model if agents else "unknown"
-        pricing = find_pricing(model=model)
-        if pricing is not None:
-            non_cached_input = max(
-                0,
-                total_input_tokens - total_cache_read_tokens - total_cache_write_tokens,
-            )
-            total_cost_usd = (
-                non_cached_input * pricing.input_per_mtok
-                + total_output_tokens * pricing.output_per_mtok
-                + total_cache_read_tokens * pricing.cache_read_per_mtok
-                + total_cache_write_tokens * pricing.cache_write_per_mtok
-            ) / 1_000_000
+    # When the simulation hasn't logged a SimulationEnded yet (or it logged
+    # zero cost), fall back to the per-agent token-based cost we accumulated
+    # during the walk. For replace-agent / fork runs the inherited source
+    # LLM events have empty `usage` (their token totals only existed in the
+    # source's SimulationEnded, which sits past the rewind anchor), so they
+    # contribute zero — only post-resume agents' costs are reflected.
+    if total_cost_usd <= 0:
+        total_cost_usd = cost_from_tokens
 
     _link_reasoning_to_channels(reasoning=reasoning, messages=messages)
 
     if timestamp is None:
         raise ValueError(f"No SimulationStarted event found in {log_path}")
-
-    run_dir = log_path.parent
 
     if status is None:
         manifest = read_manifest(run_dir=run_dir)
@@ -462,8 +476,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     evaluation_in_progress = eval_manifest is not None
     has_eval_log_file = (run_dir / "eval_stdout.log").exists()
 
-    fork_source = _read_fork_source(run_dir=run_dir)
-    replace_agent_source = _read_replace_agent_source(run_dir=run_dir)
     swap_point = _build_swap_point(
         swap_round=swap_cleared_round,
         swap_timestamp=swap_cleared_timestamp,

@@ -3,6 +3,19 @@
 Given a target ``MessageSent`` event, replays the event log up to that point
 and extracts everything needed to resume the simulation: channel messages,
 current round, delivered injections, and agent/scenario metadata.
+
+State reconstruction (channels, injections, current round) is always
+timestamp-anchored: every event with ``timestamp <= target_timestamp``
+is replayed, including the boundary ``RoundAdvanced`` whose timestamp
+equals the anchor — so the resumed simulation knows it has just entered
+``round_start``. Per-agent history reconstruction additionally accepts
+a ``cutoff_round`` (set by the replace-agent flow): individual tool
+calls are kept iff their own ``ToolCallInvoked.round_number <
+cutoff_round``, which preserves pre-anchor calls whose parent
+``LLMResponseReceived`` was logged after the anchor because the LLM
+cycle straddled a round boundary. Fork and ``--resume`` callers pass
+``cutoff_round=None`` and fall back to the same timestamp filter at
+the per-call level.
 """
 
 import logging
@@ -76,12 +89,15 @@ def build_rewind_state(
     target_message_id: str,
     message_edits: dict[str, str],
     agent_filters: dict[str, AgentHistoryFilter],
+    cutoff_round: int | None,
 ) -> RewindState:
     """Build state at a specific message, optionally applying text edits.
 
     ``agent_filters`` lets callers customize each agent's reconstructed
     pydantic-ai history. Agents not in the dict get the default
-    pass-through filter (full history).
+    pass-through filter (full history). ``cutoff_round`` is forwarded
+    to the state walk and history builder; pass ``None`` for fork /
+    ``--resume`` flows that anchor on a message timestamp.
 
     Raises:
         ValueError: If no ``MessageSent`` event with the target ID is found.
@@ -93,6 +109,7 @@ def build_rewind_state(
     return _build_rewind_state_at_timestamp(
         events=events,
         target_timestamp=target_timestamp,
+        cutoff_round=cutoff_round,
         message_edits=message_edits,
         agent_filters=agent_filters,
     )
@@ -101,6 +118,7 @@ def build_rewind_state(
 def build_rewind_state_at_event(
     events: list[SimulationEvent],
     target_event_id: str,
+    cutoff_round: int | None,
     agent_filters: dict[str, AgentHistoryFilter],
 ) -> RewindState:
     """Build rewind state targeting any event by ``event_id``.
@@ -108,7 +126,8 @@ def build_rewind_state_at_event(
     Used by the replace-agent resume path to anchor at a ``RoundAdvanced``
     event (no associated message_id). The walk includes the target event
     itself, so the resulting ``round_number`` reflects the round that has
-    just started at the anchor.
+    just started at the anchor. ``cutoff_round`` selects round-based
+    filtering when set.
 
     Raises ``ValueError`` if no event with ``target_event_id`` exists.
     """
@@ -119,6 +138,7 @@ def build_rewind_state_at_event(
     return _build_rewind_state_at_timestamp(
         events=events,
         target_timestamp=target_timestamp,
+        cutoff_round=cutoff_round,
         message_edits={},
         agent_filters=agent_filters,
     )
@@ -127,10 +147,18 @@ def build_rewind_state_at_event(
 def _build_rewind_state_at_timestamp(
     events: list[SimulationEvent],
     target_timestamp: datetime,
+    cutoff_round: int | None,
     message_edits: dict[str, str],
     agent_filters: dict[str, AgentHistoryFilter],
 ) -> RewindState:
-    """Walk ``events`` up to ``target_timestamp`` and assemble a ``RewindState``."""
+    """Walk ``events`` up to the timestamp anchor and assemble a ``RewindState``.
+
+    The state walk is timestamp-anchored regardless of ``cutoff_round``
+    so the boundary ``RoundAdvanced`` (whose timestamp is the anchor) is
+    included and the resumed run picks up at the correct round.
+    ``cutoff_round`` is forwarded to the per-agent history builder for
+    its per-tool-call round filter.
+    """
     round_number = 0
     messages_by_channel: dict[str, list[SimulationMessage]] = {}
     injected_rounds: dict[str, int] = {}
@@ -184,6 +212,7 @@ def _build_rewind_state_at_timestamp(
             agent_id=reg.agent_id,
             system_prompt=system_prompt,
             target_timestamp=target_timestamp,
+            cutoff_round=cutoff_round,
             tool_calls_only=history_filter.tool_calls_only,
             blocked_channel_ids=history_filter.blocked_channel_ids,
         )
@@ -216,7 +245,9 @@ def build_rewind_state_from_last_message(
     """Build rewind state targeting the last MessageSent event in the log.
 
     Used by ``--resume`` in autonomous mode to pick up from where the
-    simulation left off. No edits are applied.
+    simulation left off. No edits are applied. Falls back to the
+    timestamp-based cutoff because ``--resume`` does not anchor on a
+    round boundary.
 
     Raises ``ValueError`` if no ``MessageSent`` event exists in the log.
     """
@@ -233,6 +264,7 @@ def build_rewind_state_from_last_message(
         target_message_id=last_message_id,
         message_edits={},
         agent_filters=agent_filters,
+        cutoff_round=None,
     )
 
 

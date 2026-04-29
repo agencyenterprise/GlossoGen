@@ -27,10 +27,18 @@ class TokenUsage(BaseModel):
 
 
 class EventBase(BaseModel):
-    """Base model for all simulation events, providing a unique ID and UTC timestamp."""
+    """Base model for all simulation events, providing a unique ID, UTC timestamp, and round.
+
+    ``round_number`` is the round in which the event occurred. Lifecycle
+    events that fire before round 1 (``SimulationStarted``,
+    ``AgentRegistered``) carry ``round_number=0`` as a sentinel; every
+    other event carries the round it was emitted in. Subclasses do not
+    re-declare this field.
+    """
 
     event_id: str = Field(default_factory=lambda: str(uuid4()))
     timestamp: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
+    round_number: int
 
 
 class SimulationStarted(EventBase):
@@ -75,7 +83,6 @@ class MessageSent(EventBase):
 
     event_type: Literal["message_sent"] = "message_sent"
     message: SimulationMessage
-    round_number: int
     token_count: int
 
 
@@ -91,7 +98,6 @@ class LLMResponseReceived(EventBase):
     tool_calls: list[ToolCallRequest]
     stop_reason: str
     usage: TokenUsage
-    round_number: int
 
 
 class ToolCallInvoked(EventBase):
@@ -105,7 +111,6 @@ class ToolCallInvoked(EventBase):
     call_id: str
     tool_name: str
     arguments: dict[str, Any]
-    round_number: int
 
 
 class ToolResultReceived(EventBase):
@@ -117,14 +122,12 @@ class ToolResultReceived(EventBase):
     call_id: str
     arguments: dict[str, Any]
     result: str
-    round_number: int
 
 
 class RoundAdvanced(EventBase):
     """Emitted when the game clock advances to a new round in autonomous mode."""
 
     event_type: Literal["round_advanced"] = "round_advanced"
-    round_number: int
     trigger: str
 
 
@@ -139,7 +142,6 @@ class AgentRunCycleFailed(EventBase):
 
     event_type: Literal["agent_run_cycle_failed"] = "agent_run_cycle_failed"
     agent_id: str
-    round_number: int
     cycle: int
     error_type: str
     message: str
@@ -155,7 +157,6 @@ class RoundEnded(EventBase):
     """
 
     event_type: Literal["round_ended"] = "round_ended"
-    round_number: int
     trigger: str
 
 
@@ -164,7 +165,6 @@ class InjectionDelivered(EventBase):
 
     event_type: Literal["injection_delivered"] = "injection_delivered"
     agent_id: str
-    round_number: int
     text: str
 
 
@@ -183,7 +183,6 @@ class WorldEventDelivered(EventBase):
 
     event_type: Literal["world_event_delivered"] = "world_event_delivered"
     agent_id: str
-    round_number: int
     text: str
 
 
@@ -191,7 +190,6 @@ class PostmortemStarted(EventBase):
     """Emitted when the game clock enters a postmortem discussion phase after a round."""
 
     event_type: Literal["postmortem_started"] = "postmortem_started"
-    round_number: int
 
 
 class ChannelHistoryCleared(EventBase):
@@ -199,7 +197,6 @@ class ChannelHistoryCleared(EventBase):
 
     event_type: Literal["channel_history_cleared"] = "channel_history_cleared"
     channel_id: str
-    round_number: int
     reason: str
 
 
@@ -208,7 +205,6 @@ class ChannelMembershipChanged(EventBase):
 
     event_type: Literal["channel_membership_changed"] = "channel_membership_changed"
     channel_id: str
-    round_number: int
     member_agent_ids: list[str]
     reason: str
 
@@ -249,7 +245,6 @@ class VeyruCaseStarted(EventBase):
     """
 
     event_type: Literal["veyru_case_started"] = "veyru_case_started"
-    round_number: int
     case_number: int
     failure_name: str
     time_budget_seconds: int
@@ -269,7 +264,6 @@ class VeyruStabilizationJudged(EventBase):
 
     event_type: Literal["veyru_stabilization_judged"] = "veyru_stabilization_judged"
     agent_id: str
-    round_number: int
     expected_actions: str
     judge_match: bool
     judge_explanation: str

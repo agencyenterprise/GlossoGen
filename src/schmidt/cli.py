@@ -403,6 +403,7 @@ class _ReplaceManifestInfo(NamedTuple):
     visible_channels: list[str]
     blocked_channel_ids: frozenset[str]
     target_event_id: str
+    round_start: int
 
 
 def _read_replace_manifest(run_dir: Path) -> _ReplaceManifestInfo | None:
@@ -415,6 +416,7 @@ def _read_replace_manifest(run_dir: Path) -> _ReplaceManifestInfo | None:
         visible_channels=list(manifest.channels_with_visible_history),
         blocked_channel_ids=frozenset(manifest.blocked_tool_call_channels),
         target_event_id=manifest.target_event_id,
+        round_start=manifest.round_start,
     )
 
 
@@ -466,6 +468,7 @@ async def _run_simulation(
             base_state = build_rewind_state_at_event(
                 events=events,
                 target_event_id=replace_info.target_event_id,
+                cutoff_round=replace_info.round_start,
                 agent_filters=agent_filters,
             )
             resume_state = base_state._replace(

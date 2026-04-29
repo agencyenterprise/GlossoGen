@@ -19,7 +19,14 @@ from analysis.results_viewer.baseline_data import (
     list_baseline_runs,
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun
-from analysis.results_viewer.timeline_plot import palette_color_for_index
+from analysis.results_viewer.series_plot import (
+    SeriesStats,
+    add_mean_trace,
+    add_replica_trace,
+    batch_label_filter,
+    jittered_x,
+    series_color_map,
+)
 
 
 def _render_metric_selector() -> MetricOption:
@@ -58,113 +65,40 @@ def _series_checkbox_filter(
     return selected
 
 
-_CORE_LABEL_PREFIXES = ("baseline", "budget=", "eval:", "postmortem=", "single_team", "two_team")
-
-
-def _batch_label_filter(
+def _replica_xs_ys_hover(
     runs: list[BaselineRun],
-) -> tuple[list[BaselineRun], frozenset[str]]:
-    """Render checkboxes for non-core batch labels; return runs matching all selected labels.
-
-    Detects labels that aren't part of the standard baseline metadata (budget,
-    eval results, model, postmortem variant, team structure) and surfaces them
-    as opt-in checkboxes. Runs that carry none of the detected batch labels are
-    always included — they predate sub-batch tagging.
-    """
-    batch_labels: set[str] = set()
-    for run in runs:
-        for label in run.labels:
-            if not any(label.startswith(prefix) for prefix in _CORE_LABEL_PREFIXES):
-                if label not in (run.model,):
-                    batch_labels.add(label)
-    if not batch_labels:
-        return runs, frozenset()
-    st.markdown("**Batch labels**")
-    selected: set[str] = set()
-    for label in sorted(batch_labels):
-        count = sum(1 for r in runs if label in r.labels)
-        if st.checkbox(
-            label=f"{label} ({count})",
-            value=True,
-            key=f"baseline_batch_filter::{label}",
-        ):
-            selected.add(label)
-    unselected = batch_labels - selected
-    filtered = [r for r in runs if not any(label in r.labels for label in unselected)]
-    return filtered, frozenset(selected)
-
-
-def _series_color_map(series_keys: list[str]) -> dict[str, str]:
-    """Assign a palette colour to each series, stable across reruns."""
-    return {key: palette_color_for_index(index=i) for i, key in enumerate(series_keys)}
-
-
-def _add_replica_trace(
-    fig: go.Figure,
     series: str,
-    runs: list[BaselineRun],
-    colour: str,
     metric: MetricOption,
-) -> None:
-    """Scatter the individual replicas with light X-jitter so overlapping points resolve."""
+) -> tuple[list[float], list[float], list[str]]:
+    """Compute jittered X, Y, and hover text per replica for ``add_replica_trace``."""
     xs: list[float] = []
     ys: list[float] = []
     hover: list[str] = []
     for index, run in enumerate(runs):
-        jitter = 1.0 + ((index % 5) - 2) * 0.01
         value = metric.extract(run=run)
-        xs.append(run.budget * jitter)
+        xs.append(jittered_x(base_x=run.budget, index=index))
         ys.append(value)
         hover.append(
             f"{run.run_id}<br>{series}<br>budget={run.budget}<br>"
             f"{metric.display_name}={value:g}"
         )
-    fig.add_trace(
-        go.Scatter(
-            x=xs,
-            y=ys,
-            mode="markers",
-            name=f"{series} · replicas",
-            marker=dict(color=colour, size=7, opacity=0.35),
-            hovertext=hover,
-            hoverinfo="text",
-            showlegend=False,
-        )
-    )
+    return xs, ys, hover
 
 
-def _add_mean_trace(
-    fig: go.Figure,
-    series: str,
-    stats: list[BudgetStats],
-    colour: str,
-    metric: MetricOption,
-) -> None:
-    """Mean line with std error bars for a single series."""
-    stats_sorted = sorted(stats, key=lambda s: s.budget)
-    fig.add_trace(
-        go.Scatter(
-            x=[s.budget for s in stats_sorted],
-            y=[s.mean for s in stats_sorted],
-            error_y=dict(
-                type="data",
-                array=[s.std for s in stats_sorted],
-                visible=True,
-                thickness=1.5,
-                width=6,
-                color=colour,
-            ),
-            mode="lines+markers",
-            name=series,
-            line=dict(color=colour, width=2.5),
-            marker=dict(color=colour, size=10, symbol="circle"),
-            hovertemplate=(
-                f"series=%{{text}}<br>budget=%{{x}}<br>{metric.display_name} "
-                "mean=%{y:g}<extra></extra>"
-            ),
-            text=[series] * len(stats_sorted),
+def _budget_stats_to_series_stats(stats: list[BudgetStats]) -> list[SeriesStats]:
+    """Convert ``BudgetStats`` rows into the shared ``SeriesStats`` shape."""
+    return [
+        SeriesStats(
+            series=s.series,
+            x_value=float(s.budget),
+            n=s.n,
+            mean=s.mean,
+            std=s.std,
+            min_value=s.min_value,
+            max_value=s.max_value,
         )
-    )
+        for s in stats
+    ]
 
 
 def _build_figure(
@@ -173,8 +107,15 @@ def _build_figure(
     colour_by_series: dict[str, str],
     metric: MetricOption,
     selected_batch_labels: frozenset[str],
+    y_max: float,
+    x_tickvals: list[int],
 ) -> go.Figure:
-    """Assemble the budget → metric figure with mean ± std and replica dots."""
+    """Assemble the budget → metric figure with mean ± std and replica dots.
+
+    ``y_max`` and ``x_tickvals`` are passed in so the axes stay fixed when
+    the user toggles series/batch filters; recomputing them from ``runs``
+    would shrink the chart whenever a series is hidden.
+    """
     fig = go.Figure()
     runs_by_series: dict[str, list[BaselineRun]] = {}
     for run in runs:
@@ -185,29 +126,25 @@ def _build_figure(
     for stat in stats:
         stats_by_series.setdefault(stat.series, []).append(stat)
     for series, colour in colour_by_series.items():
-        _add_replica_trace(
+        xs, ys, hover = _replica_xs_ys_hover(
+            runs=runs_by_series[series], series=series, metric=metric
+        )
+        add_replica_trace(fig=fig, series=series, xs=xs, ys=ys, hover_texts=hover, colour=colour)
+        add_mean_trace(
             fig=fig,
             series=series,
-            runs=runs_by_series[series],
+            stats=_budget_stats_to_series_stats(stats=stats_by_series[series]),
+            metric_display_name=metric.display_name,
             colour=colour,
-            metric=metric,
+            dash="solid",
         )
-        _add_mean_trace(
-            fig=fig,
-            series=series,
-            stats=stats_by_series[series],
-            colour=colour,
-            metric=metric,
-        )
-    budgets_sorted = sorted({s.budget for s in stats})
-    y_max = max((run.total_rounds for run in runs), default=15)
     fig.update_layout(
         xaxis=dict(
             title="round_time_budget_seconds (log scale)",
             type="log",
             tickmode="array",
-            tickvals=budgets_sorted,
-            ticktext=[str(b) for b in budgets_sorted],
+            tickvals=x_tickvals,
+            ticktext=[str(b) for b in x_tickvals],
         ),
         yaxis=dict(
             title=f"{metric.y_axis_label} (mean ± std)",
@@ -244,6 +181,8 @@ def _build_refusal_figure(
     stats: list[BudgetStats],
     colour_by_series: dict[str, str],
     selected_batch_labels: frozenset[str],
+    y_max: float,
+    x_tickvals: list[int],
 ) -> go.Figure:
     """Dedicated plot for total content-filter refusals per run.
 
@@ -260,30 +199,25 @@ def _build_refusal_figure(
     for stat in stats:
         stats_by_series.setdefault(stat.series, []).append(stat)
     for series, colour in colour_by_series.items():
-        _add_replica_trace(
+        xs, ys, hover = _replica_xs_ys_hover(
+            runs=runs_by_series[series], series=series, metric=REFUSAL_METRIC
+        )
+        add_replica_trace(fig=fig, series=series, xs=xs, ys=ys, hover_texts=hover, colour=colour)
+        add_mean_trace(
             fig=fig,
             series=series,
-            runs=runs_by_series[series],
+            stats=_budget_stats_to_series_stats(stats=stats_by_series[series]),
+            metric_display_name=REFUSAL_METRIC.display_name,
             colour=colour,
-            metric=REFUSAL_METRIC,
+            dash="solid",
         )
-        _add_mean_trace(
-            fig=fig,
-            series=series,
-            stats=stats_by_series[series],
-            colour=colour,
-            metric=REFUSAL_METRIC,
-        )
-    budgets_sorted = sorted({s.budget for s in stats})
-    observed_max = max((REFUSAL_METRIC.extract(run=run) for run in runs), default=0.0)
-    y_max = max(observed_max * 1.1, 10.0)
     fig.update_layout(
         xaxis=dict(
             title="round_time_budget_seconds (log scale)",
             type="log",
             tickmode="array",
-            tickvals=budgets_sorted,
-            ticktext=[str(b) for b in budgets_sorted],
+            tickvals=x_tickvals,
+            ticktext=[str(b) for b in x_tickvals],
         ),
         yaxis=dict(
             title=f"{REFUSAL_METRIC.y_axis_label} (mean ± std)",
@@ -300,6 +234,8 @@ def _render_refusal_section(
     runs: list[BaselineRun],
     colour_by_series: dict[str, str],
     selected_batch_labels: frozenset[str],
+    refusal_y_max: float,
+    x_tickvals: list[int],
 ) -> None:
     """Render the dedicated Content-filter refusal chart + stats table."""
     st.markdown("---")
@@ -320,6 +256,8 @@ def _render_refusal_section(
         stats=stats,
         colour_by_series=colour_by_series,
         selected_batch_labels=selected_batch_labels,
+        y_max=refusal_y_max,
+        x_tickvals=x_tickvals,
     )
     st.plotly_chart(fig, width="stretch", key="baseline_refusal_chart")
     rows = [
@@ -373,7 +311,13 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         )
         return
     metric = _render_metric_selector()
-    batch_filtered, selected_batch_labels = _batch_label_filter(runs=all_baseline)
+    excluded = frozenset(run.model for run in all_baseline)
+    batch_filtered, selected_batch_labels = batch_label_filter(
+        runs=all_baseline,
+        labels_of=lambda run: run.labels,
+        excluded_label_values=excluded,
+        streamlit_key_prefix="baseline_batch_filter",
+    )
     if not batch_filtered:
         st.info("Select at least one batch label.")
         return
@@ -394,18 +338,29 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     series_ordered = sorted(
         {r.series_key(selected_batch_labels=selected_batch_labels) for r in filtered}
     )
-    colour_by_series = _series_color_map(series_keys=series_ordered)
+    colour_by_series = series_color_map(series_keys=series_ordered)
     stats = aggregate_by_budget(
         runs=filtered,
         value_of=metric.extract,
         selected_batch_labels=selected_batch_labels,
     )
+    # Compute axis ranges from the unfiltered baseline set so the chart's
+    # X tick layout and Y range stay constant when the user toggles series.
+    y_max = max((run.total_rounds for run in all_baseline), default=15)
+    refusal_observed_max = max(
+        (REFUSAL_METRIC.extract(run=run) for run in all_baseline),
+        default=0.0,
+    )
+    refusal_y_max = max(refusal_observed_max * 1.1, 10.0)
+    x_tickvals = sorted({r.budget for r in all_baseline})
     fig = _build_figure(
         runs=filtered,
         stats=stats,
         colour_by_series=colour_by_series,
         metric=metric,
         selected_batch_labels=selected_batch_labels,
+        y_max=y_max,
+        x_tickvals=x_tickvals,
     )
     st.plotly_chart(fig, width="stretch", key="baseline_chart")
     _render_stats_table(stats=stats, metric=metric)
@@ -413,5 +368,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         runs=filtered,
         colour_by_series=colour_by_series,
         selected_batch_labels=selected_batch_labels,
+        refusal_y_max=refusal_y_max,
+        x_tickvals=x_tickvals,
     )
     _render_included_runs(runs=filtered, metric=metric, selected_batch_labels=selected_batch_labels)

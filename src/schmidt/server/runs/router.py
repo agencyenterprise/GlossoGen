@@ -166,6 +166,7 @@ async def stop_run(scenario: str, run_dir_name: str, request: Request) -> None:
         scenario_name=resolved.scenario_name,
         total_messages=scan.message_count,
         total_cost_usd=scan.cost_usd,
+        round_number=scan.current_round,
     )
 
 
@@ -174,12 +175,14 @@ def _append_killed_event(
     scenario_name: str,
     total_messages: int,
     total_cost_usd: float,
+    round_number: int,
 ) -> None:
     """Append a SimulationEnded event with reason=killed to the JSONL log."""
     event = SimulationEnded(
         reason=RunStatus.KILLED,
         total_messages=total_messages,
         total_cost_usd=total_cost_usd,
+        round_number=round_number,
     )
     jsonl_path = run_dir / f"{scenario_name}.jsonl"
     with open(jsonl_path, "ab") as f:
