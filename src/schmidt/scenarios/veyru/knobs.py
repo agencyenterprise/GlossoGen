@@ -40,6 +40,11 @@ class VeyruKnobs(BaseKnobs):
     (args + result) so the intern can observe the protocol.
     ``judge_model`` and ``judge_provider`` specify the LLM used to evaluate
     whether stabilization actions match the Veyru's needs.
+    ``channel_noise_level`` is the per-character drop probability applied
+    to messages on the link channel(s) only (postmortem stays clean). At
+    ``0.0`` the channel is lossless (current behavior); at ``1.0`` every
+    character is dropped. Dropped characters are replaced with ``_`` so
+    agents can see where loss occurred.
     """
 
     judge_model: str
@@ -56,6 +61,15 @@ class VeyruKnobs(BaseKnobs):
     intern_enabled: bool
     intern_join_round: int | None
     intern_takeover_round: int | None
+    channel_noise_level: float
+
+    @model_validator(mode="after")
+    def _validate_channel_noise_level(self) -> "VeyruKnobs":
+        if not 0.0 <= self.channel_noise_level <= 1.0:
+            raise ValueError(
+                f"channel_noise_level must be in [0.0, 1.0] (got {self.channel_noise_level})"
+            )
+        return self
 
     @model_validator(mode="after")
     def _validate_swap_round(self) -> "VeyruKnobs":

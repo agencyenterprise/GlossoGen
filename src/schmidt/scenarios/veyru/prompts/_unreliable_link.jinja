@@ -1,0 +1,5 @@
+{% if channel_noise_level > 0 %}
+
+UNRELIABLE COMM LINK:
+The comm link is not perfectly reliable. Each character you send has an independent chance of being dropped in transit; dropped characters appear to the recipient as the underscore symbol "_". You may also see "_" in messages from the other side for the same reason. The other side may receive a different corrupted version of your message than what you see here. Treat "_" as missing data — never as a meaningful character.
+{% endif %}
