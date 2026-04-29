@@ -692,6 +692,10 @@ class VeyruScenario(SimulationScenario):
         _ = round_number
         self._world.enter_postmortem()
 
+    def restore_state_from_events(self, events: list[Any]) -> None:
+        """Seed the Veyru world's per-round outcomes from source events on resume."""
+        self._world.restore_outcomes_from_events(events=events)
+
     def get_early_round_end_trigger(self) -> str | None:
         """Signal the game clock to end the round as soon as every team has a
         decisive Veyru outcome (stabilized or collapsed).

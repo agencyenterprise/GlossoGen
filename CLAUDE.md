@@ -475,7 +475,7 @@ Scenario-specific evaluators:
 - **veyru**: generic + the following veyru-specific evaluators:
   - `language_emergence` — novel compressed language in the fictional domain (LLM judge)
   - `round_success` — fraction of rounds the team stabilized the Veyru before collapse (deterministic, no LLM)
-  - `round_success_after_resume` — same accounting as `round_success` but restricted to the rounds played after a replace-agent swap; reports N/A on non-resume runs (deterministic, no LLM)
+  - `round_success_after_resume` — same accounting as `round_success` but restricted to the rounds played after a replace-agent swap; also re-scores the source run over the same round window and reports the delta in evidence; reports N/A on non-resume runs (deterministic, no LLM)
   - `protocol_learned_after_swap` — whether two-team mode teams re-established a working protocol after an observer swap (LLM judge)
 
 After evaluation, labels are automatically written to the run's `labels.json` in the format `eval:{evaluator}:{verdict}` where verdict is `identified`, `partial`, or `fail`. Previous `eval:` labels are replaced; user-added labels are preserved.

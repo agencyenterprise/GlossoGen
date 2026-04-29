@@ -318,6 +318,90 @@ class VeyruWorld(ScenarioWorld):
         case_index = (round_number - 1) % len(self._veyru_cases)
         self._current_case = self._veyru_cases[case_index]
 
+    def restore_outcomes_from_events(self, events: list[object]) -> None:
+        """Seed per-team ``outcomes`` from a JSONL event list.
+
+        Used on resume so that the round-N injection's previous-outcome
+        block reflects the source run's actual round N-1 outcome rather
+        than a zero-valued default. Walks the events once, groups
+        per-round/per-team data, and appends a ``VeyruOutcome`` per
+        completed round (those whose ``round_ended`` was logged).
+        """
+        characters_by_round_team: dict[int, dict[TeamId, int]] = {}
+        matched_stages_by_round_team: dict[int, dict[TeamId, int]] = {}
+        round_ended_trigger: dict[int, str] = {}
+        for event in events:
+            event_type = getattr(event, "event_type", None)
+            round_number = getattr(event, "round_number", None)
+            if not isinstance(round_number, int) or round_number < 1:
+                continue
+            if event_type == "message_sent":
+                message = getattr(event, "message", None)
+                channel_id = getattr(message, "channel_id", None)
+                text = getattr(message, "text", "")
+                if isinstance(channel_id, str) and channel_id in self._channels_by_team:
+                    team_id = self._channels_by_team[channel_id]
+                    bucket = characters_by_round_team.setdefault(round_number, {})
+                    bucket[team_id] = bucket.get(team_id, 0) + len(text)
+            elif event_type == "veyru_stabilization_judged":
+                if not getattr(event, "judge_match", False):
+                    continue
+                agent_id = getattr(event, "agent_id", "")
+                if not isinstance(agent_id, str):
+                    continue
+                resolved_team_id = self._team_for_agent_id_lookup(agent_id=agent_id)
+                if resolved_team_id is None:
+                    continue
+                bucket = matched_stages_by_round_team.setdefault(round_number, {})
+                bucket[resolved_team_id] = bucket.get(resolved_team_id, 0) + 1
+            elif event_type == "round_ended":
+                trigger = getattr(event, "trigger", None)
+                if isinstance(trigger, str):
+                    round_ended_trigger[round_number] = trigger
+
+        for round_number in sorted(round_ended_trigger.keys()):
+            trigger = round_ended_trigger[round_number]
+            case_index = (round_number - 1) % len(self._veyru_cases)
+            case = self._veyru_cases[case_index]
+            stabilized_round = trigger == "veyru_stabilized"
+            chars_for_round = characters_by_round_team.get(round_number, {})
+            matched_for_round = matched_stages_by_round_team.get(round_number, {})
+            for team_id, team in self._teams.items():
+                if any(o.case_number == round_number for o in team.outcomes):
+                    continue
+                chars = chars_for_round.get(team_id, 0)
+                matched = matched_for_round.get(team_id, 0)
+                stage_outcomes = tuple(
+                    StageOutcome(
+                        motif_name=case.stages[i].motif_name,
+                        stabilized=i < matched,
+                    )
+                    for i in range(len(case.stages))
+                )
+                team.outcomes.append(
+                    VeyruOutcome(
+                        team_id=team_id,
+                        case_number=round_number,
+                        failure_name=case.failure_name,
+                        stabilized=stabilized_round and matched >= len(case.stages),
+                        characters_used=chars,
+                        time_elapsed_seconds=chars,
+                        time_budget_seconds=case.time_budget_seconds,
+                        stages_completed=matched,
+                        total_stages=len(case.stages),
+                        stage_outcomes=stage_outcomes,
+                    )
+                )
+
+    def _team_for_agent_id_lookup(self, agent_id: str) -> TeamId | None:
+        """Return the team whose observer or engineer is ``agent_id``, or None."""
+        for team_id, state in self._teams.items():
+            if state.current_observer_id == agent_id:
+                return team_id
+            if state.stabilization_engineer_id == agent_id:
+                return team_id
+        return None
+
     def get_current_stage(self, team_id: TeamId) -> VeyruStage | None:
         """Return the active stage for a team, or None if no case is loaded."""
         if self._current_case is None:

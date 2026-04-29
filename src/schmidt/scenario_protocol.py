@@ -285,6 +285,18 @@ class SimulationScenario(ABC):
         """
         _ = round_number
 
+    def restore_state_from_events(self, events: list[Any]) -> None:
+        """Reconstruct world state from a JSONL event list before resume.
+
+        Called once after a rewind state is built and before the runtime
+        starts. Scenarios with mutable world state override this to seed
+        per-round outcomes for completed rounds in the source run, so that
+        round-N injections rendered after resume reflect the source's
+        actual round N-1 outcome rather than zero-valued defaults. The
+        default is a no-op for scenarios without world state.
+        """
+        _ = events
+
     @classmethod
     def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:
         """Return channel IDs whose ``send_message``/``read_channel`` traffic
