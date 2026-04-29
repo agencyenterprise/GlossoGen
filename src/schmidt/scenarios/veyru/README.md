@@ -163,6 +163,7 @@ The `veyru_case_started` event is emitted once per round at round start by `Veyr
 | `intern_enabled` | Opt-in toggle for the single-team intern observer mode (see below). When false, `intern_join_round` and `intern_takeover_round` must be null |
 | `intern_join_round` | Round at which the intern silently joins the comm link (must be less than `intern_takeover_round`) |
 | `intern_takeover_round` | Round at which the intern replaces the field observer (must be ≤ `round_count`) |
+| `channel_noise_level` | Per-character drop probability on the link channel(s) only (postmortem stays clean). Must be in `[0.0, 1.0]`. At `0.0` the channel is lossless; dropped characters are replaced with `_`. When > 0, agents receive a system-prompt note that the link is lossy |
 
 ## Two-Team Mode (opt-in)
 
