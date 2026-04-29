@@ -86,11 +86,51 @@ def build_rewind_state(
     Raises:
         ValueError: If no ``MessageSent`` event with the target ID is found.
     """
-    target_timestamp = _find_target_timestamp(
+    target_timestamp = _find_message_timestamp(
         events=events,
         target_message_id=target_message_id,
     )
+    return _build_rewind_state_at_timestamp(
+        events=events,
+        target_timestamp=target_timestamp,
+        message_edits=message_edits,
+        agent_filters=agent_filters,
+    )
 
+
+def build_rewind_state_at_event(
+    events: list[SimulationEvent],
+    target_event_id: str,
+    agent_filters: dict[str, AgentHistoryFilter],
+) -> RewindState:
+    """Build rewind state targeting any event by ``event_id``.
+
+    Used by the replace-agent resume path to anchor at a ``RoundAdvanced``
+    event (no associated message_id). The walk includes the target event
+    itself, so the resulting ``round_number`` reflects the round that has
+    just started at the anchor.
+
+    Raises ``ValueError`` if no event with ``target_event_id`` exists.
+    """
+    target_timestamp = _find_event_timestamp(
+        events=events,
+        target_event_id=target_event_id,
+    )
+    return _build_rewind_state_at_timestamp(
+        events=events,
+        target_timestamp=target_timestamp,
+        message_edits={},
+        agent_filters=agent_filters,
+    )
+
+
+def _build_rewind_state_at_timestamp(
+    events: list[SimulationEvent],
+    target_timestamp: datetime,
+    message_edits: dict[str, str],
+    agent_filters: dict[str, AgentHistoryFilter],
+) -> RewindState:
+    """Walk ``events`` up to ``target_timestamp`` and assemble a ``RewindState``."""
     round_number = 0
     messages_by_channel: dict[str, list[SimulationMessage]] = {}
     injected_rounds: dict[str, int] = {}
@@ -196,7 +236,7 @@ def build_rewind_state_from_last_message(
     )
 
 
-def _find_target_timestamp(
+def _find_message_timestamp(
     events: list[SimulationEvent],
     target_message_id: str,
 ) -> datetime:
@@ -211,3 +251,18 @@ def _find_target_timestamp(
     raise ValueError(
         f"No MessageSent event with message_id={target_message_id!r} found in the log."
     )
+
+
+def _find_event_timestamp(
+    events: list[SimulationEvent],
+    target_event_id: str,
+) -> datetime:
+    """Find the timestamp of any event by ``event_id``.
+
+    Raises ``ValueError`` if no matching event exists.
+    """
+    for event in events:
+        if event.event_id == target_event_id:
+            return event.timestamp
+
+    raise ValueError(f"No event with event_id={target_event_id!r} found in the log.")

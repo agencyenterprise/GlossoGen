@@ -1937,7 +1937,14 @@
             "title": "Round Start"
           },
           "rounds_after_swap": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Rounds After Swap"
           },
           "replaced_agent_id": {
@@ -1984,7 +1991,7 @@
           "channels_with_visible_history"
         ],
         "title": "ReplaceAgentRequest",
-        "description": "Request body for replacing one agent in a finished run at the start of a round.\n\n``channels_with_visible_history`` lists channel IDs whose prior history\nremains visible to the replaced agent on resume; every other channel\nthey're a member of has its history wiped.\n\n``rounds_after_swap`` controls how many rounds the resumed simulation\nplays following the replacement: ``round_count`` is set to\n``round_start + rounds_after_swap``."
+        "description": "Request body for replacing one agent in a finished run at the start of a round.\n\n``channels_with_visible_history`` lists channel IDs whose prior history\nremains visible to the replaced agent on resume; every other channel\nthey're a member of has its history wiped.\n\n``rounds_after_swap`` controls how many rounds the resumed simulation\nplays following the replacement: ``round_count`` is set to\n``round_start + rounds_after_swap``. When ``None``, defaults to\n``source_round_count - round_start`` (the remaining rounds in the\noriginal run after the replacement boundary)."
       },
       "ReplaceAgentResponse": {
         "properties": {
@@ -2015,9 +2022,9 @@
             "type": "integer",
             "title": "Round Start"
           },
-          "target_message_id": {
+          "target_event_id": {
             "type": "string",
-            "title": "Target Message Id"
+            "title": "Target Event Id"
           },
           "replaced_agent_id": {
             "type": "string",
@@ -2041,14 +2048,14 @@
         "required": [
           "source_run_id",
           "round_start",
-          "target_message_id",
+          "target_event_id",
           "replaced_agent_id",
           "replacement_model",
           "replacement_provider",
           "replaced_at"
         ],
         "title": "ReplaceAgentSource",
-        "description": "Provenance for a run created via the replace-agent endpoint.\n\nThe replacement boundary is the start of round ``round_start``.\n``target_message_id`` is the resolved anchor inside the source\nrun's git history, kept for traceability."
+        "description": "Provenance for a run created via the replace-agent endpoint.\n\nThe replacement boundary is the start of round ``round_start``.\n``target_event_id`` is the resolved anchor inside the source\nrun's git history (the ``RoundAdvanced`` event for ``round_start``),\nkept for traceability."
       },
       "RoundEnding": {
         "properties": {

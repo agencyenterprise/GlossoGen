@@ -156,6 +156,26 @@ class RunRepository:
                 return sha
         return None
 
+    async def find_commit_for_event_id(self, event_id: str) -> str | None:
+        """Search commit messages for an event_id and return the commit SHA.
+
+        Every committable event's commit message embeds an ``event_id:``
+        line, so this works for any event type (round_advanced, round_ended,
+        injection_delivered, message_sent, etc.).
+        """
+        return await asyncio.to_thread(self._find_commit_for_event_id_sync, event_id)
+
+    def _find_commit_for_event_id_sync(self, event_id: str) -> str | None:
+        search = f"event_id: {event_id}"
+        commits = _parse_dulwich_log(
+            repo_path=str(self._run_dir),
+            max_entries=None,
+        )
+        for sha, message in commits:
+            if search in message:
+                return sha
+        return None
+
     async def log(self, max_count: int) -> list[GitCommitInfo]:
         """Return recent commits as a list of ``GitCommitInfo``."""
         return await asyncio.to_thread(self._log_sync, max_count)

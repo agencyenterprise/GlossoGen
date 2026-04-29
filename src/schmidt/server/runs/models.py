@@ -22,13 +22,14 @@ class ReplaceAgentSource(BaseModel):
     """Provenance for a run created via the replace-agent endpoint.
 
     The replacement boundary is the start of round ``round_start``.
-    ``target_message_id`` is the resolved anchor inside the source
-    run's git history, kept for traceability.
+    ``target_event_id`` is the resolved anchor inside the source
+    run's git history (the ``RoundAdvanced`` event for ``round_start``),
+    kept for traceability.
     """
 
     source_run_id: str
     round_start: int
-    target_message_id: str
+    target_event_id: str
     replaced_agent_id: str
     replacement_model: str
     replacement_provider: str
@@ -387,13 +388,15 @@ class ReplaceAgentRequest(BaseModel):
 
     ``rounds_after_swap`` controls how many rounds the resumed simulation
     plays following the replacement: ``round_count`` is set to
-    ``round_start + rounds_after_swap``.
+    ``round_start + rounds_after_swap``. When ``None``, defaults to
+    ``source_round_count - round_start`` (the remaining rounds in the
+    original run after the replacement boundary).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     round_start: int
-    rounds_after_swap: int
+    rounds_after_swap: int | None
     replaced_agent_id: str
     model: str
     provider: str

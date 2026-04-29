@@ -778,6 +778,11 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
           errorMessage={replaceAgent.error?.message ?? null}
           roundStart={replaceAgentRound}
           scenarioName={restData.scenario_name}
+          sourceRoundCount={
+            typeof restData.scenario_config?.round_count === "number"
+              ? restData.scenario_config.round_count
+              : null
+          }
           sourceAgents={restData.agents.map(agent => ({
             agent_id: agent.agent_id,
             role_name: agent.role_name,
@@ -1027,14 +1032,13 @@ type ReplaceAgentSourceAgent = {
   channel_ids: string[];
 };
 
-const DEFAULT_ROUNDS_AFTER_SWAP = 10;
-
 function ReplaceAgentModal({
   isPending,
   isSuccess,
   errorMessage,
   roundStart,
   scenarioName,
+  sourceRoundCount,
   sourceAgents,
   onConfirm,
   onCancel,
@@ -1044,6 +1048,7 @@ function ReplaceAgentModal({
   errorMessage: string | null;
   roundStart: number;
   scenarioName: string;
+  sourceRoundCount: number | null;
   sourceAgents: ReplaceAgentSourceAgent[];
   onConfirm: (
     replacedAgentId: string,
@@ -1060,7 +1065,9 @@ function ReplaceAgentModal({
   const initialAgent = sourceAgents.find(a => a.agent_id === replacedAgentId) ?? defaultAgent;
   const [model, setModel] = useState(initialAgent?.model ?? "");
   const [provider, setProvider] = useState(initialAgent?.provider ?? "");
-  const [roundsAfterSwap, setRoundsAfterSwap] = useState<number>(DEFAULT_ROUNDS_AFTER_SWAP);
+  const defaultRoundsAfterSwap =
+    sourceRoundCount !== null ? Math.max(1, sourceRoundCount - roundStart) : 1;
+  const [roundsAfterSwap, setRoundsAfterSwap] = useState<number>(defaultRoundsAfterSwap);
 
   const isVeyru = scenarioName === "veyru";
 

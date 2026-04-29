@@ -414,6 +414,4 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         colour_by_series=colour_by_series,
         selected_batch_labels=selected_batch_labels,
     )
-    _render_included_runs(
-        runs=filtered, metric=metric, selected_batch_labels=selected_batch_labels
-    )
+    _render_included_runs(runs=filtered, metric=metric, selected_batch_labels=selected_batch_labels)

@@ -40,6 +40,7 @@ from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.message_rewind import (
     AgentHistoryFilter,
     RewindState,
+    build_rewind_state_at_event,
     build_rewind_state_from_last_message,
 )
 from schmidt.models.agent_config import AgentConfig
@@ -220,11 +221,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--rounds-after-swap",
         dest="rounds_after_swap",
         type=int,
-        default=10,
+        default=None,
         help=(
             "Number of rounds the resumed simulation will play after the "
             "replacement boundary. round_count is set to round_start + "
-            "rounds_after_swap. Default: 10."
+            "rounds_after_swap. When omitted, defaults to "
+            "source_round_count - round_start (the remaining rounds in the "
+            "original run)."
         ),
     )
 
@@ -399,6 +402,7 @@ class _ReplaceManifestInfo(NamedTuple):
     replaced_agent_id: str
     visible_channels: list[str]
     blocked_channel_ids: frozenset[str]
+    target_event_id: str
 
 
 def _read_replace_manifest(run_dir: Path) -> _ReplaceManifestInfo | None:
@@ -410,6 +414,7 @@ def _read_replace_manifest(run_dir: Path) -> _ReplaceManifestInfo | None:
         replaced_agent_id=manifest.replaced_agent_id,
         visible_channels=list(manifest.channels_with_visible_history),
         blocked_channel_ids=frozenset(manifest.blocked_tool_call_channels),
+        target_event_id=manifest.target_event_id,
     )
 
 
@@ -458,12 +463,12 @@ async def _run_simulation(
                 tool_calls_only=True,
                 blocked_channel_ids=replace_info.blocked_channel_ids,
             )
-        resume_state = build_rewind_state_from_last_message(
-            events=events,
-            agent_filters=agent_filters,
-        )
-        if replace_info is not None:
-            resume_state = resume_state._replace(
+            base_state = build_rewind_state_at_event(
+                events=events,
+                target_event_id=replace_info.target_event_id,
+                agent_filters=agent_filters,
+            )
+            resume_state = base_state._replace(
                 replaced_agent_ids=frozenset({replace_info.replaced_agent_id}),
                 replaced_agent_channels_with_visible_history={
                     replace_info.replaced_agent_id: replace_info.visible_channels,
@@ -476,10 +481,16 @@ async def _run_simulation(
                 replace_info.visible_channels,
                 sorted(replace_info.blocked_channel_ids),
             )
+        else:
+            resume_state = build_rewind_state_from_last_message(
+                events=events,
+                agent_filters=agent_filters,
+            )
         logger.info(
             "Rewind state loaded: resuming from round %d",
             resume_state.round_number,
         )
+        scenario.restore_state_from_events(events=events)
         write_resume_context_files(
             run_dir=run_dir,
             agent_message_histories=resume_state.agent_message_histories,

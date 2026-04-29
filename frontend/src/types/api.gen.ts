@@ -889,13 +889,15 @@ export interface components {
          *
          *     ``rounds_after_swap`` controls how many rounds the resumed simulation
          *     plays following the replacement: ``round_count`` is set to
-         *     ``round_start + rounds_after_swap``.
+         *     ``round_start + rounds_after_swap``. When ``None``, defaults to
+         *     ``source_round_count - round_start`` (the remaining rounds in the
+         *     original run after the replacement boundary).
          */
         ReplaceAgentRequest: {
             /** Round Start */
             round_start: number;
             /** Rounds After Swap */
-            rounds_after_swap: number;
+            rounds_after_swap: number | null;
             /** Replaced Agent Id */
             replaced_agent_id: string;
             /** Model */
@@ -924,16 +926,17 @@ export interface components {
          * @description Provenance for a run created via the replace-agent endpoint.
          *
          *     The replacement boundary is the start of round ``round_start``.
-         *     ``target_message_id`` is the resolved anchor inside the source
-         *     run's git history, kept for traceability.
+         *     ``target_event_id`` is the resolved anchor inside the source
+         *     run's git history (the ``RoundAdvanced`` event for ``round_start``),
+         *     kept for traceability.
          */
         ReplaceAgentSource: {
             /** Source Run Id */
             source_run_id: string;
             /** Round Start */
             round_start: number;
-            /** Target Message Id */
-            target_message_id: string;
+            /** Target Event Id */
+            target_event_id: string;
             /** Replaced Agent Id */
             replaced_agent_id: string;
             /** Replacement Model */

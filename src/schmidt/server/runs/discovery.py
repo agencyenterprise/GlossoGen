@@ -279,10 +279,11 @@ def _read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:
         return None
     raw = orjson.loads(manifest_path.read_bytes())
     replaced_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
+    target_event_id = raw.get("target_event_id") or raw.get("target_message_id", "")
     return ReplaceAgentSource(
         source_run_id=raw["source_run_id"],
         round_start=raw["round_start"],
-        target_message_id=raw["target_message_id"],
+        target_event_id=target_event_id,
         replaced_agent_id=raw["replaced_agent_id"],
         replacement_model=raw["replacement_model"],
         replacement_provider=raw["replacement_provider"],

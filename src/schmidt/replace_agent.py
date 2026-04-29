@@ -17,8 +17,8 @@ from typing import Any, NamedTuple
 import orjson
 
 from schmidt.evaluation.log_reader import load_events
-from schmidt.message_rewind import build_rewind_state
-from schmidt.models.event import AgentRegistered, MessageSent, SimulationEvent, SimulationStarted
+from schmidt.message_rewind import build_rewind_state_at_event
+from schmidt.models.event import AgentRegistered, RoundAdvanced, SimulationEvent, SimulationStarted
 from schmidt.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
 from schmidt.run_config_validation import validate_run_config
 from schmidt.run_jsonl_rewriter import rewrite_run_jsonl
@@ -43,12 +43,16 @@ class ReplaceAgentRequest(NamedTuple):
     to ``round_start + rounds_after_swap``, so rounds ``round_start +
     1`` through ``round_start + rounds_after_swap`` play after the
     replacement and the replacement itself enters at ``round_start``.
+    When ``None``, defaults to ``source_round_count - round_start``
+    (the remaining rounds in the original run after the replacement
+    boundary), so a 20-round source run with ``round_start=18`` plays
+    2 rounds by default.
     """
 
     source_run_dir: Path
     scenario_name: str
     round_start: int
-    rounds_after_swap: int
+    rounds_after_swap: int | None
     replaced_agent_id: str
     model: str
     provider: str
@@ -69,30 +73,34 @@ def compose_run_id(scenario_name: str, run_dir_name: str) -> str:
     return f"{scenario_name}/{run_dir_name}"
 
 
-def resolve_round_start_message(
+def resolve_round_start_anchor(
     events: list[SimulationEvent],
     round_start: int,
 ) -> str:
-    """Resolve the message_id we rewind to so round ``round_start`` starts fresh.
+    """Resolve the ``event_id`` of the source's ``RoundAdvanced`` for ``round_start``.
 
-    Returns the last ``MessageSent`` whose ``round_number`` is strictly
-    less than ``round_start``. The resumed simulation re-enters round
-    ``round_start`` with the replaced agent on empty history. Cannot be
-    used for round 1: there is no prior message to anchor to.
+    The resumed simulation rewinds to the commit produced by that event,
+    which captures the JSONL state where round ``round_start`` has just
+    started but its injections have not yet been delivered. The resumed
+    game clock then delivers the round-``round_start`` injections fresh
+    on resume.
 
-    Raises ``ValueError`` if ``round_start <= 1`` or no qualifying
-    ``MessageSent`` exists.
+    Cannot be used for round 1: a clean replacement requires the source
+    to have completed round 0 (i.e. there must be a prior round to swap
+    out from), which never exists. Cannot be used when the source did
+    not reach ``round_start``.
+
+    Raises ``ValueError`` for those cases.
     """
     if round_start <= 1:
-        raise ValueError("Cannot replace agent at start of round 1: no prior message to rewind to")
-    candidates = [
-        event
-        for event in events
-        if isinstance(event, MessageSent) and event.round_number < round_start
-    ]
-    if not candidates:
-        raise ValueError(f"No MessageSent event found before round {round_start}")
-    return candidates[-1].message.message_id
+        raise ValueError("Cannot replace agent at start of round 1: no prior round to rewind to")
+    for event in events:
+        if isinstance(event, RoundAdvanced) and event.round_number == round_start:
+            return event.event_id
+    raise ValueError(
+        f"No RoundAdvanced event for round {round_start} in source run; "
+        f"the source did not reach that round"
+    )
 
 
 def _collect_source_agents(events: list[SimulationEvent]) -> dict[str, AgentRegistered]:
@@ -163,19 +171,19 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
             f"(known agents: {sorted(source_agents)})"
         )
 
-    target_message_id = resolve_round_start_message(
+    target_event_id = resolve_round_start_anchor(
         events=source_events,
         round_start=request.round_start,
     )
 
     source_repo = RunRepository(run_dir=request.source_run_dir)
-    target_sha = await source_repo.find_commit_for_message(
-        message_id=target_message_id,
+    target_sha = await source_repo.find_commit_for_event_id(
+        event_id=target_event_id,
     )
     if target_sha is None:
         raise ValueError(
-            f"No git commit found for message {target_message_id} "
-            f"(resolved from start of round {request.round_start}) "
+            f"No git commit found for event {target_event_id} "
+            f"(round_advanced for round {request.round_start}) "
             f"in {request.source_run_dir}"
         )
 
@@ -200,10 +208,9 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
     )
 
     rewritten_events = await load_events(log_path=new_log_path)
-    build_rewind_state(
+    build_rewind_state_at_event(
         events=rewritten_events,
-        target_message_id=target_message_id,
-        message_edits={},
+        target_event_id=target_event_id,
         agent_filters={},
     )
 
@@ -216,7 +223,23 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
     merged_scenario_config: dict[str, Any] = dict(first_event.scenario_config)
     if request.knobs is not None:
         merged_scenario_config.update(request.knobs)
-    merged_scenario_config["round_count"] = request.round_start + request.rounds_after_swap
+    if request.rounds_after_swap is None:
+        source_round_count = first_event.scenario_config.get("round_count")
+        if not isinstance(source_round_count, int):
+            raise ValueError(
+                "Cannot derive default rounds_after_swap: source run's "
+                "scenario_config has no integer 'round_count' entry"
+            )
+        effective_rounds_after_swap = source_round_count - request.round_start
+        if effective_rounds_after_swap < 0:
+            raise ValueError(
+                f"round_start ({request.round_start}) exceeds source run's "
+                f"round_count ({source_round_count}); cannot derive default "
+                f"rounds_after_swap"
+            )
+    else:
+        effective_rounds_after_swap = request.rounds_after_swap
+    merged_scenario_config["round_count"] = request.round_start + effective_rounds_after_swap
     merged_scenario_config["model_overrides"] = _build_model_overrides(
         source_agents=source_agents,
         replaced_agent_id=request.replaced_agent_id,
@@ -243,8 +266,8 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         source_run_id=source_run_id,
         source_run_dir=str(request.source_run_dir),
         round_start=request.round_start,
-        rounds_after_swap=request.rounds_after_swap,
-        target_message_id=target_message_id,
+        rounds_after_swap=effective_rounds_after_swap,
+        target_event_id=target_event_id,
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
         replacement_provider=request.provider,

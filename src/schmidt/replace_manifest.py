@@ -25,7 +25,7 @@ class ReplaceManifest(BaseModel):
     source_run_dir: str
     round_start: int
     rounds_after_swap: int
-    target_message_id: str
+    target_event_id: str
     replaced_agent_id: str
     replacement_model: str
     replacement_provider: str

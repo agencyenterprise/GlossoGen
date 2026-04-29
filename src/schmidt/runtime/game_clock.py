@@ -215,6 +215,7 @@ class GameClock:
         if self._resuming:
             await self._scenario.on_round_advanced(round_number=self._current_round)
             self._world_context.signal_round_advanced(round_number=self._current_round)
+            await self._deliver_injections(round_number=self._current_round)
             logger.info(
                 "Game clock resumed at round %d/%d",
                 self._current_round,
