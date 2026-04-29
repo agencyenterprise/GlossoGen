@@ -78,10 +78,15 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
   --round-start 5 \
   --replaced-agent-id field_observer \
   --model claude-sonnet-4-6 --provider anthropic \
-  --runs-dir ./runs
+  --runs-dir ./runs \
+  [--rounds-after-swap N]
 ```
 
-Internals: clones the source run's git repo at the last `MessageSent` before round `--round-start` began, strips only the chosen agent's `llm_response_received` / `tool_call_invoked` / `tool_result_received` events from the JSONL, and resumes the simulation. The replaced agent's model/provider can differ from the original; non-replaced agents stay on their exact original models. Cannot be used with `--round-start 1` (no prior message to anchor to).
+`--rounds-after-swap` defaults to `source_round_count - round_start` (the remaining rounds in the original run after the replacement boundary). The resumed simulation's `round_count` is set to `round_start + rounds_after_swap`.
+
+Internals: clones the source run's git repo at the commit produced by the source's `RoundAdvanced` event for `--round-start`, so round N-1 is fully ended in the cloned JSONL but round N's injections have not yet been delivered. On resume the game clock starts at round N and delivers fresh round-N injections to all agents. The replaced agent's reconstructed pydantic-ai history has `text` / `thinking` parts stripped and any tool calls targeting blocked channels (e.g. veyru's postmortem channels) removed; its full event log is preserved on disk. The veyru world's per-team `outcomes` list is seeded from the source's events on resume so the round-N injection's "PREVIOUS VEYRU RESULT" block reflects the source's actual round N-1 outcome. The replaced agent's model/provider can differ from the original; non-replaced agents stay on their exact original models. Cannot be used with `--round-start 1`.
+
+The CLI returns immediately after preparing the new run directory and spawning a detached simulation subprocess; check progress via `tail ./runs/veyru/<new_timestamp>/veyru_stdout.log` or the JSONL event log. For multi-run sweeps (e.g. several `--round-start` / `--rounds-after-swap` combinations), see the parallel orchestrator pattern in [CLAUDE.md](CLAUDE.md#parallel-replace-agent-orchestration).
 
 **Per-channel history visibility for the replaced agent.** Pass `--visible-history-channel CHANNEL` (repeatable) to control which channels keep their prior message history visible to the replaced agent. When omitted, the CLI reads the `replace_agent_default_channel_visibility` knob from the source run's `scenario_config` (a `dict[str, bool]` defined on `BaseKnobs`; channels not in the map default to visible) and combines it with the agent's actual channel memberships. Channels marked invisible (or not in `--visible-history-channel`) have the replaced agent's `member_join_index` bumped to the current message count, so its `read_channel` calls only see post-resumption messages there.
 

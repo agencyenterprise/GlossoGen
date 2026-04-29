@@ -211,6 +211,7 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
     build_rewind_state_at_event(
         events=rewritten_events,
         target_event_id=target_event_id,
+        cutoff_round=request.round_start,
         agent_filters={},
     )
 

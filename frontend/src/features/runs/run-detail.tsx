@@ -704,6 +704,9 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             replaceAgentReplacementModel={restData.replace_agent_source?.replacement_model ?? null}
             veyruCases={restData.veyru_cases}
             roundEndings={restData.round_endings}
+            resumeCutoffTimestamp={
+              restData.replace_agent_source?.replaced_at ?? restData.fork_source?.forked_at ?? null
+            }
           />
         )}
 

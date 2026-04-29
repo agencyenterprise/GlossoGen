@@ -18,7 +18,7 @@ from schmidt.event_parsing import parse_event_bytes
 from schmidt.models.event import RunStatus, SimulationEnded, SimulationStarted
 from schmidt.server.runs.models import AgentModelSummary, ForkSource, ReplaceAgentSource, RunSummary
 from schmidt.stream_manifest import delete_manifest, read_manifest
-from schmidt.token_pricing import find_pricing
+from schmidt.token_pricing import TokenPricing, find_pricing
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,25 @@ class _SinglePassResult(NamedTuple):
     current_round: int
 
 
+def _compute_cost(
+    pricing: TokenPricing | None,
+    input_tokens: int,
+    output_tokens: int,
+    cache_read: int,
+    cache_write: int,
+) -> float:
+    """Compute USD cost from token totals using the given pricing record."""
+    if pricing is None or input_tokens + output_tokens + cache_read + cache_write == 0:
+        return 0.0
+    non_cached_input = max(0, input_tokens - cache_read - cache_write)
+    return (
+        non_cached_input * pricing.input_per_mtok
+        + output_tokens * pricing.output_per_mtok
+        + cache_read * pricing.cache_read_per_mtok
+        + cache_write * pricing.cache_write_per_mtok
+    ) / 1_000_000
+
+
 def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     """Read a JSONL file once, extracting all data needed for the run summary.
 
@@ -51,17 +70,25 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     the final 20 lines), per-agent model info, message count, and
     token-based cost estimate — all in a single sequential pass.
 
+    Cost is computed per LLM event using the emitting agent's current
+    model pricing (the latest ``agent_registered`` for that agent_id seen
+    so far in the chronological scan). For replace-agent runs, this means
+    the post-resume field_observer is priced at gpt-5.4 / etc. while the
+    non-replaced engineer stays at claude-opus-4-7. Source-run LLM events
+    inherited from the cloned JSONL contribute zero cost because their
+    ``usage`` fields are empty in the on-disk events (usage was only
+    aggregated into the source's ``SimulationEnded``, which sits past the
+    rewind anchor and therefore isn't in the cloned log).
+
     Intended to be called via ``asyncio.to_thread`` so CPU and IO run in
     a worker thread, enabling true parallelism across concurrent requests.
     """
     first_bytes: bytes | None = None
     tail: list[bytes] = []
     agents_by_id: dict[str, _AgentModelInfo] = {}
+    pricing_by_agent: dict[str, TokenPricing | None] = {}
     message_count = 0
-    total_input = 0
-    total_output = 0
-    total_cache_read = 0
-    total_cache_write = 0
+    cost_usd = 0.0
     current_round = 0
 
     with open(file_path, mode="rb") as f:
@@ -90,15 +117,21 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
                         model=model,
                         provider=raw.get("provider", "unknown"),
                     )
+                    pricing_by_agent[agent_id] = find_pricing(model=model)
             elif event_type == "message_sent":
                 message_count += 1
             elif event_type == "llm_response_received":
                 usage = raw.get("usage")
                 if usage is not None:
-                    total_input += usage.get("input_tokens", 0)
-                    total_output += usage.get("output_tokens", 0)
-                    total_cache_read += usage.get("cache_read_input_tokens", 0)
-                    total_cache_write += usage.get("cache_creation_input_tokens", 0)
+                    agent_id = raw.get("agent_id", "")
+                    pricing = pricing_by_agent.get(agent_id)
+                    cost_usd += _compute_cost(
+                        pricing=pricing,
+                        input_tokens=usage.get("input_tokens", 0),
+                        output_tokens=usage.get("output_tokens", 0),
+                        cache_read=usage.get("cache_read_input_tokens", 0),
+                        cache_write=usage.get("cache_creation_input_tokens", 0),
+                    )
             elif event_type == "round_advanced":
                 round_number = raw.get("round_number", 0)
                 if round_number > current_round:
@@ -131,21 +164,6 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
         )
         for info in agents_by_id.values()
     ]
-
-    if seen:
-        model = list(seen)[0]
-    else:
-        model = "unknown"
-    cost_usd = 0.0
-    pricing = find_pricing(model=model)
-    if pricing is not None and total_input > 0:
-        non_cached_input = max(0, total_input - total_cache_read - total_cache_write)
-        cost_usd = (
-            non_cached_input * pricing.input_per_mtok
-            + total_output * pricing.output_per_mtok
-            + total_cache_read * pricing.cache_read_per_mtok
-            + total_cache_write * pricing.cache_write_per_mtok
-        ) / 1_000_000
 
     return _SinglePassResult(
         first_event=first_event,
@@ -376,6 +394,9 @@ async def _build_summary(
             current_round=cache.current_round,
         )
 
+    fork_source = _read_fork_source(run_dir=timestamp_dir)
+    replace_agent_source = _read_replace_agent_source(run_dir=timestamp_dir)
+
     try:
         scan = await scan_jsonl(file_path=jsonl_path)
     except Exception:
@@ -383,8 +404,6 @@ async def _build_summary(
         return None
 
     first_event = scan.first_event
-    fork_source = _read_fork_source(run_dir=timestamp_dir)
-    replace_agent_source = _read_replace_agent_source(run_dir=timestamp_dir)
     resolved_scenario_config = _resolve_scenario_config(
         run_dir=timestamp_dir,
         base_config=first_event.scenario_config,

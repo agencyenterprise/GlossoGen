@@ -81,6 +81,8 @@ interface ChatPaneProps {
   veyruCases: VeyruCaseSummary[];
   /** One entry per completed round describing why its main phase ended. */
   roundEndings: RoundEnding[];
+  /** ISO timestamp at which the resume happened (replace-agent / fork). Turns and rounds with earlier timestamps are rendered faded so users see they were inherited from the source run. Null for non-resumed runs. */
+  resumeCutoffTimestamp: string | null;
 }
 
 interface TurnGroup {
@@ -168,6 +170,7 @@ export function ChatPane({
   replaceAgentReplacementModel,
   veyruCases,
   roundEndings,
+  resumeCutoffTimestamp,
 }: ChatPaneProps) {
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -700,10 +703,15 @@ export function ChatPane({
                 const agent = agentMap.get(turn.agentId);
                 const color = agentColorMap.get(turn.agentId);
 
+                const isPreResume =
+                  resumeCutoffTimestamp !== null && turn.timestamp < resumeCutoffTimestamp;
                 return (
                   <div
                     key={`${roundIdx}-${turnIdx}-${turn.agentId}`}
-                    className="flex gap-2.5 px-4 py-1 transition-colors hover:bg-muted/50"
+                    className={cn(
+                      "flex gap-2.5 px-4 py-1 transition-colors hover:bg-muted/50",
+                      isPreResume && "opacity-50"
+                    )}
                   >
                     <div className="flex w-7 shrink-0 flex-col items-start">
                       <button

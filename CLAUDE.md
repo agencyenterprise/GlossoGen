@@ -391,11 +391,14 @@ schmidt replace-agent veyru \
   --replaced-agent-id field_observer \
   --model claude-sonnet-4-6 --provider anthropic \
   --runs-dir ./runs \
+  [--rounds-after-swap N] \
   [--visible-history-channel CHANNEL ...] \
   [--knobs path/to/overrides.json]
 ```
 
-Internals: clones the source run's git repo at the last `MessageSent` whose `round_number < --round-start`, drops the chosen agent's `llm_response_received` / `tool_call_invoked` / `tool_result_received` events from the JSONL, and resumes the simulation. Cannot be used with `--round-start 1`. Non-replaced agents stay on their exact original models.
+Internals: clones the source run's git repo at the commit produced by the source's `RoundAdvanced` event for `--round-start`. The cloned JSONL therefore contains every committed event up to and including that `round_advanced` (round N-1 fully ended in source — game phase, postmortem, both `round_ended` events) but no `injection_delivered` events for round N yet. On resume the game clock starts at round N and `_deliver_injections` fires the round-N injections fresh. The replaced agent's full event log is preserved on disk; its reconstructed pydantic-ai history is stripped of `text` / `thinking` parts and any tool calls targeting blocked channels (e.g. veyru's postmortem channels). The veyru world's per-team `outcomes` list is seeded from the source's `veyru_case_started` / `veyru_stabilization_judged` / `round_ended` events via `restore_state_from_events`, so the round-N injection's "PREVIOUS VEYRU RESULT" block reflects the source's actual round N-1 outcome. Cannot be used with `--round-start 1`. Non-replaced agents stay on their exact original models.
+
+`--rounds-after-swap` defaults to `source_round_count - round_start` (the remaining rounds in the original run after the replacement boundary). The resumed simulation's `round_count` is set to `round_start + rounds_after_swap`.
 
 **Per-channel history visibility (platform feature).** The replace-agent flow chooses, per channel the replaced agent is a member of, whether that channel's prior messages remain visible after resume.
 
@@ -446,6 +449,94 @@ When running simulations, evaluations, or any long-running background process, *
 3. Report a brief status update to the user
 4. Repeat: `sleep 30`, check, report — until the process completes
 5. Never use `while` loops or polling constructs — use sequential sleep/check/report cycles
+
+### Launching Replace-Agent Runs in the Background
+
+`schmidt replace-agent` is a one-shot CLI that prepares the new run directory and spawns the simulation as a detached subprocess (`subprocess.Popen` with `start_new_session=True`). The CLI returns immediately with `new_run_id=...` and `new_run_dir=...`; the simulation runs independently and writes its own `<scenario>_stdout.log` inside the new run directory.
+
+Single replace-agent run, monitor pattern:
+
+```bash
+VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
+  --source-run-dir ./runs/veyru/<source_timestamp> \
+  --round-start 15 \
+  --replaced-agent-id field_observer \
+  --model gpt-5.4 --provider openai \
+  --runs-dir ./runs \
+  --knobs /tmp/replace_knobs.json
+# CLI prints new_run_id=veyru/<new_timestamp>; that subprocess is now running detached.
+# Monitor: sleep 30 → tail ./runs/veyru/<new_timestamp>/veyru_stdout.log → repeat.
+```
+
+### Parallel Replace-Agent Orchestration
+
+To run several replace-agent variants while keeping at most N simulations live, use a small bash orchestrator. Each `schmidt replace-agent` call returns in ~25s after spawning its detached `python -m schmidt run veyru ... --resume` subprocess; the orchestrator polls active simulations via `pgrep` against the `Python -m schmidt run ... --resume` cmdline, sleeps when full, and launches the next spec when a slot frees up.
+
+Save as `/tmp/replace_orchestrator.sh` (or anywhere outside the repo so it doesn't get committed):
+
+```bash
+#!/bin/bash
+cd /Users/nsander/workspace/schmidt-poc
+
+SOURCE=runs/veyru/<source_timestamp>
+KNOBS=/tmp/replace_knobs.json   # e.g. {"postmortem_disabled_at_start": true}
+RUNS_DIR=runs
+MAX_PARALLEL=3
+LOG=/tmp/replace_orchestrator.log
+
+# Each spec is "round_start rounds_after_swap".
+queue=(
+  "15 10"
+  "20 5"
+  "10 15"
+)
+
+count_running() {
+  # Match the python simulation processes only — capital "Python" comes from
+  # the homebrew python.framework binary path, so bash/pgrep subshells that
+  # mention the pattern as a literal string do not match.
+  pgrep -f "Python -m schmidt run veyru .* --resume" 2>/dev/null | wc -l | tr -d ' '
+}
+
+echo "=== Started at $(date) ===" >> "$LOG"
+for spec in "${queue[@]}"; do
+  read -r round_start rounds_after_swap <<< "$spec"
+  while [ "$(count_running)" -ge "$MAX_PARALLEL" ]; do
+    sleep 30
+  done
+  echo "$(date): launching round_start=$round_start rounds_after_swap=$rounds_after_swap" >> "$LOG"
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
+    --source-run-dir "$SOURCE" \
+    --round-start "$round_start" \
+    --rounds-after-swap "$rounds_after_swap" \
+    --replaced-agent-id field_observer \
+    --model gpt-5.4 --provider openai \
+    --runs-dir "$RUNS_DIR" \
+    --knobs "$KNOBS" >> "$LOG" 2>&1
+  sleep 2  # let claim_run_dir get a unique unix-second slot
+done
+echo "$(date): all launches complete" >> "$LOG"
+```
+
+Launch the orchestrator detached so it survives the session:
+
+```bash
+nohup bash /tmp/replace_orchestrator.sh > /tmp/replace_orchestrator.stdout 2>&1 &
+disown
+```
+
+Monitoring pattern (every ~30s):
+
+```bash
+tail -20 /tmp/replace_orchestrator.log
+pgrep -af "Python -m schmidt run veyru .* --resume"
+```
+
+`pgrep` pitfalls:
+- The pattern **must** anchor on `Python` (capital) so bash/zsh subshells that contain the string verbatim don't false-match. The same applies to any wrapper command (e.g. a `Bash` tool call running `pgrep` on a string that quotes the pattern — that command's argv contains the pattern, and a loose pattern like `schmidt run veyru` will count it).
+- Same caveat for the orchestrator's `count_running` function — keep it in a function (not inlined into a wrapping command) and use the tight pattern.
+
+The orchestrator has no automatic recovery: if it dies, simulations keep running but no further launches happen. To resume, recompute the remaining queue (subtract already-launched specs from your full plan) and relaunch with the trimmed `queue=(...)`.
 
 ## Running Evaluations
 

@@ -111,6 +111,7 @@ async def fork_run(
         target_message_id=body.target_message_id,
         message_edits=message_edits,
         agent_filters={},
+        cutoff_round=None,
     )
 
     # Write fork manifest for provenance tracking.

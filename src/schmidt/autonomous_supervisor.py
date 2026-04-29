@@ -82,6 +82,7 @@ class AutonomousSupervisor:
                     reason=RunStatus.ERROR,
                     total_messages=total,
                     total_cost_usd=0.0,
+                    round_number=self._event_logger.current_round,
                 )
             )
             raise
@@ -242,6 +243,7 @@ class AutonomousSupervisor:
                     channel_ids=[ch.channel_id for ch in channels],
                     scenario_config=self._scenario.get_scenario_config(),
                     provider=self._provider,
+                    round_number=0,
                 )
             )
         for config in self._agent_configs:
@@ -256,6 +258,7 @@ class AutonomousSupervisor:
                     model=config.model,
                     provider=config.provider,
                     max_tokens=config.max_tokens,
+                    round_number=0,
                 )
             )
 
@@ -308,6 +311,7 @@ class AutonomousSupervisor:
                     agent_id=config.agent_id,
                     role_name=config.role_name,
                     model=config.model,
+                    round_number=self._event_logger.current_round,
                 )
             )
             logger.info("Launched agent %s (%s)", config.agent_id, config.role_name)
@@ -383,6 +387,7 @@ class AutonomousSupervisor:
                 reason=termination_status,
                 total_messages=total_messages,
                 total_cost_usd=total_cost_usd,
+                round_number=self._event_logger.current_round,
             )
         )
         logger.info(
