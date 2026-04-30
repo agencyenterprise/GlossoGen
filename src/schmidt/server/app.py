@@ -23,6 +23,7 @@ from schmidt.server.response_models import AuthVerifyResponse, HealthResponse, H
 from schmidt.server.runs.artifact_router import router as artifact_export_router
 from schmidt.server.runs.bundle_router import router as bundle_router
 from schmidt.server.runs.fork_router import router as fork_router
+from schmidt.server.runs.prod_upload_router import router as prod_upload_router
 from schmidt.server.runs.replace_agent_router import router as replace_agent_router
 from schmidt.server.runs.router import router as runs_router
 from schmidt.server.scenarios.router import router as scenarios_router
@@ -34,6 +35,8 @@ logger = logging.getLogger(__name__)
 _app_password = os.environ.get("APP_PASSWORD")
 _oauth_issuer_url = os.environ.get("OAUTH_ISSUER_URL")
 _runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs"))
+_prod_api_url = os.environ.get("PROD_API_URL")
+_prod_password = os.environ.get("PROD_PASSWORD")
 
 
 class _StubSessionManager:
@@ -63,8 +66,12 @@ def _parse_allowed_origins() -> list[str]:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Store the configured runs directory, init OAuth storage, and start MCP."""
     app.state.runs_dir = _runs_dir
+    app.state.prod_api_url = _prod_api_url
+    app.state.prod_password = _prod_password
     _runs_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Serving runs from: %s", _runs_dir)
+    if _prod_api_url and _prod_password:
+        logger.info("Prod upload target configured: %s", _prod_api_url)
 
     # Initialize OAuth storage.
     if _oauth_storage is not None:
@@ -101,6 +108,7 @@ app.include_router(replace_agent_router)
 app.include_router(pdf_export_router)
 app.include_router(artifact_export_router)
 app.include_router(bundle_router)
+app.include_router(prod_upload_router)
 app.include_router(scenarios_router)
 
 # MCP server with OAuth. Requires OAUTH_ISSUER_URL to be set.

@@ -73,7 +73,7 @@ def _pack_git_objects(run_dir: Path) -> None:
     )
 
 
-def _build_bundle_bytes(
+def build_bundle_bytes(
     run_dir: Path,
     run_id: str,
     scenario_name: str,
@@ -134,7 +134,7 @@ async def export_run_bundle(
     original_timestamp = int(resolved.run_dir.name.split("_")[0])
 
     bundle_bytes = await asyncio.to_thread(
-        _build_bundle_bytes,
+        build_bundle_bytes,
         resolved.run_dir,
         run_id,
         resolved.scenario_name,

@@ -975,6 +975,84 @@
         }
       }
     },
+    "/api/prod-upload/status": {
+      "get": {
+        "summary": "Prod Upload Status",
+        "description": "Report whether prod upload is configured on this server.",
+        "operationId": "prod_upload_status_api_prod_upload_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProdUploadStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{scenario}/{run_dir_name}/upload-to-prod": {
+      "post": {
+        "summary": "Upload Run To Prod",
+        "description": "Upload a single local run to the configured prod server.\n\nDefault: returns ``already_present`` when prod already has the run; the\nbundle is neither rebuilt nor re-uploaded. Pass ``?force=true`` to\ndelete the remote run first and re-upload, returning ``overridden``.",
+        "operationId": "upload_run_to_prod_api_runs__scenario___run_dir_name__upload_to_prod_post",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "run_dir_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Dir Name"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Force"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProdUploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/scenarios": {
       "get": {
         "summary": "List Scenarios",
@@ -1886,6 +1964,60 @@
         ],
         "title": "NoteResponse",
         "description": "Lightweight response for fetching a run's note content."
+      },
+      "ProdUploadOutcome": {
+        "type": "string",
+        "enum": [
+          "uploaded",
+          "already_present",
+          "overridden"
+        ],
+        "title": "ProdUploadOutcome",
+        "description": "Outcome of a single-run prod upload."
+      },
+      "ProdUploadResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ProdUploadOutcome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "outcome"
+        ],
+        "title": "ProdUploadResponse",
+        "description": "Result of uploading one run to the configured prod server."
+      },
+      "ProdUploadStatusResponse": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "prod_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prod Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "configured",
+          "prod_url"
+        ],
+        "title": "ProdUploadStatusResponse",
+        "description": "Whether prod upload is configured on this server."
       },
       "ReasoningEntry": {
         "properties": {

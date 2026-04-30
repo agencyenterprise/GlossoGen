@@ -11,17 +11,22 @@ import {
 } from "react";
 import {
   ArrowLeftRight,
+  Check,
   ChevronDown,
+  CloudUpload,
   Download,
   FolderArchive,
   Hash,
+  Loader2,
   Package,
   Pencil,
   UserCog,
   UserPlus,
 } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Tooltip } from "@/shared/components/ui/tooltip";
-import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
+import { api, downloadAuthenticatedFile } from "@/shared/lib/api-client";
+import { splitRunId } from "@/shared/lib/run-id";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
@@ -172,6 +177,52 @@ export function ChatPane({
   roundEndings,
   resumeCutoffTimestamp,
 }: ChatPaneProps) {
+  const prodUploadStatus = useQuery({
+    queryKey: ["prod-upload-status"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/prod-upload/status");
+      if (error) throw new Error("Failed to load prod upload status");
+      return data;
+    },
+  });
+  const [prodUploadJustSucceeded, setProdUploadJustSucceeded] = useState(false);
+  const prodUploadMutation = useMutation({
+    mutationFn: async (variables: { force: boolean }) => {
+      const { data, error } = await api.POST(
+        "/api/runs/{scenario}/{run_dir_name}/upload-to-prod",
+        {
+          params: {
+            path: splitRunId(runId),
+            query: { force: variables.force },
+          },
+        }
+      );
+      if (error) {
+        const detail = (error as { detail?: string }).detail ?? "Upload failed";
+        throw new Error(detail);
+      }
+      return data;
+    },
+    onSuccess: data => {
+      if (data.outcome === "already_present") {
+        const prodUrl = prodUploadStatus.data?.prod_url ?? "prod";
+        if (
+          window.confirm(
+            `This run is already on ${prodUrl}. Override the existing copy with the local version?`
+          )
+        ) {
+          prodUploadMutation.mutate({ force: true });
+        }
+        return;
+      }
+      setProdUploadJustSucceeded(true);
+      window.setTimeout(() => setProdUploadJustSucceeded(false), 2000);
+    },
+    onError: err => {
+      window.alert(`Upload to prod failed: ${err instanceof Error ? err.message : String(err)}`);
+    },
+  });
+
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerContentRef = useRef<HTMLDivElement>(null);
@@ -504,6 +555,29 @@ export function ChatPane({
             <Package className="h-3.5 w-3.5" />
           </button>
         </Tooltip>
+        {prodUploadStatus.data?.configured && (
+          <Tooltip label={`Upload to ${prodUploadStatus.data.prod_url}`}>
+            <button
+              aria-label="Upload to prod"
+              disabled={prodUploadMutation.isPending}
+              className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+              onClick={() => {
+                if (!window.confirm(`Upload this run to ${prodUploadStatus.data?.prod_url}?`)) {
+                  return;
+                }
+                prodUploadMutation.mutate({ force: false });
+              }}
+            >
+              {prodUploadMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : prodUploadJustSucceeded ? (
+                <Check className="h-3.5 w-3.5 text-green-600" />
+              ) : (
+                <CloudUpload className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </Tooltip>
+        )}
       </div>
 
       {currentVisibleRound !== null ? (

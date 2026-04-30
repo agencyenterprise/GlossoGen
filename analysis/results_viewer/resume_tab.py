@@ -31,6 +31,18 @@ _VIEW_WINDOW = "window accuracy"
 _VIEW_OPTIONS = (_VIEW_PER_ROUND, _VIEW_WINDOW)
 
 
+def _window_resumed_series(run: ResumeRun) -> str:
+    """Window-view series key for the resumed line, split by bugfix tag."""
+    suffix = " · bugfix" if run.has_bugfix() else ""
+    return f"{run.replacement_model}{suffix} · resumed"
+
+
+def _window_source_series(run: ResumeRun) -> str:
+    """Window-view series key for the matched source line, split by bugfix tag."""
+    suffix = " · bugfix" if run.has_bugfix() else ""
+    return f"{run.replacement_model}{suffix} · source"
+
+
 def _render_view_selector() -> str:
     """Radio letting the user pick which chart is shown."""
     chosen = st.radio(
@@ -186,7 +198,13 @@ def _build_figure(
         xs, ys, hover = replica_dots.get(series, ([], [], []))
         if xs:
             add_replica_trace(
-                fig=fig, series=series, xs=xs, ys=ys, hover_texts=hover, colour=colour
+                fig=fig,
+                series=series,
+                xs=xs,
+                ys=ys,
+                hover_texts=hover,
+                colour=colour,
+                customdata=None,
             )
         add_mean_trace(
             fig=fig,
@@ -267,12 +285,12 @@ def _aggregate_window_stats(
     """
     buckets: dict[tuple[str, int], list[float]] = {}
     for run in runs:
-        resumed_key = (f"{run.replacement_model} · resumed", run.round_start)
+        resumed_key = (_window_resumed_series(run=run), run.round_start)
         buckets.setdefault(resumed_key, []).append(_resumed_window_accuracy(run=run))
         source_value = _source_window_accuracy(run=run)
         if source_value is None:
             continue
-        source_key = (f"{run.replacement_model} · source", run.round_start)
+        source_key = (_window_source_series(run=run), run.round_start)
         buckets.setdefault(source_key, []).append(source_value)
     stats: list[SeriesStats] = []
     for (series, round_start), values in sorted(buckets.items()):
@@ -301,8 +319,8 @@ def _window_replica_dots(
     counter: dict[str, int] = {}
     for run in runs:
         for series, value in (
-            (f"{run.replacement_model} · resumed", _resumed_window_accuracy(run=run)),
-            (f"{run.replacement_model} · source", _source_window_accuracy(run=run)),
+            (_window_resumed_series(run=run), _resumed_window_accuracy(run=run)),
+            (_window_source_series(run=run), _source_window_accuracy(run=run)),
         ):
             if value is None:
                 continue
@@ -334,7 +352,13 @@ def _build_window_figure(
         xs, ys, hover = replica_dots.get(series, ([], [], []))
         if xs:
             add_replica_trace(
-                fig=fig, series=series, xs=xs, ys=ys, hover_texts=hover, colour=colour
+                fig=fig,
+                series=series,
+                xs=xs,
+                ys=ys,
+                hover_texts=hover,
+                colour=colour,
+                customdata=None,
             )
         dash = "dash" if series.endswith(" · source") else "solid"
         add_mean_trace(

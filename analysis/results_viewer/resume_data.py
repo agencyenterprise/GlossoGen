@@ -77,9 +77,18 @@ class ResumeRun(NamedTuple):
     source_round_outcomes: dict[int, bool]
     labels: list[str]
 
+    def has_bugfix(self) -> bool:
+        """Whether this run carries the ``bugfix`` label (cost-capture fix applied)."""
+        return "bugfix" in self.labels
+
     def resumed_series_key(self) -> str:
-        """Plot-series identifier for this run's resume bucket."""
-        return f"{self.replacement_model} · R{self.round_start}"
+        """Plot-series identifier for this run's resume bucket.
+
+        Runs with the ``bugfix`` label are placed on a separate series so the
+        chart can compare pre- and post-fix replicas side by side.
+        """
+        suffix = " · bugfix" if self.has_bugfix() else ""
+        return f"{self.replacement_model} · R{self.round_start}{suffix}"
 
     def source_series_key(self) -> str:
         """Plot-series identifier for this run's source line."""
