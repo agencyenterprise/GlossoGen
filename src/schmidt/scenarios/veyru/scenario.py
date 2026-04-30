@@ -739,7 +739,13 @@ class VeyruScenario(SimulationScenario):
         ``VEYRU HAS COLLAPSED`` marker the budget-exceeded path emits.
         """
         _ = round_number
-        await self._world.mark_unstabilized_teams_collapsed(reason=f"Round ended via {trigger}.")
+        if trigger == "all_agents_idle":
+            reason = "Agents stopped acting before the Veyru was fully stabilized."
+        elif trigger == "round_timeout":
+            reason = "Round duration limit reached before the Veyru was fully stabilized."
+        else:
+            reason = "Round ended before the Veyru was fully stabilized."
+        await self._world.mark_unstabilized_teams_collapsed(reason=reason)
 
     async def on_round_advanced(self, round_number: int) -> None:
         """Finalize previous Veyru outcomes, prepare the next case, handle swap/intern."""
