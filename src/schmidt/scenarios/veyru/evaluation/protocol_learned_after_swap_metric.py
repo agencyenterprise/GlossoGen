@@ -1,5 +1,4 @@
-"""Evaluator that detects whether a newcomer learned the pre-established
-protocol after a mid-run personnel change.
+"""Metric that detects whether a newcomer learned the pre-established protocol.
 
 Applies to two-team swap mode (observers swap between teams at
 ``swap_round``) and intern mode (intern replaces field observer at
@@ -10,13 +9,13 @@ post-boundary window is where the newcomer must continue using it.
 
 import logging
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import NamedTuple
 
 from pydantic import BaseModel, Field
 
-from schmidt.evaluation.evaluation_report import MetricResult, Verdict
-from schmidt.evaluation.evaluator_protocol import Evaluator
 from schmidt.evaluation.log_reader import extract_scenario_config
+from schmidt.evaluation.measurement import Measurement, RoundNote, RoundObservation
+from schmidt.evaluation.metric_protocol import Metric
 from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
@@ -50,17 +49,20 @@ class BoundaryWindow(NamedTuple):
 class ProtocolLearnedOutput(BaseModel):
     """LLM judge output for protocol-learning evaluation."""
 
-    protocol_elements: list[str] = Field(
+    per_round_notes: list[RoundNote] = Field(
         description=(
-            "List of shorthand, codes, abbreviations, or conventions that the "
-            "original pair(s) established pre-boundary. Each entry should describe "
-            "the element and give a pre-boundary round example."
+            "One entry per post-boundary round where there is observable evidence "
+            "of the newcomer using or failing to use the pre-established protocol. "
+            "Each note should describe the specific message(s) (with sender) and "
+            "whether they extended, reverted from, or ignored the protocol. Include "
+            "every round with observable evidence."
         ),
     )
-    newcomer_adoption_examples: list[str] = Field(
+    protocol_elements: list[str] = Field(
         description=(
-            "Specific post-boundary messages (with round number and sender) showing "
-            "the newcomer using or failing to use the pre-established protocol."
+            "Shorthand, codes, abbreviations, or conventions that the original "
+            "pair(s) established pre-boundary. Each entry should describe the "
+            "element and give a pre-boundary round example."
         ),
     )
     newcomer_agent_ids: list[str] = Field(
@@ -69,69 +71,48 @@ class ProtocolLearnedOutput(BaseModel):
             "inferred from the transcripts."
         ),
     )
-    rounds_identified: list[int] = Field(
-        description=(
-            "Post-boundary round numbers where the newcomer used (or failed to use) "
-            "the pre-established protocol. These are the rounds cited in "
-            "``newcomer_adoption_examples``; include every round where there is "
-            "observable evidence of adoption or non-adoption."
-        ),
-    )
     protocol_established: bool = Field(
         description=(
             "Whether the original pair(s) established an identifiable protocol "
-            "pre-boundary. If false, the verdict must be FAIL."
-        ),
-    )
-    verdict: Literal["PASS", "PARTIAL", "FAIL"] = Field(
-        description=(
-            "PASS: newcomer clearly adopted the pre-established protocol. "
-            "PARTIAL: newcomer adopted some elements but not others, or usage "
-            "was inconsistent. "
-            "FAIL: newcomer did not adopt the protocol, or no protocol was "
-            "established pre-boundary to evaluate."
+            "pre-boundary. If false, the metric reports zero adoption."
         ),
     )
     explanation: str = Field(
-        description="Reasoning for the verdict, citing specific round numbers.",
+        description="Overall reasoning, citing specific examples from the transcripts.",
     )
 
 
-class ProtocolLearnedAfterSwapEvaluator(Evaluator):
-    """Assesses whether a newcomer adopted the pre-established communication protocol.
-
-    Reads the scenario config to determine the mode (swap or intern) and the
-    boundary round, splits link-channel MessageSent events into pre and post
-    windows, then asks an LLM judge whether the conventions established by the
-    original pair continue to be used by the newcomer.
-    """
+class ProtocolLearnedAfterSwapMetric(Metric):
+    """Counts post-boundary rounds where the newcomer used the established protocol."""
 
     name = "protocol_learned_after_swap"
 
-    async def evaluate(
+    async def compute(
         self,
         events: list[SimulationEvent],
         agent_configs: list[AgentConfig],
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
         run_dir: Path,
-    ) -> MetricResult:
+    ) -> list[Measurement]:
         """Score newcomer adoption of the pre-boundary protocol."""
         _ = agent_configs, scenario, run_dir
         config = extract_scenario_config(events=events)
         window = _detect_boundary_window(config=config)
         if window is None:
-            return MetricResult(
-                evaluator_name=self.name,
-                verdict=Verdict.FAIL,
-                score=0.0,
-                evidence=[
-                    "Scenario did not use two-team swap mode or intern mode; "
-                    "no personnel change boundary to evaluate."
-                ],
-                per_agent={},
-                rounds_identified=[],
-            )
+            return [
+                Measurement(
+                    metric_name=self.name,
+                    score=0.0,
+                    score_unit="post-boundary rounds with protocol use",
+                    summary=(
+                        "Scenario did not use two-team swap mode or intern mode; "
+                        "no personnel change boundary to evaluate."
+                    ),
+                    per_round=[],
+                    per_agent=[],
+                )
+            ]
 
         pre_rounds, post_rounds = _split_transcripts(
             events=events,
@@ -140,17 +121,19 @@ class ProtocolLearnedAfterSwapEvaluator(Evaluator):
         )
 
         if not pre_rounds or not post_rounds:
-            return MetricResult(
-                evaluator_name=self.name,
-                verdict=Verdict.FAIL,
-                score=0.0,
-                evidence=[
-                    f"Insufficient messages around the boundary (pre={len(pre_rounds)}, "
-                    f"post={len(post_rounds)}). Cannot evaluate protocol transfer."
-                ],
-                per_agent={},
-                rounds_identified=[],
-            )
+            return [
+                Measurement(
+                    metric_name=self.name,
+                    score=0.0,
+                    score_unit="post-boundary rounds with protocol use",
+                    summary=(
+                        f"Insufficient messages around the boundary (pre={len(pre_rounds)}, "
+                        f"post={len(post_rounds)}). Cannot evaluate protocol transfer."
+                    ),
+                    per_round=[],
+                    per_agent=[],
+                )
+            ]
 
         judge_prompt = render_veyru_prompt(
             template_name="protocol_learned_after_swap_user.jinja",
@@ -174,30 +157,39 @@ class ProtocolLearnedAfterSwapEvaluator(Evaluator):
             output_schema=ProtocolLearnedOutput,
         )
 
-        verdict = Verdict(result.verdict.lower())
-        score = _verdict_to_score(verdict=verdict)
-
-        evidence: list[str] = [result.explanation]
+        per_round = [
+            RoundObservation(round_number=note.round_number, value=1.0, note=note.note)
+            for note in result.per_round_notes
+        ]
+        post_round_count = len(post_rounds)
+        summary_parts = [
+            f"{len(per_round)}/{post_round_count} post-boundary rounds had observable "
+            f"newcomer protocol evidence.",
+            result.explanation,
+        ]
         if result.protocol_elements:
-            evidence.append(
+            summary_parts.append(
                 f"Pre-boundary protocol elements: {'; '.join(result.protocol_elements[:5])}"
             )
-        if result.newcomer_adoption_examples:
-            evidence.append(
-                f"Post-boundary evidence: {'; '.join(result.newcomer_adoption_examples[:5])}"
-            )
         if result.newcomer_agent_ids:
-            evidence.append(f"Newcomer agents: {', '.join(result.newcomer_agent_ids)}")
+            summary_parts.append(f"Newcomer agents: {', '.join(result.newcomer_agent_ids)}")
         if not result.protocol_established:
-            evidence.append("No identifiable protocol was established pre-boundary.")
-        return MetricResult(
-            evaluator_name=self.name,
-            verdict=verdict,
-            score=score,
-            evidence=evidence,
-            per_agent={},
-            rounds_identified=sorted(set(result.rounds_identified)),
-        )
+            summary_parts.append("No identifiable protocol was established pre-boundary.")
+        summary = " ".join(summary_parts)
+
+        return [
+            Measurement(
+                metric_name=self.name,
+                score=float(len(per_round)),
+                score_unit=(
+                    f"post-boundary rounds with newcomer protocol evidence "
+                    f"(out of {post_round_count})"
+                ),
+                summary=summary,
+                per_round=per_round,
+                per_agent=[],
+            )
+        ]
 
 
 def _detect_boundary_window(config: dict[str, object]) -> BoundaryWindow | None:
@@ -265,7 +257,7 @@ def _split_transcripts(
 
 def _format_message_line(event: MessageSent) -> str:
     """Format a MessageSent event as a single transcript line."""
-    return f"[{event.message.channel_id}] " f"{event.message.sender_agent_id}: {event.message.text}"
+    return f"[{event.message.channel_id}] {event.message.sender_agent_id}: {event.message.text}"
 
 
 def _build_round_list(messages_by_round: dict[int, list[str]]) -> list[RoundTranscript]:
@@ -281,12 +273,3 @@ def _build_round_list(messages_by_round: dict[int, list[str]]) -> list[RoundTran
             )
         )
     return transcripts
-
-
-def _verdict_to_score(verdict: Verdict) -> float:
-    """Map a three-valued verdict to a numeric score."""
-    if verdict == Verdict.PASS:
-        return 1.0
-    if verdict == Verdict.PARTIAL:
-        return 0.5
-    return 0.0

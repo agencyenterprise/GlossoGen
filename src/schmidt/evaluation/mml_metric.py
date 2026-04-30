@@ -1,13 +1,13 @@
-"""Mean Length of Utterance (MLU) evaluator for primary-channel messages.
+"""Mean Message Length (MML) metric for primary-channel messages.
 
-Computes the average word count per message sent on the scenario's primary
-channel, where "word" is defined as a whitespace-delimited token. Aggregates
-per-round and overall statistics into the result's evidence. Verdict is
-always ``PARTIAL`` -- this evaluator reports numbers, not a classification.
+Computes the mean number of whitespace-delimited words per message sent on
+the scenario's primary channel. Aggregates per-round and overall statistics.
+Deterministic — does not consult the LLM provider.
 
-Complements the perplexity evaluator: perplexity captures *how surprising*
-each token is, MLU captures *how long the messages are*. A compressed or
-coded protocol typically pushes perplexity up and MLU down.
+Pairs with ``mean_word_length``: MML asks "how verbose is each message?"
+while MWL asks "how compact are the words themselves?". A run with short
+messages of long words has low MML and high MWL; a run with long messages
+of short codes has high MML and low MWL.
 """
 
 import logging
@@ -15,8 +15,8 @@ import math
 from pathlib import Path
 from typing import NamedTuple
 
-from schmidt.evaluation.evaluation_report import MetricResult, Verdict
-from schmidt.evaluation.evaluator_protocol import Evaluator
+from schmidt.evaluation.measurement import Measurement, RoundObservation
+from schmidt.evaluation.metric_protocol import Metric
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import MessageSent, SimulationEvent
@@ -25,7 +25,7 @@ from schmidt.scenario_protocol import SimulationScenario
 logger = logging.getLogger(__name__)
 
 
-class RoundMLU(NamedTuple):
+class RoundMML(NamedTuple):
     """Per-round aggregate of mean word count across primary-channel messages."""
 
     round_number: int
@@ -41,56 +41,60 @@ class RoundMessages(NamedTuple):
     texts: list[str]
 
 
-class MLUEvaluator(Evaluator):
+class MMLMetric(Metric):
     """Reports per-round mean words-per-message of primary-channel messages.
 
     Splits each primary-channel message on whitespace, counts tokens, and
-    averages. Returns ``PARTIAL`` with a numeric ``score`` equal to the
-    overall mean words-per-message across the run (flattened, not mean of
-    round means). Scenarios without a primary channel get a no-op result.
+    averages. The headline ``score`` is the overall mean words/message
+    across the run (flattened, not mean of round means). Scenarios without
+    a primary channel get a no-op result.
     """
 
-    name = "mean_length_utterance"
+    name = "mean_message_length"
 
-    async def evaluate(
+    async def compute(
         self,
         events: list[SimulationEvent],
         agent_configs: list[AgentConfig],
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
         run_dir: Path,
-    ) -> MetricResult:
+    ) -> list[Measurement]:
         """Score primary-channel messages and report per-round word-count stats."""
         _ = agent_configs, llm_provider, run_dir
         primary_channel_id = scenario.get_primary_channel_id()
         if primary_channel_id is None:
-            return MetricResult(
-                evaluator_name=self.name,
-                verdict=Verdict.PARTIAL,
-                score=0.0,
-                evidence=["scenario has no primary channel; mlu evaluator skipped"],
-                per_agent={},
-                rounds_identified=[],
-            )
+            return [
+                Measurement(
+                    metric_name=self.name,
+                    score=0.0,
+                    score_unit="words/message",
+                    summary="scenario has no primary channel; mml metric skipped",
+                    per_round=[],
+                    per_agent=[],
+                )
+            ]
 
         rounds = _collect_primary_messages_by_round(
             events=events,
             primary_channel_id=primary_channel_id,
         )
         if not rounds:
-            return MetricResult(
-                evaluator_name=self.name,
-                verdict=Verdict.PARTIAL,
-                score=0.0,
-                evidence=[
-                    f"no messages found on primary channel {primary_channel_id!r}; "
-                    "mlu evaluator has nothing to score",
-                ],
-                per_agent={},
-                rounds_identified=[],
-            )
+            return [
+                Measurement(
+                    metric_name=self.name,
+                    score=0.0,
+                    score_unit="words/message",
+                    summary=(
+                        f"no messages found on primary channel {primary_channel_id!r}; "
+                        "mml metric has nothing to score"
+                    ),
+                    per_round=[],
+                    per_agent=[],
+                )
+            ]
 
-        round_mlus = [_score_round(round_messages=rm) for rm in rounds]
+        round_mmls = [_score_round(round_messages=rm) for rm in rounds]
 
         all_word_counts = [
             float(_word_count(text=text))
@@ -101,31 +105,36 @@ class MLUEvaluator(Evaluator):
         overall_mean = _mean(values=all_word_counts)
         overall_std = _std(values=all_word_counts, mean=overall_mean)
 
-        evidence = [
-            f"mlu unit: words (whitespace split); primary channel: {primary_channel_id}",
-            f"scored {total_messages} messages across {len(round_mlus)} rounds",
-            (f"overall mean words/message: {overall_mean:.2f} " f"(std {overall_std:.2f})"),
-        ]
-        for rm in round_mlus:
-            evidence.append(
-                f"round {rm.round_number}: mean={rm.mean_words:.2f} "
-                f"std={rm.std_words:.2f} n={rm.message_count}"
+        per_round = [
+            RoundObservation(
+                round_number=rm.round_number,
+                value=rm.mean_words,
+                note=f"{rm.message_count} messages, std={rm.std_words:.2f}",
             )
+            for rm in round_mmls
+        ]
+        summary = (
+            f"{total_messages} messages on {primary_channel_id} across "
+            f"{len(round_mmls)} rounds; mean {overall_mean:.2f} words/message "
+            f"(std {overall_std:.2f})"
+        )
 
         logger.info(
-            "mlu evaluator: %.2f words/msg over %d msgs in %d rounds",
+            "mml metric: %.2f words/msg over %d msgs in %d rounds",
             overall_mean,
             total_messages,
-            len(round_mlus),
+            len(round_mmls),
         )
-        return MetricResult(
-            evaluator_name=self.name,
-            verdict=Verdict.PARTIAL,
-            score=overall_mean,
-            evidence=evidence,
-            per_agent={},
-            rounds_identified=[],
-        )
+        return [
+            Measurement(
+                metric_name=self.name,
+                score=overall_mean,
+                score_unit="words/message",
+                summary=summary,
+                per_round=per_round,
+                per_agent=[],
+            )
+        ]
 
 
 def _collect_primary_messages_by_round(
@@ -153,12 +162,12 @@ def _word_count(text: str) -> int:
     return len(text.split())
 
 
-def _score_round(round_messages: RoundMessages) -> RoundMLU:
-    """Aggregate word counts for a round's messages into a RoundMLU."""
+def _score_round(round_messages: RoundMessages) -> RoundMML:
+    """Aggregate word counts for a round's messages into a RoundMML."""
     counts = [float(_word_count(text=text)) for text in round_messages.texts]
     mean_words = _mean(values=counts)
     std_words = _std(values=counts, mean=mean_words)
-    return RoundMLU(
+    return RoundMML(
         round_number=round_messages.round_number,
         mean_words=mean_words,
         std_words=std_words,

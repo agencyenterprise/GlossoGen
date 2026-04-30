@@ -27,7 +27,6 @@ import { buildAgentColorMap, buildChannelColorMap } from "./agent-colors";
 import { AgentDrawer } from "./agent-drawer";
 import { ChatPane } from "./chat-pane";
 import { CollapsibleConfigBadges } from "./collapsible-config-badges";
-import { EvalVerdictSummary } from "./eval-verdict-summary";
 import { mergeEntries } from "./display-entry";
 import { LabelBadges } from "./eval-label-group";
 import { EvalLogPanel } from "./eval-log-panel";
@@ -581,13 +580,13 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
         />
       ) : null}
 
-      {/* Eval verdict summary (plain text, separated from labels) */}
-      <EvalVerdictSummary labels={restData.labels} size="md" containerClassName="mb-3 shrink-0" />
-
-      {/* Regular labels */}
+      {/* Regular labels (eval:* legacy labels are filtered out) */}
       {restData.labels.some(label => !label.startsWith("eval:")) ? (
         <div className="mb-3 flex shrink-0 flex-wrap gap-1.5">
-          <LabelBadges labels={restData.labels} size="md" />
+          <LabelBadges
+            labels={restData.labels.filter(label => !label.startsWith("eval:"))}
+            size="md"
+          />
         </div>
       ) : null}
 
@@ -739,7 +738,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
               setSelectedAgent(null);
               setSelectedChannel(channelId);
             }}
-            evalMetrics={restData.evaluation?.metrics ?? null}
+            measurements={restData.evaluation?.measurements ?? null}
           />
         ) : null}
       </div>

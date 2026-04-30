@@ -22,7 +22,7 @@ export function StartEvaluationModal({
   const queryClient = useQueryClient();
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
-  const [selectedEvaluators, setSelectedEvaluators] = useState<Set<string>>(new Set());
+  const [selectedMetrics, setSelectedMetrics] = useState<Set<string>>(new Set());
   const [initialized, setInitialized] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -36,12 +36,11 @@ export function StartEvaluationModal({
     },
   });
 
-  // Initialize all evaluators as selected once data loads
   const scenarioInfo = data?.scenarios.find(s => s.scenario_name === scenarioName);
-  const availableEvaluators = scenarioInfo?.available_evaluators ?? [];
+  const availableMetrics = scenarioInfo?.available_metrics ?? [];
 
-  if (!initialized && availableEvaluators.length > 0 && data) {
-    setSelectedEvaluators(new Set(availableEvaluators));
+  if (!initialized && availableMetrics.length > 0 && data) {
+    setSelectedMetrics(new Set(availableMetrics));
     const haiku = data.models.find(m => m.model_prefix.includes("haiku"));
     if (haiku) {
       setModel(haiku.model_prefix);
@@ -55,8 +54,8 @@ export function StartEvaluationModal({
     setProvider(selectedProvider);
   }
 
-  function toggleEvaluator(name: string) {
-    setSelectedEvaluators(prev => {
+  function toggleMetric(name: string) {
+    setSelectedMetrics(prev => {
       const next = new Set(prev);
       if (next.has(name)) {
         next.delete(name);
@@ -68,11 +67,11 @@ export function StartEvaluationModal({
   }
 
   function selectAll() {
-    setSelectedEvaluators(new Set(availableEvaluators));
+    setSelectedMetrics(new Set(availableMetrics));
   }
 
   function selectNone() {
-    setSelectedEvaluators(new Set());
+    setSelectedMetrics(new Set());
   }
 
   const startMutation = useMutation({
@@ -82,7 +81,7 @@ export function StartEvaluationModal({
         body: {
           model,
           provider,
-          evaluators: [...selectedEvaluators],
+          metrics: [...selectedMetrics],
         },
       });
       if (error) {
@@ -100,7 +99,7 @@ export function StartEvaluationModal({
     },
   });
 
-  const canSubmit = model && provider && selectedEvaluators.size > 0;
+  const canSubmit = model && provider && selectedMetrics.size > 0;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -127,10 +126,10 @@ export function StartEvaluationModal({
               onSelect={handleModelSelect}
             />
 
-            {/* Evaluators */}
+            {/* Metrics */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium">Evaluators</span>
+                <span className="text-xs font-medium">Metrics</span>
                 <span className="flex gap-2 text-[11px] text-muted-foreground">
                   <button type="button" className="hover:text-foreground" onClick={selectAll}>
                     All
@@ -141,15 +140,15 @@ export function StartEvaluationModal({
                 </span>
               </div>
               <div className="max-h-48 space-y-0.5 overflow-y-auto rounded-md border border-input p-2">
-                {availableEvaluators.map(name => (
+                {availableMetrics.map(name => (
                   <label
                     key={name}
                     className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs transition-colors hover:bg-muted/50"
                   >
                     <input
                       type="checkbox"
-                      checked={selectedEvaluators.has(name)}
-                      onChange={() => toggleEvaluator(name)}
+                      checked={selectedMetrics.has(name)}
+                      onChange={() => toggleMetric(name)}
                       className="rounded border-input"
                     />
                     {humanize(name)}

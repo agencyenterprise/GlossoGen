@@ -20,14 +20,14 @@ from typing import Any, NamedTuple, Self
 from schmidt.evaluation.evaluation_cost import compute_evaluation_cost
 from schmidt.evaluation.evaluation_report import (
     EvaluationReport,
-    MetricResult,
     load_report,
-    merge_metrics,
+    merge_measurements,
     write_report,
 )
-from schmidt.evaluation.evaluator_protocol import EvaluatorFactory
-from schmidt.evaluation.evaluator_registry import GENERIC_EVALUATOR_REGISTRY
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
+from schmidt.evaluation.measurement import Measurement
+from schmidt.evaluation.metric_protocol import MetricFactory
+from schmidt.evaluation.metric_registry import GENERIC_METRIC_REGISTRY
 from schmidt.event_logger import EventLogger
 from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig, AgentRole
@@ -42,10 +42,10 @@ from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, reso
 from schmidt.runtime.scenario_world import ScenarioWorld, WorldContext
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.veyru.evaluation import (
-    LanguageEmergenceEvaluator,
-    ProtocolLearnedAfterSwapEvaluator,
-    RoundSuccessAfterResumeEvaluator,
-    RoundSuccessEvaluator,
+    LanguageEmergenceMetric,
+    ProtocolLearnedAfterSwapMetric,
+    RoundSuccessAfterResumeMetric,
+    RoundSuccessMetric,
 )
 from schmidt.scenarios.veyru.ids import (
     FIELD_OBSERVER_A_ROLE,
@@ -728,6 +728,19 @@ class VeyruScenario(SimulationScenario):
             return "veyru_collapsed"
         return "veyru_mixed_outcome"
 
+    async def on_round_ended(self, round_number: int, trigger: str) -> None:
+        """Mark any team that didn't stabilize as collapsed.
+
+        Without this hook, a round ending via ``all_agents_idle`` or
+        ``round_timeout`` before the character budget runs out leaves the
+        Veyru in an indeterminate state — no terminal world event fires,
+        and the round shows as a gap in the timeline. We treat it as a
+        failure (agents gave up before stabilizing) and emit the same
+        ``VEYRU HAS COLLAPSED`` marker the budget-exceeded path emits.
+        """
+        _ = round_number
+        await self._world.mark_unstabilized_teams_collapsed(reason=f"Round ended via {trigger}.")
+
     async def on_round_advanced(self, round_number: int) -> None:
         """Finalize previous Veyru outcomes, prepare the next case, handle swap/intern."""
         self._world.consume_swap_just_happened()
@@ -1110,37 +1123,37 @@ class VeyruScenario(SimulationScenario):
     # --- Evaluation ---
 
     @classmethod
-    def get_available_evaluator_names(cls) -> list[str]:
-        """Return generic and Veyru-specific evaluator names."""
-        generic = super().get_available_evaluator_names()
+    def get_available_metric_names(cls) -> list[str]:
+        """Return generic and Veyru-specific metric names."""
+        generic = super().get_available_metric_names()
         specific = [
-            LanguageEmergenceEvaluator.name,
-            ProtocolLearnedAfterSwapEvaluator.name,
-            RoundSuccessAfterResumeEvaluator.name,
-            RoundSuccessEvaluator.name,
+            LanguageEmergenceMetric.name,
+            ProtocolLearnedAfterSwapMetric.name,
+            RoundSuccessAfterResumeMetric.name,
+            RoundSuccessMetric.name,
         ]
         return sorted(set(generic + specific))
 
-    def _get_evaluators(self) -> dict[str, EvaluatorFactory]:
-        """Return Veyru-specific evaluators."""
+    def _get_metrics(self) -> dict[str, MetricFactory]:
+        """Return Veyru-specific metrics."""
         return {
-            LanguageEmergenceEvaluator.name: LanguageEmergenceEvaluator,
-            ProtocolLearnedAfterSwapEvaluator.name: ProtocolLearnedAfterSwapEvaluator,
-            RoundSuccessAfterResumeEvaluator.name: RoundSuccessAfterResumeEvaluator,
-            RoundSuccessEvaluator.name: RoundSuccessEvaluator,
+            LanguageEmergenceMetric.name: LanguageEmergenceMetric,
+            ProtocolLearnedAfterSwapMetric.name: ProtocolLearnedAfterSwapMetric,
+            RoundSuccessAfterResumeMetric.name: RoundSuccessAfterResumeMetric,
+            RoundSuccessMetric.name: RoundSuccessMetric,
         }
 
     async def run_evaluation(
         self,
         log_path: Path,
-        evaluator_names: list[str],
+        metric_names: list[str],
         report_path: Path,
         model: str,
         provider_name: str,
         inference_provider: str | None,
         reasoning_effort: str | None,
     ) -> EvaluationReport:
-        """Run evaluators, merge generic and Veyru-specific registries, and write a report."""
+        """Run metrics, merge generic and Veyru-specific registries, and write a report."""
         events = await load_events(log_path=log_path)
         agent_configs = extract_agent_configs(events=events)
         simulation_id = extract_simulation_id(events=events)
@@ -1151,31 +1164,48 @@ class VeyruScenario(SimulationScenario):
             reasoning_effort=reasoning_effort,
         )
 
-        registry: dict[str, EvaluatorFactory] = {}
-        registry.update(GENERIC_EVALUATOR_REGISTRY)
-        registry.update(self._get_evaluators())
+        registry: dict[str, MetricFactory] = {}
+        registry.update(GENERIC_METRIC_REGISTRY)
+        registry.update(self._get_metrics())
 
-        metrics: list[MetricResult] = []
-        for eval_name in evaluator_names:
-            if eval_name not in registry:
+        # Validate names up front so a typo fails fast before any LLM cost.
+        for metric_name in metric_names:
+            if metric_name not in registry:
                 available = ", ".join(sorted(registry.keys()))
-                raise ValueError(f"Unknown evaluator: '{eval_name}'. Available: {available}")
-            evaluator = registry[eval_name]()
-            logger.info("Running evaluator: %s", eval_name)
-            result = await evaluator.evaluate(
-                events=events,
-                agent_configs=agent_configs,
-                scenario=self,
-                llm_provider=provider,
-                run_dir=log_path.parent,
+                raise ValueError(f"Unknown metric: '{metric_name}'. Available: {available}")
+
+        new_measurements: list[Measurement] = []
+        failed_metrics: list[str] = []
+        for metric_name in metric_names:
+            metric = registry[metric_name]()
+            logger.info("Running metric: %s", metric_name)
+            try:
+                measurements = await metric.compute(
+                    events=events,
+                    agent_configs=agent_configs,
+                    scenario=self,
+                    llm_provider=provider,
+                    run_dir=log_path.parent,
+                )
+            except Exception:
+                logger.exception("Metric %s failed; continuing with remaining metrics", metric_name)
+                failed_metrics.append(metric_name)
+                continue
+            for m in measurements:
+                logger.info(
+                    "Metric %s finished: %s score=%.3f (%s)",
+                    metric_name,
+                    m.metric_name,
+                    m.score,
+                    m.score_unit,
+                )
+            new_measurements.extend(measurements)
+        if failed_metrics:
+            logger.warning(
+                "Evaluation completed with %d failed metric(s): %s",
+                len(failed_metrics),
+                ", ".join(failed_metrics),
             )
-            logger.info(
-                "Evaluator %s finished: verdict=%s, score=%.2f",
-                eval_name,
-                result.verdict,
-                result.score,
-            )
-            metrics.append(result)
 
         evaluation_cost = compute_evaluation_cost(
             usage=provider.get_accumulated_usage(),
@@ -1185,13 +1215,16 @@ class VeyruScenario(SimulationScenario):
 
         existing_report = await load_report(report_path=report_path)
         if existing_report is None:
-            merged_metrics = metrics
+            merged = new_measurements
         else:
-            merged_metrics = merge_metrics(existing=existing_report.metrics, new=metrics)
+            merged = merge_measurements(
+                existing=existing_report.measurements,
+                new=new_measurements,
+            )
         report = EvaluationReport(
             simulation_id=simulation_id,
             scenario_name=self.name(),
-            metrics=merged_metrics,
+            measurements=merged,
             evaluation_cost=evaluation_cost,
         )
         await write_report(report=report, report_path=report_path)

@@ -11,12 +11,15 @@ from analysis.results_viewer.event_extractor import load_run_timeline
 from analysis.results_viewer.run_catalog import EvaluatedRun, group_runs_by_day
 from analysis.results_viewer.timeline_plot import (
     build_timeline_figure,
-    collect_per_round_evaluators,
+    build_value_metrics_figure,
+    collect_flag_metrics,
+    collect_value_metrics,
     palette_color_for_index,
 )
-from schmidt.evaluation.evaluation_report import EvaluationReport, MetricResult
+from schmidt.evaluation.evaluation_report import EvaluationReport
+from schmidt.evaluation.measurement import Measurement
 
-_EVALUATOR_CHECKBOXES_PER_ROW = 4
+_METRIC_CHECKBOXES_PER_ROW = 4
 
 
 def _render_checkbox_filter(
@@ -95,38 +98,43 @@ def _render_run_picker(runs: list[EvaluatedRun]) -> list[EvaluatedRun]:
     )
 
 
-def _find_metric(report: EvaluationReport, evaluator_name: str) -> MetricResult | None:
-    """Return the first metric matching ``evaluator_name`` in ``report``."""
-    for metric in report.metrics:
-        if metric.evaluator_name == evaluator_name:
-            return metric
+def _find_measurement(report: EvaluationReport, metric_name: str) -> Measurement | None:
+    """Return the first measurement matching ``metric_name`` in ``report``."""
+    for measurement in report.measurements:
+        if measurement.metric_name == metric_name:
+            return measurement
     return None
 
 
-@st.dialog("Evaluator output", width="large", on_dismiss="rerun")
-def _show_evaluator_dialog(
-    run_label: str, evaluator_name: str, round_number: int, report: EvaluationReport
+@st.dialog("Metric output", width="large", on_dismiss="rerun")
+def _show_metric_dialog(
+    run_label: str, metric_name: str, round_number: int, report: EvaluationReport
 ) -> None:
-    """Modal showing the evaluator's verdict/score/evidence for a clicked point."""
-    metric = _find_metric(report=report, evaluator_name=evaluator_name)
+    """Modal showing the metric's score/summary/per-round detail for a clicked point."""
+    measurement = _find_measurement(report=report, metric_name=metric_name)
     st.markdown(f"**Run** · {run_label}")
-    st.markdown(f"**Evaluator** · {evaluator_name}")
+    st.markdown(f"**Metric** · {metric_name}")
     st.markdown(f"**Round** · {round_number}")
-    if metric is None:
-        st.warning("No metric found for this evaluator in the selected run.")
+    if measurement is None:
+        st.warning("No measurement found for this metric in the selected run.")
         return
-    st.markdown(f"**Verdict** · `{metric.verdict.value}`")
-    st.markdown(f"**Score** · {metric.score}")
-    st.markdown("**Evidence**")
-    if metric.evidence:
-        for line in metric.evidence:
-            st.markdown(f"- {line}")
-    else:
-        st.caption("No evidence recorded.")
-    if metric.per_agent:
-        st.markdown("**Per-agent verdicts**")
-        for agent_id, verdict in metric.per_agent.items():
-            st.markdown(f"- `{agent_id}` · {verdict.value}")
+    st.markdown(f"**Score** · {measurement.score} ({measurement.score_unit})")
+    st.markdown(f"**Summary** · {measurement.summary}")
+    matched = [r for r in measurement.per_round if r.round_number == round_number]
+    if matched:
+        st.markdown("**This round**")
+        for round_obs in matched:
+            st.markdown(f"- value={round_obs.value} — {round_obs.note}")
+    if measurement.per_round:
+        st.markdown("**All flagged rounds**")
+        for round_obs in measurement.per_round:
+            st.markdown(
+                f"- round {round_obs.round_number}: value={round_obs.value} — {round_obs.note}"
+            )
+    if measurement.per_agent:
+        st.markdown("**Per-agent observations**")
+        for agent_obs in measurement.per_agent:
+            st.markdown(f"- `{agent_obs.agent_id}` · value={agent_obs.value} — {agent_obs.note}")
 
 
 def _timeline_chart_key() -> str:
@@ -140,7 +148,7 @@ def _timeline_chart_key() -> str:
 
 
 def _maybe_open_point_modal(selection_state: object, reports: dict[str, EvaluationReport]) -> None:
-    """Open the evaluator dialog on a click; bump the chart revision to reset selection."""
+    """Open the metric dialog on a click; bump the chart revision to reset selection."""
     points = getattr(getattr(selection_state, "selection", None), "points", None)
     if not points:
         return
@@ -149,15 +157,15 @@ def _maybe_open_point_modal(selection_state: object, reports: dict[str, Evaluati
     if not customdata or len(customdata) < 3:
         return
     run_label = str(customdata[0])
-    evaluator_name = str(customdata[1])
+    metric_name = str(customdata[1])
     round_number = int(customdata[2])
     report = reports.get(run_label)
     if report is None:
         return
     st.session_state["timeline_chart_rev"] = st.session_state.get("timeline_chart_rev", 0) + 1
-    _show_evaluator_dialog(
+    _show_metric_dialog(
         run_label=run_label,
-        evaluator_name=evaluator_name,
+        metric_name=metric_name,
         round_number=round_number,
         report=report,
     )
@@ -205,15 +213,26 @@ def _render_selected_run_links(runs: list[EvaluatedRun]) -> None:
         link_col.markdown(f"[Open ↗]({detail_url})")
 
 
-def _render_evaluator_checkboxes(available: list[str]) -> list[str]:
-    """Render evaluator checkboxes, wrapping to new rows so long names stay readable."""
-    st.markdown("### Evaluators")
+def _render_metric_checkboxes(available: list[str]) -> list[str]:
+    """Render flag-metric checkboxes, wrapping rows so long names stay readable."""
     chosen: list[str] = []
-    for row_start in range(0, len(available), _EVALUATOR_CHECKBOXES_PER_ROW):
-        row_items = available[row_start : row_start + _EVALUATOR_CHECKBOXES_PER_ROW]
-        cols = st.columns(_EVALUATOR_CHECKBOXES_PER_ROW)
+    for row_start in range(0, len(available), _METRIC_CHECKBOXES_PER_ROW):
+        row_items = available[row_start : row_start + _METRIC_CHECKBOXES_PER_ROW]
+        cols = st.columns(_METRIC_CHECKBOXES_PER_ROW)
         for col_index, name in enumerate(row_items):
-            if cols[col_index].checkbox(label=name, value=True, key=f"eval_select::{name}"):
+            if cols[col_index].checkbox(label=name, value=True, key=f"flag_select::{name}"):
+                chosen.append(name)
+    return chosen
+
+
+def _render_value_metric_checkboxes(available: list[str]) -> list[str]:
+    """Render value-metric checkboxes; uses a separate state namespace from flag selectors."""
+    chosen: list[str] = []
+    for row_start in range(0, len(available), _METRIC_CHECKBOXES_PER_ROW):
+        row_items = available[row_start : row_start + _METRIC_CHECKBOXES_PER_ROW]
+        cols = st.columns(_METRIC_CHECKBOXES_PER_ROW)
+        for col_index, name in enumerate(row_items):
+            if cols[col_index].checkbox(label=name, value=True, key=f"value_select::{name}"):
                 chosen.append(name)
     return chosen
 
@@ -241,29 +260,48 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     reports = {run.label: run.report for run in selected}
     timelines = {run.label: load_run_timeline(run_dir=run.run_dir) for run in selected}
 
-    available_evaluators = collect_per_round_evaluators(reports=list(reports.values()))
-    if not available_evaluators:
-        st.info("None of the selected runs have evaluators that report per-round evidence.")
+    report_list = list(reports.values())
+    flag_metrics = collect_flag_metrics(reports=report_list)
+    value_metrics = collect_value_metrics(reports=report_list)
+
+    if not flag_metrics and not value_metrics:
+        st.info("None of the selected runs have metrics with per-round observations.")
         return
 
-    chosen_evaluators = _render_evaluator_checkboxes(available=available_evaluators)
-    if not chosen_evaluators:
-        st.info("Select at least one evaluator.")
-        return
+    if flag_metrics:
+        st.markdown("### Flagged rounds")
+        st.caption("Lanes for binary fire/no-fire metrics. One dot per round the metric flagged.")
+        chosen_flags = _render_metric_checkboxes(available=flag_metrics)
+        if chosen_flags:
+            fig = build_timeline_figure(
+                reports=reports,
+                timelines=timelines,
+                metrics=chosen_flags,
+            )
+            selection_state = st.plotly_chart(
+                fig,
+                width="stretch",
+                on_select="rerun",
+                selection_mode=("points",),
+                key=_timeline_chart_key(),
+            )
+            _maybe_open_point_modal(selection_state=selection_state, reports=reports)
+        else:
+            st.caption("Select at least one flag metric to plot.")
 
-    fig = build_timeline_figure(
-        reports=reports,
-        timelines=timelines,
-        evaluators=chosen_evaluators,
-    )
-    selection_state = st.plotly_chart(
-        fig,
-        width="stretch",
-        on_select="rerun",
-        selection_mode=("points",),
-        key=_timeline_chart_key(),
-    )
-    _maybe_open_point_modal(selection_state=selection_state, reports=reports)
+    if value_metrics:
+        st.markdown("### Per-round values")
+        st.caption(
+            "Continuous metrics (perplexity, mwl, mml, ...) share one Y axis — "
+            "colour = run, line style = metric. `round_success*` metrics render "
+            "as a rug strip below, one tick per succeeded round."
+        )
+        chosen_values = _render_value_metric_checkboxes(available=value_metrics)
+        if chosen_values:
+            value_fig = build_value_metrics_figure(reports=reports, metrics=chosen_values)
+            st.plotly_chart(value_fig, width="stretch", key="timeline_value_chart")
+        else:
+            st.caption("Select at least one value metric to plot.")
 
     with st.expander("Selected runs — scenario config", expanded=False):
         for run in selected:

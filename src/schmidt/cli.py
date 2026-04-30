@@ -32,7 +32,6 @@ from schmidt.config_overrides import (
     validate_agent_override_ids,
 )
 from schmidt.eval_manifest import delete_eval_manifest, write_eval_manifest
-from schmidt.evaluation.label_writer import write_eval_labels
 from schmidt.evaluation.log_reader import extract_scenario_config, load_events
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
@@ -121,7 +120,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to the run directory (e.g. runs/veyru/1742234567)",
     )
     evaluate_parser.add_argument(
-        "--evaluators", type=str, required=True, help="Comma-separated evaluator names"
+        "--metrics", type=str, required=True, help="Comma-separated metric names"
     )
     evaluate_parser.add_argument("--model", type=str, required=True, help="LLM model identifier")
     evaluate_parser.add_argument(
@@ -555,13 +554,13 @@ async def _run_evaluation(
     args: argparse.Namespace,
     scenario_cls: type[SimulationScenario],
 ) -> None:
-    """Run the specified evaluators against a simulation log and write a JSON report.
+    """Run the specified metrics against a simulation log and write a JSON report.
 
     Reconstructs the scenario from the config stored in the JSONL event log,
     so the evaluate command does not need scenario-specific CLI flags.
     Writes an eval manifest while running so the web UI can detect progress.
     """
-    evaluator_names = args.evaluators.split(",")
+    metric_names = args.metrics.split(",")
     run_dir = Path(args.run_dir)
     log_path = run_dir / f"{args.scenario_name}.jsonl"
     report_path = run_dir / f"{args.scenario_name}_report.json"
@@ -572,17 +571,16 @@ async def _run_evaluation(
 
     write_eval_manifest(run_dir=run_dir, pid=os.getpid())
     try:
-        logger.info("Evaluating %s with evaluators: %s", args.scenario_name, args.evaluators)
-        report = await scenario.run_evaluation(
+        logger.info("Evaluating %s with metrics: %s", args.scenario_name, args.metrics)
+        await scenario.run_evaluation(
             log_path=log_path,
-            evaluator_names=evaluator_names,
+            metric_names=metric_names,
             report_path=report_path,
             model=args.model,
             provider_name=args.provider,
             inference_provider=args.inference_provider,
             reasoning_effort=getattr(args, "reasoning_effort", None),
         )
-        write_eval_labels(run_dir=run_dir, report=report)
         logger.info("Evaluation complete. Report written to %s", report_path)
     finally:
         delete_eval_manifest(run_dir=run_dir)

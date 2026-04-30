@@ -63,12 +63,12 @@ async def list_scenarios() -> ScenariosResponse:
     for name in sorted(SCENARIO_REGISTRY.keys()):
         knobs_files = _list_knobs_files(scenario_name=name)
         scenario_cls = SCENARIO_REGISTRY[name]
-        evaluators = scenario_cls.get_available_evaluator_names()
+        metrics = scenario_cls.get_available_metric_names()
         scenarios.append(
             ScenarioInfo(
                 scenario_name=name,
                 knobs_files=knobs_files,
-                available_evaluators=evaluators,
+                available_metrics=metrics,
             )
         )
     models = [

@@ -12,7 +12,7 @@ class ScenarioInfo(BaseModel):
 
     scenario_name: str
     knobs_files: list[str]
-    available_evaluators: list[str]
+    available_metrics: list[str]
 
 
 class ModelInfo(BaseModel):

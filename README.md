@@ -114,30 +114,31 @@ After a simulation completes, point `--run-dir` at the specific run directory. E
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
   --run-dir ./runs/veyru/1742234567 \
-  --evaluators language_strangeness,language_emergence \
+  --metrics language_strangeness,language_emergence \
   --model claude-sonnet-4-6 --provider anthropic
 ```
 
-Generic evaluators (available to all scenarios) focus on language emergence. Each is scoped to a specific phenomenon to avoid overlap:
+Generic metrics (available to all scenarios). Both deterministic and LLM-driven metrics return `Measurement` entries with `score`, `score_unit`, `summary`, structured `per_round`, and optional `per_agent` breakdowns:
 
-- `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style
-- `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames
-- `neologism` — genuinely invented words with new meanings (not abbreviations or codes)
-- `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding
-- `round_ended_idle` / `round_ended_timeout` — flag rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger (deterministic, no LLM)
-- `content_filter_refusal` — counts LLM content-filter refusals during the run
-- `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model. Scopes to `scenario.get_primary_channel_id()` (Veyru: `#link`), scores each message with `minicons.IncrementalLMScorer` length-normalized, then averages. Higher = less natural-looking language; aggressive compression / coded protocols drive the score up. Always returns `PARTIAL` — reports numbers, not a verdict (deterministic, no LLM judge)
-- `mean_length_utterance` — mean number of whitespace-delimited words per primary-channel message. Same scope as `perplexity` (`scenario.get_primary_channel_id()`); the score is the mean across all primary-channel messages and per-round mean/std/count are reported in evidence. Lower MLU points at compression — combine with `perplexity` for a deterministic two-axis read on coded language. Always returns `PARTIAL` (deterministic, no LLM judge)
+- `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style (LLM judge)
+- `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames (LLM judge)
+- `neologism` — genuinely invented words with new meanings (LLM judge)
+- `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding (LLM judge)
+- `round_ended_idle` / `round_ended_timeout` — count rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger (deterministic, no LLM)
+- `content_filter_refusal` — counts LLM content-filter refusals during the run with per-agent breakdown
+- `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model (deterministic, no LLM judge)
+- `mean_word_length` — mean characters per whitespace-delimited word on the primary channel; combine with `perplexity` for a deterministic two-axis read on coded language (deterministic, no LLM judge)
+- `mean_message_length` — mean whitespace-delimited words per primary-channel message; pairs with `mean_word_length` to separate "fewer words" from "shorter words" (deterministic, no LLM judge)
 
-Scenario-specific evaluators:
+Scenario-specific metrics:
 
-- **veyru**: `language_emergence` (novel language in a fictional domain), `round_success` (per-round stabilization rate), `protocol_learned_after_swap` (two-team mode only)
+- **veyru**: `language_emergence` (novel language in a fictional domain), `round_success` (per-round stabilization rate; emits one Measurement per team in two-team mode), `round_success_after_resume`, `protocol_learned_after_swap` (LLM judge)
 
-Output is a JSON report with per-evaluator verdicts, scores, and evidence. After evaluation, labels are automatically written to the run in the format `eval:{evaluator}:{verdict}` (where verdict is `identified`, `partial`, or `fail`), visible in the web UI for filtering.
+Output is a JSON report under the `measurements` field; metrics no longer write `eval:*` labels to `labels.json`. Filter on `score` or on the `per_round` / `per_agent` lists directly.
 
 ## Results Viewer (Streamlit)
 
-A Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round evaluator scores across multiple evaluated runs — useful for comparing models or knob configurations.
+A Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round metric hits across multiple evaluated runs — useful for comparing models or knob configurations.
 
 ```bash
 uv sync --group analysis    # one-time, installs streamlit + plotly
@@ -246,7 +247,7 @@ src/schmidt/
 
   models/                      # Pydantic data models
   llm/                         # LLM provider abstraction (used by evaluation)
-  evaluation/                  # Post-hoc LLM-as-judge evaluators
+  evaluation/                  # Post-hoc Metric / Measurement infrastructure
   scenarios/                   # One folder per scenario (class + Jinja2 prompts + README)
 
   server/                      # FastAPI web server (schmidt serve)

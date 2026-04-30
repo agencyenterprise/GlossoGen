@@ -48,6 +48,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{scenario}/{run_dir_name}/evaluation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run Evaluation
+         * @description Return only the evaluation report for a run, or null if it has not been evaluated.
+         *
+         *     Lighter than the full run-detail endpoint — used by the runs list to lazy-load
+         *     measurements on hover without pulling messages, reasoning, or tool use.
+         */
+        get: operations["get_run_evaluation_api_runs__scenario___run_dir_name__evaluation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{scenario}/{run_dir_name}/eval-logs": {
         parameters: {
             query?: never;
@@ -122,7 +145,7 @@ export interface paths {
          * @description Launch an evaluation subprocess for a completed simulation run.
          *
          *     Validates that the run exists and is complete, that no evaluation is
-         *     already in progress, and that the requested evaluators and provider
+         *     already in progress, and that the requested metrics and provider
          *     are valid. Launches ``python -m schmidt evaluate`` as a detached
          *     background process.
          */
@@ -584,6 +607,18 @@ export interface components {
             provider: string;
         };
         /**
+         * AgentObservationResponse
+         * @description Per-agent observation for an evaluation measurement.
+         */
+        AgentObservationResponse: {
+            /** Agent Id */
+            agent_id: string;
+            /** Value */
+            value: number;
+            /** Note */
+            note: string;
+        };
+        /**
          * AgentRoleInfo
          * @description Lightweight agent identity for the agent discovery endpoint.
          */
@@ -742,29 +777,12 @@ export interface components {
             lines: components["schemas"]["EvalLogLine"][];
         };
         /**
-         * EvalMetricResponse
-         * @description Result of a single evaluator for the run detail endpoint.
-         */
-        EvalMetricResponse: {
-            /** Evaluator Name */
-            evaluator_name: string;
-            verdict: components["schemas"]["Verdict"];
-            /** Score */
-            score: number;
-            /** Evidence */
-            evidence: string[];
-            /** Per Agent */
-            per_agent: {
-                [key: string]: components["schemas"]["Verdict"];
-            };
-        };
-        /**
          * EvalReportResponse
          * @description Evaluation report for the run detail endpoint.
          */
         EvalReportResponse: {
-            /** Metrics */
-            metrics: components["schemas"]["EvalMetricResponse"][];
+            /** Measurements */
+            measurements: components["schemas"]["MeasurementResponse"][];
             evaluation_cost: components["schemas"]["EvalCostResponse"] | null;
         };
         /**
@@ -870,6 +888,24 @@ export interface components {
          * @enum {string}
          */
         LaunchStatus: "started";
+        /**
+         * MeasurementResponse
+         * @description Numeric measurement produced by a single metric for the run detail endpoint.
+         */
+        MeasurementResponse: {
+            /** Metric Name */
+            metric_name: string;
+            /** Score */
+            score: number;
+            /** Score Unit */
+            score_unit: string;
+            /** Summary */
+            summary: string;
+            /** Per Round */
+            per_round: components["schemas"]["RoundObservationResponse"][];
+            /** Per Agent */
+            per_agent: components["schemas"]["AgentObservationResponse"][];
+        };
         /**
          * MessageEdit
          * @description A single message text edit for a fork request.
@@ -1036,6 +1072,18 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
+        };
+        /**
+         * RoundObservationResponse
+         * @description Per-round observation for an evaluation measurement.
+         */
+        RoundObservationResponse: {
+            /** Round Number */
+            round_number: number;
+            /** Value */
+            value: number;
+            /** Note */
+            note: string;
         };
         /**
          * RunDetailResponse
@@ -1542,8 +1590,8 @@ export interface components {
             scenario_name: string;
             /** Knobs Files */
             knobs_files: string[];
-            /** Available Evaluators */
-            available_evaluators: string[];
+            /** Available Metrics */
+            available_metrics: string[];
         };
         /**
          * ScenariosResponse
@@ -1566,8 +1614,8 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
-            /** Evaluators */
-            evaluators: string[];
+            /** Metrics */
+            metrics: string[];
         };
         /**
          * StartEvaluationResponse
@@ -1697,12 +1745,6 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
-        /**
-         * Verdict
-         * @description Three-valued outcome for a single evaluation metric.
-         * @enum {string}
-         */
-        Verdict: "pass" | "fail" | "partial";
         /**
          * VeyruCaseStageDTO
          * @description One stage of a Veyru case with symptoms and the expected procedure.
@@ -1846,6 +1888,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_evaluation_api_runs__scenario___run_dir_name__evaluation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario: string;
+                run_dir_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalReportResponse"] | null;
+                };
             };
             /** @description Validation Error */
             422: {

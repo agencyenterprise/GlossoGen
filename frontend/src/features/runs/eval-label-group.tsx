@@ -1,12 +1,10 @@
 "use client";
 
-import { partitionLabels } from "./eval-verdict-summary";
 import { labelColor } from "./label-picker-modal";
 
-/** Renders regular (non-eval) labels as colored pill badges. Eval verdicts are rendered separately by EvalVerdictSummary. */
+/** Renders labels as colored pill badges. Callers filter out legacy `eval:*` labels before passing them in. */
 export function LabelBadges({ labels, size }: { labels: string[]; size: "sm" | "md" }) {
-  const { regularLabels } = partitionLabels(labels);
-  if (regularLabels.length === 0) {
+  if (labels.length === 0) {
     return null;
   }
   const textClass = size === "sm" ? "text-[10px]" : "text-[11px]";
@@ -14,7 +12,7 @@ export function LabelBadges({ labels, size }: { labels: string[]; size: "sm" | "
 
   return (
     <>
-      {regularLabels.map(label => {
+      {labels.map(label => {
         const color = labelColor(label);
         return (
           <span

@@ -18,7 +18,12 @@ from schmidt.eval_manifest import read_eval_manifest
 from schmidt.models.event import RunStatus, SimulationEnded
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.response_models import LaunchStatus
-from schmidt.server.runs.detail_reader import debug_log_path_for, load_debug_logs, load_run_detail
+from schmidt.server.runs.detail_reader import (
+    debug_log_path_for,
+    load_debug_logs,
+    load_evaluation_report,
+    load_run_detail,
+)
 from schmidt.server.runs.discovery import (
     ResolvedRun,
     compose_run_id,
@@ -31,6 +36,7 @@ from schmidt.server.runs.models import (
     DebugLogsResponse,
     EvalLogLine,
     EvalLogsResponse,
+    EvalReportResponse,
     NoteResponse,
     RunDetailResponse,
     RunListResponse,
@@ -80,6 +86,23 @@ async def get_run_detail(
     resolved = _resolve_or_404(runs_dir=runs_dir, scenario=scenario, run_dir_name=run_dir_name)
     log_path = resolved.run_dir / f"{resolved.scenario_name}.jsonl"
     return await load_run_detail(log_path=log_path)
+
+
+@router.get("/runs/{scenario}/{run_dir_name}/evaluation", response_model=EvalReportResponse | None)
+async def get_run_evaluation(
+    scenario: str,
+    run_dir_name: str,
+    request: Request,
+) -> EvalReportResponse | None:
+    """Return only the evaluation report for a run, or null if it has not been evaluated.
+
+    Lighter than the full run-detail endpoint — used by the runs list to lazy-load
+    measurements on hover without pulling messages, reasoning, or tool use.
+    """
+    runs_dir: Path = request.app.state.runs_dir
+    resolved = _resolve_or_404(runs_dir=runs_dir, scenario=scenario, run_dir_name=run_dir_name)
+    report_path = resolved.run_dir / f"{resolved.scenario_name}_report.json"
+    return await load_evaluation_report(report_path=report_path)
 
 
 @router.get("/runs/{scenario}/{run_dir_name}/eval-logs", response_model=EvalLogsResponse)
@@ -203,7 +226,7 @@ async def start_evaluation(
     """Launch an evaluation subprocess for a completed simulation run.
 
     Validates that the run exists and is complete, that no evaluation is
-    already in progress, and that the requested evaluators and provider
+    already in progress, and that the requested metrics and provider
     are valid. Launches ``python -m schmidt evaluate`` as a detached
     background process.
     """
@@ -249,12 +272,12 @@ async def start_evaluation(
             detail=f"Unknown scenario: {resolved.scenario_name}",
         )
 
-    available = scenario_cls.get_available_evaluator_names()
-    for name in body.evaluators:
+    available = scenario_cls.get_available_metric_names()
+    for name in body.metrics:
         if name not in available:
             raise HTTPException(
                 status_code=422,
-                detail=f"Unknown evaluator '{name}'. Available: {', '.join(available)}",
+                detail=f"Unknown metric '{name}'. Available: {', '.join(available)}",
             )
 
     cmd = [
@@ -265,8 +288,8 @@ async def start_evaluation(
         resolved.scenario_name,
         "--run-dir",
         str(run_dir),
-        "--evaluators",
-        ",".join(body.evaluators),
+        "--metrics",
+        ",".join(body.metrics),
         "--model",
         body.model,
         "--provider",

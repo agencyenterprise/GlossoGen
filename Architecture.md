@@ -124,7 +124,7 @@ The `SimulationScenario` ABC defines a contract for scenario plug-ins.
 - `create_from_config(config)` — reconstruct a scenario from its serialized config dict (used by fork/resume)
 - `name()`, `scenario_description()`, `get_agents()`, `get_channels()`
 - `get_channel_display_name()`, `get_agent_display_name()`, `get_injection()`
-- `run_evaluation(log_path, evaluator_names, report_path, model, provider_name, inference_provider, reasoning_effort)`
+- `run_evaluation(log_path, metric_names, report_path, model, provider_name, inference_provider, reasoning_effort)`
 
 **Timing and round structure:**
 - `get_round_count()` — total number of rounds
@@ -251,43 +251,48 @@ Replace-agent runs store a `replace_manifest.json`. The run discovery and detail
 
 ## Evaluation System
 
-After a simulation completes, the evaluation system analyzes the JSONL log using LLM-as-judge.
+After a simulation completes, the evaluation system analyzes the JSONL log via a uniform `Metric` abstraction. Both deterministic metrics and LLM-as-judge metrics implement `Metric.compute(...)` and return one or more `Measurement` instances.
 
-**CLI**: `python -m schmidt evaluate <scenario> --run-dir ./runs/<scenario>/<timestamp> --evaluators language_strangeness,compression --model MODEL`
+**CLI**: `python -m schmidt evaluate <scenario> --run-dir ./runs/<scenario>/<timestamp> --metrics language_strangeness,perplexity --model MODEL`
 
-The user selects which evaluators to run — they are not automatically applied.
+The user selects which metrics to run — they are not automatically applied.
 
-**Generic evaluators** (available to all scenarios) focus on language emergence. Each is scoped to a specific phenomenon — their prompts explicitly exclude what the other evaluators cover, preventing overlap:
+**Generic metrics** (available to all scenarios). LLM judges scope each to a specific phenomenon; their prompts explicitly exclude what the other metrics cover, preventing overlap:
 
-- `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style
-- `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames
-- `neologism` — genuinely invented words with new meanings (not abbreviations or codes)
-- `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding
-- `round_ended_idle` / `round_ended_timeout` — flag rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger (deterministic, reads `RoundEnded.trigger`)
-- `content_filter_refusal` — counts LLM content-filter refusals (deterministic, scans `{scenario}_debug.jsonl` for `ContentFilterError` ERROR entries)
-- `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model loaded via `minicons.IncrementalLMScorer`. Scoping uses `scenario.get_primary_channel_id()` so the evaluator stays scenario-agnostic (Veyru returns `#link`; scenarios without a primary channel get a no-op result). Each message is scored with `reduction = -x.mean(0)` for length-normalized per-token surprisal, then averaged across the run. Always returns `PARTIAL` with the overall mean as `score` and per-round mean/std lines in `evidence`. No LLM judge.
-- `mean_length_utterance` — mean number of whitespace-delimited words per primary-channel message. Same scoping rule as `perplexity` (`scenario.get_primary_channel_id()`; no-op when `None`). The score is the mean across **all** primary-channel messages in the run (flatten, not mean of round means); evidence lists per-round mean / std / count. Pairs with `perplexity`: high perplexity + low MLU is a strong compressed-protocol signal, both deterministic and cheap. Always returns `PARTIAL`. No LLM judge.
+- `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style (LLM judge)
+- `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames (LLM judge)
+- `neologism` — genuinely invented words with new meanings (LLM judge)
+- `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding (LLM judge)
+- `round_ended_idle` / `round_ended_timeout` — count rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger (deterministic, reads `RoundEnded.trigger`)
+- `content_filter_refusal` — counts LLM content-filter refusals across the run with per-round + per-agent breakdowns (deterministic, scans `AgentRunCycleFailed` events)
+- `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model loaded via `minicons.IncrementalLMScorer`. Scoping uses `scenario.get_primary_channel_id()` so the metric stays scenario-agnostic (Veyru returns `#link`; scenarios without a primary channel get a no-op result). The score is the overall mean nats; `per_round` carries mean+std+message_count per round. No LLM judge.
+- `mean_word_length` — mean characters per whitespace-delimited word on the primary channel. Same scoping rule as `perplexity`. The score is the mean across all primary-channel words (flatten, not mean of round means); `per_round` lists per-round mean / std / word count. Pairs with `perplexity`: high perplexity + low MWL is a strong compressed-protocol signal (short codes replacing long words), both deterministic and cheap. No LLM judge.
+- `mean_message_length` — mean whitespace-delimited words per primary-channel message. Same scoping rule as `perplexity`. The score is the mean across all primary-channel messages (flatten, not mean of round means); `per_round` lists per-round mean / std / message count. Pairs with `mean_word_length`: low MML = fewer words per message; low MWL = shorter words. Compression can show up on either axis independently. No LLM judge.
 
-The four LLM-judge evaluators (`language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`) share a common flow: build per-round transcripts from `MessageSent` events via `round_transcript_builder`, render a Jinja2 prompt, call the LLM judge with a structured output schema, and return a `MetricResult`. The deterministic ones (`round_ended_*`, `content_filter_refusal`, `perplexity`, `mean_length_utterance`) skip the prompt+LLM step entirely.
+The LLM-judge metrics (`language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`, `language_emergence`, `protocol_learned_after_swap`) share a common flow: build per-round transcripts from `MessageSent` events, render a Jinja2 prompt, call the LLM judge with a structured output schema (returning `per_round_notes: list[RoundNote]`), and turn each `RoundNote` into a `RoundObservation`. The deterministic metrics skip the prompt+LLM step entirely.
 
-**Scenario-specific evaluators:**
-- **veyru**: `language_emergence` (novel language in the Veyru domain), `protocol_learned_after_swap` (whether a newcomer adopted the pre-established protocol after a personnel change), `round_success` (per-round stabilization success)
+**Scenario-specific metrics:**
+- **veyru**: `language_emergence` (novel language in the Veyru domain), `protocol_learned_after_swap` (whether a newcomer adopted the pre-established protocol after a personnel change), `round_success` (per-round stabilization success — emits one `Measurement` per team in two-team mode), `round_success_after_resume` (same accounting restricted to post-replace-agent rounds, with source-run comparison in `summary`)
 
-**Automatic labels**: After evaluation, `label_writer.write_eval_labels()` writes `eval:{evaluator}:{verdict}` labels to the run's `labels.json` (where verdict is `identified`, `partial`, or `fail`). Previous `eval:` labels are replaced; user-added labels are preserved.
+**No automatic labels**: Metrics no longer write `eval:*` labels into `labels.json`. Filter on `score` or on the `per_round` / `per_agent` lists directly.
 
-**Output**: A JSON report with per-evaluator results:
+**Output**: A JSON report with structured measurements:
 
 ```json
 {
   "simulation_id": "...",
   "scenario_name": "...",
-  "metrics": [
+  "measurements": [
     {
-      "evaluator_name": "language_strangeness",
-      "verdict": "pass",
-      "score": 1.0,
-      "evidence": ["Detected novel abbreviations and non-standard language patterns across 24 messages"],
-      "per_agent": {}
+      "metric_name": "language_strangeness",
+      "score": 12.0,
+      "score_unit": "rounds with non-standard language (out of 15)",
+      "summary": "12/15 rounds contained non-standard language ...",
+      "per_round": [
+        {"round_number": 3, "value": 1.0, "note": "telegraph-style: dropped articles, ..."},
+        {"round_number": 5, "value": 1.0, "note": "..."}
+      ],
+      "per_agent": []
     }
   ]
 }

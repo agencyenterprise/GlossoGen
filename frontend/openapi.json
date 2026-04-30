@@ -113,6 +113,63 @@
         }
       }
     },
+    "/api/runs/{scenario}/{run_dir_name}/evaluation": {
+      "get": {
+        "summary": "Get Run Evaluation",
+        "description": "Return only the evaluation report for a run, or null if it has not been evaluated.\n\nLighter than the full run-detail endpoint \u2014 used by the runs list to lazy-load\nmeasurements on hover without pulling messages, reasoning, or tool use.",
+        "operationId": "get_run_evaluation_api_runs__scenario___run_dir_name__evaluation_get",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "run_dir_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Dir Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/EvalReportResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Run Evaluation Api Runs  Scenario   Run Dir Name  Evaluation Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs/{scenario}/{run_dir_name}/eval-logs": {
       "get": {
         "summary": "Get Eval Logs",
@@ -256,7 +313,7 @@
     "/api/runs/{scenario}/{run_dir_name}/evaluate": {
       "post": {
         "summary": "Start Evaluation",
-        "description": "Launch an evaluation subprocess for a completed simulation run.\n\nValidates that the run exists and is complete, that no evaluation is\nalready in progress, and that the requested evaluators and provider\nare valid. Launches ``python -m schmidt evaluate`` as a detached\nbackground process.",
+        "description": "Launch an evaluation subprocess for a completed simulation run.\n\nValidates that the run exists and is complete, that no evaluation is\nalready in progress, and that the requested metrics and provider\nare valid. Launches ``python -m schmidt evaluate`` as a detached\nbackground process.",
         "operationId": "start_evaluation_api_runs__scenario___run_dir_name__evaluate_post",
         "parameters": [
           {
@@ -1330,6 +1387,30 @@
         "title": "AgentModelSummary",
         "description": "Per-agent model and provider info for run summary display."
       },
+      "AgentObservationResponse": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "value",
+          "note"
+        ],
+        "title": "AgentObservationResponse",
+        "description": "Per-agent observation for an evaluation measurement."
+      },
       "AgentRoleInfo": {
         "properties": {
           "agent_id": {
@@ -1649,53 +1730,14 @@
         "title": "EvalLogsResponse",
         "description": "Response containing evaluation subprocess stdout/stderr output."
       },
-      "EvalMetricResponse": {
-        "properties": {
-          "evaluator_name": {
-            "type": "string",
-            "title": "Evaluator Name"
-          },
-          "verdict": {
-            "$ref": "#/components/schemas/Verdict"
-          },
-          "score": {
-            "type": "number",
-            "title": "Score"
-          },
-          "evidence": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Evidence"
-          },
-          "per_agent": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/Verdict"
-            },
-            "type": "object",
-            "title": "Per Agent"
-          }
-        },
-        "type": "object",
-        "required": [
-          "evaluator_name",
-          "verdict",
-          "score",
-          "evidence",
-          "per_agent"
-        ],
-        "title": "EvalMetricResponse",
-        "description": "Result of a single evaluator for the run detail endpoint."
-      },
       "EvalReportResponse": {
         "properties": {
-          "metrics": {
+          "measurements": {
             "items": {
-              "$ref": "#/components/schemas/EvalMetricResponse"
+              "$ref": "#/components/schemas/MeasurementResponse"
             },
             "type": "array",
-            "title": "Metrics"
+            "title": "Measurements"
           },
           "evaluation_cost": {
             "anyOf": [
@@ -1710,7 +1752,7 @@
         },
         "type": "object",
         "required": [
-          "metrics",
+          "measurements",
           "evaluation_cost"
         ],
         "title": "EvalReportResponse",
@@ -1905,6 +1947,51 @@
         ],
         "title": "LaunchStatus",
         "description": "Status value for subprocess launch responses."
+      },
+      "MeasurementResponse": {
+        "properties": {
+          "metric_name": {
+            "type": "string",
+            "title": "Metric Name"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "score_unit": {
+            "type": "string",
+            "title": "Score Unit"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "per_round": {
+            "items": {
+              "$ref": "#/components/schemas/RoundObservationResponse"
+            },
+            "type": "array",
+            "title": "Per Round"
+          },
+          "per_agent": {
+            "items": {
+              "$ref": "#/components/schemas/AgentObservationResponse"
+            },
+            "type": "array",
+            "title": "Per Agent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric_name",
+          "score",
+          "score_unit",
+          "summary",
+          "per_round",
+          "per_agent"
+        ],
+        "title": "MeasurementResponse",
+        "description": "Numeric measurement produced by a single metric for the run detail endpoint."
       },
       "MessageEdit": {
         "properties": {
@@ -2213,6 +2300,30 @@
         ],
         "title": "RoundEnding",
         "description": "Reason a round's main phase ended.\n\nOne entry per round end, across all scenarios. ``trigger`` matches the\n``RoundEnded.trigger`` field (e.g. ``veyru_stabilized``,\n``all_agents_idle``, ``veyru_collapsed``, ``round_timeout``)."
+      },
+      "RoundObservationResponse": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "value",
+          "note"
+        ],
+        "title": "RoundObservationResponse",
+        "description": "Per-round observation for an evaluation measurement."
       },
       "RunDetailResponse": {
         "properties": {
@@ -3276,19 +3387,19 @@
             "type": "array",
             "title": "Knobs Files"
           },
-          "available_evaluators": {
+          "available_metrics": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Available Evaluators"
+            "title": "Available Metrics"
           }
         },
         "type": "object",
         "required": [
           "scenario_name",
           "knobs_files",
-          "available_evaluators"
+          "available_metrics"
         ],
         "title": "ScenarioInfo",
         "description": "Metadata about a single scenario, including its available knobs files."
@@ -3336,19 +3447,19 @@
             "type": "string",
             "title": "Provider"
           },
-          "evaluators": {
+          "metrics": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Evaluators"
+            "title": "Metrics"
           }
         },
         "type": "object",
         "required": [
           "model",
           "provider",
-          "evaluators"
+          "metrics"
         ],
         "title": "StartEvaluationRequest",
         "description": "Request body for starting an evaluation on a completed run."
@@ -3626,16 +3737,6 @@
           "type"
         ],
         "title": "ValidationError"
-      },
-      "Verdict": {
-        "type": "string",
-        "enum": [
-          "pass",
-          "fail",
-          "partial"
-        ],
-        "title": "Verdict",
-        "description": "Three-valued outcome for a single evaluation metric."
       },
       "VeyruCaseStageDTO": {
         "properties": {

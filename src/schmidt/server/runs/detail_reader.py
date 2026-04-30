@@ -35,17 +35,19 @@ from schmidt.scenarios.veyru.ids import (
 )
 from schmidt.server.runs.models import (
     AgentDetail,
+    AgentObservationResponse,
     AgentRunCycleFailedEntry,
     ChannelMessage,
     DebugLogEntry,
     EvalCostResponse,
-    EvalMetricResponse,
     EvalReportResponse,
     ForkSource,
     InternAnchor,
+    MeasurementResponse,
     ReasoningEntry,
     ReplaceAgentSource,
     RoundEnding,
+    RoundObservationResponse,
     RunDetailResponse,
     SwapPoint,
     ToolUseEntry,
@@ -60,7 +62,7 @@ from schmidt.token_pricing import TokenPricing, find_pricing
 logger = logging.getLogger(__name__)
 
 
-async def _load_evaluation_report(report_path: Path) -> EvalReportResponse | None:
+async def load_evaluation_report(report_path: Path) -> EvalReportResponse | None:
     """Load and parse an evaluation report JSON file, returning None if it does not exist."""
     if not report_path.exists():
         return None
@@ -86,15 +88,24 @@ async def _load_evaluation_report(report_path: Path) -> EvalReportResponse | Non
 
     report = EvaluationReport.model_validate(raw)
 
-    metrics = [
-        EvalMetricResponse(
-            evaluator_name=m.evaluator_name,
-            verdict=m.verdict,
+    measurements = [
+        MeasurementResponse(
+            metric_name=m.metric_name,
             score=m.score,
-            evidence=m.evidence,
-            per_agent=m.per_agent,
+            score_unit=m.score_unit,
+            summary=m.summary,
+            per_round=[
+                RoundObservationResponse(
+                    round_number=obs.round_number, value=obs.value, note=obs.note
+                )
+                for obs in m.per_round
+            ],
+            per_agent=[
+                AgentObservationResponse(agent_id=obs.agent_id, value=obs.value, note=obs.note)
+                for obs in m.per_agent
+            ],
         )
-        for m in report.metrics
+        for m in report.measurements
     ]
 
     cost = report.evaluation_cost
@@ -108,7 +119,7 @@ async def _load_evaluation_report(report_path: Path) -> EvalReportResponse | Non
         provider_name=cost.provider_name,
     )
 
-    return EvalReportResponse(metrics=metrics, evaluation_cost=eval_cost)
+    return EvalReportResponse(measurements=measurements, evaluation_cost=eval_cost)
 
 
 def _load_debug_logs_sync(debug_log_path: Path) -> list[DebugLogEntry]:
@@ -471,7 +482,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             else:
                 status = RunStatus.ERROR
     report_path = log_path.with_name(f"{scenario_name}_report.json")
-    evaluation = await _load_evaluation_report(report_path=report_path)
+    evaluation = await load_evaluation_report(report_path=report_path)
     eval_manifest = read_eval_manifest(run_dir=run_dir)
     evaluation_in_progress = eval_manifest is not None
     has_eval_log_file = (run_dir / "eval_stdout.log").exists()

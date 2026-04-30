@@ -44,6 +44,9 @@ class RunTimeline(NamedTuple):
     events: list[TimelineEvent]
 
 
+_NON_TERMINAL_ROUND_END_TRIGGERS = {"all_agents_idle", "round_timeout"}
+
+
 def _scan_jsonl(jsonl_path: Path) -> tuple[dict[str, Any], int, list[TimelineEvent]]:
     """Single-pass scan over a run's JSONL file, returning config + events."""
     scenario_config: dict[str, Any] = {}
@@ -52,6 +55,7 @@ def _scan_jsonl(jsonl_path: Path) -> tuple[dict[str, Any], int, list[TimelineEve
     collapsed_rounds: set[int] = set()
     stabilized_rounds: set[int] = set()
     postmortem_closed_rounds: set[int] = set()
+    non_terminal_ended_rounds: set[int] = set()
 
     with jsonl_path.open("rb") as f:
         for line in f:
@@ -63,6 +67,11 @@ def _scan_jsonl(jsonl_path: Path) -> tuple[dict[str, Any], int, list[TimelineEve
                 rnd = int(raw.get("round_number", 0))
                 if rnd > total_rounds:
                     total_rounds = rnd
+            elif event_type == "round_ended":
+                trigger = raw.get("trigger") or ""
+                rnd = int(raw.get("round_number", 0))
+                if trigger in _NON_TERMINAL_ROUND_END_TRIGGERS:
+                    non_terminal_ended_rounds.add(rnd)
             elif event_type == "world_event_delivered":
                 text = raw.get("text") or ""
                 rnd = int(raw.get("round_number", 0))
@@ -75,6 +84,14 @@ def _scan_jsonl(jsonl_path: Path) -> tuple[dict[str, Any], int, list[TimelineEve
                 rnd = int(raw.get("round_number", 0))
                 if reason in {OBSERVER_SWAP_REASON, INTERN_TAKEOVER_REASON}:
                     postmortem_closed_rounds.add(rnd)
+
+    # Backfill: rounds that ended via all_agents_idle / round_timeout without a
+    # terminal world event are implicit collapses (agents gave up before
+    # stabilizing and before blowing the budget). Newer runs emit the marker
+    # explicitly; this fallback covers older runs and keeps the timeline
+    # consistent across the dataset.
+    inferred_collapsed = non_terminal_ended_rounds - collapsed_rounds - stabilized_rounds
+    collapsed_rounds.update(inferred_collapsed)
 
     for rnd in sorted(collapsed_rounds):
         events.append(

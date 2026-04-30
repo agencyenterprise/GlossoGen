@@ -6,7 +6,6 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Discriminator
 
-from schmidt.evaluation.evaluation_report import Verdict
 from schmidt.models.event import RunStatus
 from schmidt.server.response_models import LaunchStatus
 
@@ -249,14 +248,31 @@ class AgentRunCycleFailedEntry(BaseModel):
     message: str
 
 
-class EvalMetricResponse(BaseModel):
-    """Result of a single evaluator for the run detail endpoint."""
+class RoundObservationResponse(BaseModel):
+    """Per-round observation for an evaluation measurement."""
 
-    evaluator_name: str
-    verdict: Verdict
+    round_number: int
+    value: float
+    note: str
+
+
+class AgentObservationResponse(BaseModel):
+    """Per-agent observation for an evaluation measurement."""
+
+    agent_id: str
+    value: float
+    note: str
+
+
+class MeasurementResponse(BaseModel):
+    """Numeric measurement produced by a single metric for the run detail endpoint."""
+
+    metric_name: str
     score: float
-    evidence: list[str]
-    per_agent: dict[str, Verdict]
+    score_unit: str
+    summary: str
+    per_round: list[RoundObservationResponse]
+    per_agent: list[AgentObservationResponse]
 
 
 class EvalCostResponse(BaseModel):
@@ -274,7 +290,7 @@ class EvalCostResponse(BaseModel):
 class EvalReportResponse(BaseModel):
     """Evaluation report for the run detail endpoint."""
 
-    metrics: list[EvalMetricResponse]
+    measurements: list[MeasurementResponse]
     evaluation_cost: EvalCostResponse | None
 
 
@@ -322,7 +338,7 @@ class StartEvaluationRequest(BaseModel):
 
     model: str
     provider: str
-    evaluators: list[str]
+    metrics: list[str]
 
 
 class StartEvaluationResponse(BaseModel):

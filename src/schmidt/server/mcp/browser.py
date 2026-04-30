@@ -26,8 +26,8 @@ from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.mcp.models import (
     McpAgent,
     McpAgentModel,
+    McpAgentObservation,
     McpDebugLog,
-    McpEvalMetric,
     McpExportArtifactsResult,
     McpForkSource,
     McpGetKnobsPresetResult,
@@ -35,9 +35,11 @@ from schmidt.server.mcp.models import (
     McpGetRunResult,
     McpListRunsResult,
     McpListScenariosResult,
+    McpMeasurement,
     McpMessage,
     McpModel,
     McpReasoning,
+    McpRoundObservation,
     McpRunEntry,
     McpRunMetadata,
     McpScenario,
@@ -130,8 +132,8 @@ def _run_summary_to_entry(run: RunSummary) -> McpRunEntry:
     )
 
 
-def _load_evaluation_metrics(run_summary: RunSummary) -> list[McpEvalMetric] | None:
-    """Load evaluation metrics from the report JSON, or return None."""
+def _load_evaluation_measurements(run_summary: RunSummary) -> list[McpMeasurement] | None:
+    """Load evaluation measurements from the report JSON, or return None."""
     run_dir = Path(run_summary.run_dir)
     report_path = run_dir / f"{run_summary.scenario_name}_report.json"
     if not report_path.exists():
@@ -157,14 +159,21 @@ def _load_evaluation_metrics(run_summary: RunSummary) -> list[McpEvalMetric] | N
         return None
 
     return [
-        McpEvalMetric(
-            evaluator_name=m.evaluator_name,
-            verdict=m.verdict.value,
+        McpMeasurement(
+            metric_name=m.metric_name,
             score=m.score,
-            evidence=m.evidence,
-            per_agent={agent_id: v.value for agent_id, v in m.per_agent.items()},
+            score_unit=m.score_unit,
+            summary=m.summary,
+            per_round=[
+                McpRoundObservation(round_number=obs.round_number, value=obs.value, note=obs.note)
+                for obs in m.per_round
+            ],
+            per_agent=[
+                McpAgentObservation(agent_id=obs.agent_id, value=obs.value, note=obs.note)
+                for obs in m.per_agent
+            ],
         )
-        for m in report.metrics
+        for m in report.measurements
     ]
 
 
@@ -178,7 +187,7 @@ Schmidt simulation platform. Browse and launch multi-agent simulations.
 
 ## Browsing runs
 
-1. `list_scenarios` — see available scenarios, knobs files, evaluators, \
+1. `list_scenarios` — see available scenarios, knobs files, metrics, \
 and supported models.
 2. `list_runs` — browse runs with optional filters (scenario, model, \
 status, is_forked). Paginate with offset/limit.
@@ -206,7 +215,8 @@ evaluation results without loading messages. Pass a full run_id \
 - `list_runs` returns newest runs first.
 - `get_run` messages are paginated: use `message_offset` and \
 `message_limit` to page through.
-- Evaluation metrics include per-agent verdicts (pass/fail/partial).
+- Evaluation measurements include numeric scores plus per-round and \
+per-agent observations.
 - Use `get_knobs_preset` to load a baseline, modify fields, then pass \
 to `start_run`.
 """
@@ -221,7 +231,7 @@ async def _tool_list_scenarios() -> McpListScenariosResult:
             McpScenario(
                 name=name,
                 knobs_files=_list_knobs_files(scenario_name=name),
-                evaluators=scenario_cls.get_available_evaluator_names(),
+                metrics=scenario_cls.get_available_metric_names(),
             )
         )
 
@@ -308,7 +318,7 @@ async def _tool_get_run_metadata(run_id: str) -> McpRunMetadata:
             for a in run.agent_models
         ],
         fork_source=fork_source,
-        evaluation=_load_evaluation_metrics(run_summary=run),
+        evaluation=_load_evaluation_measurements(run_summary=run),
     )
 
 
@@ -541,7 +551,7 @@ _TOOL_DEFS: list[tuple[str, str, Any]] = [
     (
         "list_scenarios",
         "List all available simulation scenarios with their "
-        "knobs files, evaluators, and supported models/providers.",
+        "knobs files, metrics, and supported models/providers.",
         _tool_list_scenarios,
     ),
     (
