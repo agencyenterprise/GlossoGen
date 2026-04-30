@@ -100,12 +100,8 @@ class HuggingFaceProvider(LLMProvider):
         for msg in messages:
             openai_messages.append({"role": msg.role, "content": msg.content})
 
-        function_choice = ChatCompletionInputFunctionName(
-            name=tool_name
-        )  # pyright: ignore[reportCallIssue]
-        tool_choice = ChatCompletionInputToolChoiceClass(
-            function=function_choice
-        )  # pyright: ignore[reportCallIssue]
+        function_choice = ChatCompletionInputFunctionName(name=tool_name)  # pyright: ignore[reportCallIssue]  # fmt: skip
+        tool_choice = ChatCompletionInputToolChoiceClass(function=function_choice)  # pyright: ignore[reportCallIssue]  # fmt: skip
         kwargs: dict[str, Any] = {
             "messages": openai_messages,
             "max_tokens": 4096,
