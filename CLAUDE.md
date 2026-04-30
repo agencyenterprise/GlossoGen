@@ -561,6 +561,7 @@ Generic evaluators (available to all scenarios). Language-emergence evaluators a
 - `neologism` — genuinely invented words with new meanings (NOT abbreviations or code mappings)
 - `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding (NOT new words or slang)
 - `perplexity` — mean per-token surprisal of primary-channel messages under `gpt2`, reported per round (deterministic, no LLM judge). Always returns PARTIAL — read the per-round numbers in the report's evidence. Skips scenarios with no primary channel.
+- `mean_length_utterance` — mean number of whitespace-delimited words per primary-channel message (deterministic, no LLM judge). Reports per-round mean/std/count in evidence; overall mean across all messages is the `score`. Always returns PARTIAL. Skips scenarios with no primary channel. Read alongside `perplexity` — high perplexity + low MLU is a strong compressed-protocol signal.
 - `round_ended_idle` — flags rounds whose main phase ended because all agents went idle on `read_notifications` (deterministic, no LLM). Requires `round_ended` events in the log.
 - `round_ended_timeout` — flags rounds whose main phase ended because the wall-clock duration limit was reached (deterministic, no LLM). Requires `round_ended` events in the log.
 
