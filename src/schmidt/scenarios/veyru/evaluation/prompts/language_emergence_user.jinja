@@ -15,12 +15,14 @@ Below are the comm link transcripts for each round.
 
 Analyze the communication across rounds. Look for:
 
-1. **Novel abbreviations or codes**: Did the agents invent shortened forms, acronyms, or codes for Veyru symptoms, failures, or stabilization procedures? Because the domain is fictional, ANY shorthand they develop is novel. Examples: single-letter codes for failure types, numbered protocols, abbreviated action sequences.
+1. **Per-round notes**: For EVERY round where novel language patterns were observed (shortened forms, acronyms, codes for Veyru symptoms/failures/procedures, numbered protocols, abbreviated action sequences, structural changes that reduce word count), return one entry in ``per_round_notes`` with the round number and a note describing the specific patterns seen that round. Skip rounds with no novel patterns.
 
-2. **Identify rounds**: List the specific round numbers where novel language patterns were observed.
+2. **Novel patterns**: List the distinct novel patterns the agents invented across the run.
 
-3. **Shared conventions**: Did both agents adopt the same shorthand? A convention only counts if both sides use or clearly understand it — one agent inventing a code that the other ignores is not a shared convention.
+3. **Compression**: Did messages become shorter from early to late rounds? Set ``compression_observed`` accordingly.
 
-4. **Structural innovation**: Did agents develop patterns like numbered action lists, keyword-only messages, or other structural changes to reduce word count?
+4. **Shared conventions**: Did both agents adopt the same shorthand? A convention only counts if both sides use or clearly understand it. Set ``shared_conventions`` accordingly.
+
+5. **Explanation**: Provide a brief overall summary.
 
 Submit your assessment using the provided tool.

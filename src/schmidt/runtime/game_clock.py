@@ -297,6 +297,10 @@ class GameClock:
                         trigger=trigger,
                     ),
                 )
+                await self._scenario.on_round_ended(
+                    round_number=self._current_round,
+                    trigger=trigger,
+                )
                 if self._has_postmortem(round_number=self._current_round):
                     await self._deliver_postmortem_injections(
                         round_number=self._current_round,

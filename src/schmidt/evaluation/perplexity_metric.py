@@ -1,10 +1,9 @@
-"""Perplexity evaluator that scores primary-channel messages with a fixed HF model.
+"""Perplexity metric: mean per-token surprisal of primary-channel messages.
 
 Uses ``minicons.scorer.IncrementalLMScorer`` with ``gpt2`` to compute the mean
 per-token surprisal (in nats) of every message sent on the scenario's primary
-channel. Aggregates per-round and overall statistics into the result's
-evidence. Verdict is always ``PARTIAL`` -- this evaluator reports numbers, not
-a classification.
+channel. Produces an overall scalar score plus a per-round breakdown.
+Deterministic — does not consult the LLM provider.
 """
 
 import asyncio
@@ -16,8 +15,8 @@ from typing import Any, NamedTuple
 import torch
 from minicons import scorer  # type: ignore[import-untyped]
 
-from schmidt.evaluation.evaluation_report import MetricResult, Verdict
-from schmidt.evaluation.evaluator_protocol import Evaluator
+from schmidt.evaluation.measurement import Measurement, RoundObservation
+from schmidt.evaluation.metric_protocol import Metric
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import MessageSent, SimulationEvent
@@ -42,55 +41,58 @@ class RoundMessages(NamedTuple):
     texts: list[str]
 
 
-class PerplexityEvaluator(Evaluator):
+class PerplexityMetric(Metric):
     """Reports per-round mean per-token surprisal of primary-channel messages.
 
-    Loads ``gpt2-medium`` via minicons, scores each primary-channel message,
-    averages per-round, and emits stats as evidence. Returns ``PARTIAL`` with a
-    numeric ``score`` equal to the overall mean per-token surprisal in nats.
-    Scenarios without a primary channel get a no-op result.
+    Loads ``gpt2`` via minicons, scores each primary-channel message,
+    averages per-round, and emits the overall mean as the headline score
+    in nats. Scenarios without a primary channel get a no-op result.
     """
 
     name = "perplexity"
     model_name = "gpt2"
 
-    async def evaluate(
+    async def compute(
         self,
         events: list[SimulationEvent],
         agent_configs: list[AgentConfig],
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
         run_dir: Path,
-    ) -> MetricResult:
+    ) -> list[Measurement]:
         """Score primary-channel messages and report per-round perplexity stats."""
         _ = agent_configs, llm_provider, run_dir
         primary_channel_id = scenario.get_primary_channel_id()
         if primary_channel_id is None:
-            return MetricResult(
-                evaluator_name=self.name,
-                verdict=Verdict.PARTIAL,
-                score=0.0,
-                evidence=["scenario has no primary channel; perplexity evaluator skipped"],
-                per_agent={},
-                rounds_identified=[],
-            )
+            return [
+                Measurement(
+                    metric_name=self.name,
+                    score=0.0,
+                    score_unit="nats/token (gpt2)",
+                    summary="scenario has no primary channel; perplexity metric skipped",
+                    per_round=[],
+                    per_agent=[],
+                )
+            ]
 
         rounds = _collect_primary_messages_by_round(
             events=events,
             primary_channel_id=primary_channel_id,
         )
         if not rounds:
-            return MetricResult(
-                evaluator_name=self.name,
-                verdict=Verdict.PARTIAL,
-                score=0.0,
-                evidence=[
-                    f"no messages found on primary channel {primary_channel_id!r}; "
-                    "perplexity evaluator has nothing to score",
-                ],
-                per_agent={},
-                rounds_identified=[],
-            )
+            return [
+                Measurement(
+                    metric_name=self.name,
+                    score=0.0,
+                    score_unit="nats/token (gpt2)",
+                    summary=(
+                        f"no messages found on primary channel {primary_channel_id!r}; "
+                        "perplexity metric has nothing to score"
+                    ),
+                    per_round=[],
+                    per_agent=[],
+                )
+            ]
 
         round_perplexities = await asyncio.to_thread(
             _score_all_rounds,
@@ -103,19 +105,19 @@ class PerplexityEvaluator(Evaluator):
         overall_mean = _mean(values=all_means)
         overall_std = _std(values=all_means, mean=overall_mean)
 
-        evidence = [
-            f"perplexity model: {self.model_name} (primary channel: {primary_channel_id})",
-            f"scored {total_messages} messages across {len(round_perplexities)} rounds",
-            (
-                f"overall mean per-token surprisal: {overall_mean:.3f} nats "
-                f"(round-to-round std {overall_std:.3f})"
-            ),
-        ]
-        for rp in round_perplexities:
-            evidence.append(
-                f"round {rp.round_number}: mean={rp.mean_surprisal:.3f} "
-                f"std={rp.std_surprisal:.3f} n={rp.message_count}"
+        per_round = [
+            RoundObservation(
+                round_number=rp.round_number,
+                value=rp.mean_surprisal,
+                note=f"{rp.message_count} messages, std={rp.std_surprisal:.3f}",
             )
+            for rp in round_perplexities
+        ]
+        summary = (
+            f"{total_messages} messages on {primary_channel_id} across "
+            f"{len(round_perplexities)} rounds; mean per-token surprisal "
+            f"{overall_mean:.3f} nats (round-to-round std {overall_std:.3f})"
+        )
 
         logger.info(
             "perplexity: model=%s rounds=%d messages=%d overall_mean=%.3f",
@@ -124,14 +126,16 @@ class PerplexityEvaluator(Evaluator):
             total_messages,
             overall_mean,
         )
-        return MetricResult(
-            evaluator_name=self.name,
-            verdict=Verdict.PARTIAL,
-            score=overall_mean,
-            evidence=evidence,
-            per_agent={},
-            rounds_identified=[],
-        )
+        return [
+            Measurement(
+                metric_name=self.name,
+                score=overall_mean,
+                score_unit=f"nats/token ({self.model_name})",
+                summary=summary,
+                per_round=per_round,
+                per_agent=[],
+            )
+        ]
 
 
 def _collect_primary_messages_by_round(
@@ -169,6 +173,8 @@ def _score_all_rounds(
     results: list[RoundPerplexity] = []
     for round_messages in rounds:
         per_message_surprisals = _score_messages(scorer_obj=lm_scorer, texts=round_messages.texts)
+        if not per_message_surprisals:
+            continue
         mean_surprisal = _mean(values=per_message_surprisals)
         std_surprisal = _std(values=per_message_surprisals, mean=mean_surprisal)
         results.append(
@@ -183,12 +189,23 @@ def _score_all_rounds(
 
 
 def _score_messages(scorer_obj: Any, texts: list[str]) -> list[float]:
-    """Return mean per-token surprisal in nats for each input text."""
-    scores: list[float] = scorer_obj.sequence_score(
+    """Return mean per-token surprisal in nats for each input text.
+
+    Drops scores that come back as NaN — minicons returns NaN for inputs that
+    tokenize to a single token (no left context), and serializing NaN to JSON
+    yields ``null`` which fails Pydantic validation downstream.
+    """
+    raw_scores: list[float] = scorer_obj.sequence_score(
         texts,
         reduction=lambda x: -x.mean(0).item(),
     )
-    return [float(s) for s in scores]
+    out: list[float] = []
+    for score in raw_scores:
+        value = float(score)
+        if math.isnan(value):
+            continue
+        out.append(value)
+    return out
 
 
 def _mean(values: list[float]) -> float:

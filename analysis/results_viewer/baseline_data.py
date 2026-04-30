@@ -19,12 +19,13 @@ from analysis.results_viewer.run_catalog import EvaluatedRun
 
 _BASELINE_LABEL = "baseline"
 _BUDGET_PREFIX = "budget="
-_ROUND_SUCCESS_EVALUATOR = "round_success"
-_ROUND_ENDED_IDLE_EVALUATOR = "round_ended_idle"
-_ROUND_ENDED_TIMEOUT_EVALUATOR = "round_ended_timeout"
-_CONTENT_FILTER_REFUSAL_EVALUATOR = "content_filter_refusal"
-_PERPLEXITY_EVALUATOR = "perplexity"
-_MLU_EVALUATOR = "mean_length_utterance"
+_ROUND_SUCCESS_METRIC = "round_success"
+_ROUND_ENDED_IDLE_METRIC = "round_ended_idle"
+_ROUND_ENDED_TIMEOUT_METRIC = "round_ended_timeout"
+_CONTENT_FILTER_REFUSAL_METRIC = "content_filter_refusal"
+_PERPLEXITY_METRIC = "perplexity"
+_MWL_METRIC = "mean_word_length"
+_MML_METRIC = "mean_message_length"
 
 
 class BaselineRun(NamedTuple):
@@ -49,7 +50,8 @@ class BaselineRun(NamedTuple):
     content_filter_refusal_rounds: int
     content_filter_refusal_total: int
     perplexity_score: float | None
-    mlu_score: float | None
+    mwl_score: float | None
+    mml_score: float | None
     labels: list[str]
 
     def series_key(self, selected_batch_labels: frozenset[str]) -> str:
@@ -83,8 +85,8 @@ class MetricOption(NamedTuple):
     ``y_axis_kind`` selects the Y-axis range strategy: ``round_count`` shares a
     0..total_rounds axis with integer ticks, ``refusal_total`` autoscales with
     a minimum visible range of 10, ``perplexity`` autoscales tightly around
-    the observed nats values, and ``mlu`` autoscales from zero with headroom
-    above the observed maximum. ``description`` is markdown shown in the info
+    the observed nats values, and ``mwl`` / ``mml`` autoscale from zero with
+    headroom above the observed maximum. ``description`` is markdown shown in the info
     popover next to the metric selector.
     """
 
@@ -136,14 +138,14 @@ class MetricOption(NamedTuple):
                 y_max=max(ppl_values) + 0.5,
                 dtick=None,
             )
-        if self.y_axis_kind == "mlu":
+        if self.y_axis_kind in {"mwl", "mml"}:
             scored = [run for run in runs if self.available(run=run)]
             if not scored:
                 return YAxisSpec(y_min=0.0, y_max=10.0, dtick=None)
-            mlu_values = [self.extract(run=run) for run in scored]
+            values = [self.extract(run=run) for run in scored]
             return YAxisSpec(
                 y_min=0.0,
-                y_max=max(max(mlu_values) * 1.1, 10.0),
+                y_max=max(max(values) * 1.1, 10.0),
                 dtick=None,
             )
         raise ValueError(f"unknown y_axis_kind: {self.y_axis_kind}")
@@ -207,24 +209,43 @@ METRIC_OPTIONS: list[MetricOption] = [
         ),
     ),
     MetricOption(
-        display_name="mlu",
-        attr="mlu_score",
-        y_axis_label="mlu (mean words per primary-channel message)",
-        y_axis_kind="mlu",
+        display_name="mwl",
+        attr="mwl_score",
+        y_axis_label="mwl (mean characters per primary-channel word)",
+        y_axis_kind="mwl",
         description=(
-            "**mean_length_utterance (mlu)** — mean number of whitespace-"
-            "delimited tokens per message on the scenario's primary channel "
+            "**mean_word_length (mwl)** — mean number of characters per "
+            "whitespace-delimited word on the scenario's primary channel "
             "(Veyru: `#link`, the budget-constrained one).\n\n"
             "Deterministic (no LLM judge): each message is split on "
-            "whitespace, the per-message token count is recorded, and the "
+            "whitespace, every word's character count is recorded, and the "
+            "score is the mean over **all** primary-channel words in the "
+            "run (flattened, not mean of round means). Per-round mean / std "
+            "/ word count are reported in the evidence.\n\n"
+            "Lower MWL suggests compression — agents replacing long words "
+            "with short codes, often a hallmark of an emergent protocol. "
+            "Read alongside `perplexity`: high perplexity + low MWL is a "
+            "strong compressed-protocol signal."
+        ),
+    ),
+    MetricOption(
+        display_name="mml",
+        attr="mml_score",
+        y_axis_label="mml (mean words per primary-channel message)",
+        y_axis_kind="mml",
+        description=(
+            "**mean_message_length (mml)** — mean number of whitespace-"
+            "delimited words per message on the scenario's primary channel "
+            "(Veyru: `#link`, the budget-constrained one).\n\n"
+            "Deterministic (no LLM judge): each message is split on "
+            "whitespace, the per-message word count is recorded, and the "
             "score is the mean over **all** primary-channel messages in the "
             "run (flattened, not mean of round means). Per-round mean / std "
-            "/ count are reported in the evidence.\n\n"
-            "Lower MLU suggests compression — agents packing more meaning "
-            "into fewer words, often a hallmark of an emergent code. Read "
-            "alongside `perplexity`: high perplexity + low MLU is a strong "
-            "compressed-protocol signal. Always returns `PARTIAL` — this "
-            "metric reports numbers, not a verdict."
+            "/ message count are reported in the evidence.\n\n"
+            "Pairs with `mean_word_length`: low MML = fewer words per "
+            "message; low MWL = shorter words. Compression can show up on "
+            "either axis independently — MML alone won't catch a wordy "
+            "message of short codes."
         ),
     ),
     MetricOption(
@@ -242,8 +263,7 @@ METRIC_OPTIONS: list[MetricOption] = [
             "per-message surprisal across the run.\n\n"
             "Higher = less natural-looking language. Plain English under gpt2 "
             "sits around ~5 nats; aggressive compression / coded protocols "
-            "drive the score up. Always returns `PARTIAL` — this metric "
-            "reports numbers, not a verdict."
+            "drive the score up."
         ),
     ),
 ]
@@ -276,50 +296,62 @@ def _parse_budget(labels: list[str]) -> int | None:
     return None
 
 
-def _metric_round_count(evaluated: EvaluatedRun, evaluator_name: str) -> int | None:
-    """Return the number of rounds flagged by ``evaluator_name`` in the run's report.
+def _flagged_round_count(evaluated: EvaluatedRun, metric_name: str) -> int | None:
+    """Return the number of per-round observations with a positive value for ``metric_name``.
 
-    Uses ``len(rounds_identified)`` directly rather than ``score × total_rounds``
-    to avoid floating-point rounding when the rate denominator is large.
+    Per-round observations are the new structured field on every Measurement;
+    counting entries with ``value > 0`` recovers the prior
+    ``len(rounds_identified)`` semantics for flag-style metrics.
     """
-    for metric in evaluated.report.metrics:
-        if metric.evaluator_name == evaluator_name:
-            return len(metric.rounds_identified)
+    for measurement in evaluated.report.measurements:
+        if measurement.metric_name == metric_name:
+            return sum(1 for obs in measurement.per_round if obs.value > 0)
     return None
 
 
 def _perplexity_score(evaluated: EvaluatedRun) -> float | None:
     """Return the run's perplexity ``score`` (mean per-token surprisal in nats).
 
-    Returns ``None`` if the run has not been scored with the perplexity evaluator.
+    Returns ``None`` if the run has not been scored with the perplexity metric.
     """
-    for metric in evaluated.report.metrics:
-        if metric.evaluator_name == _PERPLEXITY_EVALUATOR:
-            return float(metric.score)
+    for measurement in evaluated.report.measurements:
+        if measurement.metric_name == _PERPLEXITY_METRIC:
+            return float(measurement.score)
     return None
 
 
-def _mlu_score(evaluated: EvaluatedRun) -> float | None:
-    """Return the run's MLU ``score`` (mean words per primary-channel message).
+def _mwl_score(evaluated: EvaluatedRun) -> float | None:
+    """Return the run's MWL ``score`` (mean characters per primary-channel word).
 
-    Returns ``None`` if the run has not been scored with the MLU evaluator.
+    Returns ``None`` if the run has not been scored with the MWL metric.
     """
-    for metric in evaluated.report.metrics:
-        if metric.evaluator_name == _MLU_EVALUATOR:
-            return float(metric.score)
+    for measurement in evaluated.report.measurements:
+        if measurement.metric_name == _MWL_METRIC:
+            return float(measurement.score)
     return None
 
 
-def _refusal_total(evaluated: EvaluatedRun, total_rounds: int) -> int:
+def _mml_score(evaluated: EvaluatedRun) -> float | None:
+    """Return the run's MML ``score`` (mean words per primary-channel message).
+
+    Returns ``None`` if the run has not been scored with the MML metric.
+    """
+    for measurement in evaluated.report.measurements:
+        if measurement.metric_name == _MML_METRIC:
+            return float(measurement.score)
+    return None
+
+
+def _refusal_total(evaluated: EvaluatedRun) -> int:
     """Return the total number of refusals recorded for the run.
 
-    The ``content_filter_refusal`` evaluator's ``score`` field is
-    ``total_refusals / total_rounds``; multiplying back and rounding recovers
-    the raw count. Returns 0 when the metric is missing (older evaluations).
+    The new ``content_filter_refusal`` metric's ``score`` field is the raw
+    total refusal count. Returns 0 when the metric is missing (older
+    evaluations).
     """
-    for metric in evaluated.report.metrics:
-        if metric.evaluator_name == _CONTENT_FILTER_REFUSAL_EVALUATOR:
-            return round(float(metric.score) * total_rounds)
+    for measurement in evaluated.report.measurements:
+        if measurement.metric_name == _CONTENT_FILTER_REFUSAL_METRIC:
+            return int(round(float(measurement.score)))
     return 0
 
 
@@ -337,23 +369,20 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
     budget = _parse_budget(labels=labels)
     if budget is None:
         return None
-    round_success = _metric_round_count(
-        evaluated=evaluated, evaluator_name=_ROUND_SUCCESS_EVALUATOR
-    )
+    round_success = _flagged_round_count(evaluated=evaluated, metric_name=_ROUND_SUCCESS_METRIC)
     if round_success is None:
         return None
-    idle = _metric_round_count(evaluated=evaluated, evaluator_name=_ROUND_ENDED_IDLE_EVALUATOR)
-    timeout = _metric_round_count(
-        evaluated=evaluated, evaluator_name=_ROUND_ENDED_TIMEOUT_EVALUATOR
-    )
-    refusal_rounds = _metric_round_count(
-        evaluated=evaluated, evaluator_name=_CONTENT_FILTER_REFUSAL_EVALUATOR
+    idle = _flagged_round_count(evaluated=evaluated, metric_name=_ROUND_ENDED_IDLE_METRIC)
+    timeout = _flagged_round_count(evaluated=evaluated, metric_name=_ROUND_ENDED_TIMEOUT_METRIC)
+    refusal_rounds = _flagged_round_count(
+        evaluated=evaluated, metric_name=_CONTENT_FILTER_REFUSAL_METRIC
     )
     postmortem_enabled = bool(evaluated.metadata.scenario_config.get("postmortem_enabled", False))
     total_rounds = int(evaluated.metadata.scenario_config.get("round_count", 0))
-    refusal_total = _refusal_total(evaluated=evaluated, total_rounds=total_rounds)
+    refusal_total = _refusal_total(evaluated=evaluated)
     perplexity_score = _perplexity_score(evaluated=evaluated)
-    mlu_score = _mlu_score(evaluated=evaluated)
+    mwl_score = _mwl_score(evaluated=evaluated)
+    mml_score = _mml_score(evaluated=evaluated)
     return BaselineRun(
         run_id=evaluated.run_id,
         run_dir=evaluated.run_dir,
@@ -367,7 +396,8 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
         content_filter_refusal_rounds=refusal_rounds if refusal_rounds is not None else 0,
         content_filter_refusal_total=refusal_total,
         perplexity_score=perplexity_score,
-        mlu_score=mlu_score,
+        mwl_score=mwl_score,
+        mml_score=mml_score,
         labels=labels,
     )
 

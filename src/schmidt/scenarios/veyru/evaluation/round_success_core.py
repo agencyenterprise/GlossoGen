@@ -1,15 +1,14 @@
 """Shared helpers for Veyru round-success scoring.
 
-Used by ``RoundSuccessEvaluator`` (scores every round in the log) and
-``RoundSuccessAfterResumeEvaluator`` (scores only the rounds played
+Used by ``RoundSuccessMetric`` (scores every round in the log) and
+``RoundSuccessAfterResumeMetric`` (scores only the rounds played
 after a replace-agent swap). Centralising the team-result accounting
-keeps the two evaluators in lock-step on win/loss semantics.
+keeps the two metrics in lock-step on win/loss semantics.
 """
 
 import logging
 from typing import NamedTuple
 
-from schmidt.evaluation.evaluation_report import Verdict
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import (
     MessageSent,
@@ -36,12 +35,21 @@ TEAM_A_AGENT_IDS = frozenset({OBSERVER_A_ID, STABILIZATION_ENGINEER_A_ID})
 TEAM_B_AGENT_IDS = frozenset({OBSERVER_B_ID, STABILIZATION_ENGINEER_B_ID})
 
 
+class RoundOutcome(NamedTuple):
+    """A single round's outcome for one team."""
+
+    round_number: int
+    won: bool
+    note: str
+
+
 class TeamResult(NamedTuple):
     """Accumulated per-team round outcomes."""
 
     won: int
     won_rounds: list[int]
     lost_details: list[str]
+    round_outcomes: list[RoundOutcome]
 
 
 def compute_team_result(
@@ -57,22 +65,37 @@ def compute_team_result(
     won = 0
     won_rounds: list[int] = []
     lost_details: list[str] = []
+    round_outcomes: list[RoundOutcome] = []
     for rnd in round_numbers:
         if rnd in stabilized_rounds:
             won += 1
             won_rounds.append(rnd)
+            round_outcomes.append(RoundOutcome(round_number=rnd, won=True, note="stabilized"))
             continue
         if rnd in collapsed_rounds:
             if rnd in partial_rounds:
-                lost_details.append(f"{label} R{rnd}: collapsed (partial stages)")
+                detail = f"{label} R{rnd}: collapsed (partial stages)"
+                note = "collapsed (partial stages)"
             else:
-                lost_details.append(f"{label} R{rnd}: collapsed")
+                detail = f"{label} R{rnd}: collapsed"
+                note = "collapsed"
+            lost_details.append(detail)
+            round_outcomes.append(RoundOutcome(round_number=rnd, won=False, note=note))
             continue
         if rnd in partial_rounds:
-            lost_details.append(f"{label} R{rnd}: partial stages, not fully stabilized")
+            detail = f"{label} R{rnd}: partial stages, not fully stabilized"
+            note = "partial stages, not fully stabilized"
         else:
-            lost_details.append(f"{label} R{rnd}: no successful stabilization")
-    return TeamResult(won=won, won_rounds=won_rounds, lost_details=lost_details)
+            detail = f"{label} R{rnd}: no successful stabilization"
+            note = "no successful stabilization"
+        lost_details.append(detail)
+        round_outcomes.append(RoundOutcome(round_number=rnd, won=False, note=note))
+    return TeamResult(
+        won=won,
+        won_rounds=won_rounds,
+        lost_details=lost_details,
+        round_outcomes=round_outcomes,
+    )
 
 
 def is_two_team_mode(agent_configs: list[AgentConfig]) -> bool:
@@ -104,15 +127,6 @@ def filter_events_for_team(
         if isinstance(event, RoundAdvanced):
             filtered.append(event)
     return filtered
-
-
-def score_to_verdict(score: float) -> Verdict:
-    """Map a 0-1 score to a pass/partial/fail verdict."""
-    if score >= 0.9:
-        return Verdict.PASS
-    if score >= 0.5:
-        return Verdict.PARTIAL
-    return Verdict.FAIL
 
 
 def count_total_rounds(events: list[SimulationEvent]) -> int:

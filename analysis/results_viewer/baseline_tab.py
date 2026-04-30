@@ -369,7 +369,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         st.info(
             f"No selected baseline runs have a value for `{metric.display_name}`. "
             "For perplexity, run `python -m schmidt evaluate <scenario> "
-            "--evaluators perplexity ...` on the runs you want included."
+            "--metrics perplexity ...` on the runs you want included."
         )
         return
     series_ordered = sorted(

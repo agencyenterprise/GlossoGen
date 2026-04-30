@@ -3,6 +3,7 @@
 from typing import NamedTuple
 
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from analysis.results_viewer.event_extractor import RunTimeline, TimelineEventKind
 from schmidt.evaluation.evaluation_report import EvaluationReport
@@ -71,17 +72,55 @@ class _RunPlotData(NamedTuple):
     timeline: RunTimeline
 
 
-def collect_per_round_evaluators(reports: list[EvaluationReport]) -> list[str]:
-    """Return the sorted union of evaluator names present in the reports.
+def _is_value_metric(reports: list[EvaluationReport], metric_name: str) -> bool:
+    """A metric is a *value* metric if any per_round entry has value != 1.0.
 
-    Every evaluator now reports ``rounds_identified`` as a structured field on
-    ``MetricResult``; lanes appear for all evaluators that ran, even when a run
-    produced zero round hits.
+    Flag metrics (neologism, round_ended_idle, etc.) only ever emit
+    ``value=1.0`` for rounds where the phenomenon fired. Value metrics
+    (perplexity, mwl, round_success) emit varying numbers per round —
+    plotting them as binary lane dots loses information.
+    """
+    for report in reports:
+        for measurement in report.measurements:
+            if measurement.metric_name != metric_name:
+                continue
+            for obs in measurement.per_round:
+                if obs.value != 1.0:
+                    return True
+    return False
+
+
+def collect_flag_metrics(reports: list[EvaluationReport]) -> list[str]:
+    """Metric names that are flag-style (binary fire/no-fire per round).
+
+    Used by the lane plot. Value metrics like perplexity and mwl are excluded
+    because every round fires and a binary lane carries no signal.
     """
     names: set[str] = set()
     for report in reports:
-        for metric in report.metrics:
-            names.add(metric.evaluator_name)
+        for measurement in report.measurements:
+            if not measurement.per_round:
+                continue
+            if _is_value_metric(reports=reports, metric_name=measurement.metric_name):
+                continue
+            if any(obs.value > 0 for obs in measurement.per_round):
+                names.add(measurement.metric_name)
+    return sorted(names)
+
+
+def collect_value_metrics(reports: list[EvaluationReport]) -> list[str]:
+    """Metric names that carry a meaningful per-round numeric value.
+
+    Used by the per-round value subplot grid (perplexity nats, mwl
+    chars/word, round_success 0/1, etc.).
+    """
+    names: set[str] = set()
+    for report in reports:
+        for measurement in report.measurements:
+            if not measurement.per_round:
+                continue
+            if _is_value_metric(reports=reports, metric_name=measurement.metric_name):
+                names.add(measurement.metric_name)
     return sorted(names)
 
 
@@ -90,15 +129,16 @@ def _build_run_plot_data(
     report: EvaluationReport,
     timeline: RunTimeline,
 ) -> _RunPlotData:
-    """Build the per-evaluator rounds mapping for one run."""
-    per_evaluator: dict[str, list[int]] = {}
-    for metric in report.metrics:
-        if metric.rounds_identified:
-            per_evaluator[metric.evaluator_name] = sorted(metric.rounds_identified)
+    """Build the per-metric rounds mapping for one run."""
+    per_metric: dict[str, list[int]] = {}
+    for measurement in report.measurements:
+        flagged = sorted(obs.round_number for obs in measurement.per_round if obs.value > 0)
+        if flagged:
+            per_metric[measurement.metric_name] = flagged
     return _RunPlotData(
         run_key=run_key,
         total_rounds=timeline.total_rounds,
-        per_evaluator_rounds=per_evaluator,
+        per_evaluator_rounds=per_metric,
         timeline=timeline,
     )
 
@@ -142,24 +182,24 @@ def _build_click_overlay(
 def _add_run_trace(
     fig: go.Figure,
     run: _RunPlotData,
-    evaluators: list[str],
+    metrics: list[str],
     run_index: int,
     run_count: int,
     colour: str,
 ) -> None:
-    """Add one dots+lines trace per (run, evaluator lane); legend shows the run once.
+    """Add one dots+lines trace per (run, metric lane); legend shows the run once.
 
-    Each visible dot carries ``customdata = [run_key, evaluator_name, round]``. Transparent
+    Each visible dot carries ``customdata = [run_key, metric_name, round]``. Transparent
     intermediate markers are added along the connecting line so clicks on the line segment
     also open the modal (mapped to the nearest real round).
     """
     offset = _run_vertical_offset(run_index=run_index, run_count=run_count)
     legend_shown = False
-    for eval_name in evaluators:
+    for eval_name in metrics:
         rounds = run.per_evaluator_rounds.get(eval_name)
         if not rounds:
             continue
-        base_y = evaluators.index(eval_name)
+        base_y = metrics.index(eval_name)
         y = base_y + offset
         sorted_rounds = sorted(rounds)
         ys = [y] * len(sorted_rounds)
@@ -348,16 +388,16 @@ def _add_world_glyphs(
 def build_timeline_figure(
     reports: dict[str, EvaluationReport],
     timelines: dict[str, RunTimeline],
-    evaluators: list[str],
+    metrics: list[str],
 ) -> go.Figure:
-    """Build the overlay timeline figure (per-evaluator lanes, per-run colours, dots + lines).
+    """Build the overlay timeline figure (per-metric lanes, per-run colours, dots + lines).
 
     ``reports`` and ``timelines`` are keyed by the same short run identifier.
-    ``evaluators`` is the ordered list of evaluator names to render as lanes.
+    ``metrics`` is the ordered list of metric names to render as lanes.
     """
     run_keys = list(reports.keys())
-    if not evaluators:
-        return _empty_figure(message="No evaluators selected (or none have per-round evidence).")
+    if not metrics:
+        return _empty_figure(message="No metrics selected (or none have per-round entries).")
 
     run_plot_data = [
         _build_run_plot_data(run_key=key, report=reports[key], timeline=timelines[key])
@@ -371,7 +411,7 @@ def build_timeline_figure(
         _add_run_trace(
             fig=fig,
             run=run,
-            evaluators=evaluators,
+            metrics=metrics,
             run_index=index,
             run_count=len(run_plot_data),
             colour=run_colors[run.run_key],
@@ -383,8 +423,8 @@ def build_timeline_figure(
     )
     _add_prominent_events(fig=fig, runs=run_plot_data, run_colors=run_colors)
 
-    tickvals = [events_lane_y, *range(len(evaluators))]
-    ticktext = [_EVENTS_LANE_LABEL, *evaluators]
+    tickvals = [events_lane_y, *range(len(metrics))]
+    ticktext = [_EVENTS_LANE_LABEL, *metrics]
 
     fig.update_layout(
         title=dict(text="Per-round evaluator hits with scenario events", x=0.01, xanchor="left"),
@@ -401,11 +441,11 @@ def build_timeline_figure(
             tickmode="array",
             tickvals=tickvals,
             ticktext=ticktext,
-            range=[events_lane_y - 0.6, len(evaluators) - 0.4],
+            range=[events_lane_y - 0.6, len(metrics) - 0.4],
             showgrid=True,
             gridcolor="rgba(0,0,0,0.04)",
         ),
-        height=220 + 90 * len(evaluators),
+        height=220 + 90 * len(metrics),
         hovermode="closest",
         dragmode=False,
         legend=dict(
@@ -429,5 +469,299 @@ def _empty_figure(message: str) -> go.Figure:
         annotations=[
             dict(text=message, showarrow=False, x=0.5, y=0.5, xref="paper", yref="paper"),
         ]
+    )
+    return fig
+
+
+def _measurement_score_unit(reports: list[EvaluationReport], metric_name: str) -> str:
+    """Pick the first non-empty score_unit string for ``metric_name`` across reports."""
+    for report in reports:
+        for measurement in report.measurements:
+            if measurement.metric_name == metric_name and measurement.score_unit:
+                return measurement.score_unit
+    return ""
+
+
+def _per_round_for_metric(
+    report: EvaluationReport, metric_name: str
+) -> tuple[list[int], list[float]]:
+    """Return parallel lists of round numbers and values for ``metric_name`` in ``report``."""
+    for measurement in report.measurements:
+        if measurement.metric_name != metric_name:
+            continue
+        sorted_obs = sorted(measurement.per_round, key=lambda obs: obs.round_number)
+        rounds = [obs.round_number for obs in sorted_obs]
+        values = [obs.value for obs in sorted_obs]
+        return rounds, values
+    return [], []
+
+
+_METRIC_DASH_PATTERNS = ["solid", "dash", "dot", "dashdot", "longdash", "longdashdot"]
+
+
+class _SplitMetrics(NamedTuple):
+    """Split value metrics into continuous (shared Y axis) and binary success (rug strip)."""
+
+    continuous: list[str]
+    success: list[str]
+
+
+def _split_value_metrics(metrics: list[str]) -> _SplitMetrics:
+    """Pull ``round_success*`` out of the metric list — those render as a rug strip."""
+    continuous = [name for name in metrics if not name.startswith("round_success")]
+    success = [name for name in metrics if name.startswith("round_success")]
+    return _SplitMetrics(continuous=continuous, success=success)
+
+
+def _add_continuous_value_traces(
+    fig: go.Figure,
+    row: int,
+    reports: dict[str, EvaluationReport],
+    metrics: list[str],
+    run_keys: list[str],
+    run_colors: dict[str, str],
+    metric_dash: dict[str, str],
+) -> None:
+    """Lines for every (run, metric) on the shared Y axis; legend proxies handle naming."""
+    for metric_name in metrics:
+        for run_key in run_keys:
+            rounds, values = _per_round_for_metric(report=reports[run_key], metric_name=metric_name)
+            if not rounds:
+                continue
+            fig.add_trace(
+                go.Scatter(
+                    x=rounds,
+                    y=values,
+                    mode="markers+lines",
+                    name=f"{run_key} · {metric_name}",
+                    legendgroup=f"run::{run_key}",
+                    showlegend=False,
+                    line=dict(color=run_colors[run_key], width=2, dash=metric_dash[metric_name]),
+                    marker=dict(color=run_colors[run_key], size=7),
+                    hovertemplate=(
+                        f"<b>{run_key}</b><br>round %{{x}}<br>{metric_name}: %{{y:.3f}}"
+                        "<extra></extra>"
+                    ),
+                ),
+                row=row,
+                col=1,
+            )
+
+
+def _add_legend_proxies(
+    fig: go.Figure,
+    row: int,
+    run_keys: list[str],
+    run_colors: dict[str, str],
+    metrics: list[str],
+    metric_dash: dict[str, str],
+    metric_label: dict[str, str],
+) -> None:
+    """Invisible traces that populate two legend groups: runs (colour) and metrics (dash)."""
+    for run_key in run_keys:
+        fig.add_trace(
+            go.Scatter(
+                x=[None],
+                y=[None],
+                mode="lines",
+                line=dict(color=run_colors[run_key], width=3),
+                name=run_key,
+                legendgroup="runs",
+                legendgrouptitle=dict(text="Runs"),
+                showlegend=True,
+            ),
+            row=row,
+            col=1,
+        )
+    for metric_name in metrics:
+        fig.add_trace(
+            go.Scatter(
+                x=[None],
+                y=[None],
+                mode="lines",
+                line=dict(color="rgba(80,80,80,0.85)", width=3, dash=metric_dash[metric_name]),
+                name=metric_label[metric_name],
+                legendgroup="metrics",
+                legendgrouptitle=dict(text="Metrics (line style)"),
+                showlegend=True,
+            ),
+            row=row,
+            col=1,
+        )
+
+
+def _add_success_rug(
+    fig: go.Figure,
+    row: int,
+    reports: dict[str, EvaluationReport],
+    metrics: list[str],
+    run_keys: list[str],
+    run_colors: dict[str, str],
+) -> None:
+    """One row per round_success metric; vertical ticks per run on rounds where value > 0."""
+    run_count = len(run_keys)
+    for metric_index, metric_name in enumerate(metrics):
+        for run_index, run_key in enumerate(run_keys):
+            rounds, values = _per_round_for_metric(report=reports[run_key], metric_name=metric_name)
+            success_rounds = [r for r, v in zip(rounds, values) if v > 0]
+            if not success_rounds:
+                continue
+            offset = _run_vertical_offset(run_index=run_index, run_count=run_count)
+            y_pos = metric_index + offset
+            fig.add_trace(
+                go.Scatter(
+                    x=success_rounds,
+                    y=[y_pos] * len(success_rounds),
+                    mode="markers",
+                    marker=dict(
+                        color=run_colors[run_key],
+                        symbol="line-ns",
+                        size=18,
+                        line=dict(width=3, color=run_colors[run_key]),
+                    ),
+                    name=f"{run_key} · {metric_name}",
+                    legendgroup=f"run::{run_key}",
+                    showlegend=False,
+                    hovertemplate=(
+                        f"<b>{run_key}</b><br>{metric_name}<br>round %{{x}} succeeded"
+                        "<extra></extra>"
+                    ),
+                ),
+                row=row,
+                col=1,
+            )
+
+
+def _shared_y_axis_title(reports: list[EvaluationReport], metrics: list[str]) -> str:
+    """Join the distinct units of the continuous metrics for the shared Y axis label."""
+    units = []
+    seen: set[str] = set()
+    for name in metrics:
+        unit = _measurement_score_unit(reports=reports, metric_name=name)
+        if unit and unit not in seen:
+            seen.add(unit)
+            units.append(unit)
+    if not units:
+        return "value"
+    return " / ".join(units)
+
+
+def build_value_metrics_figure(
+    reports: dict[str, EvaluationReport],
+    metrics: list[str],
+) -> go.Figure:
+    """Continuous metrics share one Y axis; ``round_success*`` metrics render as a rug strip below.
+
+    Continuous metrics (perplexity, mwl, mml, …) are drawn as lines on a single
+    shared subplot — colour distinguishes runs, line dash distinguishes metrics.
+    Binary ``round_success*`` metrics get their own narrow row underneath, with
+    one vertical tick per (run, succeeded round).
+    """
+    if not metrics:
+        return _empty_figure(message="No value metrics selected.")
+
+    split = _split_value_metrics(metrics=metrics)
+    run_keys = list(reports.keys())
+    report_list = list(reports.values())
+    run_colors = {key: _RUN_PALETTE[i % len(_RUN_PALETTE)] for i, key in enumerate(run_keys)}
+
+    has_continuous = bool(split.continuous)
+    has_success = bool(split.success)
+
+    metric_dash = {
+        name: _METRIC_DASH_PATTERNS[i % len(_METRIC_DASH_PATTERNS)]
+        for i, name in enumerate(split.continuous)
+    }
+    metric_label = {
+        name: (
+            f"{name} ({_measurement_score_unit(reports=report_list, metric_name=name)})"
+            if _measurement_score_unit(reports=report_list, metric_name=name)
+            else name
+        )
+        for name in split.continuous
+    }
+
+    continuous_row = 1
+    success_row = 1
+    if has_continuous and has_success:
+        fig = make_subplots(
+            rows=2,
+            cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.08,
+            row_heights=[0.78, 0.22],
+            subplot_titles=["Per-round values", "Round success"],
+        )
+        success_row = 2
+    elif has_continuous:
+        fig = make_subplots(rows=1, cols=1, subplot_titles=["Per-round values"])
+    else:
+        fig = make_subplots(rows=1, cols=1, subplot_titles=["Round success"])
+
+    if has_continuous:
+        _add_continuous_value_traces(
+            fig=fig,
+            row=continuous_row,
+            reports=reports,
+            metrics=split.continuous,
+            run_keys=run_keys,
+            run_colors=run_colors,
+            metric_dash=metric_dash,
+        )
+        _add_legend_proxies(
+            fig=fig,
+            row=continuous_row,
+            run_keys=run_keys,
+            run_colors=run_colors,
+            metrics=split.continuous,
+            metric_dash=metric_dash,
+            metric_label=metric_label,
+        )
+        fig.update_yaxes(
+            title_text=_shared_y_axis_title(reports=report_list, metrics=split.continuous),
+            row=continuous_row,
+            col=1,
+        )
+
+    if has_success:
+        _add_success_rug(
+            fig=fig,
+            row=success_row,
+            reports=reports,
+            metrics=split.success,
+            run_keys=run_keys,
+            run_colors=run_colors,
+        )
+        fig.update_yaxes(
+            tickmode="array",
+            tickvals=list(range(len(split.success))),
+            ticktext=split.success,
+            range=[-0.6, len(split.success) - 0.4],
+            row=success_row,
+            col=1,
+        )
+
+    last_row = 2 if (has_continuous and has_success) else 1
+    fig.update_xaxes(title_text="Round", dtick=1, row=last_row, col=1)
+
+    height = 0
+    if has_continuous:
+        height += 460
+    if has_success:
+        height += 80 + 50 * len(split.success)
+
+    fig.update_layout(
+        height=max(height, 320),
+        hovermode="closest",
+        plot_bgcolor="white",
+        margin=dict(l=80, r=240, t=60, b=50),
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=1.0,
+            xanchor="left",
+            x=1.02,
+            groupclick="toggleitem",
+        ),
     )
     return fig

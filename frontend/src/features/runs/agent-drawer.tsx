@@ -11,7 +11,6 @@ import { formatTime, humanize } from "./format";
 import { NotificationDisplay } from "./notification-display";
 import { ProseMarkdown } from "./prose-markdown";
 import { ToolCallDisplay } from "./tool-call-display";
-import { VerdictPill } from "./verdict-pill";
 
 interface DrawerTurnGroup {
   timestamp: string;
@@ -39,9 +38,9 @@ function groupByTurn(messages: DisplayEntry[]): DrawerTurnGroup[] {
 }
 
 type AgentDetail = components["schemas"]["AgentDetail"];
-type EvalMetricResponse = components["schemas"]["EvalMetricResponse"];
+type MeasurementResponse = components["schemas"]["MeasurementResponse"];
 
-type DrawerTab = "prompt" | "messages" | "verdicts";
+type DrawerTab = "prompt" | "messages" | "metrics";
 
 interface AgentDrawerProps {
   agent: AgentDetail;
@@ -51,7 +50,7 @@ interface AgentDrawerProps {
   onClose: () => void;
   onNavigateToMessage: (messageId: string, channelId: string) => void;
   onNavigateToChannel: (channelId: string) => void;
-  evalMetrics: EvalMetricResponse[] | null;
+  measurements: MeasurementResponse[] | null;
 }
 
 export function AgentDrawer({
@@ -62,12 +61,19 @@ export function AgentDrawer({
   onClose,
   onNavigateToMessage,
   onNavigateToChannel,
-  evalMetrics,
+  measurements,
 }: AgentDrawerProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("prompt");
-  const [expandedMetric, setExpandedMetric] = useState<EvalMetricResponse | null>(null);
+  const [expandedMeasurement, setExpandedMeasurement] = useState<MeasurementResponse | null>(null);
   const agentMessages = messages.filter(m => m.sender_agent_id === agent.agent_id);
   const turnGroups = useMemo(() => groupByTurn(agentMessages), [agentMessages]);
+  const agentMetrics = (measurements ?? []).flatMap(measurement => {
+    const observations = measurement.per_agent.filter(obs => obs.agent_id === agent.agent_id);
+    if (observations.length === 0) {
+      return [];
+    }
+    return observations.map(obs => ({ measurement, observation: obs }));
+  });
 
   return (
     <div className="absolute inset-y-0 right-0 z-10 flex w-[calc(100%-192px)] flex-col border-l border-border bg-background">
@@ -103,9 +109,9 @@ export function AgentDrawer({
         <TabButton active={activeTab === "messages"} onClick={() => setActiveTab("messages")}>
           Messages ({agentMessages.length})
         </TabButton>
-        {evalMetrics ? (
-          <TabButton active={activeTab === "verdicts"} onClick={() => setActiveTab("verdicts")}>
-            Verdicts
+        {agentMetrics.length > 0 ? (
+          <TabButton active={activeTab === "metrics"} onClick={() => setActiveTab("metrics")}>
+            Metrics ({agentMetrics.length})
           </TabButton>
         ) : null}
       </div>
@@ -197,37 +203,36 @@ export function AgentDrawer({
             ))}
           </div>
         ) : null}
-        {activeTab === "verdicts" && evalMetrics ? (
+        {activeTab === "metrics" && agentMetrics.length > 0 ? (
           <div className="space-y-0 divide-y divide-border px-5 py-3">
-            {evalMetrics.map(metric => {
-              const agentVerdict = metric.per_agent[agent.agent_id];
-              if (!agentVerdict) {
-                return null;
-              }
-              return (
-                <button
-                  key={metric.evaluator_name}
-                  className="block w-full rounded-md py-2.5 text-left transition-colors hover:bg-muted/50"
-                  onClick={() => setExpandedMetric(metric)}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium">{humanize(metric.evaluator_name)}</span>
-                    <VerdictPill verdict={agentVerdict} />
-                  </div>
-                  {metric.evidence.length > 0 ? (
-                    <ProseMarkdown className="mt-1 line-clamp-3 [&_p]:my-0">
-                      {metric.evidence[0]!}
-                    </ProseMarkdown>
-                  ) : null}
-                </button>
-              );
-            })}
+            {agentMetrics.map(({ measurement, observation }) => (
+              <button
+                key={`${measurement.metric_name}::${observation.agent_id}`}
+                className="block w-full rounded-md py-2.5 text-left transition-colors hover:bg-muted/50"
+                onClick={() => setExpandedMeasurement(measurement)}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium">{humanize(measurement.metric_name)}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {observation.value.toFixed(2)}
+                  </span>
+                </div>
+                {observation.note ? (
+                  <span className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                    {observation.note}
+                  </span>
+                ) : null}
+              </button>
+            ))}
           </div>
         ) : null}
       </div>
 
-      {expandedMetric ? (
-        <EvidenceModal metric={expandedMetric} onClose={() => setExpandedMetric(null)} />
+      {expandedMeasurement ? (
+        <EvidenceModal
+          measurement={expandedMeasurement}
+          onClose={() => setExpandedMeasurement(null)}
+        />
       ) : null}
     </div>
   );

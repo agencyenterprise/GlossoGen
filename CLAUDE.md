@@ -24,7 +24,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `README.md` — scenario documentation
   - `scenario.py` — scenario class (channels, timing, tools, injections, turn logic, knobs schema)
   - `prompts/` — Jinja2 templates for agent system prompts and injection messages
-  - `evaluation/` — scenario-specific evaluators (optional)
+  - `evaluation/` — scenario-specific metrics (optional)
 - `src/schmidt/runtime/` — autonomous mode runtime (MCP server + coordination):
   - `simulation_state.py` — shared state: channels, sessions, locks, callbacks, world context, token counters
   - `mcp_tools.py` — MCP tool definitions (read_notifications, read_channel, send_message, etc.)
@@ -43,18 +43,22 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/run_repository.py` — git-backed repository for run directories (init, commit, clone, checkout)
 - `src/schmidt/message_history_builder.py` — reconstructs pydantic-ai ModelMessage history from JSONL events for fork/resume
 - `src/schmidt/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
-- `src/schmidt/evaluation/` — generic evaluators and evaluation infrastructure
-  - `evaluator_protocol.py` — `Evaluator` ABC and `EvaluatorFactory` type alias
-  - `evaluator_registry.py` — registry mapping evaluator names to factory callables
-  - `generic_evaluator_names.py` — canonical name list (avoids circular imports with `scenario_protocol`)
-  - `round_transcript_builder.py` — builds per-round message transcripts from events (used by all generic evaluators)
-  - `label_writer.py` — writes `eval:{evaluator}:{verdict}` labels to `labels.json` after evaluation
-  - `language_strangeness_evaluator.py` — detects unusual grammar, structure, formatting (not codes/slang/neologisms)
-  - `slang_emergence_evaluator.py` — detects informal register shifts and colloquial expressions
-  - `neologism_evaluator.py` — detects genuinely invented words (not abbreviations or codes)
-  - `shorthand_codes_evaluator.py` — detects abbreviation systems and symbol-to-meaning mappings
-  - `round_ended_idle_evaluator.py` — flags rounds ending via the `all_agents_idle` trigger
-  - `round_ended_timeout_evaluator.py` — flags rounds ending via the `round_timeout` trigger
+- `src/schmidt/evaluation/` — generic metrics and evaluation infrastructure
+  - `metric_protocol.py` — `Metric` ABC and `MetricFactory` type alias
+  - `metric_registry.py` — registry mapping metric names to factory callables
+  - `measurement.py` — `Measurement`, `RoundObservation`, `AgentObservation`, and judge-side `RoundNote` Pydantic models
+  - `generic_metric_names.py` — canonical name list (avoids circular imports with `scenario_protocol`)
+  - `round_transcript_builder.py` — builds per-round message transcripts from events (used by all generic LLM-judge metrics)
+  - `language_strangeness_metric.py` — detects unusual grammar, structure, formatting (not codes/slang/neologisms)
+  - `slang_emergence_metric.py` — detects informal register shifts and colloquial expressions
+  - `neologism_metric.py` — detects genuinely invented words (not abbreviations or codes)
+  - `shorthand_codes_metric.py` — detects abbreviation systems and symbol-to-meaning mappings
+  - `round_ended_idle_metric.py` — flags rounds ending via the `all_agents_idle` trigger
+  - `round_ended_timeout_metric.py` — flags rounds ending via the `round_timeout` trigger
+  - `content_filter_refusal_metric.py` — counts ``ContentFilterError`` refusals across the run, with per-round + per-agent breakdowns
+  - `perplexity_metric.py` — mean per-token surprisal of primary-channel messages under `gpt2`
+  - `mwl_metric.py` — mean characters per word on the primary channel
+  - `mml_metric.py` — mean words per message on the primary channel
   - `round_end_trigger_detection.py` — shared helpers for reading `RoundEnded` events
   - `prompts/` — Jinja2 templates for LLM judge prompts
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
@@ -203,7 +207,7 @@ The backend exposes an MCP (Model Context Protocol) server at `/mcp` for program
 
 ### Available Tools
 
-- `list_scenarios` — lists available scenarios with knobs files, evaluators, and supported models/providers
+- `list_scenarios` — lists available scenarios with knobs files, metrics, and supported models/providers
 - `list_runs` — paginated run listing with filtering by scenario, model, fork status, and run status
 - `get_run_metadata` — lightweight metadata for a single run: agents, channels, configuration, evaluation summary
 - `get_run` — full run content with messages; opt-in sections for reasoning, tool use, debug logs, and system prompts; filtering by agent or channel
@@ -542,38 +546,49 @@ The orchestrator has no automatic recovery: if it dies, simulations keep running
 
 ## Running Evaluations
 
-After a simulation completes, score the log with LLM-as-judge evaluators. Evaluation uses `--provider` to select the LLM judge. The evaluate command reads the scenario configuration from the JSONL event log, so no scenario-specific flags (like `--knobs`) are needed.
+After a simulation completes, score the log with one or more **metrics** — both deterministic ones and LLM-as-judge ones live behind the same `Metric` abstraction, returning a `Measurement` (`score`, `score_unit`, `summary`, `per_round`, `per_agent`). Evaluation uses `--provider` to select the LLM judge for the LLM-driven metrics; deterministic metrics ignore it. The evaluate command reads the scenario configuration from the JSONL event log, so no scenario-specific flags (like `--knobs`) are needed.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
   --run-dir ./runs/<scenario>/<timestamp> \
-  --evaluators <comma-separated evaluator names> \
+  --metrics <comma-separated metric names> \
   --model <model> --provider <provider> \
   > ./runs/<scenario>/<timestamp>/eval_stdout.log 2>&1 &
 ```
 
-Available evaluators per scenario:
+Each metric returns one or more `Measurement` entries written into `<scenario>_report.json` under the `measurements` field. The shape:
 
-Generic evaluators (available to all scenarios). Language-emergence evaluators are each scoped to a specific phenomenon — their prompts explicitly list what the other evaluators cover, so they do not overlap:
+- `metric_name` — the registered metric name (e.g. `perplexity`, `round_success`, `round_success_team_a`).
+- `score` — overall scalar measurement (mean, fraction, count — meaning depends on the metric).
+- `score_unit` — short free-form label describing what `score` represents.
+- `summary` — one-line human-readable rollup.
+- `per_round[]` — structured `RoundObservation` entries (`round_number`, `value`, `note`). Pure metrics like perplexity emit one per round with messages; flag-style metrics like `neologism` emit one per round where the phenomenon was observed.
+- `per_agent[]` — structured `AgentObservation` entries; populated by metrics that have per-agent breakdowns (e.g. `content_filter_refusal`).
 
-- `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style (NOT codes, slang, or new words)
-- `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames (NOT codes or new words)
-- `neologism` — genuinely invented words with new meanings (NOT abbreviations or code mappings)
-- `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding (NOT new words or slang)
-- `perplexity` — mean per-token surprisal of primary-channel messages under `gpt2`, reported per round (deterministic, no LLM judge). Always returns PARTIAL — read the per-round numbers in the report's evidence. Skips scenarios with no primary channel.
-- `mean_length_utterance` — mean number of whitespace-delimited words per primary-channel message (deterministic, no LLM judge). Reports per-round mean/std/count in evidence; overall mean across all messages is the `score`. Always returns PARTIAL. Skips scenarios with no primary channel. Read alongside `perplexity` — high perplexity + low MLU is a strong compressed-protocol signal.
-- `round_ended_idle` — flags rounds whose main phase ended because all agents went idle on `read_notifications` (deterministic, no LLM). Requires `round_ended` events in the log.
-- `round_ended_timeout` — flags rounds whose main phase ended because the wall-clock duration limit was reached (deterministic, no LLM). Requires `round_ended` events in the log.
+Metrics no longer write `eval:` labels into `labels.json` — filter on `score` or on the `per_round` list directly.
 
-Scenario-specific evaluators:
+Available metrics per scenario:
 
-- **veyru**: generic + the following veyru-specific evaluators:
-  - `language_emergence` — novel compressed language in the fictional domain (LLM judge)
-  - `round_success` — fraction of rounds the team stabilized the Veyru before collapse (deterministic, no LLM)
-  - `round_success_after_resume` — same accounting as `round_success` but restricted to the rounds played after a replace-agent swap; also re-scores the source run over the same round window and reports the delta in evidence; reports N/A on non-resume runs (deterministic, no LLM)
-  - `protocol_learned_after_swap` — whether two-team mode teams re-established a working protocol after an observer swap (LLM judge)
+Generic metrics (available to all scenarios):
 
-After evaluation, labels are automatically written to the run's `labels.json` in the format `eval:{evaluator}:{verdict}` where verdict is `identified`, `partial`, or `fail`. Previous `eval:` labels are replaced; user-added labels are preserved.
+- `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style (NOT codes, slang, or new words). LLM judge; `score` = number of rounds with detected anomalies.
+- `slang_emergence` — informal register shifts, existing-word repurposing (NOT codes or new words). LLM judge; `score` = number of rounds with detected slang.
+- `neologism` — genuinely invented words with new meanings (NOT abbreviations or code mappings). LLM judge; `score` = number of rounds with detected neologisms.
+- `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding (NOT new words or slang). LLM judge; `score` = number of rounds with detected codes.
+- `perplexity` — mean per-token surprisal of primary-channel messages under `gpt2`, reported per round (deterministic, no LLM judge). `score` = overall mean nats; `per_round` carries per-round mean+std+message count. Skips scenarios with no primary channel.
+- `mean_word_length` — mean number of characters per whitespace-delimited word on the primary channel (deterministic, no LLM judge). `score` = overall mean chars/word; `per_round` carries per-round mean+std+word count. Skips scenarios with no primary channel. Read alongside `perplexity` — high perplexity + low MWL is a strong compressed-protocol signal (short codes replacing long words).
+- `mean_message_length` — mean number of whitespace-delimited words per primary-channel message (deterministic, no LLM judge). `score` = overall mean words/message; `per_round` carries per-round mean+std+message count. Skips scenarios with no primary channel. Pairs with `mean_word_length`: MML asks "how verbose is each message?" while MWL asks "how compact are the words?". Both can drop independently under tight channel budgets.
+- `round_ended_idle` — flags rounds whose main phase ended because all agents went idle on `read_notifications` (deterministic, no LLM). `score` = count of idle-ended rounds. Requires `round_ended` events in the log.
+- `round_ended_timeout` — flags rounds whose main phase ended because the wall-clock duration limit was reached (deterministic, no LLM). `score` = count of timeout-ended rounds. Requires `round_ended` events in the log.
+- `content_filter_refusal` — counts `ContentFilterError` refusals across the run (deterministic, no LLM). `score` = total refusal count; `per_round` lists rounds with at least one refusal; `per_agent` lists per-agent counts.
+
+Scenario-specific metrics:
+
+- **veyru**: generic + the following veyru-specific metrics:
+  - `language_emergence` — novel compressed language in the fictional domain (LLM judge); `score` = rounds with novel patterns.
+  - `round_success` — fraction of rounds the team stabilized the Veyru before collapse (deterministic, no LLM). Single-team mode emits one Measurement (`metric_name="round_success"`); two-team mode emits two Measurements (`round_success_team_a` and `round_success_team_b`).
+  - `round_success_after_resume` — same accounting as `round_success` but restricted to the rounds played after a replace-agent swap. Re-scores the source run over the same round window and includes the comparison in `summary`. Two-team mode splits into `round_success_after_resume_team_a` / `_team_b`. Returns a zero-score measurement on non-resume runs.
+  - `protocol_learned_after_swap` — whether the newcomer adopted the pre-established protocol after an observer swap or intern takeover (LLM judge); `score` = number of post-boundary rounds with observable newcomer protocol evidence.
 
 ## Destructive Actions
 

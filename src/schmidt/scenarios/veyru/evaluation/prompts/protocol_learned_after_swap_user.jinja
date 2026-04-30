@@ -40,19 +40,14 @@ Post-boundary transcripts (rounds {{ post_boundary_first_round }}..) — newcome
 
 Analyze:
 
-1. **Identify protocol elements**: What shorthand, codes, or conventions did the original pair(s) establish pre-boundary? Cite specific examples with round numbers. If no identifiable protocol emerged pre-boundary, say so — the evaluator cannot score protocol transfer when there is nothing to transfer.
+1. **Identify protocol elements**: What shorthand, codes, or conventions did the original pair(s) establish pre-boundary? Cite specific examples with round numbers. Set ``protocol_established`` to false if there is no identifiable protocol — there is nothing to transfer when this happens.
 
 2. **Identify the newcomer(s)**: In two-team swap mode, the newcomer in each team is the observer who swapped in from the other team. In intern mode, the newcomer is the intern acting as field observer. Look at who is sending messages in the post-boundary window.
 
-3. **Assess adoption**: Does the newcomer use the protocol elements that the team established pre-boundary? Are the original messages from the remaining teammate (engineer) being understood by the newcomer? Does the newcomer continue the conventions, or do they revert to plain language / impose a different protocol?
+3. **Per-round notes**: For EVERY post-boundary round where there is observable evidence of the newcomer either using the pre-established protocol or conspicuously failing to use it, return one entry in ``per_round_notes`` with the round number and a note describing the specific message(s) (with sender) and whether they extended, reverted from, or ignored the protocol. Include every round with observable evidence; skip rounds where the post-boundary newcomer did not contribute observable signal.
 
-4. **Evidence**: Cite specific post-boundary messages showing adoption or non-adoption.
+   Grade functional protocol acquisition, not verbatim imitation. Coining new terms that follow the same convention (e.g., new two-letter state codes when that was the established pattern) counts as protocol use if the engineer accepts them without clarification. Repeated reversion to plain language, mid-round confusion that is not resolved, or imposing a different protocol counts as failing to use the protocol.
 
-5. **Round identification**: In ``rounds_identified``, list every post-boundary round number where there is observable evidence of the newcomer either using the pre-established protocol or conspicuously failing to use it (these should match the rounds cited in ``newcomer_adoption_examples``).
-
-Verdict guidance (grade functional protocol acquisition, not verbatim imitation):
-- PASS: The newcomer used the pre-boundary conventions (grammar, structure, shorthand style) and the engineer continued to understand them well enough to keep collaborating. Coining new terms that follow the same convention (e.g., new two-letter state codes when that was the established pattern) counts as PASS if the engineer accepts them without clarification. Isolated lapses that are self-corrected within the same round also count as PASS — the success criterion is whether the newcomer can do the job using the emerged protocol, not whether every message is flawless.
-- PARTIAL: The newcomer used the conventions in some rounds but frequently reverted to plain language, imposed a different structure, or caused repeated clarification requests from the engineer that were not quickly resolved. Mixed usage that visibly degrades the collaboration.
-- FAIL: The newcomer did not adopt the protocol — reverted to plain language throughout, imposed a different protocol, or no distinguishable protocol was established pre-boundary for the newcomer to adopt.
+4. **Explanation**: Provide a brief overall summary describing the newcomer's overall protocol-use behavior across the post-boundary window.
 
 Submit your assessment using the provided tool.

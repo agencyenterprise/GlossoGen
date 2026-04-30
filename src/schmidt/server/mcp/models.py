@@ -11,7 +11,7 @@ class McpScenario(BaseModel):
 
     name: str
     knobs_files: list[str]
-    evaluators: list[str]
+    metrics: list[str]
 
 
 class McpModel(BaseModel):
@@ -73,14 +73,31 @@ class McpListRunsResult(BaseModel):
     limit: int
 
 
-class McpEvalMetric(BaseModel):
-    """A single evaluation metric result."""
+class McpRoundObservation(BaseModel):
+    """Per-round observation for an evaluation measurement."""
 
-    evaluator_name: str
-    verdict: str
+    round_number: int
+    value: float
+    note: str
+
+
+class McpAgentObservation(BaseModel):
+    """Per-agent observation for an evaluation measurement."""
+
+    agent_id: str
+    value: float
+    note: str
+
+
+class McpMeasurement(BaseModel):
+    """A single evaluation measurement."""
+
+    metric_name: str
     score: float
-    evidence: list[str]
-    per_agent: dict[str, str]
+    score_unit: str
+    summary: str
+    per_round: list[McpRoundObservation]
+    per_agent: list[McpAgentObservation]
 
 
 class McpRunMetadata(BaseModel):
@@ -99,7 +116,7 @@ class McpRunMetadata(BaseModel):
     scenario_config: dict[str, Any]
     agent_models: list[McpAgentModel]
     fork_source: McpForkSource | None
-    evaluation: list[McpEvalMetric] | None
+    evaluation: list[McpMeasurement] | None
 
 
 class McpMessage(BaseModel):

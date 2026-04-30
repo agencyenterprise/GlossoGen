@@ -123,27 +123,27 @@ When `postmortem_enabled` is true, a discussion phase follows each round. Both a
 
 ## Evaluation
 
-**`language_emergence`** — Did agents develop novel compressed language? Extracts per-round transcripts and uses an LLM judge to detect:
-- Novel abbreviations or codes (single-letter codes, numbered protocols, invented shorthand)
-- Compression over time (decreasing average message length)
-- Shared conventions adopted by both agents
-- Structural innovation (keyword-only messages, compound codes like "AC+LK")
+Veyru metrics implement the generic `Metric` abstraction and return `Measurement` entries (`score`, `score_unit`, `summary`, `per_round`, `per_agent`).
 
-Scoring: PASS (1.0) if genuine novel language emerged, PARTIAL (0.5) if only English compression, FAIL (0.0) if no compression.
+**`language_emergence`** — Did agents develop novel compressed language? Extracts per-round transcripts and uses an LLM judge to detect novel abbreviations or codes, compression over time, shared conventions adopted by both agents, and structural innovation. The `score` is the count of rounds where the judge observed novel language patterns; `per_round` carries one observation per flagged round with the judge's note.
 
-**`round_success`** — How many rounds did the team stabilize the Veyru before collapse? Deterministic (no LLM): scans `ToolResultReceived` and `WorldEventDelivered` events for success and collapse markers. In two-team mode, a round counts only when both teams succeed, and per-team results are also reported.
+**`round_success`** — How many rounds did the team stabilize the Veyru before collapse? Deterministic (no LLM): scans `ToolResultReceived` and `WorldEventDelivered` events for success and collapse markers. Single-team mode emits one `Measurement` (`metric_name="round_success"`); two-team mode emits two — `round_success_team_a` and `round_success_team_b` — each with its own per-team `per_round` outcomes.
 
-**`protocol_learned_after_swap`** — Two-team mode only. Measures whether the new pairings re-established a working comm protocol after the observer swap. Compares post-swap round transcripts and outcomes to pre-swap baselines via an LLM judge.
+**`round_success_after_resume`** — Same accounting as `round_success` but restricted to the rounds played after a replace-agent swap. Re-scores the source run over the same round window and includes the resumed-vs-source delta in `summary`. Two-team mode splits into `round_success_after_resume_team_a` / `_team_b`. Returns a zero-score measurement on non-resume runs.
 
-The generic `round_ended_idle` and `round_ended_timeout` evaluators are also useful for veyru runs: they flag rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger respectively, using the `round_ended` events emitted by the game clock.
+**`protocol_learned_after_swap`** — Applies in two-team swap mode and intern mode. Measures whether the newcomer adopted the pre-established communication protocol after the personnel change. The LLM judge returns one note per post-boundary round with observable evidence; the `score` is the count of those rounds.
 
-The generic `content_filter_refusal` evaluator counts LLM content-filter refusals encountered during the run. It reads `{scenario}_debug.jsonl` for ERROR entries from `schmidt.runners.pydantic_ai_runner` whose message contains `ContentFilterError`, correlates each refusal's timestamp with `RoundAdvanced` events to bucket by round, and emits a per-agent breakdown. Score is total refusals divided by total rounds; PASS when zero refusals, PARTIAL otherwise. Useful on the Veyru stabilization engineer role, whose system prompt — detailing physical-manipulation instructions on a fictional box-shaped entity — sometimes triggers Claude's safety classifier.
+The generic `round_ended_idle` and `round_ended_timeout` metrics are also useful for veyru runs: they count rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger, using the `round_ended` events emitted by the game clock.
 
-The generic `perplexity` evaluator scores `#link` messages — Veyru's primary channel, returned by `VeyruScenario.get_primary_channel_id()` — under a fixed `gpt2` language model via `minicons.IncrementalLMScorer`. It computes mean per-token surprisal (in nats) per message with `reduction = -x.mean(0)`, aggregates per round, and reports the run-wide mean as `score`. Always returns `PARTIAL`. In two-team mode `get_primary_channel_id()` returns `None` and the evaluator emits a no-op result (no scoring across the two link channels). Empirically on opus-4-7 baselines, the score drops monotonically as `round_time_budget_seconds` grows from 150 → 2000 (~8.0 → 6.8 nats with postmortem; ~5.8 → 5.5 without), consistent with agents using more compressed / coded language under tight budgets.
+The generic `content_filter_refusal` metric counts `AgentRunCycleFailed` events with `error_type == ContentFilterError` and emits a per-agent breakdown of refusal counts. Useful on the Veyru stabilization engineer role, whose system prompt — detailing physical-manipulation instructions on a fictional box-shaped entity — sometimes triggers Claude's safety classifier.
 
-The generic `mean_length_utterance` evaluator complements `perplexity` on `#link`: it splits each primary-channel message on whitespace, counts tokens, and reports the overall mean as `score` plus per-round mean / std / count in evidence. Same scoping rule as `perplexity` — no-op in two-team mode. When the channel budget tightens, expect MLU to drop alongside any perplexity rise; the pair gives a deterministic two-axis read on language compression without a judge.
+The generic `perplexity` metric scores `#link` messages — Veyru's primary channel, returned by `VeyruScenario.get_primary_channel_id()` — under a fixed `gpt2` language model via `minicons.IncrementalLMScorer`. It computes mean per-token surprisal (in nats) per message with `reduction = -x.mean(0)`, aggregates per round, and reports the run-wide mean as `score`. In two-team mode `get_primary_channel_id()` returns `None` and the metric emits a no-op result. Empirically on opus-4-7 baselines, the score drops monotonically as `round_time_budget_seconds` grows from 150 → 2000 (~8.0 → 6.8 nats with postmortem; ~5.8 → 5.5 without), consistent with agents using more compressed / coded language under tight budgets.
 
-The `veyru_case_started` event is emitted once per round at round start by `VeyruScenario.on_round_advanced` and carries the full case payload: `case_number`, `failure_name`, `time_budget_seconds`, `stellar_reading`, and per-stage `(motif_name, observable_symptoms, treatment_motif_name, judge_expected_actions)`. It enables evaluators to read ground truth directly from the log without needing `VeyruStabilizationJudged` events or `scenario.veyru_cases` attribute access.
+The generic `mean_word_length` metric complements `perplexity` on `#link`: it splits each primary-channel message on whitespace, measures each word's character count, and reports the overall mean as `score`; `per_round` carries per-round mean / std / word count. Same scoping rule as `perplexity` — no-op in two-team mode. When the channel budget tightens, expect MWL to drop alongside any perplexity rise (short codes replacing long words); the pair gives a deterministic two-axis read on language compression without a judge.
+
+The generic `mean_message_length` metric is the message-level companion to MWL: it counts whitespace-delimited words per `#link` message and reports the overall mean. Same scoping rule. MML and MWL move independently — a run can compress by sending fewer words per message (low MML), by replacing words with short codes (low MWL), or both.
+
+The `veyru_case_started` event is emitted once per round at round start by `VeyruScenario.on_round_advanced` and carries the full case payload: `case_number`, `failure_name`, `time_budget_seconds`, `stellar_reading`, and per-stage `(motif_name, observable_symptoms, treatment_motif_name, judge_expected_actions)`. Metrics that need ground truth read it directly from the log.
 
 ## Knobs
 

@@ -539,3 +539,23 @@ class VeyruWorld(ScenarioWorld):
                 channel_id=team.link_channel_id,
                 text=(f"CRITICAL: Veyru destabilizing rapidly. {remaining:.0f} seconds remaining."),
             )
+
+    async def mark_unstabilized_teams_collapsed(self, reason: str) -> None:
+        """Emit ``VEYRU HAS COLLAPSED`` for teams that didn't stabilize this round.
+
+        Called by the scenario at round-end so that rounds ending via
+        ``all_agents_idle`` or ``round_timeout`` (without the budget being
+        exceeded) still produce a terminal world event. Skips teams that
+        already received a collapse notification or that stabilized.
+        """
+        for team in self._teams.values():
+            if team.veyru_stabilized:
+                continue
+            if THRESHOLD_COLLAPSED in team.notified_thresholds:
+                continue
+            team.notified_thresholds.update([THRESHOLD_COLLAPSED, THRESHOLD_CRITICAL])
+            team.veyru_alive = False
+            await self._context.send_update_to_channel(
+                channel_id=team.link_channel_id,
+                text=f"{VEYRU_COLLAPSED_MARKER}. {reason}",
+            )

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Self
 
 from schmidt.evaluation.evaluation_report import EvaluationReport
-from schmidt.evaluation.generic_evaluator_names import GENERIC_EVALUATOR_NAMES
+from schmidt.evaluation.generic_metric_names import GENERIC_METRIC_NAMES
 from schmidt.event_logger import EventLogger
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel
@@ -29,13 +29,27 @@ class SimulationScenario(ABC):
     """
 
     @classmethod
-    def get_available_evaluator_names(cls) -> list[str]:
-        """Return the names of all evaluators available for this scenario.
+    def get_available_metric_names(cls) -> list[str]:
+        """Return the names of all metrics available for this scenario.
 
-        The default returns only generic evaluators.
-        Scenarios with scenario-specific evaluators override this method.
+        The default returns only generic metrics.
+        Scenarios with scenario-specific metrics override this method.
         """
-        return sorted(GENERIC_EVALUATOR_NAMES)
+        return sorted(GENERIC_METRIC_NAMES)
+
+    @abstractmethod
+    async def run_evaluation(
+        self,
+        log_path: Path,
+        metric_names: list[str],
+        report_path: Path,
+        model: str,
+        provider_name: str,
+        inference_provider: str | None,
+        reasoning_effort: str | None,
+    ) -> EvaluationReport:
+        """Run metrics against a simulation log and write the report."""
+        ...
 
     @classmethod
     @abstractmethod
@@ -129,20 +143,6 @@ class SimulationScenario(ABC):
 
         Returns None when no injection is scheduled for this round and agent.
         """
-        ...
-
-    @abstractmethod
-    async def run_evaluation(
-        self,
-        log_path: Path,
-        evaluator_names: list[str],
-        report_path: Path,
-        model: str,
-        provider_name: str,
-        inference_provider: str | None,
-        reasoning_effort: str | None,
-    ) -> EvaluationReport:
-        """Run evaluators against a simulation log and write the report."""
         ...
 
     # --- Autonomous agent timing configuration ---
@@ -284,6 +284,19 @@ class SimulationScenario(ABC):
         The default is a no-op for scenarios without world state.
         """
         _ = round_number
+
+    async def on_round_ended(self, round_number: int, trigger: str) -> None:
+        """Called by the game clock after a round's game phase ends.
+
+        Fires after the ``RoundEnded`` event is logged but before any
+        postmortem injections or the next round's advance. ``trigger`` is the
+        same string written to the ``RoundEnded`` event (``all_agents_idle``,
+        ``round_timeout``, or a scenario-specific early trigger). The scenario
+        runtime's notion of "current round" is still ``round_number`` here, so
+        scenarios can emit per-round world events that attribute correctly.
+        The default is a no-op.
+        """
+        _ = round_number, trigger
 
     def restore_state_from_events(self, events: list[Any]) -> None:
         """Reconstruct world state from a JSONL event list before resume.

@@ -6,15 +6,14 @@ import { X } from "lucide-react";
 import type { components } from "@/types/api.gen";
 import { humanize } from "./format";
 import { ProseMarkdown } from "./prose-markdown";
-import { VerdictPill } from "./verdict-pill";
 
-type EvalMetricResponse = components["schemas"]["EvalMetricResponse"];
+type MeasurementResponse = components["schemas"]["MeasurementResponse"];
 
 export function EvidenceModal({
-  metric,
+  measurement,
   onClose,
 }: {
-  metric: EvalMetricResponse;
+  measurement: MeasurementResponse;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -38,9 +37,10 @@ export function EvidenceModal({
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{humanize(metric.evaluator_name)}</span>
-            <VerdictPill verdict={metric.verdict} />
-            <span className="text-xs text-muted-foreground">{metric.score.toFixed(2)}</span>
+            <span className="text-sm font-medium">{humanize(measurement.metric_name)}</span>
+            <span className="text-xs text-muted-foreground">
+              {measurement.score.toFixed(2)} {measurement.score_unit}
+            </span>
           </div>
           <button
             aria-label="Close"
@@ -52,26 +52,49 @@ export function EvidenceModal({
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            Evidence
+            Summary
           </div>
-          <ul className="space-y-3">
-            {metric.evidence.map(text => (
-              <li key={text}>
-                <ProseMarkdown>{text}</ProseMarkdown>
-              </li>
-            ))}
-          </ul>
+          <ProseMarkdown>{measurement.summary}</ProseMarkdown>
 
-          {Object.keys(metric.per_agent).length > 0 ? (
+          {measurement.per_round.length > 0 ? (
+            <>
+              <div className="mb-2 mt-5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Per round
+              </div>
+              <div className="divide-y divide-border">
+                {measurement.per_round.map(observation => (
+                  <div
+                    key={observation.round_number}
+                    className="flex flex-col gap-0.5 py-1.5 text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Round {observation.round_number}</span>
+                      <span className="text-muted-foreground">{observation.value.toFixed(2)}</span>
+                    </div>
+                    {observation.note ? (
+                      <span className="text-muted-foreground">{observation.note}</span>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
+
+          {measurement.per_agent.length > 0 ? (
             <>
               <div className="mb-2 mt-5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Per agent
               </div>
               <div className="divide-y divide-border">
-                {Object.entries(metric.per_agent).map(([agentId, verdict]) => (
-                  <div key={agentId} className="flex items-center justify-between py-1.5">
-                    <span className="text-xs">{humanize(agentId)}</span>
-                    <VerdictPill verdict={verdict} />
+                {measurement.per_agent.map(observation => (
+                  <div key={observation.agent_id} className="flex flex-col gap-0.5 py-1.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{humanize(observation.agent_id)}</span>
+                      <span className="text-muted-foreground">{observation.value.toFixed(2)}</span>
+                    </div>
+                    {observation.note ? (
+                      <span className="text-muted-foreground">{observation.note}</span>
+                    ) : null}
                   </div>
                 ))}
               </div>
