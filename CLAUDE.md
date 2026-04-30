@@ -143,6 +143,8 @@ cp .env.example .env
 | `ALLOWED_ORIGINS` | Optional | Comma-separated CORS origins (defaults to `http://localhost:3000`) |
 | `SCHMIDT_RUNS_DIR` | Optional | Directory for simulation run data (defaults to `./runs`) |
 | `OAUTH_ISSUER_URL` | Yes (for MCP) | Public backend URL for MCP OAuth (MCP is disabled if unset) |
+| `PROD_API_URL` | Optional | Target prod server URL for the "Upload to prod" button (button hidden when unset) |
+| `PROD_PASSWORD` | Optional | Bearer password for `PROD_API_URL` (required alongside `PROD_API_URL`) |
 
 Frontend environment variables go in `frontend/.env.local` (see `frontend/.env.local.example`):
 
@@ -558,6 +560,7 @@ Generic evaluators (available to all scenarios). Language-emergence evaluators a
 - `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames (NOT codes or new words)
 - `neologism` — genuinely invented words with new meanings (NOT abbreviations or code mappings)
 - `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding (NOT new words or slang)
+- `perplexity` — mean per-token surprisal of primary-channel messages under `gpt2`, reported per round (deterministic, no LLM judge). Always returns PARTIAL — read the per-round numbers in the report's evidence. Skips scenarios with no primary channel.
 - `round_ended_idle` — flags rounds whose main phase ended because all agents went idle on `read_notifications` (deterministic, no LLM). Requires `round_ended` events in the log.
 - `round_ended_timeout` — flags rounds whose main phase ended because the wall-clock duration limit was reached (deterministic, no LLM). Requires `round_ended` events in the log.
 

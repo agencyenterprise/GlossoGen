@@ -8,6 +8,7 @@ from schmidt.evaluation.content_filter_refusal_evaluator import ContentFilterRef
 from schmidt.evaluation.evaluator_protocol import Evaluator, EvaluatorFactory
 from schmidt.evaluation.language_strangeness_evaluator import LanguageStrangenessEvaluator
 from schmidt.evaluation.neologism_evaluator import NeologismEvaluator
+from schmidt.evaluation.perplexity_evaluator import PerplexityEvaluator
 from schmidt.evaluation.round_ended_idle_evaluator import RoundEndedIdleEvaluator
 from schmidt.evaluation.round_ended_timeout_evaluator import RoundEndedTimeoutEvaluator
 from schmidt.evaluation.shorthand_codes_evaluator import ShorthandCodesEvaluator
@@ -17,6 +18,7 @@ _GENERIC_EVALUATORS: list[type[Evaluator]] = [
     ContentFilterRefusalEvaluator,
     LanguageStrangenessEvaluator,
     NeologismEvaluator,
+    PerplexityEvaluator,
     RoundEndedIdleEvaluator,
     RoundEndedTimeoutEvaluator,
     ShorthandCodesEvaluator,

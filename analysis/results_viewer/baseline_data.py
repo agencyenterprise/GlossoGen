@@ -23,6 +23,7 @@ _ROUND_SUCCESS_EVALUATOR = "round_success"
 _ROUND_ENDED_IDLE_EVALUATOR = "round_ended_idle"
 _ROUND_ENDED_TIMEOUT_EVALUATOR = "round_ended_timeout"
 _CONTENT_FILTER_REFUSAL_EVALUATOR = "content_filter_refusal"
+_PERPLEXITY_EVALUATOR = "perplexity"
 
 
 class BaselineRun(NamedTuple):
@@ -46,6 +47,7 @@ class BaselineRun(NamedTuple):
     round_ended_timeout: int
     content_filter_refusal_rounds: int
     content_filter_refusal_total: int
+    perplexity_score: float | None
     labels: list[str]
 
     def series_key(self, selected_batch_labels: frozenset[str]) -> str:
@@ -57,21 +59,81 @@ class BaselineRun(NamedTuple):
         return f"{self.model} · {suffix}"
 
 
+class YAxisSpec(NamedTuple):
+    """Y-axis range and tick spacing for a metric, computed from the run set.
+
+    ``dtick`` is ``None`` when the metric should use plotly's automatic tick
+    placement (refusal counts, perplexity nats); set to an integer for the
+    round-count metrics so each integer position gets a tick.
+    """
+
+    y_min: float
+    y_max: float
+    dtick: int | None
+
+
 class MetricOption(NamedTuple):
     """User-selectable metric for the baseline plot.
 
     ``attr`` is the ``BaselineRun`` field to aggregate; the plot shows the
     per-bucket mean and std of that value. ``display_name`` is what the
     selector shows; ``y_axis_label`` is the wording shown on the chart's Y axis.
+    ``y_axis_kind`` selects the Y-axis range strategy: ``round_count`` shares a
+    0..total_rounds axis with integer ticks, ``refusal_total`` autoscales with
+    a minimum visible range of 10, and ``perplexity`` autoscales tightly around
+    the observed nats values. ``description`` is markdown shown in the info
+    popover next to the metric selector.
     """
 
     display_name: str
     attr: str
     y_axis_label: str
+    y_axis_kind: str
+    description: str
 
     def extract(self, run: "BaselineRun") -> float:
-        """Pull this metric's value out of ``run`` as a float for aggregation."""
-        return float(getattr(run, self.attr))
+        """Pull this metric's value out of ``run`` as a float for aggregation.
+
+        Caller must filter out runs where ``available(run)`` is False before
+        calling this — the perplexity metric raises on unscored runs.
+        """
+        value = getattr(run, self.attr)
+        if value is None:
+            raise ValueError(f"metric {self.display_name!r} not available for run {run.run_id}")
+        return float(value)
+
+    def available(self, run: "BaselineRun") -> bool:
+        """Return True if ``run`` has a value for this metric.
+
+        Round-count and refusal metrics always have a value (zeroed by default
+        for older runs); perplexity is the only metric that can be missing.
+        """
+        return getattr(run, self.attr) is not None
+
+    def y_axis(self, runs: list["BaselineRun"]) -> YAxisSpec:
+        """Compute the Y-axis range and tick spacing for this metric.
+
+        Receives the full set of baseline runs (not the filtered subset) so the
+        axis stays fixed when the user toggles series — preventing the chart
+        from shrinking when a series is hidden.
+        """
+        if self.y_axis_kind == "round_count":
+            y_max = max((run.total_rounds for run in runs), default=15)
+            return YAxisSpec(y_min=0.0, y_max=float(y_max), dtick=1)
+        if self.y_axis_kind == "refusal_total":
+            refusal_max = max((self.extract(run=run) for run in runs), default=0.0)
+            return YAxisSpec(y_min=0.0, y_max=max(refusal_max * 1.1, 10.0), dtick=None)
+        if self.y_axis_kind == "perplexity":
+            scored = [run for run in runs if self.available(run=run)]
+            if not scored:
+                return YAxisSpec(y_min=0.0, y_max=10.0, dtick=None)
+            ppl_values = [self.extract(run=run) for run in scored]
+            return YAxisSpec(
+                y_min=max(0.0, min(ppl_values) - 0.5),
+                y_max=max(ppl_values) + 0.5,
+                dtick=None,
+            )
+        raise ValueError(f"unknown y_axis_kind: {self.y_axis_kind}")
 
 
 METRIC_OPTIONS: list[MetricOption] = [
@@ -79,25 +141,78 @@ METRIC_OPTIONS: list[MetricOption] = [
         display_name="round_success",
         attr="round_success",
         y_axis_label="round_success (# of rounds stabilized)",
+        y_axis_kind="round_count",
+        description=(
+            "**round_success** — number of rounds the team stabilized the Veyru "
+            "before collapse, out of `total_rounds`.\n\n"
+            "Deterministic (no LLM): scans `ToolResultReceived` and "
+            "`WorldEventDelivered` events for success and collapse markers. "
+            "In two-team mode a round counts only when both teams succeed."
+        ),
     ),
     MetricOption(
         display_name="round_ended_idle",
         attr="round_ended_idle",
         y_axis_label="round_ended_idle (# of rounds ended via all_agents_idle)",
+        y_axis_kind="round_count",
+        description=(
+            "**round_ended_idle** — number of rounds whose main phase ended "
+            "because every agent was simultaneously idle on `read_notifications`.\n\n"
+            "Deterministic (no LLM): reads the `RoundEnded` event's `trigger` "
+            "field and counts entries equal to `all_agents_idle`. A high count "
+            "means agents finish their work and stop talking before the round "
+            "timer runs out."
+        ),
     ),
     MetricOption(
         display_name="round_ended_timeout",
         attr="round_ended_timeout",
         y_axis_label="round_ended_timeout (# of rounds ended via round_timeout)",
+        y_axis_kind="round_count",
+        description=(
+            "**round_ended_timeout** — number of rounds whose main phase ended "
+            "because the wall-clock duration limit was reached.\n\n"
+            "Deterministic (no LLM): reads the `RoundEnded` event's `trigger` "
+            "field and counts entries equal to `round_timeout`. A high count "
+            "means the round budget was insufficient for agents to converge."
+        ),
+    ),
+    MetricOption(
+        display_name="content_filter_refusal",
+        attr="content_filter_refusal_total",
+        y_axis_label="content_filter refusals (total per run)",
+        y_axis_kind="refusal_total",
+        description=(
+            "**content_filter_refusal** — total number of `ContentFilterError` "
+            "refusals logged by the agent runner during the run.\n\n"
+            "Deterministic (no LLM): reads `{scenario}_debug.jsonl` for ERROR "
+            "entries from `schmidt.runners.pydantic_ai_runner` whose message "
+            "contains `ContentFilterError`. The runner retries on refusal, so "
+            "a single round can accumulate many. Useful on the Veyru "
+            "stabilization-engineer role, whose physical-manipulation prompt "
+            "sometimes trips Claude's safety classifier."
+        ),
+    ),
+    MetricOption(
+        display_name="perplexity",
+        attr="perplexity_score",
+        y_axis_label="perplexity (mean per-token surprisal, nats, gpt2)",
+        y_axis_kind="perplexity",
+        description=(
+            "**perplexity** — mean per-token surprisal (in nats) of "
+            "primary-channel messages under a fixed `gpt2` language model.\n\n"
+            "Deterministic (no LLM judge): scopes to the scenario's primary "
+            "channel (Veyru: `#link`, the budget-constrained one), scores each "
+            "message with `minicons.IncrementalLMScorer` using "
+            "`reduction = -x.mean(0)` (length-normalized), then averages "
+            "per-message surprisal across the run.\n\n"
+            "Higher = less natural-looking language. Plain English under gpt2 "
+            "sits around ~5 nats; aggressive compression / coded protocols "
+            "drive the score up. Always returns `PARTIAL` — this metric "
+            "reports numbers, not a verdict."
+        ),
     ),
 ]
-
-
-REFUSAL_METRIC = MetricOption(
-    display_name="content_filter_refusal",
-    attr="content_filter_refusal_total",
-    y_axis_label="content_filter refusals (total per run)",
-)
 """Metric definition for the dedicated refusal plot.
 
 Lives outside ``METRIC_OPTIONS`` because its magnitude (can exceed 100 per run)
@@ -136,6 +251,17 @@ def _metric_round_count(evaluated: EvaluatedRun, evaluator_name: str) -> int | N
     for metric in evaluated.report.metrics:
         if metric.evaluator_name == evaluator_name:
             return len(metric.rounds_identified)
+    return None
+
+
+def _perplexity_score(evaluated: EvaluatedRun) -> float | None:
+    """Return the run's perplexity ``score`` (mean per-token surprisal in nats).
+
+    Returns ``None`` if the run has not been scored with the perplexity evaluator.
+    """
+    for metric in evaluated.report.metrics:
+        if metric.evaluator_name == _PERPLEXITY_EVALUATOR:
+            return float(metric.score)
     return None
 
 
@@ -181,6 +307,7 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
     postmortem_enabled = bool(evaluated.metadata.scenario_config.get("postmortem_enabled", False))
     total_rounds = int(evaluated.metadata.scenario_config.get("round_count", 0))
     refusal_total = _refusal_total(evaluated=evaluated, total_rounds=total_rounds)
+    perplexity_score = _perplexity_score(evaluated=evaluated)
     return BaselineRun(
         run_id=evaluated.run_id,
         run_dir=evaluated.run_dir,
@@ -193,6 +320,7 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
         round_ended_timeout=timeout if timeout is not None else 0,
         content_filter_refusal_rounds=refusal_rounds if refusal_rounds is not None else 0,
         content_filter_refusal_total=refusal_total,
+        perplexity_score=perplexity_score,
         labels=labels,
     )
 

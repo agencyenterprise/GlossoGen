@@ -378,6 +378,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/prod-upload/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Prod Upload Status
+         * @description Report whether prod upload is configured on this server.
+         */
+        get: operations["prod_upload_status_api_prod_upload_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{scenario}/{run_dir_name}/upload-to-prod": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Run To Prod
+         * @description Upload a single local run to the configured prod server.
+         *
+         *     Default: returns ``already_present`` when prod already has the run; the
+         *     bundle is neither rebuilt nor re-uploaded. Pass ``?force=true`` to
+         *     delete the remote run first and re-upload, returning ``overridden``.
+         */
+        post: operations["upload_run_to_prod_api_runs__scenario___run_dir_name__upload_to_prod_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/scenarios": {
         parameters: {
             query?: never;
@@ -853,6 +897,31 @@ export interface components {
         NoteResponse: {
             /** Content */
             content: string | null;
+        };
+        /**
+         * ProdUploadOutcome
+         * @description Outcome of a single-run prod upload.
+         * @enum {string}
+         */
+        ProdUploadOutcome: "uploaded" | "already_present" | "overridden";
+        /**
+         * ProdUploadResponse
+         * @description Result of uploading one run to the configured prod server.
+         */
+        ProdUploadResponse: {
+            /** Run Id */
+            run_id: string;
+            outcome: components["schemas"]["ProdUploadOutcome"];
+        };
+        /**
+         * ProdUploadStatusResponse
+         * @description Whether prod upload is configured on this server.
+         */
+        ProdUploadStatusResponse: {
+            /** Configured */
+            configured: boolean;
+            /** Prod Url */
+            prod_url: string | null;
         };
         /**
          * ReasoningEntry
@@ -2310,6 +2379,60 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    prod_upload_status_api_prod_upload_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProdUploadStatusResponse"];
+                };
+            };
+        };
+    };
+    upload_run_to_prod_api_runs__scenario___run_dir_name__upload_to_prod_post: {
+        parameters: {
+            query?: {
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                scenario: string;
+                run_dir_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProdUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

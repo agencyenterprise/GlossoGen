@@ -263,8 +263,11 @@ The user selects which evaluators to run — they are not automatically applied.
 - `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames
 - `neologism` — genuinely invented words with new meanings (not abbreviations or codes)
 - `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding
+- `round_ended_idle` / `round_ended_timeout` — flag rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger (deterministic, reads `RoundEnded.trigger`)
+- `content_filter_refusal` — counts LLM content-filter refusals (deterministic, scans `{scenario}_debug.jsonl` for `ContentFilterError` ERROR entries)
+- `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model loaded via `minicons.IncrementalLMScorer`. Scoping uses `scenario.get_primary_channel_id()` so the evaluator stays scenario-agnostic (Veyru returns `#link`; scenarios without a primary channel get a no-op result). Each message is scored with `reduction = -x.mean(0)` for length-normalized per-token surprisal, then averaged across the run. Always returns `PARTIAL` with the overall mean as `score` and per-round mean/std lines in `evidence`. No LLM judge.
 
-All generic evaluators share a common flow: build per-round transcripts from `MessageSent` events via `round_transcript_builder`, render a Jinja2 prompt, call the LLM judge with a structured output schema, and return a `MetricResult`.
+The four LLM-judge evaluators (`language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`) share a common flow: build per-round transcripts from `MessageSent` events via `round_transcript_builder`, render a Jinja2 prompt, call the LLM judge with a structured output schema, and return a `MetricResult`. The deterministic ones (`round_ended_*`, `content_filter_refusal`, `perplexity`) skip the prompt+LLM step entirely.
 
 **Scenario-specific evaluators:**
 - **veyru**: `language_emergence` (novel language in the Veyru domain), `protocol_learned_after_swap` (whether a newcomer adopted the pre-established protocol after a personnel change), `round_success` (per-round stabilization success)

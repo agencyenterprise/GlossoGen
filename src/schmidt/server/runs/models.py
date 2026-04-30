@@ -1,6 +1,7 @@
 """Pydantic response models for simulation run endpoints and SSE event schemas."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Discriminator
@@ -472,6 +473,33 @@ class ImportBundleResponse(BaseModel):
     run_id: str
     scenario_name: str
     run_dir: str
+
+
+# ---------------------------------------------------------------------------
+# Prod upload models
+# ---------------------------------------------------------------------------
+
+
+class ProdUploadStatusResponse(BaseModel):
+    """Whether prod upload is configured on this server."""
+
+    configured: bool
+    prod_url: str | None
+
+
+class ProdUploadOutcome(str, Enum):
+    """Outcome of a single-run prod upload."""
+
+    UPLOADED = "uploaded"
+    ALREADY_PRESENT = "already_present"
+    OVERRIDDEN = "overridden"
+
+
+class ProdUploadResponse(BaseModel):
+    """Result of uploading one run to the configured prod server."""
+
+    run_id: str
+    outcome: ProdUploadOutcome
 
 
 # ---------------------------------------------------------------------------

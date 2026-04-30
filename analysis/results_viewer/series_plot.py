@@ -51,24 +51,30 @@ def add_replica_trace(
     ys: list[float],
     hover_texts: list[str],
     colour: str,
+    customdata: list[str] | None,
 ) -> None:
     """Scatter individual replicas with light X-jitter so overlapping points resolve.
 
     Caller computes both the x value and the metric value per replica because
     different tabs use different x axes (log-scale budget vs linear round_start).
+
+    ``customdata`` attaches a per-point string (e.g. a URL) that the caller can
+    read back from Streamlit selection events; pass ``None`` when the trace
+    does not need point-level metadata.
     """
-    fig.add_trace(
-        go.Scatter(
-            x=xs,
-            y=ys,
-            mode="markers",
-            name=f"{series} · replicas",
-            marker=dict(color=colour, size=7, opacity=0.35),
-            hovertext=hover_texts,
-            hoverinfo="text",
-            showlegend=False,
-        )
+    trace_kwargs: dict[str, object] = dict(
+        x=xs,
+        y=ys,
+        mode="markers",
+        name=f"{series} · replicas",
+        marker=dict(color=colour, size=7, opacity=0.35),
+        hovertext=hover_texts,
+        hoverinfo="text",
+        showlegend=False,
     )
+    if customdata is not None:
+        trace_kwargs["customdata"] = customdata
+    fig.add_trace(go.Scatter(**trace_kwargs))
 
 
 def add_mean_trace(
