@@ -8,6 +8,7 @@ from this list instead of depending on each other.
 GENERIC_EVALUATOR_NAMES: list[str] = [
     "content_filter_refusal",
     "language_strangeness",
+    "mean_length_utterance",
     "neologism",
     "perplexity",
     "round_ended_idle",

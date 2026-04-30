@@ -188,15 +188,12 @@ export function ChatPane({
   const [prodUploadJustSucceeded, setProdUploadJustSucceeded] = useState(false);
   const prodUploadMutation = useMutation({
     mutationFn: async (variables: { force: boolean }) => {
-      const { data, error } = await api.POST(
-        "/api/runs/{scenario}/{run_dir_name}/upload-to-prod",
-        {
-          params: {
-            path: splitRunId(runId),
-            query: { force: variables.force },
-          },
-        }
-      );
+      const { data, error } = await api.POST("/api/runs/{scenario}/{run_dir_name}/upload-to-prod", {
+        params: {
+          path: splitRunId(runId),
+          query: { force: variables.force },
+        },
+      });
       if (error) {
         const detail = (error as { detail?: string }).detail ?? "Upload failed";
         throw new Error(detail);

@@ -127,6 +127,7 @@ Generic evaluators (available to all scenarios) focus on language emergence. Eac
 - `round_ended_idle` / `round_ended_timeout` — flag rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger (deterministic, no LLM)
 - `content_filter_refusal` — counts LLM content-filter refusals during the run
 - `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model. Scopes to `scenario.get_primary_channel_id()` (Veyru: `#link`), scores each message with `minicons.IncrementalLMScorer` length-normalized, then averages. Higher = less natural-looking language; aggressive compression / coded protocols drive the score up. Always returns `PARTIAL` — reports numbers, not a verdict (deterministic, no LLM judge)
+- `mean_length_utterance` — mean number of whitespace-delimited words per primary-channel message. Same scope as `perplexity` (`scenario.get_primary_channel_id()`); the score is the mean across all primary-channel messages and per-round mean/std/count are reported in evidence. Lower MLU points at compression — combine with `perplexity` for a deterministic two-axis read on coded language. Always returns `PARTIAL` (deterministic, no LLM judge)
 
 Scenario-specific evaluators:
 
