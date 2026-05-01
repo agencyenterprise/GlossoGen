@@ -154,7 +154,7 @@ cp .env.example .env
 | `OAUTH_ISSUER_URL` | Yes (for MCP) | Public backend URL for MCP OAuth (MCP is disabled if unset) |
 | `PROD_API_URL` | Optional | Target prod server URL for the "Upload to prod" button (button hidden when unset) |
 | `PROD_PASSWORD` | Optional | Bearer password for `PROD_API_URL` (required alongside `PROD_API_URL`) |
-| `SELF_HOSTED_BASE_URLS` | Required for `--provider self-hosted` | JSON object mapping model name → OpenAI-compatible `/v1` base URL. Example: `{"meta-llama/Llama-3.3-70B-Instruct":"https://....modal.run/v1","Qwen/Qwen3-Next-80B-A3B-Instruct":"https://....modal.run/v1"}` |
+| `SELF_HOSTED_BASE_URLS` | Required for `--provider self-hosted` | JSON object mapping model name → OpenAI-compatible `/v1` base URL. Example: `{"meta-llama/Llama-3.3-70B-Instruct":"https://....modal.run/v1","Qwen/Qwen3-32B":"https://....modal.run/v1"}` |
 | `SELF_HOSTED_API_KEY` | Required for `--provider self-hosted` | Bearer token shared across all entries in `SELF_HOSTED_BASE_URLS` (matches each server's `--api-key`) |
 
 Frontend environment variables go in `frontend/.env.local` (see `frontend/.env.local.example`):
@@ -347,7 +347,7 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
 Required flags: `--model`, `--provider` (`anthropic`, `openai`, `google-gla`, `ollama`, `self-hosted`), `--runs-dir`.
 Optional flags: `--max-agent-turns` (default: 200), `--config <path>` (base config JSON file).
 
-The `self-hosted` provider points pydantic-ai at any OpenAI-compatible chat-completions endpoint. `SELF_HOSTED_BASE_URLS` is a JSON map from model name → `/v1` URL, so multiple self-hosted models can coexist; `SELF_HOSTED_API_KEY` is the bearer token shared across them. Reference deployments are in `modal/` (Llama 3.3 70B + Qwen3-Next-80B-A3B-Instruct, both vLLM with tool calling) — see `modal/README.md` for deploy steps. Once deployed and the env vars are set:
+The `self-hosted` provider points pydantic-ai at any OpenAI-compatible chat-completions endpoint. `SELF_HOSTED_BASE_URLS` is a JSON map from model name → `/v1` URL, so multiple self-hosted models can coexist; `SELF_HOSTED_API_KEY` is the bearer token shared across them. Reference deployments are in `modal/` (Llama 3.3 70B + Qwen3-32B, both vLLM with tool calling) — see `modal/README.md` for deploy steps. Once deployed and the env vars are set:
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \

@@ -1,9 +1,9 @@
-"""Qwen3-Next-80B-A3B-Instruct on Modal via vLLM's OpenAI-compatible HTTP API with tool calling."""
+"""Qwen3-32B (dense) on Modal via vLLM's OpenAI-compatible HTTP API with tool calling."""
 
 import modal
 
-MODEL_NAME = "Qwen/Qwen3-Next-80B-A3B-Instruct"
-N_GPU = 2
+MODEL_NAME = "Qwen/Qwen3-32B"
+N_GPU = 1
 VLLM_PORT = 8000
 MINUTES = 60
 
@@ -20,12 +20,12 @@ vllm_image = (
 hf_cache_vol = modal.Volume.from_name("huggingface-cache", create_if_missing=True)
 vllm_cache_vol = modal.Volume.from_name("vllm-cache", create_if_missing=True)
 
-app = modal.App("qwen-3-next-80b-a3b-instruct")
+app = modal.App("qwen-3-32b")
 
 
 @app.function(
     image=vllm_image,
-    gpu=f"H200:{N_GPU}",
+    gpu=f"H100:{N_GPU}",
     secrets=[
         modal.Secret.from_name("huggingface-schmidt"),
         modal.Secret.from_name("vllm-api-key"),
@@ -38,8 +38,8 @@ app = modal.App("qwen-3-next-80b-a3b-instruct")
     scaledown_window=15 * MINUTES,
     timeout=30 * MINUTES,
 )
-@modal.concurrent(max_inputs=32)
-@modal.web_server(port=VLLM_PORT, startup_timeout=25 * MINUTES)
+@modal.concurrent(max_inputs=4)
+@modal.web_server(port=VLLM_PORT, startup_timeout=20 * MINUTES)
 def serve() -> None:
     """Launch vLLM's OpenAI-compatible server as a subprocess; Modal proxies inbound HTTPS to it."""
     import os
@@ -58,9 +58,9 @@ def serve() -> None:
         "--tensor-parallel-size",
         str(N_GPU),
         "--max-model-len",
-        "32768",
+        "24576",
         "--gpu-memory-utilization",
-        "0.92",
+        "0.95",
         "--enable-auto-tool-choice",
         "--tool-call-parser",
         "hermes",
