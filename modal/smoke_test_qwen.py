@@ -4,6 +4,8 @@ Runs inside a Modal container with the vllm-api-key secret attached so the API
 key never leaves Modal. Hits chat completion plain + tool-calling variants.
 """
 
+# mypy: disable-error-code="attr-defined,misc"
+
 import modal
 
 ENDPOINT_BASE = "https://ae-alignment--qwen-3-next-80b-a3b-instruct-serve.modal.run"

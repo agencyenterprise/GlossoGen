@@ -1,5 +1,7 @@
 """Qwen3-Next-80B-A3B-Instruct on Modal via vLLM's OpenAI-compatible HTTP API with tool calling."""
 
+# mypy: disable-error-code="attr-defined,misc"
+
 import modal
 
 MODEL_NAME = "Qwen/Qwen3-Next-80B-A3B-Instruct"
