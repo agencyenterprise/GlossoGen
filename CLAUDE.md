@@ -70,6 +70,11 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `mcp/oauth_login_page.py` — login form for the MCP OAuth authorization flow
   - `run_launcher.py` — shared simulation launch helper used by REST and MCP run-start flows
 - `linter/` — custom linting scripts
+- `modal/` — self-hosted LLM endpoint (Modal-hosted Llama 3.3 70B by default)
+  - `serve_llama.py` — Modal app launching vLLM's OpenAI-compatible HTTP server on `H100:2`
+  - `tool_chat_template_llama3.1_json.jinja` — vLLM tool-calling chat template (Llama 3.1/3.3)
+  - `smoke_test_llama.py` — end-to-end smoke test (runs inside Modal so the API key never leaves)
+  - `README.md` — deploy + integration instructions
 - `frontend/` — Next.js web application
   - `src/features/auth/` — authentication gate and login page
   - `src/features/mcp-config/` — MCP integration modal with connection instructions
@@ -149,6 +154,8 @@ cp .env.example .env
 | `OAUTH_ISSUER_URL` | Yes (for MCP) | Public backend URL for MCP OAuth (MCP is disabled if unset) |
 | `PROD_API_URL` | Optional | Target prod server URL for the "Upload to prod" button (button hidden when unset) |
 | `PROD_PASSWORD` | Optional | Bearer password for `PROD_API_URL` (required alongside `PROD_API_URL`) |
+| `SELF_HOSTED_BASE_URLS` | Required for `--provider self-hosted` | JSON object mapping model name → OpenAI-compatible `/v1` base URL. Example: `{"meta-llama/Llama-3.3-70B-Instruct":"https://....modal.run/v1","Qwen/Qwen3-Next-80B-A3B-Instruct":"https://....modal.run/v1"}` |
+| `SELF_HOSTED_API_KEY` | Required for `--provider self-hosted` | Bearer token shared across all entries in `SELF_HOSTED_BASE_URLS` (matches each server's `--api-key`) |
 
 Frontend environment variables go in `frontend/.env.local` (see `frontend/.env.local.example`):
 
@@ -320,8 +327,20 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
   > ./runs/<scenario>_stdout.log 2>&1 &
 ```
 
-Required flags: `--model`, `--provider` (`anthropic`, `openai`, `google-gla`, `ollama`), `--runs-dir`.
+Required flags: `--model`, `--provider` (`anthropic`, `openai`, `google-gla`, `ollama`, `self-hosted`), `--runs-dir`.
 Optional flags: `--max-agent-turns` (default: 200), `--config <path>` (base config JSON file).
+
+The `self-hosted` provider points pydantic-ai at any OpenAI-compatible chat-completions endpoint. `SELF_HOSTED_BASE_URLS` is a JSON map from model name → `/v1` URL, so multiple self-hosted models can coexist; `SELF_HOSTED_API_KEY` is the bearer token shared across them. Reference deployments are in `modal/` (Llama 3.3 70B + Qwen3-Next-80B-A3B-Instruct, both vLLM with tool calling) — see `modal/README.md` for deploy steps. Once deployed and the env vars are set:
+
+```bash
+VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
+  --model meta-llama/Llama-3.3-70B-Instruct --provider self-hosted \
+  --runs-dir ./runs \
+  --config src/schmidt/scenarios/veyru/knobs_default.json \
+  > ./runs/veyru_stdout.log 2>&1 &
+```
+
+The pricing entry in `src/schmidt/token_pricing.py` is keyed by the literal model name (case-sensitive prefix match after dots→dashes); add a new entry there if you serve a different model.
 
 Examples:
 

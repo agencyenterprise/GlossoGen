@@ -955,6 +955,12 @@ class VeyruScenario(SimulationScenario):
                     "The discussion channel is only available during the post-round "
                     "discussion phase. Wait for the discussion phase to begin."
                 )
+        link_channel_ids = {LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNEL_ID}
+        if channel_id in link_channel_ids and self._world.in_postmortem:
+            return (
+                "The comm link is closed during the post-round discussion phase. "
+                "Use the discussion channel instead."
+            )
         return None
 
     def transform_outgoing_message(self, agent_id: str, channel_id: str, text: str) -> str:
@@ -995,6 +1001,17 @@ class VeyruScenario(SimulationScenario):
         async def stabilize_veyru(ctx: ToolContext, action: str) -> str:
             """Apply a stabilization action to the caller's team Veyru."""
             agent_id = resolve_agent_id(ctx=ctx)
+            if self._world.in_postmortem:
+                result_text = (
+                    "Cannot stabilize during the post-round discussion phase. "
+                    "Wait for the next round to begin."
+                )
+                await self._maybe_notify_intern_stabilize(
+                    caller_id=agent_id,
+                    action=action,
+                    result=result_text,
+                )
+                return result_text
             team_id = self._world.get_team_for_agent(agent_id=agent_id)
             team = self._world.teams[team_id]
             if agent_id != team.current_observer_id:

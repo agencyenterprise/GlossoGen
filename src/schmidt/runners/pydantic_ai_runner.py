@@ -9,6 +9,7 @@ reasoning text and detecting tool call results.
 import asyncio
 import json
 import logging
+import os
 from collections.abc import AsyncIterable, Callable
 
 from pydantic_ai import Agent, _agent_graph
@@ -28,7 +29,8 @@ from pydantic_ai.messages import (
     ThinkingPartDelta,
 )
 from pydantic_ai.models.anthropic import AnthropicModelSettings
-from pydantic_ai.models.openai import OpenAIResponsesModelSettings
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModelSettings
+from pydantic_ai.providers.openai import OpenAIProvider as PydanticAIOpenAIProvider
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage, UsageLimits
@@ -59,6 +61,24 @@ from schmidt.token_pricing import find_pricing
 logger = logging.getLogger(__name__)
 
 AGENT_RUN_RETRY_ATTEMPTS = 3
+
+
+def _resolve_self_hosted_base_url(model: str) -> str:
+    """Look up the OpenAI-compatible base URL for a self-hosted model.
+
+    Reads ``SELF_HOSTED_BASE_URLS`` from the environment, expecting a JSON
+    object mapping model names (as passed to the simulation) to their
+    serving endpoints.
+    """
+    raw = os.environ["SELF_HOSTED_BASE_URLS"]
+    mapping: dict[str, str] = json.loads(raw)
+    if model not in mapping:
+        configured = ", ".join(sorted(mapping)) or "<none>"
+        raise KeyError(
+            f"Self-hosted model {model!r} has no entry in SELF_HOSTED_BASE_URLS "
+            f"(configured models: {configured})"
+        )
+    return mapping[model]
 
 
 def _log_agent_run_retry(retry_state: RetryCallState) -> None:
@@ -191,27 +211,41 @@ class PydanticAIRunner(AgentRunner):
             role_name=agent_config.role_name,
         )
 
-        if provider == "anthropic":
-            default_settings: ModelSettings = AnthropicModelSettings(
-                anthropic_cache_instructions=True,
-                anthropic_cache_tool_definitions=True,
-                anthropic_cache_messages=True,
+        if provider == "self-hosted":
+            base_url = _resolve_self_hosted_base_url(model=agent_config.model)
+            self_hosted_provider = PydanticAIOpenAIProvider(
+                base_url=base_url,
+                api_key=os.environ["SELF_HOSTED_API_KEY"],
             )
-        elif provider == "openai":
-            default_settings = OpenAIResponsesModelSettings(
-                openai_reasoning_effort="high",
-                openai_reasoning_summary="concise",
+            self_hosted_model = OpenAIChatModel(agent_config.model, provider=self_hosted_provider)
+            agent: Agent[None, str] = Agent(
+                model=self_hosted_model,
+                system_prompt=full_system_prompt,
+                toolsets=[mcp_server],
+                model_settings=ModelSettings(),
             )
         else:
-            default_settings = ModelSettings()
+            if provider == "anthropic":
+                default_settings: ModelSettings = AnthropicModelSettings(
+                    anthropic_cache_instructions=True,
+                    anthropic_cache_tool_definitions=True,
+                    anthropic_cache_messages=True,
+                )
+            elif provider == "openai":
+                default_settings = OpenAIResponsesModelSettings(
+                    openai_reasoning_effort="high",
+                    openai_reasoning_summary="concise",
+                )
+            else:
+                default_settings = ModelSettings()
 
-        model_prefix = "openai-responses" if provider == "openai" else provider
-        agent: Agent[None, str] = Agent(
-            model=f"{model_prefix}:{agent_config.model}",
-            system_prompt=full_system_prompt,
-            toolsets=[mcp_server],
-            model_settings=default_settings,
-        )
+            model_prefix = "openai-responses" if provider == "openai" else provider
+            agent = Agent(
+                model=f"{model_prefix}:{agent_config.model}",
+                system_prompt=full_system_prompt,
+                toolsets=[mcp_server],
+                model_settings=default_settings,
+            )
 
         message_history: list[ModelMessage] | None = agent_config.initial_message_history
         total_input_tokens = 0

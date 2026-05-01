@@ -21,7 +21,7 @@ lint-server:
 	VIRTUAL_ENV= uv run --no-sync mypy . --exclude '^(\.venv|frontend|vulture_whitelist\.py|runs)'
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
 	VIRTUAL_ENV= uv run --no-sync vulture src/ vulture_whitelist.py --min-confidence 60
-	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs
+	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal
 	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs
 	@echo "Server linting complete"
 

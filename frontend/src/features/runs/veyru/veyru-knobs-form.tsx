@@ -191,6 +191,24 @@ function SharedSection({
         disabled={false}
       />
       <NumberInput
+        label="Channel noise level"
+        description="Per-character drop probability on the comm link channel(s) (postmortem stays clean). 0.0 = lossless, 1.0 = every character dropped. Dropped characters are replaced with `_`."
+        value={state.channel_noise_level}
+        onChange={next =>
+          onChange({
+            ...state,
+            channel_noise_level: next === null ? state.channel_noise_level : next,
+          })
+        }
+        min={0}
+        max={1}
+        step={0.05}
+        unit={null}
+        error={getFieldError({ errors, field: "channel_noise_level" })}
+        nullable={false}
+        disabled={false}
+      />
+      <NumberInput
         label="Random seed"
         description="Controls the shuffle of failure motifs into round cases."
         value={state.seed}

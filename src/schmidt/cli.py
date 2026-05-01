@@ -86,8 +86,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--provider",
         type=str,
         required=True,
-        choices=["anthropic", "openai", "google-gla", "ollama"],
-        help="LLM provider (anthropic, openai, google-gla, ollama)",
+        choices=["anthropic", "openai", "google-gla", "ollama", "self-hosted"],
+        help="LLM provider (anthropic, openai, google-gla, ollama, self-hosted)",
     )
     run_parser.add_argument(
         "--max-agent-turns",
@@ -189,7 +189,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--provider",
         type=str,
         required=True,
-        choices=["anthropic", "openai", "google-gla", "ollama"],
+        choices=["anthropic", "openai", "google-gla", "ollama", "self-hosted"],
         help="Provider for the replacement agent",
     )
     replace_parser.add_argument(
