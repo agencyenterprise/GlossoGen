@@ -25,6 +25,15 @@ class BaseKnobs(BaseModel):
     Channel IDs not in the map default to ``True`` (visible). The
     simulation itself does not read this field at runtime; only the
     replace-agent CLI/HTTP/FE flows consult it to populate defaults.
+
+    ``agent_max_tokens`` is the per-cycle output token cap passed to the
+    LLM (``ModelSettings.max_tokens``). Default is sized for thinking-capable
+    models (Anthropic Opus, OpenAI o1/gpt-5 reasoning, Qwen3-Thinking,
+    DeepSeek-R1) where the budget includes reasoning tokens. Self-hosted
+    non-thinking deployments (Llama 3.3 Instruct, Qwen Instruct) typically
+    emit <2K output tokens per cycle, so this can be lowered (e.g. 4096) in
+    runs that hit ``vllm`` ``--max-model-len`` limits to reclaim input
+    headroom.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -33,3 +42,4 @@ class BaseKnobs(BaseModel):
     model_overrides: dict[str, AgentModelOverride]
     postmortem_duration_seconds: float = 120.0
     replace_agent_default_channel_visibility: dict[str, bool] = {}
+    agent_max_tokens: int = 16384

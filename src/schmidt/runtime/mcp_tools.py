@@ -22,7 +22,11 @@ from mcp.server.fastmcp import FastMCP
 from schmidt.models.event import MessageSent
 from schmidt.models.mcp_responses import ChannelMessage, SendMessageResult
 from schmidt.models.message import SimulationMessage
-from schmidt.runtime.activity_notification import NewMessagesNotification, NoActivityNotification
+from schmidt.runtime.activity_notification import (
+    ActivityNotification,
+    NewMessagesNotification,
+    NoActivityNotification,
+)
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.scenario_mcp_tool import ToolContext, resolve_agent_id
 from schmidt.runtime.simulation_state import SimulationRuntime
@@ -51,6 +55,23 @@ BASE_TOOL_NAMES: frozenset[str] = frozenset(
 These are always visible in ``tools/list`` and exempt from the per-agent
 authorization guard.
 """
+
+
+def _build_notification_payload(
+    notification: ActivityNotification,
+    session: AgentSession,
+) -> dict[str, Any]:
+    """Serialize a notification with the session's queue depth as ``pending_count``.
+
+    ``pending_count`` is delivery-time metadata: it tells the agent how many
+    additional notifications are still queued for it after this one is
+    consumed. It is computed at the MCP boundary rather than carried on the
+    notification models, since the queue depth is only meaningful when the
+    notification is handed to the agent.
+    """
+    payload = notification.model_dump()
+    payload["pending_count"] = session.pending_notifications_count()
+    return payload
 
 
 def _resolve_agent_from_context(ctx: ToolContext, runtime: SimulationRuntime) -> AgentSession:
@@ -125,7 +146,10 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         description=(
             "Read the latest updates from the world: new messages, events, or status. "
             "Must be called on its own — never in parallel with another tool call. "
-            "Issue any other tool calls first, see their results, then call read_notifications."
+            "Issue any other tool calls first, see their results, then call read_notifications. "
+            "The response includes a pending_count field indicating how many additional "
+            "notifications are still queued. If pending_count > 0, you must call "
+            "read_notifications again after handling the current one to drain the queue."
         ),
     )
     async def read_notifications(ctx: ToolContext) -> dict[str, Any]:
@@ -173,13 +197,16 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                 session.read_notifications_in_flight,
                 sibling_dispatched_recently,
             )
-            return NoActivityNotification(
-                detail=(
-                    "read_notifications cannot be issued in parallel with other tool "
-                    "calls. Wait for your other tool calls to return, observe their "
-                    "results, then call read_notifications by itself in the next turn."
+            return _build_notification_payload(
+                notification=NoActivityNotification(
+                    detail=(
+                        "read_notifications cannot be issued in parallel with other tool "
+                        "calls. Wait for your other tool calls to return, observe their "
+                        "results, then call read_notifications by itself in the next turn."
+                    ),
                 ),
-            ).model_dump()
+                session=session,
+            )
         session.read_notifications_in_flight = True
         try:
             return await _await_notification_loop(session=session, runtime=runtime)
@@ -203,9 +230,10 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                     "Agent %s read_notifications timed out after 120s, returning no_activity",
                     session.agent_id,
                 )
-                return NoActivityNotification(
-                    detail="No new messages.",
-                ).model_dump()
+                return _build_notification_payload(
+                    notification=NoActivityNotification(detail="No new messages."),
+                    session=session,
+                )
             if isinstance(notification, NewMessagesNotification):
                 fresh_channels = [
                     ch
@@ -227,12 +255,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                             channel_id=ch,
                         ),
                     )
-            logger.info(
-                "Agent %s received %s",
-                session.agent_id,
-                notification.type.value,
-            )
-            return notification.model_dump()
+            return _build_notification_payload(notification=notification, session=session)
 
     @mcp.tool(
         name="read_channel",
