@@ -92,48 +92,6 @@ def _log_agent_run_retry(retry_state: RetryCallState) -> None:
     )
 
 
-@retry(
-    stop=stop_after_attempt(AGENT_RUN_RETRY_ATTEMPTS),
-    reraise=True,
-    before_sleep=_log_agent_run_retry,
-)
-async def _run_agent_call(
-    *,
-    agent: Agent[None, str],
-    prompt: str,
-    message_history: list[ModelMessage] | None,
-    event_stream_handler: EventStreamHandler[None],
-    max_tokens: int,
-    record_usage: Callable[[RunUsage], None],
-) -> PydanticAIAgentRunResult[str]:
-    """Drive ``agent.iter`` so cumulative usage is captured even on cancellation.
-
-    The supplied ``record_usage`` callback is invoked exactly once per call —
-    on success, error, or cancellation — with the cumulative ``RunUsage`` for
-    that attempt. This lets the caller flush a usage event for cycles that
-    never reach a clean completion (e.g. when the supervisor cancels the
-    agent task at scenario end).
-    """
-    async with agent.iter(
-        user_prompt=prompt,
-        message_history=message_history,
-        usage_limits=UsageLimits(request_limit=None),
-        model_settings=ModelSettings(max_tokens=max_tokens),
-    ) as agent_run:
-        try:
-            node = agent_run.next_node
-            while not isinstance(node, End):
-                if Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
-                    run_ctx = _agent_graph.build_run_context(agent_run.ctx)
-                    async with node.stream(agent_run.ctx) as stream:
-                        await event_stream_handler(run_ctx, stream)
-                node = await agent_run.next(node)
-            assert agent_run.result is not None
-            return agent_run.result
-        finally:
-            record_usage(agent_run.usage())
-
-
 def _log_task_exception(task: asyncio.Task[None]) -> None:
     """Log exceptions from fire-and-forget event logging tasks."""
     if not task.cancelled() and task.exception() is not None:
@@ -170,6 +128,72 @@ class _StreamingState:
         task: asyncio.Task[None] = asyncio.get_running_loop().create_task(coro)  # type: ignore[arg-type]
         task.add_done_callback(_log_task_exception)
         self.background_tasks.append(task)
+
+
+@retry(
+    stop=stop_after_attempt(AGENT_RUN_RETRY_ATTEMPTS),
+    reraise=True,
+    before_sleep=_log_agent_run_retry,
+)
+async def _run_agent_call(
+    *,
+    agent: Agent[None, str],
+    prompt: str,
+    message_history: list[ModelMessage] | None,
+    event_stream_handler: EventStreamHandler[None],
+    max_tokens: int,
+    record_usage: Callable[[RunUsage], None],
+    non_streaming_model_requests: bool,
+    state: _StreamingState,
+    flush_inter_call_response: Callable[[], None],
+) -> PydanticAIAgentRunResult[str]:
+    """Drive ``agent.iter`` so cumulative usage is captured even on cancellation.
+
+    The supplied ``record_usage`` callback is invoked exactly once per call —
+    on success, error, or cancellation — with the cumulative ``RunUsage`` for
+    that attempt. This lets the caller flush a usage event for cycles that
+    never reach a clean completion (e.g. when the supervisor cancels the
+    agent task at scenario end).
+
+    When ``non_streaming_model_requests`` is true, model-request nodes bypass
+    pydantic-ai's streaming path and use the non-streaming ``model.request()``.
+    This works around https://github.com/vllm-project/vllm/issues/31871, where
+    vLLM's hermes tool parser leaks raw ``<tool_call>`` XML into the content
+    field instead of populating ``tool_calls`` whenever ``stream=True``.
+    Tool-execution nodes still stream so ``FunctionToolCallEvent`` /
+    ``FunctionToolResultEvent`` continue to drive logging; text and thinking
+    parts are accumulated directly from ``model_response.parts``.
+    """
+    async with agent.iter(
+        user_prompt=prompt,
+        message_history=message_history,
+        usage_limits=UsageLimits(request_limit=None),
+        model_settings=ModelSettings(max_tokens=max_tokens),
+    ) as agent_run:
+        try:
+            node = agent_run.next_node
+            while not isinstance(node, End):
+                if Agent.is_model_request_node(node) and non_streaming_model_requests:
+                    if state.accumulated_tool_calls:
+                        flush_inter_call_response()
+                    next_node = await agent_run.next(node)
+                    if Agent.is_call_tools_node(next_node):
+                        for part in next_node.model_response.parts:
+                            if isinstance(part, TextPart):
+                                state.accumulated_text += part.content
+                            elif isinstance(part, ThinkingPart) and part.content:
+                                state.accumulated_thinking += part.content
+                    node = next_node
+                    continue
+                if Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
+                    run_ctx = _agent_graph.build_run_context(agent_run.ctx)
+                    async with node.stream(agent_run.ctx) as stream:
+                        await event_stream_handler(run_ctx, stream)
+                node = await agent_run.next(node)
+            assert agent_run.result is not None
+            return agent_run.result
+        finally:
+            record_usage(agent_run.usage())
 
 
 class PydanticAIRunner(AgentRunner):
@@ -247,6 +271,11 @@ class PydanticAIRunner(AgentRunner):
                 model_settings=default_settings,
             )
 
+        # vLLM's hermes tool parser drops <tool_call> XML on the floor when
+        # streaming (https://github.com/vllm-project/vllm/issues/31871), so the
+        # self-hosted path runs model requests in non-streaming mode.
+        non_streaming_model_requests = provider == "self-hosted"
+
         message_history: list[ModelMessage] | None = agent_config.initial_message_history
         total_input_tokens = 0
         total_output_tokens = 0
@@ -306,6 +335,22 @@ class PydanticAIRunner(AgentRunner):
                         prompt,
                     )
 
+                    def _flush_inter_call_response() -> None:
+                        """Close out a prior tool_use response when the next model request begins.
+
+                        Mirrors the streaming-mode behavior in
+                        ``_process_stream_event`` where a fresh
+                        ``PartStartEvent`` for a ``TextPart``/``ThinkingPart``
+                        flushes the previously-accumulated tool calls.
+                        """
+                        self._flush_response_block(
+                            agent_id=agent_id,
+                            state=captured_state,
+                            event_logger=event_logger,
+                            stop_reason="tool_use",
+                            round_number=event_logger.current_round,
+                        )
+
                     cycle_succeeded = False
                     result: PydanticAIAgentRunResult[str] | None = None
                     try:
@@ -316,6 +361,9 @@ class PydanticAIRunner(AgentRunner):
                             event_stream_handler=_handle_events,
                             max_tokens=agent_config.max_tokens,
                             record_usage=_record_usage,
+                            non_streaming_model_requests=non_streaming_model_requests,
+                            state=captured_state,
+                            flush_inter_call_response=_flush_inter_call_response,
                         )
                         cycle_succeeded = True
                     except Exception as exc:

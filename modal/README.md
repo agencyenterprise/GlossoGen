@@ -6,14 +6,17 @@ The current deployment serves **`meta-llama/Llama-3.3-70B-Instruct`** at bf16 on
 
 ## Available deployments
 
-Two Modal apps are defined here, each serving a different model. They run in parallel under separate URLs sharing the same `vllm-api-key` and `huggingface-schmidt` secrets and the same `huggingface-cache` / `vllm-cache` Modal Volumes.
+Three Modal apps are defined here, each serving a different model. They run in parallel under separate URLs sharing the same `vllm-api-key` and `huggingface-schmidt` secrets and the same `huggingface-cache` / `vllm-cache` Modal Volumes.
 
 | Modal app | Model | GPU | Tool/reasoning parsers | URL |
 | --- | --- | --- | --- | --- |
 | `llama-3-3-70b-instruct` | `meta-llama/Llama-3.3-70B-Instruct` (dense, gated) | `H100:2` bf16 | `llama3_json` (no reasoning parser) | `https://<workspace>--llama-3-3-70b-instruct-serve.modal.run/v1` |
-| `qwen-3-next-80b-a3b-instruct` | `Qwen/Qwen3-Next-80B-A3B-Instruct` (MoE, 80B/3B-active, ungated) | `H200:2` bf16 | `qwen3_coder` + reasoning `qwen3` | `https://<workspace>--qwen-3-next-80b-a3b-instruct-serve.modal.run/v1` |
+| `qwen-3-next-80b-a3b-instruct` | `Qwen/Qwen3-Next-80B-A3B-Instruct` (MoE, 80B/3B-active, ungated) | `H200:2` bf16 | `hermes` + reasoning `qwen3` | `https://<workspace>--qwen-3-next-80b-a3b-instruct-serve.modal.run/v1` |
+| `qwen-3-32b` | `Qwen/Qwen3-32B` (dense, ungated) | `H100:1` bf16 | `hermes` + reasoning `qwen3` | `https://<workspace>--qwen-3-32b-serve.modal.run/v1` |
 
-Schmidt's `--provider self-hosted` reads `SELF_HOSTED_BASE_URLS` (a JSON object mapping model name → `/v1` URL) and looks up the URL for the model the run is launched with. List both entries in `.env` to allow switching from the UI without redeploying.
+Schmidt's `--provider self-hosted` reads `SELF_HOSTED_BASE_URLS` (a JSON object mapping model name → `/v1` URL) and looks up the URL for the model the run is launched with. List the entries you want available in `.env` to switch from the UI without redeploying.
+
+The simulation runner forces `stream=False` on the OpenAI-compatible endpoint for `--provider self-hosted` to work around [vLLM issue #31871](https://github.com/vllm-project/vllm/issues/31871) — vLLM's `hermes` tool parser drops `<tool_call>` XML on the floor in streaming mode. Tool execution events still stream from pydantic-ai's `CallToolsNode`, so logging is unaffected.
 
 ## Files
 
@@ -21,9 +24,11 @@ Schmidt's `--provider self-hosted` reads `SELF_HOSTED_BASE_URLS` (a JSON object 
 | --- | --- |
 | `serve_llama.py` | Modal app for Llama 3.3 70B Instruct (vLLM, `H100:2` bf16). |
 | `serve_qwen.py` | Modal app for Qwen3-Next-80B-A3B-Instruct (vLLM, `H200:2` bf16). |
+| `serve_qwen_32b.py` | Modal app for Qwen3-32B dense (vLLM, `H100:1` bf16). |
 | `tool_chat_template_llama3.1_json.jinja` | Llama 3.1/3.3 tool-calling chat template (baked into the Llama image only; Qwen uses its bundled `tokenizer_config.json` template). |
 | `smoke_test_llama.py` | Ephemeral end-to-end test against the Llama endpoint. |
-| `smoke_test_qwen.py` | Ephemeral end-to-end test against the Qwen endpoint. |
+| `smoke_test_qwen.py` | Ephemeral end-to-end test against the Qwen3-Next-80B endpoint. |
+| `smoke_test_qwen_32b.py` | Ephemeral end-to-end test against the Qwen3-32B endpoint. |
 
 ## Prerequisites
 
@@ -81,7 +86,7 @@ A single bearer token shared across **every** entry in `SELF_HOSTED_BASE_URLS`. 
 ### Example `.env`
 
 ```bash
-SELF_HOSTED_BASE_URLS={"meta-llama/Llama-3.3-70B-Instruct":"https://<workspace>--llama-3-3-70b-instruct-serve.modal.run/v1","Qwen/Qwen3-Next-80B-A3B-Instruct":"https://<workspace>--qwen-3-next-80b-a3b-instruct-serve.modal.run/v1"}
+SELF_HOSTED_BASE_URLS={"meta-llama/Llama-3.3-70B-Instruct":"https://<workspace>--llama-3-3-70b-instruct-serve.modal.run/v1","Qwen/Qwen3-Next-80B-A3B-Instruct":"https://<workspace>--qwen-3-next-80b-a3b-instruct-serve.modal.run/v1","Qwen/Qwen3-32B":"https://<workspace>--qwen-3-32b-serve.modal.run/v1"}
 SELF_HOSTED_API_KEY=<the VLLM_API_KEY value you generated above>
 ```
 
@@ -109,17 +114,18 @@ Runs an ephemeral function inside Modal (the API key never leaves Modal) that hi
 
 ## Stop the deployment when finished
 
-Both apps run with `min_containers=1`, so Modal keeps the GPUs warm and **bills continuously** until you stop them (rough order of magnitude: ~$8/hr for the Llama H100:2 deploy, ~$9/hr for the Qwen H200:2 deploy). When you are done iterating, stop each app:
+All apps run with `min_containers=1`, so Modal keeps the GPUs warm and **bills continuously** until you stop them (rough order of magnitude: ~$8/hr for the Llama `H100:2` deploy, ~$9/hr for the Qwen3-Next `H200:2` deploy, ~$4/hr for the Qwen3-32B `H100:1` deploy). When you are done iterating, stop the apps you no longer need:
 
 ```bash
 modal app stop llama-3-3-70b-instruct --yes
 modal app stop qwen-3-next-80b-a3b-instruct --yes
+modal app stop qwen-3-32b --yes
 ```
 
 To confirm:
 
 ```bash
-modal app list | grep -E 'llama-3-3|qwen-3-next'   # status should read "stopped"
+modal app list | grep -E 'llama-3-3|qwen-3-next|qwen-3-32b'   # status should read "stopped"
 ```
 
 The `huggingface-cache` and `vllm-cache` Modal Volumes survive `app stop`, so the next `modal deploy` cold-starts in ~30–90 s instead of re-downloading 140–160 GB of weights. Stopping does not delete the Modal Secrets either — `huggingface-schmidt` and `vllm-api-key` persist in the workspace.
@@ -128,4 +134,4 @@ The `huggingface-cache` and `vllm-cache` Modal Volumes survive `app stop`, so th
 
 - **Warm pool**: `min_containers=1` keeps one replica always warm. Stop the apps as shown above when you're done iterating.
 - **Configuration**: GPU type, model name, `--max-model-len`, and `--gpu-memory-utilization` are all parameters in `serve_llama.py`. Llama 3.3 70B at bf16 fits 16384 ctx comfortably on H100:2 at 0.95 utilization; 24576 ctx is the practical ceiling before KV cache OOMs.
-- **Redeploys**: when you change `vllm serve` flags, Modal launches the new container alongside the old one. With `min_containers=1` the swap can take several minutes — clients may see HTTP 303 (vLLM still loading) responses during the transition. To force a clean swap, run `modal app stop llama-3-3-70b-instruct --yes` before `modal deploy` so there is no live container to compete with the new one.
+- **Redeploys**: when you change `vllm serve` flags, Modal launches the new container alongside the old one. With `min_containers=1` the swap can take several minutes — clients may see HTTP 303 (vLLM still loading) responses during the transition. To force a clean swap, run `modal app stop <app-name> --yes` before `modal deploy` so there is no live container to compete with the new one.

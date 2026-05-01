@@ -1,9 +1,9 @@
-"""Llama 3.3 70B Instruct on Modal via vLLM's OpenAI-compatible HTTP API with tool calling."""
+"""Qwen3-32B (dense) on Modal via vLLM's OpenAI-compatible HTTP API with tool calling."""
 
 import modal
 
-MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
-N_GPU = 2
+MODEL_NAME = "Qwen/Qwen3-32B"
+N_GPU = 1
 VLLM_PORT = 8000
 MINUTES = 60
 
@@ -15,16 +15,12 @@ vllm_image = (
         "huggingface_hub[hf_transfer]",
     )
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
-    .add_local_file(
-        "modal/tool_chat_template_llama3.1_json.jinja",
-        "/root/tool_chat_template_llama3.1_json.jinja",
-    )
 )
 
 hf_cache_vol = modal.Volume.from_name("huggingface-cache", create_if_missing=True)
 vllm_cache_vol = modal.Volume.from_name("vllm-cache", create_if_missing=True)
 
-app = modal.App("llama-3-3-70b-instruct")
+app = modal.App("qwen-3-32b")
 
 
 @app.function(
@@ -40,10 +36,10 @@ app = modal.App("llama-3-3-70b-instruct")
     },
     min_containers=1,
     scaledown_window=15 * MINUTES,
-    timeout=10 * MINUTES,
+    timeout=30 * MINUTES,
 )
-@modal.concurrent(max_inputs=32)
-@modal.web_server(port=VLLM_PORT, startup_timeout=10 * MINUTES)
+@modal.concurrent(max_inputs=4)
+@modal.web_server(port=VLLM_PORT, startup_timeout=20 * MINUTES)
 def serve() -> None:
     """Launch vLLM's OpenAI-compatible server as a subprocess; Modal proxies inbound HTTPS to it."""
     import os
@@ -67,9 +63,7 @@ def serve() -> None:
         "0.95",
         "--enable-auto-tool-choice",
         "--tool-call-parser",
-        "llama3_json",
-        "--chat-template",
-        "/root/tool_chat_template_llama3.1_json.jinja",
+        "hermes",
         "--uvicorn-log-level",
         "info",
     ]
