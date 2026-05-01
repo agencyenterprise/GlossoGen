@@ -11,8 +11,7 @@ vllm_image = (
     modal.Image.from_registry("nvidia/cuda:12.9.0-devel-ubuntu22.04", add_python="3.12")
     .entrypoint([])
     .pip_install(
-        "vllm==0.11.0",
-        "transformers>=5.0.0rc3",
+        "vllm==0.19.1",
         "huggingface_hub[hf_transfer]",
     )
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
@@ -65,8 +64,6 @@ def serve() -> None:
         "--enable-auto-tool-choice",
         "--tool-call-parser",
         "hermes",
-        "--reasoning-parser",
-        "qwen3",
         "--uvicorn-log-level",
         "info",
     ]
