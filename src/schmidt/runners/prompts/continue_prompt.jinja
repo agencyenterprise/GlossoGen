@@ -1,1 +1,1 @@
-Call read_notifications() to wait for the next event. When you receive new_messages, call read_channel to see them. When you receive new_info, act on it. Use send_message(channel_id, text, force=false) to communicate.
+Call read_notifications() to wait for the next event. When you receive new_messages, call read_channel to see them. When you receive new_info, act on it. Use send_message(channel_id, text, force=false) to communicate. If the response shows pending_count > 0, call read_notifications() again after handling the current notification to drain the queue.

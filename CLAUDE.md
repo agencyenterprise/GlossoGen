@@ -290,8 +290,25 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, not in git)
 ├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
 ├── {scenario_name}_stdout.log     # (pipe stdout here, not in git)
+├── labels.json                    # JSON array of label strings (e.g. ["baseline_oss"])
+├── note.json                      # Optional free-text note for the run
 └── fork_manifest.json             # (forked runs only) provenance: source_run_id, target_message_id
 ```
+
+### Run Labels
+
+Labels are short tags attached to a run for filtering and grouping in the UI and in evaluation queries. They live in `labels.json` inside the run dir as a JSON array of strings.
+
+Three ways to apply them:
+
+1. **Frontend "Create simulation" page**: enter labels at form time. Frontend POSTs the run, polls until it appears, then calls `PUT /api/runs/{scenario}/{run_dir_name}/labels` with `{"labels": [...]}` — see [new-simulation-form.tsx](frontend/src/features/runs/new-simulation-form.tsx).
+2. **Backend API**: same endpoint — `PUT /api/runs/{scenario}/{run_dir_name}/labels` with body `UpdateLabelsRequest{labels: list[str]}` — see [router.py:409](src/schmidt/server/runs/router.py#L409). The PUT replaces all labels (it does not append), so include any existing labels you want to keep.
+3. **Direct file write** (orchestrator scripts): write `labels.json` directly to the run dir as soon as the dir exists. Faster than the API and avoids needing the backend to be running. Example:
+   ```bash
+   echo '["baseline_oss"]' > "runs/veyru/<timestamp>/labels.json"
+   ```
+
+**Important**: do not PUT labels after evaluations have run. Evaluations merge into `labels.json` (preserving prior labels), but a PUT replaces. Apply your labels *before* `schmidt evaluate` if you also want eval-derived labels to coexist.
 
 ### Git-Backed Run History
 

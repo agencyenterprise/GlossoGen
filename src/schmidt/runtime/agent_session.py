@@ -75,6 +75,10 @@ class AgentSession:
         """Return True if there are unprocessed notifications in the queue."""
         return not self._queue.empty()
 
+    def pending_notifications_count(self) -> int:
+        """Return the number of notifications still queued for the agent."""
+        return self._queue.qsize()
+
     def push_notification(self, notification: ActivityNotification) -> None:
         """Enqueue a notification for this agent. Non-blocking."""
         if isinstance(notification, DoneNotification):

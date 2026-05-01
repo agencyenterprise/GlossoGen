@@ -462,7 +462,7 @@ class VeyruScenario(SimulationScenario):
                     tool_names=d.tool_names,
                     model=default_model,
                     provider=default_provider,
-                    max_tokens=16384,
+                    max_tokens=self._knobs.agent_max_tokens,
                 )
             )
         return agents

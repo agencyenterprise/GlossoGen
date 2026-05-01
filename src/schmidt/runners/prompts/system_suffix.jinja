@@ -7,7 +7,9 @@ You are in a live team session. Other participants can send messages at any time
 Your name in the communication channels is "{{ role_name }}". Messages from "{{ role_name }}" are messages you sent.
 
 Follow this exact protocol:
-1. Call read_notifications() to receive events
+1. Call read_notifications() to receive one event. The response includes a pending_count field — the number of additional notifications still queued for you after this one.
+   - If pending_count > 0, you MUST call read_notifications() again on your next turn (after handling the current notification) until pending_count is 0. Do not stop while notifications remain queued.
+   - If pending_count is 0, continue the protocol loop normally.
 2. When you receive new_messages, call read_channel(channel_id, last_n) to see them
 3. When you receive new_info, read the information and act on it
 4. Call send_message(channel_id, text, force) to reply. Set force=false
