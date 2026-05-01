@@ -42,7 +42,7 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
 ```
 
 Flags:
-- `--provider` — LLM provider: `anthropic`, `openai`, `google-gla`, `ollama` (required)
+- `--provider` — LLM provider: `anthropic`, `openai`, `google-gla`, `ollama`, `self-hosted` (required). The `self-hosted` value targets any OpenAI-compatible chat-completions endpoint via `SELF_HOSTED_BASE_URLS` (a JSON map of model name → `/v1` URL) plus `SELF_HOSTED_API_KEY` — see [modal/README.md](modal/README.md) for reference Modal deployments (Llama 3.3 70B, Qwen3-Next-80B-A3B-Instruct).
 - `--max-agent-turns` — Maximum agentic turns per agent (default: 200)
 - `--resume` — Resume from an existing run directory after a crash
 
@@ -249,6 +249,12 @@ src/schmidt/
   llm/                         # LLM provider abstraction (used by evaluation)
   evaluation/                  # Post-hoc Metric / Measurement infrastructure
   scenarios/                   # One folder per scenario (class + Jinja2 prompts + README)
+
+modal/                         # Self-hosted LLM endpoint deployable to Modal (vLLM + Llama 3.3)
+  serve_llama.py               # Modal app exposing OpenAI-compatible chat-completions API
+  tool_chat_template_llama3.1_json.jinja  # vLLM tool-calling chat template
+  smoke_test_llama.py          # End-to-end smoke test for the deployed endpoint
+  README.md                    # Deploy + integration instructions
 
   server/                      # FastAPI web server (schmidt serve)
     password_auth_middleware.py # Shared-password ASGI middleware

@@ -9,7 +9,7 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 
 | Decision            | Choice                                                       |
 | ------------------- | ------------------------------------------------------------ |
-| LLM Backend         | Pydantic AI (supports Anthropic, OpenAI, Ollama)             |
+| LLM Backend         | Pydantic AI (supports Anthropic, OpenAI, Ollama, self-hosted OpenAI-compatible endpoints) |
 | Transport           | MCP over Streamable HTTP (agents are external processes)     |
 | Scenario Definition | Python classes                                               |
 | Agent Autonomy      | Agents decide when to speak; no central turn controller      |

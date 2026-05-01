@@ -2,6 +2,8 @@
 
 Run all simulation agents against a single locally-hosted model on your Mac. Three serving options are compared below. Ollama is the only one that works end-to-end with tool calling today.
 
+> For a **cloud-hosted self-hosted endpoint** (vLLM + Llama 3.3 70B / Qwen3-Next-80B on Modal H100s/H200s, with tool calling), see [`modal/README.md`](../modal/README.md). That path uses the `--provider self-hosted` flag and `SELF_HOSTED_BASE_URLS` (a JSON map of model name → `/v1` URL) plus `SELF_HOSTED_API_KEY` env vars instead of `OLLAMA_BASE_URL`.
+
 ## Prerequisites
 
 - Apple Silicon Mac (M2 or later)

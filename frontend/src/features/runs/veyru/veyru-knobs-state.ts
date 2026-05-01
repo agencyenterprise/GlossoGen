@@ -16,6 +16,7 @@ export type VeyruKnobsState = {
   intern_join_round: number | null;
   intern_takeover_round: number | null;
   postmortem_after_swap: boolean;
+  channel_noise_level: number;
 };
 
 export type VeyruFieldError = {
@@ -82,6 +83,7 @@ export function knobsToState(knobs: Record<string, unknown>): VeyruKnobsState {
     intern_join_round: coerceNullableNumber(knobs.intern_join_round),
     intern_takeover_round: coerceNullableNumber(knobs.intern_takeover_round),
     postmortem_after_swap: coerceBool(knobs.postmortem_after_swap, true),
+    channel_noise_level: 0.0,
   };
 }
 
@@ -106,6 +108,7 @@ export function mergePresetIntoState({
     intern_join_round: preset.intern_join_round,
     intern_takeover_round: preset.intern_takeover_round,
     postmortem_after_swap: preset.postmortem_after_swap,
+    channel_noise_level: previous.channel_noise_level,
   };
 }
 
@@ -124,6 +127,12 @@ export function validateState(state: VeyruKnobsState): VeyruFieldError[] {
     errors.push({
       field: "round_time_budget_seconds",
       message: "Round time budget must be at least 1 second.",
+    });
+  }
+  if (state.channel_noise_level < 0 || state.channel_noise_level > 1) {
+    errors.push({
+      field: "channel_noise_level",
+      message: "Channel noise level must be between 0 and 1.",
     });
   }
   if (state.mode === "swap") {
@@ -221,5 +230,6 @@ export function buildPayload({
     seed: state.seed,
     swap_round: swapRound,
     two_teams: twoTeams,
+    channel_noise_level: state.channel_noise_level,
   };
 }
