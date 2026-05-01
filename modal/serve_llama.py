@@ -1,5 +1,7 @@
 """Llama 3.3 70B Instruct on Modal via vLLM's OpenAI-compatible HTTP API with tool calling."""
 
+# mypy: disable-error-code="attr-defined,misc"
+
 import modal
 
 MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
