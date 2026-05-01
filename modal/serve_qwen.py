@@ -64,7 +64,7 @@ def serve() -> None:
         "0.92",
         "--enable-auto-tool-choice",
         "--tool-call-parser",
-        "qwen3_coder",
+        "hermes",
         "--reasoning-parser",
         "qwen3",
         "--uvicorn-log-level",
