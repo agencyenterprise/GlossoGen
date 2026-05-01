@@ -21,7 +21,7 @@ from schmidt.message_rewind import build_rewind_state_at_event
 from schmidt.models.event import AgentRegistered, RoundAdvanced, SimulationEvent, SimulationStarted
 from schmidt.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
 from schmidt.run_config_validation import validate_run_config
-from schmidt.run_jsonl_rewriter import rewrite_run_jsonl
+from schmidt.run_jsonl_rewriter import patch_simulation_started_scenario_config, rewrite_run_jsonl
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.token_pricing import list_providers
@@ -215,17 +215,17 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         agent_filters={},
     )
 
-    first_event = rewritten_events[0]
-    if not isinstance(first_event, SimulationStarted):
-        raise ValueError("First event in rewritten JSONL is not SimulationStarted")
+    source_first_event = source_events[0]
+    if not isinstance(source_first_event, SimulationStarted):
+        raise ValueError("First event in source JSONL is not SimulationStarted")
 
     scenario_cls = SCENARIO_REGISTRY[request.scenario_name]
 
-    merged_scenario_config: dict[str, Any] = dict(first_event.scenario_config)
+    merged_scenario_config: dict[str, Any] = dict(source_first_event.scenario_config)
     if request.knobs is not None:
         merged_scenario_config.update(request.knobs)
     if request.rounds_after_swap is None:
-        source_round_count = first_event.scenario_config.get("round_count")
+        source_round_count = source_first_event.scenario_config.get("round_count")
         if not isinstance(source_round_count, int):
             raise ValueError(
                 "Cannot derive default rounds_after_swap: source run's "
@@ -257,6 +257,11 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
 
     config_path = new_run_dir / "replace_config.json"
     config_path.write_bytes(orjson.dumps(validated.scenario_config))
+
+    patch_simulation_started_scenario_config(
+        log_path=new_log_path,
+        scenario_config=validated.scenario_config,
+    )
 
     source_run_id = compose_run_id(
         scenario_name=request.scenario_name,

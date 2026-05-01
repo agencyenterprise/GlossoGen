@@ -18,7 +18,11 @@ from schmidt.evaluation.log_reader import load_events
 from schmidt.message_rewind import build_rewind_state
 from schmidt.models.event import SimulationStarted
 from schmidt.run_config_validation import validate_run_config
-from schmidt.run_jsonl_rewriter import drop_all_agent_history, rewrite_run_jsonl
+from schmidt.run_jsonl_rewriter import (
+    drop_all_agent_history,
+    patch_simulation_started_scenario_config,
+    rewrite_run_jsonl,
+)
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.runs.discovery import compose_run_id, resolve_run
@@ -78,6 +82,22 @@ async def fork_run(
     if scenario_name not in SCENARIO_REGISTRY:
         raise HTTPException(status_code=422, detail=f"Unknown scenario: {scenario_name}")
 
+    # Load source events from the source's HEAD JSONL. The merge base for
+    # scenario_config must come from HEAD (which reflects schema backfills),
+    # not from the checked-out commit, which may predate later knob fields.
+    source_log_path = source_run_dir / f"{scenario_name}.jsonl"
+    if not source_log_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Source run JSONL not found: {source_log_path}",
+        )
+    source_events = await load_events(log_path=source_log_path)
+    source_first_event = source_events[0]
+    if not isinstance(source_first_event, SimulationStarted):
+        raise HTTPException(
+            status_code=500, detail="First event in source JSONL is not SimulationStarted"
+        )
+
     # Find the git commit for the target message.
     source_repo = RunRepository(run_dir=source_run_dir)
     target_sha = await source_repo.find_commit_for_message(message_id=body.target_message_id)
@@ -114,6 +134,27 @@ async def fork_run(
         cutoff_round=None,
     )
 
+    # Build config file from source scenario config + optional knobs overrides.
+    scenario_cls = SCENARIO_REGISTRY[scenario_name]
+    merged_scenario_config = dict(source_first_event.scenario_config)
+    if body.knobs is not None:
+        merged_scenario_config.update(body.knobs)
+
+    try:
+        validated = validate_run_config(
+            scenario_cls=scenario_cls,
+            scenario_config=merged_scenario_config,
+            default_provider=body.provider,
+            valid_providers=set(list_providers()),
+        )
+    except (SystemExit, ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid fork configuration: {exc}") from exc
+
+    patch_simulation_started_scenario_config(
+        log_path=new_log_path,
+        scenario_config=validated.scenario_config,
+    )
+
     # Write fork manifest for provenance tracking.
     manifest = {
         "source_run_id": source_run_id,
@@ -129,26 +170,6 @@ async def fork_run(
         message="fork: applied message edits and new run_id",
         paths=None,
     )
-
-    # Build config file from source scenario config + optional knobs overrides.
-    scenario_cls = SCENARIO_REGISTRY[scenario_name]
-    first_event = events[0]
-    if not isinstance(first_event, SimulationStarted):
-        raise HTTPException(status_code=500, detail="First event is not SimulationStarted")
-    source_scenario_config = dict(first_event.scenario_config)
-    merged_scenario_config = dict(source_scenario_config)
-    if body.knobs is not None:
-        merged_scenario_config.update(body.knobs)
-
-    try:
-        validated = validate_run_config(
-            scenario_cls=scenario_cls,
-            scenario_config=merged_scenario_config,
-            default_provider=body.provider,
-            valid_providers=set(list_providers()),
-        )
-    except (SystemExit, ValueError, TypeError) as exc:
-        raise HTTPException(status_code=422, detail=f"Invalid fork configuration: {exc}") from exc
 
     config_path, override_args = _build_fork_config(
         scenario_config=validated.scenario_config,
