@@ -38,7 +38,7 @@ app = modal.App("qwen-3-32b")
     scaledown_window=15 * MINUTES,
     timeout=30 * MINUTES,
 )
-@modal.concurrent(max_inputs=4)
+@modal.concurrent(max_inputs=8)
 @modal.web_server(port=VLLM_PORT, startup_timeout=20 * MINUTES)
 def serve() -> None:
     """Launch vLLM's OpenAI-compatible server as a subprocess; Modal proxies inbound HTTPS to it."""
