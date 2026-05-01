@@ -310,6 +310,31 @@ Three ways to apply them:
 
 **Important**: do not PUT labels after evaluations have run. Evaluations merge into `labels.json` (preserving prior labels), but a PUT replaces. Apply your labels *before* `schmidt evaluate` if you also want eval-derived labels to coexist.
 
+### DO NOT use substring matching to bulk-relabel runs
+
+I (Claude) once destroyed eval-derived labels on 40 runs by writing this:
+
+```bash
+# ❌ NEVER do this. Will match runs with ANY of these substrings, including
+#    legitimately-evaluated runs that just happen to have "baseline" + the
+#    budget tier in their labels list.
+for d in ./runs/veyru/*/; do
+  content=$(cat "$d/labels.json")
+  if [[ "$content" == *'"baseline"'*'"budget=2000"'* ]]; then
+    echo '["baseline_oss", "budget=2000"]' > "$d/labels.json"   # WIPES eval labels
+  fi
+done
+```
+
+The pattern matched runs labeled `["baseline", "budget=2000", "eval:content_filter_refusal:0", "eval:round_success:pass", ...]` and overwrote all of those eval-derived labels. They are NOT recoverable from git (labels.json is not tracked in the per-run git repos) and have to be regenerated via `schmidt evaluate`.
+
+**Rules when bulk-modifying labels.json:**
+
+1. **Always parse as JSON, never substring-match the file contents.** Use Python (`json.load`) and compare list membership precisely (`labels == ['baseline_oss', 'budget=2000']` not `'baseline_oss' in content`).
+2. **Scope by run identity, not by label content.** If you're modifying runs you just created in this session, list those run dirs by mtime or by tracking the run IDs at launch. Don't infer them from current label state.
+3. **Never overwrite — append.** If you must modify labels, read existing JSON, append/remove specific entries, write back. Only blow away the whole list if you're certain the run has no eval-derived labels (i.e. you just created it and `schmidt evaluate` has not run on it).
+4. **If unsure, dry-run first.** Print which runs you'd modify and their current labels; ask the user to confirm before writing.
+
 ### Git-Backed Run History
 
 Each run directory is initialized as a git repository at simulation start. The `EventLogger` commits after writing committable events (messages, tool results, rounds, injections). Non-committable events like `LLMResponseReceived` are written to JSONL but only appear in git as part of the next meaningful commit's diff.
