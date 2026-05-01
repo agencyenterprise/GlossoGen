@@ -88,9 +88,9 @@ def _knob_fragments(scenario_config: dict[str, Any]) -> list[str]:
     round_count = scenario_config.get("round_count")
     if isinstance(round_count, int):
         fragments.append(f"r={round_count}")
-    max_round_duration = scenario_config.get("max_round_duration_seconds")
-    if isinstance(max_round_duration, (int, float)):
-        fragments.append(f"d={int(max_round_duration)}s")
+    round_time_budget = scenario_config.get("round_time_budget_seconds")
+    if isinstance(round_time_budget, (int, float)):
+        fragments.append(f"b={int(round_time_budget)}s")
     seconds_per_token = scenario_config.get("seconds_per_token")
     if isinstance(seconds_per_token, (int, float)):
         fragments.append(f"spt={seconds_per_token:g}")
@@ -114,8 +114,8 @@ def _postmortem_fragment(scenario_config: dict[str, Any], mode: str) -> str:
     return "postmortem dropped after boundary"
 
 
-def _compose_label(metadata: RunMetadata, run_timestamp: int) -> str:
-    """Readable picker label: [HH:MM:SS] mode • postmortem-state • knobs • model."""
+def _compose_label(metadata: RunMetadata, run_timestamp: int, run_dir_name: str) -> str:
+    """Readable picker label: [HH:MM:SS] run_dir_name • mode • postmortem-state • knobs • model."""
     mode = _mode_label(scenario_config=metadata.scenario_config)
     postmortem_fragment = _postmortem_fragment(scenario_config=metadata.scenario_config, mode=mode)
     knob_fragments = _knob_fragments(scenario_config=metadata.scenario_config)
@@ -125,7 +125,7 @@ def _compose_label(metadata: RunMetadata, run_timestamp: int) -> str:
         knobs_fragment = ""
     time_str = datetime.fromtimestamp(run_timestamp).strftime("%H:%M:%S")
     return (
-        f"[{time_str}] {mode} • {postmortem_fragment}{knobs_fragment} • "
+        f"[{time_str}] {run_dir_name} • {mode} • {postmortem_fragment}{knobs_fragment} • "
         f"{metadata.primary_model}"
     )
 
@@ -148,7 +148,9 @@ def _load_runs_for_scenario(scenario_dir: Path, scenario_name: str) -> list[Eval
         report = EvaluationReport.model_validate_json(report_path.read_bytes())
         metadata = _scan_metadata(jsonl_path=jsonl_path)
         run_timestamp = _parse_run_timestamp(run_dir_name=entry.name)
-        label = _compose_label(metadata=metadata, run_timestamp=run_timestamp)
+        label = _compose_label(
+            metadata=metadata, run_timestamp=run_timestamp, run_dir_name=entry.name
+        )
         execution_mode = _mode_label(scenario_config=metadata.scenario_config)
         run_id = _derive_run_id(scenario_name=scenario_name, run_dir=entry)
         out.append(
