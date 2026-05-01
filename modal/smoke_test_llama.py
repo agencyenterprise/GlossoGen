@@ -5,8 +5,6 @@ key never leaves Modal. Hits /health, /v1/chat/completions plain, and
 /v1/chat/completions with a tool definition to verify tool calling works.
 """
 
-# mypy: disable-error-code="attr-defined,misc"
-
 import modal
 
 ENDPOINT_BASE = "https://ae-alignment--llama-3-3-70b-instruct-serve.modal.run"

@@ -30,7 +30,7 @@ dependencies = [
     "watchdog>=6.0.0",
     "minicons>=0.2.55",
     "torch>=2.2.0",
-    "transformers>=4.40.0,<5.0.0",
+    "transformers>=5.0.0rc3",
 ]
 
 [dependency-groups]
@@ -46,6 +46,7 @@ dev = [
     "types-Markdown>=3.7.0.20250322",
     "types-cachetools>=6.2.0.20260408",
     "types-pyperclip>=1.11.0.20260408",
+    "modal>=1.4.2",
 ]
 analysis = [
     "streamlit>=1.40.0",

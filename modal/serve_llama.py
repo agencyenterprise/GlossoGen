@@ -1,7 +1,5 @@
 """Llama 3.3 70B Instruct on Modal via vLLM's OpenAI-compatible HTTP API with tool calling."""
 
-# mypy: disable-error-code="attr-defined,misc"
-
 import modal
 
 MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
@@ -14,7 +12,7 @@ vllm_image = (
     .entrypoint([])
     .pip_install(
         "vllm==0.11.0",
-        "transformers>=4.55.0,<5",
+        "transformers>=5.0.0rc3",
         "huggingface_hub[hf_transfer]",
     )
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
