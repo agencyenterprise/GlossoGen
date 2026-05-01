@@ -6,13 +6,12 @@ The current deployment serves **`meta-llama/Llama-3.3-70B-Instruct`** at bf16 on
 
 ## Available deployments
 
-Three Modal apps are defined here, each serving a different model. They run in parallel under separate URLs sharing the same `vllm-api-key` and `huggingface-schmidt` secrets and the same `huggingface-cache` / `vllm-cache` Modal Volumes.
+Two Modal apps are defined here, each serving a different model. They run in parallel under separate URLs sharing the same `vllm-api-key` and `huggingface-schmidt` secrets and the same `huggingface-cache` / `vllm-cache` Modal Volumes.
 
-| Modal app | Model | GPU | Tool/reasoning parsers | URL |
+| Modal app | Model | GPU | Tool-call parser | URL |
 | --- | --- | --- | --- | --- |
-| `llama-3-3-70b-instruct` | `meta-llama/Llama-3.3-70B-Instruct` (dense, gated) | `H100:2` bf16 | `llama3_json` (no reasoning parser) | `https://<workspace>--llama-3-3-70b-instruct-serve.modal.run/v1` |
-| `qwen-3-next-80b-a3b-instruct` | `Qwen/Qwen3-Next-80B-A3B-Instruct` (MoE, 80B/3B-active, ungated) | `H200:2` bf16 | `hermes` + reasoning `qwen3` | `https://<workspace>--qwen-3-next-80b-a3b-instruct-serve.modal.run/v1` |
-| `qwen-3-32b` | `Qwen/Qwen3-32B` (dense, ungated) | `H100:1` bf16 | `hermes` + reasoning `qwen3` | `https://<workspace>--qwen-3-32b-serve.modal.run/v1` |
+| `llama-3-3-70b-instruct` | `meta-llama/Llama-3.3-70B-Instruct` (dense, gated) | `H100:2` bf16 | `llama3_json` | `https://<workspace>--llama-3-3-70b-instruct-serve.modal.run/v1` |
+| `qwen-3-32b` | `Qwen/Qwen3-32B` (dense, ungated) | `H100:1` bf16 | `hermes` | `https://<workspace>--qwen-3-32b-serve.modal.run/v1` |
 
 Schmidt's `--provider self-hosted` reads `SELF_HOSTED_BASE_URLS` (a JSON object mapping model name → `/v1` URL) and looks up the URL for the model the run is launched with. List the entries you want available in `.env` to switch from the UI without redeploying.
 
@@ -23,12 +22,10 @@ The simulation runner forces `stream=False` on the OpenAI-compatible endpoint fo
 | File | Purpose |
 | --- | --- |
 | `serve_llama.py` | Modal app for Llama 3.3 70B Instruct (vLLM, `H100:2` bf16). |
-| `serve_qwen.py` | Modal app for Qwen3-Next-80B-A3B-Instruct (vLLM, `H200:2` bf16). |
-| `serve_qwen_32b.py` | Modal app for Qwen3-32B dense (vLLM, `H100:1` bf16). |
+| `serve_qwen.py` | Modal app for Qwen3-32B dense (vLLM, `H100:1` bf16). |
 | `tool_chat_template_llama3.1_json.jinja` | Llama 3.1/3.3 tool-calling chat template (baked into the Llama image only; Qwen uses its bundled `tokenizer_config.json` template). |
 | `smoke_test_llama.py` | Ephemeral end-to-end test against the Llama endpoint. |
-| `smoke_test_qwen.py` | Ephemeral end-to-end test against the Qwen3-Next-80B endpoint. |
-| `smoke_test_qwen_32b.py` | Ephemeral end-to-end test against the Qwen3-32B endpoint. |
+| `smoke_test_qwen.py` | Ephemeral end-to-end test against the Qwen3-32B endpoint. |
 
 ## Prerequisites
 
@@ -74,7 +71,7 @@ A **JSON object** mapping each served model name to its OpenAI-compatible `/v1` 
 
 | Field | Value |
 | --- | --- |
-| **Key** | The model identifier as known to vLLM — the same string passed to `vllm serve <MODEL>`. For the deployments here that is the HuggingFace model ID (e.g. `meta-llama/Llama-3.3-70B-Instruct`, `Qwen/Qwen3-Next-80B-A3B-Instruct`). |
+| **Key** | The model identifier as known to vLLM — the same string passed to `vllm serve <MODEL>`. For the deployments here that is the HuggingFace model ID (e.g. `meta-llama/Llama-3.3-70B-Instruct`, `Qwen/Qwen3-32B`). |
 | **Value** | The fully-qualified base URL **including the `/v1` suffix**. Modal returns a hostname per app (`https://<workspace>--<app-name>-serve.modal.run`); append `/v1` to reach vLLM's OpenAI-compatible chat-completions API. |
 
 The frontend reads this map to populate the model dropdown — to add a new self-hosted model, deploy it (any host) and add a key/value pair here. No code change needed.
@@ -86,7 +83,7 @@ A single bearer token shared across **every** entry in `SELF_HOSTED_BASE_URLS`. 
 ### Example `.env`
 
 ```bash
-SELF_HOSTED_BASE_URLS={"meta-llama/Llama-3.3-70B-Instruct":"https://<workspace>--llama-3-3-70b-instruct-serve.modal.run/v1","Qwen/Qwen3-Next-80B-A3B-Instruct":"https://<workspace>--qwen-3-next-80b-a3b-instruct-serve.modal.run/v1","Qwen/Qwen3-32B":"https://<workspace>--qwen-3-32b-serve.modal.run/v1"}
+SELF_HOSTED_BASE_URLS={"meta-llama/Llama-3.3-70B-Instruct":"https://<workspace>--llama-3-3-70b-instruct-serve.modal.run/v1","Qwen/Qwen3-32B":"https://<workspace>--qwen-3-32b-serve.modal.run/v1"}
 SELF_HOSTED_API_KEY=<the VLLM_API_KEY value you generated above>
 ```
 
@@ -114,18 +111,17 @@ Runs an ephemeral function inside Modal (the API key never leaves Modal) that hi
 
 ## Stop the deployment when finished
 
-All apps run with `min_containers=1`, so Modal keeps the GPUs warm and **bills continuously** until you stop them (rough order of magnitude: ~$8/hr for the Llama `H100:2` deploy, ~$9/hr for the Qwen3-Next `H200:2` deploy, ~$4/hr for the Qwen3-32B `H100:1` deploy). When you are done iterating, stop the apps you no longer need:
+All apps run with `min_containers=1`, so Modal keeps the GPUs warm and **bills continuously** until you stop them (rough order of magnitude: ~$8/hr for the Llama `H100:2` deploy, ~$4/hr for the Qwen3-32B `H100:1` deploy). When you are done iterating, stop the apps you no longer need:
 
 ```bash
 modal app stop llama-3-3-70b-instruct --yes
-modal app stop qwen-3-next-80b-a3b-instruct --yes
 modal app stop qwen-3-32b --yes
 ```
 
 To confirm:
 
 ```bash
-modal app list | grep -E 'llama-3-3|qwen-3-next|qwen-3-32b'   # status should read "stopped"
+modal app list | grep -E 'llama-3-3|qwen-3-32b'   # status should read "stopped"
 ```
 
 The `huggingface-cache` and `vllm-cache` Modal Volumes survive `app stop`, so the next `modal deploy` cold-starts in ~30–90 s instead of re-downloading 140–160 GB of weights. Stopping does not delete the Modal Secrets either — `huggingface-schmidt` and `vllm-api-key` persist in the workspace.

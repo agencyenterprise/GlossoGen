@@ -1,4 +1,4 @@
-"""Ephemeral smoke test against the deployed Qwen3-Next-80B-A3B-Instruct endpoint.
+"""Ephemeral smoke test against the deployed Qwen3-32B endpoint.
 
 Runs inside a Modal container with the vllm-api-key secret attached so the API
 key never leaves Modal. Hits chat completion plain + tool-calling variants.
@@ -6,11 +6,11 @@ key never leaves Modal. Hits chat completion plain + tool-calling variants.
 
 import modal
 
-ENDPOINT_BASE = "https://ae-alignment--qwen-3-next-80b-a3b-instruct-serve.modal.run"
-MODEL_NAME = "Qwen/Qwen3-Next-80B-A3B-Instruct"
+ENDPOINT_BASE = "https://ae-alignment--qwen-3-32b-serve.modal.run"
+MODEL_NAME = "Qwen/Qwen3-32B"
 
 image = modal.Image.debian_slim().pip_install("httpx==0.28.1")
-app = modal.App("qwen-3-next-smoke-test")
+app = modal.App("qwen-3-32b-smoke-test")
 
 
 @app.function(
@@ -22,7 +22,7 @@ def smoke_test() -> None:
     """Hit the chat endpoints (plain + tool) and print results.
 
     Retries on HTTP 303 with backoff for up to ~12 minutes, since Modal returns
-    303 while the underlying vLLM server is still loading the 80B weights.
+    303 while the underlying vLLM server is still loading the weights.
     """
     import json
     import os
