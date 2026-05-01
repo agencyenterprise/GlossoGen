@@ -83,3 +83,38 @@ def drop_all_agent_history(event_dict: dict[str, Any]) -> bool:
     edits invalidate prior tool args and results.
     """
     return event_dict.get("event_type") in _FRESH_AGENT_EVENT_TYPES
+
+
+def patch_simulation_started_scenario_config(
+    log_path: Path,
+    scenario_config: dict[str, Any],
+) -> None:
+    """Overwrite the first ``simulation_started`` event's ``scenario_config``.
+
+    Derived runs (fork, replace-agent) clone a source repo at an old commit
+    where the JSONL may predate later schema additions or backfills. After
+    validation produces an authoritative merged config, this helper writes
+    it into the cloned JSONL so downstream readers (evaluate, UI) see a
+    config that matches the new run's actual configuration.
+    """
+    raw_bytes = log_path.read_bytes()
+    lines = raw_bytes.split(b"\n")
+    output_lines: list[bytes] = []
+    patched = False
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        event_dict = orjson.loads(stripped)
+        if not patched and event_dict.get("event_type") == "simulation_started":
+            event_dict["scenario_config"] = scenario_config
+            patched = True
+        output_lines.append(orjson.dumps(event_dict))
+
+    if not patched:
+        raise ValueError(
+            f"No simulation_started event found in {log_path}; cannot patch scenario_config"
+        )
+
+    log_path.write_bytes(b"\n".join(output_lines) + b"\n")
