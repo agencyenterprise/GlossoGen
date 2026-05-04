@@ -3,7 +3,7 @@
 import modal
 
 MODEL_NAME = "Qwen/Qwen3-32B"
-N_GPU = 1
+N_GPU = 2
 VLLM_PORT = 8000
 MINUTES = 60
 
