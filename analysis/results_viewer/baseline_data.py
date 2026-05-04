@@ -13,20 +13,23 @@ This module is streamlit-free so it can be reused by ad-hoc analysis scripts.
 from pathlib import Path
 from typing import Callable, NamedTuple
 
-import orjson
-
+from analysis.results_viewer.measurement_scores import (
+    mcr_score,
+    mml_score,
+    mwl_score,
+    perplexity_score,
+    read_labels,
+)
 from analysis.results_viewer.run_catalog import EvaluatedRun
 
 _BASELINE_LABEL = "baseline"
+_BASELINE_OSS_LABEL = "baseline_oss"
+_BASELINE_LABELS = frozenset({_BASELINE_LABEL, _BASELINE_OSS_LABEL})
 _BUDGET_PREFIX = "budget="
 _ROUND_SUCCESS_METRIC = "round_success"
 _ROUND_ENDED_IDLE_METRIC = "round_ended_idle"
 _ROUND_ENDED_TIMEOUT_METRIC = "round_ended_timeout"
 _CONTENT_FILTER_REFUSAL_METRIC = "content_filter_refusal"
-_PERPLEXITY_METRIC = "perplexity"
-_MWL_METRIC = "mean_word_length"
-_MML_METRIC = "mean_message_length"
-_MCR_METRIC = "mean_chars_per_round"
 
 
 class BaselineRun(NamedTuple):
@@ -297,17 +300,6 @@ in its own section.
 """
 
 
-def _read_labels(run_dir: Path) -> list[str]:
-    """Return the labels stored in the run directory's ``labels.json``, or an empty list."""
-    labels_path = run_dir / "labels.json"
-    if not labels_path.exists():
-        return []
-    raw = orjson.loads(labels_path.read_bytes())
-    if not isinstance(raw, list):
-        return []
-    return [label for label in raw if isinstance(label, str)]
-
-
 def _parse_budget(labels: list[str]) -> int | None:
     """Extract the integer value from the first ``budget=<N>`` label, if any."""
     for label in labels:
@@ -331,50 +323,6 @@ def _flagged_round_count(evaluated: EvaluatedRun, metric_name: str) -> int | Non
     return None
 
 
-def _perplexity_score(evaluated: EvaluatedRun) -> float | None:
-    """Return the run's perplexity ``score`` (mean per-token surprisal in nats).
-
-    Returns ``None`` if the run has not been scored with the perplexity metric.
-    """
-    for measurement in evaluated.report.measurements:
-        if measurement.metric_name == _PERPLEXITY_METRIC:
-            return float(measurement.score)
-    return None
-
-
-def _mwl_score(evaluated: EvaluatedRun) -> float | None:
-    """Return the run's MWL ``score`` (mean characters per primary-channel word).
-
-    Returns ``None`` if the run has not been scored with the MWL metric.
-    """
-    for measurement in evaluated.report.measurements:
-        if measurement.metric_name == _MWL_METRIC:
-            return float(measurement.score)
-    return None
-
-
-def _mml_score(evaluated: EvaluatedRun) -> float | None:
-    """Return the run's MML ``score`` (mean words per primary-channel message).
-
-    Returns ``None`` if the run has not been scored with the MML metric.
-    """
-    for measurement in evaluated.report.measurements:
-        if measurement.metric_name == _MML_METRIC:
-            return float(measurement.score)
-    return None
-
-
-def _mcr_score(evaluated: EvaluatedRun) -> float | None:
-    """Return the run's MCR ``score`` (mean total chars per primary-channel round).
-
-    Returns ``None`` if the run has not been scored with the MCR metric.
-    """
-    for measurement in evaluated.report.measurements:
-        if measurement.metric_name == _MCR_METRIC:
-            return float(measurement.score)
-    return None
-
-
 def _refusal_total(evaluated: EvaluatedRun) -> int:
     """Return the total number of refusals recorded for the run.
 
@@ -391,13 +339,14 @@ def _refusal_total(evaluated: EvaluatedRun) -> int:
 def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
     """Convert an ``EvaluatedRun`` into a ``BaselineRun`` if it qualifies.
 
-    A run qualifies when it has the ``baseline`` label, a parseable ``budget=<N>``
-    label, and a ``round_success`` metric in its evaluation report. The two
-    round-end metrics default to 0.0 when missing so older runs evaluated
-    before they existed still render on the chart (just as a flat zero line).
+    A run qualifies when it has the ``baseline`` or ``baseline_oss`` label,
+    a parseable ``budget=<N>`` label, and a ``round_success`` metric in its
+    evaluation report. The two round-end metrics default to 0.0 when missing
+    so older runs evaluated before they existed still render on the chart
+    (just as a flat zero line).
     """
-    labels = _read_labels(run_dir=evaluated.run_dir)
-    if _BASELINE_LABEL not in labels:
+    labels = read_labels(run_dir=evaluated.run_dir)
+    if not _BASELINE_LABELS.intersection(labels):
         return None
     budget = _parse_budget(labels=labels)
     if budget is None:
@@ -413,10 +362,6 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
     postmortem_enabled = bool(evaluated.metadata.scenario_config.get("postmortem_enabled", False))
     total_rounds = int(evaluated.metadata.scenario_config.get("round_count", 0))
     refusal_total = _refusal_total(evaluated=evaluated)
-    perplexity_score = _perplexity_score(evaluated=evaluated)
-    mwl_score = _mwl_score(evaluated=evaluated)
-    mml_score = _mml_score(evaluated=evaluated)
-    mcr_score = _mcr_score(evaluated=evaluated)
     return BaselineRun(
         run_id=evaluated.run_id,
         run_dir=evaluated.run_dir,
@@ -429,10 +374,10 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
         round_ended_timeout=timeout if timeout is not None else 0,
         content_filter_refusal_rounds=refusal_rounds if refusal_rounds is not None else 0,
         content_filter_refusal_total=refusal_total,
-        perplexity_score=perplexity_score,
-        mwl_score=mwl_score,
-        mml_score=mml_score,
-        mcr_score=mcr_score,
+        perplexity_score=perplexity_score(evaluated=evaluated),
+        mwl_score=mwl_score(evaluated=evaluated),
+        mml_score=mml_score(evaluated=evaluated),
+        mcr_score=mcr_score(evaluated=evaluated),
         labels=labels,
     )
 
