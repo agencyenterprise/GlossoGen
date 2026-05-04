@@ -26,6 +26,7 @@ _CONTENT_FILTER_REFUSAL_METRIC = "content_filter_refusal"
 _PERPLEXITY_METRIC = "perplexity"
 _MWL_METRIC = "mean_word_length"
 _MML_METRIC = "mean_message_length"
+_MCR_METRIC = "mean_chars_per_round"
 
 
 class BaselineRun(NamedTuple):
@@ -52,6 +53,7 @@ class BaselineRun(NamedTuple):
     perplexity_score: float | None
     mwl_score: float | None
     mml_score: float | None
+    mcr_score: float | None
     labels: list[str]
 
     def series_key(self, selected_batch_labels: frozenset[str]) -> str:
@@ -85,8 +87,8 @@ class MetricOption(NamedTuple):
     ``y_axis_kind`` selects the Y-axis range strategy: ``round_count`` shares a
     0..total_rounds axis with integer ticks, ``refusal_total`` autoscales with
     a minimum visible range of 10, ``perplexity`` autoscales tightly around
-    the observed nats values, and ``mwl`` / ``mml`` autoscale from zero with
-    headroom above the observed maximum. ``description`` is markdown shown in the info
+    the observed nats values, and ``mwl`` / ``mml`` / ``mcr`` autoscale from
+    zero with headroom above the observed maximum. ``description`` is markdown shown in the info
     popover next to the metric selector.
     """
 
@@ -138,7 +140,7 @@ class MetricOption(NamedTuple):
                 y_max=max(ppl_values) + 0.5,
                 dtick=None,
             )
-        if self.y_axis_kind in {"mwl", "mml"}:
+        if self.y_axis_kind in {"mwl", "mml", "mcr"}:
             scored = [run for run in runs if self.available(run=run)]
             if not scored:
                 return YAxisSpec(y_min=0.0, y_max=10.0, dtick=None)
@@ -249,6 +251,26 @@ METRIC_OPTIONS: list[MetricOption] = [
         ),
     ),
     MetricOption(
+        display_name="mcr",
+        attr="mcr_score",
+        y_axis_label="mcr (mean characters per round on primary channel)",
+        y_axis_kind="mcr",
+        description=(
+            "**mean_chars_per_round (mcr)** — total characters of all "
+            "primary-channel messages in a round, averaged across rounds.\n\n"
+            "Deterministic (no LLM judge): sums `len(text)` over every "
+            "message on the primary channel per round, then takes the mean "
+            "across rounds that had at least one message. Per-round total "
+            "and message count are reported in the evidence.\n\n"
+            "Captures channel utilization — how much of the per-round "
+            "character budget agents actually use. In Veyru this maps "
+            "directly to `time_budget_seconds`, since one character costs "
+            "one second of communication time. Pairs with MML and MWL: "
+            "MCR is the headline throughput, MML/MWL decompose it into "
+            "verbosity vs lexical density."
+        ),
+    ),
+    MetricOption(
         display_name="perplexity",
         attr="perplexity_score",
         y_axis_label="perplexity (mean per-token surprisal, nats, gpt2)",
@@ -342,6 +364,17 @@ def _mml_score(evaluated: EvaluatedRun) -> float | None:
     return None
 
 
+def _mcr_score(evaluated: EvaluatedRun) -> float | None:
+    """Return the run's MCR ``score`` (mean total chars per primary-channel round).
+
+    Returns ``None`` if the run has not been scored with the MCR metric.
+    """
+    for measurement in evaluated.report.measurements:
+        if measurement.metric_name == _MCR_METRIC:
+            return float(measurement.score)
+    return None
+
+
 def _refusal_total(evaluated: EvaluatedRun) -> int:
     """Return the total number of refusals recorded for the run.
 
@@ -383,6 +416,7 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
     perplexity_score = _perplexity_score(evaluated=evaluated)
     mwl_score = _mwl_score(evaluated=evaluated)
     mml_score = _mml_score(evaluated=evaluated)
+    mcr_score = _mcr_score(evaluated=evaluated)
     return BaselineRun(
         run_id=evaluated.run_id,
         run_dir=evaluated.run_dir,
@@ -398,6 +432,7 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
         perplexity_score=perplexity_score,
         mwl_score=mwl_score,
         mml_score=mml_score,
+        mcr_score=mcr_score,
         labels=labels,
     )
 

@@ -58,7 +58,7 @@ def serve() -> None:
         "--tensor-parallel-size",
         str(N_GPU),
         "--max-model-len",
-        "24576",
+        "32768",
         "--gpu-memory-utilization",
         "0.95",
         "--enable-auto-tool-choice",

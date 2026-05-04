@@ -5,6 +5,7 @@ Generic metrics are scenario-agnostic and available to all scenarios.
 
 from schmidt.evaluation.content_filter_refusal_metric import ContentFilterRefusalMetric
 from schmidt.evaluation.language_strangeness_metric import LanguageStrangenessMetric
+from schmidt.evaluation.mcr_metric import MCRMetric
 from schmidt.evaluation.metric_protocol import Metric, MetricFactory
 from schmidt.evaluation.mml_metric import MMLMetric
 from schmidt.evaluation.mwl_metric import MWLMetric
@@ -18,6 +19,7 @@ from schmidt.evaluation.slang_emergence_metric import SlangEmergenceMetric
 _GENERIC_METRICS: list[type[Metric]] = [
     ContentFilterRefusalMetric,
     LanguageStrangenessMetric,
+    MCRMetric,
     MMLMetric,
     MWLMetric,
     NeologismMetric,

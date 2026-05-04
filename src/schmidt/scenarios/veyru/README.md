@@ -143,6 +143,8 @@ The generic `mean_word_length` metric complements `perplexity` on `#link`: it sp
 
 The generic `mean_message_length` metric is the message-level companion to MWL: it counts whitespace-delimited words per `#link` message and reports the overall mean. Same scoping rule. MML and MWL move independently — a run can compress by sending fewer words per message (low MML), by replacing words with short codes (low MWL), or both.
 
+The generic `mean_chars_per_round` metric is the throughput companion: it sums every `#link` message's character count per round, then averages across rounds. The score is denominated in the same unit as `time_budget_seconds` — one character costs one second of communication time — so MCR directly answers "how much of the budget did the team spend on average?". Pairs cleanly with the others because total chars = messages × words/message × chars/word, so MCR = MML × MWL × messages-per-round.
+
 The `veyru_case_started` event is emitted once per round at round start by `VeyruScenario.on_round_advanced` and carries the full case payload: `case_number`, `failure_name`, `time_budget_seconds`, `stellar_reading`, and per-stage `(motif_name, observable_symptoms, treatment_motif_name, judge_expected_actions)`. Metrics that need ground truth read it directly from the log.
 
 ## Knobs
