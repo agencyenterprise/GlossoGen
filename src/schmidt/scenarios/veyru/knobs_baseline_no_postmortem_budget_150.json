@@ -6,10 +6,11 @@
   "intern_takeover_round": null,
   "judge_model": "claude-haiku-4-5-20251001",
   "judge_provider": "anthropic",
-  "max_round_duration_seconds": 300,
+  "max_round_duration_seconds": 600,
   "model_overrides": {},
   "postmortem_after_swap": false,
   "postmortem_disabled_at_start": false,
+  "postmortem_duration_seconds": 240,
   "postmortem_enabled": false,
   "replace_agent_default_channel_visibility": {
     "postmortem": false,
