@@ -129,6 +129,7 @@ Generic metrics (available to all scenarios). Both deterministic and LLM-driven 
 - `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model (deterministic, no LLM judge)
 - `mean_word_length` — mean characters per whitespace-delimited word on the primary channel; combine with `perplexity` for a deterministic two-axis read on coded language (deterministic, no LLM judge)
 - `mean_message_length` — mean whitespace-delimited words per primary-channel message; pairs with `mean_word_length` to separate "fewer words" from "shorter words" (deterministic, no LLM judge)
+- `mean_chars_per_round` — mean total characters per round on the primary channel; the headline channel-utilization number that maps directly to Veyru's `time_budget_seconds` (deterministic, no LLM judge)
 
 Scenario-specific metrics:
 
