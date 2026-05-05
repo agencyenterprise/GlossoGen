@@ -1,9 +1,13 @@
 """Streamlit tab plotting cross-run replace-agent runs against sources A and B.
 
-X = round_start, Y = mean fraction of post-swap rounds stabilized. Per
-``imported_model``: a solid line for the resumed cross-run runs, a dashed
-line for what source A achieved over the same window, and a dotted line
-for source B. Only runs labeled ``cross_team`` are eligible.
+X = round_start, Y = mean fraction of rounds stabilized **from round_start
+onward**. The solid line is the swapped run's accuracy over its post-swap
+window. The dashed line is source A's accuracy over the same round window
+(rounds [round_start, end] in the original sim A); the dotted line is
+source B's accuracy over the same window. Source labels carry the model
+that actually played the source's replaced agent (e.g. opus for A, gpt-5.4
+for B) — not the imported model. Only runs labeled ``cross_team`` are
+eligible.
 """
 
 import plotly.graph_objects as go
@@ -20,26 +24,26 @@ from analysis.results_viewer.series_plot import (
 )
 
 
-def _resumed_series(run: CrossSwapRun) -> str:
-    """Window-view series key for the cross-run resumed line."""
-    return f"{run.imported_model} · resumed"
+def _swapped_series(run: CrossSwapRun) -> str:
+    """Series key for the cross-run swapped line (the imported agent's model)."""
+    return f"{run.imported_model} · swapped"
 
 
 def _source_a_series(run: CrossSwapRun) -> str:
-    """Window-view series key for the matched source-A line."""
-    return f"{run.imported_model} · source A"
+    """Series key for source A's matched-window line, labelled with A's actual model."""
+    return f"{run.source_a_replaced_agent_model} · source A"
 
 
 def _source_b_series(run: CrossSwapRun) -> str:
-    """Window-view series key for the matched source-B line."""
-    return f"{run.imported_model} · source B"
+    """Series key for source B's matched-window line, labelled with B's actual model."""
+    return f"{run.source_b_replaced_agent_model} · source B"
 
 
 def _bucket_filter(runs: list[CrossSwapRun]) -> set[str]:
     """One checkbox per distinct (model · round_start) bucket; returns selected keys."""
     counts: dict[str, int] = {}
     for run in runs:
-        key = run.resumed_series_key()
+        key = run.swapped_series_key()
         counts[key] = counts.get(key, 0) + 1
     if not counts:
         return set()
@@ -55,52 +59,52 @@ def _bucket_filter(runs: list[CrossSwapRun]) -> set[str]:
     return selected
 
 
-def _resumed_window_accuracy(run: CrossSwapRun) -> float:
-    """Mean success across the rounds the cross-run resumed actually played."""
-    values = list(run.resumed_round_outcomes.values())
+def _swapped_window_accuracy(run: CrossSwapRun) -> float:
+    """Mean success across the rounds the swapped run actually played."""
+    values = list(run.swapped_round_outcomes.values())
     return sum(1.0 for v in values if v) / len(values)
 
 
-def _matched_window_accuracy(
-    resumed_outcomes: dict[int, bool],
-    other_outcomes: dict[int, bool],
-) -> float | None:
-    """Mean success of ``other_outcomes`` over rounds the resumed run played."""
-    matched = [
-        other_outcomes[round_number]
-        for round_number in resumed_outcomes
-        if round_number in other_outcomes
-    ]
-    if not matched:
+def _from_round_start_accuracy(outcomes: dict[int, bool], round_start: int) -> float | None:
+    """Mean success across rounds at or after ``round_start`` in ``outcomes``."""
+    sliced = [v for round_number, v in outcomes.items() if round_number >= round_start]
+    if not sliced:
         return None
-    return sum(1.0 for v in matched if v) / len(matched)
+    return sum(1.0 for v in sliced if v) / len(sliced)
 
 
 def _aggregate_window_stats(runs: list[CrossSwapRun]) -> list[SeriesStats]:
-    """Bucket per-replica window accuracies by (series, round_start).
+    """Bucket per-replica accuracies by (series, round_start).
 
-    Each cross-swap run contributes to up to three series for its round_start:
-    ``resumed``, ``source A``, ``source B`` (the latter two only when the
-    matching source has rounds overlapping the resumed window).
+    Each cross-swap run contributes the swapped run's post-swap window
+    accuracy. Each unique source-A/source-B run contributes its accuracy
+    over rounds at or after ``round_start`` once per ``(series, round_start)``
+    bucket it shows up in, so repeat-source replicas don't inflate the source
+    baselines.
     """
     buckets: dict[tuple[str, int], list[float]] = {}
+    seen_source_runs: dict[tuple[str, int], set[str]] = {}
     for run in runs:
-        resumed_key = (_resumed_series(run=run), run.round_start)
-        buckets.setdefault(resumed_key, []).append(_resumed_window_accuracy(run=run))
-        source_a_value = _matched_window_accuracy(
-            resumed_outcomes=run.resumed_round_outcomes,
-            other_outcomes=run.source_a_round_outcomes,
+        swapped_key = (_swapped_series(run=run), run.round_start)
+        buckets.setdefault(swapped_key, []).append(_swapped_window_accuracy(run=run))
+        source_a_value = _from_round_start_accuracy(
+            outcomes=run.source_a_round_outcomes, round_start=run.round_start
         )
         if source_a_value is not None:
             source_a_key = (_source_a_series(run=run), run.round_start)
-            buckets.setdefault(source_a_key, []).append(source_a_value)
-        source_b_value = _matched_window_accuracy(
-            resumed_outcomes=run.resumed_round_outcomes,
-            other_outcomes=run.source_b_round_outcomes,
+            seen = seen_source_runs.setdefault(source_a_key, set())
+            if run.source_a_run_id not in seen:
+                seen.add(run.source_a_run_id)
+                buckets.setdefault(source_a_key, []).append(source_a_value)
+        source_b_value = _from_round_start_accuracy(
+            outcomes=run.source_b_round_outcomes, round_start=run.round_start
         )
         if source_b_value is not None:
             source_b_key = (_source_b_series(run=run), run.round_start)
-            buckets.setdefault(source_b_key, []).append(source_b_value)
+            seen = seen_source_runs.setdefault(source_b_key, set())
+            if run.source_b_run_id not in seen:
+                seen.add(run.source_b_run_id)
+                buckets.setdefault(source_b_key, []).append(source_b_value)
     stats: list[SeriesStats] = []
     for (series, round_start), values in sorted(buckets.items()):
         mean = sum(values) / len(values)
@@ -123,39 +127,52 @@ def _aggregate_window_stats(runs: list[CrossSwapRun]) -> list[SeriesStats]:
 def _window_replica_dots(
     runs: list[CrossSwapRun],
 ) -> dict[str, tuple[list[float], list[float], list[str]]]:
-    """Per-series jittered (round_start, accuracy) replica points for the chart."""
+    """Per-series jittered (round_start, accuracy) replica points for the chart.
+
+    Swapped dots are one per replica. Source-A/B dots are one per *unique*
+    source run id within each ``(series, round_start)`` bucket, so a source
+    that shows up across many replicas is still drawn as a single dot.
+    """
     dots: dict[str, tuple[list[float], list[float], list[str]]] = {}
     counter: dict[str, int] = {}
+    seen_source_dots: dict[tuple[str, int], set[str]] = {}
     for run in runs:
-        source_a_value = _matched_window_accuracy(
-            resumed_outcomes=run.resumed_round_outcomes,
-            other_outcomes=run.source_a_round_outcomes,
+        swapped_value = _swapped_window_accuracy(run=run)
+        bucket = dots.setdefault(_swapped_series(run=run), ([], [], []))
+        index = counter.get(_swapped_series(run=run), 0)
+        bucket[0].append(jittered_x_linear(base_x=float(run.round_start), index=index))
+        bucket[1].append(swapped_value)
+        bucket[2].append(
+            f"{run.run_id}<br>{_swapped_series(run=run)}<br>"
+            f"round_start={run.round_start}<br>accuracy={swapped_value:.3f}"
         )
-        source_b_value = _matched_window_accuracy(
-            resumed_outcomes=run.resumed_round_outcomes,
-            other_outcomes=run.source_b_round_outcomes,
-        )
-        for series, value in (
-            (_resumed_series(run=run), _resumed_window_accuracy(run=run)),
-            (_source_a_series(run=run), source_a_value),
-            (_source_b_series(run=run), source_b_value),
+        counter[_swapped_series(run=run)] = index + 1
+        for series_fn, source_run_id, outcomes in (
+            (_source_a_series, run.source_a_run_id, run.source_a_round_outcomes),
+            (_source_b_series, run.source_b_run_id, run.source_b_round_outcomes),
         ):
+            value = _from_round_start_accuracy(outcomes=outcomes, round_start=run.round_start)
             if value is None:
                 continue
+            series = series_fn(run=run)
+            seen = seen_source_dots.setdefault((series, run.round_start), set())
+            if source_run_id in seen:
+                continue
+            seen.add(source_run_id)
             bucket = dots.setdefault(series, ([], [], []))
             index = counter.get(series, 0)
             bucket[0].append(jittered_x_linear(base_x=float(run.round_start), index=index))
             bucket[1].append(value)
             bucket[2].append(
-                f"{run.run_id}<br>{series}<br>round_start={run.round_start}<br>"
-                f"accuracy={value:.3f}"
+                f"{source_run_id}<br>{series}<br>round_start={run.round_start}<br>"
+                f"accuracy from R{run.round_start}={value:.3f}"
             )
             counter[series] = index + 1
     return dots
 
 
 def _series_dash(series: str) -> str:
-    """Dash style by series role: solid resumed, dashed source A, dotted source B."""
+    """Dash style by series role: solid swapped, dashed source A, dotted source B."""
     if series.endswith(" · source A"):
         return "dash"
     if series.endswith(" · source B"):
@@ -202,7 +219,7 @@ def _build_window_figure(
             tickvals=x_tickvals,
             ticktext=[f"R{r}" for r in x_tickvals],
         ),
-        yaxis=dict(title="post-swap window accuracy (mean ± std)", range=[-0.05, 1.05], dtick=0.25),
+        yaxis=dict(title="round success (mean ± std)", range=[-0.05, 1.05], dtick=0.25),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         margin=dict(l=60, r=20, t=40, b=60),
         height=420,
@@ -213,9 +230,13 @@ def _build_window_figure(
 def _render_window_view(runs: list[CrossSwapRun]) -> None:
     """Render the per-window aggregate accuracy chart + caption."""
     st.caption(
-        "Per replica, mean success across the rounds it actually played; "
-        "the dashed line is what source A achieved over the same rounds, "
-        "and the dotted line is source B over the same rounds."
+        "Solid: mean success across each swapped replica's post-swap rounds. "
+        "Dashed: source A's accuracy over rounds at or after round_start "
+        "(matched window in the original sim A). Dotted: source B's accuracy "
+        "over the same window. Source-line labels carry the model that "
+        "actually played the source run's replaced agent. Each unique source "
+        "run is counted once per bucket so repeat-source replicas don't stack "
+        "the baseline."
     )
     stats = _aggregate_window_stats(runs=runs)
     if not stats:
@@ -231,18 +252,18 @@ def _render_included_runs(runs: list[CrossSwapRun]) -> None:
     """Per-replica audit listing inside an expander."""
     rows = [
         {
-            "series": run.resumed_series_key(),
+            "series": run.swapped_series_key(),
             "round_start": run.round_start,
             "rounds_after_swap": run.rounds_after_swap,
             "source_b_round_end": run.source_b_round_end,
             "imported_model": run.imported_model,
-            "rounds_played": len(run.resumed_round_outcomes),
-            "rounds_won": sum(1 for ok in run.resumed_round_outcomes.values() if ok),
+            "rounds_played": len(run.swapped_round_outcomes),
+            "rounds_won": sum(1 for ok in run.swapped_round_outcomes.values() if ok),
             "source_a_run_id": run.source_a_run_id,
             "source_b_run_id": run.source_b_run_id,
             "run_id": run.run_id,
         }
-        for run in sorted(runs, key=lambda r: (r.resumed_series_key(), r.run_id))
+        for run in sorted(runs, key=lambda r: (r.swapped_series_key(), r.run_id))
     ]
     with st.expander(f"Included runs ({len(rows)})", expanded=False):
         st.dataframe(rows, width="stretch", hide_index=True)
@@ -261,7 +282,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     if not selected_buckets:
         st.info("Select at least one cross-swap bucket.")
         return
-    filtered = [r for r in all_cross_swap if r.resumed_series_key() in selected_buckets]
+    filtered = [r for r in all_cross_swap if r.swapped_series_key() in selected_buckets]
     if not filtered:
         st.info("No cross-swap runs match the selected buckets.")
         return

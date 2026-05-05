@@ -757,8 +757,9 @@ export interface components {
          *
          *     ``source_b_round_end`` is the last Sim B round whose events feed into
          *     the imported agent's reconstructed history. When ``None``, defaults
-         *     to ``round_start - 1`` (so the imported agent has the same amount of
-         *     'experience' as the slot it replaces).
+         *     to ``min(round_start - 1, B_max_round)`` so the imported agent gets
+         *     the largest possible slice of source B's history without exceeding
+         *     what B actually played.
          *
          *     ``model`` and ``provider`` override the imported agent's
          *     model/provider. When both are ``None``, the imported agent runs
