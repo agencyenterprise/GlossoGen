@@ -1,6 +1,6 @@
-"""Load cross-run replace-agent runs with per-round resumed/source outcomes.
+"""Load cross-run replace-agent runs with per-round swapped/source outcomes.
 
-Each ``CrossSwapRun`` carries per-round success booleans for the resumed run
+Each ``CrossSwapRun`` carries per-round success booleans for the swapped run
 itself and for both source A (the timeline that was modified) and source B
 (the run the imported agent came from). The tab uses these to plot one line
 per ``imported_model`` bucket plus matched lines for source A and source B
@@ -53,6 +53,7 @@ class _ManifestSummary(NamedTuple):
     rounds_after_swap: int
     source_b_round_end: int
     imported_model: str
+    replaced_agent_id: str
     source_a_run_id: str
     source_a_run_dir: str
     source_b_run_id: str
@@ -62,10 +63,10 @@ class _ManifestSummary(NamedTuple):
 class CrossSwapRun(NamedTuple):
     """A single cross-run replace-agent run with per-round outcomes for itself + A + B.
 
-    ``resumed_round_outcomes`` covers only post-swap rounds (round number
+    ``swapped_round_outcomes`` covers only post-swap rounds (round number
     ``>= round_start``); rounds 1..round_start-1 are inherited from source A's
     git history at clone time and would conflate source-A data with the
-    resumed run. ``source_a_round_outcomes`` and ``source_b_round_outcomes``
+    swapped run. ``source_a_round_outcomes`` and ``source_b_round_outcomes``
     carry every advanced round from each source so callers can match a window
     themselves.
     """
@@ -79,13 +80,15 @@ class CrossSwapRun(NamedTuple):
     imported_model: str
     source_a_run_id: str
     source_b_run_id: str
-    resumed_round_outcomes: dict[int, bool]
+    source_a_replaced_agent_model: str
+    source_b_replaced_agent_model: str
+    swapped_round_outcomes: dict[int, bool]
     source_a_round_outcomes: dict[int, bool]
     source_b_round_outcomes: dict[int, bool]
     labels: list[str]
 
-    def resumed_series_key(self) -> str:
-        """Plot-series identifier for this run's resumed bucket."""
+    def swapped_series_key(self) -> str:
+        """Plot-bucket identifier (imported model + round_start) for filter rows."""
         return f"{self.imported_model} · R{self.round_start}"
 
 
@@ -99,6 +102,7 @@ def _read_manifest_summary(run_dir: Path) -> _ManifestSummary | None:
     rounds_after_swap = raw.get("rounds_after_swap")
     source_b_round_end = raw.get("source_b_round_end")
     imported_model = raw.get("imported_model")
+    replaced_agent_id = raw.get("replaced_agent_id")
     source_a_run_id = raw.get("source_a_run_id")
     source_a_run_dir = raw.get("source_a_run_dir")
     source_b_run_id = raw.get("source_b_run_id")
@@ -110,6 +114,8 @@ def _read_manifest_summary(run_dir: Path) -> _ManifestSummary | None:
     if not isinstance(source_b_round_end, int):
         return None
     if not isinstance(imported_model, str):
+        return None
+    if not isinstance(replaced_agent_id, str):
         return None
     if not isinstance(source_a_run_id, str):
         return None
@@ -124,6 +130,7 @@ def _read_manifest_summary(run_dir: Path) -> _ManifestSummary | None:
         rounds_after_swap=rounds_after_swap,
         source_b_round_end=source_b_round_end,
         imported_model=imported_model,
+        replaced_agent_id=replaced_agent_id,
         source_a_run_id=source_a_run_id,
         source_a_run_dir=source_a_run_dir,
         source_b_run_id=source_b_run_id,
@@ -174,22 +181,40 @@ def _compute_round_outcomes(
     return {round_number: round_number in won for round_number in advanced}
 
 
-_outcomes_cache: dict[Path, dict[int, bool]] = {}
+class _SourceRunSummary(NamedTuple):
+    """Cached per-round outcomes plus agent configs for a source run dir."""
+
+    round_outcomes: dict[int, bool]
+    agent_configs: list[AgentConfig]
 
 
-def _load_round_outcomes(run_dir: Path, scenario_name: str) -> dict[int, bool]:
-    """Replay events for ``run_dir`` and return per-round success outcomes (cached)."""
-    cached = _outcomes_cache.get(run_dir)
+_source_summary_cache: dict[Path, _SourceRunSummary] = {}
+
+
+def _load_source_summary(run_dir: Path, scenario_name: str) -> _SourceRunSummary:
+    """Replay events for ``run_dir`` once and return outcomes + agent configs (cached)."""
+    cached = _source_summary_cache.get(run_dir)
     if cached is not None:
         return cached
     log_path = run_dir / f"{scenario_name}.jsonl"
     if not log_path.exists():
-        return {}
+        summary = _SourceRunSummary(round_outcomes={}, agent_configs=[])
+        _source_summary_cache[run_dir] = summary
+        return summary
     events = asyncio.run(load_events(log_path=log_path))
     agent_configs = extract_agent_configs(events=events)
     outcomes = _compute_round_outcomes(events=events, agent_configs=agent_configs)
-    _outcomes_cache[run_dir] = outcomes
-    return outcomes
+    summary = _SourceRunSummary(round_outcomes=outcomes, agent_configs=agent_configs)
+    _source_summary_cache[run_dir] = summary
+    return summary
+
+
+def _model_for_agent(agent_configs: list[AgentConfig], agent_id: str) -> str:
+    """Return the model registered for ``agent_id``; ``"unknown"`` if missing."""
+    for config in agent_configs:
+        if config.agent_id == agent_id:
+            return config.model
+    return "unknown"
 
 
 def _resolve_run_dir(stored_dir: str) -> Path | None:
@@ -207,24 +232,24 @@ def build_cross_swap_run(evaluated: EvaluatedRun) -> CrossSwapRun | None:
     """Convert an ``EvaluatedRun`` into a ``CrossSwapRun`` if it qualifies.
 
     A run qualifies when it has a ``cross_run_replace_manifest.json``, the
-    resumed run's JSONL has at least one advanced round at or after
+    swapped run's JSONL has at least one advanced round at or after
     ``round_start``, and at least one of source A / source B can be located
     with usable round outcomes.
     """
     manifest = _read_manifest_summary(run_dir=evaluated.run_dir)
     if manifest is None:
         return None
-    all_resumed_outcomes = _load_round_outcomes(
+    swapped_summary = _load_source_summary(
         run_dir=evaluated.run_dir, scenario_name=evaluated.scenario_name
     )
-    resumed_outcomes = {
+    swapped_outcomes = {
         round_number: succeeded
-        for round_number, succeeded in all_resumed_outcomes.items()
+        for round_number, succeeded in swapped_summary.round_outcomes.items()
         if round_number >= manifest.round_start
     }
-    if not resumed_outcomes:
+    if not swapped_outcomes:
         logger.warning(
-            "Skipping %s: no advanced rounds at or after round_start=%d in resumed run",
+            "Skipping %s: no advanced rounds at or after round_start=%d in swapped run",
             evaluated.run_id,
             manifest.round_start,
         )
@@ -239,16 +264,18 @@ def build_cross_swap_run(evaluated: EvaluatedRun) -> CrossSwapRun | None:
             manifest.source_b_run_dir,
         )
         return None
-    source_a_outcomes = (
-        _load_round_outcomes(run_dir=source_a_dir, scenario_name=evaluated.scenario_name)
-        if source_a_dir is not None
-        else {}
-    )
-    source_b_outcomes = (
-        _load_round_outcomes(run_dir=source_b_dir, scenario_name=evaluated.scenario_name)
-        if source_b_dir is not None
-        else {}
-    )
+    if source_a_dir is not None:
+        source_a_summary = _load_source_summary(
+            run_dir=source_a_dir, scenario_name=evaluated.scenario_name
+        )
+    else:
+        source_a_summary = _SourceRunSummary(round_outcomes={}, agent_configs=[])
+    if source_b_dir is not None:
+        source_b_summary = _load_source_summary(
+            run_dir=source_b_dir, scenario_name=evaluated.scenario_name
+        )
+    else:
+        source_b_summary = _SourceRunSummary(round_outcomes={}, agent_configs=[])
     labels = _read_labels(run_dir=evaluated.run_dir)
     return CrossSwapRun(
         run_id=evaluated.run_id,
@@ -260,9 +287,17 @@ def build_cross_swap_run(evaluated: EvaluatedRun) -> CrossSwapRun | None:
         imported_model=manifest.imported_model,
         source_a_run_id=manifest.source_a_run_id,
         source_b_run_id=manifest.source_b_run_id,
-        resumed_round_outcomes=resumed_outcomes,
-        source_a_round_outcomes=source_a_outcomes,
-        source_b_round_outcomes=source_b_outcomes,
+        source_a_replaced_agent_model=_model_for_agent(
+            agent_configs=source_a_summary.agent_configs,
+            agent_id=manifest.replaced_agent_id,
+        ),
+        source_b_replaced_agent_model=_model_for_agent(
+            agent_configs=source_b_summary.agent_configs,
+            agent_id=manifest.replaced_agent_id,
+        ),
+        swapped_round_outcomes=swapped_outcomes,
+        source_a_round_outcomes=source_a_summary.round_outcomes,
+        source_b_round_outcomes=source_b_summary.round_outcomes,
         labels=labels,
     )
 
