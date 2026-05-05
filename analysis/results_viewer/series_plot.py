@@ -161,6 +161,32 @@ def aggregate_buckets(
     return out
 
 
+def render_horizontal_checkboxes(
+    title: str,
+    options: list[tuple[str, str, int]],
+    key_prefix: str,
+) -> set[str]:
+    """Render a horizontal row of checkboxes; return the selected option keys.
+
+    ``options`` is a list of ``(option_key, label, count)`` tuples. The label
+    is what the user sees; the option_key is what's returned. Counts are
+    appended to the label in parentheses.
+    """
+    if not options:
+        return set()
+    st.markdown(f"**{title}**")
+    cols = st.columns(len(options))
+    selected: set[str] = set()
+    for col, (key, label, count) in zip(cols, options):
+        if col.checkbox(
+            label=f"{label} ({count})",
+            value=True,
+            key=f"{key_prefix}::{key}",
+        ):
+            selected.add(key)
+    return selected
+
+
 def batch_label_filter(
     runs: Sequence[_RunT],
     labels_of: Callable[[_RunT], list[str]],

@@ -25,6 +25,7 @@ from analysis.results_viewer.series_plot import (
     add_replica_trace,
     aggregate_buckets,
     jittered_x_linear,
+    render_horizontal_checkboxes,
     series_color_map,
 )
 from analysis.results_viewer.verbosity_data import (
@@ -79,39 +80,13 @@ def _render_metric_selector() -> VerbosityMetricOption:
 _COMBINED_SERIES_KEY = "all runs"
 
 
-def _render_horizontal_checkboxes(
-    title: str,
-    options: list[tuple[str, str, int]],
-    key_prefix: str,
-) -> set[str]:
-    """Render a horizontal row of checkboxes; return the selected option keys.
-
-    ``options`` is a list of ``(option_key, label, count)`` tuples. The label
-    is what the user sees; the option_key is what's returned. Counts are
-    appended to the label in parentheses.
-    """
-    if not options:
-        return set()
-    st.markdown(f"**{title}**")
-    cols = st.columns(len(options))
-    selected: set[str] = set()
-    for col, (key, label, count) in zip(cols, options):
-        if col.checkbox(
-            label=f"{label} ({count})",
-            value=True,
-            key=f"{key_prefix}::{key}",
-        ):
-            selected.add(key)
-    return selected
-
-
 def _render_model_filter(runs: list[VerbosityRun]) -> set[str]:
     """Checkboxes for each distinct model in the data."""
     counts: dict[str, int] = {}
     for run in runs:
         counts[run.model] = counts.get(run.model, 0) + 1
     options = [(model, model, counts[model]) for model in sorted(counts)]
-    return _render_horizontal_checkboxes(
+    return render_horizontal_checkboxes(
         title="Model",
         options=options,
         key_prefix="verbosity_model_filter",
@@ -128,7 +103,7 @@ def _render_postmortem_filter(runs: list[VerbosityRun]) -> set[bool]:
         ("no_postmortem", "no postmortem", counts[False]),
     ]
     options = [(k, lbl, c) for k, lbl, c in options if c > 0]
-    selected_keys = _render_horizontal_checkboxes(
+    selected_keys = render_horizontal_checkboxes(
         title="Postmortem",
         options=options,
         key_prefix="verbosity_postmortem_filter",
@@ -147,7 +122,7 @@ def _render_kind_filter(runs: list[VerbosityRun]) -> set[str]:
     for run in runs:
         counts["resume" if run.is_resume else "baseline"] += 1
     options = [(k, k, counts[k]) for k in ("baseline", "resume") if counts[k] > 0]
-    return _render_horizontal_checkboxes(
+    return render_horizontal_checkboxes(
         title="Run kind",
         options=options,
         key_prefix="verbosity_kind_filter",
@@ -173,7 +148,7 @@ def _render_budget_filter(runs: list[VerbosityRun]) -> set[int | None]:
         )
         for b in sorted_keys
     ]
-    selected_keys = _render_horizontal_checkboxes(
+    selected_keys = render_horizontal_checkboxes(
         title="Budget per round",
         options=options,
         key_prefix="verbosity_budget_filter",

@@ -47,6 +47,7 @@ class BaselineRun(NamedTuple):
     budget: int
     model: str
     postmortem_enabled: bool
+    kind: str
     total_rounds: int
     round_success: int
     round_ended_idle: int
@@ -60,12 +61,12 @@ class BaselineRun(NamedTuple):
     labels: list[str]
 
     def series_key(self, selected_batch_labels: frozenset[str]) -> str:
-        """Plot-series identifier: one trace per (model, postmortem, batch-label-subset)."""
+        """Plot-series identifier: one trace per (model, postmortem, kind, batch-label-subset)."""
         suffix = "postmortem" if self.postmortem_enabled else "no-postmortem"
         carried = sorted(label for label in selected_batch_labels if label in self.labels)
         if carried:
-            return f"{self.model} · {suffix} ({', '.join(carried)})"
-        return f"{self.model} · {suffix}"
+            return f"{self.model} · {suffix} · {self.kind} ({', '.join(carried)})"
+        return f"{self.model} · {suffix} · {self.kind}"
 
 
 class YAxisSpec(NamedTuple):
@@ -346,8 +347,10 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
     (just as a flat zero line).
     """
     labels = read_labels(run_dir=evaluated.run_dir)
-    if not _BASELINE_LABELS.intersection(labels):
+    matching = _BASELINE_LABELS.intersection(labels)
+    if not matching:
         return None
+    kind = _BASELINE_OSS_LABEL if _BASELINE_OSS_LABEL in matching else _BASELINE_LABEL
     budget = _parse_budget(labels=labels)
     if budget is None:
         return None
@@ -368,6 +371,7 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
         budget=budget,
         model=evaluated.metadata.primary_model,
         postmortem_enabled=postmortem_enabled,
+        kind=kind,
         total_rounds=total_rounds,
         round_success=round_success,
         round_ended_idle=idle if idle is not None else 0,
