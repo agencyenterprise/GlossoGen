@@ -32,6 +32,7 @@ from analysis.results_viewer.series_plot import (
     add_replica_trace,
     batch_label_filter,
     jittered_x,
+    render_horizontal_checkboxes,
     series_color_map,
 )
 
@@ -90,24 +91,53 @@ def _render_metric_selector() -> MetricOption:
     return selected
 
 
-def _series_checkbox_filter(
-    runs: list[BaselineRun], selected_batch_labels: frozenset[str]
-) -> set[str]:
-    """Render one checkbox per distinct series; return the set of selected series keys."""
+def _render_model_filter(runs: list[BaselineRun]) -> set[str]:
+    """Checkboxes for each distinct model in the data."""
     counts: dict[str, int] = {}
     for run in runs:
-        key = run.series_key(selected_batch_labels=selected_batch_labels)
-        counts[key] = counts.get(key, 0) + 1
-    st.markdown("**Series (model · postmortem variant)**")
-    selected: set[str] = set()
-    for name in sorted(counts):
-        if st.checkbox(
-            label=f"{name} ({counts[name]})",
-            value=True,
-            key=f"baseline_series_filter::{name}",
-        ):
-            selected.add(name)
+        counts[run.model] = counts.get(run.model, 0) + 1
+    options = [(model, model, counts[model]) for model in sorted(counts)]
+    return render_horizontal_checkboxes(
+        title="Model",
+        options=options,
+        key_prefix="baseline_model_filter",
+    )
+
+
+def _render_postmortem_filter(runs: list[BaselineRun]) -> set[bool]:
+    """Two checkboxes: with-postmortem / without-postmortem."""
+    counts = {True: 0, False: 0}
+    for run in runs:
+        counts[run.postmortem_enabled] += 1
+    options = [
+        ("postmortem", "with postmortem", counts[True]),
+        ("no_postmortem", "no postmortem", counts[False]),
+    ]
+    options = [(k, lbl, c) for k, lbl, c in options if c > 0]
+    selected_keys = render_horizontal_checkboxes(
+        title="Postmortem",
+        options=options,
+        key_prefix="baseline_postmortem_filter",
+    )
+    selected: set[bool] = set()
+    if "postmortem" in selected_keys:
+        selected.add(True)
+    if "no_postmortem" in selected_keys:
+        selected.add(False)
     return selected
+
+
+def _render_kind_filter(runs: list[BaselineRun]) -> set[str]:
+    """Two checkboxes: ``baseline`` vs ``baseline_oss`` runs."""
+    counts: dict[str, int] = {}
+    for run in runs:
+        counts[run.kind] = counts.get(run.kind, 0) + 1
+    options = [(k, k, counts[k]) for k in sorted(counts)]
+    return render_horizontal_checkboxes(
+        title="Run kind",
+        options=options,
+        key_prefix="baseline_kind_filter",
+    )
 
 
 def _replica_xs_ys_hover(
@@ -340,29 +370,37 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         return
     metric = _render_metric_selector()
     frontend_base = _render_frontend_base()
+    selected_models = _render_model_filter(runs=all_baseline)
+    selected_postmortem = _render_postmortem_filter(runs=all_baseline)
+    selected_kinds = _render_kind_filter(runs=all_baseline)
+    if not selected_models:
+        st.info("Select at least one model.")
+        return
+    if not selected_postmortem:
+        st.info("Select at least one postmortem option.")
+        return
+    if not selected_kinds:
+        st.info("Select at least one run kind.")
+        return
+    primary_filtered = [
+        run
+        for run in all_baseline
+        if run.model in selected_models
+        and run.postmortem_enabled in selected_postmortem
+        and run.kind in selected_kinds
+    ]
+    if not primary_filtered:
+        st.info("No baseline runs for the selected filters.")
+        return
     excluded = frozenset(run.model for run in all_baseline)
-    batch_filtered, selected_batch_labels = batch_label_filter(
-        runs=all_baseline,
+    filtered, selected_batch_labels = batch_label_filter(
+        runs=primary_filtered,
         labels_of=lambda run: run.labels,
         excluded_label_values=excluded,
         streamlit_key_prefix="baseline_batch_filter",
     )
-    if not batch_filtered:
-        st.info("Select at least one batch label.")
-        return
-    selected_series = _series_checkbox_filter(
-        runs=batch_filtered, selected_batch_labels=selected_batch_labels
-    )
-    if not selected_series:
-        st.info("Select at least one series.")
-        return
-    filtered = [
-        run
-        for run in batch_filtered
-        if run.series_key(selected_batch_labels=selected_batch_labels) in selected_series
-    ]
     if not filtered:
-        st.info("No baseline runs for the selected series.")
+        st.info("Select at least one batch label.")
         return
     metric_runs = [run for run in filtered if metric.available(run=run)]
     if not metric_runs:
