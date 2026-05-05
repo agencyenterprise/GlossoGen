@@ -8,8 +8,58 @@
     "/api/runs": {
       "get": {
         "summary": "List Runs",
-        "description": "List all discovered simulation runs.",
+        "description": "List discovered simulation runs.\n\nSupports optional filters used by the cross-run replace-agent\npicker: ``scenario`` restricts to a single scenario, and\n``contains_agent_id`` further restricts to runs that registered\nthat agent. ``status`` restricts to runs with a specific final\nstatus (e.g. ``completed``).",
         "operationId": "list_runs_api_runs_get",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "contains_agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Contains Agent Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RunStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -17,6 +67,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RunListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -766,6 +826,65 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ReplaceAgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent": {
+      "post": {
+        "summary": "Cross Run Replace Agent",
+        "description": "Import an agent from one finished run into another at a chosen round boundary.\n\nThe imported agent keeps its full pydantic-ai history (text,\nthinking, tool calls) up to ``source_b_round_end`` of the source\nrun, then re-enters the target run at ``round_start``. Same\nscenario and same ``agent_id`` only.",
+        "operationId": "cross_run_replace_agent_api_runs__scenario___run_dir_name__cross_run_replace_agent_post",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "run_dir_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Dir Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrossRunReplaceAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrossRunReplaceAgentResponse"
                 }
               }
             }
@@ -1603,6 +1722,174 @@
         ],
         "title": "ChannelMessage",
         "description": "A message sent by an agent to a channel."
+      },
+      "CrossRunReplaceAgentRequest": {
+        "properties": {
+          "source_b_run_id": {
+            "type": "string",
+            "title": "Source B Run Id"
+          },
+          "round_start": {
+            "type": "integer",
+            "title": "Round Start"
+          },
+          "source_b_round_end": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source B Round End"
+          },
+          "rounds_after_swap": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounds After Swap"
+          },
+          "replaced_agent_id": {
+            "type": "string",
+            "title": "Replaced Agent Id"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "knobs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knobs"
+          },
+          "channels_with_visible_history": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channels With Visible History"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_b_run_id",
+          "round_start",
+          "source_b_round_end",
+          "rounds_after_swap",
+          "replaced_agent_id",
+          "model",
+          "provider",
+          "knobs",
+          "channels_with_visible_history"
+        ],
+        "title": "CrossRunReplaceAgentRequest",
+        "description": "Request body for importing an agent from another run at the start of a round.\n\n``source_b_run_id`` is the canonical ``<scenario>/<run_dir>`` identifier\nof the run the imported agent comes from. The target run (Sim A) is\ninferred from the URL path.\n\n``source_b_round_end`` is the last Sim B round whose events feed into\nthe imported agent's reconstructed history. When ``None``, defaults\nto ``round_start - 1`` (so the imported agent has the same amount of\n'experience' as the slot it replaces).\n\n``model`` and ``provider`` override the imported agent's\nmodel/provider. When both are ``None``, the imported agent runs\nunder Sim B's model/provider.\n\n``channels_with_visible_history`` lists Sim A channel IDs whose\nprior history remains visible to the imported agent on resume;\nevery other channel they're a member of has its history wiped.\n\n``rounds_after_swap`` controls the post-swap round budget exactly\nas in the same-run replace-agent endpoint."
+      },
+      "CrossRunReplaceAgentResponse": {
+        "properties": {
+          "new_run_id": {
+            "type": "string",
+            "title": "New Run Id"
+          },
+          "new_run_dir": {
+            "type": "string",
+            "title": "New Run Dir"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_run_id",
+          "new_run_dir"
+        ],
+        "title": "CrossRunReplaceAgentResponse",
+        "description": "Response returned after a cross-run replace-agent run is launched."
+      },
+      "CrossRunReplaceAgentSource": {
+        "properties": {
+          "source_a_run_id": {
+            "type": "string",
+            "title": "Source A Run Id"
+          },
+          "source_b_run_id": {
+            "type": "string",
+            "title": "Source B Run Id"
+          },
+          "round_start": {
+            "type": "integer",
+            "title": "Round Start"
+          },
+          "source_b_round_end": {
+            "type": "integer",
+            "title": "Source B Round End"
+          },
+          "target_event_id": {
+            "type": "string",
+            "title": "Target Event Id"
+          },
+          "replaced_agent_id": {
+            "type": "string",
+            "title": "Replaced Agent Id"
+          },
+          "imported_model": {
+            "type": "string",
+            "title": "Imported Model"
+          },
+          "imported_provider": {
+            "type": "string",
+            "title": "Imported Provider"
+          },
+          "replaced_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Replaced At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_a_run_id",
+          "source_b_run_id",
+          "round_start",
+          "source_b_round_end",
+          "target_event_id",
+          "replaced_agent_id",
+          "imported_model",
+          "imported_provider",
+          "replaced_at"
+        ],
+        "title": "CrossRunReplaceAgentSource",
+        "description": "Provenance for a run created via the cross-run replace-agent endpoint.\n\n``source_a_run_id`` is the target run whose timeline was modified.\n``source_b_run_id`` is the run the imported agent came from.\n``source_b_round_end`` is the last Sim B round whose events fed\ninto the imported agent's history."
       },
       "DebugLogEntry": {
         "properties": {
@@ -2448,6 +2735,16 @@
               }
             ]
           },
+          "cross_run_replace_agent_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CrossRunReplaceAgentSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "swap_point": {
             "anyOf": [
               {
@@ -2534,6 +2831,7 @@
           "has_eval_log_file",
           "fork_source",
           "replace_agent_source",
+          "cross_run_replace_agent_source",
           "swap_point",
           "intern_join",
           "intern_takeover",
@@ -2645,6 +2943,16 @@
               }
             ]
           },
+          "cross_run_replace_agent_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CrossRunReplaceAgentSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "models": {
             "items": {
               "type": "string"
@@ -2695,6 +3003,7 @@
           "run_dir",
           "fork_source",
           "replace_agent_source",
+          "cross_run_replace_agent_source",
           "models",
           "provider",
           "agent_models",

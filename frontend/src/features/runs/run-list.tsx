@@ -513,6 +513,18 @@ export function RunList() {
                                 </span>
                               );
                             }
+                            if (run.cross_run_replace_agent_source) {
+                              const cr = run.cross_run_replace_agent_source;
+                              badges.push(
+                                <span
+                                  key="cross-run"
+                                  title={`Cross-run: imported ${cr.replaced_agent_id} from ${cr.source_b_run_id} (through end of round ${cr.source_b_round_end}) at round ${cr.round_start}`}
+                                  className="inline-flex items-center gap-0.5 text-violet-700 dark:text-violet-400"
+                                >
+                                  <Repeat className="h-2.5 w-2.5" />R{cr.round_start}
+                                </span>
+                              );
+                            }
                             if (cfg.intern_enabled === true) {
                               const round = cfg.intern_takeover_round;
                               badges.push(

@@ -204,27 +204,20 @@ def _has_git_members(tar: tarfile.TarFile) -> bool:
 def _rename_to_original_timestamp(run_dir: Path, original_timestamp: int) -> Path:
     """Rename a run directory to use the original timestamp from the bundle.
 
-    Uses the same collision-avoidance suffix scheme as claim_run_dir. If the
-    directory already has the correct name, returns it unchanged.
+    On collision, advances the target timestamp by one second until a free
+    slot is found, mirroring ``claim_run_dir``'s "step the timestamp" approach
+    so dir names stay timestamp-only (no ``_N`` suffix).
     """
-    target_name = str(original_timestamp)
-    if run_dir.name == target_name:
-        return run_dir
-
     parent = run_dir.parent
-    candidate = parent / target_name
-    if not candidate.exists():
-        run_dir.rename(candidate)
-        return candidate
-
-    # Collision: append _2, _3, ... until we find a free slot.
-    suffix = 2
+    target_ts = original_timestamp
     while True:
-        candidate = parent / f"{target_name}_{suffix}"
+        candidate = parent / str(target_ts)
+        if run_dir.name == candidate.name:
+            return run_dir
         if not candidate.exists():
             run_dir.rename(candidate)
             return candidate
-        suffix += 1
+        target_ts += 1
 
 
 def _extract_and_validate_bundle(

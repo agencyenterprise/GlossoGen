@@ -94,17 +94,48 @@ The CLI returns immediately after preparing the new run directory and spawning a
 
 Derived runs appear in the run list with a "Replaced" badge linking to the source. The same operation is available via `POST /api/runs/{run_id}/replace-agent`, which accepts `channels_with_visible_history: list[str]` and `knobs: dict | null` in the body.
 
+## Cross-Run Replacing an Agent (Round-Level Rewind, Different Source for the Imported Agent)
+
+`schmidt cross-run-replace-agent` is a sibling of `replace-agent` that imports an agent from a *different* completed run (Sim B) into a target run (Sim A) at a chosen round boundary. Same scenario and same `agent_id` only. The imported agent retains its **full** pydantic-ai history (text + thinking + tool calls) from Sim B; non-replaced agents in Sim A continue with their full Sim A history. Useful for asking "how does an agent that learned its protocol with one team perform when dropped into another team that learned a different protocol?".
+
+```bash
+schmidt cross-run-replace-agent veyru \
+  --source-a-run-dir ./runs/veyru/<sim_a_timestamp> \
+  --source-b-run-dir ./runs/veyru/<sim_b_timestamp> \
+  --replaced-agent-id field_observer \
+  --round-start 15 \
+  --runs-dir ./runs \
+  [--source-b-round-end N] \
+  [--model M --provider P] \
+  [--knobs path/to/overrides.json] \
+  [--rounds-after-swap K] \
+  [--visible-history-channel CHANNEL ...]
+```
+
+Defaults: `--source-b-round-end` is `min(round_start - 1, B_max_round)` (largest temporally-aligned slice of B that doesn't exceed what B reached); `--model` / `--provider` default to whatever the imported agent ran under in Sim B (read from B's `AgentRegistered`). Both must be passed together to override.
+
+Internals: clones Sim A at the round-start commit (same as replace-agent), copies Sim B's full JSONL into the new run dir as `imported_history_source.jsonl`, writes `cross_run_replace_manifest.json` with both source IDs + the imported model/provider, and launches the resumed simulation. On resume, the CLI detects `cross_run_replace_manifest.json` and feeds Sim B's events to a single agent's history reconstruction via an `ImportedHistory` redirect on `AgentHistoryFilter`; every other agent reads from Sim A's events. Channel-blocking on the imported history strips the scenario's default blocked channels (e.g. veyru's postmortem) plus any channel the imported agent had in Sim B but is missing in Sim A.
+
+For veyru cross-team experiments, set `--knobs` with `{"postmortem_disabled_at_start": true}` to drop the postmortem channel after the swap (the FE modal does this automatically; the CLI does not). Without it, the two agents have a backchannel in postmortem that quickly re-aligns their protocols, washing out the cross-team-confusion signal. Cross-run runs appear in the run list with a violet "Cross-run" badge that links back to both Source A and Source B.
+
+The cross-run API endpoint is `POST /api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent`. The path identifies Sim A; the body's `source_b_run_id` identifies Sim B.
+
+The same `round_success_after_resume` evaluator works for both replace-agent and cross-run flows; for cross-run runs the comparison is against Sim A over the same window.
+
 ## Run Output Directory Structure
 
 All simulation outputs use a standard directory layout under `runs/`:
 
 ```
 runs/{scenario_name}/{unix_timestamp}/
-├── {scenario_name}.jsonl          # Event log
-├── {scenario_name}_debug.jsonl    # Debug log (JSON lines, visible in FE Logs tab)
-├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
-├── fork_manifest.json             # (forked runs only) provenance tracking
-└── replace_manifest.json          # (replace-agent runs only) provenance tracking
+├── {scenario_name}.jsonl              # Event log
+├── {scenario_name}_debug.jsonl        # Debug log (JSON lines, visible in FE Logs tab)
+├── {scenario_name}_report.json        # Evaluation report (written by evaluate)
+├── fork_manifest.json                 # (forked runs only) provenance tracking
+├── replace_manifest.json              # (replace-agent runs only) provenance tracking
+├── cross_run_replace_manifest.json    # (cross-run replace-agent runs only) source A/B + imported model
+├── imported_history_source.jsonl      # (cross-run replace-agent runs only) verbatim copy of Sim B's JSONL
+└── resume_context_{agent_id}.json     # per-agent reconstructed pydantic-ai message history at resume time
 ```
 
 ## Running Evaluation

@@ -57,10 +57,31 @@ router = APIRouter(prefix="/api")
 
 
 @router.get("/runs", response_model=RunListResponse)
-async def list_runs(request: Request) -> RunListResponse:
-    """List all discovered simulation runs."""
+async def list_runs(
+    request: Request,
+    scenario: str | None = None,
+    contains_agent_id: str | None = None,
+    status: RunStatus | None = None,
+) -> RunListResponse:
+    """List discovered simulation runs.
+
+    Supports optional filters used by the cross-run replace-agent
+    picker: ``scenario`` restricts to a single scenario, and
+    ``contains_agent_id`` further restricts to runs that registered
+    that agent. ``status`` restricts to runs with a specific final
+    status (e.g. ``completed``).
+    """
     runs_dir: Path = request.app.state.runs_dir
     summaries = await discover_runs(runs_dir=runs_dir)
+    if scenario is not None:
+        summaries = [s for s in summaries if s.scenario_name == scenario]
+    if contains_agent_id is not None:
+        summaries = [
+            s for s in summaries
+            if any(am.agent_id == contains_agent_id for am in s.agent_models)
+        ]
+    if status is not None:
+        summaries = [s for s in summaries if s.status == status]
     return RunListResponse(runs=summaries)
 
 

@@ -22,8 +22,10 @@ import {
   Pencil,
   UserCog,
   UserPlus,
+  Users,
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { Tooltip } from "@/shared/components/ui/tooltip";
 import { api, downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { splitRunId } from "@/shared/lib/run-id";
@@ -66,6 +68,8 @@ interface ChatPaneProps {
   onForkFromMessage: (targetMessageId: string) => void;
   /** Open the replace-agent modal pre-filled with the given round_start. Null disables the trigger. */
   onReplaceAgentFromRound: ((roundNumber: number) => void) | null;
+  /** Open the cross-run replace-agent modal pre-filled with the given round_start. Null disables the trigger. */
+  onCrossRunReplaceFromRound: ((roundNumber: number) => void) | null;
   /** The message_id that was the fork point, if this is a forked run. */
   forkPointMessageId: string | null;
   /** Round number where the first post-swap messages appear (if the run had an observer swap). */
@@ -82,6 +86,14 @@ interface ChatPaneProps {
   replaceAgentReplacedAgentId: string | null;
   /** Replacement model identifier (only set when replaceAgentRoundStart is set). */
   replaceAgentReplacementModel: string | null;
+  /** Round at which an agent was imported via cross-run replace (if this run was derived). */
+  crossRunReplaceRoundStart: number | null;
+  /** Agent ID slot filled by the imported agent (only set when crossRunReplaceRoundStart is set). */
+  crossRunReplacedAgentId: string | null;
+  /** Source A run id (target timeline) (only set when crossRunReplaceRoundStart is set). */
+  crossRunSourceARunId: string | null;
+  /** Source B run id the imported agent came from (only set when crossRunReplaceRoundStart is set). */
+  crossRunSourceBRunId: string | null;
   /** Per-round Veyru case metadata (empty for non-Veyru scenarios). */
   veyruCases: VeyruCaseSummary[];
   /** One entry per completed round describing why its main phase ended. */
@@ -165,6 +177,7 @@ export function ChatPane({
   onCancelEdit,
   onForkFromMessage,
   onReplaceAgentFromRound,
+  onCrossRunReplaceFromRound,
   forkPointMessageId,
   swapRoundNumber,
   swappedObserverDisplayNames,
@@ -173,6 +186,10 @@ export function ChatPane({
   replaceAgentRoundStart,
   replaceAgentReplacedAgentId,
   replaceAgentReplacementModel,
+  crossRunReplaceRoundStart,
+  crossRunReplacedAgentId,
+  crossRunSourceARunId,
+  crossRunSourceBRunId,
   veyruCases,
   roundEndings,
   resumeCutoffTimestamp,
@@ -723,6 +740,48 @@ export function ChatPane({
                   </div>
                 </div>
               ) : null}
+              {crossRunReplaceRoundStart !== null &&
+              round.roundNumber === crossRunReplaceRoundStart ? (
+                <div
+                  id="cross-run-replace-agent-divider"
+                  className="mx-4 my-4 rounded-md border-2 border-dashed border-violet-400/80 bg-violet-50 px-4 py-3 dark:border-violet-600/70 dark:bg-violet-950/50"
+                >
+                  <div className="flex items-center justify-center gap-2 text-violet-800 dark:text-violet-200">
+                    <UserCog className="h-4 w-4" />
+                    <span className="text-sm font-semibold">
+                      {crossRunReplacedAgentId !== null && crossRunSourceBRunId !== null ? (
+                        <>
+                          {crossRunReplacedAgentId} imported from{" "}
+                          <Link
+                            href={`/runs/${crossRunSourceBRunId}`}
+                            className="underline-offset-2 hover:underline"
+                          >
+                            {crossRunSourceBRunId}
+                          </Link>
+                        </>
+                      ) : (
+                        <>Agent imported from another run</>
+                      )}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-center text-[11px] text-violet-700/80 dark:text-violet-300/80">
+                    Round {round.roundNumber} begins with the imported agent carrying its full
+                    history from source B
+                    {crossRunSourceARunId !== null ? (
+                      <>
+                        ; this timeline derives from source A{" "}
+                        <Link
+                          href={`/runs/${crossRunSourceARunId}`}
+                          className="underline-offset-2 hover:underline"
+                        >
+                          {crossRunSourceARunId}
+                        </Link>
+                      </>
+                    ) : null}
+                    . Other agents continue from this run.
+                  </div>
+                </div>
+              ) : null}
               {internTakeoverRoundNumber !== null &&
               round.roundNumber === internTakeoverRoundNumber ? (
                 <div
@@ -764,6 +823,19 @@ export function ChatPane({
                       onClick={() => onReplaceAgentFromRound(round.roundNumber)}
                     >
                       <UserCog className="h-3 w-3" />
+                    </button>
+                  </Tooltip>
+                ) : null}
+                {forkEnabled && onCrossRunReplaceFromRound !== null && round.roundNumber >= 2 ? (
+                  <Tooltip
+                    label={`Import an agent from another run at start of round ${round.roundNumber}`}
+                  >
+                    <button
+                      aria-label={`Cross-run replace at start of round ${round.roundNumber}`}
+                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      onClick={() => onCrossRunReplaceFromRound(round.roundNumber)}
+                    >
+                      <Users className="h-3 w-3" />
                     </button>
                   </Tooltip>
                 ) : null}

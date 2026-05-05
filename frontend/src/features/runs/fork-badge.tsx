@@ -130,3 +130,27 @@ export function ReplaceAgentPointFab({
     </button>
   );
 }
+
+interface CrossRunReplaceAgentPointFabProps {
+  onClick: () => void;
+  roundNumber: number;
+  stackIndex: number;
+}
+
+/** Floating action button that scrolls to the cross-run replace-agent marker. */
+export function CrossRunReplaceAgentPointFab({
+  onClick,
+  roundNumber,
+  stackIndex,
+}: CrossRunReplaceAgentPointFabProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`fixed ${bottomClass(stackIndex)} right-6 z-40 flex items-center gap-1.5 rounded-full border border-violet-300/60 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-700 shadow-lg transition-all hover:bg-violet-100 hover:shadow-xl dark:border-violet-700/50 dark:bg-violet-950/80 dark:text-violet-300 dark:hover:bg-violet-900/80`}
+      title={`Go to cross-run agent import (round ${roundNumber})`}
+    >
+      <UserCog className="h-3.5 w-3.5" />
+      Go to cross-run import (round {roundNumber})
+    </button>
+  );
+}

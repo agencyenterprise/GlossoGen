@@ -38,6 +38,7 @@ from schmidt.server.runs.models import (
     AgentObservationResponse,
     AgentRunCycleFailedEntry,
     ChannelMessage,
+    CrossRunReplaceAgentSource,
     DebugLogEntry,
     EvalCostResponse,
     EvalReportResponse,
@@ -199,6 +200,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     run_dir = log_path.parent
     fork_source = _read_fork_source(run_dir=run_dir)
     replace_agent_source = _read_replace_agent_source(run_dir=run_dir)
+    cross_run_replace_agent_source = _read_cross_run_replace_agent_source(run_dir=run_dir)
 
     run_id = ""
     scenario_name = ""
@@ -512,6 +514,8 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         timestamp = fork_source.forked_at
     elif replace_agent_source is not None:
         timestamp = replace_agent_source.replaced_at
+    elif cross_run_replace_agent_source is not None:
+        timestamp = cross_run_replace_agent_source.replaced_at
 
     return RunDetailResponse(
         run_id=run_id,
@@ -535,6 +539,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         has_eval_log_file=has_eval_log_file,
         fork_source=fork_source,
         replace_agent_source=replace_agent_source,
+        cross_run_replace_agent_source=cross_run_replace_agent_source,
         swap_point=swap_point,
         intern_join=intern_join,
         intern_takeover=intern_takeover,
@@ -661,5 +666,27 @@ def _read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:
         replaced_agent_id=raw["replaced_agent_id"],
         replacement_model=raw["replacement_model"],
         replacement_provider=raw["replacement_provider"],
+        replaced_at=replaced_at,
+    )
+
+
+def _read_cross_run_replace_agent_source(
+    run_dir: Path,
+) -> CrossRunReplaceAgentSource | None:
+    """Read cross-run provenance from cross_run_replace_manifest.json if it exists."""
+    manifest_path = run_dir / "cross_run_replace_manifest.json"
+    if not manifest_path.exists():
+        return None
+    raw = orjson.loads(manifest_path.read_bytes())
+    replaced_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
+    return CrossRunReplaceAgentSource(
+        source_a_run_id=raw["source_a_run_id"],
+        source_b_run_id=raw["source_b_run_id"],
+        round_start=raw["round_start"],
+        source_b_round_end=raw["source_b_round_end"],
+        target_event_id=raw["target_event_id"],
+        replaced_agent_id=raw["replaced_agent_id"],
+        imported_model=raw["imported_model"],
+        imported_provider=raw["imported_provider"],
         replaced_at=replaced_at,
     )

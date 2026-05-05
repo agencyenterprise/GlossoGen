@@ -16,7 +16,13 @@ from pydantic import BaseModel
 from schmidt.eval_manifest import read_eval_manifest
 from schmidt.event_parsing import parse_event_bytes
 from schmidt.models.event import RunStatus, SimulationEnded, SimulationStarted
-from schmidt.server.runs.models import AgentModelSummary, ForkSource, ReplaceAgentSource, RunSummary
+from schmidt.server.runs.models import (
+    AgentModelSummary,
+    CrossRunReplaceAgentSource,
+    ForkSource,
+    ReplaceAgentSource,
+    RunSummary,
+)
 from schmidt.stream_manifest import delete_manifest, read_manifest
 from schmidt.token_pricing import TokenPricing, find_pricing
 
@@ -200,6 +206,7 @@ class _SummaryCache(BaseModel):
     current_round: int
     fork_source: ForkSource | None
     replace_agent_source: ReplaceAgentSource | None
+    cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
 
 
 def _read_summary_cache(run_dir: Path) -> _SummaryCache | None:
@@ -309,6 +316,28 @@ def _read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:
     )
 
 
+def _read_cross_run_replace_agent_source(
+    run_dir: Path,
+) -> CrossRunReplaceAgentSource | None:
+    """Read cross-run provenance from cross_run_replace_manifest.json if it exists."""
+    manifest_path = run_dir / "cross_run_replace_manifest.json"
+    if not manifest_path.exists():
+        return None
+    raw = orjson.loads(manifest_path.read_bytes())
+    replaced_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
+    return CrossRunReplaceAgentSource(
+        source_a_run_id=raw["source_a_run_id"],
+        source_b_run_id=raw["source_b_run_id"],
+        round_start=raw["round_start"],
+        source_b_round_end=raw["source_b_round_end"],
+        target_event_id=raw["target_event_id"],
+        replaced_agent_id=raw["replaced_agent_id"],
+        imported_model=raw["imported_model"],
+        imported_provider=raw["imported_provider"],
+        replaced_at=replaced_at,
+    )
+
+
 def _resolve_scenario_config(
     run_dir: Path,
     base_config: dict[str, Any],
@@ -386,6 +415,7 @@ async def _build_summary(
             run_dir=str(timestamp_dir),
             fork_source=cache.fork_source,
             replace_agent_source=cache.replace_agent_source,
+            cross_run_replace_agent_source=cache.cross_run_replace_agent_source,
             models=cache.models,
             provider=cache.provider,
             agent_models=cache.agent_models,
@@ -396,6 +426,9 @@ async def _build_summary(
 
     fork_source = _read_fork_source(run_dir=timestamp_dir)
     replace_agent_source = _read_replace_agent_source(run_dir=timestamp_dir)
+    cross_run_replace_agent_source = _read_cross_run_replace_agent_source(
+        run_dir=timestamp_dir,
+    )
 
     try:
         scan = await scan_jsonl(file_path=jsonl_path)
@@ -414,7 +447,11 @@ async def _build_summary(
     )
 
     if scan.last_event is not None:
-        derived = fork_source is not None or replace_agent_source is not None
+        derived = (
+            fork_source is not None
+            or replace_agent_source is not None
+            or cross_run_replace_agent_source is not None
+        )
         start_time = run_timestamp if derived else first_event.timestamp
         duration_seconds = (scan.last_event.timestamp - start_time).total_seconds()
         _write_summary_cache(
@@ -433,6 +470,7 @@ async def _build_summary(
                 current_round=scan.current_round,
                 fork_source=fork_source,
                 replace_agent_source=replace_agent_source,
+                cross_run_replace_agent_source=cross_run_replace_agent_source,
             ),
         )
         return RunSummary(
@@ -450,6 +488,7 @@ async def _build_summary(
             run_dir=str(timestamp_dir),
             fork_source=fork_source,
             replace_agent_source=replace_agent_source,
+            cross_run_replace_agent_source=cross_run_replace_agent_source,
             models=scan.unique_models,
             provider=first_event.provider,
             agent_models=scan.agent_models,
@@ -465,7 +504,8 @@ async def _build_summary(
         delete_manifest(run_dir=timestamp_dir)
         fork_path = timestamp_dir / "fork_manifest.json"
         replace_path = timestamp_dir / "replace_manifest.json"
-        if fork_path.exists() or replace_path.exists():
+        cross_run_path = timestamp_dir / "cross_run_replace_manifest.json"
+        if fork_path.exists() or replace_path.exists() or cross_run_path.exists():
             status = RunStatus.STARTING
         else:
             status = RunStatus.ERROR
@@ -484,6 +524,7 @@ async def _build_summary(
         run_dir=str(timestamp_dir),
         fork_source=fork_source,
         replace_agent_source=replace_agent_source,
+        cross_run_replace_agent_source=cross_run_replace_agent_source,
         models=scan.unique_models,
         provider=first_event.provider,
         agent_models=scan.agent_models,

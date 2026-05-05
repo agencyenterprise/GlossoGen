@@ -13,7 +13,13 @@ export interface paths {
         };
         /**
          * List Runs
-         * @description List all discovered simulation runs.
+         * @description List discovered simulation runs.
+         *
+         *     Supports optional filters used by the cross-run replace-agent
+         *     picker: ``scenario`` restricts to a single scenario, and
+         *     ``contains_agent_id`` further restricts to runs that registered
+         *     that agent. ``status`` restricts to runs with a specific final
+         *     status (e.g. ``completed``).
          */
         get: operations["list_runs_api_runs_get"];
         put?: never;
@@ -289,6 +295,31 @@ export interface paths {
          *     model/provider.
          */
         post: operations["replace_agent_api_runs__scenario___run_dir_name__replace_agent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cross Run Replace Agent
+         * @description Import an agent from one finished run into another at a chosen round boundary.
+         *
+         *     The imported agent keeps its full pydantic-ai history (text,
+         *     thinking, tool calls) up to ``source_b_round_end`` of the source
+         *     run, then re-enters the target run at ``round_start``. Same
+         *     scenario and same ``agent_id`` only.
+         */
+        post: operations["cross_run_replace_agent_api_runs__scenario___run_dir_name__cross_run_replace_agent_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -717,6 +748,94 @@ export interface components {
             token_count: number;
         };
         /**
+         * CrossRunReplaceAgentRequest
+         * @description Request body for importing an agent from another run at the start of a round.
+         *
+         *     ``source_b_run_id`` is the canonical ``<scenario>/<run_dir>`` identifier
+         *     of the run the imported agent comes from. The target run (Sim A) is
+         *     inferred from the URL path.
+         *
+         *     ``source_b_round_end`` is the last Sim B round whose events feed into
+         *     the imported agent's reconstructed history. When ``None``, defaults
+         *     to ``round_start - 1`` (so the imported agent has the same amount of
+         *     'experience' as the slot it replaces).
+         *
+         *     ``model`` and ``provider`` override the imported agent's
+         *     model/provider. When both are ``None``, the imported agent runs
+         *     under Sim B's model/provider.
+         *
+         *     ``channels_with_visible_history`` lists Sim A channel IDs whose
+         *     prior history remains visible to the imported agent on resume;
+         *     every other channel they're a member of has its history wiped.
+         *
+         *     ``rounds_after_swap`` controls the post-swap round budget exactly
+         *     as in the same-run replace-agent endpoint.
+         */
+        CrossRunReplaceAgentRequest: {
+            /** Source B Run Id */
+            source_b_run_id: string;
+            /** Round Start */
+            round_start: number;
+            /** Source B Round End */
+            source_b_round_end: number | null;
+            /** Rounds After Swap */
+            rounds_after_swap: number | null;
+            /** Replaced Agent Id */
+            replaced_agent_id: string;
+            /** Model */
+            model: string | null;
+            /** Provider */
+            provider: string | null;
+            /** Knobs */
+            knobs: {
+                [key: string]: unknown;
+            } | null;
+            /** Channels With Visible History */
+            channels_with_visible_history: string[];
+        };
+        /**
+         * CrossRunReplaceAgentResponse
+         * @description Response returned after a cross-run replace-agent run is launched.
+         */
+        CrossRunReplaceAgentResponse: {
+            /** New Run Id */
+            new_run_id: string;
+            /** New Run Dir */
+            new_run_dir: string;
+        };
+        /**
+         * CrossRunReplaceAgentSource
+         * @description Provenance for a run created via the cross-run replace-agent endpoint.
+         *
+         *     ``source_a_run_id`` is the target run whose timeline was modified.
+         *     ``source_b_run_id`` is the run the imported agent came from.
+         *     ``source_b_round_end`` is the last Sim B round whose events fed
+         *     into the imported agent's history.
+         */
+        CrossRunReplaceAgentSource: {
+            /** Source A Run Id */
+            source_a_run_id: string;
+            /** Source B Run Id */
+            source_b_run_id: string;
+            /** Round Start */
+            round_start: number;
+            /** Source B Round End */
+            source_b_round_end: number;
+            /** Target Event Id */
+            target_event_id: string;
+            /** Replaced Agent Id */
+            replaced_agent_id: string;
+            /** Imported Model */
+            imported_model: string;
+            /** Imported Provider */
+            imported_provider: string;
+            /**
+             * Replaced At
+             * Format: date-time
+             */
+            replaced_at: string;
+        };
+        /**
          * DebugLogEntry
          * @description A single debug log entry from the simulation run.
          */
@@ -1133,6 +1252,7 @@ export interface components {
             has_eval_log_file: boolean;
             fork_source: components["schemas"]["ForkSource"] | null;
             replace_agent_source: components["schemas"]["ReplaceAgentSource"] | null;
+            cross_run_replace_agent_source: components["schemas"]["CrossRunReplaceAgentSource"] | null;
             swap_point: components["schemas"]["SwapPoint"] | null;
             intern_join: components["schemas"]["InternAnchor"] | null;
             intern_takeover: components["schemas"]["InternAnchor"] | null;
@@ -1194,6 +1314,7 @@ export interface components {
             run_dir: string;
             fork_source: components["schemas"]["ForkSource"] | null;
             replace_agent_source: components["schemas"]["ReplaceAgentSource"] | null;
+            cross_run_replace_agent_source: components["schemas"]["CrossRunReplaceAgentSource"] | null;
             /** Models */
             models: string[];
             /** Provider */
@@ -1820,7 +1941,11 @@ export type $defs = Record<string, never>;
 export interface operations {
     list_runs_api_runs_get: {
         parameters: {
-            query?: never;
+            query?: {
+                scenario?: string | null;
+                contains_agent_id?: string | null;
+                status?: components["schemas"]["RunStatus"] | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1834,6 +1959,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2277,6 +2411,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReplaceAgentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cross_run_replace_agent_api_runs__scenario___run_dir_name__cross_run_replace_agent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario: string;
+                run_dir_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrossRunReplaceAgentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrossRunReplaceAgentResponse"];
                 };
             };
             /** @description Validation Error */

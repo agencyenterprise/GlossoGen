@@ -286,14 +286,19 @@ All simulation outputs use a standard directory layout. Each run directory is a 
 
 ```
 runs/{scenario_name}/{unix_timestamp}/
-├── .git/                          # Git history (one commit per meaningful event)
-├── {scenario_name}.jsonl          # Event log (messages, reasoning, round transitions)
-├── {scenario_name}_debug.jsonl    # Debug log (JSON lines from Python logger, not in git)
-├── {scenario_name}_report.json    # Evaluation report (written by evaluate)
-├── {scenario_name}_stdout.log     # (pipe stdout here, not in git)
-├── labels.json                    # JSON array of label strings (e.g. ["baseline_oss"])
-├── note.json                      # Optional free-text note for the run
-└── fork_manifest.json             # (forked runs only) provenance: source_run_id, target_message_id
+├── .git/                              # Git history (one commit per meaningful event)
+├── {scenario_name}.jsonl              # Event log (messages, reasoning, round transitions)
+├── {scenario_name}_debug.jsonl        # Debug log (JSON lines from Python logger, not in git)
+├── {scenario_name}_report.json        # Evaluation report (written by evaluate)
+├── {scenario_name}_stdout.log         # (pipe stdout here, not in git)
+├── labels.json                        # JSON array of label strings (e.g. ["baseline_oss"])
+├── note.json                          # Optional free-text note for the run
+├── fork_manifest.json                 # (forked runs only) provenance: source_run_id, target_message_id
+├── replace_manifest.json              # (replace-agent runs only) provenance + post-swap channel visibility
+├── cross_run_replace_manifest.json    # (cross-run replace-agent runs only) source_a/source_b/imported_model + post-swap channel visibility
+├── imported_history_source.jsonl      # (cross-run replace-agent runs only) verbatim copy of Sim B's JSONL used to mount the imported agent's history
+├── replace_config.json                # (replace-agent or cross-run runs only) merged scenario_config + model_overrides written by the orchestrator
+└── resume_context_{agent_id}.json     # (resume / fork / replace-agent / cross-run runs) per-agent reconstructed pydantic-ai message history dumped at resume time for inspection
 ```
 
 ### Run Labels
@@ -476,6 +481,42 @@ Internals: clones the source run's git repo at the commit produced by the source
 **Per-scenario knob overrides.** `--knobs <file.json>` is merged onto the source's `scenario_config` before validation. Veyru exposes `postmortem_disabled_at_start: bool` for this flow: setting it to `true` flips `world.disable_postmortem_globally()` at world construction, dropping the postmortem channel for the rest of the resumed simulation (no postmortem injections, no postmortem phase, sends to postmortem are rejected).
 
 The replace-agent API endpoint is `POST /api/runs/{scenario}/{run_dir_name}/replace-agent`. Replace-agent runs appear in the run list with a "Replaced" badge.
+
+### Cross-Run Replacing an Agent (Round-Level Rewind, Different Source for the Imported Agent)
+
+Cross-run replace-agent is a sibling of replace-agent that imports an agent from a *different* completed run (Sim B) into a target run (Sim A) at a chosen round boundary. Same scenario and same `agent_id` only. The imported agent retains its **full pydantic-ai history** (text + thinking + tool calls) from Sim B; non-replaced agents in Sim A continue with their full Sim A history.
+
+```bash
+schmidt cross-run-replace-agent veyru \
+  --source-a-run-dir ./runs/veyru/<sim_a_timestamp> \
+  --source-b-run-dir ./runs/veyru/<sim_b_timestamp> \
+  --replaced-agent-id field_observer \
+  --round-start 15 \
+  --runs-dir ./runs \
+  [--source-b-round-end N] \
+  [--model M --provider P] \
+  [--knobs path/to/overrides.json] \
+  [--rounds-after-swap K] \
+  [--visible-history-channel CHANNEL ...]
+```
+
+**Default for `--source-b-round-end`** is `min(round_start - 1, B_max_round)` — temporally aligned with Sim A's swap point but clamped to the last round Sim B actually played, so the imported agent always gets the largest possible slice of B's history without exceeding what B reached. Example: `round_start=20` against a Sim B that only ran 15 rounds → `source_b_round_end=15`.
+
+**Default for `--model`/`--provider`** is to read Sim B's `AgentRegistered` for the imported agent (so the imported agent runs under the same model it used in Sim B). Override with `--model M --provider P` to test cross-team behaviour with a different model. Both must be provided together.
+
+**Imported agent history reconstruction.** The cross-run flow extends `AgentHistoryFilter` with an `imported: ImportedHistory | None` slot (events + target_timestamp + cutoff_round). When set, that agent's history is rebuilt from Sim B's `imported_history_source.jsonl` (a verbatim copy of Sim B's JSONL placed inside the new run dir) and the agent's system prompt is taken from Sim B's `AgentRegistered`. All other agents continue to use Sim A's events. Channel-blocking on the reconstructed history covers the scenario's default blocked channels (e.g. veyru's postmortem) plus any channel the imported agent had in Sim B but is missing in Sim A.
+
+**Postmortem on cross-run runs.** The FE modal sets `postmortem_disabled_at_start: true` for veyru by default (so opus and gpt-5.4 don't have a backchannel to re-align protocols after the swap). The CLI does **not** auto-set this — pass `--knobs /tmp/cross_team_knobs.json` with `{"postmortem_disabled_at_start": true}` for the same effect. Forgetting this contaminates cross-team experiments.
+
+**Manifest + provenance.** Persisted as `cross_run_replace_manifest.json` (parallel to `replace_manifest.json`). Carries both `source_a_run_id` (target timeline) and `source_b_run_id` (where the imported agent came from), plus `imported_model`/`imported_provider`, `round_start`, `source_b_round_end`, `rounds_after_swap`, `replaced_agent_id`, `channels_with_visible_history`, `blocked_tool_call_channels`. The discovery layer surfaces this on `RunSummary` / `RunDetailResponse` as `cross_run_replace_agent_source`. Cross-run runs appear in the run list with a violet "Cross-run" badge that links back to both sources.
+
+**API endpoint** is `POST /api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent`. The path's `{scenario}/{run_dir_name}` identifies Sim A; the body's `source_b_run_id` identifies Sim B. The `GET /api/runs` listing accepts `?scenario=&contains_agent_id=&status=` filters used by the FE modal's Sim B picker.
+
+**Verifying the imported history.** Each resumed run writes `resume_context_{agent_id}.json` to the new run dir capturing the exact reconstructed pydantic-ai messages handed to that agent on its first turn. For cross-run runs, `resume_context_<replaced_agent_id>.json`'s tail should match Sim B's last few `field_observer` (or whichever role) messages verbatim — that confirms the cross-run history is being mounted from Sim B and not contaminated by Sim A.
+
+**Label convention.** Cross-run runs are labelled `cross_team` plus a range tag like `15-25` (rounds played post-swap). The streamlit results viewer's "Cross-swap" tab filters on `cross_team` and plots `round_success_after_resume` per `(imported_model, round_start)` bucket against both Source A and Source B accuracy on the same rounds. Apply labels by writing `labels.json` directly *before* `schmidt evaluate` runs (the eval-derived labels merge into that file).
+
+**`round_success_after_resume` works for both flows.** The metric reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (`round_start`, `rounds_after_swap`, `source_run_id`, `source_run_dir`). For cross-run runs, the comparison is against Sim A (`source_a_*`) — i.e. "did the imported agent perform better/worse than what the original agent achieved over the same window?".
 
 ### Per-Agent Model Overrides
 

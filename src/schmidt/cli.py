@@ -31,6 +31,9 @@ from schmidt.config_overrides import (
     split_agent_overrides,
     validate_agent_override_ids,
 )
+from schmidt.cross_run_replace_agent import CrossRunReplaceAgentRequest as CrossRunCoreRequest
+from schmidt.cross_run_replace_agent import cross_run_replace_agent_in_run
+from schmidt.cross_run_replace_manifest import read_cross_run_replace_manifest
 from schmidt.eval_manifest import delete_eval_manifest, write_eval_manifest
 from schmidt.evaluation.log_reader import extract_scenario_config, load_events
 from schmidt.event_bus import EventBus
@@ -38,12 +41,13 @@ from schmidt.event_logger import EventLogger
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
 from schmidt.message_rewind import (
     AgentHistoryFilter,
+    ImportedHistory,
     RewindState,
     build_rewind_state_at_event,
     build_rewind_state_from_last_message,
 )
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import AgentRegistered, SimulationStarted
+from schmidt.models.event import AgentRegistered, RoundAdvanced, SimulationEvent, SimulationStarted
 from schmidt.port_allocator import find_free_port
 from schmidt.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from schmidt.replace_agent import replace_agent_in_run
@@ -230,6 +234,111 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    cross_run_parser = subparsers.add_parser(
+        "cross-run-replace-agent",
+        help=(
+            "Import an agent from one finished run into another at a chosen "
+            "round boundary, retaining its full pydantic-ai history"
+        ),
+    )
+    cross_run_parser.add_argument(
+        "scenario_name",
+        type=str,
+        choices=scenario_names,
+        help="Name of the scenario both source runs belong to",
+    )
+    cross_run_parser.add_argument(
+        "--source-a-run-dir",
+        type=str,
+        required=True,
+        help="Path to the target run directory whose timeline is being modified",
+    )
+    cross_run_parser.add_argument(
+        "--source-b-run-dir",
+        type=str,
+        required=True,
+        help="Path to the run directory the imported agent comes from",
+    )
+    cross_run_parser.add_argument(
+        "--round-start",
+        dest="round_start",
+        type=int,
+        required=True,
+        help=(
+            "Round number in source A that the resumed simulation should "
+            "re-enter. Rewinds source A to the boundary just before this round."
+        ),
+    )
+    cross_run_parser.add_argument(
+        "--source-b-round-end",
+        dest="source_b_round_end",
+        type=int,
+        default=None,
+        help=(
+            "Last round of source B whose events feed into the imported "
+            "agent's history. Defaults to min(round_start - 1, B_max_round) "
+            "so the imported agent gets all of B's history without exceeding "
+            "what B actually played."
+        ),
+    )
+    cross_run_parser.add_argument(
+        "--replaced-agent-id",
+        type=str,
+        required=True,
+        help=(
+            "agent_id of the agent slot in source A to fill with the imported "
+            "agent (must also exist in source B)"
+        ),
+    )
+    cross_run_parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Override the imported agent's model (defaults to source B's model)",
+    )
+    cross_run_parser.add_argument(
+        "--provider",
+        type=str,
+        default=None,
+        choices=["anthropic", "openai", "google-gla", "ollama", "self-hosted"],
+        help="Override the imported agent's provider (defaults to source B's provider)",
+    )
+    cross_run_parser.add_argument(
+        "--runs-dir",
+        type=str,
+        required=True,
+        help="Root directory where the new run is written",
+    )
+    cross_run_parser.add_argument(
+        "--knobs",
+        type=str,
+        help="Optional path to a JSON file with scenario knob overrides",
+    )
+    cross_run_parser.add_argument(
+        "--visible-history-channel",
+        dest="visible_history_channels",
+        action="append",
+        default=None,
+        help=(
+            "Channel ID for which the imported agent retains visibility of "
+            "prior source-A messages on resume. Repeatable. When omitted, "
+            "the per-channel defaults from source A's "
+            "`replace_agent_default_channel_visibility` knob are used."
+        ),
+    )
+    cross_run_parser.add_argument(
+        "--rounds-after-swap",
+        dest="rounds_after_swap",
+        type=int,
+        default=None,
+        help=(
+            "Number of rounds the resumed simulation will play after the "
+            "replacement boundary. round_count is set to round_start + "
+            "rounds_after_swap. When omitted, defaults to "
+            "source_a_round_count - round_start."
+        ),
+    )
+
     return parser
 
 
@@ -255,6 +364,11 @@ def main() -> None:
     if known_args.command == "replace-agent":
         args = parser.parse_args()
         asyncio.run(_run_replace_agent(args=args))
+        return
+
+    if known_args.command == "cross-run-replace-agent":
+        args = parser.parse_args()
+        asyncio.run(_run_cross_run_replace_agent(args=args))
         return
 
     scenario_cls = get_scenario_class(name=known_args.scenario_name)
@@ -419,6 +533,36 @@ def _read_replace_manifest(run_dir: Path) -> _ReplaceManifestInfo | None:
     )
 
 
+class _CrossRunManifestInfo(NamedTuple):
+    """Cross-run replace-agent manifest fields needed to configure resume."""
+
+    replaced_agent_id: str
+    visible_channels: list[str]
+    blocked_channel_ids: frozenset[str]
+    target_event_id: str
+    round_start: int
+    imported_history_path: Path
+    source_b_round_end: int
+    source_b_cutoff_event_id: str
+
+
+def _read_cross_run_manifest(run_dir: Path) -> _CrossRunManifestInfo | None:
+    """Read ``cross_run_replace_manifest.json`` if present and project to resume fields."""
+    manifest = read_cross_run_replace_manifest(run_dir=run_dir)
+    if manifest is None:
+        return None
+    return _CrossRunManifestInfo(
+        replaced_agent_id=manifest.replaced_agent_id,
+        visible_channels=list(manifest.channels_with_visible_history),
+        blocked_channel_ids=frozenset(manifest.blocked_tool_call_channels),
+        target_event_id=manifest.target_event_id,
+        round_start=manifest.round_start,
+        imported_history_path=run_dir / manifest.imported_history_source,
+        source_b_round_end=manifest.source_b_round_end,
+        source_b_cutoff_event_id=manifest.source_b_cutoff_event_id,
+    )
+
+
 async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
@@ -458,11 +602,29 @@ async def _run_simulation(
         logger.info("Loading rewind state from %s", log_path)
         events = await load_events(log_path=log_path)
         replace_info = _read_replace_manifest(run_dir=run_dir)
+        cross_run_info = _read_cross_run_manifest(run_dir=run_dir)
         agent_filters: dict[str, AgentHistoryFilter] = {}
-        if replace_info is not None:
+        if cross_run_info is not None:
+            cross_run_resume = await _build_cross_run_resume_state(
+                events=events,
+                run_dir=run_dir,
+                cross_run_info=cross_run_info,
+            )
+            resume_state = cross_run_resume
+            logger.info(
+                "Cross-run replace-agent run detected: %s resuming with full Sim B "
+                "history (cutoff round=%d), visible source-A channels %s, blocked "
+                "tool-call channels %s",
+                cross_run_info.replaced_agent_id,
+                cross_run_info.source_b_round_end,
+                cross_run_info.visible_channels,
+                sorted(cross_run_info.blocked_channel_ids),
+            )
+        elif replace_info is not None:
             agent_filters[replace_info.replaced_agent_id] = AgentHistoryFilter(
                 tool_calls_only=True,
                 blocked_channel_ids=replace_info.blocked_channel_ids,
+                imported=None,
             )
             base_state = build_rewind_state_at_event(
                 events=events,
@@ -678,3 +840,181 @@ async def _resolve_default_visible_channels(
             agent_channels = list(event.channel_ids)
 
     return [channel_id for channel_id in agent_channels if visibility_map.get(channel_id, True)]
+
+
+async def _resolve_imported_model_from_source_b(
+    source_b_run_dir: Path,
+    scenario_name: str,
+    replaced_agent_id: str,
+) -> tuple[str, str]:
+    """Read source B's ``AgentRegistered`` for the replaced agent.
+
+    Returns ``(model, provider)``. Raises ``SystemExit`` if the agent is
+    missing — the orchestrator will catch the same case later, but this
+    gives a clearer CLI error message.
+    """
+    log_path = source_b_run_dir / f"{scenario_name}.jsonl"
+    events = await load_events(log_path=log_path)
+    for event in events:
+        if isinstance(event, AgentRegistered) and event.agent_id == replaced_agent_id:
+            return event.model, event.provider
+    raise SystemExit(
+        f"cross-run-replace-agent: agent {replaced_agent_id!r} not found in "
+        f"source B run {source_b_run_dir}"
+    )
+
+
+async def _resolve_source_b_max_round(source_b_run_dir: Path, scenario_name: str) -> int:
+    """Return the highest ``RoundAdvanced.round_number`` observed in source B.
+
+    Used to clamp the default ``source_b_round_end`` to source B's
+    actual reach when source A's swap point is past source B's tail.
+    Raises ``SystemExit`` if source B has no ``RoundAdvanced`` events.
+    """
+    log_path = source_b_run_dir / f"{scenario_name}.jsonl"
+    events = await load_events(log_path=log_path)
+    max_round = 0
+    for event in events:
+        if isinstance(event, RoundAdvanced) and event.round_number > max_round:
+            max_round = event.round_number
+    if max_round == 0:
+        raise SystemExit(
+            f"cross-run-replace-agent: source B run {source_b_run_dir} has no RoundAdvanced events"
+        )
+    return max_round
+
+
+async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
+    """Drive the cross-run replace-agent operation from the CLI.
+
+    Loads optional knob overrides from ``--knobs`` and resolves the
+    visible-history channel list (explicit ``--visible-history-channel``
+    flags, or source A's per-channel defaults), defaults
+    ``--source-b-round-end`` to ``min(round_start - 1, B_max_round)``
+    so the imported agent gets the largest possible slice of source B's
+    history without exceeding what B actually played, calls the shared
+    helper, and prints the new run ID and run dir on success.
+    """
+    knobs: dict[str, Any] | None = None
+    if args.knobs is not None:
+        knobs = json.loads(Path(args.knobs).read_text())
+
+    source_a_run_dir = Path(args.source_a_run_dir).resolve()
+    source_b_run_dir = Path(args.source_b_run_dir).resolve()
+
+    if args.visible_history_channels is None:
+        visible_channels = await _resolve_default_visible_channels(
+            source_run_dir=source_a_run_dir,
+            scenario_name=args.scenario_name,
+            replaced_agent_id=args.replaced_agent_id,
+        )
+    else:
+        visible_channels = list(args.visible_history_channels)
+
+    if args.source_b_round_end is None:
+        source_b_max_round = await _resolve_source_b_max_round(
+            source_b_run_dir=source_b_run_dir,
+            scenario_name=args.scenario_name,
+        )
+        source_b_round_end = min(args.round_start - 1, source_b_max_round)
+    else:
+        source_b_round_end = args.source_b_round_end
+
+    if (args.model is None) != (args.provider is None):
+        raise SystemExit(
+            "cross-run-replace-agent: --model and --provider must be provided "
+            "together (both or neither)"
+        )
+    if args.model is None:
+        model, provider = await _resolve_imported_model_from_source_b(
+            source_b_run_dir=source_b_run_dir,
+            scenario_name=args.scenario_name,
+            replaced_agent_id=args.replaced_agent_id,
+        )
+    else:
+        model = args.model
+        provider = args.provider
+
+    logger.info(
+        "Cross-run replace-agent: replaced=%s round_start=%d source_b_round_end=%d "
+        "visible_channels=%s model=%s provider=%s",
+        args.replaced_agent_id,
+        args.round_start,
+        source_b_round_end,
+        visible_channels,
+        model,
+        provider,
+    )
+
+    request = CrossRunCoreRequest(
+        source_a_run_dir=source_a_run_dir,
+        source_b_run_dir=source_b_run_dir,
+        scenario_name=args.scenario_name,
+        round_start=args.round_start,
+        source_b_round_end=source_b_round_end,
+        rounds_after_swap=args.rounds_after_swap,
+        replaced_agent_id=args.replaced_agent_id,
+        model=model,
+        provider=provider,
+        knobs=knobs,
+        channels_with_visible_history=visible_channels,
+        runs_dir=Path(args.runs_dir).resolve(),
+    )
+    try:
+        result = await cross_run_replace_agent_in_run(request=request)
+    except ValueError as exc:
+        raise SystemExit(f"cross-run-replace-agent failed: {exc}") from exc
+
+    print(f"new_run_id={result.new_run_id}")
+    print(f"new_run_dir={result.new_run_dir}")
+
+
+async def _build_cross_run_resume_state(
+    events: list[SimulationEvent],
+    run_dir: Path,
+    cross_run_info: _CrossRunManifestInfo,
+) -> RewindState:
+    """Build the rewind state for a cross-run replace-agent resume.
+
+    Loads source B's events from ``imported_history_path``, computes
+    the cutoff timestamp (Sim B's ``RoundAdvanced(source_b_round_end +
+    1)`` event, or Sim B's last event when Sim B did not advance
+    further), and constructs an ``AgentHistoryFilter`` that redirects
+    the imported agent's history reconstruction to source B's events.
+    Replaced-agent channel visibility on source A is applied by the
+    caller via ``replaced_agent_channels_with_visible_history``.
+    """
+    imported_events = await load_events(log_path=cross_run_info.imported_history_path)
+    if cross_run_info.source_b_cutoff_event_id:
+        imported_target_timestamp = next(
+            event.timestamp
+            for event in imported_events
+            if event.event_id == cross_run_info.source_b_cutoff_event_id
+        )
+    else:
+        imported_target_timestamp = imported_events[-1].timestamp
+
+    agent_filters: dict[str, AgentHistoryFilter] = {
+        cross_run_info.replaced_agent_id: AgentHistoryFilter(
+            tool_calls_only=False,
+            blocked_channel_ids=cross_run_info.blocked_channel_ids,
+            imported=ImportedHistory(
+                events=tuple(imported_events),
+                target_timestamp=imported_target_timestamp,
+                cutoff_round=cross_run_info.source_b_round_end + 1,
+            ),
+        )
+    }
+    base_state = build_rewind_state_at_event(
+        events=events,
+        target_event_id=cross_run_info.target_event_id,
+        cutoff_round=cross_run_info.round_start,
+        agent_filters=agent_filters,
+    )
+    _ = run_dir
+    return base_state._replace(
+        replaced_agent_ids=frozenset({cross_run_info.replaced_agent_id}),
+        replaced_agent_channels_with_visible_history={
+            cross_run_info.replaced_agent_id: cross_run_info.visible_channels,
+        },
+    )
