@@ -22,6 +22,9 @@ from schmidt.server.pdf.router import router as pdf_export_router
 from schmidt.server.response_models import AuthVerifyResponse, HealthResponse, HealthStatus
 from schmidt.server.runs.artifact_router import router as artifact_export_router
 from schmidt.server.runs.bundle_router import router as bundle_router
+from schmidt.server.runs.cross_run_replace_agent_router import (
+    router as cross_run_replace_agent_router,
+)
 from schmidt.server.runs.fork_router import router as fork_router
 from schmidt.server.runs.prod_upload_router import router as prod_upload_router
 from schmidt.server.runs.replace_agent_router import router as replace_agent_router
@@ -105,6 +108,7 @@ app.add_middleware(
 app.include_router(runs_router)
 app.include_router(fork_router)
 app.include_router(replace_agent_router)
+app.include_router(cross_run_replace_agent_router)
 app.include_router(pdf_export_router)
 app.include_router(artifact_export_router)
 app.include_router(bundle_router)

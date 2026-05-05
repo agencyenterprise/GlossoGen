@@ -39,22 +39,44 @@ from schmidt.runners.communication_protocol import build_full_system_prompt
 logger = logging.getLogger(__name__)
 
 
+class ImportedHistory(NamedTuple):
+    """Redirect for an agent's history reconstruction to a different event stream.
+
+    Used by the cross-run replace-agent flow to import an agent from a
+    different completed run. When attached to an ``AgentHistoryFilter``,
+    the per-agent history is built from ``events`` up to
+    ``target_timestamp`` with ``cutoff_round`` driving the per-tool-call
+    filter, and the ``AgentRegistered`` for that agent inside ``events``
+    supplies the system prompt. The state walk (channels, injections,
+    current round) still uses the caller's primary event list.
+    """
+
+    events: tuple[SimulationEvent, ...]
+    target_timestamp: datetime
+    cutoff_round: int
+
+
 class AgentHistoryFilter(NamedTuple):
     """Per-agent filter applied while reconstructing pydantic-ai history.
 
     ``tool_calls_only`` strips text and thinking parts from the agent's
     prior responses; only tool call parts survive. ``blocked_channel_ids``
     drops every ``send_message``/``read_channel`` call targeting one of
-    those channels along with its matching tool return.
+    those channels along with its matching tool return. ``imported``
+    redirects history reconstruction to a different event stream (see
+    ``ImportedHistory``); when ``None`` the agent's history is built
+    from the caller's primary event list.
     """
 
     tool_calls_only: bool
     blocked_channel_ids: frozenset[str]
+    imported: ImportedHistory | None
 
 
 _PASS_THROUGH_FILTER = AgentHistoryFilter(
     tool_calls_only=False,
     blocked_channel_ids=frozenset(),
+    imported=None,
 )
 
 
@@ -202,17 +224,36 @@ def _build_rewind_state_at_timestamp(
 
     agent_message_histories: dict[str, list[ModelMessage]] = {}
     for reg in agent_registrations:
-        system_prompt = build_full_system_prompt(
-            base_prompt=reg.system_prompt,
-            role_name=reg.role_name,
-        )
         history_filter = agent_filters.get(reg.agent_id, _PASS_THROUGH_FILTER)
+        history_events: list[SimulationEvent]
+        history_target_timestamp: datetime
+        history_cutoff_round: int | None
+        if history_filter.imported is not None:
+            history_events = list(history_filter.imported.events)
+            history_target_timestamp = history_filter.imported.target_timestamp
+            history_cutoff_round = history_filter.imported.cutoff_round
+            imported_registration = _find_imported_registration(
+                events=history_events,
+                agent_id=reg.agent_id,
+            )
+            system_prompt = build_full_system_prompt(
+                base_prompt=imported_registration.system_prompt,
+                role_name=imported_registration.role_name,
+            )
+        else:
+            history_events = events
+            history_target_timestamp = target_timestamp
+            history_cutoff_round = cutoff_round
+            system_prompt = build_full_system_prompt(
+                base_prompt=reg.system_prompt,
+                role_name=reg.role_name,
+            )
         agent_message_histories[reg.agent_id] = build_message_history(
-            events=events,
+            events=history_events,
             agent_id=reg.agent_id,
             system_prompt=system_prompt,
-            target_timestamp=target_timestamp,
-            cutoff_round=cutoff_round,
+            target_timestamp=history_target_timestamp,
+            cutoff_round=history_cutoff_round,
             tool_calls_only=history_filter.tool_calls_only,
             blocked_channel_ids=history_filter.blocked_channel_ids,
         )
@@ -298,3 +339,23 @@ def _find_event_timestamp(
             return event.timestamp
 
     raise ValueError(f"No event with event_id={target_event_id!r} found in the log.")
+
+
+def _find_imported_registration(
+    events: list[SimulationEvent],
+    agent_id: str,
+) -> AgentRegistered:
+    """Locate the ``AgentRegistered`` event for ``agent_id`` inside an imported stream.
+
+    Used when an ``AgentHistoryFilter`` redirects an agent's history
+    reconstruction to a different run's events: the system prompt for the
+    reconstructed history must come from that run, not the live one.
+
+    Raises ``ValueError`` if no matching event exists.
+    """
+    for event in events:
+        if isinstance(event, AgentRegistered) and event.agent_id == agent_id:
+            return event
+    raise ValueError(
+        f"No AgentRegistered event for agent_id={agent_id!r} in the imported event stream."
+    )

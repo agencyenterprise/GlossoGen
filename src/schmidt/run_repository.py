@@ -237,26 +237,16 @@ def _parse_dulwich_log(
 def claim_run_dir(runs_dir: Path, scenario_name: str) -> Path:
     """Atomically claim a unique run directory using the current unix timestamp.
 
-    Creates ``{runs_dir}/{scenario_name}/{unix_timestamp}/``. If the directory
-    already exists (another run started in the same second), appends ``_2``,
-    ``_3``, etc. until a free slot is found. Uses ``mkdir(exist_ok=False)`` for
-    atomic collision detection on POSIX filesystems.
+    Creates ``{runs_dir}/{scenario_name}/{unix_timestamp}/``. If another run
+    already claimed the same second, sleeps 1s so the wall clock advances and
+    retries. Uses ``mkdir(exist_ok=False)`` for atomic collision detection on
+    POSIX filesystems.
     """
     base_dir = runs_dir / scenario_name
-    unix_ts = str(int(time.time()))
-
-    candidate = base_dir / unix_ts
-    try:
-        candidate.mkdir(parents=True, exist_ok=False)
-        return candidate
-    except FileExistsError:
-        pass
-
-    suffix = 2
     while True:
-        candidate = base_dir / f"{unix_ts}_{suffix}"
+        candidate = base_dir / str(int(time.time()))
         try:
             candidate.mkdir(parents=True, exist_ok=False)
             return candidate
         except FileExistsError:
-            suffix += 1
+            time.sleep(1)

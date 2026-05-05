@@ -32,6 +32,7 @@ import { LabelBadges } from "./eval-label-group";
 import { EvalLogPanel } from "./eval-log-panel";
 import { EvalPanel } from "./eval-panel";
 import {
+  CrossRunReplaceAgentPointFab,
   ForkBadge,
   ForkPointFab,
   InternJoinFab,
@@ -56,7 +57,10 @@ import { ScenarioDescriptionModal } from "./scenario-description-modal";
 import { ModelPicker } from "./model-picker";
 import { useFork } from "./use-fork";
 import { useReplaceAgent } from "./use-replace-agent";
+import { useCrossRunReplaceAgent } from "./use-cross-run-replace-agent";
 import { ReplaceAgentBadge } from "./replace-agent-badge";
+import { CrossRunReplaceAgentBadge } from "./cross-run-replace-agent-badge";
+import { CrossRunReplaceAgentModal } from "./cross-run-replace-agent-modal";
 import { ConfigValueModal } from "./config-value-modal";
 import { AgentModelOverrides, type AgentModelOverride } from "./agent-model-overrides";
 import { LabelPickerModal } from "./label-picker-modal";
@@ -133,6 +137,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const [showEvalPanel, setShowEvalPanel] = useState(true);
   const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
   const [replaceAgentRound, setReplaceAgentRound] = useState<number | null>(null);
+  const [crossRunReplaceRound, setCrossRunReplaceRound] = useState<number | null>(null);
   const [showEvalModal, setShowEvalModal] = useState(false);
   const [evalJustLaunched, setEvalJustLaunched] = useState(false);
   const [copiedRunId, setCopiedRunId] = useState(false);
@@ -143,6 +148,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const queryClient = useQueryClient();
   const fork = useFork(runId);
   const replaceAgent = useReplaceAgent(runId);
+  const crossRunReplace = useCrossRunReplaceAgent(runId);
 
   const handleSelectChannel = useCallback((ch: string | null) => {
     setSelectedChannel(ch);
@@ -389,6 +395,42 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     setReplaceAgentRound(null);
   }, [replaceAgent]);
 
+  const handleCrossRunReplaceFromRound = useCallback((roundNumber: number) => {
+    setCrossRunReplaceRound(roundNumber);
+  }, []);
+
+  const handleConfirmCrossRunReplace = useCallback(
+    (args: {
+      sourceBRunId: string;
+      replacedAgentId: string;
+      sourceBRoundEnd: number;
+      roundsAfterSwap: number;
+      channelsWithVisibleHistory: string[];
+      model: string | null;
+      provider: string | null;
+      knobs: Record<string, unknown> | null;
+    }) => {
+      if (crossRunReplaceRound === null) return;
+      crossRunReplace.mutate({
+        sourceBRunId: args.sourceBRunId,
+        roundStart: crossRunReplaceRound,
+        sourceBRoundEnd: args.sourceBRoundEnd,
+        roundsAfterSwap: args.roundsAfterSwap,
+        replacedAgentId: args.replacedAgentId,
+        model: args.model,
+        provider: args.provider,
+        channelsWithVisibleHistory: args.channelsWithVisibleHistory,
+        knobs: args.knobs,
+      });
+    },
+    [crossRunReplaceRound, crossRunReplace]
+  );
+
+  const handleCloseCrossRunReplace = useCallback(() => {
+    crossRunReplace.reset();
+    setCrossRunReplaceRound(null);
+  }, [crossRunReplace]);
+
   const handleConfirmFork = useCallback(
     (model: string, provider: string, modelOverrides: Record<string, AgentModelOverride>) => {
       if (!forkModalMessageId) return;
@@ -468,6 +510,16 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
               replacedAgentId={restData.replace_agent_source.replaced_agent_id}
               replacementModel={restData.replace_agent_source.replacement_model}
               roundStart={restData.replace_agent_source.round_start}
+            />
+          ) : null}
+          {restData.cross_run_replace_agent_source ? (
+            <CrossRunReplaceAgentBadge
+              sourceARunId={restData.cross_run_replace_agent_source.source_a_run_id}
+              sourceBRunId={restData.cross_run_replace_agent_source.source_b_run_id}
+              replacedAgentId={restData.cross_run_replace_agent_source.replaced_agent_id}
+              importedModel={restData.cross_run_replace_agent_source.imported_model}
+              roundStart={restData.cross_run_replace_agent_source.round_start}
+              sourceBRoundEnd={restData.cross_run_replace_agent_source.source_b_round_end}
             />
           ) : null}
           <span className="group/help relative">
@@ -693,6 +745,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             onCancelEdit={fork.cancelEdit}
             onForkFromMessage={handleForkFromMessage}
             onReplaceAgentFromRound={handleReplaceAgentFromRound}
+            onCrossRunReplaceFromRound={handleCrossRunReplaceFromRound}
             forkPointMessageId={restData.fork_source?.target_message_id ?? null}
             swapRoundNumber={restData.swap_point?.round_number ?? null}
             swappedObserverDisplayNames={restData.swap_point?.swapped_observer_display_names ?? []}
@@ -701,6 +754,12 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             replaceAgentRoundStart={restData.replace_agent_source?.round_start ?? null}
             replaceAgentReplacedAgentId={restData.replace_agent_source?.replaced_agent_id ?? null}
             replaceAgentReplacementModel={restData.replace_agent_source?.replacement_model ?? null}
+            crossRunReplaceRoundStart={restData.cross_run_replace_agent_source?.round_start ?? null}
+            crossRunReplacedAgentId={
+              restData.cross_run_replace_agent_source?.replaced_agent_id ?? null
+            }
+            crossRunSourceARunId={restData.cross_run_replace_agent_source?.source_a_run_id ?? null}
+            crossRunSourceBRunId={restData.cross_run_replace_agent_source?.source_b_run_id ?? null}
             veyruCases={restData.veyru_cases}
             roundEndings={restData.round_endings}
             resumeCutoffTimestamp={
@@ -797,6 +856,32 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
         />
       ) : null}
 
+      {/* Cross-run replace-agent confirmation modal */}
+      {crossRunReplaceRound !== null ? (
+        <CrossRunReplaceAgentModal
+          isPending={crossRunReplace.isPending}
+          isSuccess={crossRunReplace.isSuccess}
+          errorMessage={crossRunReplace.error?.message ?? null}
+          roundStart={crossRunReplaceRound}
+          scenarioName={restData.scenario_name}
+          sourceRoundCount={
+            typeof restData.scenario_config?.round_count === "number"
+              ? restData.scenario_config.round_count
+              : null
+          }
+          sourceAgents={restData.agents.map(agent => ({
+            agent_id: agent.agent_id,
+            role_name: agent.role_name,
+            model: agent.model,
+            provider: agent.provider,
+            channel_ids: agent.channel_ids,
+          }))}
+          currentRunId={runId}
+          onConfirm={handleConfirmCrossRunReplace}
+          onCancel={handleCloseCrossRunReplace}
+        />
+      ) : null}
+
       {/* Fork confirmation modal */}
       {forkModalMessageId ? (
         <ForkModal
@@ -842,6 +927,8 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
           restData.intern_takeover !== null ? nextStackIndex++ : null;
         const replaceAgentStackIndex =
           restData.replace_agent_source !== null ? nextStackIndex++ : null;
+        const crossRunReplaceStackIndex =
+          restData.cross_run_replace_agent_source !== null ? nextStackIndex++ : null;
 
         const scrollToDivider = (elementId: string) => {
           flushSync(() => {
@@ -919,6 +1006,14 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
                 stackIndex={replaceAgentStackIndex}
                 roundNumber={restData.replace_agent_source.round_start}
                 onClick={() => scrollToDivider("replace-agent-divider")}
+              />
+            ) : null}
+
+            {restData.cross_run_replace_agent_source && crossRunReplaceStackIndex !== null ? (
+              <CrossRunReplaceAgentPointFab
+                stackIndex={crossRunReplaceStackIndex}
+                roundNumber={restData.cross_run_replace_agent_source.round_start}
+                onClick={() => scrollToDivider("cross-run-replace-agent-divider")}
               />
             ) : null}
           </>

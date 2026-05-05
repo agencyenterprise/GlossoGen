@@ -2,15 +2,17 @@
 
 Mirrors ``RoundSuccessMetric`` but filters the scored round set to
 ``[round_start, round_start + rounds_after_swap]`` as recorded in the
-run's ``replace_manifest.json``. Also re-scores the *source* run over
-the same round window (per-run, since the source may have ended early)
-and reports both numbers plus the delta in ``summary`` — so a single
-measurement tells us whether the replacement out-performed, matched,
-or under-performed the agents it replaced.
+run's resume manifest (``replace_manifest.json`` for same-run replace
+flows, ``cross_run_replace_manifest.json`` for cross-run flows). Also
+re-scores the *source* run over the same round window — for both
+flows the comparison is against the original Sim A whose timeline was
+modified — and reports both numbers plus the delta in ``summary`` so
+a single measurement tells us whether the replacement out-performed,
+matched, or under-performed the agents it replaced.
 
 Two-team runs emit two Measurements (``round_success_after_resume_team_a``
 and ``round_success_after_resume_team_b``); single-team runs emit one.
-Runs without a replace manifest emit a single zero-score measurement
+Runs without any resume manifest emit a single zero-score measurement
 explaining that the metric does not apply.
 
 Summary format contract — these prefixes are parsed by the Streamlit
@@ -26,13 +28,14 @@ import logging
 from pathlib import Path
 from typing import NamedTuple
 
+from schmidt.cross_run_replace_manifest import read_cross_run_replace_manifest
 from schmidt.evaluation.log_reader import extract_agent_configs, load_events
 from schmidt.evaluation.measurement import Measurement, RoundObservation
 from schmidt.evaluation.metric_protocol import Metric
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent
-from schmidt.replace_manifest import ReplaceManifest, read_replace_manifest
+from schmidt.replace_manifest import read_replace_manifest
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.veyru.evaluation.round_success_core import (
     TEAM_A_AGENT_IDS,
@@ -59,6 +62,45 @@ class _SideScore(NamedTuple):
     lost_details: list[str]
 
 
+class _ResumeAnchor(NamedTuple):
+    """Common fields the metric needs from either resume manifest type.
+
+    ``source_run_id`` and ``source_run_dir`` always reference the
+    *target* run (Sim A) — the one whose timeline was modified.
+    ``flow_label`` is used in ``summary`` text (``replace-agent`` or
+    ``cross-run replace-agent``).
+    """
+
+    round_start: int
+    rounds_after_swap: int
+    source_run_id: str
+    source_run_dir: str
+    flow_label: str
+
+
+def _read_resume_anchor(run_dir: Path) -> _ResumeAnchor | None:
+    """Read whichever resume manifest the run has and project to common fields."""
+    replace = read_replace_manifest(run_dir=run_dir)
+    if replace is not None:
+        return _ResumeAnchor(
+            round_start=replace.round_start,
+            rounds_after_swap=replace.rounds_after_swap,
+            source_run_id=replace.source_run_id,
+            source_run_dir=replace.source_run_dir,
+            flow_label="replace-agent",
+        )
+    cross_run = read_cross_run_replace_manifest(run_dir=run_dir)
+    if cross_run is not None:
+        return _ResumeAnchor(
+            round_start=cross_run.round_start,
+            rounds_after_swap=cross_run.rounds_after_swap,
+            source_run_id=cross_run.source_a_run_id,
+            source_run_dir=cross_run.source_a_run_dir,
+            flow_label="cross-run replace-agent",
+        )
+    return None
+
+
 class RoundSuccessAfterResumeMetric(Metric):
     """Counts post-resume rounds where a Veyru was stabilized before collapse."""
 
@@ -74,23 +116,23 @@ class RoundSuccessAfterResumeMetric(Metric):
     ) -> list[Measurement]:
         """Score post-swap rounds and append a source-run comparison."""
         _ = llm_provider
-        manifest = read_replace_manifest(run_dir=run_dir)
-        if manifest is None:
+        anchor = _read_resume_anchor(run_dir=run_dir)
+        if anchor is None:
             return [
                 Measurement(
                     metric_name=self.name,
                     score=0.0,
                     score_unit="fraction of post-resume rounds stabilized",
                     summary=(
-                        "Run is not a replace-agent run; round_success_after_resume "
-                        "does not apply."
+                        "Run is not a replace-agent or cross-run replace-agent run; "
+                        "round_success_after_resume does not apply."
                     ),
                     per_round=[],
                     per_agent=[],
                 )
             ]
 
-        candidate_rounds = _candidate_rounds(manifest=manifest)
+        candidate_rounds = _candidate_rounds(anchor=anchor)
         resumed_scored = sorted(candidate_rounds & collect_advanced_round_numbers(events=events))
         if not resumed_scored:
             return [
@@ -99,9 +141,9 @@ class RoundSuccessAfterResumeMetric(Metric):
                     score=0.0,
                     score_unit="fraction of post-resume rounds stabilized",
                     summary=(
-                        "Replace-agent run did not advance any post-resume round "
-                        f"(round_start={manifest.round_start}, "
-                        f"rounds_after_swap={manifest.rounds_after_swap})."
+                        f"{anchor.flow_label} run did not advance any post-resume round "
+                        f"(round_start={anchor.round_start}, "
+                        f"rounds_after_swap={anchor.rounds_after_swap})."
                     ),
                     per_round=[],
                     per_agent=[],
@@ -115,7 +157,7 @@ class RoundSuccessAfterResumeMetric(Metric):
         )
         source_sides_by_label = await _score_source_window(
             scenario_name=scenario.name(),
-            manifest=manifest,
+            anchor=anchor,
             candidate_rounds=candidate_rounds,
         )
 
@@ -124,16 +166,16 @@ class RoundSuccessAfterResumeMetric(Metric):
                 metric_base_name=self.name,
                 resumed_side=resumed_side,
                 source_side=source_sides_by_label.get(resumed_side.team_label),
-                manifest=manifest,
+                anchor=anchor,
                 resumed_scored=resumed_scored,
             )
             for resumed_side in resumed_sides
         ]
 
 
-def _candidate_rounds(manifest: ReplaceManifest) -> set[int]:
+def _candidate_rounds(anchor: _ResumeAnchor) -> set[int]:
     """Inclusive ``[round_start, round_start + rounds_after_swap]`` round set."""
-    return set(range(manifest.round_start, manifest.round_start + manifest.rounds_after_swap + 1))
+    return set(range(anchor.round_start, anchor.round_start + anchor.rounds_after_swap + 1))
 
 
 def _score_window(
@@ -203,11 +245,11 @@ def _score_window(
 
 async def _score_source_window(
     scenario_name: str,
-    manifest: ReplaceManifest,
+    anchor: _ResumeAnchor,
     candidate_rounds: set[int],
 ) -> dict[str, _SideScore]:
     """Score the source run's events over the same window. Empty when unavailable."""
-    source_dir = _resolve_source_run_dir(manifest=manifest)
+    source_dir = _resolve_source_run_dir(anchor=anchor)
     if source_dir is None:
         return {}
     source_log = source_dir / f"{scenario_name}.jsonl"
@@ -232,7 +274,7 @@ def _build_side_measurement(
     metric_base_name: str,
     resumed_side: _SideScore,
     source_side: _SideScore | None,
-    manifest: ReplaceManifest,
+    anchor: _ResumeAnchor,
     resumed_scored: list[int],
 ) -> Measurement:
     """Compose a Measurement for one team (or solo) covering both resumed and source."""
@@ -244,8 +286,8 @@ def _build_side_measurement(
     pct = round(resumed_side.score * 100)
     headline = (
         f"Resumed: {resumed_side.won}/{resumed_side.total} ({pct}%) stabilized "
-        f"in post-resume rounds (round_start={manifest.round_start}, "
-        f"rounds_after_swap={manifest.rounds_after_swap})."
+        f"in post-resume rounds (round_start={anchor.round_start}, "
+        f"rounds_after_swap={anchor.rounds_after_swap})."
     )
     summary_parts = [headline]
     if source_side is not None:
@@ -258,12 +300,12 @@ def _build_side_measurement(
         else:
             delta_label = "0 pp (same)"
         summary_parts.append(
-            f"Source {manifest.source_run_id} over the same window: "
+            f"Source {anchor.source_run_id} over the same window: "
             f"{source_side.won}/{source_side.total} ({source_pct}%)."
         )
         summary_parts.append(f"Δ vs source: {delta_label}.")
     else:
-        summary_parts.append(f"Source run {manifest.source_run_id} not available for comparison.")
+        summary_parts.append(f"Source run {anchor.source_run_id} not available for comparison.")
     summary_parts.append(f"Scored rounds (resumed): {resumed_scored}.")
     summary_parts.extend(resumed_side.lost_details)
     summary = " ".join(summary_parts)
@@ -289,12 +331,12 @@ def _build_side_measurement(
     )
 
 
-def _resolve_source_run_dir(manifest: ReplaceManifest) -> Path | None:
+def _resolve_source_run_dir(anchor: _ResumeAnchor) -> Path | None:
     """Return the source run directory, trying the stored path then cwd-relative."""
-    raw_path = Path(manifest.source_run_dir)
+    raw_path = Path(anchor.source_run_dir)
     if raw_path.is_dir():
         return raw_path
-    cwd_relative = Path.cwd() / manifest.source_run_dir
+    cwd_relative = Path.cwd() / anchor.source_run_dir
     if cwd_relative.is_dir():
         return cwd_relative
     return None

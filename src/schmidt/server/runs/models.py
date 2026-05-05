@@ -36,6 +36,26 @@ class ReplaceAgentSource(BaseModel):
     replaced_at: datetime
 
 
+class CrossRunReplaceAgentSource(BaseModel):
+    """Provenance for a run created via the cross-run replace-agent endpoint.
+
+    ``source_a_run_id`` is the target run whose timeline was modified.
+    ``source_b_run_id`` is the run the imported agent came from.
+    ``source_b_round_end`` is the last Sim B round whose events fed
+    into the imported agent's history.
+    """
+
+    source_a_run_id: str
+    source_b_run_id: str
+    round_start: int
+    source_b_round_end: int
+    target_event_id: str
+    replaced_agent_id: str
+    imported_model: str
+    imported_provider: str
+    replaced_at: datetime
+
+
 class SwapPoint(BaseModel):
     """Anchor for the moment agents were swapped between teams.
 
@@ -88,6 +108,7 @@ class RunSummary(BaseModel):
     run_dir: str
     fork_source: ForkSource | None
     replace_agent_source: ReplaceAgentSource | None
+    cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
     models: list[str]
     provider: str
     agent_models: list[AgentModelSummary]
@@ -318,6 +339,7 @@ class RunDetailResponse(BaseModel):
     has_eval_log_file: bool
     fork_source: ForkSource | None
     replace_agent_source: ReplaceAgentSource | None
+    cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
     swap_point: SwapPoint | None
     intern_join: InternAnchor | None
     intern_takeover: InternAnchor | None
@@ -423,6 +445,56 @@ class ReplaceAgentRequest(BaseModel):
 
 class ReplaceAgentResponse(BaseModel):
     """Response returned after a replace-agent run is launched."""
+
+    new_run_id: str
+    new_run_dir: str
+
+
+# ---------------------------------------------------------------------------
+# Cross-run replace-agent request/response models
+# ---------------------------------------------------------------------------
+
+
+class CrossRunReplaceAgentRequest(BaseModel):
+    """Request body for importing an agent from another run at the start of a round.
+
+    ``source_b_run_id`` is the canonical ``<scenario>/<run_dir>`` identifier
+    of the run the imported agent comes from. The target run (Sim A) is
+    inferred from the URL path.
+
+    ``source_b_round_end`` is the last Sim B round whose events feed into
+    the imported agent's reconstructed history. When ``None``, defaults
+    to ``min(round_start - 1, B_max_round)`` so the imported agent gets
+    the largest possible slice of source B's history without exceeding
+    what B actually played.
+
+    ``model`` and ``provider`` override the imported agent's
+    model/provider. When both are ``None``, the imported agent runs
+    under Sim B's model/provider.
+
+    ``channels_with_visible_history`` lists Sim A channel IDs whose
+    prior history remains visible to the imported agent on resume;
+    every other channel they're a member of has its history wiped.
+
+    ``rounds_after_swap`` controls the post-swap round budget exactly
+    as in the same-run replace-agent endpoint.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_b_run_id: str
+    round_start: int
+    source_b_round_end: int | None
+    rounds_after_swap: int | None
+    replaced_agent_id: str
+    model: str | None
+    provider: str | None
+    knobs: dict[str, Any] | None
+    channels_with_visible_history: list[str]
+
+
+class CrossRunReplaceAgentResponse(BaseModel):
+    """Response returned after a cross-run replace-agent run is launched."""
 
     new_run_id: str
     new_run_dir: str

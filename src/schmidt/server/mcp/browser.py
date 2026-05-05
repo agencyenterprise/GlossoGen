@@ -361,6 +361,7 @@ async def _tool_get_run(
             has_eval_log_file=detail.has_eval_log_file,
             fork_source=detail.fork_source,
             replace_agent_source=detail.replace_agent_source,
+            cross_run_replace_agent_source=detail.cross_run_replace_agent_source,
             swap_point=detail.swap_point,
             intern_join=detail.intern_join,
             intern_takeover=detail.intern_takeover,
