@@ -10,8 +10,12 @@ for B) — not the imported model. Only runs labeled ``cross_team`` are
 eligible.
 """
 
+import json
+from typing import NamedTuple
+
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 
 from analysis.results_viewer.cross_swap_data import CrossSwapRun, list_cross_swap_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
@@ -22,6 +26,25 @@ from analysis.results_viewer.series_plot import (
     jittered_x_linear,
     series_color_map,
 )
+
+
+def _render_frontend_base() -> str:
+    """Text input for the schmidt frontend base URL used to deep-link runs."""
+    raw = st.text_input(
+        label="Frontend base URL (for run links)",
+        value="http://localhost:3000",
+        key="cross_swap_frontend_base",
+        help=(
+            "Click a dot in the chart to open the corresponding swapped or source "
+            "run at `<base>/runs/<scenario>/<run_dir_name>`."
+        ),
+    )
+    return raw.rstrip("/")
+
+
+def _run_url(frontend_base: str, run_id: str) -> str:
+    """Build the per-run frontend URL: ``<base>/runs/<scenario>/<run_dir_name>``."""
+    return f"{frontend_base}/runs/{run_id}"
 
 
 def _swapped_series(run: CrossSwapRun) -> str:
@@ -37,6 +60,58 @@ def _source_a_series(run: CrossSwapRun) -> str:
 def _source_b_series(run: CrossSwapRun) -> str:
     """Series key for source B's matched-window line, labelled with B's actual model."""
     return f"{run.source_b_replaced_agent_model} · source B"
+
+
+class _SourcePair(NamedTuple):
+    """A unique ``(source_a_run_id, source_b_run_id)`` pair with display models."""
+
+    source_a_run_id: str
+    source_b_run_id: str
+    source_a_model: str
+    source_b_model: str
+
+    def label(self) -> str:
+        """Human-readable label used in the selectbox and as the section header."""
+        return (
+            f"{self.source_a_run_id} [{self.source_a_model}]  →  "
+            f"{self.source_b_run_id} [{self.source_b_model}]"
+        )
+
+
+def _distinct_source_pairs(runs: list[CrossSwapRun]) -> list[_SourcePair]:
+    """Return sorted-by-label distinct source pairs across ``runs``."""
+    seen: dict[tuple[str, str], _SourcePair] = {}
+    for run in runs:
+        key = (run.source_a_run_id, run.source_b_run_id)
+        if key in seen:
+            continue
+        seen[key] = _SourcePair(
+            source_a_run_id=run.source_a_run_id,
+            source_b_run_id=run.source_b_run_id,
+            source_a_model=run.source_a_replaced_agent_model,
+            source_b_model=run.source_b_replaced_agent_model,
+        )
+    return sorted(seen.values(), key=lambda pair: pair.label())
+
+
+def _render_source_pair_selector(pairs: list[_SourcePair]) -> _SourcePair:
+    """Single-select dropdown over the distinct source pairs in the data."""
+    labels = [pair.label() for pair in pairs]
+    chosen_label = st.selectbox(
+        label="Source pair (Sim A → Sim B)",
+        options=labels,
+        index=0,
+        key="cross_swap_source_pair",
+        help=(
+            "Each entry is a distinct cross-team experiment. Selecting a pair "
+            "limits the chart and table below to runs whose source A and "
+            "source B match the chosen pair."
+        ),
+    )
+    for pair in pairs:
+        if pair.label() == chosen_label:
+            return pair
+    return pairs[0]
 
 
 def _bucket_filter(runs: list[CrossSwapRun]) -> set[str]:
@@ -124,29 +199,41 @@ def _aggregate_window_stats(runs: list[CrossSwapRun]) -> list[SeriesStats]:
     return stats
 
 
-def _window_replica_dots(
-    runs: list[CrossSwapRun],
-) -> dict[str, tuple[list[float], list[float], list[str]]]:
+class _ReplicaDots(NamedTuple):
+    """Per-series jittered points + per-point URLs for the cross-swap chart."""
+
+    xs: list[float]
+    ys: list[float]
+    hover_texts: list[str]
+    urls: list[str]
+
+
+def _window_replica_dots(runs: list[CrossSwapRun], frontend_base: str) -> dict[str, _ReplicaDots]:
     """Per-series jittered (round_start, accuracy) replica points for the chart.
 
     Swapped dots are one per replica. Source-A/B dots are one per *unique*
     source run id within each ``(series, round_start)`` bucket, so a source
     that shows up across many replicas is still drawn as a single dot.
+    Each dot carries a frontend URL so the click handler can open the run.
     """
-    dots: dict[str, tuple[list[float], list[float], list[str]]] = {}
+    dots: dict[str, _ReplicaDots] = {}
     counter: dict[str, int] = {}
     seen_source_dots: dict[tuple[str, int], set[str]] = {}
     for run in runs:
         swapped_value = _swapped_window_accuracy(run=run)
-        bucket = dots.setdefault(_swapped_series(run=run), ([], [], []))
-        index = counter.get(_swapped_series(run=run), 0)
-        bucket[0].append(jittered_x_linear(base_x=float(run.round_start), index=index))
-        bucket[1].append(swapped_value)
-        bucket[2].append(
-            f"{run.run_id}<br>{_swapped_series(run=run)}<br>"
-            f"round_start={run.round_start}<br>accuracy={swapped_value:.3f}"
+        swapped_series = _swapped_series(run=run)
+        swapped_url = _run_url(frontend_base=frontend_base, run_id=run.run_id)
+        bucket = dots.setdefault(swapped_series, _ReplicaDots([], [], [], []))
+        index = counter.get(swapped_series, 0)
+        bucket.xs.append(jittered_x_linear(base_x=float(run.round_start), index=index))
+        bucket.ys.append(swapped_value)
+        bucket.hover_texts.append(
+            f"{run.run_id}<br>{swapped_series}<br>"
+            f"round_start={run.round_start}<br>accuracy={swapped_value:.3f}<br>"
+            f"click to open · {swapped_url}"
         )
-        counter[_swapped_series(run=run)] = index + 1
+        bucket.urls.append(swapped_url)
+        counter[swapped_series] = index + 1
         for series_fn, source_run_id, outcomes in (
             (_source_a_series, run.source_a_run_id, run.source_a_round_outcomes),
             (_source_b_series, run.source_b_run_id, run.source_b_round_outcomes),
@@ -159,14 +246,17 @@ def _window_replica_dots(
             if source_run_id in seen:
                 continue
             seen.add(source_run_id)
-            bucket = dots.setdefault(series, ([], [], []))
+            url = _run_url(frontend_base=frontend_base, run_id=source_run_id)
+            bucket = dots.setdefault(series, _ReplicaDots([], [], [], []))
             index = counter.get(series, 0)
-            bucket[0].append(jittered_x_linear(base_x=float(run.round_start), index=index))
-            bucket[1].append(value)
-            bucket[2].append(
+            bucket.xs.append(jittered_x_linear(base_x=float(run.round_start), index=index))
+            bucket.ys.append(value)
+            bucket.hover_texts.append(
                 f"{source_run_id}<br>{series}<br>round_start={run.round_start}<br>"
-                f"accuracy from R{run.round_start}={value:.3f}"
+                f"accuracy from R{run.round_start}={value:.3f}<br>"
+                f"click to open · {url}"
             )
+            bucket.urls.append(url)
             counter[series] = index + 1
     return dots
 
@@ -182,7 +272,7 @@ def _series_dash(series: str) -> str:
 
 def _build_window_figure(
     stats: list[SeriesStats],
-    replica_dots: dict[str, tuple[list[float], list[float], list[str]]],
+    replica_dots: dict[str, _ReplicaDots],
     x_tickvals: list[int],
 ) -> go.Figure:
     """Per-window-accuracy figure: X = round_start, Y = mean fraction stabilized."""
@@ -193,16 +283,16 @@ def _build_window_figure(
     for stat in stats:
         stats_by_series.setdefault(stat.series, []).append(stat)
     for series, colour in palette.items():
-        xs, ys, hover = replica_dots.get(series, ([], [], []))
-        if xs:
+        dots = replica_dots.get(series)
+        if dots is not None and dots.xs:
             add_replica_trace(
                 fig=fig,
                 series=series,
-                xs=xs,
-                ys=ys,
-                hover_texts=hover,
+                xs=dots.xs,
+                ys=dots.ys,
+                hover_texts=dots.hover_texts,
                 colour=colour,
-                customdata=None,
+                customdata=dots.urls,
             )
         add_mean_trace(
             fig=fig,
@@ -227,7 +317,44 @@ def _build_window_figure(
     return fig
 
 
-def _render_window_view(runs: list[CrossSwapRun]) -> None:
+def _maybe_open_clicked_run(chart_event: object) -> None:
+    """Open the most recently clicked dot's run in a new browser tab.
+
+    Streamlit reruns the script on every selection change, so we de-duplicate
+    via ``st.session_state["cross_swap_last_opened_url"]`` to avoid re-opening
+    the same run when the user toggles an unrelated filter. The actual
+    navigation is done by injecting a ``window.open`` script via
+    ``components.html``.
+    """
+    selection = getattr(chart_event, "selection", None)
+    if selection is None:
+        return
+    points = selection.get("points") if isinstance(selection, dict) else None
+    if not points:
+        return
+    last_point = points[-1]
+    customdata = last_point.get("customdata")
+    if not customdata:
+        return
+    if isinstance(customdata, list):
+        url = customdata[0] if customdata else None
+    else:
+        url = customdata
+    if not isinstance(url, str) or not url:
+        return
+    last_key = "cross_swap_last_opened_url"
+    if st.session_state.get(last_key) == url:
+        return
+    st.session_state[last_key] = url
+    encoded = json.dumps(url)
+    components.html(
+        f"<script>window.open({encoded}, '_blank', 'noopener,noreferrer');</script>",
+        height=0,
+    )
+    st.toast(f"opened {url}", icon="↗")
+
+
+def _render_window_view(runs: list[CrossSwapRun], frontend_base: str) -> None:
     """Render the per-window aggregate accuracy chart + caption."""
     st.caption(
         "Solid: mean success across each swapped replica's post-swap rounds. "
@@ -236,16 +363,23 @@ def _render_window_view(runs: list[CrossSwapRun]) -> None:
         "over the same window. Source-line labels carry the model that "
         "actually played the source run's replaced agent. Each unique source "
         "run is counted once per bucket so repeat-source replicas don't stack "
-        "the baseline."
+        "the baseline. Click any dot to open that run in a new tab."
     )
     stats = _aggregate_window_stats(runs=runs)
     if not stats:
         st.info("No window data to plot.")
         return
-    replica_dots = _window_replica_dots(runs=runs)
+    replica_dots = _window_replica_dots(runs=runs, frontend_base=frontend_base)
     x_tickvals = sorted({int(s.x_value) for s in stats})
     fig = _build_window_figure(stats=stats, replica_dots=replica_dots, x_tickvals=x_tickvals)
-    st.plotly_chart(fig, width="stretch", key="cross_swap_window_accuracy_chart")
+    chart_event = st.plotly_chart(
+        fig,
+        width="stretch",
+        key="cross_swap_window_accuracy_chart",
+        on_select="rerun",
+        selection_mode=("points",),
+    )
+    _maybe_open_clicked_run(chart_event=chart_event)
 
 
 def _render_included_runs(runs: list[CrossSwapRun]) -> None:
@@ -278,13 +412,26 @@ def render(evaluated: list[EvaluatedRun]) -> None:
             "Add the 'cross_team' label to cross-run replace-agent runs you want compared here."
         )
         return
-    selected_buckets = _bucket_filter(runs=all_cross_swap)
+    frontend_base = _render_frontend_base()
+    pairs = _distinct_source_pairs(runs=all_cross_swap)
+    chosen_pair = _render_source_pair_selector(pairs=pairs)
+    pair_runs = [
+        run
+        for run in all_cross_swap
+        if run.source_a_run_id == chosen_pair.source_a_run_id
+        and run.source_b_run_id == chosen_pair.source_b_run_id
+    ]
+    if not pair_runs:
+        st.info("No cross-swap runs match the selected source pair.")
+        return
+    selected_buckets = _bucket_filter(runs=pair_runs)
     if not selected_buckets:
         st.info("Select at least one cross-swap bucket.")
         return
-    filtered = [r for r in all_cross_swap if r.swapped_series_key() in selected_buckets]
+    filtered = [r for r in pair_runs if r.swapped_series_key() in selected_buckets]
     if not filtered:
         st.info("No cross-swap runs match the selected buckets.")
         return
-    _render_window_view(runs=filtered)
+    st.markdown(f"### {chosen_pair.label()}")
+    _render_window_view(runs=filtered, frontend_base=frontend_base)
     _render_included_runs(runs=filtered)
