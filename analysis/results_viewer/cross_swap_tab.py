@@ -382,6 +382,165 @@ def _render_window_view(runs: list[CrossSwapRun], frontend_base: str) -> None:
     _maybe_open_clicked_run(chart_event=chart_event)
 
 
+def _swapped_per_round_means(
+    runs: list[CrossSwapRun],
+) -> dict[int, dict[int, float]]:
+    """Per ``round_start``, mean post-swap success at each round across replicas."""
+    grouped: dict[int, list[CrossSwapRun]] = {}
+    for run in runs:
+        grouped.setdefault(run.round_start, []).append(run)
+    means: dict[int, dict[int, float]] = {}
+    for round_start, group in grouped.items():
+        per_round: dict[int, list[float]] = {}
+        for run in group:
+            for round_number, succeeded in run.swapped_round_outcomes.items():
+                per_round.setdefault(round_number, []).append(1.0 if succeeded else 0.0)
+        means[round_start] = {
+            round_number: sum(values) / len(values) for round_number, values in per_round.items()
+        }
+    return means
+
+
+def _source_per_round_step(outcomes: dict[int, bool]) -> tuple[list[int], list[float]]:
+    """Sorted ``(rounds, 0/1 values)`` for a single source run's outcomes."""
+    rounds = sorted(outcomes)
+    values = [1.0 if outcomes[round_number] else 0.0 for round_number in rounds]
+    return rounds, values
+
+
+_TIMELINE_Y_OFFSET_STEP = 0.03
+
+
+def _build_timeline_figure(runs: list[CrossSwapRun]) -> go.Figure:
+    """Per-round timeline: source A & B outcomes plus per-round_start swapped mean.
+
+    Each series is rendered with a small Y offset (multiples of
+    ``_TIMELINE_Y_OFFSET_STEP``) so coincident lines at 0 or 1 don't hide
+    each other. Hover restores the true value; the Y axis still ticks at 0
+    and 1 so the floor/ceiling stay legible.
+    """
+    fig = go.Figure()
+    sample = runs[0]
+    source_a_label = f"{sample.source_a_replaced_agent_model} · source A"
+    source_b_label = f"{sample.source_b_replaced_agent_model} · source B"
+    swap_round_starts = sorted({run.round_start for run in runs})
+    series_keys = [
+        source_a_label,
+        source_b_label,
+        *[f"{sample.imported_model} · swapped @ R{rs}" for rs in swap_round_starts],
+    ]
+    palette = series_color_map(series_keys=series_keys)
+
+    a_rounds, a_values = _source_per_round_step(outcomes=sample.source_a_round_outcomes)
+    if a_rounds:
+        offset = 0.0
+        fig.add_trace(
+            go.Scatter(
+                x=a_rounds,
+                y=[v + offset for v in a_values],
+                customdata=a_values,
+                mode="lines+markers",
+                name=source_a_label,
+                line=dict(color=palette[source_a_label], dash="dash", shape="hv"),
+                marker=dict(size=6),
+                hovertemplate=(
+                    f"{sample.source_a_run_id}<br>round=%{{x}}<br>"
+                    "stabilized=%{customdata:.0f}<extra></extra>"
+                ),
+            )
+        )
+    b_rounds, b_values = _source_per_round_step(outcomes=sample.source_b_round_outcomes)
+    if b_rounds:
+        offset = _TIMELINE_Y_OFFSET_STEP
+        fig.add_trace(
+            go.Scatter(
+                x=b_rounds,
+                y=[v + offset for v in b_values],
+                customdata=b_values,
+                mode="lines+markers",
+                name=source_b_label,
+                line=dict(color=palette[source_b_label], dash="dot", shape="hv"),
+                marker=dict(size=6),
+                hovertemplate=(
+                    f"{sample.source_b_run_id}<br>round=%{{x}}<br>"
+                    "stabilized=%{customdata:.0f}<extra></extra>"
+                ),
+            )
+        )
+
+    swap_means = _swapped_per_round_means(runs=runs)
+    for index, round_start in enumerate(swap_round_starts):
+        means_at_round = swap_means[round_start]
+        rounds = sorted(means_at_round)
+        values = [means_at_round[round_number] for round_number in rounds]
+        offset = -_TIMELINE_Y_OFFSET_STEP * (index + 1)
+        replica_count = sum(1 for run in runs if run.round_start == round_start)
+        label = f"{sample.imported_model} · swapped @ R{round_start}"
+        fig.add_trace(
+            go.Scatter(
+                x=rounds,
+                y=[v + offset for v in values],
+                customdata=values,
+                mode="lines+markers",
+                name=f"{label} (n={replica_count})",
+                line=dict(color=palette[label], dash="solid"),
+                marker=dict(size=7),
+                hovertemplate=(
+                    f"{label}<br>round=%{{x}}<br>"
+                    "mean stabilized=%{customdata:.2f}<extra></extra>"
+                ),
+            )
+        )
+        fig.add_vline(
+            x=round_start,
+            line=dict(color=palette[label], width=1, dash="dot"),
+            opacity=0.4,
+        )
+
+    all_rounds = sorted(
+        set(a_rounds)
+        | set(b_rounds)
+        | {round_number for series in swap_means.values() for round_number in series}
+    )
+    max_offset_below = _TIMELINE_Y_OFFSET_STEP * len(swap_round_starts)
+    max_offset_above = _TIMELINE_Y_OFFSET_STEP
+    fig.update_layout(
+        xaxis=dict(
+            title="round",
+            tickmode="array",
+            tickvals=all_rounds,
+            ticktext=[f"R{r}" for r in all_rounds],
+        ),
+        yaxis=dict(
+            title="round stabilized (1.0=yes, 0.0=collapsed)",
+            range=[-0.05 - max_offset_below, 1.05 + max_offset_above],
+            tickmode="array",
+            tickvals=[0.0, 0.25, 0.5, 0.75, 1.0],
+            ticktext=["0", "0.25", "0.5", "0.75", "1"],
+        ),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        margin=dict(l=60, r=20, t=40, b=60),
+        height=420,
+    )
+    return fig
+
+
+def _render_timeline_view(runs: list[CrossSwapRun]) -> None:
+    """Render the per-round timeline plot below the window-accuracy chart."""
+    st.markdown("#### Round-by-round timeline")
+    st.caption(
+        "Source A (dashed) and source B (dotted) show per-round outcomes "
+        "of the original simulations as 0/1 step lines — flat at 1 means "
+        "stabilized, drops to 0 mark collapses. Solid lines are the swapped "
+        "runs' mean stabilization rate per round, one line per ``round_start`` "
+        "bucket. Vertical dotted lines mark each swap boundary. Each series "
+        "is rendered with a small Y offset so coincident lines at 0 or 1 "
+        "stay distinguishable; hover shows the true value."
+    )
+    fig = _build_timeline_figure(runs=runs)
+    st.plotly_chart(fig, width="stretch", key="cross_swap_timeline_chart")
+
+
 def _render_included_runs(runs: list[CrossSwapRun]) -> None:
     """Per-replica audit listing inside an expander."""
     rows = [
@@ -434,4 +593,5 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         return
     st.markdown(f"### {chosen_pair.label()}")
     _render_window_view(runs=filtered, frontend_base=frontend_base)
+    _render_timeline_view(runs=filtered)
     _render_included_runs(runs=filtered)
