@@ -13,9 +13,8 @@ import orjson
 from analysis.results_viewer.run_catalog import EvaluatedRun
 
 PERPLEXITY_METRIC = "perplexity"
-MWL_METRIC = "mean_word_length"
-MML_METRIC = "mean_message_length"
 MCR_METRIC = "mean_chars_per_round"
+MCM_METRIC = "mean_chars_per_message"
 ROUND_SUCCESS_METRIC = "round_success"
 ROUND_SUCCESS_AFTER_RESUME_METRIC = "round_success_after_resume"
 
@@ -44,19 +43,14 @@ def perplexity_score(evaluated: EvaluatedRun) -> float | None:
     return measurement_score(evaluated=evaluated, metric_name=PERPLEXITY_METRIC)
 
 
-def mwl_score(evaluated: EvaluatedRun) -> float | None:
-    """Mean characters per primary-channel word; ``None`` if unscored."""
-    return measurement_score(evaluated=evaluated, metric_name=MWL_METRIC)
-
-
-def mml_score(evaluated: EvaluatedRun) -> float | None:
-    """Mean words per primary-channel message; ``None`` if unscored."""
-    return measurement_score(evaluated=evaluated, metric_name=MML_METRIC)
-
-
 def mcr_score(evaluated: EvaluatedRun) -> float | None:
     """Mean total chars per primary-channel round; ``None`` if unscored."""
     return measurement_score(evaluated=evaluated, metric_name=MCR_METRIC)
+
+
+def mcm_score(evaluated: EvaluatedRun) -> float | None:
+    """Mean chars per primary-channel message; ``None`` if unscored."""
+    return measurement_score(evaluated=evaluated, metric_name=MCM_METRIC)
 
 
 def round_success_score(evaluated: EvaluatedRun) -> float | None:

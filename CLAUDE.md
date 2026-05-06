@@ -57,9 +57,8 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `round_ended_timeout_metric.py` — flags rounds ending via the `round_timeout` trigger
   - `content_filter_refusal_metric.py` — counts ``ContentFilterError`` refusals across the run, with per-round + per-agent breakdowns
   - `perplexity_metric.py` — mean per-token surprisal of primary-channel messages under `gpt2`
-  - `mwl_metric.py` — mean characters per word on the primary channel
-  - `mml_metric.py` — mean words per message on the primary channel
   - `mcr_metric.py` — mean total characters per round on the primary channel
+  - `mcm_metric.py` — mean characters per message on the primary channel
   - `round_end_trigger_detection.py` — shared helpers for reading `RoundEnded` events
   - `prompts/` — Jinja2 templates for LLM judge prompts
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
@@ -679,9 +678,8 @@ Generic metrics (available to all scenarios):
 - `neologism` — genuinely invented words with new meanings (NOT abbreviations or code mappings). LLM judge; `score` = number of rounds with detected neologisms.
 - `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding (NOT new words or slang). LLM judge; `score` = number of rounds with detected codes.
 - `perplexity` — mean per-token surprisal of primary-channel messages under `gpt2`, reported per round (deterministic, no LLM judge). `score` = overall mean nats; `per_round` carries per-round mean+std+message count. Skips scenarios with no primary channel.
-- `mean_word_length` — mean number of characters per whitespace-delimited word on the primary channel (deterministic, no LLM judge). `score` = overall mean chars/word; `per_round` carries per-round mean+std+word count. Skips scenarios with no primary channel. Read alongside `perplexity` — high perplexity + low MWL is a strong compressed-protocol signal (short codes replacing long words).
-- `mean_message_length` — mean number of whitespace-delimited words per primary-channel message (deterministic, no LLM judge). `score` = overall mean words/message; `per_round` carries per-round mean+std+message count. Skips scenarios with no primary channel. Pairs with `mean_word_length`: MML asks "how verbose is each message?" while MWL asks "how compact are the words?". Both can drop independently under tight channel budgets.
-- `mean_chars_per_round` — total characters of all primary-channel messages in a round, averaged across rounds (deterministic, no LLM judge). `score` = mean chars/round; `per_round` carries per-round total + message count. Skips scenarios with no primary channel. The headline throughput number — in Veyru this maps directly to `time_budget_seconds` (one char = one second). Read alongside MML and MWL: MCR is total channel utilization, MML/MWL decompose it into verbosity vs lexical density.
+- `mean_chars_per_round` — total characters of all primary-channel messages in a round, averaged across rounds (deterministic, no LLM judge). `score` = mean chars/round; `per_round` carries per-round total + message count. Skips scenarios with no primary channel. The headline throughput number — in Veyru this maps directly to `time_budget_seconds` (one char = one second).
+- `mean_chars_per_message` — characters per primary-channel message, averaged across all messages (deterministic, no LLM judge). `score` = overall mean chars/message; `per_round` carries per-round mean+std+message count. Skips scenarios with no primary channel. Normalizes MCR by message count: rounds that need more back-and-forth no longer inflate the score, so MCM isolates per-message verbosity from message density.
 - `round_ended_idle` — flags rounds whose main phase ended because all agents went idle on `read_notifications` (deterministic, no LLM). `score` = count of idle-ended rounds. Requires `round_ended` events in the log.
 - `round_ended_timeout` — flags rounds whose main phase ended because the wall-clock duration limit was reached (deterministic, no LLM). `score` = count of timeout-ended rounds. Requires `round_ended` events in the log.
 - `content_filter_refusal` — counts `ContentFilterError` refusals across the run (deterministic, no LLM). `score` = total refusal count; `per_round` lists rounds with at least one refusal; `per_agent` lists per-agent counts.

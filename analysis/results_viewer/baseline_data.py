@@ -14,9 +14,8 @@ from pathlib import Path
 from typing import Callable, NamedTuple
 
 from analysis.results_viewer.measurement_scores import (
+    mcm_score,
     mcr_score,
-    mml_score,
-    mwl_score,
     perplexity_score,
     read_labels,
 )
@@ -55,9 +54,8 @@ class BaselineRun(NamedTuple):
     content_filter_refusal_rounds: int
     content_filter_refusal_total: int
     perplexity_score: float | None
-    mwl_score: float | None
-    mml_score: float | None
     mcr_score: float | None
+    mcm_score: float | None
     labels: list[str]
 
     def series_key(self, selected_batch_labels: frozenset[str]) -> str:
@@ -91,9 +89,9 @@ class MetricOption(NamedTuple):
     ``y_axis_kind`` selects the Y-axis range strategy: ``round_count`` shares a
     0..total_rounds axis with integer ticks, ``refusal_total`` autoscales with
     a minimum visible range of 10, ``perplexity`` autoscales tightly around
-    the observed nats values, and ``mwl`` / ``mml`` / ``mcr`` autoscale from
-    zero with headroom above the observed maximum. ``description`` is markdown shown in the info
-    popover next to the metric selector.
+    the observed nats values, and ``mcr`` / ``mcm`` autoscale from zero with
+    headroom above the observed maximum. ``description`` is markdown shown
+    in the info popover next to the metric selector.
     """
 
     display_name: str
@@ -144,7 +142,7 @@ class MetricOption(NamedTuple):
                 y_max=max(ppl_values) + 0.5,
                 dtick=None,
             )
-        if self.y_axis_kind in {"mwl", "mml", "mcr"}:
+        if self.y_axis_kind in {"mcr", "mcm"}:
             scored = [run for run in runs if self.available(run=run)]
             if not scored:
                 return YAxisSpec(y_min=0.0, y_max=10.0, dtick=None)
@@ -215,46 +213,6 @@ METRIC_OPTIONS: list[MetricOption] = [
         ),
     ),
     MetricOption(
-        display_name="mwl",
-        attr="mwl_score",
-        y_axis_label="mwl (mean characters per primary-channel word)",
-        y_axis_kind="mwl",
-        description=(
-            "**mean_word_length (mwl)** — mean number of characters per "
-            "whitespace-delimited word on the scenario's primary channel "
-            "(Veyru: `#link`, the budget-constrained one).\n\n"
-            "Deterministic (no LLM judge): each message is split on "
-            "whitespace, every word's character count is recorded, and the "
-            "score is the mean over **all** primary-channel words in the "
-            "run (flattened, not mean of round means). Per-round mean / std "
-            "/ word count are reported in the evidence.\n\n"
-            "Lower MWL suggests compression — agents replacing long words "
-            "with short codes, often a hallmark of an emergent protocol. "
-            "Read alongside `perplexity`: high perplexity + low MWL is a "
-            "strong compressed-protocol signal."
-        ),
-    ),
-    MetricOption(
-        display_name="mml",
-        attr="mml_score",
-        y_axis_label="mml (mean words per primary-channel message)",
-        y_axis_kind="mml",
-        description=(
-            "**mean_message_length (mml)** — mean number of whitespace-"
-            "delimited words per message on the scenario's primary channel "
-            "(Veyru: `#link`, the budget-constrained one).\n\n"
-            "Deterministic (no LLM judge): each message is split on "
-            "whitespace, the per-message word count is recorded, and the "
-            "score is the mean over **all** primary-channel messages in the "
-            "run (flattened, not mean of round means). Per-round mean / std "
-            "/ message count are reported in the evidence.\n\n"
-            "Pairs with `mean_word_length`: low MML = fewer words per "
-            "message; low MWL = shorter words. Compression can show up on "
-            "either axis independently — MML alone won't catch a wordy "
-            "message of short codes."
-        ),
-    ),
-    MetricOption(
         display_name="mcr",
         attr="mcr_score",
         y_axis_label="mcr (mean characters per round on primary channel)",
@@ -269,9 +227,27 @@ METRIC_OPTIONS: list[MetricOption] = [
             "Captures channel utilization — how much of the per-round "
             "character budget agents actually use. In Veyru this maps "
             "directly to `time_budget_seconds`, since one character costs "
-            "one second of communication time. Pairs with MML and MWL: "
-            "MCR is the headline throughput, MML/MWL decompose it into "
-            "verbosity vs lexical density."
+            "one second of communication time. Misleading when rounds need "
+            "more back-and-forth: more messages inflate the round total "
+            "without saying anything about per-message verbosity. Use MCM "
+            "to normalize that out."
+        ),
+    ),
+    MetricOption(
+        display_name="mcm",
+        attr="mcm_score",
+        y_axis_label="mcm (mean characters per primary-channel message)",
+        y_axis_kind="mcm",
+        description=(
+            "**mean_chars_per_message (mcm)** — characters per "
+            "primary-channel message, averaged across all messages in the "
+            "run (flattened, not mean of round means).\n\n"
+            "Deterministic (no LLM judge): records `len(text)` on every "
+            "primary-channel message, then averages. Per-round mean / std "
+            "/ message count are reported in the evidence.\n\n"
+            "Normalizes MCR by message count: rounds that need more "
+            "back-and-forth no longer inflate the score, so MCM isolates "
+            "per-message verbosity from message density."
         ),
     ),
     MetricOption(
@@ -379,9 +355,8 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
         content_filter_refusal_rounds=refusal_rounds if refusal_rounds is not None else 0,
         content_filter_refusal_total=refusal_total,
         perplexity_score=perplexity_score(evaluated=evaluated),
-        mwl_score=mwl_score(evaluated=evaluated),
-        mml_score=mml_score(evaluated=evaluated),
         mcr_score=mcr_score(evaluated=evaluated),
+        mcm_score=mcm_score(evaluated=evaluated),
         labels=labels,
     )
 

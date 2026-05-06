@@ -8,9 +8,8 @@ list instead of depending on each other.
 GENERIC_METRIC_NAMES: list[str] = [
     "content_filter_refusal",
     "language_strangeness",
+    "mean_chars_per_message",
     "mean_chars_per_round",
-    "mean_message_length",
-    "mean_word_length",
     "neologism",
     "perplexity",
     "round_ended_idle",
