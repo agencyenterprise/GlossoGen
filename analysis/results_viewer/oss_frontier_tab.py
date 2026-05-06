@@ -12,7 +12,7 @@ common to every oss_frontier mixed-model cell), so each comparison column shares
 the same OSS-baseline backbone. Budgets shown: ``250s`` and ``800s``.
 """
 
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -166,7 +166,7 @@ def _build_css_frame(mean_df: pd.DataFrame) -> pd.DataFrame:
     css = pd.DataFrame("", index=mean_df.index, columns=mean_df.columns)
     for row in mean_df.index:
         for col in mean_df.columns:
-            css.loc[row, col] = _gradient_css_for_value(value=mean_df.loc[row, col])
+            css.loc[row, col] = _gradient_css_for_value(value=cast(float, mean_df.loc[row, col]))
     return css
 
 
