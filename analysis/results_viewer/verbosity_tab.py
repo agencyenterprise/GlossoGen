@@ -1,7 +1,7 @@
 """Streamlit tab plotting language-metric verbosity vs round-success rate.
 
 One scatter point per evaluated baseline or resume run. The user picks one of
-four language metrics for the X axis (MCR / MML / MWL / perplexity); Y is the
+three language metrics for the X axis (MCR / MCM / perplexity); Y is the
 run's round-success fraction. Points are coloured by series
 ``(model, postmortem_enabled, baseline-vs-resume)`` so users can read whether
 the verbosity → success relationship holds within each configuration.

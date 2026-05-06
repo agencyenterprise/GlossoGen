@@ -292,7 +292,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     if value_metrics:
         st.markdown("### Per-round values")
         st.caption(
-            "Continuous metrics (perplexity, mcr, ...) share one Y axis — "
+            "Continuous metrics (perplexity, mcr, mcm, ...) share one Y axis — "
             "colour = run, line style = metric. `round_success*` metrics render "
             "as a rug strip below, one tick per succeeded round."
         )
