@@ -10,6 +10,7 @@ import streamlit as st
 
 from analysis.results_viewer.resume_data import ResumeRun, list_resume_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
+from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
 from analysis.results_viewer.series_plot import (
     SeriesStats,
     add_mean_trace,
@@ -107,32 +108,43 @@ def _aggregate_window_stats(
 
 def _window_replica_dots(
     runs: list[ResumeRun],
-) -> dict[str, tuple[list[float], list[float], list[str]]]:
-    """Per-series jittered (round_start, accuracy) replica points for the window chart."""
-    dots: dict[str, tuple[list[float], list[float], list[str]]] = {}
+    frontend_base: str,
+) -> dict[str, tuple[list[float], list[float], list[str], list[str]]]:
+    """Per-series jittered (round_start, accuracy) replica points + URL for the window chart.
+
+    Resumed dots link to the resumed run; source dots link to the matched
+    source run so users can open either side of the comparison.
+    """
+    dots: dict[str, tuple[list[float], list[float], list[str], list[str]]] = {}
     counter: dict[str, int] = {}
     for run in runs:
-        for series, value in (
-            (_window_resumed_series(run=run), _resumed_window_accuracy(run=run)),
-            (_window_source_series(run=run), _source_window_accuracy(run=run)),
+        for series, value, target_run_id in (
+            (_window_resumed_series(run=run), _resumed_window_accuracy(run=run), run.run_id),
+            (
+                _window_source_series(run=run),
+                _source_window_accuracy(run=run),
+                run.source_run_id,
+            ),
         ):
             if value is None:
                 continue
-            bucket = dots.setdefault(series, ([], [], []))
+            bucket = dots.setdefault(series, ([], [], [], []))
             index = counter.get(series, 0)
             bucket[0].append(jittered_x_linear(base_x=float(run.round_start), index=index))
             bucket[1].append(value)
+            url = run_url(frontend_base=frontend_base, run_id=target_run_id)
             bucket[2].append(
-                f"{run.run_id}<br>{series}<br>round_start={run.round_start}<br>"
-                f"accuracy={value:.3f}"
+                f"{target_run_id}<br>{series}<br>round_start={run.round_start}<br>"
+                f"accuracy={value:.3f}<br>click to open · {url}"
             )
+            bucket[3].append(url)
             counter[series] = index + 1
     return dots
 
 
 def _build_window_figure(
     stats: list[SeriesStats],
-    replica_dots: dict[str, tuple[list[float], list[float], list[str]]],
+    replica_dots: dict[str, tuple[list[float], list[float], list[str], list[str]]],
     x_tickvals: list[int],
 ) -> go.Figure:
     """Per-window-accuracy figure: X = round_start, Y = mean fraction stabilized."""
@@ -142,18 +154,10 @@ def _build_window_figure(
     stats_by_series: dict[str, list[SeriesStats]] = {}
     for stat in stats:
         stats_by_series.setdefault(stat.series, []).append(stat)
+    # Means are drawn first so the replica scatter sits on top and click events
+    # land on replica points (which carry the per-run customdata URL) rather
+    # than the larger opaque mean markers.
     for series, colour in palette.items():
-        xs, ys, hover = replica_dots.get(series, ([], [], []))
-        if xs:
-            add_replica_trace(
-                fig=fig,
-                series=series,
-                xs=xs,
-                ys=ys,
-                hover_texts=hover,
-                colour=colour,
-                customdata=None,
-            )
         dash = "dash" if series.endswith(" · source") else "solid"
         add_mean_trace(
             fig=fig,
@@ -163,6 +167,18 @@ def _build_window_figure(
             colour=colour,
             dash=dash,
         )
+    for series, colour in palette.items():
+        xs, ys, hover, urls = replica_dots.get(series, ([], [], [], []))
+        if xs:
+            add_replica_trace(
+                fig=fig,
+                series=series,
+                xs=xs,
+                ys=ys,
+                hover_texts=hover,
+                colour=colour,
+                customdata=urls,
+            )
     fig.update_layout(
         xaxis=dict(
             title="round_start",
@@ -178,7 +194,7 @@ def _build_window_figure(
     return fig
 
 
-def _render_window_view(runs: list[ResumeRun]) -> None:
+def _render_window_view(runs: list[ResumeRun], frontend_base: str) -> None:
     """Render the per-window aggregate accuracy chart + caption."""
     st.caption(
         "Per replica, mean success across the rounds it actually played; "
@@ -188,13 +204,20 @@ def _render_window_view(runs: list[ResumeRun]) -> None:
     if not stats:
         st.info("No window data to plot.")
         return
-    replica_dots = _window_replica_dots(runs=runs)
+    replica_dots = _window_replica_dots(runs=runs, frontend_base=frontend_base)
     x_tickvals = sorted({int(s.x_value) for s in stats})
     fig = _build_window_figure(stats=stats, replica_dots=replica_dots, x_tickvals=x_tickvals)
-    st.plotly_chart(fig, width="stretch", key="resume_window_accuracy_chart")
+    chart_event = st.plotly_chart(
+        fig,
+        width="stretch",
+        key="resume_window_accuracy_chart",
+        on_select="rerun",
+        selection_mode=("points",),
+    )
+    maybe_open_clicked_run(chart_event=chart_event, session_key="resume_last_opened_url")
 
 
-def _render_included_runs(runs: list[ResumeRun]) -> None:
+def _render_included_runs(runs: list[ResumeRun], frontend_base: str) -> None:
     """Per-replica audit listing inside an expander."""
     rows = [
         {
@@ -206,11 +229,29 @@ def _render_included_runs(runs: list[ResumeRun]) -> None:
             "rounds_won": sum(1 for ok in run.resumed_round_outcomes.values() if ok),
             "source_run_id": run.source_run_id,
             "run_id": run.run_id,
+            "url": run_url(frontend_base=frontend_base, run_id=run.run_id),
+            "source_url": run_url(frontend_base=frontend_base, run_id=run.source_run_id),
         }
         for run in sorted(runs, key=lambda r: (r.resumed_series_key(), r.run_id))
     ]
     with st.expander(f"Included runs ({len(rows)})", expanded=False):
-        st.dataframe(rows, width="stretch", hide_index=True)
+        st.dataframe(
+            rows,
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "url": st.column_config.LinkColumn(
+                    label="open",
+                    display_text="↗",
+                    help="Open this resumed run in the schmidt frontend",
+                ),
+                "source_url": st.column_config.LinkColumn(
+                    label="open source",
+                    display_text="↗",
+                    help="Open the matched source run in the schmidt frontend",
+                ),
+            },
+        )
 
 
 def render(evaluated: list[EvaluatedRun]) -> None:
@@ -222,6 +263,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
             "Add the 'resume' label to replace-agent runs you want compared here."
         )
         return
+    frontend_base = render_frontend_base(streamlit_key="resume_frontend_base")
     selected_buckets = _bucket_filter(runs=all_resume)
     if not selected_buckets:
         st.info("Select at least one resume bucket.")
@@ -230,5 +272,5 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     if not filtered:
         st.info("No resume runs match the selected buckets.")
         return
-    _render_window_view(runs=filtered)
-    _render_included_runs(runs=filtered)
+    _render_window_view(runs=filtered, frontend_base=frontend_base)
+    _render_included_runs(runs=filtered, frontend_base=frontend_base)

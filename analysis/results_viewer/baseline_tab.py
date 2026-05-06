@@ -10,11 +10,8 @@ corresponding run in the schmidt frontend (URL is attached to each point as
 ``customdata`` and read back from the chart's selection event).
 """
 
-import json
-
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 
 from analysis.results_viewer.baseline_data import (
     METRIC_OPTIONS,
@@ -26,6 +23,7 @@ from analysis.results_viewer.baseline_data import (
     list_baseline_runs,
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun
+from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
 from analysis.results_viewer.series_plot import (
     SeriesStats,
     add_mean_trace,
@@ -35,32 +33,6 @@ from analysis.results_viewer.series_plot import (
     render_horizontal_checkboxes,
     series_color_map,
 )
-
-
-def _render_frontend_base() -> str:
-    """Text input for the frontend base URL used to build per-run links.
-
-    Returned value is trimmed of trailing slashes. Defaults to the local dev
-    server; the user can paste a Railway / production URL to deep-link into a
-    deployed frontend instead.
-    """
-    raw = st.text_input(
-        label="Frontend base URL (for run links)",
-        value="http://localhost:3000",
-        key="baseline_frontend_base",
-        help="Run-id dots in the chart and the table below link to "
-        "`<base>/runs/<scenario>/<run_dir_name>` on this host.",
-    )
-    return raw.rstrip("/")
-
-
-def _run_url(frontend_base: str, run_id: str) -> str:
-    """Build the per-run frontend URL: ``<base>/runs/<scenario>/<run_dir_name>``.
-
-    ``run_id`` already has the ``<scenario>/<run_dir_name>`` shape from
-    ``run_catalog._derive_run_id``, so the final path is just ``/runs/<run_id>``.
-    """
-    return f"{frontend_base}/runs/{run_id}"
 
 
 def _render_metric_selector() -> MetricOption:
@@ -158,7 +130,7 @@ def _replica_xs_ys_hover(
     urls: list[str] = []
     for index, run in enumerate(runs):
         value = metric.extract(run=run)
-        url = _run_url(frontend_base=frontend_base, run_id=run.run_id)
+        url = run_url(frontend_base=frontend_base, run_id=run.run_id)
         xs.append(jittered_x(base_x=run.budget, index=index))
         ys.append(value)
         hover.append(
@@ -211,6 +183,21 @@ def _build_figure(
     stats_by_series: dict[str, list[BudgetStats]] = {}
     for stat in stats:
         stats_by_series.setdefault(stat.series, []).append(stat)
+    # Means are drawn first so the replica scatter sits on top and click events
+    # land on replica points (which carry the per-run customdata URL) rather
+    # than the larger opaque mean markers.
+    for series, colour in colour_by_series.items():
+        if series not in runs_by_series:
+            continue
+        if series in stats_by_series:
+            add_mean_trace(
+                fig=fig,
+                series=series,
+                stats=_budget_stats_to_series_stats(stats=stats_by_series[series]),
+                metric_display_name=metric.display_name,
+                colour=colour,
+                dash="solid",
+            )
     for series, colour in colour_by_series.items():
         if series not in runs_by_series:
             continue
@@ -229,15 +216,6 @@ def _build_figure(
             colour=colour,
             customdata=urls,
         )
-        if series in stats_by_series:
-            add_mean_trace(
-                fig=fig,
-                series=series,
-                stats=_budget_stats_to_series_stats(stats=stats_by_series[series]),
-                metric_display_name=metric.display_name,
-                colour=colour,
-                dash="solid",
-            )
     yaxis_kwargs: dict[str, object] = {
         "title": f"{metric.y_axis_label} (mean ± std)",
         "range": [y_axis.y_min, y_axis.y_max],
@@ -278,43 +256,6 @@ def _render_stats_table(stats: list[BudgetStats], metric: MetricOption) -> None:
     st.dataframe(rows, width="stretch", hide_index=True)
 
 
-def _maybe_open_clicked_run(chart_event: object) -> None:
-    """Open the most recently clicked replica in a new browser tab.
-
-    Streamlit reruns the script on every selection change, so we
-    de-duplicate via ``st.session_state["baseline_last_opened_url"]`` to avoid
-    re-opening the same run when the user toggles an unrelated filter. The
-    actual navigation is done by injecting a tiny ``window.open`` script via
-    ``components.html`` — Streamlit has no native "open external URL" call.
-    """
-    selection = getattr(chart_event, "selection", None)
-    if selection is None:
-        return
-    points = selection.get("points") if isinstance(selection, dict) else None
-    if not points:
-        return
-    last_point = points[-1]
-    customdata = last_point.get("customdata")
-    if not customdata:
-        return
-    if isinstance(customdata, list):
-        url = customdata[0] if customdata else None
-    else:
-        url = customdata
-    if not isinstance(url, str) or not url:
-        return
-    last_key = "baseline_last_opened_url"
-    if st.session_state.get(last_key) == url:
-        return
-    st.session_state[last_key] = url
-    encoded = json.dumps(url)
-    components.html(
-        f"<script>window.open({encoded}, '_blank', 'noopener,noreferrer');</script>",
-        height=0,
-    )
-    st.toast(f"opened {url}", icon="↗")
-
-
 def _render_included_runs(
     runs: list[BaselineRun],
     metric: MetricOption,
@@ -333,7 +274,7 @@ def _render_included_runs(
             "budget": r.budget,
             metric.display_name: round(metric.extract(run=r), 4),
             "run_id": r.run_id,
-            "url": _run_url(frontend_base=frontend_base, run_id=r.run_id),
+            "url": run_url(frontend_base=frontend_base, run_id=r.run_id),
         }
         for r in sorted(
             runs,
@@ -369,7 +310,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         )
         return
     metric = _render_metric_selector()
-    frontend_base = _render_frontend_base()
+    frontend_base = render_frontend_base(streamlit_key="baseline_frontend_base")
     selected_models = _render_model_filter(runs=all_baseline)
     selected_postmortem = _render_postmortem_filter(runs=all_baseline)
     selected_kinds = _render_kind_filter(runs=all_baseline)
@@ -440,7 +381,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         on_select="rerun",
         selection_mode=("points",),
     )
-    _maybe_open_clicked_run(chart_event=chart_event)
+    maybe_open_clicked_run(chart_event=chart_event, session_key="baseline_last_opened_url")
     _render_stats_table(stats=stats, metric=metric)
     _render_included_runs(
         runs=metric_runs,

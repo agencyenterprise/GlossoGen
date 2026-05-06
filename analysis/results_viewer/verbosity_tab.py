@@ -11,15 +11,14 @@ they use ``round_success_after_resume`` so the success score is on the same
 scope as the verbosity metrics (post-resume only).
 """
 
-import json
 import math
 
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 from plotly.subplots import make_subplots
 
 from analysis.results_viewer.run_catalog import EvaluatedRun
+from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
 from analysis.results_viewer.series_plot import (
     add_mean_trace,
     add_replica_trace,
@@ -34,23 +33,6 @@ from analysis.results_viewer.verbosity_data import (
     VerbosityRun,
     list_verbosity_runs,
 )
-
-
-def _render_frontend_base() -> str:
-    """Text input for the frontend base URL used to build per-run links."""
-    raw = st.text_input(
-        label="Frontend base URL (for run links)",
-        value="http://localhost:3000",
-        key="verbosity_frontend_base",
-        help="Run-id dots in the chart link to "
-        "`<base>/runs/<scenario>/<run_dir_name>` on this host.",
-    )
-    return raw.rstrip("/")
-
-
-def _run_url(frontend_base: str, run_id: str) -> str:
-    """Build the per-run frontend URL."""
-    return f"{frontend_base}/runs/{run_id}"
 
 
 def _render_metric_selector() -> VerbosityMetricOption:
@@ -245,7 +227,7 @@ def _build_scatter(
             f"<br>success={r.success_fraction:.0%}"
             for r in bucket
         ]
-        urls = [_run_url(frontend_base=frontend_base, run_id=r.run_id) for r in bucket]
+        urls = [run_url(frontend_base=frontend_base, run_id=r.run_id) for r in bucket]
         fig.add_trace(
             go.Scatter(
                 x=xs,
@@ -334,7 +316,7 @@ def _build_per_round_figure(
                 f"{run.run_id}<br>round={obs.round_number}<br>"
                 f"{metric.display_name}={obs.value:.2f}"
             )
-            urls.append(_run_url(frontend_base=frontend_base, run_id=run.run_id))
+            urls.append(run_url(frontend_base=frontend_base, run_id=run.run_id))
             flat_round_values.append((series, float(obs.round_number), obs.value))
     if xs:
         add_replica_trace(
@@ -436,40 +418,6 @@ def _render_summary_table(
     st.dataframe(rows, width="stretch", hide_index=True)
 
 
-def _maybe_open_clicked_run(chart_event: object) -> None:
-    """Open the most recently clicked point in a new browser tab.
-
-    De-duplicates via ``st.session_state["verbosity_last_opened_url"]`` so
-    unrelated reruns don't re-trigger the navigation.
-    """
-    selection = getattr(chart_event, "selection", None)
-    if selection is None:
-        return
-    points = selection.get("points") if isinstance(selection, dict) else None
-    if not points:
-        return
-    last_point = points[-1]
-    customdata = last_point.get("customdata")
-    if not customdata:
-        return
-    if isinstance(customdata, list):
-        url = customdata[0] if customdata else None
-    else:
-        url = customdata
-    if not isinstance(url, str) or not url:
-        return
-    last_key = "verbosity_last_opened_url"
-    if st.session_state.get(last_key) == url:
-        return
-    st.session_state[last_key] = url
-    encoded = json.dumps(url)
-    components.html(
-        f"<script>window.open({encoded}, '_blank', 'noopener,noreferrer');</script>",
-        height=0,
-    )
-    st.toast(f"opened {url}", icon="↗")
-
-
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Verbosity tab body."""
     all_runs = list_verbosity_runs(evaluated_runs=evaluated)
@@ -480,7 +428,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         )
         return
     metric = _render_metric_selector()
-    frontend_base = _render_frontend_base()
+    frontend_base = render_frontend_base(streamlit_key="verbosity_frontend_base")
     selected_models = _render_model_filter(runs=all_runs)
     selected_postmortem = _render_postmortem_filter(runs=all_runs)
     selected_kinds = _render_kind_filter(runs=all_runs)
@@ -527,7 +475,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         on_select="rerun",
         selection_mode=("points",),
     )
-    _maybe_open_clicked_run(chart_event=chart_event)
+    maybe_open_clicked_run(chart_event=chart_event, session_key="verbosity_last_opened_url")
     _render_summary_table(runs=metric_runs, metric=metric)
     st.markdown("### Per-round verbosity")
     st.caption(
@@ -547,4 +495,4 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         on_select="rerun",
         selection_mode=("points",),
     )
-    _maybe_open_clicked_run(chart_event=per_round_event)
+    maybe_open_clicked_run(chart_event=per_round_event, session_key="verbosity_last_opened_url")
