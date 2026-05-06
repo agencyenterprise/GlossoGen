@@ -1,7 +1,7 @@
 """Per-run records for the Verbosity tab's success-rate scatter.
 
-Each ``VerbosityRun`` pairs a single language metric (MCR / MML / MWL /
-perplexity) with the run's success fraction. Baseline runs use the run-wide
+Each ``VerbosityRun`` pairs a single language metric (MCR / MCM / perplexity)
+with the run's success fraction. Baseline runs use the run-wide
 ``round_success`` score; resume runs use ``round_success_after_resume`` so
 the success-fraction is on the same scope as the language metrics, which are
 computed only over post-resume messages.
@@ -15,14 +15,12 @@ from typing import NamedTuple
 import orjson
 
 from analysis.results_viewer.measurement_scores import (
+    MCM_METRIC,
     MCR_METRIC,
-    MML_METRIC,
-    MWL_METRIC,
     PERPLEXITY_METRIC,
     ROUND_SUCCESS_METRIC,
+    mcm_score,
     mcr_score,
-    mml_score,
-    mwl_score,
     perplexity_score,
     read_labels,
     round_success_after_resume_score,
@@ -53,8 +51,7 @@ class VerbosityRun(NamedTuple):
     budget: int | None
     success_fraction: float
     mcr_score: float | None
-    mml_score: float | None
-    mwl_score: float | None
+    mcm_score: float | None
     perplexity_score: float | None
     per_round_by_metric: dict[str, list[RoundValue]]
     labels: list[str]
@@ -77,8 +74,7 @@ class VerbosityMetricOption(NamedTuple):
 
 _DISPLAY_NAME_TO_METRIC = {
     "mcr": MCR_METRIC,
-    "mml": MML_METRIC,
-    "mwl": MWL_METRIC,
+    "mcm": MCM_METRIC,
     "perplexity": PERPLEXITY_METRIC,
 }
 
@@ -98,26 +94,17 @@ VERBOSITY_METRIC_OPTIONS: list[VerbosityMetricOption] = [
         ),
     ),
     VerbosityMetricOption(
-        display_name="mml",
-        attr="mml_score",
-        x_axis_label="mml (mean words per primary-channel message)",
+        display_name="mcm",
+        attr="mcm_score",
+        x_axis_label="mcm (mean characters per primary-channel message)",
         description=(
-            "**mean_message_length (mml)** — mean number of whitespace-"
-            "delimited words per primary-channel message.\n\n"
-            "Lower MML = shorter messages. Pairs with MWL: low MML = "
-            "fewer words per message; low MWL = shorter words. Compression "
-            "can show up on either axis independently."
-        ),
-    ),
-    VerbosityMetricOption(
-        display_name="mwl",
-        attr="mwl_score",
-        x_axis_label="mwl (mean characters per primary-channel word)",
-        description=(
-            "**mean_word_length (mwl)** — mean number of characters per "
-            "whitespace-delimited word.\n\n"
-            "Lower MWL = agents replacing long words with short codes, "
-            "often a hallmark of an emergent protocol."
+            "**mean_chars_per_message (mcm)** — characters per "
+            "primary-channel message, averaged across all messages. "
+            "Normalizes MCR by message count: rounds that need more "
+            "back-and-forth no longer inflate the score, so MCM "
+            "isolates per-message verbosity from message density.\n\n"
+            "Lower MCM = each message carries fewer characters, "
+            "regardless of how many messages the round needed."
         ),
     ),
     VerbosityMetricOption(
@@ -167,8 +154,7 @@ def build_verbosity_run(evaluated: EvaluatedRun) -> VerbosityRun | None:
         budget=budget,
         success_fraction=success_fraction,
         mcr_score=mcr_score(evaluated=evaluated),
-        mml_score=mml_score(evaluated=evaluated),
-        mwl_score=mwl_score(evaluated=evaluated),
+        mcm_score=mcm_score(evaluated=evaluated),
         perplexity_score=perplexity_score(evaluated=evaluated),
         per_round_by_metric=_collect_per_round(evaluated=evaluated),
         labels=labels,
@@ -178,8 +164,8 @@ def build_verbosity_run(evaluated: EvaluatedRun) -> VerbosityRun | None:
 def _collect_per_round(evaluated: EvaluatedRun) -> dict[str, list[RoundValue]]:
     """Build per-round value lists for each verbosity metric on a run.
 
-    Keyed by the streamlit display name (``mcr`` / ``mml`` / ``mwl`` /
-    ``perplexity``) so the tab can look up by ``MetricOption.display_name``.
+    Keyed by the streamlit display name (``mcr`` / ``perplexity``) so the tab
+    can look up by ``MetricOption.display_name``.
     Missing metrics yield an empty list rather than absent keys.
     """
     by_name: dict[str, list[RoundValue]] = {display: [] for display in _DISPLAY_NAME_TO_METRIC}

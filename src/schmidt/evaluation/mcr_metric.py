@@ -5,11 +5,7 @@ channel each round, then averages across rounds. Deterministic — does not
 consult the LLM provider.
 
 Captures channel utilization — how much of the per-round character budget
-agents actually use. Pairs with ``mean_word_length`` and
-``mean_message_length``: MWL asks "how compact are the words?", MML asks
-"how verbose is each message?", MCR asks "how much language does the
-channel carry per round overall?". A run can have low MWL + low MML and
-still high MCR if it sends many short messages.
+agents actually use.
 """
 
 import logging
