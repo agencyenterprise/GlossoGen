@@ -432,6 +432,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{scenario}/{run_dir_name}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Sync Run Metadata
+         * @description Overwrite labels / note / evaluation report for an existing run.
+         *
+         *     Returns 404 when the run does not exist on this server. Each field of
+         *     the body is independent: ``null`` skips the field, a value replaces it.
+         */
+        put: operations["sync_run_metadata_api_runs__scenario___run_dir_name__metadata_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/prod-upload/status": {
         parameters: {
             query?: never;
@@ -470,6 +493,29 @@ export interface paths {
          *     delete the remote run first and re-upload, returning ``overridden``.
          */
         post: operations["upload_run_to_prod_api_runs__scenario___run_dir_name__upload_to_prod_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{scenario}/{run_dir_name}/sync-metadata-to-prod": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Run Metadata To Prod
+         * @description Read labels / note / eval report locally and PUT them onto the prod run.
+         *
+         *     Returns 404 when prod does not have this run (caller should fall back
+         *     to the full ``upload-to-prod`` flow). 503 when prod is not configured.
+         */
+        post: operations["sync_run_metadata_to_prod_api_runs__scenario___run_dir_name__sync_metadata_to_prod_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -636,6 +682,21 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
+        };
+        /**
+         * AgentObservation
+         * @description One agent's contribution to a Measurement.
+         *
+         *     Used only when an agent-level breakdown is meaningful (e.g.
+         *     content_filter_refusal per agent). Empty list otherwise.
+         */
+        AgentObservation: {
+            /** Agent Id */
+            agent_id: string;
+            /** Value */
+            value: number;
+            /** Note */
+            note: string;
         };
         /**
          * AgentObservationResponse
@@ -906,6 +967,52 @@ export interface components {
             evaluation_cost: components["schemas"]["EvalCostResponse"] | null;
         };
         /**
+         * EvaluationCost
+         * @description Token usage and estimated dollar cost for an evaluation run.
+         */
+        EvaluationCost: {
+            usage: components["schemas"]["EvaluationTokenUsage"];
+            /** Estimated Cost Usd */
+            estimated_cost_usd: number;
+            /** Model */
+            model: string;
+            /** Provider Name */
+            provider_name: string;
+        };
+        /**
+         * EvaluationReport
+         * @description Aggregated evaluation output for a single simulation run.
+         *
+         *     Attributes:
+         *         simulation_id: Unique identifier of the simulation that was evaluated.
+         *         scenario_name: Name of the scenario that was simulated.
+         *         measurements: Collection of measurements produced by all metrics.
+         *         evaluation_cost: Token usage and estimated dollar cost for the evaluation.
+         */
+        EvaluationReport: {
+            /** Simulation Id */
+            simulation_id: string;
+            /** Scenario Name */
+            scenario_name: string;
+            /** Measurements */
+            measurements: components["schemas"]["Measurement"][];
+            evaluation_cost: components["schemas"]["EvaluationCost"];
+        };
+        /**
+         * EvaluationTokenUsage
+         * @description Accumulated token counts across all LLM calls during an evaluation run.
+         */
+        EvaluationTokenUsage: {
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Cache Read Input Tokens */
+            cache_read_input_tokens: number;
+            /** Cache Creation Input Tokens */
+            cache_creation_input_tokens: number;
+        };
+        /**
          * ForkRequest
          * @description Request body for creating a forked simulation run.
          */
@@ -1008,6 +1115,30 @@ export interface components {
          * @enum {string}
          */
         LaunchStatus: "started";
+        /**
+         * Measurement
+         * @description Numeric measurement result for a single metric applied to a run.
+         *
+         *     ``score`` is the metric's overall scalar (mean, fraction, count, ...).
+         *     ``score_unit`` is a free-form human-readable label describing what
+         *     ``score`` represents. ``summary`` is a one-line rollup.
+         *     ``per_round`` and ``per_agent`` carry structured breakdowns that
+         *     downstream tools can plot or filter without re-parsing strings.
+         */
+        Measurement: {
+            /** Metric Name */
+            metric_name: string;
+            /** Score */
+            score: number;
+            /** Score Unit */
+            score_unit: string;
+            /** Summary */
+            summary: string;
+            /** Per Round */
+            per_round: components["schemas"]["RoundObservation"][];
+            /** Per Agent */
+            per_agent: components["schemas"]["AgentObservation"][];
+        };
         /**
          * MeasurementResponse
          * @description Numeric measurement produced by a single metric for the run detail endpoint.
@@ -1192,6 +1323,23 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
+        };
+        /**
+         * RoundObservation
+         * @description One round's structured contribution to a Measurement.
+         *
+         *     A metric only emits a RoundObservation for rounds it has something to
+         *     say about. Pure metrics (perplexity, mlu) emit one per round with
+         *     messages; flag-style metrics (neologism, round_ended_idle) emit one
+         *     per round where the phenomenon fired.
+         */
+        RoundObservation: {
+            /** Round Number */
+            round_number: number;
+            /** Value */
+            value: number;
+            /** Note */
+            note: string;
         };
         /**
          * RoundObservationResponse
@@ -1785,6 +1933,35 @@ export interface components {
             target_message_id: string;
             /** Swapped Observer Display Names */
             swapped_observer_display_names: string[];
+        };
+        /**
+         * SyncMetadataRequest
+         * @description Body for the per-run metadata-only ingest endpoint.
+         *
+         *     Each field is optional. ``None`` means "leave the existing value on disk
+         *     untouched". Provide an empty list / empty string / a fresh report to
+         *     explicitly overwrite.
+         */
+        SyncMetadataRequest: {
+            /** Labels */
+            labels: string[] | null;
+            /** Note */
+            note: string | null;
+            report: components["schemas"]["EvaluationReport"] | null;
+        };
+        /**
+         * SyncMetadataResponse
+         * @description Outcome of a metadata sync, indicating which fields were written.
+         */
+        SyncMetadataResponse: {
+            /** Run Id */
+            run_id: string;
+            /** Labels Written */
+            labels_written: boolean;
+            /** Note Written */
+            note_written: boolean;
+            /** Report Written */
+            report_written: boolean;
         };
         /**
          * ToolUseEntry
@@ -2627,6 +2804,42 @@ export interface operations {
             };
         };
     };
+    sync_run_metadata_api_runs__scenario___run_dir_name__metadata_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario: string;
+                run_dir_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncMetadataRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncMetadataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     prod_upload_status_api_prod_upload_status_get: {
         parameters: {
             query?: never;
@@ -2668,6 +2881,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProdUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_run_metadata_to_prod_api_runs__scenario___run_dir_name__sync_metadata_to_prod_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario: string;
+                run_dir_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncMetadataResponse"];
                 };
             };
             /** @description Validation Error */

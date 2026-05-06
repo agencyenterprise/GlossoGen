@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Discriminator
 
+from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.models.event import RunStatus
 from schmidt.server.response_models import LaunchStatus
 
@@ -588,6 +589,35 @@ class ProdUploadResponse(BaseModel):
 
     run_id: str
     outcome: ProdUploadOutcome
+
+
+# ---------------------------------------------------------------------------
+# Metadata sync (labels, note, eval report) models
+# ---------------------------------------------------------------------------
+
+
+class SyncMetadataRequest(BaseModel):
+    """Body for the per-run metadata-only ingest endpoint.
+
+    Each field is optional. ``None`` means "leave the existing value on disk
+    untouched". Provide an empty list / empty string / a fresh report to
+    explicitly overwrite.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    labels: list[str] | None
+    note: str | None
+    report: EvaluationReport | None
+
+
+class SyncMetadataResponse(BaseModel):
+    """Outcome of a metadata sync, indicating which fields were written."""
+
+    run_id: str
+    labels_written: bool
+    note_written: bool
+    report_written: bool
 
 
 # ---------------------------------------------------------------------------
