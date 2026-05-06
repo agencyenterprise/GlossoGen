@@ -291,7 +291,7 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── {scenario_name}_report.json        # Evaluation report (written by evaluate)
 ├── {scenario_name}_stdout.log         # (pipe stdout here, not in git)
 ├── labels.json                        # JSON array of label strings (e.g. ["baseline_oss"])
-├── note.json                          # Optional free-text note for the run
+├── note.md                            # Optional free-text note for the run
 ├── fork_manifest.json                 # (forked runs only) provenance: source_run_id, target_message_id
 ├── replace_manifest.json              # (replace-agent runs only) provenance + post-swap channel visibility
 ├── cross_run_replace_manifest.json    # (cross-run replace-agent runs only) source_a/source_b/imported_model + post-swap channel visibility

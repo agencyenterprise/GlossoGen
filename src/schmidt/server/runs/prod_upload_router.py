@@ -8,15 +8,19 @@ import asyncio
 import logging
 from pathlib import Path
 
+import aiofiles
 import httpx
+import orjson
 from fastapi import APIRouter, HTTPException, Request
 
+from schmidt.evaluation.evaluation_report import EvaluationReport, load_report
 from schmidt.server.runs.bundle_router import build_bundle_bytes
 from schmidt.server.runs.discovery import compose_run_id, resolve_run
 from schmidt.server.runs.models import (
     ProdUploadOutcome,
     ProdUploadResponse,
     ProdUploadStatusResponse,
+    SyncMetadataResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -213,3 +217,100 @@ async def upload_run_to_prod(
         len(bundle_bytes) / (1024 * 1024),
     )
     return ProdUploadResponse(run_id=run_id, outcome=outcome)
+
+
+async def _read_local_metadata(
+    *,
+    run_dir: Path,
+    scenario_name: str,
+) -> tuple[list[str] | None, str | None, EvaluationReport | None]:
+    """Read labels.json, note.md, <scenario>_report.json from the run dir."""
+    labels: list[str] | None = None
+    labels_path = run_dir / "labels.json"
+    if labels_path.exists():
+        async with aiofiles.open(labels_path, mode="rb") as f:
+            labels = orjson.loads(await f.read())
+
+    note: str | None = None
+    note_path = run_dir / "note.md"
+    if note_path.exists():
+        async with aiofiles.open(note_path, mode="r", encoding="utf-8") as f:
+            note = await f.read()
+
+    report = await load_report(report_path=run_dir / f"{scenario_name}_report.json")
+
+    return labels, note, report
+
+
+@router.post(
+    "/runs/{scenario}/{run_dir_name}/sync-metadata-to-prod",
+    response_model=SyncMetadataResponse,
+)
+async def sync_run_metadata_to_prod(
+    scenario: str,
+    run_dir_name: str,
+    request: Request,
+) -> SyncMetadataResponse:
+    """Read labels / note / eval report locally and PUT them onto the prod run.
+
+    Returns 404 when prod does not have this run (caller should fall back
+    to the full ``upload-to-prod`` flow). 503 when prod is not configured.
+    """
+    prod_url, prod_password = _read_prod_credentials(request=request)
+    runs_dir: Path = request.app.state.runs_dir
+
+    try:
+        resolved = resolve_run(
+            runs_dir=runs_dir,
+            scenario_name=scenario,
+            run_dir_name=run_dir_name,
+        )
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Local run not found")
+
+    run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
+
+    labels, note, report = await _read_local_metadata(
+        run_dir=resolved.run_dir,
+        scenario_name=resolved.scenario_name,
+    )
+
+    payload = {
+        "labels": labels,
+        "note": note,
+        "report": report.model_dump(mode="json") if report is not None else None,
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.put(
+                url=f"{prod_url}/api/runs/{scenario}/{run_dir_name}/metadata",
+                headers={"Authorization": f"Bearer {prod_password}"},
+                json=payload,
+                timeout=_REQUEST_TIMEOUT_SECONDS,
+            )
+        except Exception as exc:
+            logger.exception("Failed to PUT metadata for %s to prod", run_id)
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to reach prod server: {exc}",
+            )
+
+    if response.status_code == 404:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Run {run_id} is not on prod — upload the full bundle first.",
+        )
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Prod metadata sync returned HTTP {response.status_code}: {response.text}",
+        )
+
+    data = response.json()
+    return SyncMetadataResponse(
+        run_id=data["run_id"],
+        labels_written=bool(data["labels_written"]),
+        note_written=bool(data["note_written"]),
+        report_written=bool(data["report_written"]),
+    )

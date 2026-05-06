@@ -1151,6 +1151,65 @@
         }
       }
     },
+    "/api/runs/{scenario}/{run_dir_name}/metadata": {
+      "put": {
+        "summary": "Sync Run Metadata",
+        "description": "Overwrite labels / note / evaluation report for an existing run.\n\nReturns 404 when the run does not exist on this server. Each field of\nthe body is independent: ``null`` skips the field, a value replaces it.",
+        "operationId": "sync_run_metadata_api_runs__scenario___run_dir_name__metadata_put",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "run_dir_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Dir Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncMetadataRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncMetadataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/prod-upload/status": {
       "get": {
         "summary": "Prod Upload Status",
@@ -1212,6 +1271,55 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProdUploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{scenario}/{run_dir_name}/sync-metadata-to-prod": {
+      "post": {
+        "summary": "Sync Run Metadata To Prod",
+        "description": "Read labels / note / eval report locally and PUT them onto the prod run.\n\nReturns 404 when prod does not have this run (caller should fall back\nto the full ``upload-to-prod`` flow). 503 when prod is not configured.",
+        "operationId": "sync_run_metadata_to_prod_api_runs__scenario___run_dir_name__sync_metadata_to_prod_post",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "run_dir_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Dir Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncMetadataResponse"
                 }
               }
             }
@@ -1505,6 +1613,30 @@
         ],
         "title": "AgentModelSummary",
         "description": "Per-agent model and provider info for run summary display."
+      },
+      "AgentObservation": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "value",
+          "note"
+        ],
+        "title": "AgentObservation",
+        "description": "One agent's contribution to a Measurement.\n\nUsed only when an agent-level breakdown is meaningful (e.g.\ncontent_filter_refusal per agent). Empty list otherwise."
       },
       "AgentObservationResponse": {
         "properties": {
@@ -2045,6 +2177,94 @@
         "title": "EvalReportResponse",
         "description": "Evaluation report for the run detail endpoint."
       },
+      "EvaluationCost": {
+        "properties": {
+          "usage": {
+            "$ref": "#/components/schemas/EvaluationTokenUsage"
+          },
+          "estimated_cost_usd": {
+            "type": "number",
+            "title": "Estimated Cost Usd"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "provider_name": {
+            "type": "string",
+            "title": "Provider Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usage",
+          "estimated_cost_usd",
+          "model",
+          "provider_name"
+        ],
+        "title": "EvaluationCost",
+        "description": "Token usage and estimated dollar cost for an evaluation run."
+      },
+      "EvaluationReport": {
+        "properties": {
+          "simulation_id": {
+            "type": "string",
+            "title": "Simulation Id"
+          },
+          "scenario_name": {
+            "type": "string",
+            "title": "Scenario Name"
+          },
+          "measurements": {
+            "items": {
+              "$ref": "#/components/schemas/Measurement"
+            },
+            "type": "array",
+            "title": "Measurements"
+          },
+          "evaluation_cost": {
+            "$ref": "#/components/schemas/EvaluationCost"
+          }
+        },
+        "type": "object",
+        "required": [
+          "simulation_id",
+          "scenario_name",
+          "measurements",
+          "evaluation_cost"
+        ],
+        "title": "EvaluationReport",
+        "description": "Aggregated evaluation output for a single simulation run.\n\nAttributes:\n    simulation_id: Unique identifier of the simulation that was evaluated.\n    scenario_name: Name of the scenario that was simulated.\n    measurements: Collection of measurements produced by all metrics.\n    evaluation_cost: Token usage and estimated dollar cost for the evaluation."
+      },
+      "EvaluationTokenUsage": {
+        "properties": {
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "cache_read_input_tokens": {
+            "type": "integer",
+            "title": "Cache Read Input Tokens"
+          },
+          "cache_creation_input_tokens": {
+            "type": "integer",
+            "title": "Cache Creation Input Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_tokens",
+          "output_tokens",
+          "cache_read_input_tokens",
+          "cache_creation_input_tokens"
+        ],
+        "title": "EvaluationTokenUsage",
+        "description": "Accumulated token counts across all LLM calls during an evaluation run."
+      },
       "ForkRequest": {
         "properties": {
           "target_message_id": {
@@ -2234,6 +2454,51 @@
         ],
         "title": "LaunchStatus",
         "description": "Status value for subprocess launch responses."
+      },
+      "Measurement": {
+        "properties": {
+          "metric_name": {
+            "type": "string",
+            "title": "Metric Name"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "score_unit": {
+            "type": "string",
+            "title": "Score Unit"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "per_round": {
+            "items": {
+              "$ref": "#/components/schemas/RoundObservation"
+            },
+            "type": "array",
+            "title": "Per Round"
+          },
+          "per_agent": {
+            "items": {
+              "$ref": "#/components/schemas/AgentObservation"
+            },
+            "type": "array",
+            "title": "Per Agent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric_name",
+          "score",
+          "score_unit",
+          "summary",
+          "per_round",
+          "per_agent"
+        ],
+        "title": "Measurement",
+        "description": "Numeric measurement result for a single metric applied to a run.\n\n``score`` is the metric's overall scalar (mean, fraction, count, ...).\n``score_unit`` is a free-form human-readable label describing what\n``score`` represents. ``summary`` is a one-line rollup.\n``per_round`` and ``per_agent`` carry structured breakdowns that\ndownstream tools can plot or filter without re-parsing strings."
       },
       "MeasurementResponse": {
         "properties": {
@@ -2587,6 +2852,30 @@
         ],
         "title": "RoundEnding",
         "description": "Reason a round's main phase ended.\n\nOne entry per round end, across all scenarios. ``trigger`` matches the\n``RoundEnded.trigger`` field (e.g. ``veyru_stabilized``,\n``all_agents_idle``, ``veyru_collapsed``, ``round_timeout``)."
+      },
+      "RoundObservation": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "value",
+          "note"
+        ],
+        "title": "RoundObservation",
+        "description": "One round's structured contribution to a Measurement.\n\nA metric only emits a RoundObservation for rounds it has something to\nsay about. Pure metrics (perplexity, mlu) emit one per round with\nmessages; flag-style metrics (neologism, round_ended_idle) emit one\nper round where the phenomenon fired."
       },
       "RoundObservationResponse": {
         "properties": {
@@ -3863,6 +4152,83 @@
         ],
         "title": "SwapPoint",
         "description": "Anchor for the moment agents were swapped between teams.\n\n``target_message_id`` is the first ``MessageSent`` on a link channel\nafter the swap fired, used by the frontend to scroll the timeline\nto that exact point. ``swapped_observer_display_names`` are the\ntwo observers who exchanged teams, in stable order."
+      },
+      "SyncMetadataRequest": {
+        "properties": {
+          "labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labels"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "labels",
+          "note",
+          "report"
+        ],
+        "title": "SyncMetadataRequest",
+        "description": "Body for the per-run metadata-only ingest endpoint.\n\nEach field is optional. ``None`` means \"leave the existing value on disk\nuntouched\". Provide an empty list / empty string / a fresh report to\nexplicitly overwrite."
+      },
+      "SyncMetadataResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "labels_written": {
+            "type": "boolean",
+            "title": "Labels Written"
+          },
+          "note_written": {
+            "type": "boolean",
+            "title": "Note Written"
+          },
+          "report_written": {
+            "type": "boolean",
+            "title": "Report Written"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "labels_written",
+          "note_written",
+          "report_written"
+        ],
+        "title": "SyncMetadataResponse",
+        "description": "Outcome of a metadata sync, indicating which fields were written."
       },
       "ToolUseEntry": {
         "properties": {
