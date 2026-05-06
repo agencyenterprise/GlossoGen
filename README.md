@@ -159,6 +159,7 @@ Generic metrics (available to all scenarios). Both deterministic and LLM-driven 
 - `content_filter_refusal` — counts LLM content-filter refusals during the run with per-agent breakdown
 - `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model (deterministic, no LLM judge)
 - `mean_chars_per_round` — mean total characters per round on the primary channel; the headline channel-utilization number that maps directly to Veyru's `time_budget_seconds` (deterministic, no LLM judge)
+- `mean_chars_per_message` — mean characters per primary-channel message, averaged across all messages; normalizes MCR by message count so rounds with more back-and-forth no longer inflate the score (deterministic, no LLM judge)
 
 Scenario-specific metrics:
 

@@ -77,7 +77,7 @@ def _is_value_metric(reports: list[EvaluationReport], metric_name: str) -> bool:
 
     Flag metrics (neologism, round_ended_idle, etc.) only ever emit
     ``value=1.0`` for rounds where the phenomenon fired. Value metrics
-    (perplexity, mcr, round_success) emit varying numbers per round —
+    (perplexity, mcr, mcm, round_success) emit varying numbers per round —
     plotting them as binary lane dots loses information.
     """
     for report in reports:
@@ -93,7 +93,7 @@ def _is_value_metric(reports: list[EvaluationReport], metric_name: str) -> bool:
 def collect_flag_metrics(reports: list[EvaluationReport]) -> list[str]:
     """Metric names that are flag-style (binary fire/no-fire per round).
 
-    Used by the lane plot. Value metrics like perplexity and mcr are excluded
+    Used by the lane plot. Value metrics like perplexity, mcr, mcm are excluded
     because every round fires and a binary lane carries no signal.
     """
     names: set[str] = set()
@@ -112,7 +112,7 @@ def collect_value_metrics(reports: list[EvaluationReport]) -> list[str]:
     """Metric names that carry a meaningful per-round numeric value.
 
     Used by the per-round value subplot grid (perplexity nats, mcr
-    chars/round, round_success 0/1, etc.).
+    chars/round, mcm chars/message, round_success 0/1, etc.).
     """
     names: set[str] = set()
     for report in reports:
@@ -652,7 +652,7 @@ def build_value_metrics_figure(
 ) -> go.Figure:
     """Continuous metrics share one Y axis; ``round_success*`` metrics render as a rug strip below.
 
-    Continuous metrics (perplexity, mcr, …) are drawn as lines on a single
+    Continuous metrics (perplexity, mcr, mcm, …) are drawn as lines on a single
     shared subplot — colour distinguishes runs, line dash distinguishes metrics.
     Binary ``round_success*`` metrics get their own narrow row underneath, with
     one vertical tick per (run, succeeded round).
