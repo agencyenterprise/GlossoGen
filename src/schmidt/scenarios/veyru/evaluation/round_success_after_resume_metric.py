@@ -32,6 +32,7 @@ from schmidt.cross_run_replace_manifest import read_cross_run_replace_manifest
 from schmidt.evaluation.log_reader import extract_agent_configs, load_events
 from schmidt.evaluation.measurement import Measurement, RoundObservation
 from schmidt.evaluation.metric_protocol import Metric
+from schmidt.evaluation.metric_run_options import MetricRunOptions
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import AgentSwappedMidRun, SimulationEvent
@@ -191,9 +192,10 @@ class RoundSuccessAfterResumeMetric(Metric):
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
         run_dir: Path,
+        options: MetricRunOptions,
     ) -> list[Measurement]:
         """Score one Measurement per swap anchor (manifest or in-run scheduled)."""
-        _ = llm_provider
+        _ = llm_provider, options
         anchors = _read_resume_anchors(events=events, run_dir=run_dir)
         if not anchors:
             return [

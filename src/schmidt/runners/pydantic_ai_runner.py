@@ -9,7 +9,6 @@ reasoning text and detecting tool call results.
 import asyncio
 import json
 import logging
-import os
 from collections.abc import AsyncIterable, Callable
 
 from pydantic_ai import Agent, _agent_graph
@@ -28,9 +27,6 @@ from pydantic_ai.messages import (
     ThinkingPart,
     ThinkingPartDelta,
 )
-from pydantic_ai.models.anthropic import AnthropicModelSettings
-from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModelSettings
-from pydantic_ai.providers.openai import OpenAIProvider as PydanticAIOpenAIProvider
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage, UsageLimits
@@ -55,30 +51,17 @@ from schmidt.runners.communication_protocol import (
     INITIAL_PROMPT,
     build_full_system_prompt,
 )
+from schmidt.runners.pydantic_ai_model_factory import (
+    build_pydantic_ai_model,
+    default_pydantic_ai_settings,
+)
+from schmidt.runtime.simulation_state import SimulationRuntime
 from schmidt.server.runs.streaming_event import AgentCostUpdated
 from schmidt.token_pricing import find_pricing
 
 logger = logging.getLogger(__name__)
 
 AGENT_RUN_RETRY_ATTEMPTS = 3
-
-
-def _resolve_self_hosted_base_url(model: str) -> str:
-    """Look up the OpenAI-compatible base URL for a self-hosted model.
-
-    Reads ``SELF_HOSTED_BASE_URLS`` from the environment, expecting a JSON
-    object mapping model names (as passed to the simulation) to their
-    serving endpoints.
-    """
-    raw = os.environ["SELF_HOSTED_BASE_URLS"]
-    mapping: dict[str, str] = json.loads(raw)
-    if model not in mapping:
-        configured = ", ".join(sorted(mapping)) or "<none>"
-        raise KeyError(
-            f"Self-hosted model {model!r} has no entry in SELF_HOSTED_BASE_URLS "
-            f"(configured models: {configured})"
-        )
-    return mapping[model]
 
 
 def _log_agent_run_retry(retry_state: RetryCallState) -> None:
@@ -212,10 +195,11 @@ class PydanticAIRunner(AgentRunner):
         self,
         agent_config: AgentConfig,
         mcp_server_url: str,
-        event_logger: EventLogger,
+        runtime: SimulationRuntime,
         cost_tracker: dict[str, float],
     ) -> AgentRunResult:
         """Launch a Pydantic AI agent that loops until it receives a done notification."""
+        event_logger = runtime.event_logger
         agent_id = agent_config.agent_id
         provider = agent_config.provider
         logger.info(
@@ -235,41 +219,12 @@ class PydanticAIRunner(AgentRunner):
             role_name=agent_config.role_name,
         )
 
-        if provider == "self-hosted":
-            base_url = _resolve_self_hosted_base_url(model=agent_config.model)
-            self_hosted_provider = PydanticAIOpenAIProvider(
-                base_url=base_url,
-                api_key=os.environ["SELF_HOSTED_API_KEY"],
-            )
-            self_hosted_model = OpenAIChatModel(agent_config.model, provider=self_hosted_provider)
-            agent: Agent[None, str] = Agent(
-                model=self_hosted_model,
-                system_prompt=full_system_prompt,
-                toolsets=[mcp_server],
-                model_settings=ModelSettings(),
-            )
-        else:
-            if provider == "anthropic":
-                default_settings: ModelSettings = AnthropicModelSettings(
-                    anthropic_cache_instructions=True,
-                    anthropic_cache_tool_definitions=True,
-                    anthropic_cache_messages=True,
-                )
-            elif provider == "openai":
-                default_settings = OpenAIResponsesModelSettings(
-                    openai_reasoning_effort="high",
-                    openai_reasoning_summary="concise",
-                )
-            else:
-                default_settings = ModelSettings()
-
-            model_prefix = "openai-responses" if provider == "openai" else provider
-            agent = Agent(
-                model=f"{model_prefix}:{agent_config.model}",
-                system_prompt=full_system_prompt,
-                toolsets=[mcp_server],
-                model_settings=default_settings,
-            )
+        agent: Agent[None, str] = Agent(
+            model=build_pydantic_ai_model(model=agent_config.model, provider=provider),
+            system_prompt=full_system_prompt,
+            toolsets=[mcp_server],
+            model_settings=default_pydantic_ai_settings(provider=provider),
+        )
 
         # vLLM's hermes tool parser drops <tool_call> XML on the floor when
         # streaming (https://github.com/vllm-project/vllm/issues/31871), so the
@@ -313,7 +268,7 @@ class PydanticAIRunner(AgentRunner):
                                 event=event,
                                 state=captured_state,
                                 event_logger=event_logger,
-                                round_number=event_logger.current_round,
+                                round_number=runtime.current_round,
                             )
 
                     last_recorded_usage = RunUsage()
@@ -348,7 +303,7 @@ class PydanticAIRunner(AgentRunner):
                             state=captured_state,
                             event_logger=event_logger,
                             stop_reason="tool_use",
-                            round_number=event_logger.current_round,
+                            round_number=runtime.current_round,
                         )
 
                     cycle_succeeded = False
@@ -376,7 +331,7 @@ class PydanticAIRunner(AgentRunner):
                             event_logger.log(
                                 event=AgentRunCycleFailed(
                                     agent_id=agent_id,
-                                    round_number=event_logger.current_round,
+                                    round_number=runtime.current_round,
                                     cycle=total_turns + 1,
                                     error_type=type(exc).__name__,
                                     message=str(exc),
@@ -443,7 +398,7 @@ class PydanticAIRunner(AgentRunner):
                         state=state,
                         event_logger=event_logger,
                         stop_reason="end_turn",
-                        round_number=event_logger.current_round,
+                        round_number=runtime.current_round,
                         usage=TokenUsage(
                             input_tokens=cycle_usage.input_tokens,
                             output_tokens=cycle_usage.output_tokens,

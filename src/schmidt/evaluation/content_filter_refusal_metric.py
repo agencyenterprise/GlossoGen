@@ -14,6 +14,7 @@ from pathlib import Path
 
 from schmidt.evaluation.measurement import AgentObservation, Measurement, RoundObservation
 from schmidt.evaluation.metric_protocol import Metric
+from schmidt.evaluation.metric_run_options import MetricRunOptions
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import AgentRunCycleFailed, RoundAdvanced, SimulationEvent
@@ -42,9 +43,10 @@ class ContentFilterRefusalMetric(Metric):
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
         run_dir: Path,
+        options: MetricRunOptions,
     ) -> list[Measurement]:
         """Count content-filter refusals from the event log."""
-        _ = scenario, llm_provider, run_dir
+        _ = scenario, llm_provider, run_dir, options
 
         total_rounds = sum(1 for event in events if isinstance(event, RoundAdvanced))
         refusals = [

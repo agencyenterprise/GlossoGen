@@ -38,10 +38,16 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 1. **CLI** parses arguments in two passes (first to identify the scenario, then to parse known flags plus `key=value` overrides). Builds the scenario, agent configs, event logger, and agent runner. Passes everything into the `AutonomousSupervisor`.
 2. **AutonomousSupervisor.run()** opens the event logger, builds per-agent `AgentSession` objects, creates the `SimulationRuntime` (FastMCP server), and wires a `GameClock`. Logs `SimulationStarted` and one `AgentRegistered` event per agent.
 3. **MCP server starts** on a configured port, exposing the `comms` MCP server. Agent runners are launched as concurrent asyncio tasks, each starting an external Claude Code process connected to the MCP server URL.
-4. **Game clock delivers round-1 injections** as `NewInfoNotification` messages pushed to agent session queues. Agents receive these via the `read_notifications` MCP tool and begin interacting.
+4. **Game clock triggers round-1 injection delivery** through `runtime.deliver_round_injections(1)`, which pushes `NewInfoNotification` messages to agent session queues. Agents receive these via the `read_notifications` MCP tool and begin interacting.
 5. **Agents act autonomously** by calling MCP tools: `read_notifications` (blocks until a notification arrives), `read_channel` (fetches recent messages), `send_message` (posts to a channel), `list_channels` (discovers available channels), and `get_channel_members` (sees who is in a channel). There is no central turn controller.
-6. **Round advancement** uses a hybrid condition. The game clock polls at 500ms intervals and advances the round when either (a) all agents are idle (blocked on `read_notifications` with empty queues) *and* at least 5 seconds have passed since the last message, or (b) the round duration exceeds `max_round_duration_seconds` since the last message. When a round advances, the game clock delivers injections for the new round to the appropriate agents.
+6. **Round advancement** uses a hybrid condition. The game clock polls at 500ms intervals and advances the round when either (a) all agents are idle (blocked on `read_notifications` with empty queues) *and* at least 5 seconds have passed since the last message, or (b) the round duration exceeds `max_round_duration_seconds` since the last message. When a round advances, the clock bumps `runtime.current_round`, logs `RoundAdvanced`, and calls `runtime.deliver_round_injections(round_number)` to push that round's injections.
 7. **Termination** occurs when the game clock reaches `max_rounds`. The runtime broadcasts a `DoneNotification` to all agents, waits up to 120 seconds for agent tasks to finish, and logs `SimulationEnded` with total message count.
+
+## Simulation Runtime
+
+`SimulationRuntime` is the shared-state container that the game clock, MCP tools, world context, scenarios, and runners all interact with. It owns the channel router, per-agent sessions, agent tool allowlists, the world context, and the active round number (`current_round`, written by the game clock via `set_current_round`, seeded by the supervisor on resume). It also owns injection delivery: `deliver_round_injections`, `deliver_postmortem_injections`, and `has_postmortem_for_round` look up scenario-defined injection content, push it to agent sessions, and emit the corresponding `InjectionDelivered` / `PostmortemStarted` events. Resume bookkeeping (`_last_injected_rounds`) lives on the runtime and is seeded via `seed_last_injected_rounds`.
+
+Scenarios receive a `ScenarioRuntimeHandle` (a `Protocol` exposing `event_logger` and `current_round`) via `bind_runtime`, used to emit custom events and read the active round.
 
 ## MCP Tools
 
@@ -73,13 +79,14 @@ The runner uses `agent.run()` with an `event_stream_handler` to stream token del
 
 ## Game Clock
 
-The `GameClock` runs as an asyncio task and manages three responsibilities:
+The `GameClock` runs as an asyncio task and manages two responsibilities:
 
 1. **Round progression**: Polls at 500ms intervals, checking two advancement conditions:
    - *All agents idle*: Every agent is blocked on `read_notifications` with an empty notification queue.
    - *Round timeout*: Time since the last message exceeds `max_round_duration_seconds`.
-2. **Injection delivery**: When a round advances, the clock calls `scenario.get_injection(round_number, agent_id)` for each agent and pushes `NewInfoNotification` to agents that have injections scheduled. Logs an `InjectionDelivered` event for each.
-3. **Termination**: When `current_round >= max_rounds` and an advancement trigger fires, the clock returns `RunStatus.SCENARIO_COMPLETE` to the supervisor.
+2. **Termination**: When `runtime.current_round >= max_rounds` and an advancement trigger fires, the clock returns `RunStatus.SCENARIO_COMPLETE` to the supervisor.
+
+When a round advances, the clock calls `runtime.set_current_round(...)`, logs `RoundAdvanced`, fires the round-boundary hook, and then delegates injection delivery to `runtime.deliver_round_injections(round_number)`. Postmortem phases work the same way: the clock owns the `_in_postmortem` flag and timing resets, then calls `runtime.deliver_postmortem_injections(round_number)` (which logs `PostmortemStarted` and pushes the per-agent injections).
 
 The game clock receives a callback from the runtime (via `add_on_message_callback`) that resets the quiet-period timer whenever a message is sent.
 
@@ -134,7 +141,7 @@ The `SimulationScenario` ABC defines a contract for scenario plug-ins.
 - `get_world()` — scenario world (state, world-event delivery, tool handlers)
 - `get_mcp_tools()` — scenario-specific MCP tools (agent_id injected automatically)
 
-The game clock uses the timing methods to manage round progression, injection delivery, and termination.
+The game clock uses the timing methods to manage round progression and termination; injection delivery is triggered by the clock and performed by the runtime via `deliver_round_injections` / `deliver_postmortem_injections`, which read scenario-defined injection content and push it onto agent sessions.
 
 ## Agent Prompt Framing
 

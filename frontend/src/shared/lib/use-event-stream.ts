@@ -219,6 +219,7 @@ export function useEventStream(
             timestamp: data.timestamp,
             result_timestamp: null,
             round_number: data.round_number,
+            result_round_number: null,
             stabilize_metadata: null,
           };
           return [...prev, entry];
@@ -244,6 +245,7 @@ export function useEventStream(
                     ...t,
                     result: data.result,
                     result_timestamp: data.timestamp,
+                    result_round_number: data.round_number,
                     stabilize_metadata: attachedMetadata ?? t.stabilize_metadata,
                   }
                 : t
@@ -261,6 +263,7 @@ export function useEventStream(
             timestamp: data.timestamp,
             result_timestamp: data.timestamp,
             round_number: data.round_number,
+            result_round_number: data.round_number,
             stabilize_metadata: attachedMetadata,
           };
           return [...prev, entry];

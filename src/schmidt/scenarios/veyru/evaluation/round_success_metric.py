@@ -12,6 +12,7 @@ from pathlib import Path
 
 from schmidt.evaluation.measurement import Measurement, RoundObservation
 from schmidt.evaluation.metric_protocol import Metric
+from schmidt.evaluation.metric_run_options import MetricRunOptions
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent
@@ -47,9 +48,10 @@ class RoundSuccessMetric(Metric):
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
         run_dir: Path,
+        options: MetricRunOptions,
     ) -> list[Measurement]:
         """Count successful stabilizations from tool results and world events."""
-        _ = scenario, llm_provider, run_dir
+        _ = scenario, llm_provider, run_dir, options
         is_two_team = is_two_team_mode(agent_configs=agent_configs)
         total_rounds = count_total_rounds(events=events)
         round_numbers = list(range(1, total_rounds + 1))

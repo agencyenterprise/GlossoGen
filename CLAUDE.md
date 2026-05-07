@@ -26,16 +26,17 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `prompts/` — Jinja2 templates for agent system prompts and injection messages
   - `evaluation/` — scenario-specific metrics (optional)
 - `src/schmidt/runtime/` — autonomous mode runtime (MCP server + coordination):
-  - `simulation_state.py` — shared state: channels, sessions, locks, callbacks, world context, token counters
+  - `simulation_state.py` — shared state: channels, sessions, locks, callbacks, world context, token counters, current round, injection delivery (`deliver_round_injections`, `deliver_postmortem_injections`, `has_postmortem_for_round`)
   - `mcp_tools.py` — MCP tool definitions (read_notifications, read_channel, send_message, etc.)
   - `mcp_server.py` — starts FastMCP over Streamable HTTP
-  - `game_clock.py` — round progression, injection delivery, termination detection
+  - `game_clock.py` — round progression and termination detection (delegates injection delivery to `SimulationRuntime`)
   - `agent_session.py` — per-agent notification queue, reaction delay, idle tracking
   - `scenario_mcp_tool.py` — ScenarioMcpTool for scenario-specific tool registration
   - `scenario_world.py` — ScenarioWorld ABC, WorldContext, MessageEvent, RoundAdvancedEvent
 - `src/schmidt/runners/` — autonomous mode agent runners:
   - `agent_runner_base.py` — abstract base class for agent runners
   - `pydantic_ai_runner.py` — Pydantic AI agent runner via pydantic-ai framework
+  - `pydantic_ai_model_factory.py` — per-provider mapping from `(model, provider)` to a pydantic-ai `model=` argument and default `ModelSettings`; shared by the runner and the post-simulation `protocol_probe` helper
   - `communication_protocol.py` — shared prompts and constants for the agent communication protocol
 - `src/schmidt/config_overrides.py` — Hydra-style dot-notation config override parser
 - `src/schmidt/autonomous_supervisor.py` — autonomous mode orchestrator (supports resume via `RewindState`)
@@ -44,8 +45,10 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/message_history_builder.py` — reconstructs pydantic-ai ModelMessage history from JSONL events for fork/resume
 - `src/schmidt/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
 - `src/schmidt/evaluation/` — generic metrics and evaluation infrastructure
-  - `metric_protocol.py` — `Metric` ABC and `MetricFactory` type alias
-  - `metric_registry.py` — registry mapping metric names to factory callables
+  - `metric_protocol.py` — `Metric` ABC; `compute(events, agent_configs, scenario, llm_provider, run_dir, options)` is the only entry point. Most metrics ignore `options`; metrics that need per-invocation flags (e.g. `protocol_probe`) read them off the passed `MetricRunOptions`.
+  - `metric_run_options.py` — `MetricRunOptions` Pydantic model carrying per-invocation flags (`probe_round`, `probe_replicas`); built by the CLI from argparse and threaded into `scenario.run_evaluation(...)`.
+  - `metric_registry.py` — `dict[str, type[Metric]]` mapping metric names to their classes; `cls()` builds an instance and `cls.compute(..., options=options)` runs it.
+  - `protocol_probe_response.py` — `ProtocolProbeOutput` (the structured-output schema enforced on each probe LLM call) and `ProtocolProbeResponse` (the JSONL row schema).
   - `measurement.py` — `Measurement`, `RoundObservation`, `AgentObservation`, and judge-side `RoundNote` Pydantic models
   - `generic_metric_names.py` — canonical name list (avoids circular imports with `scenario_protocol`)
   - `round_transcript_builder.py` — builds per-round message transcripts from events (used by all generic LLM-judge metrics)
@@ -299,6 +302,7 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── replace_config.json                # (replace-agent or cross-run runs only) merged scenario_config + model_overrides written by the orchestrator
 ├── resume_context_{agent_id}.json     # (resume / fork / replace-agent / cross-run runs) per-agent reconstructed pydantic-ai message history dumped at resume time for inspection
 ├── resume_context_{agent_id}_round_{R}.json  # (in-run scheduled swap) one file per AgentSwappedMidRun event capturing the swapped-in agent's seed history
+├── protocol_probe_responses.jsonl     # (veyru only, when protocol_probe metric is run) one row per (agent, question, replica)
 └── multi_swap_cache.json              # streamlit Multi-swap tab cache (per-phase round_success); regenerated whenever the JSONL's size or mtime changes
 ```
 
@@ -472,7 +476,7 @@ schmidt replace-agent veyru \
   [--knobs path/to/overrides.json]
 ```
 
-Internals: clones the source run's git repo at the commit produced by the source's `RoundAdvanced` event for `--round-start`. The cloned JSONL therefore contains every committed event up to and including that `round_advanced` (round N-1 fully ended in source — game phase, postmortem, both `round_ended` events) but no `injection_delivered` events for round N yet. On resume the game clock starts at round N and `_deliver_injections` fires the round-N injections fresh. The replaced agent's full event log is preserved on disk; its reconstructed pydantic-ai history is stripped of `text` / `thinking` parts and any tool calls targeting blocked channels (e.g. veyru's postmortem channels). The veyru world's per-team `outcomes` list is seeded from the source's `veyru_case_started` / `veyru_stabilization_judged` / `round_ended` events via `restore_state_from_events`, so the round-N injection's "PREVIOUS VEYRU RESULT" block reflects the source's actual round N-1 outcome. Cannot be used with `--round-start 1`. Non-replaced agents stay on their exact original models.
+Internals: clones the source run's git repo at the commit produced by the source's `RoundAdvanced` event for `--round-start`. The cloned JSONL therefore contains every committed event up to and including that `round_advanced` (round N-1 fully ended in source — game phase, postmortem, both `round_ended` events) but no `injection_delivered` events for round N yet. On resume the game clock starts at round N and calls `runtime.deliver_round_injections(N)` to fire the round-N injections fresh. The replaced agent's full event log is preserved on disk; its reconstructed pydantic-ai history is stripped of `text` / `thinking` parts and any tool calls targeting blocked channels (e.g. veyru's postmortem channels). The veyru world's per-team `outcomes` list is seeded from the source's `veyru_case_started` / `veyru_stabilization_judged` / `round_ended` events via `restore_state_from_events`, so the round-N injection's "PREVIOUS VEYRU RESULT" block reflects the source's actual round N-1 outcome. Cannot be used with `--round-start 1`. Non-replaced agents stay on their exact original models.
 
 `--rounds-after-swap` defaults to `source_round_count - round_start` (the remaining rounds in the original run after the replacement boundary). The resumed simulation's `round_count` is set to `round_start + rounds_after_swap`.
 
@@ -734,6 +738,7 @@ Scenario-specific metrics:
   - `round_success` — fraction of rounds the team stabilized the Veyru before collapse (deterministic, no LLM). Single-team mode emits one Measurement (`metric_name="round_success"`); two-team mode emits two Measurements (`round_success_team_a` and `round_success_team_b`).
   - `round_success_after_resume` — same accounting as `round_success` but restricted to the rounds played after a replace-agent swap. Re-scores the source run over the same round window and includes the comparison in `summary`. Two-team mode splits into `round_success_after_resume_team_a` / `_team_b`. Returns a zero-score measurement on non-resume runs.
   - `protocol_learned_after_swap` — whether the newcomer adopted the pre-established protocol after an observer swap or intern takeover (LLM judge); `score` = number of post-boundary rounds with observable newcomer protocol evidence.
+  - `protocol_probe` — probes each agent post-simulation against a fixed test bank of hypothetical inputs ("if symptoms X, what do you send to #link?") and writes one row per (agent, question, replica) to `protocol_probe_responses.jsonl` under the run dir. Each agent is probed under its own original model (read from `AgentRegistered`), not the eval `--model`. The structured output schema enforces both `reasoning` and `message` fields. Test bank lives at `src/schmidt/scenarios/veyru/protocol_probe_questions.json` (28 questions: 14 motifs × {observer, engineer}); regenerate via `scripts/build_veyru_probe_questions.py`. Requires `--probe-replicas N` (≥1) on the eval CLI; optional `--probe-round R` cuts each agent's reconstructed history at the start of round R so probes capture the protocol as of that point. `score` = total probe rows written. Distance / similarity computation across the JSONL is downstream analysis, not part of this metric.
 
 ## Destructive Actions
 

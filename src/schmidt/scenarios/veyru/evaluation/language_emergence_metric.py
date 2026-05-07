@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from schmidt.evaluation.measurement import Measurement, RoundNote, RoundObservation
 from schmidt.evaluation.metric_protocol import Metric
+from schmidt.evaluation.metric_run_options import MetricRunOptions
 from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
@@ -73,9 +74,10 @@ class LanguageEmergenceMetric(Metric):
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
         run_dir: Path,
+        options: MetricRunOptions,
     ) -> list[Measurement]:
         """Evaluate whether novel compressed language emerged across rounds."""
-        _ = agent_configs, run_dir
+        _ = agent_configs, run_dir, options
         round_transcripts = self._build_round_transcripts(
             events=events,
             scenario=scenario,

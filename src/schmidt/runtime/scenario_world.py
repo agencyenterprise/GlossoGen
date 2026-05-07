@@ -8,6 +8,7 @@ and can push channel-scoped notifications via ``send_update_to_channel``.
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import NamedTuple
 
 from schmidt.channel_router import ChannelRouter
@@ -51,6 +52,7 @@ class WorldContext:
     """
 
     _channel_router: ChannelRouter
+    _get_current_round: Callable[[], int]
 
     def __init__(
         self,
@@ -83,7 +85,7 @@ class WorldContext:
             await self._event_logger.log(
                 event=WorldEventDelivered(
                     agent_id=agent_id,
-                    round_number=self._event_logger.current_round,
+                    round_number=self._get_current_round(),
                     text=text,
                 )
             )
@@ -107,7 +109,7 @@ class WorldContext:
         await self._event_logger.log(
             event=WorldEventDelivered(
                 agent_id=agent_id,
-                round_number=self._event_logger.current_round,
+                round_number=self._get_current_round(),
                 text=text,
             )
         )
@@ -151,7 +153,7 @@ class WorldContext:
         await self._event_logger.log(
             event=ChannelMembershipChanged(
                 channel_id=channel_id,
-                round_number=self._event_logger.current_round,
+                round_number=self._get_current_round(),
                 member_agent_ids=list(member_agent_ids),
                 reason=reason,
             )
@@ -170,7 +172,7 @@ class WorldContext:
         await self._event_logger.log(
             event=ChannelHistoryCleared(
                 channel_id=channel_id,
-                round_number=self._event_logger.current_round,
+                round_number=self._get_current_round(),
                 reason=reason,
             )
         )

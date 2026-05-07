@@ -1,10 +1,10 @@
-"""Abstract base class and factory type alias for simulation metrics."""
+"""Abstract base class for simulation metrics."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from pathlib import Path
 
 from schmidt.evaluation.measurement import Measurement
+from schmidt.evaluation.metric_run_options import MetricRunOptions
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent
@@ -32,6 +32,7 @@ class Metric(ABC):
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
         run_dir: Path,
+        options: MetricRunOptions,
     ) -> list[Measurement]:
         """Score a simulation run and produce one or more Measurements.
 
@@ -43,13 +44,12 @@ class Metric(ABC):
                 call a language model. Deterministic metrics ignore this.
             run_dir: On-disk directory holding the run's JSONL log, debug log,
                 and any scenario outputs.
+            options: Per-invocation options forwarded from the CLI. Most
+                metrics ignore this; ``protocol_probe`` reads
+                ``probe_round`` and ``probe_replicas`` from it.
 
         Returns:
             A non-empty list of ``Measurement`` instances. Metrics that
             return a single number return a one-element list.
         """
         ...
-
-
-MetricFactory = Callable[[], Metric]
-"""A zero-argument callable that produces a ``Metric`` instance."""

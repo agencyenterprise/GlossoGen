@@ -13,3 +13,4 @@ class SimulationMessage(BaseModel):
     sender_agent_id: str
     text: str
     timestamp: datetime
+    round_number: int

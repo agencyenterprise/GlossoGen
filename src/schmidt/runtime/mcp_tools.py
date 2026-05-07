@@ -20,7 +20,7 @@ from uuid import uuid4
 from mcp.server.fastmcp import FastMCP
 
 from schmidt.models.event import MessageSent
-from schmidt.models.mcp_responses import ChannelMessage, SendMessageResult
+from schmidt.models.mcp_responses import ChannelMessage, ReadChannelResult, SendMessageResult
 from schmidt.models.message import SimulationMessage
 from schmidt.runtime.activity_notification import (
     ActivityNotification,
@@ -60,17 +60,20 @@ authorization guard.
 def _build_notification_payload(
     notification: ActivityNotification,
     session: AgentSession,
+    current_round: int,
 ) -> dict[str, Any]:
-    """Serialize a notification with the session's queue depth as ``pending_count``.
+    """Serialize a notification with queue depth and the current simulation round.
 
-    ``pending_count`` is delivery-time metadata: it tells the agent how many
-    additional notifications are still queued for it after this one is
-    consumed. It is computed at the MCP boundary rather than carried on the
-    notification models, since the queue depth is only meaningful when the
-    notification is handed to the agent.
+    ``pending_count`` tells the agent how many additional notifications are
+    still queued after this one is consumed. ``current_round`` is the round
+    the simulation is in at delivery time so the agent can recognise that
+    instructions seen on a channel before the current round are stale —
+    each ``read_channel`` and ``send_message`` response carries the same
+    field, providing a consistent reference everywhere the agent looks.
     """
     payload = notification.model_dump()
     payload["pending_count"] = session.pending_notifications_count()
+    payload["current_round"] = current_round
     return payload
 
 
@@ -206,6 +209,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                     ),
                 ),
                 session=session,
+                current_round=runtime.current_round,
             )
         session.read_notifications_in_flight = True
         try:
@@ -233,6 +237,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                 return _build_notification_payload(
                     notification=NoActivityNotification(detail="No new messages."),
                     session=session,
+                    current_round=runtime.current_round,
                 )
             if isinstance(notification, NewMessagesNotification):
                 fresh_channels = [
@@ -255,13 +260,17 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                             channel_id=ch,
                         ),
                     )
-            return _build_notification_payload(notification=notification, session=session)
+            return _build_notification_payload(
+                notification=notification,
+                session=session,
+                current_round=runtime.current_round,
+            )
 
     @mcp.tool(
         name="read_channel",
         description="Read the last N messages from a channel.",
     )
-    async def read_channel(ctx: ToolContext, channel_id: str, last_n: int) -> list[dict[str, Any]]:
+    async def read_channel(ctx: ToolContext, channel_id: str, last_n: int) -> dict[str, Any]:
         """Return recent messages and advance the agent's read position.
 
         Updates last_seen so that messages visible at read time are not
@@ -286,14 +295,18 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
             )
             recent = visible[-last_n:]
             display_name_fn = runtime.scenario.get_agent_display_name
-            return [
-                {
-                    "sender": display_name_fn(agent_id=msg.sender_agent_id),
-                    "text": msg.text,
-                    "timestamp": msg.timestamp.isoformat(),
-                }
-                for msg in recent
-            ]
+            return ReadChannelResult(
+                current_round=runtime.current_round,
+                messages=[
+                    ChannelMessage(
+                        round=msg.round_number,
+                        sender=display_name_fn(agent_id=msg.sender_agent_id),
+                        text=msg.text,
+                        timestamp=msg.timestamp.isoformat(),
+                    )
+                    for msg in recent
+                ],
+            ).model_dump()
 
     @mcp.tool(
         name="send_message",
@@ -327,6 +340,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                     detail=rejection_reason,
                     new_messages=[],
                     token_count=0,
+                    current_round=runtime.current_round,
                 ).model_dump()
 
             display_name_fn = runtime.scenario.get_agent_display_name
@@ -346,6 +360,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                     unseen = history[last_seen:]
                     new_messages = [
                         ChannelMessage(
+                            round=msg.round_number,
                             sender=display_name_fn(agent_id=msg.sender_agent_id),
                             text=msg.text,
                             timestamp=msg.timestamp.isoformat(),
@@ -369,6 +384,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                         ),
                         new_messages=new_messages,
                         token_count=0,
+                        current_round=runtime.current_round,
                     ).model_dump()
 
                 transformed_text = runtime.scenario.transform_outgoing_message(
@@ -382,12 +398,13 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                     sender_agent_id=agent_id,
                     text=transformed_text,
                     timestamp=datetime.now(tz=UTC),
+                    round_number=runtime.current_round,
                 )
                 runtime.channel_router.append_message(message=message)
                 await runtime.event_logger.log(
                     event=MessageSent(
                         message=message,
-                        round_number=runtime.event_logger.current_round,
+                        round_number=runtime.current_round,
                         token_count=token_count,
                     )
                 )
@@ -423,6 +440,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                 detail=f"Message sent to channel '{channel_id}'",
                 new_messages=[],
                 token_count=token_count,
+                current_round=runtime.current_round,
             ).model_dump()
 
     @mcp.tool(

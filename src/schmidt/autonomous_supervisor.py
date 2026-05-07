@@ -171,12 +171,13 @@ class AutonomousSupervisor:
         except Exception:
             logger.exception("Simulation failed")
             total = self._count_total_messages()
+            current_round = self._runtime.current_round if self._runtime is not None else 1
             await self._event_logger.log(
                 event=SimulationEnded(
                     reason=RunStatus.ERROR,
                     total_messages=total,
                     total_cost_usd=0.0,
-                    round_number=self._event_logger.current_round,
+                    round_number=current_round,
                 )
             )
             raise
@@ -248,10 +249,6 @@ class AutonomousSupervisor:
             event_logger=self._event_logger,
         )
 
-        # Give the scenario a handle on the event logger so its MCP tool
-        # executors can emit custom events (e.g. judge verdicts).
-        self._scenario.bind_event_logger(event_logger=self._event_logger)
-
         # Build the simulation runtime (shared state) and store for error-path access.
         runtime = SimulationRuntime(
             scenario=self._scenario,
@@ -264,10 +261,13 @@ class AutonomousSupervisor:
         )
         self._runtime = runtime
 
+        # Give the scenario a runtime handle so its MCP tool executors can
+        # emit custom events (e.g. judge verdicts) and read the active round.
+        self._scenario.bind_runtime(runtime=runtime)
+
         # Restore channel messages and agent read positions when resuming.
         resuming = self._resume_state is not None
         start_round = 1
-        last_injected: dict[str, int] = {}
         if self._resume_state is not None:
             runtime.channel_router.restore_messages(
                 messages_by_channel=self._resume_state.messages_by_channel,
@@ -312,8 +312,10 @@ class AutonomousSupervisor:
                             ),
                         )
             start_round = self._resume_state.round_number
-            last_injected = self._resume_state.injected_rounds
-            self._event_logger.initialize_round_number(round_number=start_round)
+            runtime.seed_last_injected_rounds(
+                injected_rounds=self._resume_state.injected_rounds,
+            )
+            runtime.set_current_round(round_number=start_round)
             logger.info(
                 "Resumed autonomous simulation at round %d",
                 self._resume_state.round_number,
@@ -326,12 +328,11 @@ class AutonomousSupervisor:
         game_clock = GameClock(
             scenario=self._scenario,
             agent_sessions=agent_sessions,
-            event_logger=self._event_logger,
+            runtime=runtime,
             world_context=world_context,
             max_rounds=self._scenario.get_round_count(),
             max_round_duration_seconds=self._scenario.get_max_round_duration_seconds(),
             start_round=start_round,
-            last_injected_rounds=last_injected,
             resuming=resuming,
             on_round_boundary=round_boundary_hook,
         )
@@ -406,7 +407,7 @@ class AutonomousSupervisor:
                 runner.start(
                     agent_config=config,
                     mcp_server_url=mcp_server_url,
-                    event_logger=self._event_logger,
+                    runtime=runtime,
                     cost_tracker=self._cost_tracker,
                 ),
                 name=f"agent-{config.agent_id}",
@@ -417,7 +418,7 @@ class AutonomousSupervisor:
                     agent_id=config.agent_id,
                     role_name=config.role_name,
                     model=config.model,
-                    round_number=self._event_logger.current_round,
+                    round_number=runtime.current_round,
                 )
             )
             logger.info("Launched agent %s (%s)", config.agent_id, config.role_name)
@@ -495,7 +496,7 @@ class AutonomousSupervisor:
                 reason=termination_status,
                 total_messages=total_messages,
                 total_cost_usd=total_cost_usd,
-                round_number=self._event_logger.current_round,
+                round_number=runtime.current_round,
             )
         )
         logger.info(
