@@ -364,6 +364,8 @@ Agents connect to a shared MCP server via the Pydantic AI framework. A game cloc
 
 **Canonical seed: `seed=42`.** Always use `seed=42` when launching comparison runs so results are comparable against the baseline. Do not vary the seed across replications — the seed fixes the case set, so running multiple times with the same seed measures LLM stochasticity on an identical workload. Only change the seed if the user explicitly asks for it.
 
+**Canonical judge: `claude-haiku-4-5-20251001`.** Set `judge_model: "claude-haiku-4-5-20251001"` and `judge_provider: "anthropic"` in every scenario knobs file. Keeping the judge fixed across runs holds judge-side noise constant so cross-run comparisons measure agent behavior, not judge variance. Only change the judge if the user explicitly asks for it.
+
 ### Hydra-Style Config & Overrides
 
 The `run` subcommand uses a unified config system inspired by Hydra. A base config file (`--config`) provides scenario knobs, and trailing `key=value` arguments override individual fields using dot-notation. The `agents.*` namespace is reserved for per-agent model/provider overrides.
