@@ -26,7 +26,10 @@ async def load_events(log_path: Path) -> list[SimulationEvent]:
     lacks it, tracking the most recent ``RoundAdvanced`` while walking the
     log so each event receives the round it was emitted in. Lifecycle
     events emitted before round 1 (``simulation_started``,
-    ``agent_registered``) get ``round_number=0``.
+    ``agent_registered``) get ``round_number=0``. ``parse_event`` further
+    backfills the ``round_number`` on the nested ``message`` payload of
+    ``message_sent`` events from the parent event's ``round_number`` for
+    runs that predate per-message round tagging.
     """
     events: list[SimulationEvent] = []
     running_round = 0

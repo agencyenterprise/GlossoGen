@@ -138,7 +138,7 @@ export function mergeEntries(
         sender_agent_id: t.sender_agent_id,
         text: "",
         timestamp: t.result_timestamp,
-        round_number: t.round_number,
+        round_number: t.result_round_number ?? t.round_number,
         is_notification_result: true,
         tool_name: t.tool_name,
         tool_arguments: t.arguments,

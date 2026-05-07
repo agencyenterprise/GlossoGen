@@ -289,11 +289,13 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 timestamp=event.timestamp,
                 result_timestamp=None,
                 round_number=event.round_number,
+                result_round_number=None,
             )
             pending_result = pending_tool_results_by_call_id.pop(event.call_id, None)
             if pending_result is not None:
                 tu_entry.result = pending_result.result
                 tu_entry.result_timestamp = pending_result.timestamp
+                tu_entry.result_round_number = pending_result.round_number
             pending_metadata = pending_stabilize_metadata_by_call_id.pop(event.call_id, None)
             if pending_metadata is not None:
                 tu_entry.stabilize_metadata = pending_metadata
@@ -353,11 +355,13 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     timestamp=event.timestamp,
                     result_timestamp=None,
                     round_number=event.round_number,
+                    result_round_number=None,
                 )
                 pending_result = pending_tool_results_by_call_id.pop(tc.call_id, None)
                 if pending_result is not None:
                     tu_entry.result = pending_result.result
                     tu_entry.result_timestamp = pending_result.timestamp
+                    tu_entry.result_round_number = pending_result.round_number
                 pending_metadata = pending_stabilize_metadata_by_call_id.pop(tc.call_id, None)
                 if pending_metadata is not None:
                     tu_entry.stabilize_metadata = pending_metadata
@@ -369,6 +373,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             if matched is not None:
                 matched.result = event.result
                 matched.result_timestamp = event.timestamp
+                matched.result_round_number = event.round_number
             else:
                 # Some runs log tool results before the parent LLM response block.
                 pending_tool_results_by_call_id[event.call_id] = event

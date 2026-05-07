@@ -36,6 +36,7 @@ from schmidt.cross_run_replace_agent import cross_run_replace_agent_in_run
 from schmidt.cross_run_replace_manifest import read_cross_run_replace_manifest
 from schmidt.eval_manifest import delete_eval_manifest, write_eval_manifest
 from schmidt.evaluation.log_reader import extract_scenario_config, load_events
+from schmidt.evaluation.metric_run_options import MetricRunOptions
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter
@@ -148,6 +149,26 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         choices=["low", "medium", "high"],
         help="Reasoning effort level for OpenAI reasoning models (low/medium/high)",
+    )
+    evaluate_parser.add_argument(
+        "--probe-round",
+        dest="probe_round",
+        type=int,
+        default=None,
+        help=(
+            "Round number at which the protocol_probe metric reconstructs each agent's "
+            "history. When omitted, the probe sees the full end-of-run history."
+        ),
+    )
+    evaluate_parser.add_argument(
+        "--probe-replicas",
+        dest="probe_replicas",
+        type=int,
+        default=None,
+        help=(
+            "Number of independent replicas the protocol_probe metric runs per "
+            "(agent, question). Required when --metrics includes protocol_probe."
+        ),
     )
 
     serve_parser = subparsers.add_parser("serve", help="Start the web server")
@@ -755,6 +776,11 @@ async def _run_evaluation(
     config = extract_scenario_config(events=events)
     scenario = scenario_cls.create_from_config(config=config)
 
+    options = MetricRunOptions(
+        probe_round=args.probe_round,
+        probe_replicas=args.probe_replicas,
+    )
+
     write_eval_manifest(run_dir=run_dir, pid=os.getpid())
     try:
         logger.info("Evaluating %s with metrics: %s", args.scenario_name, args.metrics)
@@ -766,6 +792,7 @@ async def _run_evaluation(
             provider_name=args.provider,
             inference_provider=args.inference_provider,
             reasoning_effort=getattr(args, "reasoning_effort", None),
+            options=options,
         )
         logger.info("Evaluation complete. Report written to %s", report_path)
     finally:

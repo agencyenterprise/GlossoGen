@@ -17,6 +17,7 @@ from typing import NamedTuple
 
 from schmidt.evaluation.measurement import Measurement, RoundObservation
 from schmidt.evaluation.metric_protocol import Metric
+from schmidt.evaluation.metric_run_options import MetricRunOptions
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import MessageSent, SimulationEvent
@@ -59,9 +60,10 @@ class MCMMetric(Metric):
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
         run_dir: Path,
+        options: MetricRunOptions,
     ) -> list[Measurement]:
         """Score primary-channel messages and report per-round char-count stats."""
-        _ = agent_configs, llm_provider, run_dir
+        _ = agent_configs, llm_provider, run_dir, options
         primary_channel_id = scenario.get_primary_channel_id()
         if primary_channel_id is None:
             return [

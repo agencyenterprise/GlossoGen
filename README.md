@@ -161,6 +161,7 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── imported_history_source.jsonl      # (cross-run replace-agent runs only) verbatim copy of Sim B's JSONL
 ├── resume_context_{agent_id}.json     # per-agent reconstructed pydantic-ai message history at resume time
 ├── resume_context_{agent_id}_round_{R}.json  # (in-run scheduled swap) one file per AgentSwappedMidRun event
+├── protocol_probe_responses.jsonl     # (veyru only) one row per (agent, question, replica) when protocol_probe is run
 └── multi_swap_cache.json              # streamlit Multi-swap tab cache (per-phase round_success)
 ```
 
@@ -189,7 +190,7 @@ Generic metrics (available to all scenarios). Both deterministic and LLM-driven 
 
 Scenario-specific metrics:
 
-- **veyru**: `language_emergence` (novel language in a fictional domain), `round_success` (per-round stabilization rate; emits one Measurement per team in two-team mode), `round_success_after_resume`, `protocol_learned_after_swap` (LLM judge)
+- **veyru**: `language_emergence` (novel language in a fictional domain), `round_success` (per-round stabilization rate; emits one Measurement per team in two-team mode), `round_success_after_resume`, `protocol_learned_after_swap` (LLM judge), `protocol_probe` (probe each agent under its original model on a fixed test bank; writes `protocol_probe_responses.jsonl`; requires `--probe-replicas N`, optional `--probe-round R`)
 
 Output is a JSON report under the `measurements` field; metrics no longer write `eval:*` labels to `labels.json`. Filter on `score` or on the `per_round` / `per_agent` lists directly.
 
@@ -292,10 +293,10 @@ src/schmidt/
   simulation_server.py         # Embedded SSE server per simulation
 
   runtime/                     # MCP server + coordination
-    simulation_state.py        # Shared state: channels, sessions, locks
+    simulation_state.py        # Shared state: channels, sessions, locks, current round, injection delivery
     mcp_tools.py               # MCP tool definitions (read_notifications, read_channel, send_message)
     mcp_server.py              # FastMCP over Streamable HTTP
-    game_clock.py              # Round progression, injection delivery, termination
+    game_clock.py              # Round progression and termination (delegates injection delivery to runtime)
     agent_session.py           # Per-agent notification queue, reaction delay, idle tracking
 
   runners/                     # Agent runner implementations

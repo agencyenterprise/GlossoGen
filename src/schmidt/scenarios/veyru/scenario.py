@@ -26,9 +26,9 @@ from schmidt.evaluation.evaluation_report import (
 )
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
 from schmidt.evaluation.measurement import Measurement
-from schmidt.evaluation.metric_protocol import MetricFactory
+from schmidt.evaluation.metric_protocol import Metric
 from schmidt.evaluation.metric_registry import GENERIC_METRIC_REGISTRY
-from schmidt.event_logger import EventLogger
+from schmidt.evaluation.metric_run_options import MetricRunOptions
 from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
@@ -40,10 +40,11 @@ from schmidt.models.event import (
 )
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld, WorldContext
-from schmidt.scenario_protocol import SimulationScenario
+from schmidt.scenario_protocol import ScenarioRuntimeHandle, SimulationScenario
 from schmidt.scenarios.veyru.evaluation import (
     LanguageEmergenceMetric,
     ProtocolLearnedAfterSwapMetric,
+    ProtocolProbeMetric,
     RoundSuccessAfterResumeMetric,
     RoundSuccessMetric,
 )
@@ -172,7 +173,7 @@ class VeyruScenario(SimulationScenario):
 
     def __init__(self, knobs: VeyruKnobs) -> None:
         self._knobs = knobs
-        self._event_logger: EventLogger | None = None
+        self._runtime: ScenarioRuntimeHandle | None = None
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
         self._postmortem_active: bool = (
             knobs.postmortem_enabled and not knobs.postmortem_disabled_at_start
@@ -533,9 +534,9 @@ class VeyruScenario(SimulationScenario):
             return agent_id
         return display
 
-    def bind_event_logger(self, event_logger: EventLogger) -> None:
-        """Stash the event logger so stabilize_veyru can emit judge verdicts."""
-        self._event_logger = event_logger
+    def bind_runtime(self, runtime: ScenarioRuntimeHandle) -> None:
+        """Stash the runtime handle so stabilize_veyru can emit judge verdicts."""
+        self._runtime = runtime
 
     def _get_previous_outcome_for_agent(
         self,
@@ -584,9 +585,9 @@ class VeyruScenario(SimulationScenario):
             return False
         if self._knobs.intern_join_round is None:
             return False
-        if self._event_logger is None:
+        if self._runtime is None:
             return False
-        if self._event_logger.current_round < self._knobs.intern_join_round:
+        if self._runtime.current_round < self._knobs.intern_join_round:
             return False
         return not self._has_intern_taken_over()
 
@@ -841,11 +842,11 @@ class VeyruScenario(SimulationScenario):
 
     async def _emit_case_started_event(self, round_number: int) -> None:
         """Log a VeyruCaseStarted event carrying the full ground-truth case data."""
-        if self._event_logger is None:
+        if self._runtime is None:
             return
         case = self._world.current_case
         assert case is not None, "finalize_round_sync must populate current_case"
-        await self._event_logger.log(
+        await self._runtime.event_logger.log(
             event=VeyruCaseStarted(
                 round_number=round_number,
                 case_number=case.case_number,
@@ -1068,11 +1069,11 @@ class VeyruScenario(SimulationScenario):
                 observer_action=action,
             )
 
-            if self._event_logger is not None:
-                await self._event_logger.log(
+            if self._runtime is not None:
+                await self._runtime.event_logger.log(
                     event=VeyruStabilizationJudged(
                         agent_id=agent_id,
-                        round_number=self._event_logger.current_round,
+                        round_number=self._runtime.current_round,
                         expected_actions=current_stage.judge_expected_actions,
                         judge_match=judgment.match,
                         judge_explanation=judgment.explanation,
@@ -1175,11 +1176,12 @@ class VeyruScenario(SimulationScenario):
         ]
         return sorted(set(generic + specific))
 
-    def _get_metrics(self) -> dict[str, MetricFactory]:
-        """Return Veyru-specific metrics."""
+    def _get_metrics(self) -> dict[str, type[Metric]]:
+        """Return Veyru-specific metric classes keyed by metric name."""
         return {
             LanguageEmergenceMetric.name: LanguageEmergenceMetric,
             ProtocolLearnedAfterSwapMetric.name: ProtocolLearnedAfterSwapMetric,
+            ProtocolProbeMetric.name: ProtocolProbeMetric,
             RoundSuccessAfterResumeMetric.name: RoundSuccessAfterResumeMetric,
             RoundSuccessMetric.name: RoundSuccessMetric,
         }
@@ -1193,6 +1195,7 @@ class VeyruScenario(SimulationScenario):
         provider_name: str,
         inference_provider: str | None,
         reasoning_effort: str | None,
+        options: MetricRunOptions,
     ) -> EvaluationReport:
         """Run metrics, merge generic and Veyru-specific registries, and write a report."""
         events = await load_events(log_path=log_path)
@@ -1205,7 +1208,7 @@ class VeyruScenario(SimulationScenario):
             reasoning_effort=reasoning_effort,
         )
 
-        registry: dict[str, MetricFactory] = {}
+        registry: dict[str, type[Metric]] = {}
         registry.update(GENERIC_METRIC_REGISTRY)
         registry.update(self._get_metrics())
 
@@ -1227,6 +1230,7 @@ class VeyruScenario(SimulationScenario):
                     scenario=self,
                     llm_provider=provider,
                     run_dir=log_path.parent,
+                    options=options,
                 )
             except Exception:
                 logger.exception("Metric %s failed; continuing with remaining metrics", metric_name)

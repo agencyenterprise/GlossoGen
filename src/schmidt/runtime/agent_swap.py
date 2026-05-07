@@ -132,7 +132,7 @@ async def execute_agent_swap(
         runner.start(
             agent_config=new_config,
             mcp_server_url=resources.mcp_server_url,
-            event_logger=event_logger,
+            runtime=runtime,
             cost_tracker=resources.cost_tracker,
         ),
         name=f"agent-{agent_id}-swapped-r{spec.at_round}",

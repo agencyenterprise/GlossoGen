@@ -10,6 +10,7 @@ from pathlib import Path
 
 from schmidt.evaluation.measurement import Measurement, RoundObservation
 from schmidt.evaluation.metric_protocol import Metric
+from schmidt.evaluation.metric_run_options import MetricRunOptions
 from schmidt.evaluation.round_end_trigger_detection import count_rounds, find_round_end_triggers
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
@@ -33,9 +34,10 @@ class RoundEndedIdleMetric(Metric):
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
         run_dir: Path,
+        options: MetricRunOptions,
     ) -> list[Measurement]:
         """Identify rounds that ended via the idle trigger."""
-        _ = agent_configs, scenario, llm_provider, run_dir
+        _ = agent_configs, scenario, llm_provider, run_dir, options
         total_rounds = count_rounds(events=events)
         triggers = find_round_end_triggers(events=events)
 

@@ -231,6 +231,7 @@ def _build_rewind_state_at_timestamp(
                     sender_agent_id=msg.sender_agent_id,
                     text=message_edits[msg.message_id],
                     timestamp=msg.timestamp,
+                    round_number=msg.round_number,
                 )
             channel_id = msg.channel_id
             if channel_id not in messages_by_channel:

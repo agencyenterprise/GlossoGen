@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from schmidt.evaluation.log_reader import extract_scenario_config
 from schmidt.evaluation.measurement import Measurement, RoundNote, RoundObservation
 from schmidt.evaluation.metric_protocol import Metric
+from schmidt.evaluation.metric_run_options import MetricRunOptions
 from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
@@ -94,9 +95,10 @@ class ProtocolLearnedAfterSwapMetric(Metric):
         scenario: SimulationScenario,
         llm_provider: LLMProvider,
         run_dir: Path,
+        options: MetricRunOptions,
     ) -> list[Measurement]:
         """Score newcomer adoption of the pre-boundary protocol."""
-        _ = agent_configs, scenario, run_dir
+        _ = agent_configs, scenario, run_dir, options
         config = extract_scenario_config(events=events)
         window = _detect_boundary_window(config=config, events=events)
         if window is None:

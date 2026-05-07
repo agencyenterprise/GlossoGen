@@ -1,0 +1,226 @@
+[
+  {
+    "id": "obs_00_alignment_collapse",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "Faces are flickering randomly between light and dark patches that form no pattern."
+    }
+  },
+  {
+    "id": "eng_00_alignment_collapse",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "Faces are flickering randomly between light and dark patches that form no pattern.",
+      "matched_motif": "Alignment Collapse",
+      "stellar_action_text": "Sound a sustained moderate tone near all six faces simultaneously for 10 seconds, starting from the top face. Let the tone fade naturally and wait for the hum to stabilize."
+    }
+  },
+  {
+    "id": "obs_01_drift_escalation",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "The light on each face keeps sliding slowly across the surface like colors drifting."
+    }
+  },
+  {
+    "id": "eng_01_drift_escalation",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "The light on each face keeps sliding slowly across the surface like colors drifting.",
+      "matched_motif": "Drift Escalation",
+      "stellar_action_text": "Chime a bell near two opposite faces, starting from the top face. Alternate the chime between the two faces \u2014 10 seconds pause between chimes \u2014 for five cycles at moderate tone."
+    }
+  },
+  {
+    "id": "obs_02_echo_saturation",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "The hum has a layered quality, like multiple tones stacked on top of each other."
+    }
+  },
+  {
+    "id": "eng_02_echo_saturation",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "The hum has a layered quality, like multiple tones stacked on top of each other.",
+      "matched_motif": "Echo Saturation",
+      "stellar_action_text": "Drape a cloth over two adjacent edges near the top face for 10 seconds at moderate coverage. Then chime a bell three times near the top face."
+    }
+  },
+  {
+    "id": "obs_03_leak_instability",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "The corners are noticeably dimmer than the rest, almost dark."
+    }
+  },
+  {
+    "id": "eng_03_leak_instability",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "The corners are noticeably dimmer than the rest, almost dark.",
+      "matched_motif": "Leak Instability",
+      "stellar_action_text": "Warm each corner of the top face by holding a heated stone nearby for 10 seconds at moderate warmth, in sequence. Then trace each edge of the top face with a finger."
+    }
+  },
+  {
+    "id": "obs_04_low_intensity",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "It is dim overall, all faces are faint."
+    }
+  },
+  {
+    "id": "eng_04_low_intensity",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "It is dim overall, all faces are faint.",
+      "matched_motif": "Low Intensity",
+      "stellar_action_text": "Place a warm stone beside the top face at moderate warmth for 10 seconds. Rotate and repeat for each face."
+    }
+  },
+  {
+    "id": "obs_05_high_intensity",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "All faces are blazing with painfully bright white light."
+    }
+  },
+  {
+    "id": "eng_05_high_intensity",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "All faces are blazing with painfully bright white light.",
+      "matched_motif": "High Intensity",
+      "stellar_action_text": "Drape a cool cloth over the Veyru for 10 seconds. Remove the cloth and fan moderate cool air across the top face and the opposite face for 10 seconds."
+    }
+  },
+  {
+    "id": "obs_06_phase_inversion",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "Opposite faces alternate between bright and dark in a strict pulsing rhythm."
+    }
+  },
+  {
+    "id": "eng_06_phase_inversion",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "Opposite faces alternate between bright and dark in a strict pulsing rhythm.",
+      "matched_motif": "Phase Inversion",
+      "stellar_action_text": "Illuminate the top face with a dim lamp and the opposite face with a bright lamp simultaneously at moderate brightness for 10 seconds, without moving the lamps."
+    }
+  },
+  {
+    "id": "obs_07_resonance_cascade",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "One face is dramatically brighter than the others with intense localized vibration."
+    }
+  },
+  {
+    "id": "eng_07_resonance_cascade",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "One face is dramatically brighter than the others with intense localized vibration.",
+      "matched_motif": "Resonance Cascade",
+      "stellar_action_text": "Drape a folded cloth over the top face for 10 seconds at moderate coverage. Then chime a bell near each edge of the top face twice."
+    }
+  },
+  {
+    "id": "obs_08_corner_deadlock",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "One or two corners glow intensely bright while the rest looks normal."
+    }
+  },
+  {
+    "id": "eng_08_corner_deadlock",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "One or two corners glow intensely bright while the rest looks normal.",
+      "matched_motif": "Corner Deadlock",
+      "stellar_action_text": "At each corner of the top face, chime a bell briefly at moderate tone, then warm the two edges meeting at that corner with a heated stone for 10 seconds."
+    }
+  },
+  {
+    "id": "obs_09_boundary_softening",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "Edges appear to wobble or flex when touched."
+    }
+  },
+  {
+    "id": "eng_09_boundary_softening",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "Edges appear to wobble or flex when touched.",
+      "matched_motif": "Boundary Softening",
+      "stellar_action_text": "Rest a flat board against the top face at moderate contact for 10 seconds. Rotate and repeat for each face-pair."
+    }
+  },
+  {
+    "id": "obs_10_propagation_stall",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "Light patterns have frozen completely \u2014 dim, not bright, and totally still."
+    }
+  },
+  {
+    "id": "eng_10_propagation_stall",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "Light patterns have frozen completely \u2014 dim, not bright, and totally still.",
+      "matched_motif": "Propagation Stall",
+      "stellar_action_text": "Chime a bell near the center of each face once at moderate tone, starting from the top face. Then place a warm stone beside the Veyru for 10 seconds."
+    }
+  },
+  {
+    "id": "obs_11_harmonic_split",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "The hum has split into two or more competing tones that clash."
+    }
+  },
+  {
+    "id": "eng_11_harmonic_split",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "The hum has split into two or more competing tones that clash.",
+      "matched_motif": "Harmonic Split",
+      "stellar_action_text": "Place the Veyru on a soft surface with the top face up at moderate contact. Let it rest undisturbed for 10 seconds."
+    }
+  },
+  {
+    "id": "obs_12_thermal_bleed",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "Surfaces feel rough or gritty, and the light has a reddish tint."
+    }
+  },
+  {
+    "id": "eng_12_thermal_bleed",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "Surfaces feel rough or gritty, and the light has a reddish tint.",
+      "matched_motif": "Thermal Bleed",
+      "stellar_action_text": "Drape a cool cloth over the Veyru for 10 seconds. Remove and fan moderate cool air across all six faces for 10 seconds, starting from the top face."
+    }
+  },
+  {
+    "id": "obs_13_core_void",
+    "agent_role_filter": "field_observer",
+    "inputs": {
+      "symptoms": "Faces glow normally at the surface but it sounds hollow when tapped."
+    }
+  },
+  {
+    "id": "eng_13_core_void",
+    "agent_role_filter": "stabilization_engineer",
+    "inputs": {
+      "observer_message": "Faces glow normally at the surface but it sounds hollow when tapped.",
+      "matched_motif": "Core Void",
+      "stellar_action_text": "Rotate the Veyru slowly over 10 seconds while sounding a steady tone at moderate volume near opposite faces, starting from the top face. After rotation, chime a bell once near each corner."
+    }
+  }
+]

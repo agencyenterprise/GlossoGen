@@ -14,7 +14,8 @@ from schmidt.event_logger import EventLogger
 from schmidt.llm.token_counter import TokenCounter, create_token_counter
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.channel import Channel
-from schmidt.runtime.activity_notification import DoneNotification
+from schmidt.models.event import InjectionDelivered, PostmortemStarted
+from schmidt.runtime.activity_notification import DoneNotification, NewInfoNotification
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.scenario_world import WorldContext
 from schmidt.scenario_protocol import SimulationScenario
@@ -41,7 +42,9 @@ class SimulationRuntime:
         self._agent_sessions = agent_sessions
         self._agent_tool_allowlists = agent_tool_allowlists
         self._world_context = world_context
+        self._current_round = 1
         world_context._channel_router = self._channel_router
+        world_context._get_current_round = lambda: self._current_round
         self._agent_configs_by_id = {c.agent_id: c for c in agent_configs}
         self._token_counters: dict[str, TokenCounter] = {}
         self._channel_locks: dict[str, asyncio.Lock] = {
@@ -49,6 +52,7 @@ class SimulationRuntime:
         }
         self._on_message_callbacks: list[Callable[[], None]] = []
         self._channel_message_count_at_round_start: dict[int, dict[str, int]] = {}
+        self._last_injected_rounds: dict[str, int] = {}
 
     @property
     def scenario(self) -> SimulationScenario:
@@ -64,6 +68,20 @@ class SimulationRuntime:
     def event_logger(self) -> EventLogger:
         """Access the event logger for writing JSONL events."""
         return self._event_logger
+
+    @property
+    def current_round(self) -> int:
+        """The simulation round number in effect right now.
+
+        Written by the game clock when it logs a ``RoundAdvanced``, and by the
+        supervisor when seeding round state on resume. Read by MCP tools,
+        scenario hooks, the world context, and runners.
+        """
+        return self._current_round
+
+    def set_current_round(self, round_number: int) -> None:
+        """Update the active round number. Called by the game clock and the supervisor."""
+        self._current_round = round_number
 
     @property
     def agent_sessions(self) -> dict[str, AgentSession]:
@@ -201,4 +219,100 @@ class SimulationRuntime:
         for session in self._agent_sessions.values():
             session.push_notification(
                 notification=DoneNotification(reason=reason),
+            )
+
+    def seed_last_injected_rounds(self, injected_rounds: dict[str, int]) -> None:
+        """Seed per-agent last-injected round numbers from a resumed run's state.
+
+        Subsequent ``deliver_round_injections`` calls skip any agent whose
+        round number is already covered, so injections delivered in the
+        source run are not re-emitted on resume.
+        """
+        self._last_injected_rounds = dict(injected_rounds)
+
+    def has_postmortem_for_round(self, round_number: int) -> bool:
+        """True if any agent has a postmortem injection scheduled for ``round_number``."""
+        for agent_id in self._agent_sessions:
+            injection = self._scenario.get_postmortem_injection(
+                round_number=round_number,
+                agent_id=agent_id,
+            )
+            if injection is not None:
+                return True
+        return False
+
+    async def deliver_round_injections(self, round_number: int) -> None:
+        """Push round injections to every agent that has one for ``round_number``.
+
+        Skips agents whose ``_last_injected_rounds`` entry already covers
+        this round (set during resume).
+        """
+        for agent_id, session in self._agent_sessions.items():
+            already_injected_round = self._last_injected_rounds.get(agent_id, 0)
+            if round_number <= already_injected_round:
+                logger.debug(
+                    "Skipping injection for %s round %d (already delivered up to round %d)",
+                    agent_id,
+                    round_number,
+                    already_injected_round,
+                )
+                continue
+
+            injection_text = self._scenario.get_injection(
+                round_number=round_number,
+                agent_id=agent_id,
+            )
+            if not injection_text:
+                continue
+
+            session.push_notification(
+                notification=NewInfoNotification(text=injection_text),
+            )
+            await self._event_logger.log(
+                event=InjectionDelivered(
+                    agent_id=agent_id,
+                    round_number=round_number,
+                    text=injection_text,
+                )
+            )
+            logger.debug(
+                "Injection delivered to %s for round %d",
+                agent_id,
+                round_number,
+            )
+
+    async def deliver_postmortem_injections(self, round_number: int) -> None:
+        """Log ``PostmortemStarted`` and push postmortem injections to agents.
+
+        Phase-transition state (the clock's ``_in_postmortem`` flag, timing
+        resets) is set by the caller before invoking this method.
+        """
+        await self._event_logger.log(
+            event=PostmortemStarted(round_number=round_number),
+        )
+        self._scenario.on_postmortem_started(round_number=round_number)
+        logger.info("Postmortem started for round %d", round_number)
+
+        for agent_id, session in self._agent_sessions.items():
+            injection_text = self._scenario.get_postmortem_injection(
+                round_number=round_number,
+                agent_id=agent_id,
+            )
+            if not injection_text:
+                continue
+
+            session.push_notification(
+                notification=NewInfoNotification(text=injection_text),
+            )
+            await self._event_logger.log(
+                event=InjectionDelivered(
+                    agent_id=agent_id,
+                    round_number=round_number,
+                    text=injection_text,
+                ),
+            )
+            logger.debug(
+                "Postmortem injection delivered to %s for round %d",
+                agent_id,
+                round_number,
             )

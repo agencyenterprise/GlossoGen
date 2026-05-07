@@ -7,10 +7,11 @@ its agents, channels, injections, timing parameters, and evaluation logic.
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Protocol, Self
 
 from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.evaluation.generic_metric_names import GENERIC_METRIC_NAMES
+from schmidt.evaluation.metric_run_options import MetricRunOptions
 from schmidt.event_logger import EventLogger
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel
@@ -18,6 +19,21 @@ from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.runtime.scenario_world import ScenarioWorld
 
 logger = logging.getLogger(__name__)
+
+
+class ScenarioRuntimeHandle(Protocol):
+    """Read-only view of the simulation runtime exposed to scenarios.
+
+    Scenarios receive this handle via ``bind_runtime`` and use it to log
+    custom events and read the current round number. Defined as a
+    Protocol to avoid an import cycle with ``SimulationRuntime``.
+    """
+
+    @property
+    def event_logger(self) -> EventLogger: ...
+
+    @property
+    def current_round(self) -> int: ...
 
 
 class SimulationScenario(ABC):
@@ -47,6 +63,7 @@ class SimulationScenario(ABC):
         provider_name: str,
         inference_provider: str | None,
         reasoning_effort: str | None,
+        options: MetricRunOptions,
     ) -> EvaluationReport:
         """Run metrics against a simulation log and write the report."""
         ...
@@ -185,14 +202,15 @@ class SimulationScenario(ABC):
         """
         _ = run_dir
 
-    def bind_event_logger(self, event_logger: EventLogger) -> None:
-        """Called before the simulation starts, giving the scenario a handle to the event logger.
+    def bind_runtime(self, runtime: ScenarioRuntimeHandle) -> None:
+        """Called before the simulation starts, giving the scenario a runtime handle.
 
         Scenarios that want to emit custom events (e.g. judge verdicts,
-        world-state transitions) from inside their MCP tool executors store
-        the logger here and use it at runtime. The default is a no-op.
+        world-state transitions) from inside their MCP tool executors or
+        read the active round number store the handle here and use it at
+        runtime. The default is a no-op.
         """
-        _ = event_logger
+        _ = runtime
 
     def is_finished_early(self) -> bool:
         """Return True if the scenario has reached a natural conclusion before max rounds.

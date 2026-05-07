@@ -2012,7 +2012,11 @@ export interface components {
          *     field is filled once the tool execution completes. ``timestamp``
          *     anchors to ``tool_call_invoked``; ``result_timestamp`` anchors to
          *     ``tool_result_received`` so the UI can render call and result at
-         *     their true chronological positions.
+         *     their true chronological positions. ``round_number`` is the round
+         *     the call was issued in; ``result_round_number`` is the round the
+         *     result was received in. They differ for tool calls that hang across
+         *     a round boundary (e.g. ``read_notifications`` blocking until the
+         *     next round's injection arrives).
          */
         ToolUseEntry: {
             /** Message Id */
@@ -2038,6 +2042,8 @@ export interface components {
             result_timestamp: string | null;
             /** Round Number */
             round_number: number;
+            /** Result Round Number */
+            result_round_number: number | null;
             stabilize_metadata?: components["schemas"]["VeyruStabilizeMetadata"] | null;
         };
         /**
