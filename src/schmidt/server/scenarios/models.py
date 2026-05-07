@@ -37,10 +37,16 @@ class KnobsContentResponse(BaseModel):
 
 
 class AgentRoleInfo(BaseModel):
-    """Lightweight agent identity for the agent discovery endpoint."""
+    """Lightweight agent identity for the agent discovery endpoint.
+
+    ``channels`` lists the channel IDs the agent is a member of given
+    the supplied knobs. Used by the FE phase-builder to render per-agent
+    channel-visibility controls when configuring scheduled swaps.
+    """
 
     agent_id: str
     role_name: str
+    channels: list[str]
 
 
 class AgentRolesRequest(BaseModel):

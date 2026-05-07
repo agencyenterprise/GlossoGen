@@ -8,6 +8,7 @@ new information (injections) as if the world is evolving around them.
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 
 from schmidt.event_logger import EventLogger
 from schmidt.models.event import (
@@ -21,6 +22,15 @@ from schmidt.runtime.activity_notification import NewInfoNotification
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.scenario_world import WorldContext
 from schmidt.scenario_protocol import SimulationScenario
+
+RoundBoundaryHook = Callable[[int], Awaitable[None]]
+"""Callback invoked after a ``RoundAdvanced`` is logged and before injections fire.
+
+Receives the new round number. Used to dispatch scheduled in-run
+interventions (agent swaps, postmortem toggles) at the start of a
+round so the new state is in place before the round's injections
+reach any agent.
+"""
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +52,7 @@ class GameClock:
         start_round: int,
         last_injected_rounds: dict[str, int],
         resuming: bool,
+        on_round_boundary: RoundBoundaryHook | None,
     ) -> None:
         self._scenario = scenario
         self._agent_sessions = agent_sessions
@@ -52,6 +63,7 @@ class GameClock:
         self._start_round = start_round
         self._last_injected_rounds = last_injected_rounds
         self._resuming = resuming
+        self._on_round_boundary = on_round_boundary
         self._current_round = self._start_round
         self._round_start_time = time.monotonic()
         self._last_message_time = time.monotonic()
@@ -196,6 +208,9 @@ class GameClock:
             self._current_round,
             trigger,
         )
+
+        if self._on_round_boundary is not None:
+            await self._on_round_boundary(self._current_round)
 
         await self._scenario.on_round_advanced(round_number=self._current_round)
         self._world_context.signal_round_advanced(round_number=self._current_round)

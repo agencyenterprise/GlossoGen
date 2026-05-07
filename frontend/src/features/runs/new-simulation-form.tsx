@@ -12,6 +12,14 @@ import { ModelPicker } from "./model-picker";
 import { ConfigValueModal } from "./config-value-modal";
 import { AgentModelOverrides, type AgentModelOverride } from "./agent-model-overrides";
 import { labelColor } from "./label-picker-modal";
+import {
+  PhaseBuilder,
+  buildScheduledEvents,
+  computeRoundCount,
+  emptyPhaseBuilderState,
+  validatePhaseBuilder,
+  type PhaseBuilderState,
+} from "./phase-builder";
 import { VeyruKnobsForm } from "./veyru/veyru-knobs-form";
 import {
   buildPayload as buildVeyruPayload,
@@ -149,6 +157,7 @@ export function NewSimulationForm() {
   const [knobsFile, setKnobsFile] = useState("");
   const [knobs, setKnobs] = useState<KnobsMap | null>(null);
   const [veyruState, setVeyruState] = useState<VeyruKnobsState | null>(null);
+  const [phaseBuilder, setPhaseBuilder] = useState<PhaseBuilderState>(emptyPhaseBuilderState());
   const [labels, setLabels] = useState<string[]>([]);
   const [labelInput, setLabelInput] = useState("");
   const [note, setNote] = useState("");
@@ -254,6 +263,15 @@ export function NewSimulationForm() {
         }
       }
 
+      const scheduledEvents = buildScheduledEvents(phaseBuilder);
+      if (scheduledEvents.length > 0) {
+        if (knobsPayload === null) {
+          knobsPayload = {};
+        }
+        knobsPayload.scheduled_events = scheduledEvents;
+        knobsPayload.round_count = computeRoundCount(phaseBuilder);
+      }
+
       const { error } = await api.POST("/api/runs/start", {
         body: {
           scenario_name: scenario,
@@ -307,8 +325,13 @@ export function NewSimulationForm() {
     },
   });
 
+  const phaseBuilderErrors = useMemo(() => validatePhaseBuilder(phaseBuilder), [phaseBuilder]);
+
   const canSubmit = (() => {
     if (!scenario || !model || !provider) {
+      return false;
+    }
+    if (phaseBuilderErrors.length > 0) {
       return false;
     }
     if (isVeyru) {
@@ -331,6 +354,7 @@ export function NewSimulationForm() {
     setKnobs(null);
     setVeyruState(null);
     setModelOverrides({});
+    setPhaseBuilder(emptyPhaseBuilderState());
   }
 
   function handleKnobsFileChange(value: string) {
@@ -452,6 +476,30 @@ export function NewSimulationForm() {
             overrides={modelOverrides}
             onChange={setModelOverrides}
           />
+        </div>
+      ) : null}
+
+      {agentRoles.length > 0 ? (
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">Phases</label>
+          <p className="text-xs text-muted-foreground">
+            Optionally script mid-run agent swaps. Each phase fires at its boundary round; total
+            round_count is the sum of all phase durations.
+          </p>
+          <PhaseBuilder
+            state={phaseBuilder}
+            onChange={setPhaseBuilder}
+            agents={agentRoles}
+            models={data?.models ?? []}
+            scenarioHasPostmortem={agentRoles.some(a => a.channels.includes("postmortem"))}
+          />
+          {phaseBuilderErrors.length > 0 ? (
+            <ul className="list-disc space-y-0.5 pl-4 text-xs text-destructive">
+              {phaseBuilderErrors.map((err, i) => (
+                <li key={i}>{err}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
 

@@ -19,7 +19,7 @@ from schmidt.evaluation.metric_protocol import Metric
 from schmidt.evaluation.prompt_renderer import render_evaluator_prompt
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import MessageSent, SimulationEvent
+from schmidt.models.event import AgentSwappedMidRun, MessageSent, SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.veyru.evaluation.prompt_renderer import render_veyru_prompt
 
@@ -98,7 +98,7 @@ class ProtocolLearnedAfterSwapMetric(Metric):
         """Score newcomer adoption of the pre-boundary protocol."""
         _ = agent_configs, scenario, run_dir
         config = extract_scenario_config(events=events)
-        window = _detect_boundary_window(config=config)
+        window = _detect_boundary_window(config=config, events=events)
         if window is None:
             return [
                 Measurement(
@@ -106,18 +106,22 @@ class ProtocolLearnedAfterSwapMetric(Metric):
                     score=0.0,
                     score_unit="post-boundary rounds with protocol use",
                     summary=(
-                        "Scenario did not use two-team swap mode or intern mode; "
-                        "no personnel change boundary to evaluate."
+                        "Scenario did not use two-team swap mode, intern mode, or in-run "
+                        "scheduled swaps; no personnel change boundary to evaluate."
                     ),
                     per_round=[],
                     per_agent=[],
                 )
             ]
 
+        # ``intern`` and ``scheduled_swap`` both place the boundary AT the
+        # newcomer's first round (post = round >= boundary). Two-team
+        # ``swap`` mode keeps the swap round in the pre-boundary window.
+        boundary_includes_round = window.mode_label in ("intern", "scheduled_swap")
         pre_rounds, post_rounds = _split_transcripts(
             events=events,
             boundary_round=window.boundary_round,
-            is_intern=window.mode_label == "intern",
+            boundary_includes_round=boundary_includes_round,
         )
 
         if not pre_rounds or not post_rounds:
@@ -192,8 +196,17 @@ class ProtocolLearnedAfterSwapMetric(Metric):
         ]
 
 
-def _detect_boundary_window(config: dict[str, object]) -> BoundaryWindow | None:
-    """Return the boundary window for swap or intern mode, or None if neither applies."""
+def _detect_boundary_window(
+    config: dict[str, object],
+    events: list[SimulationEvent],
+) -> BoundaryWindow | None:
+    """Return the boundary window for swap, intern mode, or scheduled swap.
+
+    Detection order (first match wins): intern mode, two-team swap mode,
+    in-run scheduled swap (first ``AgentSwappedMidRun`` event in the
+    log). Multi-swap runs only report on the first boundary; downstream
+    consumers can read the JSONL directly to inspect later swaps.
+    """
     intern_enabled = bool(config.get("intern_enabled", False))
     two_teams = bool(config.get("two_teams", False))
 
@@ -224,15 +237,35 @@ def _detect_boundary_window(config: dict[str, object]) -> BoundaryWindow | None:
             ),
         )
 
+    first_swap = next(
+        (event for event in events if isinstance(event, AgentSwappedMidRun)),
+        None,
+    )
+    if first_swap is not None:
+        return BoundaryWindow(
+            mode_label="scheduled_swap",
+            boundary_round=first_swap.round_number,
+            pre_boundary_last_round=first_swap.round_number - 1,
+            post_boundary_first_round=first_swap.round_number,
+            newcomer_label=f"swapped-in {first_swap.agent_id}",
+        )
+
     return None
 
 
 def _split_transcripts(
     events: list[SimulationEvent],
     boundary_round: int,
-    is_intern: bool,
+    boundary_includes_round: bool,
 ) -> tuple[list[RoundTranscript], list[RoundTranscript]]:
-    """Partition link-channel messages into pre and post boundary windows."""
+    """Partition link-channel messages into pre and post boundary windows.
+
+    ``boundary_includes_round=True`` puts the boundary round itself
+    into the post-boundary window (intern / scheduled-swap modes,
+    where the newcomer is already active for that round).
+    ``False`` keeps it in the pre-boundary window (two-team swap mode,
+    where the swap fires after the round completes).
+    """
     pre_by_round: dict[int, list[str]] = {}
     post_by_round: dict[int, list[str]] = {}
 
@@ -243,7 +276,7 @@ def _split_transcripts(
             continue
         line = _format_message_line(event=event)
         rn = event.round_number
-        is_post = rn >= boundary_round if is_intern else rn > boundary_round
+        is_post = rn >= boundary_round if boundary_includes_round else rn > boundary_round
         target = post_by_round if is_post else pre_by_round
         if rn not in target:
             target[rn] = []

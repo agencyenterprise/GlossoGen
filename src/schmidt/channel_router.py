@@ -4,8 +4,41 @@ import logging
 
 from schmidt.models.channel import Channel
 from schmidt.models.message import SimulationMessage
+from schmidt.runtime.scheduled_events import (
+    ChannelVisibility,
+    ChannelVisibilityFromRound,
+    ChannelVisibilityNone,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def compute_per_channel_join_index(
+    channel_visibility: dict[str, ChannelVisibility],
+    current_channel_message_counts: dict[str, int],
+    channel_message_count_at_round_start: dict[int, dict[str, int]],
+) -> dict[str, int]:
+    """Translate per-channel visibility into concrete ``member_join_index`` values.
+
+    ``ChannelVisibilityFull`` → 0 (visible from the channel's first message).
+    ``ChannelVisibilityNone`` → ``current_channel_message_counts[channel_id]``
+    (every existing message hidden; new agent only sees post-swap messages).
+    ``ChannelVisibilityFromRound(R)`` →
+    ``channel_message_count_at_round_start[R].get(channel_id, 0)`` (windowed
+    from round R onwards). Channels not present in the visibility dict
+    are omitted from the result, signalling to the caller that
+    ``member_join_index`` should be left untouched for them.
+    """
+    result: dict[str, int] = {}
+    for channel_id, visibility in channel_visibility.items():
+        if isinstance(visibility, ChannelVisibilityNone):
+            result[channel_id] = current_channel_message_counts.get(channel_id, 0)
+        elif isinstance(visibility, ChannelVisibilityFromRound):
+            snapshot = channel_message_count_at_round_start.get(visibility.round_floor, {})
+            result[channel_id] = snapshot.get(channel_id, 0)
+        else:
+            result[channel_id] = 0
+    return result
 
 
 class ChannelRouter:
@@ -119,25 +152,25 @@ class ChannelRouter:
     def apply_replacement_visibility(
         self,
         agent_id: str,
-        channels_with_visible_history: list[str],
+        per_channel_join_index: dict[str, int],
     ) -> None:
-        """Selectively wipe channel-history visibility for a replaced agent.
+        """Set ``member_join_index`` for ``agent_id`` on the listed channels.
 
-        For every channel ``agent_id`` is a member of: if the channel is in
-        ``channels_with_visible_history`` the existing ``member_join_index``
-        is preserved (history visible to the replaced agent on subsequent
-        ``read_channel`` calls); otherwise the index is bumped to the
-        current message count, making prior messages invisible while every
-        other agent's view of the channel is unchanged.
+        Each ``(channel_id, join_index)`` entry overwrites
+        ``channel.member_join_index[agent_id]``. Channels absent from the
+        dict are left untouched (preserve existing visibility). Channels
+        the agent is not currently a member of are skipped silently.
+        Used by the replace-agent resume flow and the in-run agent-swap
+        flow to install per-channel windowed visibility for a swapped-in
+        agent.
         """
-        visible = set(channels_with_visible_history)
-        for channel_id, channel in self._channels.items():
+        for channel_id, join_index in per_channel_join_index.items():
+            channel = self._channels.get(channel_id)
+            if channel is None:
+                continue
             if agent_id not in channel.member_agent_ids:
                 continue
-            if channel_id in visible:
-                continue
-            history_len = len(self._messages[channel_id])
-            channel.member_join_index[agent_id] = history_len
+            channel.member_join_index[agent_id] = join_index
 
     def clear_history(self, channel_id: str) -> None:
         """Wipe the in-memory message history for a channel.

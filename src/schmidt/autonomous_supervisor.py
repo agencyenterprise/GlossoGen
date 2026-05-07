@@ -7,15 +7,20 @@ autonomously via MCP tools.
 import asyncio
 import logging
 from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
 import httpx
+from pydantic import TypeAdapter
 
+from schmidt.channel_router import compute_per_channel_join_index
 from schmidt.event_logger import EventLogger
 from schmidt.message_rewind import RewindState
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import (
     AgentConnected,
     AgentRegistered,
+    PostmortemDisabledMidRun,
     RunStatus,
     SimulationEnded,
     SimulationStarted,
@@ -23,10 +28,13 @@ from schmidt.models.event import (
 from schmidt.runners.agent_runner_base import AgentRunner
 from schmidt.runtime.activity_notification import NewMessagesNotification
 from schmidt.runtime.agent_session import AgentSession
+from schmidt.runtime.agent_swap import AgentSwapResources, execute_agent_swap
 from schmidt.runtime.game_clock import GameClock
 from schmidt.runtime.mcp_server import start_mcp_server
 from schmidt.runtime.mcp_tools import BASE_TOOL_NAMES
 from schmidt.runtime.scenario_world import WorldContext
+from schmidt.runtime.scheduled_events import ScheduledEvent, SwapAgent
+from schmidt.runtime.scheduler import RoundBoundaryScheduler
 from schmidt.runtime.simulation_state import SimulationRuntime
 from schmidt.scenario_protocol import SimulationScenario
 
@@ -54,6 +62,7 @@ class AutonomousSupervisor:
         resume_state: RewindState | None,
         run_id: str,
         provider: str,
+        log_path: Path,
     ) -> None:
         self._scenario = scenario
         self._agent_configs = agent_configs
@@ -63,7 +72,92 @@ class AutonomousSupervisor:
         self._resume_state = resume_state
         self._run_id = run_id
         self._provider = provider
+        self._log_path = log_path
         self._runtime: SimulationRuntime | None = None
+        scheduled_events_raw_obj = scenario.get_scenario_config().get("scheduled_events", [])
+        scheduled_events_raw: list[Any] = (
+            list(scheduled_events_raw_obj) if isinstance(scheduled_events_raw_obj, list) else []
+        )
+        scheduled = self._parse_scheduled_events(raw=scheduled_events_raw)
+        self._scheduler = RoundBoundaryScheduler(events=scheduled)
+        self._runner_tasks: dict[str, asyncio.Task[Any]] = {}
+        self._cost_tracker: dict[str, float] = {}
+        self._mcp_server_url = ""
+
+    @staticmethod
+    def _parse_scheduled_events(raw: list[Any]) -> list[ScheduledEvent]:
+        """Validate and coerce raw schedule entries from scenario_config.
+
+        ``scenario_config`` is a JSON-friendly dict produced by knob
+        merging; the schedule entries arrive as plain dicts that must be
+        re-validated through the discriminated ``ScheduledEvent`` union
+        before the runtime can use them.
+        """
+        if not raw:
+            return []
+        adapter: TypeAdapter[list[ScheduledEvent]] = TypeAdapter(list[ScheduledEvent])
+        return adapter.validate_python(raw)
+
+    async def perform_agent_swap(self, spec: SwapAgent) -> None:
+        """Scheduler-invoked hook: swap one agent for a fresh runner."""
+        if self._runtime is None:
+            raise RuntimeError("Runtime not initialised; cannot swap agents")
+        resources = AgentSwapResources(
+            runtime=self._runtime,
+            runner_factory=self._runner_factory,
+            runner_tasks=self._runner_tasks,
+            log_path=self._log_path,
+            run_dir=self._log_path.parent,
+            mcp_server_url=self._mcp_server_url,
+            cost_tracker=self._cost_tracker,
+        )
+        await execute_agent_swap(spec=spec, resources=resources)
+
+    def _make_round_boundary_hook(
+        self,
+        runtime: SimulationRuntime,
+    ) -> Callable[[int], Any] | None:
+        """Build the round-boundary callback the game clock invokes per round.
+
+        Returns ``None`` when no scheduled events are configured so the
+        game clock skips the call. Otherwise the callback (1) snapshots
+        per-channel message counts at round-start so subsequent
+        ``ChannelVisibilityFromRound`` lookups resolve correctly and
+        (2) dispatches any scheduled events for the round.
+        """
+
+        async def _hook(round_number: int) -> None:
+            runtime.snapshot_round_start(round_number=round_number)
+            await self._scheduler.dispatch(round_number=round_number, ops=self)
+
+        if self._scheduler.empty:
+            # Still snapshot per round even without scheduled events so
+            # downstream tooling can rely on the field always being populated.
+            async def _snapshot_only(round_number: int) -> None:
+                runtime.snapshot_round_start(round_number=round_number)
+
+            return _snapshot_only
+        return _hook
+
+    async def set_postmortem_enabled(self, round_number: int, enabled: bool) -> None:
+        """Scheduler-invoked hook: toggle postmortem mid-run.
+
+        Only ``enabled=False`` is supported (validated upstream by
+        ``SetPostmortem``). Calls the world's ``disable_postmortem_globally``
+        and emits ``PostmortemDisabledMidRun``.
+        """
+        if enabled:
+            raise ValueError("Re-enabling postmortem mid-run is not supported")
+        world = self._scenario.get_world()
+        disable = getattr(world, "disable_postmortem_globally", None)
+        if disable is None:
+            raise ValueError(
+                "Scenario world does not support disable_postmortem_globally; "
+                "set_postmortem cannot be scheduled for this scenario"
+            )
+        disable()
+        await self._event_logger.log(event=PostmortemDisabledMidRun(round_number=round_number))
+        logger.info("Postmortem disabled mid-run at round %d", round_number)
 
     async def run(self) -> None:
         """Execute the full simulation lifecycle."""
@@ -179,16 +273,25 @@ class AutonomousSupervisor:
                 messages_by_channel=self._resume_state.messages_by_channel,
             )
             replaced_ids = self._resume_state.replaced_agent_ids
-            visibility_map = self._resume_state.replaced_agent_channels_with_visible_history
+            visibility_map = self._resume_state.replaced_agent_channel_visibility
+            round_snapshots = self._resume_state.channel_message_count_at_round_start
+            runtime.seed_round_snapshots(snapshots=round_snapshots)
+            current_counts: dict[str, int] = {
+                channel_id: runtime.channel_router.get_message_count(channel_id=channel_id)
+                for channel_id in self._resume_state.messages_by_channel
+            }
             for agent_id in replaced_ids:
-                # Selectively wipe channel-history visibility for replace-agent:
-                # channels listed in the visibility map keep prior history visible
-                # to the replaced agent; every other channel they're a member of
-                # has member_join_index bumped to the current message count so
-                # read_channel returns only post-replacement messages there.
+                # Translate per-channel visibility into concrete join indices and
+                # apply them to the replaced agent. Channels not declared keep
+                # whatever join_index they had on resume.
+                per_channel = compute_per_channel_join_index(
+                    channel_visibility=visibility_map.get(agent_id, {}),
+                    current_channel_message_counts=current_counts,
+                    channel_message_count_at_round_start=round_snapshots,
+                )
                 runtime.channel_router.apply_replacement_visibility(
                     agent_id=agent_id,
-                    channels_with_visible_history=visibility_map.get(agent_id, []),
+                    per_channel_join_index=per_channel,
                 )
             for agent_id, session in agent_sessions.items():
                 has_history = bool(self._resume_state.agent_message_histories.get(agent_id))
@@ -216,7 +319,10 @@ class AutonomousSupervisor:
                 self._resume_state.round_number,
             )
 
-        # Build and wire the game clock.
+        # Build and wire the game clock. The boundary hook is None when no
+        # scheduled events are configured, so the per-round overhead is a
+        # single None check.
+        round_boundary_hook = self._make_round_boundary_hook(runtime=runtime)
         game_clock = GameClock(
             scenario=self._scenario,
             agent_sessions=agent_sessions,
@@ -227,6 +333,7 @@ class AutonomousSupervisor:
             start_round=start_round,
             last_injected_rounds=last_injected,
             resuming=resuming,
+            on_round_boundary=round_boundary_hook,
         )
         runtime.add_on_message_callback(callback=game_clock.on_message_sent)
 
@@ -263,6 +370,7 @@ class AutonomousSupervisor:
             )
 
         mcp_server_url = _mcp_server_url(port=self._mcp_server_port)
+        self._mcp_server_url = mcp_server_url
 
         # Start MCP server as a background task.
         mcp_task = asyncio.create_task(
@@ -292,8 +400,6 @@ class AutonomousSupervisor:
         # is updated by each runner after every cycle so the supervisor can
         # still recover the agent's last known cost if its task gets cancelled
         # on shutdown before it can return an AgentRunResult.
-        cost_tracker: dict[str, float] = {}
-        agent_tasks = []
         for config in self._agent_configs:
             runner = self._runner_factory()
             task = asyncio.create_task(
@@ -301,11 +407,11 @@ class AutonomousSupervisor:
                     agent_config=config,
                     mcp_server_url=mcp_server_url,
                     event_logger=self._event_logger,
-                    cost_tracker=cost_tracker,
+                    cost_tracker=self._cost_tracker,
                 ),
                 name=f"agent-{config.agent_id}",
             )
-            agent_tasks.append(task)
+            self._runner_tasks[config.agent_id] = task
             await self._event_logger.log(
                 event=AgentConnected(
                     agent_id=config.agent_id,
@@ -350,7 +456,9 @@ class AutonomousSupervisor:
         # Wait for each agent task to finish. We don't consume the returned
         # AgentRunResult for cost — cost_tracker is the source of truth so
         # that cancelled agents still contribute their last recorded value.
-        for task in agent_tasks:
+        # Snapshot the task list because mid-run swaps may have replaced
+        # entries; we wait on whichever runner is currently active per agent.
+        for task in list(self._runner_tasks.values()):
             try:
                 await asyncio.wait_for(task, timeout=30.0)
             except asyncio.TimeoutError:
@@ -363,7 +471,7 @@ class AutonomousSupervisor:
             except Exception:
                 logger.exception("Agent task %s failed", task.get_name())
 
-        total_cost_usd = sum(cost_tracker.values())
+        total_cost_usd = sum(self._cost_tracker.values())
 
         # Stop the world simulation.
         logger.info("Stopping world simulation")

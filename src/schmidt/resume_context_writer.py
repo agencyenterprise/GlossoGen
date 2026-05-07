@@ -85,3 +85,33 @@ def write_resume_context_files(
             len(history),
             path.name,
         )
+
+
+def write_swap_resume_context_file(
+    run_dir: Path,
+    agent_id: str,
+    round_number: int,
+    history: list[ModelMessage],
+) -> None:
+    """Dump a per-swap resume context for verification of in-run agent swaps.
+
+    Distinct filename per swap (``resume_context_<agent_id>_round_<R>.json``)
+    so multiple swaps in the same run do not overwrite each other. Used by
+    the in-run scheduled-swap flow to make the new agent's seed history
+    inspectable after the fact.
+    """
+    path = run_dir / f"resume_context_{agent_id}_round_{round_number}.json"
+    payload = {
+        "agent_id": agent_id,
+        "round_number": round_number,
+        "num_messages": len(history),
+        "messages": [_serialize_message(message=message) for message in history],
+    }
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+    logger.info(
+        "Wrote swap resume context for %s @ round %d: %d messages -> %s",
+        agent_id,
+        round_number,
+        len(history),
+        path.name,
+    )

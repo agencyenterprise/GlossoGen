@@ -14,6 +14,7 @@ from schmidt.evaluation.log_reader import load_events
 from schmidt.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,
+    AgentSwappedMidRun,
     ChannelHistoryCleared,
     ChannelMembershipChanged,
     LLMResponseReceived,
@@ -37,6 +38,7 @@ from schmidt.server.runs.models import (
     AgentDetail,
     AgentObservationResponse,
     AgentRunCycleFailedEntry,
+    AgentSwapEventDTO,
     ChannelMessage,
     CrossRunReplaceAgentSource,
     DebugLogEntry,
@@ -210,6 +212,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     timestamp = None
     channel_ids: list[str] = []
     agents_by_id: dict[str, AgentDetail] = {}
+    agent_swap_events: list[AgentSwapEventDTO] = []
     messages: list[ChannelMessage] = []
     reasoning: list[ReasoningEntry] = []
     tool_use: list[ToolUseEntry] = []
@@ -259,6 +262,20 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 system_prompt=event.system_prompt,
             )
             pricing_by_agent[event.agent_id] = find_pricing(model=event.model)
+
+        elif isinstance(event, AgentSwappedMidRun):
+            registered = agents_by_id.get(event.agent_id)
+            agent_swap_events.append(
+                AgentSwapEventDTO(
+                    agent_id=event.agent_id,
+                    round_number=event.round_number,
+                    timestamp=event.timestamp,
+                    new_model=event.new_model,
+                    new_provider=event.new_provider,
+                    system_prompt=registered.system_prompt if registered else "",
+                )
+            )
+            pricing_by_agent[event.agent_id] = find_pricing(model=event.new_model)
 
         elif isinstance(event, ToolCallInvoked):
             total_messages += 1
@@ -530,6 +547,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         channel_ids=channel_ids,
         provider=provider,
         agents=agents,
+        agent_swap_events=agent_swap_events,
         messages=messages,
         reasoning=reasoning,
         tool_use=tool_use,

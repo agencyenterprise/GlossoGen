@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Hash, X } from "lucide-react";
+import { Tooltip } from "@/shared/components/ui/tooltip";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
+import type { AgentInstance } from "./agent-instance";
 import type { DisplayEntry } from "./display-entry";
 import { EvidenceModal } from "./evidence-modal";
 import { formatTime, humanize } from "./format";
@@ -12,38 +14,30 @@ import { NotificationDisplay } from "./notification-display";
 import { ProseMarkdown } from "./prose-markdown";
 import { ToolCallDisplay } from "./tool-call-display";
 
-interface DrawerTurnGroup {
-  timestamp: string;
+interface RoundGroup {
+  round_number: number;
   entries: DisplayEntry[];
 }
 
-function groupByTurn(messages: DisplayEntry[]): DrawerTurnGroup[] {
-  const groups: DrawerTurnGroup[] = [];
-  let current: DrawerTurnGroup | null = null;
-
+function groupByRound(messages: DisplayEntry[]): RoundGroup[] {
+  const groups: RoundGroup[] = [];
   for (const msg of messages) {
-    if (current) {
-      current.entries.push(msg);
+    const last = groups.at(-1);
+    if (last && last.round_number === msg.round_number) {
+      last.entries.push(msg);
     } else {
-      current = {
-        timestamp: msg.timestamp,
-        entries: [msg],
-      };
+      groups.push({ round_number: msg.round_number, entries: [msg] });
     }
-  }
-  if (current) {
-    groups.push(current);
   }
   return groups;
 }
 
-type AgentDetail = components["schemas"]["AgentDetail"];
 type MeasurementResponse = components["schemas"]["MeasurementResponse"];
 
 type DrawerTab = "prompt" | "messages" | "metrics";
 
 interface AgentDrawerProps {
-  agent: AgentDetail;
+  instance: AgentInstance;
   messages: DisplayEntry[];
   agentColor: AgentColor;
   channelColorMap: Map<string, AgentColor>;
@@ -53,8 +47,18 @@ interface AgentDrawerProps {
   measurements: MeasurementResponse[] | null;
 }
 
+function instanceLabel(instance: AgentInstance): string {
+  const start = instance.round_start;
+  const end = instance.round_end ?? "…";
+  const range = `r${start}-${end}`;
+  if (instance.is_latest && instance.generation === 1) {
+    return range;
+  }
+  return `Gen ${instance.generation} · ${range}`;
+}
+
 export function AgentDrawer({
-  agent,
+  instance,
   messages,
   agentColor,
   channelColorMap,
@@ -65,15 +69,82 @@ export function AgentDrawer({
 }: AgentDrawerProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("prompt");
   const [expandedMeasurement, setExpandedMeasurement] = useState<MeasurementResponse | null>(null);
-  const agentMessages = messages.filter(m => m.sender_agent_id === agent.agent_id);
-  const turnGroups = useMemo(() => groupByTurn(agentMessages), [agentMessages]);
+  const instanceMessages = useMemo(
+    () =>
+      messages.filter(
+        m =>
+          m.sender_agent_id === instance.agent_id &&
+          m.round_number >= instance.round_start &&
+          (instance.round_end === null || m.round_number <= instance.round_end)
+      ),
+    [messages, instance.agent_id, instance.round_start, instance.round_end]
+  );
+  const roundGroups = useMemo(() => groupByRound(instanceMessages), [instanceMessages]);
   const agentMetrics = (measurements ?? []).flatMap(measurement => {
-    const observations = measurement.per_agent.filter(obs => obs.agent_id === agent.agent_id);
+    const observations = measurement.per_agent.filter(obs => obs.agent_id === instance.agent_id);
     if (observations.length === 0) {
       return [];
     }
     return observations.map(obs => ({ measurement, observation: obs }));
   });
+  const showAggregateMetricsCaveat = !instance.is_latest || instance.generation > 1;
+  const roundNumbers = useMemo(() => roundGroups.map(g => g.round_number), [roundGroups]);
+
+  // Track which round divider is currently topmost in the scroll viewport so
+  // the floating "Round N" badge in the Messages tab reflects what's actually
+  // visible rather than the chat-pane's scroll state.
+  const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+  const roundDividerRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const [currentDrawerRound, setCurrentDrawerRound] = useState<number | null>(null);
+  const [showRoundJumper, setShowRoundJumper] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== "messages") return;
+    const root = messagesScrollRef.current;
+    if (!root || roundNumbers.length === 0) return;
+    const visibility = new Map<number, number>();
+    const observer = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          const round = Number(entry.target.getAttribute("data-round-number"));
+          if (Number.isNaN(round)) continue;
+          if (entry.isIntersecting) {
+            visibility.set(round, entry.intersectionRatio);
+          } else {
+            visibility.delete(round);
+          }
+        }
+        if (visibility.size === 0) {
+          return;
+        }
+        const topmost = [...visibility.keys()].sort((a, b) => a - b)[0];
+        if (topmost !== undefined) {
+          setCurrentDrawerRound(topmost);
+        }
+      },
+      { root, threshold: [0, 0.1, 0.5, 1] }
+    );
+    for (const node of roundDividerRefs.current.values()) {
+      observer.observe(node);
+    }
+    return () => observer.disconnect();
+  }, [activeTab, roundNumbers]);
+
+  // Display round falls back to the first round of this instance when the
+  // observer has not yet fired (initial mount, post-tab-switch, or
+  // currentDrawerRound now lies outside the round set after a re-render).
+  const displayRound =
+    currentDrawerRound !== null && roundNumbers.includes(currentDrawerRound)
+      ? currentDrawerRound
+      : (roundNumbers[0] ?? null);
+
+  const jumpToRound = (roundNumber: number) => {
+    const node = roundDividerRefs.current.get(roundNumber);
+    if (node) {
+      node.scrollIntoView({ behavior: "instant", block: "start" });
+    }
+    setShowRoundJumper(false);
+  };
 
   return (
     <div className="absolute inset-y-0 right-0 z-10 flex w-[calc(100%-192px)] flex-col border-l border-border bg-background">
@@ -86,11 +157,24 @@ export function AgentDrawer({
             agentColor.fg
           )}
         >
-          {deriveInitials(agent.role_name)}
+          {deriveInitials(instance.role_name)}
         </div>
-        <div>
-          <div className="text-[15px] font-medium">{agent.role_name}</div>
-          <div className="text-[11px] text-muted-foreground">{agent.model}</div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[15px] font-medium">{instance.role_name}</span>
+            <span className="rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {instanceLabel(instance)}
+            </span>
+            {instance.is_latest && instance.round_end === null ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                live
+              </span>
+            ) : null}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            {instance.provider}/{instance.model}
+          </div>
         </div>
         <button
           aria-label="Close"
@@ -107,7 +191,7 @@ export function AgentDrawer({
           System prompt
         </TabButton>
         <TabButton active={activeTab === "messages"} onClick={() => setActiveTab("messages")}>
-          Messages ({agentMessages.length})
+          Messages ({instanceMessages.length})
         </TabButton>
         {agentMetrics.length > 0 ? (
           <TabButton active={activeTab === "metrics"} onClick={() => setActiveTab("metrics")}>
@@ -117,30 +201,98 @@ export function AgentDrawer({
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        ref={activeTab === "messages" ? messagesScrollRef : null}
+        className="relative flex-1 overflow-y-auto"
+      >
         {activeTab === "prompt" ? (
           <div className="p-5">
             <ProseMarkdown className="rounded-lg bg-muted/50 p-3">
-              {agent.system_prompt}
+              {instance.system_prompt}
             </ProseMarkdown>
           </div>
         ) : null}
         {activeTab === "messages" ? (
           <div className="py-2">
-            {turnGroups.map((turn, turnIdx) => (
-              <div key={turnIdx} className="flex gap-2.5 px-5 py-2">
-                <div className="flex w-5 shrink-0 flex-col items-center justify-center">
-                  <span className="text-[10px] font-medium leading-none text-muted-foreground/50">
-                    {turnIdx + 1}
+            {displayRound !== null ? (
+              <div className="sticky top-2 z-30 flex justify-center">
+                <div className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/90 px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur">
+                    <Hash className="h-3 w-3" />
+                    Round {displayRound}
                   </span>
+                  {roundNumbers.length > 1 ? (
+                    <div className="relative">
+                      <Tooltip label="Jump to round">
+                        <button
+                          type="button"
+                          aria-haspopup="listbox"
+                          aria-expanded={showRoundJumper}
+                          aria-label="Jump to round"
+                          onClick={() => setShowRoundJumper(v => !v)}
+                          className="inline-flex cursor-pointer items-center justify-center rounded-full border border-border bg-background/90 p-1 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:border-foreground/30 hover:bg-background hover:text-foreground"
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </Tooltip>
+                      {showRoundJumper ? (
+                        <div
+                          role="listbox"
+                          aria-label="Rounds"
+                          className="absolute right-0 top-full z-40 mt-1 w-32 overflow-hidden rounded-md border border-border bg-background shadow-lg"
+                        >
+                          <div className="max-h-64 overflow-y-auto py-1">
+                            {roundNumbers.map(n => (
+                              <button
+                                key={n}
+                                type="button"
+                                role="option"
+                                aria-selected={n === displayRound}
+                                onClick={() => jumpToRound(n)}
+                                className={cn(
+                                  "block w-full px-3 py-1 text-left text-[11px] transition-colors hover:bg-muted",
+                                  n === displayRound
+                                    ? "font-medium text-foreground"
+                                    : "text-muted-foreground"
+                                )}
+                              >
+                                Round {n}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="mb-1">
-                    <span className="text-[10px] text-muted-foreground">
-                      {formatTime(turn.timestamp)}
-                    </span>
-                  </div>
-                  {turn.entries.map(entry => {
+              </div>
+            ) : null}
+            {roundGroups.length === 0 ? (
+              <div className="px-5 py-8 text-center text-xs text-muted-foreground">
+                No messages from this generation yet.
+              </div>
+            ) : null}
+            {roundGroups.map(group => (
+              <div key={group.round_number}>
+                <div
+                  ref={node => {
+                    if (node) {
+                      roundDividerRefs.current.set(group.round_number, node);
+                    } else {
+                      roundDividerRefs.current.delete(group.round_number);
+                    }
+                  }}
+                  data-round-number={group.round_number}
+                  className="flex items-center gap-2 border-y border-border bg-background/95 px-5 py-1 backdrop-blur"
+                >
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Round {group.round_number}
+                  </span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <div className="space-y-2 px-5 py-3">
+                  {group.entries.map(entry => {
                     const entryChColor = channelColorMap.get(entry.channel_id);
                     return (
                       <div
@@ -195,6 +347,9 @@ export function AgentDrawer({
                             {entry.text}
                           </ProseMarkdown>
                         )}
+                        <div className="mt-1 text-[10px] text-muted-foreground">
+                          {formatTime(entry.timestamp)}
+                        </div>
                       </div>
                     );
                   })}
@@ -205,6 +360,11 @@ export function AgentDrawer({
         ) : null}
         {activeTab === "metrics" && agentMetrics.length > 0 ? (
           <div className="space-y-0 divide-y divide-border px-5 py-3">
+            {showAggregateMetricsCaveat ? (
+              <div className="pb-2 text-[11px] text-muted-foreground">
+                Metrics aggregated across all generations of this agent.
+              </div>
+            ) : null}
             {agentMetrics.map(({ measurement, observation }) => (
               <button
                 key={`${measurement.metric_name}::${observation.agent_id}`}

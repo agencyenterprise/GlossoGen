@@ -1408,7 +1408,7 @@
     "/api/scenarios/{scenario_name}/agents": {
       "post": {
         "summary": "Get Agent Roles",
-        "description": "Return the agent IDs and display names for a scenario with the given knobs.",
+        "description": "Return the agent IDs, display names, and channels for the given knobs.\n\nThe ``channels`` field is populated by instantiating the scenario\nwith the supplied knobs and reading each ``AgentConfig.channel_ids``;\nthe FE phase-builder uses this to render per-agent visibility\ncontrols. Returns an empty channel list per agent if scenario\ninstantiation fails (e.g. invalid knobs) so the FE can still show\nrole names while the user fixes the knobs.",
         "operationId": "get_agent_roles_api_scenarios__scenario_name__agents_post",
         "parameters": [
           {
@@ -1671,15 +1671,23 @@
           "role_name": {
             "type": "string",
             "title": "Role Name"
+          },
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channels"
           }
         },
         "type": "object",
         "required": [
           "agent_id",
-          "role_name"
+          "role_name",
+          "channels"
         ],
         "title": "AgentRoleInfo",
-        "description": "Lightweight agent identity for the agent discovery endpoint."
+        "description": "Lightweight agent identity for the agent discovery endpoint.\n\n``channels`` lists the channel IDs the agent is a member of given\nthe supplied knobs. Used by the FE phase-builder to render per-agent\nchannel-visibility controls when configuring scheduled swaps."
       },
       "AgentRolesRequest": {
         "properties": {
@@ -1764,6 +1772,46 @@
         ],
         "title": "AgentRunCycleFailedEntry",
         "description": "A single agent-run-cycle failure extracted from the event log.\n\nOne entry per ``AgentRunCycleFailed`` event. ``error_type`` is the\nexception class name (e.g. ``\"ContentFilterError\"``)."
+      },
+      "AgentSwapEventDTO": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "new_model": {
+            "type": "string",
+            "title": "New Model"
+          },
+          "new_provider": {
+            "type": "string",
+            "title": "New Provider"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "round_number",
+          "timestamp",
+          "new_model",
+          "new_provider",
+          "system_prompt"
+        ],
+        "title": "AgentSwapEventDTO",
+        "description": "One in-run agent swap, surfaced for per-instance tab rendering on the FE.\n\nEach ``AgentSwappedMidRun`` event in the run's JSONL becomes one DTO.\nThe FE groups consecutive events by ``agent_id`` to derive an ordered\nlist of agent instances (generations) and split message visibility\nby round range."
       },
       "AllLabelsResponse": {
         "properties": {
@@ -2958,6 +3006,13 @@
             "type": "array",
             "title": "Agents"
           },
+          "agent_swap_events": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSwapEventDTO"
+            },
+            "type": "array",
+            "title": "Agent Swap Events"
+          },
           "messages": {
             "items": {
               "$ref": "#/components/schemas/ChannelMessage"
@@ -3111,6 +3166,7 @@
           "channel_ids",
           "provider",
           "agents",
+          "agent_swap_events",
           "messages",
           "reasoning",
           "tool_use",

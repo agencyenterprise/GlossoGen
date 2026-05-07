@@ -537,8 +537,23 @@ class VeyruScenario(SimulationScenario):
         """Stash the event logger so stabilize_veyru can emit judge verdicts."""
         self._event_logger = event_logger
 
-    def _get_previous_outcome_for_agent(self, agent_id: str) -> VeyruOutcome | None:
-        """Return the most recent outcome for the team the agent belongs to."""
+    def _get_previous_outcome_for_agent(
+        self,
+        agent_id: str,
+        round_number: int,
+    ) -> VeyruOutcome | None:
+        """Return the most recent outcome for the team the agent belongs to.
+
+        Returns None for an agent that was just swapped in at the start
+        of ``round_number`` — they did not participate in
+        ``round_number - 1`` and the ``PREVIOUS VEYRU RESULT`` block
+        would leak prior-round context they should not see.
+        """
+        if self._world.was_agent_just_swapped_in_round(
+            agent_id=agent_id,
+            round_number=round_number,
+        ):
+            return None
         team_id = self._world.get_team_for_agent(agent_id=agent_id)
         outcomes = self._world.get_outcomes_for_team(team_id=team_id)
         if len(outcomes) == 0:
@@ -613,7 +628,10 @@ class VeyruScenario(SimulationScenario):
         current_case_index = (round_number - 1) % len(self._veyru_cases)
         current_case = self._veyru_cases[current_case_index]
 
-        previous_outcome = self._get_previous_outcome_for_agent(agent_id=agent_id)
+        previous_outcome = self._get_previous_outcome_for_agent(
+            agent_id=agent_id,
+            round_number=round_number,
+        )
 
         treatment_mapping = get_stellar_treatment_mapping(
             stellar_reading=current_case.stellar_reading,

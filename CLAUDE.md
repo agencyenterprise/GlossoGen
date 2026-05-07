@@ -297,7 +297,9 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── cross_run_replace_manifest.json    # (cross-run replace-agent runs only) source_a/source_b/imported_model + post-swap channel visibility
 ├── imported_history_source.jsonl      # (cross-run replace-agent runs only) verbatim copy of Sim B's JSONL used to mount the imported agent's history
 ├── replace_config.json                # (replace-agent or cross-run runs only) merged scenario_config + model_overrides written by the orchestrator
-└── resume_context_{agent_id}.json     # (resume / fork / replace-agent / cross-run runs) per-agent reconstructed pydantic-ai message history dumped at resume time for inspection
+├── resume_context_{agent_id}.json     # (resume / fork / replace-agent / cross-run runs) per-agent reconstructed pydantic-ai message history dumped at resume time for inspection
+├── resume_context_{agent_id}_round_{R}.json  # (in-run scheduled swap) one file per AgentSwappedMidRun event capturing the swapped-in agent's seed history
+└── multi_swap_cache.json              # streamlit Multi-swap tab cache (per-phase round_success); regenerated whenever the JSONL's size or mtime changes
 ```
 
 ### Run Labels
@@ -516,6 +518,45 @@ schmidt cross-run-replace-agent veyru \
 **Label convention.** Cross-run runs are labelled `cross_team` plus a range tag like `15-25` (rounds played post-swap). The streamlit results viewer's "Cross-swap" tab filters on `cross_team` and plots `round_success_after_resume` per `(imported_model, round_start)` bucket against both Source A and Source B accuracy on the same rounds. Apply labels by writing `labels.json` directly *before* `schmidt evaluate` runs (the eval-derived labels merge into that file).
 
 **`round_success_after_resume` works for both flows.** The metric reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (`round_start`, `rounds_after_swap`, `source_run_id`, `source_run_dir`). For cross-run runs, the comparison is against Sim A (`source_a_*`) — i.e. "did the imported agent perform better/worse than what the original agent achieved over the same window?".
+
+### In-Run Agent Swaps via `scheduled_events`
+
+The in-run scheduler swaps agents at scheduled round boundaries inside a single live simulation. Multiple swaps fire across the same run on one continuous timeline (Phase A → B → C → D for three swaps).
+
+Configure via the `scheduled_events` knob (defined on `BaseKnobs`). Two event types:
+
+```jsonc
+{
+  "scheduled_events": [
+    { "type": "set_postmortem", "at_round": 16, "enabled": false },
+    { "type": "swap_agent", "at_round": 16, "agent_id": "field_observer",
+      "model": "claude-sonnet-4-6", "provider": "anthropic",
+      "channel_visibility": { "link": { "kind": "full" } } },
+    { "type": "swap_agent", "at_round": 31, "agent_id": "stabilization_engineer",
+      "model": "claude-sonnet-4-6", "provider": "anthropic",
+      "channel_visibility": { "link": { "kind": "from_round", "round_floor": 16 } } }
+  ]
+}
+```
+
+`channel_visibility` is a discriminated union per channel ID:
+- `{"kind": "full"}` — full predecessor history visible to the swapped-in agent.
+- `{"kind": "none"}` — channel hidden entirely (no reads, no sends, history not retained in seed).
+- `{"kind": "from_round", "round_floor": R}` — predecessor `read_channel` returns dropped; `send_message` calls retained from round `R` onward.
+
+Channels not listed in `channel_visibility` default to `Full`.
+
+**Globally disabled channels** (e.g. Veyru's postmortem after `set_postmortem`) are forced to `none` by the runtime regardless of the swap config. The swap logic queries `ScenarioWorld.get_globally_disabled_channels()` and overrides each entry's visibility before reconstructing the seed history. Globally disabled channels are also excluded from the swapped-in agent's wake-up `NewMessagesNotification`.
+
+**Notification round floor**: `read_notifications` is not channel-scoped, so its tool returns are not filtered by `channel_visibility`. The history builder derives a notification floor as `min(v.round_floor for v in channel_visibility.values() if v.kind == "from_round")` and drops `read_notifications` calls whose source `ToolCallInvoked.round_number` falls below it. The filter applies to every history-reconstruction caller (replace-agent, fork, cross-run, in-run swap).
+
+**Per-swap resume context**: each swap writes `resume_context_<agent_id>_round_<R>.json` to the run directory. The file captures the swapped-in agent's pydantic-ai message history at swap time.
+
+**FE viewer**: the run viewer renders one tab per `(agent_id, generation)`. Single-instance agents render a flat sidebar row; multi-instance agents render a parent role row with indented `Gen k · rA-B` sub-rows. The chat pane renders a dashed indigo `agent-swap-divider` between adjacent rounds that straddle a swap.
+
+**Evaluation**: `round_success_after_resume` walks every `AgentSwappedMidRun` event and emits one Measurement per swap (`round_success_after_resume_round_<R>_<agent_id>`). The baseline window for each anchor is the previous phase in the same run; the summary carries `Δ vs source: ±N pp` between adjacent phases.
+
+**Streamlit Multi-swap tab**: per-phase round-success bar chart with Δ pp annotations between phases.
 
 ### Per-Agent Model Overrides
 
