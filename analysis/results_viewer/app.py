@@ -8,6 +8,7 @@ import streamlit as st
 from analysis.results_viewer import (
     baseline_tab,
     cross_swap_tab,
+    multi_swap_tab,
     oss_frontier_tab,
     resume_tab,
     timeline_tab,
@@ -19,7 +20,7 @@ st.set_page_config(page_title="Analysis Results Viewer", layout="wide")
 
 
 def main() -> None:
-    """Render six tabs: Timeline, Baseline, Verbosity, Resume, Cross-swap, OSS vs Frontier."""
+    """Render seven tabs: Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS-vs-Frontier."""  # noqa: E501
     runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs")).resolve()
     st.sidebar.markdown(f"**Runs directory**: `{runs_dir}`")
     evaluated = list_evaluated_runs(runs_dir=runs_dir)
@@ -31,8 +32,19 @@ def main() -> None:
         verbosity_panel,
         resume_panel,
         cross_swap_panel,
+        multi_swap_panel,
         oss_frontier_panel,
-    ) = st.tabs(["Timeline", "Baseline", "Verbosity", "Resume", "Cross-swap", "OSS vs Frontier"])
+    ) = st.tabs(
+        [
+            "Timeline",
+            "Baseline",
+            "Verbosity",
+            "Resume",
+            "Cross-swap",
+            "Multi-swap",
+            "OSS vs Frontier",
+        ]
+    )
     with timeline_panel:
         timeline_tab.render(evaluated=evaluated)
     with baseline_panel:
@@ -43,6 +55,8 @@ def main() -> None:
         resume_tab.render(evaluated=evaluated)
     with cross_swap_panel:
         cross_swap_tab.render(evaluated=evaluated)
+    with multi_swap_panel:
+        multi_swap_tab.render(evaluated=evaluated)
     with oss_frontier_panel:
         oss_frontier_tab.render(evaluated=evaluated)
 

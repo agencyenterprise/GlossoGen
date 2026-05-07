@@ -97,15 +97,53 @@ async def get_knobs_content(scenario_name: str, knobs_name: str) -> KnobsContent
     response_model=AgentRolesResponse,
 )
 async def get_agent_roles(scenario_name: str, body: AgentRolesRequest) -> AgentRolesResponse:
-    """Return the agent IDs and display names for a scenario with the given knobs."""
+    """Return the agent IDs, display names, and channels for the given knobs.
+
+    The ``channels`` field is populated by instantiating the scenario
+    with the supplied knobs and reading each ``AgentConfig.channel_ids``;
+    the FE phase-builder uses this to render per-agent visibility
+    controls. Returns an empty channel list per agent if scenario
+    instantiation fails (e.g. invalid knobs) so the FE can still show
+    role names while the user fixes the knobs.
+    """
     if scenario_name not in SCENARIO_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Unknown scenario: {scenario_name}")
 
     scenario_cls = SCENARIO_REGISTRY[scenario_name]
     roles = scenario_cls.get_agent_roles(knobs=body.knobs)
-    return AgentRolesResponse(
-        agents=[AgentRoleInfo(agent_id=r.agent_id, role_name=r.role_name) for r in roles]
+    channels_by_agent_id = _resolve_channels_by_agent(
+        scenario_name=scenario_name,
+        knobs=body.knobs,
     )
+    return AgentRolesResponse(
+        agents=[
+            AgentRoleInfo(
+                agent_id=r.agent_id,
+                role_name=r.role_name,
+                channels=channels_by_agent_id.get(r.agent_id, []),
+            )
+            for r in roles
+        ]
+    )
+
+
+def _resolve_channels_by_agent(
+    scenario_name: str,
+    knobs: dict[str, object] | None,
+) -> dict[str, list[str]]:
+    """Instantiate the scenario with the given knobs and map agent_id -> channel_ids.
+
+    Returns an empty dict if instantiation fails for any reason; the
+    caller falls back to empty channel lists per agent.
+    """
+    scenario_cls = SCENARIO_REGISTRY[scenario_name]
+    try:
+        scenario = scenario_cls.create_from_config(config=knobs or {})
+        agents = scenario.get_agents(default_model="placeholder", default_provider="anthropic")
+    except Exception:
+        logger.exception("Failed to resolve channels for scenario %s", scenario_name)
+        return {}
+    return {agent.agent_id: list(agent.channel_ids) for agent in agents}
 
 
 @router.post("/runs/start", response_model=StartRunResponse)

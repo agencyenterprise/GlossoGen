@@ -35,6 +35,7 @@ from schmidt.models.event import (
 )
 from schmidt.models.message import SimulationMessage
 from schmidt.runners.communication_protocol import build_full_system_prompt
+from schmidt.runtime.scheduled_events import ChannelVisibility
 
 logger = logging.getLogger(__name__)
 
@@ -60,22 +61,25 @@ class AgentHistoryFilter(NamedTuple):
     """Per-agent filter applied while reconstructing pydantic-ai history.
 
     ``tool_calls_only`` strips text and thinking parts from the agent's
-    prior responses; only tool call parts survive. ``blocked_channel_ids``
-    drops every ``send_message``/``read_channel`` call targeting one of
-    those channels along with its matching tool return. ``imported``
+    prior responses; only tool call parts survive. ``channel_visibility``
+    maps channel_id to a ``ChannelVisibility`` variant — ``Full`` keeps
+    every send/read tool call on that channel, ``None`` drops them all,
+    ``FromRound(R)`` drops every ``read_channel`` and drops
+    ``send_message`` calls with ``ToolCallInvoked.round_number < R``.
+    Channels absent from the dict default to ``Full``. ``imported``
     redirects history reconstruction to a different event stream (see
     ``ImportedHistory``); when ``None`` the agent's history is built
     from the caller's primary event list.
     """
 
     tool_calls_only: bool
-    blocked_channel_ids: frozenset[str]
+    channel_visibility: dict[str, ChannelVisibility]
     imported: ImportedHistory | None
 
 
 _PASS_THROUGH_FILTER = AgentHistoryFilter(
     tool_calls_only=False,
-    blocked_channel_ids=frozenset(),
+    channel_visibility={},
     imported=None,
 )
 
@@ -84,15 +88,22 @@ class RewindState(NamedTuple):
     """Everything needed to resume a simulation from a specific message.
 
     ``replaced_agent_ids`` lists agents whose channel-history visibility
-    must be wiped on resume (replace-agent flow). Empty for plain
+    must be reconfigured on resume (replace-agent flow). Empty for plain
     `--resume` and fork.
 
-    ``replaced_agent_channels_with_visible_history`` maps agent_id to a
-    list of channel IDs whose prior history should remain visible to that
-    replaced agent. Channels of the replaced agent that are not in the
-    list have their ``member_join_index`` bumped to the current message
-    count on resume. Defaults to an empty mapping (= wipe every channel
-    the agent is in, for callers that don't supply explicit visibility).
+    ``replaced_agent_channel_visibility`` maps agent_id to a per-channel
+    visibility config. The supervisor consults this map and the
+    ``channel_message_count_at_round_start`` snapshot to compute each
+    replaced agent's ``member_join_index`` per channel on resume. Channels
+    not listed in the inner dict are left untouched (preserve existing
+    visibility). Defaults to an empty mapping for `--resume`/fork flows.
+
+    ``channel_message_count_at_round_start`` snapshots, per round,
+    how many ``MessageSent`` events had appeared on each channel before
+    the ``RoundAdvanced(round_number)`` anchor. Used to translate
+    ``ChannelVisibilityFromRound(R)`` into a concrete
+    ``member_join_index`` for windowed channel visibility on a
+    swapped-in agent.
     """
 
     round_number: int
@@ -103,7 +114,8 @@ class RewindState(NamedTuple):
     agent_registrations: list[AgentRegistered]
     agent_message_histories: dict[str, list[ModelMessage]]
     replaced_agent_ids: frozenset[str]
-    replaced_agent_channels_with_visible_history: dict[str, list[str]]
+    replaced_agent_channel_visibility: dict[str, dict[str, ChannelVisibility]]
+    channel_message_count_at_round_start: dict[int, dict[str, int]]
 
 
 def build_rewind_state(
@@ -187,6 +199,8 @@ def _build_rewind_state_at_timestamp(
     scenario_name = ""
     scenario_config: dict[str, Any] = {}
     agent_registrations: list[AgentRegistered] = []
+    channel_count_at_round_start: dict[int, dict[str, int]] = {}
+    running_channel_counts: dict[str, int] = {}
 
     for event in events:
         if event.timestamp > target_timestamp:
@@ -201,6 +215,7 @@ def _build_rewind_state_at_timestamp(
 
         elif isinstance(event, RoundAdvanced):
             round_number = event.round_number
+            channel_count_at_round_start[event.round_number] = dict(running_channel_counts)
 
         elif isinstance(event, InjectionDelivered):
             current = injected_rounds.get(event.agent_id, 0)
@@ -221,6 +236,7 @@ def _build_rewind_state_at_timestamp(
             if channel_id not in messages_by_channel:
                 messages_by_channel[channel_id] = []
             messages_by_channel[channel_id].append(msg)
+            running_channel_counts[channel_id] = running_channel_counts.get(channel_id, 0) + 1
 
     agent_message_histories: dict[str, list[ModelMessage]] = {}
     for reg in agent_registrations:
@@ -255,7 +271,7 @@ def _build_rewind_state_at_timestamp(
             target_timestamp=history_target_timestamp,
             cutoff_round=history_cutoff_round,
             tool_calls_only=history_filter.tool_calls_only,
-            blocked_channel_ids=history_filter.blocked_channel_ids,
+            channel_visibility=history_filter.channel_visibility,
         )
 
     logger.info(
@@ -275,7 +291,8 @@ def _build_rewind_state_at_timestamp(
         agent_registrations=agent_registrations,
         agent_message_histories=agent_message_histories,
         replaced_agent_ids=frozenset(),
-        replaced_agent_channels_with_visible_history={},
+        replaced_agent_channel_visibility={},
+        channel_message_count_at_round_start=channel_count_at_round_start,
     )
 
 

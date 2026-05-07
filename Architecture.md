@@ -304,6 +304,79 @@ Same as replace-agent, the supervisor calls `write_resume_context_files` at resu
 
 Cross-run replace-agent runs store a `cross_run_replace_manifest.json` plus a `imported_history_source.jsonl` (verbatim copy of Sim B's JSONL). The run discovery and detail endpoints expose the manifest as `cross_run_replace_agent_source` on the response models alongside `fork_source` and `replace_agent_source`. The frontend shows a violet "Cross-run X: A=… · B=… → imported_model @ round N" badge in the run detail header with both sources as links, and a violet floating action button to scroll to the swap divider in the chat pane.
 
+## In-Run Agent Swaps (Round-Boundary Scheduler)
+
+The in-run scheduler swaps one agent's seat for a fresh instance at scheduled round boundaries inside a single live simulation. Multiple swaps can fire across the same run; a run with three swaps produces four phases (A → B → C → D) on one continuous timeline.
+
+### Knobs Surface
+
+`BaseKnobs.scheduled_events: list[ScheduledEvent]` is a discriminated Pydantic union. Two variants:
+
+```jsonc
+{ "type": "swap_agent", "at_round": 16, "agent_id": "field_observer",
+  "model": "claude-sonnet-4-6", "provider": "anthropic",
+  "channel_visibility": { "link": { "kind": "from_round", "round_floor": 16 } } }
+
+{ "type": "set_postmortem", "at_round": 16, "enabled": false }
+```
+
+`channel_visibility` is itself a discriminated union (`Full` / `None` / `FromRound(round_floor)`) — the same shape used by replace-agent's per-channel visibility and by the history reconstruction filter.
+
+### Swap Flow
+
+1. **Round boundary fires** in `RoundBoundaryScheduler` (driven by the game clock's `signal_round_advanced`). The scheduler dispatches every event whose `at_round` matches.
+2. **`SwapAgent` dispatch** calls `execute_agent_swap` in `runtime/agent_swap.py` with an `AgentSwapResources` bundle (runtime, runner factory, runner-task table, log path, run dir, MCP url, cost tracker).
+3. **Drain old runner**: push `DoneNotification(reason="agent_swap")` to the existing `AgentSession`; wait `SWAP_RUNNER_GRACE_SECONDS`; force-cancel on timeout.
+4. **Compose effective channel visibility**: query `runtime.scenario.get_world().get_globally_disabled_channels()` and force `ChannelVisibilityNone` for each (so a previously-disabled channel like Veyru postmortem can never bleed into the new agent's view, even if the swap config didn't explicitly list it).
+5. **Rebuild seed history** by replaying the live JSONL through `build_message_history` with `cutoff_round=at_round`, `tool_calls_only=True`, and the effective channel visibility. The same builder produces the notification round-floor filter automatically (see below).
+6. **Apply `member_join_index`** on the channel router via `compute_per_channel_join_index` so the swapped-in agent's `read_channel` calls only see post-window content.
+7. **Replace `AgentSession` and `AgentConfig`** on the runtime (new system prompt + reconstructed `initial_message_history`). Persist the seed history to `resume_context_<agent_id>_round_<R>.json` for inspection.
+8. **Spawn fresh runner** via the supplied factory; wake it via `NewMessagesNotification` on every channel it can still read (excluding globally disabled ones).
+9. **Notify the world** via `ScenarioWorld.on_agent_swapped_mid_run(agent_id, round_number)` so scenarios can suppress prior-round injection content for the just-swapped agent (e.g. Veyru drops the `--- PREVIOUS VEYRU RESULT ---` block on the swap-round injection — the new agent didn't participate in the round being summarised).
+10. **Emit `AgentSwappedMidRun`** event to the JSONL.
+
+`SetPostmortem` dispatch calls a scenario-provided method on the world (Veyru exposes `disable_postmortem_globally`) and emits `PostmortemDisabledMidRun`. Scenarios opt in to global channel disablement by overriding `get_globally_disabled_channels()` to return the channel IDs closed for the rest of the run.
+
+### `ScenarioWorld` ABC Hooks
+
+The base `ScenarioWorld` exposes two hooks for the in-run swap flow, both no-op by default:
+
+- `get_globally_disabled_channels() -> frozenset[str]` — channel IDs the runtime treats as dead for any swapped-in agent. The swap logic forces `ChannelVisibilityNone` on these and excludes them from the wake-up notification.
+- `on_agent_swapped_mid_run(agent_id, round_number)` — invoked after a fresh agent is instantiated. Scenarios use this to suppress injection content the swapped-in agent should not see. Veyru tracks `_just_swapped_agent_round[agent_id]` and drops the `--- PREVIOUS VEYRU RESULT ---` block on that round's injection.
+
+### Notification Round-Floor Filter
+
+`read_notifications` is not channel-scoped, so its tool returns are not filtered by `channel_visibility`. The predecessor's `read_notifications` returns carry round-start injection text (e.g. `--- PREVIOUS VEYRU RESULT ---`), which would land in the swapped-in agent's seed history even when channel windowing is in effect.
+
+`message_history_builder.py` derives a notification round floor from the `channel_visibility` config: `min(v.round_floor for v in channel_visibility.values() if isinstance(v, ChannelVisibilityFromRound))`, or `None` when no channel uses `FromRound`. `read_notifications` calls whose source `ToolCallInvoked.round_number` falls below the floor are dropped, in both the parented-cycle and orphan-cycle paths.
+
+The filter applies to every caller that builds an agent history with a `FromRound` entry: replace-agent, fork, cross-run, and in-run swap.
+
+### Per-Swap Resume Context Files
+
+`write_swap_resume_context_file` writes one `resume_context_<agent_id>_round_<R>.json` per swap into the run directory. The filename includes the round number so multiple swaps in the same run keep separate files. The payload mirrors the replace-agent `resume_context_<agent_id>.json` shape and captures the swapped-in agent's pydantic-ai message history at swap time for audit.
+
+### Key Modules
+
+- `runtime/scheduled_events.py` — `ChannelVisibility` discriminated union (`Full` / `None` / `FromRound`), `SwapAgent`, `SetPostmortem`, `ScheduledEvent` discriminated union
+- `runtime/scheduler.py` — `RoundBoundaryScheduler` and the `SchedulerOps` Protocol
+- `runtime/agent_swap.py` — `AgentSwapResources` named tuple + `execute_agent_swap`
+- `runtime/scenario_world.py` — `get_globally_disabled_channels()` and `on_agent_swapped_mid_run()` ABC hooks
+- `models/event.py` — `AgentSwappedMidRun`, `PostmortemDisabledMidRun` event types
+- `message_history_builder.py` — notification round-floor derivation + filter
+- `resume_context_writer.py` — `write_swap_resume_context_file`
+- `scenarios/veyru/evaluation/round_success_after_resume_metric.py` — walks every `AgentSwappedMidRun` event and emits one Measurement per anchor (named `round_success_after_resume_round_<R>_<agent_id>`); the in-run baseline window is the previous phase in the same run
+
+### FE Per-Agent-Instance Tabs
+
+The run viewer derives one `AgentInstance` per `(agent_id, generation)` from `agents` + `agent_swap_events` on the run-detail response. Single-instance agents render a flat sidebar row. Multi-instance agents render a parent role row with indented `Gen k · rA-B` sub-rows; the latest generation pulses green on live runs. Per-instance drawer tabs filter messages by round range and show round-banner dividers. The chat pane renders a dashed indigo `agent-swap-divider` between adjacent rounds that straddle a swap event.
+
+`server/runs/models.py` exposes `AgentSwapEventDTO` and a `agent_swap_events: list[AgentSwapEventDTO]` field on `RunDetailResponse`. `server/runs/detail_reader.py` populates it from the JSONL events.
+
+### Provenance
+
+In-run swap runs carry no manifest file — the `AgentSwappedMidRun` events in the JSONL are the source of truth. Run discovery and detail endpoints surface swaps via the `agent_swap_events` field on `RunDetailResponse`.
+
 ## Evaluation System
 
 After a simulation completes, the evaluation system analyzes the JSONL log via a uniform `Metric` abstraction. Both deterministic metrics and LLM-as-judge metrics implement `Metric.compute(...)` and return one or more `Measurement` instances.
@@ -430,6 +503,7 @@ A separate Streamlit app at [analysis/results_viewer/](analysis/results_viewer/)
 - `run_catalog.py` — discovers runs that have an evaluator report.
 - `event_extractor.py` — derives a per-round timeline from the JSONL events.
 - `timeline_plot.py` — builds a Plotly figure overlaying multiple runs' evaluator scores per round.
+- `multi_swap_data.py` / `multi_swap_tab.py` — per-phase round-success visualisation for runs with one or more `AgentSwappedMidRun` events. Renders one bar per phase plus Δ pp annotations between adjacent phases. Loads runs concurrently via `asyncio.gather` + `asyncio.to_thread`, skips non-multi-swap runs through a byte-level pre-scan for the swap-event marker, and persists per-run results to `multi_swap_cache.json` keyed on JSONL size + mtime.
 - `app.py` — Streamlit entrypoint; reads `SCHMIDT_RUNS_DIR`, lets the user multiselect runs.
 
 Streamlit and Plotly live behind the optional `analysis` uv dependency group so a server-only install (`uv sync`) does not pull them in. Launched with `make results-viewer`.

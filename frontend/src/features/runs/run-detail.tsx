@@ -25,7 +25,12 @@ import { cn } from "@/shared/lib/cn";
 import { useEventStream } from "@/shared/lib/use-event-stream";
 import { buildAgentColorMap, buildChannelColorMap } from "./agent-colors";
 import { AgentDrawer } from "./agent-drawer";
-import { ChatPane } from "./chat-pane";
+import {
+  deriveAgentInstances,
+  resolveSelectedInstance,
+  type AgentInstance,
+} from "./agent-instance";
+import { ChatPane, type AgentSwapDivider } from "./chat-pane";
 import { CollapsibleConfigBadges } from "./collapsible-config-badges";
 import { mergeEntries } from "./display-entry";
 import { LabelBadges } from "./eval-label-group";
@@ -283,6 +288,58 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     return [...restAgents, ...extra];
   }, [restData, sse.agents]);
 
+  const swapEvents = useMemo(
+    () => restData?.agent_swap_events ?? [],
+    [restData?.agent_swap_events]
+  );
+
+  const observedMaxRound = useMemo(() => {
+    let max = 0;
+    for (const m of restData?.messages ?? []) {
+      if (m.round_number > max) max = m.round_number;
+    }
+    for (const m of sse.messages) {
+      if (m.round_number > max) max = m.round_number;
+    }
+    return max > 0 ? max : null;
+  }, [restData?.messages, sse.messages]);
+
+  const agentInstances = useMemo<AgentInstance[]>(
+    () => deriveAgentInstances(allAgents, swapEvents, observedMaxRound, isInProgress),
+    [allAgents, swapEvents, observedMaxRound, isInProgress]
+  );
+
+  const agentSwapDividers = useMemo(() => {
+    const previousModelByAgent = new Map<string, string>();
+    for (const a of allAgents) {
+      previousModelByAgent.set(a.agent_id, a.model);
+    }
+    const dividers: AgentSwapDivider[] = [];
+    const sorted = [...swapEvents].sort((a, b) => {
+      if (a.round_number !== b.round_number) return a.round_number - b.round_number;
+      return a.agent_id.localeCompare(b.agent_id);
+    });
+    const generationsByAgent = new Map<string, number>();
+    for (const event of sorted) {
+      const previousGeneration = generationsByAgent.get(event.agent_id) ?? 1;
+      const generation = previousGeneration + 1;
+      generationsByAgent.set(event.agent_id, generation);
+      const oldModel = previousModelByAgent.get(event.agent_id) ?? "?";
+      const role = allAgents.find(a => a.agent_id === event.agent_id)?.role_name ?? event.agent_id;
+      dividers.push({
+        agent_id: event.agent_id,
+        role_name: role,
+        round_number: event.round_number,
+        generation,
+        old_model: oldModel,
+        new_model: event.new_model,
+        post_swap_instance_key: `${event.agent_id}:${generation}`,
+      });
+      previousModelByAgent.set(event.agent_id, event.new_model);
+    }
+    return dividers;
+  }, [allAgents, swapEvents]);
+
   // Merge REST + SSE channel IDs
   const allChannelIds = useMemo(() => {
     const restChannels = restData?.channel_ids ?? [];
@@ -477,8 +534,8 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const evaluationInProgress = restData.evaluation_in_progress || evalJustLaunched;
   const hasLogs = allDebugLogs.length > 0;
   const hasEvalLogs = evaluationInProgress || evaluation !== null || restData.has_eval_log_file;
-  const activeAgent = allAgents.find(a => a.agent_id === selectedAgent);
-  const activeAgentColor = selectedAgent ? agentColorMap.get(selectedAgent) : undefined;
+  const activeInstance = resolveSelectedInstance(selectedAgent, agentInstances);
+  const activeAgentColor = activeInstance ? agentColorMap.get(activeInstance.agent_id) : undefined;
   const forkEnabled =
     effectiveStatus === "scenario_complete" ||
     effectiveStatus === "error" ||
@@ -700,6 +757,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
         <RunSidebar
           channelIds={allChannelIds}
           agents={allAgents}
+          agentInstances={agentInstances}
           selectedChannel={selectedChannel}
           selectedAgent={selectedAgent}
           showLogs={showLogs}
@@ -765,6 +823,12 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             resumeCutoffTimestamp={
               restData.replace_agent_source?.replaced_at ?? restData.fork_source?.forked_at ?? null
             }
+            agentSwapDividers={agentSwapDividers}
+            activeInstanceRoundRange={
+              activeInstance
+                ? { start: activeInstance.round_start, end: activeInstance.round_end }
+                : null
+            }
           />
         )}
 
@@ -785,9 +849,9 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
         ) : null}
 
         {/* Agent drawer */}
-        {activeAgent && activeAgentColor ? (
+        {activeInstance && activeAgentColor ? (
           <AgentDrawer
-            agent={activeAgent}
+            instance={activeInstance}
             messages={displayEntries}
             agentColor={activeAgentColor}
             channelColorMap={channelColorMap}

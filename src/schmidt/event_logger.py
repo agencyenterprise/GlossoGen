@@ -14,8 +14,10 @@ import orjson
 
 from schmidt.event_bus import EventBus
 from schmidt.models.event import (
+    AgentSwappedMidRun,
     InjectionDelivered,
     MessageSent,
+    PostmortemDisabledMidRun,
     RoundAdvanced,
     SimulationEnded,
     SimulationEvent,
@@ -61,6 +63,13 @@ def _build_commit_message(event: SimulationEvent) -> str:
         summary = f"{event_type}: round {event.round_number} ({event.trigger})"
     elif isinstance(event, InjectionDelivered):
         summary = f"{event_type}: {event.agent_id} (round {event.round_number})"
+    elif isinstance(event, AgentSwappedMidRun):
+        summary = (
+            f"{event_type}: {event.agent_id} -> {event.new_provider}/{event.new_model} "
+            f"(round {event.round_number})"
+        )
+    elif isinstance(event, PostmortemDisabledMidRun):
+        summary = f"{event_type}: round {event.round_number}"
     elif isinstance(event, SimulationEnded):
         summary = f"{event_type}: {event.reason.value}"
     else:

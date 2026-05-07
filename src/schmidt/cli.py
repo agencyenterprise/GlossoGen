@@ -56,6 +56,11 @@ from schmidt.resume_context_writer import write_resume_context_files
 from schmidt.run_config_validation import validate_run_config
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.runners.pydantic_ai_runner import PydanticAIRunner
+from schmidt.runtime.scheduled_events import (
+    ChannelVisibility,
+    ChannelVisibilityFull,
+    ChannelVisibilityNone,
+)
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios import SCENARIO_REGISTRY
@@ -513,10 +518,29 @@ class _ReplaceManifestInfo(NamedTuple):
     """Replace-agent manifest fields needed to configure resume."""
 
     replaced_agent_id: str
-    visible_channels: list[str]
-    blocked_channel_ids: frozenset[str]
+    channel_visibility: dict[str, ChannelVisibility]
     target_event_id: str
     round_start: int
+
+
+def _channel_visibility_from_manifest(
+    visible_channels: list[str],
+    blocked_channels: list[str],
+) -> dict[str, ChannelVisibility]:
+    """Translate replace-agent manifest channel lists into a visibility dict.
+
+    ``visible_channels`` (channels whose prior history remains visible)
+    map to ``ChannelVisibilityFull``. ``blocked_channels`` (channels
+    whose tool calls are stripped from the predecessor's history) map
+    to ``ChannelVisibilityNone``. Channels not in either list are
+    omitted (caller decides default behaviour).
+    """
+    result: dict[str, ChannelVisibility] = {}
+    for channel_id in visible_channels:
+        result[channel_id] = ChannelVisibilityFull()
+    for channel_id in blocked_channels:
+        result[channel_id] = ChannelVisibilityNone()
+    return result
 
 
 def _read_replace_manifest(run_dir: Path) -> _ReplaceManifestInfo | None:
@@ -526,8 +550,10 @@ def _read_replace_manifest(run_dir: Path) -> _ReplaceManifestInfo | None:
         return None
     return _ReplaceManifestInfo(
         replaced_agent_id=manifest.replaced_agent_id,
-        visible_channels=list(manifest.channels_with_visible_history),
-        blocked_channel_ids=frozenset(manifest.blocked_tool_call_channels),
+        channel_visibility=_channel_visibility_from_manifest(
+            visible_channels=list(manifest.channels_with_visible_history),
+            blocked_channels=list(manifest.blocked_tool_call_channels),
+        ),
         target_event_id=manifest.target_event_id,
         round_start=manifest.round_start,
     )
@@ -537,8 +563,7 @@ class _CrossRunManifestInfo(NamedTuple):
     """Cross-run replace-agent manifest fields needed to configure resume."""
 
     replaced_agent_id: str
-    visible_channels: list[str]
-    blocked_channel_ids: frozenset[str]
+    channel_visibility: dict[str, ChannelVisibility]
     target_event_id: str
     round_start: int
     imported_history_path: Path
@@ -553,8 +578,10 @@ def _read_cross_run_manifest(run_dir: Path) -> _CrossRunManifestInfo | None:
         return None
     return _CrossRunManifestInfo(
         replaced_agent_id=manifest.replaced_agent_id,
-        visible_channels=list(manifest.channels_with_visible_history),
-        blocked_channel_ids=frozenset(manifest.blocked_tool_call_channels),
+        channel_visibility=_channel_visibility_from_manifest(
+            visible_channels=list(manifest.channels_with_visible_history),
+            blocked_channels=list(manifest.blocked_tool_call_channels),
+        ),
         target_event_id=manifest.target_event_id,
         round_start=manifest.round_start,
         imported_history_path=run_dir / manifest.imported_history_source,
@@ -613,17 +640,15 @@ async def _run_simulation(
             resume_state = cross_run_resume
             logger.info(
                 "Cross-run replace-agent run detected: %s resuming with full Sim B "
-                "history (cutoff round=%d), visible source-A channels %s, blocked "
-                "tool-call channels %s",
+                "history (cutoff round=%d), channel_visibility=%s",
                 cross_run_info.replaced_agent_id,
                 cross_run_info.source_b_round_end,
-                cross_run_info.visible_channels,
-                sorted(cross_run_info.blocked_channel_ids),
+                cross_run_info.channel_visibility,
             )
         elif replace_info is not None:
             agent_filters[replace_info.replaced_agent_id] = AgentHistoryFilter(
                 tool_calls_only=True,
-                blocked_channel_ids=replace_info.blocked_channel_ids,
+                channel_visibility=replace_info.channel_visibility,
                 imported=None,
             )
             base_state = build_rewind_state_at_event(
@@ -634,16 +659,14 @@ async def _run_simulation(
             )
             resume_state = base_state._replace(
                 replaced_agent_ids=frozenset({replace_info.replaced_agent_id}),
-                replaced_agent_channels_with_visible_history={
-                    replace_info.replaced_agent_id: replace_info.visible_channels,
+                replaced_agent_channel_visibility={
+                    replace_info.replaced_agent_id: replace_info.channel_visibility,
                 },
             )
             logger.info(
-                "Replace-agent run detected: %s resuming with visible channels %s, "
-                "blocked tool-call channels %s",
+                "Replace-agent run detected: %s resuming with channel_visibility=%s",
                 replace_info.replaced_agent_id,
-                replace_info.visible_channels,
-                sorted(replace_info.blocked_channel_ids),
+                replace_info.channel_visibility,
             )
         else:
             resume_state = build_rewind_state_from_last_message(
@@ -680,6 +703,7 @@ async def _run_simulation(
         resume_state=resume_state,
         run_id=run_id,
         provider=args.provider,
+        log_path=log_path,
     )
 
     json_handler, bus_log_handler = _setup_logging(
@@ -982,7 +1006,7 @@ async def _build_cross_run_resume_state(
     further), and constructs an ``AgentHistoryFilter`` that redirects
     the imported agent's history reconstruction to source B's events.
     Replaced-agent channel visibility on source A is applied by the
-    caller via ``replaced_agent_channels_with_visible_history``.
+    caller via ``replaced_agent_channel_visibility``.
     """
     imported_events = await load_events(log_path=cross_run_info.imported_history_path)
     if cross_run_info.source_b_cutoff_event_id:
@@ -997,7 +1021,7 @@ async def _build_cross_run_resume_state(
     agent_filters: dict[str, AgentHistoryFilter] = {
         cross_run_info.replaced_agent_id: AgentHistoryFilter(
             tool_calls_only=False,
-            blocked_channel_ids=cross_run_info.blocked_channel_ids,
+            channel_visibility=cross_run_info.channel_visibility,
             imported=ImportedHistory(
                 events=tuple(imported_events),
                 target_timestamp=imported_target_timestamp,
@@ -1014,7 +1038,7 @@ async def _build_cross_run_resume_state(
     _ = run_dir
     return base_state._replace(
         replaced_agent_ids=frozenset({cross_run_info.replaced_agent_id}),
-        replaced_agent_channels_with_visible_history={
-            cross_run_info.replaced_agent_id: cross_run_info.visible_channels,
+        replaced_agent_channel_visibility={
+            cross_run_info.replaced_agent_id: cross_run_info.channel_visibility,
         },
     )

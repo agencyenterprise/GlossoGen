@@ -48,6 +48,7 @@ class SimulationRuntime:
             ch.channel_id: asyncio.Lock() for ch in channels
         }
         self._on_message_callbacks: list[Callable[[], None]] = []
+        self._channel_message_count_at_round_start: dict[int, dict[str, int]] = {}
 
     @property
     def scenario(self) -> SimulationScenario:
@@ -91,6 +92,61 @@ class SimulationRuntime:
         if session is None:
             raise ValueError(f"Unknown agent: {agent_id}")
         return session
+
+    @property
+    def channel_message_count_at_round_start(self) -> dict[int, dict[str, int]]:
+        """Per-round per-channel message counts captured when each round began.
+
+        Populated by ``snapshot_round_start`` on every round advance.
+        Used by the in-run swap flow to compute per-channel
+        ``member_join_index`` for ``ChannelVisibilityFromRound`` config.
+        """
+        return self._channel_message_count_at_round_start
+
+    def snapshot_round_start(self, round_number: int) -> None:
+        """Snapshot per-channel message counts as ``round_number`` begins.
+
+        Called by the game clock right after emitting ``RoundAdvanced``.
+        The snapshot is keyed by ``round_number``; subsequent calls for
+        the same round overwrite the prior entry.
+        """
+        snapshot: dict[str, int] = {}
+        for channel_id in self._channels_iter():
+            snapshot[channel_id] = self._channel_router.get_message_count(channel_id=channel_id)
+        self._channel_message_count_at_round_start[round_number] = snapshot
+
+    def seed_round_snapshots(self, snapshots: dict[int, dict[str, int]]) -> None:
+        """Pre-populate the round-start snapshots from a resumed run's history.
+
+        Called once on resume so that ``ChannelVisibilityFromRound``
+        lookups in subsequent in-run swaps can reference rounds that
+        ran in the source simulation.
+        """
+        self._channel_message_count_at_round_start.update(snapshots)
+
+    def _channels_iter(self) -> list[str]:
+        """Return the list of channel IDs currently registered with the router."""
+        return [ch_id for ch_id in self._channel_router.get_all_messages()]
+
+    def update_agent_config(self, agent_id: str, config: AgentConfig) -> None:
+        """Replace the stored ``AgentConfig`` for an agent (used by mid-run swaps).
+
+        Discards any cached token counter for the agent so the next
+        ``count_tokens`` call rebuilds it for the new model/provider.
+        """
+        self._agent_configs_by_id[agent_id] = config
+        self._token_counters.pop(agent_id, None)
+
+    def replace_agent_session(self, agent_id: str, session: AgentSession) -> None:
+        """Swap the active ``AgentSession`` for an agent (used by mid-run swaps)."""
+        self._agent_sessions[agent_id] = session
+
+    def get_agent_config(self, agent_id: str) -> AgentConfig:
+        """Look up the active ``AgentConfig`` for an agent, raising if unknown."""
+        config = self._agent_configs_by_id.get(agent_id)
+        if config is None:
+            raise ValueError(f"Unknown agent: {agent_id}")
+        return config
 
     def is_tool_allowed(self, agent_id: str, tool_name: str) -> bool:
         """Check whether an agent is authorized to call a scenario tool."""

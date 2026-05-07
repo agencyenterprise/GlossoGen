@@ -25,6 +25,9 @@ from schmidt.runtime.scenario_world import (
     WorldContext,
 )
 from schmidt.scenarios.veyru.ids import (
+    POSTMORTEM_A_CHANNEL_ID,
+    POSTMORTEM_B_CHANNEL_ID,
+    POSTMORTEM_CHANNEL_ID,
     TEAM_A_ID,
     TEAM_B_ID,
     TEAM_SOLO_ID,
@@ -127,6 +130,7 @@ class VeyruWorld(ScenarioWorld):
         self._postmortem_globally_disabled: bool = postmortem_globally_disabled
         self._swap_just_happened: bool = False
         self._intern_takeover_just_happened: bool = False
+        self._just_swapped_agent_round: dict[str, int] = {}
         self._channels_by_team: dict[str, TeamId] = self._build_channel_to_team_lookup(
             teams=teams,
         )
@@ -177,6 +181,26 @@ class VeyruWorld(ScenarioWorld):
     def disable_postmortem_globally(self) -> None:
         """Close the postmortem channel for the rest of the simulation."""
         self._postmortem_globally_disabled = True
+
+    def get_globally_disabled_channels(self) -> frozenset[str]:
+        """Postmortem channels (single-team and two-team variants) when disabled."""
+        if not self._postmortem_globally_disabled:
+            return frozenset()
+        return frozenset({POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID})
+
+    def on_agent_swapped_mid_run(self, agent_id: str, round_number: int) -> None:
+        """Record that an agent was swapped at the start of ``round_number``.
+
+        Consulted by ``_get_previous_outcome_for_agent`` so the agent's
+        first injection skips the ``PREVIOUS VEYRU RESULT`` block — the
+        new agent did not participate in round ``round_number - 1`` and
+        leaking that result would hand them context they should not see.
+        """
+        self._just_swapped_agent_round[agent_id] = round_number
+
+    def was_agent_just_swapped_in_round(self, agent_id: str, round_number: int) -> bool:
+        """Return True iff the agent was swapped at the start of ``round_number``."""
+        return self._just_swapped_agent_round.get(agent_id) == round_number
 
     def mark_swap_just_happened(self) -> None:
         """Flag that a swap just fired; consumed by the next injection pass."""

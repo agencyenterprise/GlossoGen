@@ -136,6 +136,23 @@ class AgentDetail(BaseModel):
     system_prompt: str
 
 
+class AgentSwapEventDTO(BaseModel):
+    """One in-run agent swap, surfaced for per-instance tab rendering on the FE.
+
+    Each ``AgentSwappedMidRun`` event in the run's JSONL becomes one DTO.
+    The FE groups consecutive events by ``agent_id`` to derive an ordered
+    list of agent instances (generations) and split message visibility
+    by round range.
+    """
+
+    agent_id: str
+    round_number: int
+    timestamp: datetime
+    new_model: str
+    new_provider: str
+    system_prompt: str
+
+
 class ChannelMessage(BaseModel):
     """A message sent by an agent to a channel."""
 
@@ -331,6 +348,7 @@ class RunDetailResponse(BaseModel):
     channel_ids: list[str]
     provider: str
     agents: list[AgentDetail]
+    agent_swap_events: list[AgentSwapEventDTO]
     messages: list[ChannelMessage]
     reasoning: list[ReasoningEntry]
     tool_use: list[ToolUseEntry]

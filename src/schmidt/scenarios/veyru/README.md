@@ -168,6 +168,7 @@ The `veyru_case_started` event is emitted once per round at round start by `Veyr
 | `intern_join_round` | Round at which the intern silently joins the comm link (must be less than `intern_takeover_round`) |
 | `intern_takeover_round` | Round at which the intern replaces the field observer (must be ≤ `round_count`) |
 | `channel_noise_level` | Per-character drop probability on the link channel(s) only (postmortem stays clean). Must be in `[0.0, 1.0]`. At `0.0` the channel is lossless; dropped characters are replaced with `_`. When > 0, agents receive a system-prompt note that the link is lossy |
+| `scheduled_events` | Platform knob (on `BaseKnobs`) for in-run agent swaps and runtime toggles fired at round boundaries. Each entry is a `swap_agent` (replaces one agent's seat with a fresh instance + reconstructed history) or `set_postmortem` (toggles postmortem mid-run via `disable_postmortem_globally`). See "Multi-Phase Protocol Transmission" below |
 
 ## Two-Team Mode (opt-in)
 
@@ -219,3 +220,36 @@ python -m schmidt run veyru \
   --runs-dir ./runs \
   --config src/schmidt/scenarios/veyru/knobs_default.json
 ```
+
+## Multi-Phase Protocol Transmission via `scheduled_events`
+
+For multi-generational protocol-transmission studies, the platform-level `scheduled_events` knob fires one `swap_agent` event per generation boundary inside a single run. Each phase shares one continuous JSONL and one continuous timeline.
+
+Veyru-specific behaviour at swap time:
+
+- `VeyruWorld.get_globally_disabled_channels()` returns `{"postmortem"}` when `_postmortem_globally_disabled=True` (set by either `postmortem_disabled_at_start` at world boot or a `set_postmortem` scheduled event mid-run). The runtime forces `ChannelVisibilityNone` on those channels for the swapped-in agent regardless of the swap config.
+- `VeyruWorld.on_agent_swapped_mid_run(agent_id, round_number)` records `_just_swapped_agent_round[agent_id] = round_number`. The injection builder's `_get_previous_outcome_for_agent` returns `None` for that round, dropping the `--- PREVIOUS VEYRU RESULT ---` block from the swap-round injection (the swapped-in agent did not participate in the round being summarised).
+
+Worked example for a 4-phase protocol-transmission run with each phase having a windowed `#link` history:
+
+```jsonc
+{
+  "round_count": 60,
+  "round_time_budget_seconds": 150,
+  "postmortem_enabled": true,
+  "scheduled_events": [
+    { "type": "set_postmortem", "at_round": 16, "enabled": false },
+    { "type": "swap_agent", "at_round": 16, "agent_id": "field_observer",
+      "model": "claude-sonnet-4-6", "provider": "anthropic",
+      "channel_visibility": { "link": { "kind": "full" } } },
+    { "type": "swap_agent", "at_round": 31, "agent_id": "stabilization_engineer",
+      "model": "claude-sonnet-4-6", "provider": "anthropic",
+      "channel_visibility": { "link": { "kind": "from_round", "round_floor": 16 } } },
+    { "type": "swap_agent", "at_round": 46, "agent_id": "field_observer",
+      "model": "claude-sonnet-4-6", "provider": "anthropic",
+      "channel_visibility": { "link": { "kind": "from_round", "round_floor": 31 } } }
+  ]
+}
+```
+
+Score per-phase round-success via `round_success_after_resume` (one Measurement per swap, with the previous phase as the baseline) and visualise the decay in the Streamlit Multi-swap tab.

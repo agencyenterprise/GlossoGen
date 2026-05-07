@@ -15,6 +15,7 @@ from pydantic import AliasChoices, BaseModel, Discriminator, Field
 
 from schmidt.models.message import SimulationMessage
 from schmidt.models.tool_definition import ToolCallRequest
+from schmidt.runtime.scheduled_events import ChannelVisibility
 
 
 class TokenUsage(BaseModel):
@@ -252,6 +253,34 @@ class VeyruCaseStarted(EventBase):
     stellar_reading: VeyruStellarReading
 
 
+class AgentSwappedMidRun(EventBase):
+    """Emitted when the in-run scheduler swaps one agent for a fresh instance.
+
+    Captures the swap-time round, the agent_id whose seat changed, the
+    new model/provider, and the per-channel history visibility config
+    used when reconstructing the new agent's pydantic-ai history. Used
+    by resume-aware metrics to compute per-swap performance windows
+    (replaces ``replace_manifest.json`` for in-run swaps).
+    """
+
+    event_type: Literal["agent_swapped_mid_run"] = "agent_swapped_mid_run"
+    agent_id: str
+    new_model: str
+    new_provider: str
+    channel_visibility: dict[str, ChannelVisibility]
+
+
+class PostmortemDisabledMidRun(EventBase):
+    """Emitted when the in-run scheduler disables postmortem at a round boundary.
+
+    The world's ``disable_postmortem_globally()`` flag is flipped at
+    this point; subsequent postmortem injections and phase entries are
+    skipped for the rest of the run.
+    """
+
+    event_type: Literal["postmortem_disabled_mid_run"] = "postmortem_disabled_mid_run"
+
+
 class VeyruStabilizationJudged(EventBase):
     """Emitted by the veyru scenario after the stabilization judge rules on a stabilize_veyru call.
 
@@ -287,6 +316,8 @@ SimulationEvent = Annotated[
         ChannelMembershipChanged,
         WorldEventDelivered,
         SimulationEnded,
+        AgentSwappedMidRun,
+        PostmortemDisabledMidRun,
         VeyruStabilizationJudged,
         VeyruCaseStarted,
     ],

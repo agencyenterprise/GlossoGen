@@ -573,7 +573,14 @@ export interface paths {
         put?: never;
         /**
          * Get Agent Roles
-         * @description Return the agent IDs and display names for a scenario with the given knobs.
+         * @description Return the agent IDs, display names, and channels for the given knobs.
+         *
+         *     The ``channels`` field is populated by instantiating the scenario
+         *     with the supplied knobs and reading each ``AgentConfig.channel_ids``;
+         *     the FE phase-builder uses this to render per-agent visibility
+         *     controls. Returns an empty channel list per agent if scenario
+         *     instantiation fails (e.g. invalid knobs) so the FE can still show
+         *     role names while the user fixes the knobs.
          */
         post: operations["get_agent_roles_api_scenarios__scenario_name__agents_post"];
         delete?: never;
@@ -713,12 +720,18 @@ export interface components {
         /**
          * AgentRoleInfo
          * @description Lightweight agent identity for the agent discovery endpoint.
+         *
+         *     ``channels`` lists the channel IDs the agent is a member of given
+         *     the supplied knobs. Used by the FE phase-builder to render per-agent
+         *     channel-visibility controls when configuring scheduled swaps.
          */
         AgentRoleInfo: {
             /** Agent Id */
             agent_id: string;
             /** Role Name */
             role_name: string;
+            /** Channels */
+            channels: string[];
         };
         /**
          * AgentRolesRequest
@@ -763,6 +776,32 @@ export interface components {
             error_type: string;
             /** Message */
             message: string;
+        };
+        /**
+         * AgentSwapEventDTO
+         * @description One in-run agent swap, surfaced for per-instance tab rendering on the FE.
+         *
+         *     Each ``AgentSwappedMidRun`` event in the run's JSONL becomes one DTO.
+         *     The FE groups consecutive events by ``agent_id`` to derive an ordered
+         *     list of agent instances (generations) and split message visibility
+         *     by round range.
+         */
+        AgentSwapEventDTO: {
+            /** Agent Id */
+            agent_id: string;
+            /** Round Number */
+            round_number: number;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** New Model */
+            new_model: string;
+            /** New Provider */
+            new_provider: string;
+            /** System Prompt */
+            system_prompt: string;
         };
         /**
          * AllLabelsResponse
@@ -1386,6 +1425,8 @@ export interface components {
             provider: string;
             /** Agents */
             agents: components["schemas"]["AgentDetail"][];
+            /** Agent Swap Events */
+            agent_swap_events: components["schemas"]["AgentSwapEventDTO"][];
             /** Messages */
             messages: components["schemas"]["ChannelMessage"][];
             /** Reasoning */

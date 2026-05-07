@@ -228,3 +228,30 @@ class ScenarioWorld(ABC):
         Async notifications should be sent from the ``run`` loop instead.
         """
         _ = agent_id, channel_id, text, token_count
+
+    def get_globally_disabled_channels(self) -> frozenset[str]:
+        """Return channel IDs that have been globally disabled for the rest of the run.
+
+        The runtime treats these channels as effectively dead for any
+        agent swapped in via the in-run scheduler: the swap logic forces
+        ``ChannelVisibilityNone`` on them (history hidden, predecessor
+        tool calls dropped) and excludes them from the wake-up
+        notification so the new agent does not get spurious "you have
+        new messages" alerts on a channel they shouldn't be reading.
+        Default returns the empty set; scenarios that disable channels
+        mid-run (e.g. veyru's ``disable_postmortem_globally``) override.
+        """
+        return frozenset()
+
+    def on_agent_swapped_mid_run(self, agent_id: str, round_number: int) -> None:
+        """Notify the world that an in-run agent swap has fired.
+
+        Called by the runtime's swap dispatcher right after a fresh
+        agent has been instantiated for ``agent_id`` at the start of
+        ``round_number``. Scenarios can use this to suppress
+        injection content that would leak prior-round context the
+        newly-swapped agent should not see (e.g. veyru's
+        ``PREVIOUS VEYRU RESULT`` block, which describes a round the
+        new agent did not participate in). Default is a no-op.
+        """
+        _ = agent_id, round_number

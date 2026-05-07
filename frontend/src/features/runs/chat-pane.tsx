@@ -101,6 +101,32 @@ interface ChatPaneProps {
   roundEndings: RoundEnding[];
   /** ISO timestamp at which the resume happened (replace-agent / fork). Turns and rounds with earlier timestamps are rendered faded so users see they were inherited from the source run. Null for non-resumed runs. */
   resumeCutoffTimestamp: string | null;
+  /**
+   * In-run scheduled agent swaps. Each entry is rendered as a slate divider
+   * at the top of its ``round_number`` so the channel chat shows where the
+   * pre-swap agent ends and the post-swap agent begins. Empty for runs with
+   * no scheduled swaps.
+   */
+  agentSwapDividers: AgentSwapDivider[];
+  /**
+   * Round range of the currently-selected agent instance (drawer open).
+   * When set, the round timeline badge and jump-to-round dropdown clamp to
+   * this range so the user can't navigate to rounds outside the active
+   * generation's window. Null when no agent drawer is open or the active
+   * instance has no upper bound.
+   */
+  activeInstanceRoundRange: { start: number; end: number | null } | null;
+}
+
+export interface AgentSwapDivider {
+  agent_id: string;
+  role_name: string;
+  round_number: number;
+  generation: number;
+  old_model: string;
+  new_model: string;
+  /** Synthetic instance_key for the post-swap generation; clicking the divider opens its drawer tab. */
+  post_swap_instance_key: string;
 }
 
 interface TurnGroup {
@@ -194,6 +220,8 @@ export function ChatPane({
   veyruCases,
   roundEndings,
   resumeCutoffTimestamp,
+  agentSwapDividers,
+  activeInstanceRoundRange,
 }: ChatPaneProps) {
   const prodUploadStatus = useQuery({
     queryKey: ["prod-upload-status"],
@@ -331,10 +359,17 @@ export function ChatPane({
     }
   }, []);
 
-  const sortedRoundNumbers = useMemo(
-    () => [...messagesByRound.keys()].sort((a, b) => a - b),
-    [messagesByRound]
-  );
+  const sortedRoundNumbers = useMemo(() => {
+    const all = [...messagesByRound.keys()].sort((a, b) => a - b);
+    if (activeInstanceRoundRange === null) {
+      return all;
+    }
+    return all.filter(n => {
+      if (n < activeInstanceRoundRange.start) return false;
+      if (activeInstanceRoundRange.end !== null && n > activeInstanceRoundRange.end) return false;
+      return true;
+    });
+  }, [messagesByRound, activeInstanceRoundRange]);
 
   const jumpToRound = useCallback((roundNumber: number) => {
     const el = roundMarkerRefs.current.get(roundNumber);
@@ -644,7 +679,14 @@ export function ChatPane({
         )}
       </div>
 
-      {currentVisibleRound !== null ? (
+      {/* Hide the chat-pane round badge while an agent drawer is open
+          (activeInstanceRoundRange !== null). The drawer renders its own
+          per-round sticky dividers, and the chat-pane sits behind the
+          drawer so the badge would otherwise bleed through over the
+          drawer's tabs (system prompt, messages, metrics) showing a
+          confusing "Round N" that's tied to the chat-pane's scroll
+          position rather than the active agent instance. */}
+      {currentVisibleRound !== null && activeInstanceRoundRange === null ? (
         <div className="absolute left-1/2 top-12 z-30 flex -translate-x-1/2 items-center gap-1.5">
           <button
             type="button"
@@ -832,6 +874,27 @@ export function ChatPane({
                   </div>
                 </div>
               ) : null}
+              {agentSwapDividers
+                .filter(swap => swap.round_number === round.roundNumber)
+                .map(swap => (
+                  <button
+                    key={swap.post_swap_instance_key}
+                    type="button"
+                    onClick={() => onSelectAgent(swap.post_swap_instance_key)}
+                    className="mx-4 my-4 block w-[calc(100%-2rem)] rounded-md border-2 border-dashed border-indigo-400/80 bg-indigo-50 px-4 py-3 text-left transition-colors hover:bg-indigo-100/70 dark:border-indigo-600/70 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/50"
+                  >
+                    <div className="flex items-center justify-center gap-2 text-indigo-800 dark:text-indigo-200">
+                      <UserCog className="h-4 w-4" />
+                      <span className="text-sm font-semibold">
+                        {swap.role_name} swapped — {swap.old_model} → {swap.new_model}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-center text-[11px] text-indigo-700/80 dark:text-indigo-300/80">
+                      Round {round.roundNumber} begins with reconstructed history. Click to open Gen{" "}
+                      {swap.generation}.
+                    </div>
+                  </button>
+                ))}
               {internTakeoverRoundNumber !== null &&
               round.roundNumber === internTakeoverRoundNumber ? (
                 <div

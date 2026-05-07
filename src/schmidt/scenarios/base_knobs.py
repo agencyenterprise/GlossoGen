@@ -1,6 +1,8 @@
 """Shared base models for scenario knobs."""
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from schmidt.runtime.scheduled_events import ScheduledEvent
 
 
 class AgentModelOverride(BaseModel):
@@ -26,6 +28,12 @@ class BaseKnobs(BaseModel):
     simulation itself does not read this field at runtime; only the
     replace-agent CLI/HTTP/FE flows consult it to populate defaults.
 
+    ``scheduled_events`` declares mid-run interventions (agent swaps and
+    postmortem toggles) keyed off round boundaries. The runtime's
+    ``RoundBoundaryScheduler`` dispatches each event when the game clock
+    advances to its ``at_round``. Defaults to an empty list (no
+    interventions; equivalent to a normal run).
+
     ``agent_max_tokens`` is the per-cycle output token cap passed to the
     LLM (``ModelSettings.max_tokens``). Default is sized for thinking-capable
     models (Anthropic Opus, OpenAI o1/gpt-5 reasoning, Qwen3-Thinking,
@@ -42,4 +50,5 @@ class BaseKnobs(BaseModel):
     model_overrides: dict[str, AgentModelOverride]
     postmortem_duration_seconds: float = 120.0
     replace_agent_default_channel_visibility: dict[str, bool] = {}
+    scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
     agent_max_tokens: int = 16384

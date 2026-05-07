@@ -122,6 +122,30 @@ The cross-run API endpoint is `POST /api/runs/{scenario}/{run_dir_name}/cross-ru
 
 The same `round_success_after_resume` evaluator works for both replace-agent and cross-run flows; for cross-run runs the comparison is against Sim A over the same window.
 
+## In-Run Agent Swaps via `scheduled_events`
+
+The in-run scheduler swaps agents at scheduled round boundaries inside a single live simulation. Multiple swaps fire across the same run on one continuous timeline; a run with three swaps produces four phases (A → B → C → D) on the same timeline.
+
+Configure via the `scheduled_events` knob in the scenario config. Two event types:
+
+```jsonc
+{
+  "scheduled_events": [
+    { "type": "set_postmortem", "at_round": 16, "enabled": false },
+    { "type": "swap_agent", "at_round": 16, "agent_id": "field_observer",
+      "model": "claude-sonnet-4-6", "provider": "anthropic",
+      "channel_visibility": { "link": { "kind": "full" } } },
+    { "type": "swap_agent", "at_round": 31, "agent_id": "stabilization_engineer",
+      "model": "claude-sonnet-4-6", "provider": "anthropic",
+      "channel_visibility": { "link": { "kind": "from_round", "round_floor": 16 } } }
+  ]
+}
+```
+
+`channel_visibility` is a per-channel discriminated union: `{"kind":"full"}` keeps all predecessor history visible; `{"kind":"none"}` hides the channel entirely; `{"kind":"from_round","round_floor":R}` windows the channel to round `R` onward. Channels not listed default to `Full`. Globally disabled channels (e.g. veyru's postmortem after `set_postmortem`) are forced to `none` by the runtime regardless of the swap config.
+
+Each swap emits an `AgentSwappedMidRun` event into the JSONL, writes a `resume_context_<agent_id>_round_<R>.json` file capturing the swapped-in agent's seed history, and invokes `ScenarioWorld.on_agent_swapped_mid_run` so the scenario can suppress prior-round injection content for the swapped-in agent's first turn. The frontend renders one tab per `(agent_id, generation)` and a dashed indigo divider in the chat pane between adjacent rounds that straddle a swap. The `round_success_after_resume` evaluator emits one Measurement per swap (named `round_success_after_resume_round_<R>_<agent_id>`) with the previous phase as the baseline. The Streamlit Multi-swap tab visualises per-phase round-success with Δ pp annotations between phases.
+
 ## Run Output Directory Structure
 
 All simulation outputs use a standard directory layout under `runs/`:
@@ -135,7 +159,9 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── replace_manifest.json              # (replace-agent runs only) provenance tracking
 ├── cross_run_replace_manifest.json    # (cross-run replace-agent runs only) source A/B + imported model
 ├── imported_history_source.jsonl      # (cross-run replace-agent runs only) verbatim copy of Sim B's JSONL
-└── resume_context_{agent_id}.json     # per-agent reconstructed pydantic-ai message history at resume time
+├── resume_context_{agent_id}.json     # per-agent reconstructed pydantic-ai message history at resume time
+├── resume_context_{agent_id}_round_{R}.json  # (in-run scheduled swap) one file per AgentSwappedMidRun event
+└── multi_swap_cache.json              # streamlit Multi-swap tab cache (per-phase round_success)
 ```
 
 ## Running Evaluation
