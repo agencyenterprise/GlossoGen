@@ -190,21 +190,30 @@ def list_verbosity_runs(evaluated_runs: list[EvaluatedRun]) -> list[VerbosityRun
     return out
 
 
+_BUDGET_CACHE: dict[Path, tuple[int, int, int | None]] = {}
+
+
 def _resolve_budget(evaluated: EvaluatedRun) -> int | None:
     """Resolve the run's character/time budget from its event log.
 
     Reads the first ``veyru_case_started`` event in the run's JSONL and
-    returns its ``time_budget_seconds``. Veyru's character budget equals its
-    time budget (one char = one second), and the budget stays constant
-    across cases within a run. Works for both baseline and resume runs since
-    resumed runs emit case-started events on every round_advanced. Returns
-    ``None`` when no case-started event exists (e.g. a run that crashed
-    before round 1).
+    returns its ``time_budget_seconds``. Veyru's character budget equals
+    its time budget (one char = one second), and the budget stays
+    constant across cases within a run. Memoized per ``jsonl_path``
+    keyed on the file's size + mtime, so repeat renders skip the file
+    I/O. Returns ``None`` when no case-started event exists (e.g. a run
+    that crashed before round 1).
     """
     scenario_name = evaluated.run_id.split("/", 1)[0]
     jsonl_path = evaluated.run_dir / f"{scenario_name}.jsonl"
-    if not jsonl_path.exists():
+    try:
+        stat = jsonl_path.stat()
+    except FileNotFoundError:
         return None
+    cached = _BUDGET_CACHE.get(jsonl_path)
+    if cached is not None and cached[0] == stat.st_size and cached[1] == stat.st_mtime_ns:
+        return cached[2]
+    budget: int | None = None
     with jsonl_path.open("rb") as f:
         for line in f:
             event = orjson.loads(line)
@@ -212,9 +221,10 @@ def _resolve_budget(evaluated: EvaluatedRun) -> int | None:
                 continue
             value = event.get("time_budget_seconds")
             if isinstance(value, (int, float)):
-                return int(value)
-            return None
-    return None
+                budget = int(value)
+            break
+    _BUDGET_CACHE[jsonl_path] = (stat.st_size, stat.st_mtime_ns, budget)
+    return budget
 
 
 def _is_two_team(evaluated: EvaluatedRun) -> bool:

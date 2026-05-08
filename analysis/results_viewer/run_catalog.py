@@ -1,4 +1,14 @@
-"""Enumerates Veyru runs that have evaluation reports available."""
+"""Enumerates Veyru runs that have evaluation reports available.
+
+The per-run scan (read + parse the report JSON, scan the first ~20 JSONL
+lines for metadata) costs ~1ms per run; multiplied by hundreds of runs
+that's the dominant cost on every Streamlit rerun. Once a run has
+finished, its files don't change, so we memoize ``EvaluatedRun``
+instances in a module-level dict keyed on each run's
+``(jsonl_size, jsonl_mtime_ns, report_size, report_mtime_ns)``. Streamlit
+reuses the same Python process across reruns within one session, so this
+cache persists across UI interactions without needing on-disk files.
+"""
 
 from collections import OrderedDict
 from datetime import date, datetime
@@ -8,6 +18,18 @@ from typing import Any, NamedTuple
 import orjson
 
 from schmidt.evaluation.evaluation_report import EvaluationReport
+
+
+class _RunCacheKey(NamedTuple):
+    """Identity tuple for an evaluated run's two on-disk inputs."""
+
+    jsonl_size: int
+    jsonl_mtime_ns: int
+    report_size: int
+    report_mtime_ns: int
+
+
+_RUN_CACHE: dict[Path, tuple[_RunCacheKey, "EvaluatedRun"]] = {}
 
 
 class RunMetadata(NamedTuple):
@@ -135,36 +157,77 @@ def _derive_run_id(scenario_name: str, run_dir: Path) -> str:
     return f"{scenario_name}/{run_dir.name}"
 
 
+def _stat_cache_key(jsonl_path: Path, report_path: Path) -> _RunCacheKey | None:
+    """Build the cache key from the JSONL + report file stats; ``None`` if either is missing."""
+    try:
+        jsonl_stat = jsonl_path.stat()
+        report_stat = report_path.stat()
+    except FileNotFoundError:
+        return None
+    return _RunCacheKey(
+        jsonl_size=jsonl_stat.st_size,
+        jsonl_mtime_ns=jsonl_stat.st_mtime_ns,
+        report_size=report_stat.st_size,
+        report_mtime_ns=report_stat.st_mtime_ns,
+    )
+
+
+def _build_evaluated_run(
+    *,
+    scenario_name: str,
+    entry: Path,
+    jsonl_path: Path,
+    report_path: Path,
+) -> EvaluatedRun:
+    """Read the report + metadata from disk and assemble one ``EvaluatedRun``."""
+    report = EvaluationReport.model_validate_json(report_path.read_bytes())
+    metadata = _scan_metadata(jsonl_path=jsonl_path)
+    run_timestamp = _parse_run_timestamp(run_dir_name=entry.name)
+    label = _compose_label(
+        metadata=metadata, run_timestamp=run_timestamp, run_dir_name=entry.name
+    )
+    execution_mode = _mode_label(scenario_config=metadata.scenario_config)
+    run_id = _derive_run_id(scenario_name=scenario_name, run_dir=entry)
+    return EvaluatedRun(
+        label=label,
+        run_dir=entry,
+        run_id=run_id,
+        run_timestamp=run_timestamp,
+        scenario_name=scenario_name,
+        execution_mode=execution_mode,
+        report=report,
+        metadata=metadata,
+    )
+
+
 def _load_runs_for_scenario(scenario_dir: Path, scenario_name: str) -> list[EvaluatedRun]:
-    """Load every run directory under ``scenario_dir`` that has an evaluation report."""
+    """Load every run directory under ``scenario_dir`` that has an evaluation report.
+
+    Cached per run via ``_RUN_CACHE``: a hit costs only two ``stat`` calls
+    per run, while a miss does the original report-parse + JSONL-scan and
+    populates the cache.
+    """
     out: list[EvaluatedRun] = []
     for entry in sorted(scenario_dir.iterdir()):
         if not entry.is_dir():
             continue
         report_path = entry / f"{scenario_name}_report.json"
         jsonl_path = entry / f"{scenario_name}.jsonl"
-        if not report_path.exists() or not jsonl_path.exists():
+        cache_key = _stat_cache_key(jsonl_path=jsonl_path, report_path=report_path)
+        if cache_key is None:
             continue
-        report = EvaluationReport.model_validate_json(report_path.read_bytes())
-        metadata = _scan_metadata(jsonl_path=jsonl_path)
-        run_timestamp = _parse_run_timestamp(run_dir_name=entry.name)
-        label = _compose_label(
-            metadata=metadata, run_timestamp=run_timestamp, run_dir_name=entry.name
+        cached = _RUN_CACHE.get(entry)
+        if cached is not None and cached[0] == cache_key:
+            out.append(cached[1])
+            continue
+        evaluated = _build_evaluated_run(
+            scenario_name=scenario_name,
+            entry=entry,
+            jsonl_path=jsonl_path,
+            report_path=report_path,
         )
-        execution_mode = _mode_label(scenario_config=metadata.scenario_config)
-        run_id = _derive_run_id(scenario_name=scenario_name, run_dir=entry)
-        out.append(
-            EvaluatedRun(
-                label=label,
-                run_dir=entry,
-                run_id=run_id,
-                run_timestamp=run_timestamp,
-                scenario_name=scenario_name,
-                execution_mode=execution_mode,
-                report=report,
-                metadata=metadata,
-            )
-        )
+        _RUN_CACHE[entry] = (cache_key, evaluated)
+        out.append(evaluated)
     return out
 
 
