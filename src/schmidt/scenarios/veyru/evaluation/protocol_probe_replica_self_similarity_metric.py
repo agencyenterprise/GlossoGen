@@ -34,6 +34,7 @@ from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.veyru.evaluation.protocol_probe_similarity_core import (
     ARTIFACT_SCHEMA_VERSION,
     ProbeSimilarityCell,
+    cutoff_sort_key,
     load_probe_rows,
     matrix_to_cells,
     pairwise_similarity_matrix,
@@ -183,8 +184,12 @@ class ProtocolProbeReplicaSelfSimilarityMetric(Metric):
                 )
             ]
         rows_by_key = _group_rows(rows=rows)
+        sorted_keys = sorted(
+            rows_by_key.keys(),
+            key=lambda key: (key.agent_id, key.question_id, cutoff_sort_key(key.cutoff_round)),
+        )
         groups: list[ReplicaSelfSimGroup] = []
-        for key in sorted(rows_by_key.keys()):
+        for key in sorted_keys:
             built = _build_group(rows=rows_by_key[key])
             if built is not None:
                 groups.append(built)
