@@ -23,10 +23,14 @@ from typing import TextIO
 from pydantic import BaseModel
 from pydantic_ai.messages import ModelMessage
 
+from schmidt.evaluation.evaluation_cost import EvaluationTokenUsage, compute_evaluation_cost
 from schmidt.evaluation.measurement import Measurement
 from schmidt.evaluation.metric_protocol import Metric
 from schmidt.evaluation.metric_run_options import MetricRunOptions
-from schmidt.evaluation.protocol_probe_response import ProtocolProbeResponse
+from schmidt.evaluation.protocol_probe_response import (
+    ProtocolProbeResponse,
+    ProtocolProbeUsageReport,
+)
 from schmidt.llm.provider import LLMProvider
 from schmidt.message_history_builder import build_message_history
 from schmidt.models.agent_config import AgentConfig
@@ -49,6 +53,7 @@ logger = logging.getLogger(__name__)
 _PROBE_PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts" / "probe"
 _TEST_BANK_PATH = Path(__file__).resolve().parent.parent / "protocol_probe_questions.json"
 _RESPONSES_FILE_NAME = "protocol_probe_responses.jsonl"
+_USAGE_FILE_NAME = "protocol_probe_usage.json"
 
 _ROLE_FILTER_TO_ROLE_NAMES: dict[str, frozenset[str]] = {
     "field_observer": frozenset(
@@ -112,6 +117,7 @@ class ProtocolProbeMetric(Metric):
         target_timestamp = _resolve_history_timestamp(events=events)
 
         rows_written = 0
+        usage_by_model: dict[tuple[str, str], EvaluationTokenUsage] = {}
         with responses_path.open("a", encoding="utf-8") as responses_file:
             for question in questions:
                 matching_agents = _match_agents(
@@ -160,12 +166,18 @@ class ProtocolProbeMetric(Metric):
                         probe_round=probe_round,
                         probe_replicas=probe_replicas,
                         responses_file=responses_file,
+                        usage_by_model=usage_by_model,
                     )
 
+        usage_report = _build_usage_report(usage_by_model=usage_by_model)
+        usage_path = run_dir / _USAGE_FILE_NAME
+        usage_path.write_text(usage_report.model_dump_json(indent=2) + "\n")
         summary = (
             f"Collected {rows_written} probe responses across "
             f"{len(questions)} questions × {probe_replicas} replica(s); "
-            f"written to {responses_path.name}"
+            f"written to {responses_path.name}; "
+            f"probe LLM cost ${usage_report.total_estimated_cost_usd:.4f} "
+            f"(see {usage_path.name})"
         )
         return [
             Measurement(
@@ -188,12 +200,13 @@ class ProtocolProbeMetric(Metric):
         probe_round: int | None,
         probe_replicas: int,
         responses_file: TextIO,
+        usage_by_model: dict[tuple[str, str], EvaluationTokenUsage],
     ) -> int:
         """Run the configured number of replicas for one (agent, question) pair."""
         rows_written = 0
         for replica_index in range(1, probe_replicas + 1):
             try:
-                output = await run_protocol_probe(
+                call_result = await run_protocol_probe(
                     agent_id=agent_config.agent_id,
                     role_name=agent_config.role_name,
                     full_system_prompt=full_system_prompt,
@@ -210,6 +223,12 @@ class ProtocolProbeMetric(Metric):
                     replica_index,
                 )
                 continue
+            _accumulate_usage(
+                usage_by_model=usage_by_model,
+                model=agent_config.model,
+                provider=agent_config.provider,
+                call_usage=call_result.usage,
+            )
             row = ProtocolProbeResponse(
                 timestamp=datetime.now(tz=timezone.utc),
                 replica_index=replica_index,
@@ -220,8 +239,8 @@ class ProtocolProbeMetric(Metric):
                 question_id=question.id,
                 question_role_filter=question.agent_role_filter,
                 cutoff_round=probe_round,
-                reasoning_text=output.reasoning,
-                response_text=output.message,
+                reasoning_text=call_result.output.reasoning,
+                response_text=call_result.output.message,
             )
             responses_file.write(row.model_dump_json() + "\n")
             responses_file.flush()
@@ -256,3 +275,40 @@ def _resolve_history_timestamp(events: list[SimulationEvent]) -> datetime:
     if not events:
         return datetime.now(tz=timezone.utc)
     return events[-1].timestamp
+
+
+def _accumulate_usage(
+    usage_by_model: dict[tuple[str, str], EvaluationTokenUsage],
+    model: str,
+    provider: str,
+    call_usage: EvaluationTokenUsage,
+) -> None:
+    """Increment the per-(model, provider) running totals by one probe call's usage."""
+    key = (model, provider)
+    existing = usage_by_model.get(key)
+    if existing is None:
+        usage_by_model[key] = call_usage
+        return
+    usage_by_model[key] = EvaluationTokenUsage(
+        input_tokens=existing.input_tokens + call_usage.input_tokens,
+        output_tokens=existing.output_tokens + call_usage.output_tokens,
+        cache_read_input_tokens=existing.cache_read_input_tokens
+        + call_usage.cache_read_input_tokens,
+        cache_creation_input_tokens=existing.cache_creation_input_tokens
+        + call_usage.cache_creation_input_tokens,
+    )
+
+
+def _build_usage_report(
+    usage_by_model: dict[tuple[str, str], EvaluationTokenUsage],
+) -> ProtocolProbeUsageReport:
+    """Compute per-model cost and aggregate the run total."""
+    per_model = [
+        compute_evaluation_cost(usage=usage, model=model, provider_name=provider)
+        for (model, provider), usage in usage_by_model.items()
+    ]
+    total = sum(entry.estimated_cost_usd for entry in per_model)
+    return ProtocolProbeUsageReport(
+        total_estimated_cost_usd=total,
+        per_model=per_model,
+    )
