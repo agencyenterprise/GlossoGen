@@ -23,6 +23,7 @@ visual; similarity scores are small chips, not the dominant signal.
 """
 
 import logging
+import re
 from pathlib import Path
 from typing import NamedTuple
 
@@ -38,6 +39,7 @@ from analysis.results_viewer.probe_similarity_data import (
     list_probe_similarity_runs,
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun
+from analysis.results_viewer.run_link import render_frontend_base, run_url
 from schmidt.evaluation.protocol_probe_response import ProtocolProbeResponse
 
 logger = logging.getLogger(__name__)
@@ -74,11 +76,17 @@ class GridColumn(NamedTuple):
 
 
 class GridCell(NamedTuple):
-    """Payload for one (row, column) cell in the text-card grid."""
+    """Payload for one (row, column) cell in the text-card grid.
+
+    ``extra`` is an optional second ``(score, label)`` chip rendered after
+    the primary chip — used by the cross-team 3-column grid where the
+    SimC column carries comparisons against both SimA and SimB.
+    """
 
     replicas: list[str]
     score: float | None
     score_label: str
+    extra: tuple[float, str] | None
 
 
 class GridRow(NamedTuple):
@@ -90,6 +98,22 @@ class GridRow(NamedTuple):
     cells_by_column_key: dict[str, GridCell]
     row_score: float | None
     row_score_label: str
+
+
+def _natural_sort_key(text: str) -> list[object]:
+    """Sort key that orders mixed alpha/numeric strings in human-natural order.
+
+    Splits ``text`` into runs of digits and non-digits, casting the digit
+    runs to ``int`` so e.g. ``q2`` sorts before ``q10``. Used for ordering
+    probe ``question_id`` values in the grid rows.
+    """
+    parts: list[object] = []
+    for chunk in re.split(r"(\d+)", text):
+        if chunk.isdigit():
+            parts.append(int(chunk))
+        else:
+            parts.append(chunk)
+    return parts
 
 
 def _format_cutoff(cutoff_round: int | None) -> str:
@@ -107,12 +131,27 @@ def _truncate(text: str, limit: int) -> str:
 
 
 def _run_picker_label(probe_run: ProbeSimilarityRun) -> str:
-    """One-line picker label combining run_id, model, and label list."""
+    """One-line picker label combining run_id, model, round count, budget, postmortem, labels."""
     if probe_run.labels:
         label_str = ",".join(probe_run.labels)
     else:
         label_str = "—"
-    return f"{probe_run.run_id} · {probe_run.primary_model} · labels=[{label_str}]"
+    if probe_run.round_count is None:
+        rounds_str = "r=?"
+    else:
+        rounds_str = f"r={probe_run.round_count}"
+    if probe_run.round_time_budget_seconds is None:
+        budget_str = "b=?"
+    else:
+        budget_str = f"b={probe_run.round_time_budget_seconds}s"
+    if probe_run.postmortem_enabled:
+        postmortem_str = "postmortem=on"
+    else:
+        postmortem_str = "postmortem=off"
+    return (
+        f"{probe_run.run_id} · {probe_run.primary_model} · {rounds_str}"
+        f" · {budget_str} · {postmortem_str} · labels=[{label_str}]"
+    )
 
 
 def _self_similarity(replicas: list[str]) -> float | None:
@@ -199,7 +238,28 @@ def _questions_for_agent(
         for cell in cells
         if cell.cell_id.run_id == run_id and cell.cell_id.agent_id == agent_id
     }
-    return sorted(matched)
+    return sorted(matched, key=_natural_sort_key)
+
+
+def _is_single_team_run(probe_run: ProbeSimilarityRun) -> bool:
+    """Return ``True`` for runs whose probe data captures a single, non-imported team.
+
+    Replica self-similarity asks "does this agent give the same answer
+    across replicas?" — a question that only makes sense when the agent's
+    history is uncontaminated by team-swap dynamics. We exclude:
+
+    * Cross-run replace-agent runs (presence of
+      ``cross_run_replace_manifest.json``), where one agent was lifted
+      from another run mid-play.
+    * Two-team runs, detectable via two or more distinct ``agent_id``
+      values sharing the same ``role_name`` in the probe rows.
+    """
+    if (probe_run.run_dir / _CROSS_RUN_MANIFEST_FILENAME).exists():
+        return False
+    agents_per_role: dict[str, set[str]] = {}
+    for row in probe_run.rows:
+        agents_per_role.setdefault(row.role_name, set()).add(row.agent_id)
+    return all(len(agents) <= 1 for agents in agents_per_role.values())
 
 
 def _read_cross_team_replaced_agent_id(run_dir: Path) -> str | None:
@@ -232,6 +292,35 @@ def _median(values: list[float]) -> float | None:
     return (sorted_values[middle - 1] + sorted_values[middle]) / 2
 
 
+def _mean(values: list[float]) -> float | None:
+    """Return the arithmetic mean of ``values``; ``None`` when the list is empty."""
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+_SATURATED_THRESHOLD = 0.99
+
+
+def _format_median_mean(values: list[float]) -> tuple[str, str]:
+    """Return ``(value_text, delta_text)`` for an ``st.metric`` summary tile.
+
+    The big value is the median; the delta sub-line carries the mean and a
+    "saturated" count — the fraction of cells with similarity at or above
+    :data:`_SATURATED_THRESHOLD`. Both extra numbers help disambiguate the
+    median when the underlying distribution is bimodal.
+    """
+    median_score = _median(values=values)
+    mean_score = _mean(values=values)
+    value_text = "—" if median_score is None else f"{median_score:.2f}"
+    if mean_score is None:
+        delta_text = "mean — · sat —"
+    else:
+        saturated = sum(1 for value in values if value >= _SATURATED_THRESHOLD)
+        delta_text = f"mean {mean_score:.2f} · {saturated}/{len(values)} sat"
+    return value_text, delta_text
+
+
 def _render_subtab_help(*, title: str, body: str) -> None:
     """Render a top-of-subtab title with an inline ``ⓘ`` popover."""
     title_col, info_col = st.columns([12, 1])
@@ -244,78 +333,95 @@ def _render_subtab_help(*, title: str, body: str) -> None:
 
 
 _CROSS_TEAM_HELP_BODY = (
-    "For one cross-run replace-agent run, this view compares the imported "
-    "agent's protocol against where it came from (Sim B), and the "
-    "agents that stayed in Sim A against their original Sim A protocol.\n\n"
-    "**Rows** are probe questions; each row begins with the question id and "
-    "its prompt (e.g. `symptoms: ...` for observer questions).\n\n"
-    "**Columns** are the source-run cell on the left and the cross-team "
-    "TARGET cell on the right. Each cell shows the agent's verbatim replica "
-    "responses at that probe question. The chip on the TARGET cell is the "
-    "mean Levenshtein similarity over the cartesian product of source × "
-    "target replicas — saturation at `1.00` means the protocol survived "
-    "the swap unchanged; lower scores indicate drift.\n\n"
-    "**Both source-run probes are read at `cutoff_round = null` (end of "
-    "the source's full play).** For source B that means the protocol Sim "
-    "B converged to by *its* last round — which only matches what the "
-    "imported agent actually carried into Sim A when "
-    "`source_b_round_end == B_max_round`. If Sim B kept playing past the "
-    "extraction point, probe Sim B with `--probe-round source_b_round_end` "
-    "to get a snapshot matched to the moment the agent was lifted out.\n\n"
-    "Two grids are rendered: the imported agent versus source B, and "
-    "every other probed agent versus source A. Both source A and source "
-    "B must have probe data — re-run "
-    "`schmidt evaluate ... --metrics protocol_probe` on the missing "
-    "source if the warning fires."
+    "For one cross-run replace-agent run, this view shows each probed "
+    "agent's protocol at three points side by side: **SimA** (the host "
+    "timeline), **SimB** (the imported agent's origin), and **SimC** "
+    "(the cross-run run itself). The same `agent_id` is followed across "
+    "all three runs, so the SimA cell shows what the *displaced* "
+    "predecessor was speaking and the SimB cell shows what the *foreign "
+    "team's* same-role agent was speaking.\n\n"
+    "**Rows** are probe questions; each row begins with the question id "
+    "and its prompt (e.g. `symptoms: ...` for observer questions).\n\n"
+    "**Columns** are SimA · SimB · SimC. The SimC cell carries two "
+    "chips: `vs SimA` (mean Levenshtein similarity over the cartesian "
+    "product of SimA × SimC replicas) and `vs SimB` (same against SimB). "
+    "Saturation at `1.00` means the protocol matches that origin "
+    "unchanged; lower scores indicate drift.\n\n"
+    "**All three probes are read at `cutoff_round = null` (end of run).** "
+    "For SimB that means the protocol the foreign team converged to by "
+    "*its* last round — which only matches what the imported agent "
+    "actually carried into SimC when `source_b_round_end == B_max_round`. "
+    "If SimB kept playing past the extraction point, re-probe SimB with "
+    "`--probe-round source_b_round_end` to get a snapshot matched to the "
+    "moment the agent was lifted out.\n\n"
+    "Two row-groups are rendered: the imported agent and every other "
+    "probed agent. All three runs must have probe data — re-run "
+    "`schmidt evaluate ... --metrics protocol_probe` on any missing source "
+    "if the warning fires."
 )
 
 _CROSS_TEAM_OVERVIEW_PROSE = (
-    "A cross-team swap takes one agent out of **Sim B** at the end of "
-    "round `source_b_round_end` and drops it into **Sim A** at the start "
-    "of round `round_start`, replacing Sim A's same-role agent. The "
-    "imported agent keeps its full pydantic-ai history from Sim B (every "
-    "message, every thought) — it walks into Sim A's environment "
+    "A cross-team swap takes one agent out of **SimB** at the end of "
+    "round `source_b_round_end` and drops it into **SimA** at the start "
+    "of round `round_start`, producing **SimC** (the run we're looking at). "
+    "The imported agent keeps its full pydantic-ai history from SimB "
+    "(every message, every thought) — it walks into SimA's environment "
     "remembering everything it learned with its old teammates. The two "
-    "sections below answer two separate questions about what happened "
-    "next:"
+    "row groups below show how each agent's protocol compares across the "
+    "three sims:"
 )
 
 _CROSS_TEAM_IMPORTED_PROSE = (
-    "Each row is one probe question. The **source** column shows what "
-    "agent `{replaced_agent_id}` answered at the end of Sim B's full "
-    "play (`{source_b_run_id}`, `cutoff_round=null`); the **TARGET** "
-    "column shows what the *same agent* answered after being inserted "
-    "into `{source_a_run_id}` and continuing to play. The score chip "
-    "is the mean Levenshtein similarity over the cartesian product of "
-    "source × target replicas for that question.\n\n"
-    "**Caveat on the source side:** the comparison uses Sim B's "
-    "end-of-run probe, not a probe taken at the extraction round "
-    "(`source_b_round_end`). When Sim B kept playing past the "
-    "extraction point, this snapshot reflects Sim B's final protocol "
-    "rather than what the imported agent actually carried over.\n\n"
-    "**High score (≈1.00)** — the imported agent kept emitting the "
-    "same surface form it had in Sim B, i.e. its protocol "
-    "*persisted* across the swap.\n\n"
-    "**Low score (≈0.00)** — the imported agent's answers changed "
-    "after the swap, i.e. it *adapted* to its new co-actors' protocol "
-    "(or simply drifted)."
+    "Each row is one probe question. The **SimA** column shows what the "
+    "*displaced* same-role predecessor was answering at the end of "
+    "`{source_a_run_id}` — the protocol the imported agent's new "
+    "teammates were used to. The **SimB** column shows what the "
+    "imported agent (`{replaced_agent_id}`) was answering at the end of "
+    "its origin `{source_b_run_id}` — the protocol it brought into "
+    "SimC. The **SimC** column shows what the imported agent answered "
+    "after playing the rest of SimC alongside SimA's teammates.\n\n"
+    "**SimC chips:** `vs SimA` and `vs SimB` are each the mean "
+    "Levenshtein similarity over the cartesian product of replicas "
+    "between SimC and that origin. The row title carries `min sim`, "
+    "the smaller of the two — rows are sorted lowest-min-first so the "
+    "questions where the imported agent diverged most from at least one "
+    "origin surface at the top.\n\n"
+    "**High `vs SimB`** — the imported agent kept emitting its origin "
+    "protocol after the swap, i.e. its protocol *persisted*.\n"
+    "**High `vs SimA`** — the imported agent's responses match what "
+    "its new teammates were used to, i.e. it *adapted* (or the two "
+    "teams independently converged on the same protocol).\n"
+    "**Both low** — the imported agent drifted into something neither "
+    "team was speaking.\n"
+    "**Both high** — both source teams independently converged on the "
+    "same protocol; the swap had nothing to disrupt.\n\n"
+    "**Caveat on the SimB side:** the comparison uses SimB's end-of-run "
+    "probe, not a probe taken at the extraction round "
+    "(`source_b_round_end`). When SimB kept playing past the "
+    "extraction point, this snapshot reflects SimB's final protocol "
+    "rather than what the imported agent actually carried over."
 )
 
 _CROSS_TEAM_CO_ACTORS_PROSE = (
-    "These are every probed agent in the target run *other than* "
+    "These are every probed agent in SimC *other than* "
     "`{replaced_agent_id}` — i.e. every agent that stayed in "
-    "`{source_a_run_id}` across the swap boundary. In a two-team "
-    "scenario this includes the replaced agent's actual teammate **and "
-    "the opposing team's agents**, since they all share Sim A's "
-    "history. Each row's **source** column is what the agent answered "
-    "at the end of the original Sim A run (`cutoff_round=null`); the "
-    "**TARGET** column is what the *same agent* answered after the "
-    "swap played out in the new run.\n\n"
-    "**High score (≈1.00)** — the co-acting agent kept its original "
-    "protocol despite the new face at the table.\n\n"
-    "**Low score (≈0.00)** — the co-acting agent shifted its "
-    "responses, i.e. it *accommodated* the imported agent (or the "
-    "team's protocol re-negotiated)."
+    "`{source_a_run_id}` across the swap boundary. The **SimA** column "
+    "shows what the agent answered at the end of its original SimA run; "
+    "the **SimB** column shows what the *foreign team's* same-role "
+    "agent was answering at the end of `{source_b_run_id}` (a different "
+    "physical agent, same `agent_id`); the **SimC** column shows what "
+    "the staying agent answered after the swap played out.\n\n"
+    "**SimC chips:** `vs SimA` (did the staying agent retain its "
+    "original protocol?) and `vs SimB` (did it shift toward what the "
+    "foreign team's same-role agent was speaking?). The row title's "
+    "`min sim` is the smaller of the two; rows are sorted "
+    "lowest-min-first so the questions where the staying agent "
+    "diverged most surface at the top.\n\n"
+    "**High `vs SimA`** — the co-acting agent kept its original "
+    "protocol despite the new face at the table.\n"
+    "**High `vs SimB`** — the co-acting agent's protocol now matches "
+    "the foreign team — either *accommodation* to the imported agent "
+    "or independent convergence between the two teams."
 )
 
 _MULTI_SWAP_HELP_BODY = (
@@ -371,7 +477,12 @@ _REPLICA_SELF_HELP_BODY = (
     "Rows are sorted lowest-similarity-first so non-converged questions "
     "surface at the top.\n\n"
     "When the run was probed at multiple cutoffs (`--probe-round R` "
-    "across rounds), pick which cutoff snapshot to inspect."
+    "across rounds), pick which cutoff snapshot to inspect.\n\n"
+    "**Single-team runs only.** Cross-run replace-agent runs and "
+    "two-team runs are excluded — those mix histories from different "
+    "teams, so a single replica-self number per agent doesn't answer a "
+    "clean question. Use the Cross-team swap or Multi-stage swap "
+    "subtabs for those workflows."
 )
 
 
@@ -413,9 +524,15 @@ def _render_grid_cell(cell: GridCell | None) -> None:
         for text in cell.replicas
     )
     chip = _score_chip(score=cell.score, label=cell.score_label)
+    if cell.extra is None:
+        chips_html = chip
+    else:
+        extra_score, extra_label = cell.extra
+        extra_chip = _score_chip(score=extra_score, label=extra_label)
+        chips_html = f"{chip}&nbsp;&nbsp;{extra_chip}"
     st.markdown(
         f"<div style='font-size:0.90em'>{body_html}</div>"
-        f"<div style='margin-top:4px'>{chip}</div>"
+        f"<div style='margin-top:4px'>{chips_html}</div>"
         f"<div style='color:#888;font-size:0.75em;margin-top:2px'>"
         f"{len(cell.replicas)} replica(s)</div>",
         unsafe_allow_html=True,
@@ -486,9 +603,13 @@ def _build_question_row(
 def _render_replica_self_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
     """Show one (agent, question) row per cell with replicas as side-by-side columns."""
     _render_subtab_help(title="Replica self-similarity", body=_REPLICA_SELF_HELP_BODY)
-    runs_with_data = [run for run in probe_runs if run.rows]
+    runs_with_data = [run for run in probe_runs if run.rows and _is_single_team_run(probe_run=run)]
     if not runs_with_data:
-        st.info("No runs with `protocol_probe_responses.jsonl` available.")
+        st.info(
+            "No single-team runs with `protocol_probe_responses.jsonl` available. "
+            "Cross-team and two-team runs are excluded from this view — see the "
+            "Cross-team swap or Multi-stage swap subtabs instead."
+        )
         return
     options = {_run_picker_label(probe_run=run): run for run in runs_with_data}
     chosen_label = st.selectbox(
@@ -498,6 +619,9 @@ def _render_replica_self_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
         key="probe_replica_self_run",
     )
     chosen_run = options[chosen_label]
+    frontend_base = render_frontend_base(streamlit_key="probe_replica_self_frontend_base")
+    target_url = run_url(frontend_base=frontend_base, run_id=chosen_run.run_id)
+    st.markdown(f"[Open run in frontend ↗]({target_url})")
     cells = _build_cells(probe_runs=[chosen_run])
     if not cells:
         st.info("No probe rows in the chosen run.")
@@ -540,6 +664,7 @@ def _render_replica_self_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
                     replicas=[replica_text],
                     score=None,
                     score_label="",
+                    extra=None,
                 )
             rows.append(
                 _build_question_row(
@@ -551,7 +676,7 @@ def _render_replica_self_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
             )
             if self_score is not None:
                 scores_per_agent.setdefault(agent_id, []).append(self_score)
-        rows.sort(key=lambda row: (row.row_score if row.row_score is not None else 1.0))
+        rows.sort(key=lambda row: _natural_sort_key(row.row_key))
         head = agent_cells[0]
         grids_per_agent[agent_id] = _ReplicaSelfAgentGrid(
             heading=(
@@ -583,15 +708,23 @@ def _render_replica_self_medians(*, scores_per_agent: dict[str, list[float]]) ->
         all_scores.extend(scores)
     if not all_scores:
         return
-    overall_median = _median(values=all_scores)
     sorted_agents = sorted(scores_per_agent.items())
     metric_cols = st.columns(len(sorted_agents) + 1)
-    overall_text = "—" if overall_median is None else f"{overall_median:.2f}"
-    metric_cols[0].metric(label="Overall median self-similarity", value=overall_text)
+    overall_value, overall_delta = _format_median_mean(values=all_scores)
+    metric_cols[0].metric(
+        label="Overall · median self-sim",
+        value=overall_value,
+        delta=overall_delta,
+        delta_color="off",
+    )
     for index, (agent_id, scores) in enumerate(sorted_agents):
-        agent_median = _median(values=scores)
-        agent_text = "—" if agent_median is None else f"{agent_median:.2f}"
-        metric_cols[index + 1].metric(label=f"{agent_id} · median", value=agent_text)
+        agent_value, agent_delta = _format_median_mean(values=scores)
+        metric_cols[index + 1].metric(
+            label=f"{agent_id} · median",
+            value=agent_value,
+            delta=agent_delta,
+            delta_color="off",
+        )
 
 
 # ---- Subtab: Compare runs ---------------------------------------------------
@@ -633,6 +766,12 @@ def _render_compare_runs_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
         key="probe_compare_run_b",
     )
     run_b = run_b_options[chosen_b_label]
+    frontend_base = render_frontend_base(streamlit_key="probe_compare_frontend_base")
+    run_a_url = run_url(frontend_base=frontend_base, run_id=run_a.run_id)
+    run_b_url = run_url(frontend_base=frontend_base, run_id=run_b.run_id)
+    st.markdown(
+        f"[Open Run A in frontend ↗]({run_a_url}) · [Open Run B in frontend ↗]({run_b_url})"
+    )
     cells = _build_cells(probe_runs=[run_a, run_b])
     cells_at_eor = [cell for cell in cells if cell.cell_id.cutoff_round is None]
     if not cells_at_eor:
@@ -655,7 +794,12 @@ def _render_compare_runs_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
     scores_per_agent: dict[str, list[float]] = {}
     for agent_id in sorted(agents_a):
         question_ids = sorted(
-            {cell.cell_id.question_id for cell in cells_at_eor if cell.cell_id.agent_id == agent_id}
+            {
+                cell.cell_id.question_id
+                for cell in cells_at_eor
+                if cell.cell_id.agent_id == agent_id
+            },
+            key=_natural_sort_key,
         )
         rows: list[GridRow] = []
         for question_id in question_ids:
@@ -665,8 +809,10 @@ def _render_compare_runs_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
                 continue
             score = _cross_cell_similarity(replicas_a=cell_a.replicas, replicas_b=cell_b.replicas)
             cells_by_column_key = {
-                "run_a": GridCell(replicas=cell_a.replicas, score=None, score_label=""),
-                "run_b": GridCell(replicas=cell_b.replicas, score=score, score_label="sim to A"),
+                "run_a": GridCell(replicas=cell_a.replicas, score=None, score_label="", extra=None),
+                "run_b": GridCell(
+                    replicas=cell_b.replicas, score=score, score_label="sim to A", extra=None
+                ),
             }
             rows.append(
                 _build_question_row(
@@ -678,7 +824,7 @@ def _render_compare_runs_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
             )
             if score is not None:
                 scores_per_agent.setdefault(agent_id, []).append(score)
-        rows.sort(key=lambda row: (row.row_score if row.row_score is not None else 1.0))
+        rows.sort(key=lambda row: _natural_sort_key(row.row_key))
         if rows:
             rows_per_agent[agent_id] = rows
     _render_compare_runs_medians(scores_per_agent=scores_per_agent)
@@ -695,15 +841,23 @@ def _render_compare_runs_medians(*, scores_per_agent: dict[str, list[float]]) ->
         all_scores.extend(scores)
     if not all_scores:
         return
-    overall_median = _median(values=all_scores)
     sorted_agents = sorted(scores_per_agent.items())
     metric_cols = st.columns(len(sorted_agents) + 1)
-    overall_text = "—" if overall_median is None else f"{overall_median:.2f}"
-    metric_cols[0].metric(label="Overall median similarity", value=overall_text)
+    overall_value, overall_delta = _format_median_mean(values=all_scores)
+    metric_cols[0].metric(
+        label="Overall · median similarity",
+        value=overall_value,
+        delta=overall_delta,
+        delta_color="off",
+    )
     for index, (agent_id, scores) in enumerate(sorted_agents):
-        agent_median = _median(values=scores)
-        agent_text = "—" if agent_median is None else f"{agent_median:.2f}"
-        metric_cols[index + 1].metric(label=f"{agent_id} · median", value=agent_text)
+        agent_value, agent_delta = _format_median_mean(values=scores)
+        metric_cols[index + 1].metric(
+            label=f"{agent_id} · median",
+            value=agent_value,
+            delta=agent_delta,
+            delta_color="off",
+        )
 
 
 # ---- Subtab: Multi-stage swap -----------------------------------------------
@@ -722,14 +876,18 @@ class _PhaseColumn(NamedTuple):
 def _expected_cutoff_for_phase(*, phase: PhaseScore, phases: list[PhaseScore]) -> int | None:
     """The probe ``cutoff_round`` capturing the protocol *as it stood when ``phase`` ended*.
 
-    For every phase except the last, that's the round before the next
-    phase's swap (which is ``phase.round_end``). For the last phase
-    we use ``None`` (end-of-run).
+    The probe metric defines ``cutoff_round=R`` as "history covers rounds
+    1..R-1 inclusive" — i.e. the probe was taken at the *start* of
+    round R. To capture the protocol at the end of a phase whose last
+    round is ``phase.round_end``, the matching probe cutoff is
+    ``phase.round_end + 1`` (= the start of the next phase, which is
+    when the swap fired). For the last phase we use ``None``
+    (end-of-run probe).
     """
     is_last = phase.phase_index == len(phases) - 1
     if is_last:
         return None
-    return phase.round_end
+    return phase.round_end + 1
 
 
 def _build_phase_columns(
@@ -811,6 +969,7 @@ def _build_agent_rows_for_multi_swap(
                 replicas=phase_cell.replicas,
                 score=score,
                 score_label=score_label,
+                extra=None,
             )
         if cells_by_column_key:
             rows.append(
@@ -837,12 +996,10 @@ def _render_multi_swap_medians(
     phase k-1 and phase k — the *drift* across that swap. A trailing
     "Overall (k≥1)" tile aggregates the cross-phase medians.
     """
-    median_per_column: list[float | None] = [_median(values=scores) for scores in transition_scores]
     cross_phase_scores: list[float] = []
     for index, scores in enumerate(transition_scores):
         if index >= 1:
             cross_phase_scores.extend(scores)
-    overall = _median(values=cross_phase_scores)
     tile_count = len(phase_columns) + (1 if len(phase_columns) > 1 else 0)
     metric_cols = st.columns(tile_count)
     for index, phase_column in enumerate(phase_columns):
@@ -850,11 +1007,18 @@ def _render_multi_swap_medians(
             label = f"{phase_column.header_label} · median self-sim"
         else:
             label = f"{phase_column.header_label} · median vs prev"
-        value_text = "—" if median_per_column[index] is None else f"{median_per_column[index]:.2f}"
-        metric_cols[index].metric(label=label, value=value_text)
+        value_text, delta_text = _format_median_mean(values=transition_scores[index])
+        metric_cols[index].metric(
+            label=label, value=value_text, delta=delta_text, delta_color="off"
+        )
     if len(phase_columns) > 1:
-        overall_text = "—" if overall is None else f"{overall:.2f}"
-        metric_cols[-1].metric(label="Overall median (k≥1)", value=overall_text)
+        overall_value, overall_delta = _format_median_mean(values=cross_phase_scores)
+        metric_cols[-1].metric(
+            label="Overall median (k≥1)",
+            value=overall_value,
+            delta=overall_delta,
+            delta_color="off",
+        )
 
 
 def _render_multi_swap_subtab(
@@ -883,6 +1047,9 @@ def _render_multi_swap_subtab(
     )
     multi_swap = options[chosen_label]
     probe_run = probe_run_by_id[multi_swap.run_id]
+    frontend_base = render_frontend_base(streamlit_key="probe_multi_swap_frontend_base")
+    target_url = run_url(frontend_base=frontend_base, run_id=multi_swap.run_id)
+    st.markdown(f"[Open run in frontend ↗]({target_url})")
     available_cutoffs = {row.cutoff_round for row in probe_run.rows}
     phase_columns, missing_phases = _build_phase_columns(
         phases=multi_swap.phases, available_cutoffs=available_cutoffs
@@ -986,31 +1153,56 @@ def _resolve_cross_team_context(
     )
 
 
+class _CrossTeamSectionScores(NamedTuple):
+    """Per-question similarity score lists for one cross-team section.
+
+    ``vs_a`` is each rendered question's SimC↔SimA cartesian-product
+    similarity; ``vs_b`` is the SimC↔SimB similarity. Both lists are
+    aligned one-per-rendered-question (matching scores are dropped
+    together when a question is missing from any of the three runs).
+    """
+
+    vs_a: list[float]
+    vs_b: list[float]
+
+
 def _render_cross_team_grid(
     *,
     target: ProbeSimilarityRun,
-    source: ProbeSimilarityRun,
+    source_a: ProbeSimilarityRun,
+    source_b: ProbeSimilarityRun,
     agent_ids: list[str],
-    source_label: str,
     section_title: str,
     section_explanation: str,
-) -> list[float]:
-    """Render one comparison grid (source vs target) and return per-question scores."""
-    cells = _build_cells(probe_runs=[target, source])
+) -> _CrossTeamSectionScores:
+    """Render one 3-column SimA · SimB · SimC grid and return per-question score lists.
+
+    The SimC cell carries two chips — ``vs SimA`` and ``vs SimB`` —
+    each the cartesian-product Levenshtein similarity between SimC's
+    replicas and the matching origin run's same-``agent_id`` end-of-run
+    replicas.
+    """
+    cells = _build_cells(probe_runs=[target, source_a, source_b])
     cells_index = _cells_by_aqc(cells=cells)
     columns = [
         GridColumn(
-            key="source",
-            header_label=f"{source_label} · {source.run_id}",
-            header_caption=source.primary_model,
+            key="sim_a",
+            header_label=f"SimA · {source_a.run_id}",
+            header_caption=source_a.primary_model,
         ),
         GridColumn(
-            key="target",
-            header_label=f"TARGET · {target.run_id}",
+            key="sim_b",
+            header_label=f"SimB · {source_b.run_id}",
+            header_caption=source_b.primary_model,
+        ),
+        GridColumn(
+            key="sim_c",
+            header_label=f"SimC (target) · {target.run_id}",
             header_caption=target.primary_model,
         ),
     ]
-    collected_scores: list[float] = []
+    scores_vs_a: list[float] = []
+    scores_vs_b: list[float] = []
     rendered_any = False
     for agent_id in agent_ids:
         question_ids = sorted(
@@ -1018,43 +1210,59 @@ def _render_cross_team_grid(
                 cell.cell_id.question_id
                 for cell in cells
                 if cell.cell_id.agent_id == agent_id and cell.cell_id.cutoff_round is None
-            }
+            },
+            key=_natural_sort_key,
         )
         rows: list[GridRow] = []
         for question_id in question_ids:
-            source_cell = cells_index.get((source.run_id, agent_id, question_id, None))
-            target_cell = cells_index.get((target.run_id, agent_id, question_id, None))
-            if source_cell is None or target_cell is None:
+            cell_a = cells_index.get((source_a.run_id, agent_id, question_id, None))
+            cell_b = cells_index.get((source_b.run_id, agent_id, question_id, None))
+            cell_c = cells_index.get((target.run_id, agent_id, question_id, None))
+            if cell_a is None or cell_b is None or cell_c is None:
                 continue
-            score = _cross_cell_similarity(
-                replicas_a=source_cell.replicas, replicas_b=target_cell.replicas
+            score_vs_a = _cross_cell_similarity(
+                replicas_a=cell_a.replicas, replicas_b=cell_c.replicas
             )
+            score_vs_b = _cross_cell_similarity(
+                replicas_a=cell_b.replicas, replicas_b=cell_c.replicas
+            )
+            if score_vs_a is None or score_vs_b is None:
+                continue
+            row_score = min(score_vs_a, score_vs_b)
             cells_by_column_key = {
-                "source": GridCell(replicas=source_cell.replicas, score=None, score_label=""),
-                "target": GridCell(
-                    replicas=target_cell.replicas, score=score, score_label="sim to source"
+                "sim_a": GridCell(
+                    replicas=cell_a.replicas, score=None, score_label="", extra=None
+                ),
+                "sim_b": GridCell(
+                    replicas=cell_b.replicas, score=None, score_label="", extra=None
+                ),
+                "sim_c": GridCell(
+                    replicas=cell_c.replicas,
+                    score=score_vs_a,
+                    score_label="vs SimA",
+                    extra=(score_vs_b, "vs SimB"),
                 ),
             }
             rows.append(
                 _build_question_row(
                     question_id=question_id,
                     cells_by_column_key=cells_by_column_key,
-                    row_score=score,
-                    row_score_label="sim",
+                    row_score=row_score,
+                    row_score_label="min sim",
                 )
             )
-            if score is not None:
-                collected_scores.append(score)
+            scores_vs_a.append(score_vs_a)
+            scores_vs_b.append(score_vs_b)
         if not rows:
             continue
-        rows.sort(key=lambda row: (row.row_score if row.row_score is not None else 1.0))
+        rows.sort(key=lambda row: _natural_sort_key(row.row_key))
         if not rendered_any:
             st.markdown(f"### {section_title}")
             st.markdown(section_explanation)
             rendered_any = True
         st.markdown(f"#### {agent_id}")
         _render_text_grid(columns=columns, rows=rows)
-    return collected_scores
+    return _CrossTeamSectionScores(vs_a=scores_vs_a, vs_b=scores_vs_b)
 
 
 def _render_cross_team_subtab(
@@ -1101,6 +1309,14 @@ def _render_cross_team_subtab(
     )
     if context is None:
         return
+    frontend_base = render_frontend_base(streamlit_key="probe_cross_team_frontend_base")
+    target_url = run_url(frontend_base=frontend_base, run_id=context.target.run_id)
+    source_a_url = run_url(frontend_base=frontend_base, run_id=context.source_a.run_id)
+    source_b_url = run_url(frontend_base=frontend_base, run_id=context.source_b.run_id)
+    st.markdown(
+        f"[Open target ↗]({target_url}) · [Open source A ↗]({source_a_url})"
+        f" · [Open source B ↗]({source_b_url})"
+    )
     st.markdown(
         f"**Swap @ round {context.round_start}** · imported agent "
         f"`{context.replaced_agent_id}` arrived from `{context.source_b.run_id}` "
@@ -1116,10 +1332,10 @@ def _render_cross_team_subtab(
     ]
     imported_scores = _render_cross_team_grid(
         target=context.target,
-        source=context.source_b,
+        source_a=context.source_a,
+        source_b=context.source_b,
         agent_ids=imported_agent_ids,
-        source_label="source B (origin)",
-        section_title="Imported agent — vs origin (source B)",
+        section_title="Imported agent — protocol across SimA, SimB, SimC",
         section_explanation=_CROSS_TEAM_IMPORTED_PROSE.format(
             replaced_agent_id=context.replaced_agent_id,
             source_b_run_id=context.source_b.run_id,
@@ -1128,32 +1344,46 @@ def _render_cross_team_subtab(
     )
     co_actor_scores = _render_cross_team_grid(
         target=context.target,
-        source=context.source_a,
+        source_a=context.source_a,
+        source_b=context.source_b,
         agent_ids=co_acting_agent_ids,
-        source_label="source A (origin)",
-        section_title="Co-acting agents — vs origin (source A)",
+        section_title="Co-acting agents — protocol across SimA, SimB, SimC",
         section_explanation=_CROSS_TEAM_CO_ACTORS_PROSE.format(
             replaced_agent_id=context.replaced_agent_id,
             source_a_run_id=context.source_a.run_id,
+            source_b_run_id=context.source_b.run_id,
         ),
     )
-    if imported_scores or co_actor_scores:
-        st.markdown("---")
-        summary_cols = st.columns(2)
-        if imported_scores:
-            summary_cols[0].metric(
-                label="Imported agent · mean sim to source B",
-                value=f"{sum(imported_scores) / len(imported_scores):.2f}",
-            )
-        else:
-            summary_cols[0].metric(label="Imported agent", value="—")
-        if co_actor_scores:
-            summary_cols[1].metric(
-                label="Co-acting agents · mean sim to source A",
-                value=f"{sum(co_actor_scores) / len(co_actor_scores):.2f}",
-            )
-        else:
-            summary_cols[1].metric(label="Co-acting agents", value="—")
+    _render_cross_team_summary(imported=imported_scores, co_actor=co_actor_scores)
+
+
+def _render_cross_team_summary(
+    *,
+    imported: _CrossTeamSectionScores,
+    co_actor: _CrossTeamSectionScores,
+) -> None:
+    """Render the bottom-of-tab summary tiles for both sections × both deltas."""
+    if not (imported.vs_a or imported.vs_b or co_actor.vs_a or co_actor.vs_b):
+        return
+    st.markdown("---")
+    tile_specs: list[tuple[str, list[float]]] = [
+        ("Imported · median vs SimA", imported.vs_a),
+        ("Imported · median vs SimB", imported.vs_b),
+        ("Co-acting · median vs SimA", co_actor.vs_a),
+        ("Co-acting · median vs SimB", co_actor.vs_b),
+    ]
+    summary_cols = st.columns(len(tile_specs))
+    for column, (label, values) in zip(summary_cols, tile_specs, strict=True):
+        if not values:
+            column.metric(label=label, value="—")
+            continue
+        value_text, delta_text = _format_median_mean(values=values)
+        column.metric(
+            label=label,
+            value=value_text,
+            delta=delta_text,
+            delta_color="off",
+        )
 
 
 # ---- Top-level entry point --------------------------------------------------
