@@ -55,12 +55,20 @@ def build_pydantic_ai_model(model: str, provider: str) -> str | OpenAIChatModel:
 
 
 def default_pydantic_ai_settings(provider: str) -> ModelSettings:
-    """Return the per-provider default ``ModelSettings`` used by both the runner and probes."""
+    """Return the per-provider default ``ModelSettings`` used by both the runner and probes.
+
+    On Anthropic we enable automatic prompt caching (``anthropic_cache=True``)
+    rather than the per-block ``anthropic_cache_messages``. Auto mode passes a
+    top-level ``cache_control`` parameter so the server caches the longest
+    matching prefix across calls — important when many calls share the same
+    ``system + history`` prefix but vary the trailing user prompt (e.g. the
+    probe metric calls 28 questions per agent).
+    """
     if provider == "anthropic":
         return AnthropicModelSettings(
+            anthropic_cache=True,
             anthropic_cache_instructions=True,
             anthropic_cache_tool_definitions=True,
-            anthropic_cache_messages=True,
         )
     if provider == "openai":
         return OpenAIResponsesModelSettings(

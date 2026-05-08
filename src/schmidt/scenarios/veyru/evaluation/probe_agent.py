@@ -4,15 +4,18 @@ Given an agent's original ``model``/``provider``, a reconstructed message
 history, and a probe prompt, builds a tool-less pydantic-ai ``Agent`` with
 ``output_type=ProtocolProbeOutput`` and runs one ``agent.run(...)`` call.
 No MCP server, no game clock, no subprocess — just one LLM round-trip.
+The function returns the structured output together with the token usage
+of the call so the metric can aggregate cost per ``(model, provider)``.
 """
 
 import logging
 
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage
-from pydantic_ai.usage import UsageLimits
+from pydantic_ai.usage import RunUsage, UsageLimits
 
-from schmidt.evaluation.protocol_probe_response import ProtocolProbeOutput
+from schmidt.evaluation.evaluation_cost import EvaluationTokenUsage
+from schmidt.evaluation.protocol_probe_response import ProtocolProbeCallResult, ProtocolProbeOutput
 from schmidt.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
@@ -29,8 +32,8 @@ async def run_protocol_probe(
     provider: str,
     message_history: list[ModelMessage],
     probe_prompt: str,
-) -> ProtocolProbeOutput:
-    """Run one structured probe call against the agent and return the validated output.
+) -> ProtocolProbeCallResult:
+    """Run one structured probe call against the agent and return output + usage.
 
     Builds a fresh ``Agent`` with no tools and ``output_type=ProtocolProbeOutput``
     so the LLM produces both ``reasoning`` and ``message`` in one structured
@@ -58,4 +61,17 @@ async def run_protocol_probe(
         message_history=message_history,
         usage_limits=UsageLimits(request_limit=None),
     )
-    return result.output
+    return ProtocolProbeCallResult(
+        output=result.output,
+        usage=_run_usage_to_evaluation_token_usage(run_usage=result.usage()),
+    )
+
+
+def _run_usage_to_evaluation_token_usage(run_usage: RunUsage) -> EvaluationTokenUsage:
+    """Project pydantic-ai's ``RunUsage`` onto the evaluation cost token model."""
+    return EvaluationTokenUsage(
+        input_tokens=run_usage.input_tokens,
+        output_tokens=run_usage.output_tokens,
+        cache_read_input_tokens=run_usage.cache_read_tokens,
+        cache_creation_input_tokens=run_usage.cache_write_tokens,
+    )
