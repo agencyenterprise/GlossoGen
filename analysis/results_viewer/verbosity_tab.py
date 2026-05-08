@@ -27,6 +27,7 @@ from analysis.results_viewer.series_plot import (
     render_horizontal_checkboxes,
     series_color_map,
 )
+from analysis.results_viewer.timeline_plot import palette_color_for_index
 from analysis.results_viewer.verbosity_data import (
     VERBOSITY_METRIC_OPTIONS,
     VerbosityMetricOption,
@@ -293,6 +294,139 @@ def _build_scatter(
     return fig
 
 
+_VERBOSITY_X_OPTIONS: list[VerbosityMetricOption] = [
+    opt for opt in VERBOSITY_METRIC_OPTIONS if opt.display_name in ("mcr", "mcm")
+]
+
+
+def _render_verbosity_x_selector() -> VerbosityMetricOption:
+    """Radio selector for the verbosity-vs-perplexity scatter X axis (MCR or MCM)."""
+    display_names = [opt.display_name for opt in _VERBOSITY_X_OPTIONS]
+    chosen = st.radio(
+        label="Verbosity metric (X)",
+        options=display_names,
+        index=0,
+        horizontal=True,
+        key="verbosity_vs_ppl_x_selector",
+    )
+    selected = _VERBOSITY_X_OPTIONS[0]
+    for option in _VERBOSITY_X_OPTIONS:
+        if option.display_name == chosen:
+            selected = option
+            break
+    return selected
+
+
+def _budget_color_map(runs: list[VerbosityRun]) -> dict[int | None, str]:
+    """Stable palette colour per distinct budget bucket present in ``runs``."""
+    budgets = sorted(
+        {run.budget for run in runs},
+        key=lambda b: (b is None, b if b is not None else 0),
+    )
+    return {budget: palette_color_for_index(index=i) for i, budget in enumerate(budgets)}
+
+
+def _build_verbosity_vs_perplexity_figure(
+    runs: list[VerbosityRun],
+    x_metric: VerbosityMetricOption,
+    frontend_base: str,
+) -> go.Figure | None:
+    """Per-(run, round) scatter of verbosity (MCR or MCM) against perplexity.
+
+    Joins each run's per-round verbosity values with its per-round perplexity
+    values by ``round_number``. Points coloured by budget bucket; single OLS
+    trendline plus Pearson correlation are computed across all displayed
+    points so the inverse trend is explicit. Returns ``None`` when no
+    (run, round) pair has both metrics populated.
+    """
+    fig = go.Figure()
+    budget_colour = _budget_color_map(runs=runs)
+    all_xs: list[float] = []
+    all_ys: list[float] = []
+    by_budget: dict[int | None, list[tuple[float, float, str, str]]] = {}
+    for run in runs:
+        verbosity_rounds = {
+            obs.round_number: obs.value
+            for obs in run.per_round_by_metric.get(x_metric.display_name, [])
+        }
+        perplexity_rounds = {
+            obs.round_number: obs.value for obs in run.per_round_by_metric.get("perplexity", [])
+        }
+        shared_rounds = sorted(set(verbosity_rounds) & set(perplexity_rounds))
+        if not shared_rounds:
+            continue
+        for round_number in shared_rounds:
+            x_value = float(verbosity_rounds[round_number])
+            y_value = float(perplexity_rounds[round_number])
+            hover = (
+                f"{run.run_id}<br>round={round_number}<br>"
+                f"{x_metric.display_name}={x_value:.2f}<br>perplexity={y_value:.2f}<br>"
+                f"budget={run.budget if run.budget is not None else 'unknown'}"
+            )
+            url = run_url(frontend_base=frontend_base, run_id=run.run_id)
+            by_budget.setdefault(run.budget, []).append((x_value, y_value, hover, url))
+            all_xs.append(x_value)
+            all_ys.append(y_value)
+    if not all_xs:
+        return None
+    budget_keys = sorted(
+        by_budget.keys(),
+        key=lambda b: (b is None, b if b is not None else 0),
+    )
+    for budget in budget_keys:
+        points = by_budget[budget]
+        budget_label = "unknown" if budget is None else str(budget)
+        fig.add_trace(
+            go.Scatter(
+                x=[p[0] for p in points],
+                y=[p[1] for p in points],
+                mode="markers",
+                name=f"budget={budget_label}",
+                marker=dict(
+                    color=budget_colour[budget],
+                    size=7,
+                    symbol="circle",
+                    opacity=0.65,
+                    line=dict(width=0.5, color="#222"),
+                ),
+                hovertext=[p[2] for p in points],
+                hoverinfo="text",
+                customdata=[p[3] for p in points],
+            )
+        )
+    fit = _ols_line(xs=all_xs, ys=all_ys)
+    if fit is not None:
+        slope, intercept = fit
+        x_min, x_max = min(all_xs), max(all_xs)
+        fig.add_trace(
+            go.Scatter(
+                x=[x_min, x_max],
+                y=[slope * x_min + intercept, slope * x_max + intercept],
+                mode="lines",
+                line=dict(color="#444", width=1.5, dash="dash"),
+                name="OLS fit",
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+    pearson = _pearson(xs=all_xs, ys=all_ys)
+    pearson_text = "n/a" if pearson is None else f"r={pearson:.2f}"
+    title = (
+        f"{x_metric.display_name} vs perplexity (per-round) · "
+        f"n={len(all_xs)} round-points across {len(runs)} runs · {pearson_text}"
+    )
+    fig.update_layout(
+        title=dict(text=title, x=0.0, xanchor="left"),
+        xaxis=dict(title=x_metric.x_axis_label),
+        yaxis=dict(title="perplexity (mean per-token surprisal, nats, gpt2)"),
+        height=520,
+        margin=dict(t=70, b=40, l=60, r=20),
+        legend=dict(orientation="h", y=-0.18),
+        hovermode="closest",
+    )
+    return fig
+
+
 def _build_per_round_figure(
     runs: list[VerbosityRun],
     metric: VerbosityMetricOption,
@@ -496,3 +630,32 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         selection_mode=("points",),
     )
     maybe_open_clicked_run(chart_event=per_round_event, session_key="verbosity_last_opened_url")
+    st.markdown("### Verbosity vs perplexity (per round)")
+    st.caption(
+        "One point per (run, round) joining the run's per-round verbosity "
+        "with its per-round perplexity. Coloured by budget bucket. The "
+        "Pearson correlation in the title makes the inverse MCR/MCM-vs-PPL "
+        "trend explicit (PPL as a downstream side effect of compressing "
+        "for a narrow channel)."
+    )
+    x_metric = _render_verbosity_x_selector()
+    vs_ppl_fig = _build_verbosity_vs_perplexity_figure(
+        runs=filtered,
+        x_metric=x_metric,
+        frontend_base=frontend_base,
+    )
+    if vs_ppl_fig is None:
+        st.info(
+            "No selected runs have both per-round verbosity and per-round "
+            "perplexity. Run `schmidt evaluate <scenario> --metrics "
+            f"{x_metric.display_name},perplexity ...` first."
+        )
+        return
+    vs_ppl_event = st.plotly_chart(
+        vs_ppl_fig,
+        width="stretch",
+        key="verbosity_vs_ppl_chart",
+        on_select="rerun",
+        selection_mode=("points",),
+    )
+    maybe_open_clicked_run(chart_event=vs_ppl_event, session_key="verbosity_last_opened_url")
