@@ -156,8 +156,10 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help=(
-            "Round number at which the protocol_probe metric reconstructs each agent's "
-            "history. When omitted, the probe sees the full end-of-run history."
+            "Cutoff for the protocol_probe metric: drops every tool call whose "
+            "round_number >= R, so reconstructed history covers rounds 1..R-1 "
+            "(inclusive). Pass --probe-round=R+1 to capture the agent's state "
+            "at the END of round R. Omit for the full end-of-run history."
         ),
     )
     evaluate_parser.add_argument(
