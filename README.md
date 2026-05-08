@@ -162,6 +162,9 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── resume_context_{agent_id}.json     # per-agent reconstructed pydantic-ai message history at resume time
 ├── resume_context_{agent_id}_round_{R}.json  # (in-run scheduled swap) one file per AgentSwappedMidRun event
 ├── protocol_probe_responses.jsonl     # (veyru only) one row per (agent, question, replica) when protocol_probe is run
+├── protocol_probe_replica_self_similarity.json  # (veyru only) within-run replica × replica similarity matrices
+├── protocol_probe_agent_pair_similarity.json    # (veyru only) within-run agent × agent similarity matrices (two-team)
+├── protocol_probe_cutoff_trajectory.json        # (veyru only) per (agent, question) adjacent-cutoff series
 └── multi_swap_cache.json              # streamlit Multi-swap tab cache (per-phase round_success)
 ```
 
@@ -190,13 +193,13 @@ Generic metrics (available to all scenarios). Both deterministic and LLM-driven 
 
 Scenario-specific metrics:
 
-- **veyru**: `language_emergence` (novel language in a fictional domain), `round_success` (per-round stabilization rate; emits one Measurement per team in two-team mode), `round_success_after_resume`, `protocol_learned_after_swap` (LLM judge), `protocol_probe` (probe each agent under its original model on a fixed test bank; writes `protocol_probe_responses.jsonl`; requires `--probe-replicas N`, optional `--probe-round R`)
+- **veyru**: `language_emergence` (novel language in a fictional domain), `round_success` (per-round stabilization rate; emits one Measurement per team in two-team mode), `round_success_after_resume`, `protocol_learned_after_swap` (LLM judge), `protocol_probe` (probe each agent under its original model on a fixed test bank; writes `protocol_probe_responses.jsonl`; requires `--probe-replicas N`, optional `--probe-round R`), `protocol_probe_replica_self_similarity` / `protocol_probe_agent_pair_similarity` / `protocol_probe_cutoff_trajectory` (Levenshtein-based similarity over the probe responses; each writes its own matrix artifact for the streamlit "Probe similarity" tab)
 
 Output is a JSON report under the `measurements` field; metrics no longer write `eval:*` labels to `labels.json`. Filter on `score` or on the `per_round` / `per_agent` lists directly.
 
 ## Results Viewer (Streamlit)
 
-A Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round metric hits across multiple evaluated runs — useful for comparing models or knob configurations.
+A Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round metric hits across multiple evaluated runs — useful for comparing models or knob configurations. Tabs include Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS vs Frontier, and Probe similarity (Levenshtein-based comparisons across the per-run probe artifacts, with a multi-select run picker driving every sub-view).
 
 ```bash
 uv sync --group analysis    # one-time, installs streamlit + plotly

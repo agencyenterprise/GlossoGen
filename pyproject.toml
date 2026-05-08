@@ -32,6 +32,7 @@ dependencies = [
     "torch>=2.2.0",
     "transformers>=5.0.0rc3",
     "matplotlib>=3.10.9",
+    "rapidfuzz>=3.10.0",
 ]
 
 [dependency-groups]

@@ -44,7 +44,10 @@ from schmidt.scenario_protocol import ScenarioRuntimeHandle, SimulationScenario
 from schmidt.scenarios.veyru.evaluation import (
     LanguageEmergenceMetric,
     ProtocolLearnedAfterSwapMetric,
+    ProtocolProbeAgentPairSimilarityMetric,
+    ProtocolProbeCutoffTrajectoryMetric,
     ProtocolProbeMetric,
+    ProtocolProbeReplicaSelfSimilarityMetric,
     RoundSuccessAfterResumeMetric,
     RoundSuccessMetric,
 )
@@ -1171,6 +1174,10 @@ class VeyruScenario(SimulationScenario):
         specific = [
             LanguageEmergenceMetric.name,
             ProtocolLearnedAfterSwapMetric.name,
+            ProtocolProbeMetric.name,
+            ProtocolProbeAgentPairSimilarityMetric.name,
+            ProtocolProbeCutoffTrajectoryMetric.name,
+            ProtocolProbeReplicaSelfSimilarityMetric.name,
             RoundSuccessAfterResumeMetric.name,
             RoundSuccessMetric.name,
         ]
@@ -1182,6 +1189,9 @@ class VeyruScenario(SimulationScenario):
             LanguageEmergenceMetric.name: LanguageEmergenceMetric,
             ProtocolLearnedAfterSwapMetric.name: ProtocolLearnedAfterSwapMetric,
             ProtocolProbeMetric.name: ProtocolProbeMetric,
+            ProtocolProbeAgentPairSimilarityMetric.name: ProtocolProbeAgentPairSimilarityMetric,
+            ProtocolProbeCutoffTrajectoryMetric.name: ProtocolProbeCutoffTrajectoryMetric,
+            ProtocolProbeReplicaSelfSimilarityMetric.name: ProtocolProbeReplicaSelfSimilarityMetric,
             RoundSuccessAfterResumeMetric.name: RoundSuccessAfterResumeMetric,
             RoundSuccessMetric.name: RoundSuccessMetric,
         }

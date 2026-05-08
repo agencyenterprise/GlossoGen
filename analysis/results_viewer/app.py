@@ -10,6 +10,7 @@ from analysis.results_viewer import (
     cross_swap_tab,
     multi_swap_tab,
     oss_frontier_tab,
+    probe_similarity_tab,
     resume_tab,
     timeline_tab,
     verbosity_tab,
@@ -20,7 +21,7 @@ st.set_page_config(page_title="Analysis Results Viewer", layout="wide")
 
 
 def main() -> None:
-    """Render seven tabs: Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS-vs-Frontier."""  # noqa: E501
+    """Render eight tabs: Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS-vs-Frontier, Probe similarity."""  # noqa: E501
     runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs")).resolve()
     st.sidebar.markdown(f"**Runs directory**: `{runs_dir}`")
     evaluated = list_evaluated_runs(runs_dir=runs_dir)
@@ -34,6 +35,7 @@ def main() -> None:
         cross_swap_panel,
         multi_swap_panel,
         oss_frontier_panel,
+        probe_similarity_panel,
     ) = st.tabs(
         [
             "Timeline",
@@ -43,6 +45,7 @@ def main() -> None:
             "Cross-swap",
             "Multi-swap",
             "OSS vs Frontier",
+            "Probe similarity",
         ]
     )
     with timeline_panel:
@@ -59,6 +62,8 @@ def main() -> None:
         multi_swap_tab.render(evaluated=evaluated)
     with oss_frontier_panel:
         oss_frontier_tab.render(evaluated=evaluated)
+    with probe_similarity_panel:
+        probe_similarity_tab.render(evaluated=evaluated)
 
 
 main()
