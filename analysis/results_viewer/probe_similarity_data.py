@@ -64,6 +64,9 @@ class ProbeSimilarityRun(NamedTuple):
     run_dir: Path
     scenario_name: str
     primary_model: str
+    round_count: int | None
+    round_time_budget_seconds: int | None
+    postmortem_enabled: bool
     labels: list[str]
     rows: list[ProtocolProbeResponse]
     replica_self: ReplicaSelfSimArtifact | None
@@ -161,11 +164,25 @@ def _build_run_sync(evaluated: EvaluatedRun) -> ProbeSimilarityRun | None:
     cutoff_trajectory = _read_cutoff_trajectory(run_dir=evaluated.run_dir)
     if not rows and replica_self is None and agent_pair is None and cutoff_trajectory is None:
         return None
+    raw_round_count = evaluated.metadata.scenario_config.get("round_count")
+    if isinstance(raw_round_count, int):
+        round_count = raw_round_count
+    else:
+        round_count = None
+    raw_budget = evaluated.metadata.scenario_config.get("round_time_budget_seconds")
+    if isinstance(raw_budget, (int, float)):
+        round_time_budget_seconds = int(raw_budget)
+    else:
+        round_time_budget_seconds = None
+    postmortem_enabled = bool(evaluated.metadata.scenario_config.get("postmortem_enabled", False))
     return ProbeSimilarityRun(
         run_id=evaluated.run_id,
         run_dir=evaluated.run_dir,
         scenario_name=evaluated.scenario_name,
         primary_model=evaluated.metadata.primary_model,
+        round_count=round_count,
+        round_time_budget_seconds=round_time_budget_seconds,
+        postmortem_enabled=postmortem_enabled,
         labels=_read_labels(run_dir=evaluated.run_dir),
         rows=rows,
         replica_self=replica_self,
