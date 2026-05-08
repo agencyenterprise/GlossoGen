@@ -138,3 +138,17 @@ def matrix_to_cells(matrix: list[list[float]]) -> list[ProbeSimilarityCell]:
         for j in range(i + 1, size):
             cells.append(ProbeSimilarityCell(i=i, j=j, value=matrix[i][j]))
     return cells
+
+
+def cutoff_sort_key(cutoff_round: int | None) -> tuple[int, int]:
+    """Return a tuple sort key that orders numeric cutoffs ascending then ``None`` last.
+
+    Use as the ``cutoff_round`` field of a composite sort key so JSONLs
+    that mix numeric ``--probe-round`` values with the default ``null``
+    end-of-run probe sort cleanly. Plain ``sorted`` on a tuple with a
+    ``cutoff_round: int | None`` field raises ``TypeError`` when both
+    flavours are present.
+    """
+    if cutoff_round is None:
+        return (1, 0)
+    return (0, cutoff_round)

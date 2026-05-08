@@ -37,6 +37,7 @@ from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenarios.veyru.evaluation.protocol_probe_similarity_core import (
     ARTIFACT_SCHEMA_VERSION,
     ProbeSimilarityCell,
+    cutoff_sort_key,
     load_probe_rows,
 )
 
@@ -191,8 +192,16 @@ class ProtocolProbeAgentPairSimilarityMetric(Metric):
                 )
             ]
         grouped = _group_rows(rows=rows)
+        sorted_keys = sorted(
+            grouped.keys(),
+            key=lambda key: (
+                key.question_id,
+                cutoff_sort_key(key.cutoff_round),
+                key.role_filter,
+            ),
+        )
         groups: list[AgentPairSimGroup] = []
-        for key in sorted(grouped.keys()):
+        for key in sorted_keys:
             built = _build_group(key=key, rows_by_agent=grouped[key])
             if built is not None:
                 groups.append(built)

@@ -258,11 +258,23 @@ def _match_agents(
     agent_configs: list[AgentConfig],
     role_filter: str,
 ) -> list[AgentConfig]:
-    """Return the agents whose ``role_name`` falls under the given role filter."""
+    """Return one matching ``AgentConfig`` per distinct ``agent_id``.
+
+    Cross-run replace-agent runs emit multiple ``AgentRegistered`` events
+    for the same ``agent_id`` (one for the original agent, one for the
+    imported agent at the swap point). Without dedup the metric would
+    probe each ``agent_id`` once per registration, inflating the replica
+    count. The latest registration wins (it carries the post-swap system
+    prompt the probe should be reasoning under).
+    """
     role_names = _ROLE_FILTER_TO_ROLE_NAMES.get(role_filter)
     if role_names is None:
         return []
-    return [config for config in agent_configs if config.role_name in role_names]
+    by_agent_id: dict[str, AgentConfig] = {}
+    for config in agent_configs:
+        if config.role_name in role_names:
+            by_agent_id[config.agent_id] = config
+    return list(by_agent_id.values())
 
 
 def _resolve_history_timestamp(events: list[SimulationEvent]) -> datetime:
