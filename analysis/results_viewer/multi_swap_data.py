@@ -270,15 +270,26 @@ def _initial_agent_models(agent_configs: list[AgentConfig]) -> dict[str, str]:
     return models
 
 
+_MARKER_SCAN_CACHE: dict[Path, tuple[int, int, bool, bool]] = {}
+
+
 def _scan_jsonl_for_markers_sync(log_path: Path) -> tuple[bool, bool]:
     """Single byte-level pass that returns ``(has_swap, run_completed)``.
 
     Uses substring matching against the raw JSONL bytes — far cheaper than
     parsing every line into a typed event when the goal is just to decide
     whether the run is even eligible for the multi-swap tab and whether it
-    is safe to write a long-lived cache. Both checks are O(file_size) so
-    they run in one combined sweep.
+    is safe to write a long-lived cache. Memoized per ``log_path`` keyed
+    on the JSONL's size + mtime, so repeat renders skip the file I/O.
     """
+    stat = log_path.stat()
+    cached = _MARKER_SCAN_CACHE.get(log_path)
+    if (
+        cached is not None
+        and cached[0] == stat.st_size
+        and cached[1] == stat.st_mtime_ns
+    ):
+        return cached[2], cached[3]
     has_swap = False
     has_end = False
     with open(log_path, mode="rb") as f:
@@ -289,6 +300,7 @@ def _scan_jsonl_for_markers_sync(log_path: Path) -> tuple[bool, bool]:
                 has_end = True
             if has_swap and has_end:
                 break
+    _MARKER_SCAN_CACHE[log_path] = (stat.st_size, stat.st_mtime_ns, has_swap, has_end)
     return has_swap, has_end
 
 
@@ -430,27 +442,47 @@ def _build_multi_swap_run_from_events(
     )
 
 
+_MULTI_SWAP_RUN_CACHE: dict[Path, tuple[int, int, MultiSwapRun | None]] = {}
+
+
 async def _build_multi_swap_run_async(evaluated: EvaluatedRun) -> MultiSwapRun | None:
-    """Async pipeline: fast pre-filter → cache check → load+score → cache write."""
+    """Async pipeline: fast pre-filter → cache check → load+score → cache write.
+
+    The fast path returns from an in-memory dict keyed on the JSONL's
+    ``(size, mtime_ns)`` — most renders hit this and skip both the
+    marker scan and the on-disk cache read.
+    """
     log_path = evaluated.run_dir / f"{evaluated.scenario_name}.jsonl"
     if not log_path.exists():
         return None
 
-    has_swap, run_completed = await asyncio.to_thread(_scan_jsonl_for_markers_sync, log_path)
+    has_swap, run_completed = _scan_jsonl_for_markers_sync(log_path)
     if not has_swap:
         return None
 
+    log_stat = log_path.stat()
+    cached_in_memory = _MULTI_SWAP_RUN_CACHE.get(log_path)
+    if (
+        cached_in_memory is not None
+        and cached_in_memory[0] == log_stat.st_size
+        and cached_in_memory[1] == log_stat.st_mtime_ns
+    ):
+        return cached_in_memory[2]
+
     cached = await asyncio.to_thread(_read_cache, evaluated.run_dir, log_path)
     if cached is not None:
+        _MULTI_SWAP_RUN_CACHE[log_path] = (log_stat.st_size, log_stat.st_mtime_ns, cached)
         return cached
 
     events = await load_events(log_path=log_path)
     multi_swap = _build_multi_swap_run_from_events(evaluated=evaluated, events=events)
     if multi_swap is None:
+        _MULTI_SWAP_RUN_CACHE[log_path] = (log_stat.st_size, log_stat.st_mtime_ns, None)
         return None
 
     if run_completed:
         await asyncio.to_thread(_write_cache, evaluated.run_dir, log_path, multi_swap)
+    _MULTI_SWAP_RUN_CACHE[log_path] = (log_stat.st_size, log_stat.st_mtime_ns, multi_swap)
     return multi_swap
 
 
@@ -463,16 +495,34 @@ def build_multi_swap_run(evaluated: EvaluatedRun) -> MultiSwapRun | None:
     return asyncio.run(_build_multi_swap_run_async(evaluated=evaluated))
 
 
+def _has_swap_marker(evaluated: EvaluatedRun) -> bool:
+    """Synchronous fast pre-filter: ``True`` if the JSONL contains a swap marker."""
+    log_path = evaluated.run_dir / f"{evaluated.scenario_name}.jsonl"
+    if not log_path.exists():
+        return False
+    has_swap, _ = _scan_jsonl_for_markers_sync(log_path)
+    return has_swap
+
+
 async def _list_multi_swap_runs_async(
     evaluated_runs: list[EvaluatedRun],
 ) -> list[MultiSwapRun]:
-    """Concurrent fan-out across all candidate runs, returning successful builds."""
+    """Concurrent fan-out across candidate runs, returning successful builds.
+
+    A cheap synchronous pre-filter drops runs whose JSONL has no swap
+    marker before the asyncio dispatch — typical corpora have many runs
+    but only a handful with in-run swaps, and skipping them keeps
+    warm-cache renders close to a pure dict lookup.
+    """
+    candidates = [run for run in evaluated_runs if _has_swap_marker(evaluated=run)]
+    if not candidates:
+        return []
     results = await asyncio.gather(
-        *(_build_multi_swap_run_async(evaluated=run) for run in evaluated_runs),
+        *(_build_multi_swap_run_async(evaluated=run) for run in candidates),
         return_exceptions=True,
     )
     out: list[MultiSwapRun] = []
-    for source_run, result in zip(evaluated_runs, results, strict=True):
+    for source_run, result in zip(candidates, results, strict=True):
         if isinstance(result, BaseException):
             logger.exception(
                 "Failed to build multi-swap run for %s",

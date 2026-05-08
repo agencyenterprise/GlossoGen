@@ -44,10 +44,69 @@ from schmidt.scenarios.veyru.evaluation.protocol_probe_replica_self_similarity_m
 )
 from schmidt.scenarios.veyru.evaluation.protocol_probe_similarity_core import (
     ARTIFACT_SCHEMA_VERSION,
+    PROBE_RESPONSES_FILE_NAME,
     load_probe_rows,
 )
 
 logger = logging.getLogger(__name__)
+
+
+_PROBE_FILES = (
+    PROBE_RESPONSES_FILE_NAME,
+    REPLICA_SELF_ARTIFACT_FILE_NAME,
+    AGENT_PAIR_ARTIFACT_FILE_NAME,
+    CUTOFF_TRAJECTORY_ARTIFACT_FILE_NAME,
+    "labels.json",
+)
+
+
+class _ProbeRunCacheKey(NamedTuple):
+    """Identity tuple for a run's probe + artifact + labels stats.
+
+    Each element is a ``(size, mtime_ns)`` tuple if the file exists, or
+    ``None`` if it doesn't. The order matches :data:`_PROBE_FILES`.
+    """
+
+    fingerprints: tuple[tuple[int, int] | None, ...]
+    primary_model: str
+    round_count: int | None
+    round_time_budget_seconds: int | None
+    postmortem_enabled: bool
+
+
+_PROBE_RUN_CACHE: dict[Path, tuple[_ProbeRunCacheKey, "ProbeSimilarityRun"]] = {}
+
+
+def _probe_run_cache_key(*, evaluated: EvaluatedRun) -> _ProbeRunCacheKey:
+    """Stat each probe-related file and combine with the run's stable metadata."""
+    fingerprints: list[tuple[int, int] | None] = []
+    for filename in _PROBE_FILES:
+        path = evaluated.run_dir / filename
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            fingerprints.append(None)
+            continue
+        fingerprints.append((stat.st_size, stat.st_mtime_ns))
+    raw_round_count = evaluated.metadata.scenario_config.get("round_count")
+    if isinstance(raw_round_count, int):
+        round_count = raw_round_count
+    else:
+        round_count = None
+    raw_budget = evaluated.metadata.scenario_config.get("round_time_budget_seconds")
+    if isinstance(raw_budget, (int, float)):
+        round_time_budget_seconds = int(raw_budget)
+    else:
+        round_time_budget_seconds = None
+    return _ProbeRunCacheKey(
+        fingerprints=tuple(fingerprints),
+        primary_model=evaluated.metadata.primary_model,
+        round_count=round_count,
+        round_time_budget_seconds=round_time_budget_seconds,
+        postmortem_enabled=bool(
+            evaluated.metadata.scenario_config.get("postmortem_enabled", False)
+        ),
+    )
 
 
 class ProbeSimilarityRun(NamedTuple):
@@ -153,42 +212,39 @@ def _read_labels(run_dir: Path) -> list[str]:
 
 
 def _build_run_sync(evaluated: EvaluatedRun) -> ProbeSimilarityRun | None:
-    """Synchronous per-run load.
+    """Synchronous per-run load with stat-based memoization.
 
-    Returns ``None`` for runs that have neither a probe JSONL nor any
-    similarity artifact — those have nothing to display.
+    A cached entry is reused whenever every probe-related file's
+    ``(size, mtime_ns)`` matches the cached key. On a miss, all four
+    files are reparsed and the result is cached. Returns ``None`` for
+    runs that have neither a probe JSONL nor any similarity artifact.
     """
+    cache_key = _probe_run_cache_key(evaluated=evaluated)
+    cached = _PROBE_RUN_CACHE.get(evaluated.run_dir)
+    if cached is not None and cached[0] == cache_key:
+        return cached[1]
     rows = load_probe_rows(run_dir=evaluated.run_dir)
     replica_self = _read_replica_self(run_dir=evaluated.run_dir)
     agent_pair = _read_agent_pair(run_dir=evaluated.run_dir)
     cutoff_trajectory = _read_cutoff_trajectory(run_dir=evaluated.run_dir)
     if not rows and replica_self is None and agent_pair is None and cutoff_trajectory is None:
         return None
-    raw_round_count = evaluated.metadata.scenario_config.get("round_count")
-    if isinstance(raw_round_count, int):
-        round_count = raw_round_count
-    else:
-        round_count = None
-    raw_budget = evaluated.metadata.scenario_config.get("round_time_budget_seconds")
-    if isinstance(raw_budget, (int, float)):
-        round_time_budget_seconds = int(raw_budget)
-    else:
-        round_time_budget_seconds = None
-    postmortem_enabled = bool(evaluated.metadata.scenario_config.get("postmortem_enabled", False))
-    return ProbeSimilarityRun(
+    probe_run = ProbeSimilarityRun(
         run_id=evaluated.run_id,
         run_dir=evaluated.run_dir,
         scenario_name=evaluated.scenario_name,
-        primary_model=evaluated.metadata.primary_model,
-        round_count=round_count,
-        round_time_budget_seconds=round_time_budget_seconds,
-        postmortem_enabled=postmortem_enabled,
+        primary_model=cache_key.primary_model,
+        round_count=cache_key.round_count,
+        round_time_budget_seconds=cache_key.round_time_budget_seconds,
+        postmortem_enabled=cache_key.postmortem_enabled,
         labels=_read_labels(run_dir=evaluated.run_dir),
         rows=rows,
         replica_self=replica_self,
         agent_pair=agent_pair,
         cutoff_trajectory=cutoff_trajectory,
     )
+    _PROBE_RUN_CACHE[evaluated.run_dir] = (cache_key, probe_run)
+    return probe_run
 
 
 async def _build_run_async(evaluated: EvaluatedRun) -> ProbeSimilarityRun | None:
@@ -196,16 +252,35 @@ async def _build_run_async(evaluated: EvaluatedRun) -> ProbeSimilarityRun | None
     return await asyncio.to_thread(_build_run_sync, evaluated)
 
 
+def _has_any_probe_file(run_dir: Path) -> bool:
+    """Cheap existence check: return ``True`` if any probe-related file exists."""
+    for filename in _PROBE_FILES:
+        if filename == "labels.json":
+            continue
+        if (run_dir / filename).exists():
+            return True
+    return False
+
+
 async def _list_probe_similarity_runs_async(
     evaluated_runs: list[EvaluatedRun],
 ) -> list[ProbeSimilarityRun]:
-    """Concurrent fan-out across all candidate runs, returning successful loads."""
+    """Concurrent fan-out across candidate runs, returning successful loads.
+
+    A cheap synchronous pre-filter drops runs that have no probe-related
+    files at all — typical large corpora have hundreds of evaluated runs
+    but only a few with probe data, and skipping the thread-pool dispatch
+    for those keeps warm-cache renders close to zero overhead.
+    """
+    candidates = [run for run in evaluated_runs if _has_any_probe_file(run_dir=run.run_dir)]
+    if not candidates:
+        return []
     results = await asyncio.gather(
-        *(_build_run_async(evaluated=run) for run in evaluated_runs),
+        *(_build_run_async(evaluated=run) for run in candidates),
         return_exceptions=True,
     )
     out: list[ProbeSimilarityRun] = []
-    for source_run, result in zip(evaluated_runs, results, strict=True):
+    for source_run, result in zip(candidates, results, strict=True):
         if isinstance(result, BaseException):
             logger.exception(
                 "Failed to build probe-similarity run for %s",
