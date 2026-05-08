@@ -86,12 +86,15 @@ class ProtocolProbeMetric(Metric):
     """Probes each agent with a fixed test bank, optionally cut at a round.
 
     ``options.probe_round=None`` reconstructs the full end-of-run history.
-    Setting ``options.probe_round=R`` cuts the history at the start of
-    round ``R`` so the probe sees only the protocol the agent had
-    developed by that point. Each replica runs the same reconstructed
-    history through one ``agent.run(...)`` call — independent of every
-    other replica — and appends one row to
-    ``protocol_probe_responses.jsonl``.
+    Setting ``options.probe_round=R`` drops every tool call whose
+    ``round_number >= R``, so the reconstructed history covers rounds
+    ``1..R-1`` (inclusive). To probe the agent at the END of round R,
+    pass ``options.probe_round=R+1``. Common pitfall: ``probe_round=15``
+    captures the state through round 14, NOT through round 15.
+
+    Each replica runs the same reconstructed history through one
+    ``agent.run(...)`` call — independent of every other replica — and
+    appends one row to ``protocol_probe_responses.jsonl``.
     """
 
     name = "protocol_probe"

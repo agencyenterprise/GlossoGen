@@ -4,7 +4,7 @@ Lives in its own module so ``scenario_protocol.py`` can import the type without
 forming a circular dependency with ``metric_protocol.py``.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MetricRunOptions(BaseModel):
@@ -17,5 +17,20 @@ class MetricRunOptions(BaseModel):
     ``protocol_probe`` metric reads ``probe_round`` and ``probe_replicas``.
     """
 
-    probe_round: int | None
-    probe_replicas: int | None
+    probe_round: int | None = Field(
+        description=(
+            "Cutoff for the probe metric's reconstructed history. The filter "
+            "drops every tool call whose ``round_number >= probe_round``, so "
+            "the resulting history covers rounds ``1..probe_round-1`` "
+            "(inclusive). To capture the agent's state at the END of round R, "
+            "pass ``probe_round=R+1``. ``None`` keeps the full end-of-run "
+            "history."
+        ),
+    )
+    probe_replicas: int | None = Field(
+        description=(
+            "Number of independent probe-LLM calls to make per (agent, "
+            "question) pair. Required when running the ``protocol_probe`` "
+            "metric; ignored otherwise."
+        ),
+    )

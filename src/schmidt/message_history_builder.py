@@ -287,6 +287,11 @@ def build_message_history(
     is ``None``, the legacy ``ToolCallInvoked.timestamp <=
     target_timestamp`` predicate is used (fork / ``--resume`` flows).
 
+    Cutoff is **exclusive**: ``cutoff_round=R`` covers rounds
+    ``1..R-1``. To capture state at the END of round R (e.g. the last
+    activity of a phase that ended at round R), pass
+    ``cutoff_round=R+1``.
+
     When ``tool_calls_only`` is True, ``TextPart`` and ``ThinkingPart``
     are stripped from each ``ModelResponse``; only ``ToolCallPart``
     instances survive. When ``tool_calls_only`` is False, text and
