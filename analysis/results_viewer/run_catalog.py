@@ -183,9 +183,7 @@ def _build_evaluated_run(
     report = EvaluationReport.model_validate_json(report_path.read_bytes())
     metadata = _scan_metadata(jsonl_path=jsonl_path)
     run_timestamp = _parse_run_timestamp(run_dir_name=entry.name)
-    label = _compose_label(
-        metadata=metadata, run_timestamp=run_timestamp, run_dir_name=entry.name
-    )
+    label = _compose_label(metadata=metadata, run_timestamp=run_timestamp, run_dir_name=entry.name)
     execution_mode = _mode_label(scenario_config=metadata.scenario_config)
     run_id = _derive_run_id(scenario_name=scenario_name, run_dir=entry)
     return EvaluatedRun(

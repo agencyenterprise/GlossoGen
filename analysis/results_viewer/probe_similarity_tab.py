@@ -1230,12 +1230,8 @@ def _render_cross_team_grid(
                 continue
             row_score = min(score_vs_a, score_vs_b)
             cells_by_column_key = {
-                "sim_a": GridCell(
-                    replicas=cell_a.replicas, score=None, score_label="", extra=None
-                ),
-                "sim_b": GridCell(
-                    replicas=cell_b.replicas, score=None, score_label="", extra=None
-                ),
+                "sim_a": GridCell(replicas=cell_a.replicas, score=None, score_label="", extra=None),
+                "sim_b": GridCell(replicas=cell_b.replicas, score=None, score_label="", extra=None),
                 "sim_c": GridCell(
                     replicas=cell_c.replicas,
                     score=score_vs_a,
