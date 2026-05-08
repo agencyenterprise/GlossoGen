@@ -284,11 +284,7 @@ def _scan_jsonl_for_markers_sync(log_path: Path) -> tuple[bool, bool]:
     """
     stat = log_path.stat()
     cached = _MARKER_SCAN_CACHE.get(log_path)
-    if (
-        cached is not None
-        and cached[0] == stat.st_size
-        and cached[1] == stat.st_mtime_ns
-    ):
+    if cached is not None and cached[0] == stat.st_size and cached[1] == stat.st_mtime_ns:
         return cached[2], cached[3]
     has_swap = False
     has_end = False
