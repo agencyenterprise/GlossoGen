@@ -15,9 +15,9 @@ Your job:
 8. **No catch-all "other" / "miscellaneous" category.** If a label does not fit any group, omit it from the ontology and call that out in ``explanation``.
 9. **Drop scenario-functional labels.** Labels that describe an agent doing their job (e.g. ``"engineer relays motif-specific procedural steps"``) are not linguistic phenomena — call them out in ``explanation`` as omitted, do not create a category for them.
 
-Label pool ({{ label_pool | length }} entries from {{ source_run_count }} run(s)). The ``evidence_count`` column counts the number of rounds in which the open-coding judge saw the feature in that run — use it as a stability signal (a label cited in 12 rounds is a more reliable group anchor than a label cited in 1).
+Label pool ({{ label_pool | length }} unique label texts after dedupe, drawn from {{ source_run_count }} run(s)). Each row is one verbatim label text, with ``runs`` counting how many distinct runs emitted it and ``cites`` counting the total number of round-level citations across those runs. A label emitted by many runs is a strong cross-run signal; a label cited in many rounds within its runs is a stable mechanism; a label that's both is the most reliable group anchor.
 
-{% for entry in label_pool %}- ``{{ entry.text }}``  (run: {{ entry.run_id }}, evidence_count: {{ entry.evidence_count }}, rounds: {{ entry.evidence_rounds | join(",") }}{% if entry.sample_quotes %}, sample: {% for quote in entry.sample_quotes %}"{{ quote }}"{% if not loop.last %} / {% endif %}{% endfor %}{% endif %})
+{% for entry in label_pool %}- ``{{ entry.text }}``  (runs: {{ entry.run_ids | length }}, cites: {{ entry.evidence_count_total }}{% if entry.sample_quotes %}, sample: {% for quote in entry.sample_quotes %}"{{ quote }}"{% if not loop.last %} / {% endif %}{% endfor %}{% endif %})
 {% endfor %}
 
 Emit the consolidated taxonomy. Submit via the provided tool.
