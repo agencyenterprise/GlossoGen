@@ -38,44 +38,6 @@ LABELS_FILENAME = "labels.json"
 ONTOLOGY_DEFAULT_DIR = Path("analysis/communication_ontology")
 
 
-FEATURE_CLASS_PRESETS: dict[str, list[str]] = {
-    "Abbreviation family": [
-        "first_letter_abbreviation",
-        "syllable_truncation_abbreviation",
-        "vowel_deletion_abbreviation",
-        "single_letter_symptom_code",
-    ],
-    "Arbitrary mapping family": [
-        "numeric_substitution",
-        "positional_slot_ordering",
-    ],
-    "Structural family": [
-        "telegraphic_ellipsis",
-        "implicit_conjunction_of_sequential_steps",
-        "arrow_notation_for_sequential_steps",
-        "punctuation_as_inline_separator",
-    ],
-    "Pragmatic family": [
-        "single_token_acknowledgement",
-        "clarification_request",
-        "register_shift_on_failure",
-        "self_correction_without_prompting",
-    ],
-    "Reuse / evolution family": [
-        "lexical_reuse_across_rounds",
-        "compression_accelerates_across_rounds",
-        "asymmetric_compression_by_role",
-    ],
-}
-"""Preset groupings of ontology categories used by the hypothesis-test UI.
-
-Lookup keys are display labels shown in the preset picker; values are
-ontology category ids that should be selected for that family. Missing
-categories (e.g. ontology changed) are silently filtered out when the
-preset is applied.
-"""
-
-
 class _FeaturePresenceCacheKey(NamedTuple):
     """Identity tuple capturing every file this loader touches per run."""
 
