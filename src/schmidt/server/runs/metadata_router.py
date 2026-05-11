@@ -14,7 +14,7 @@ from pathlib import Path
 import orjson
 from fastapi import APIRouter, HTTPException, Request
 
-from schmidt.evaluation.evaluation_report import write_report
+from schmidt.evaluation.reports.evaluation_report import write_report
 from schmidt.server.runs.discovery import compose_run_id, resolve_run
 from schmidt.server.runs.models import SyncMetadataRequest, SyncMetadataResponse
 

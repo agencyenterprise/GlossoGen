@@ -8,6 +8,7 @@ import streamlit as st
 from analysis.results_viewer import (
     baseline_tab,
     cross_swap_tab,
+    feature_presence_tab,
     multi_swap_tab,
     oss_frontier_tab,
     probe_similarity_tab,
@@ -21,7 +22,7 @@ st.set_page_config(page_title="Analysis Results Viewer", layout="wide")
 
 
 def main() -> None:
-    """Render eight tabs: Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS-vs-Frontier, Probe similarity."""  # noqa: E501
+    """Render nine tabs: Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS-vs-Frontier, Probe similarity, Language features."""  # noqa: E501
     runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs")).resolve()
     st.sidebar.markdown(f"**Runs directory**: `{runs_dir}`")
     evaluated = list_evaluated_runs(runs_dir=runs_dir)
@@ -36,6 +37,7 @@ def main() -> None:
         multi_swap_panel,
         oss_frontier_panel,
         probe_similarity_panel,
+        feature_presence_panel,
     ) = st.tabs(
         [
             "Timeline",
@@ -46,6 +48,7 @@ def main() -> None:
             "Multi-swap",
             "OSS vs Frontier",
             "Probe similarity",
+            "Language features",
         ]
     )
     with timeline_panel:
@@ -64,6 +67,8 @@ def main() -> None:
         oss_frontier_tab.render(evaluated=evaluated)
     with probe_similarity_panel:
         probe_similarity_tab.render(evaluated=evaluated)
+    with feature_presence_panel:
+        feature_presence_tab.render(evaluated=evaluated)
 
 
 main()

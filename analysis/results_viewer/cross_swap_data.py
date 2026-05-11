@@ -24,7 +24,7 @@ from analysis.results_viewer.run_catalog import EvaluatedRun
 from schmidt.evaluation.log_reader import extract_agent_configs, load_events
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent
-from schmidt.scenarios.veyru.evaluation.round_success_core import (
+from schmidt.scenarios.veyru.evaluation.metrics.round_success.scoring import (
     TEAM_A_AGENT_IDS,
     TEAM_B_AGENT_IDS,
     collect_advanced_round_numbers,

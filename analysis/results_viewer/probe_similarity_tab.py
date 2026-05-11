@@ -23,7 +23,6 @@ visual; similarity scores are small chips, not the dominant signal.
 """
 
 import logging
-import re
 from pathlib import Path
 from typing import NamedTuple
 
@@ -33,6 +32,7 @@ from rapidfuzz.distance import Levenshtein
 
 from analysis.results_viewer.cross_swap_data import list_cross_swap_runs
 from analysis.results_viewer.multi_swap_data import MultiSwapRun, PhaseScore, list_multi_swap_runs
+from analysis.results_viewer.natural_sort import natural_sort_key
 from analysis.results_viewer.probe_question_bank import get_question_prompt
 from analysis.results_viewer.probe_similarity_data import (
     ProbeSimilarityRun,
@@ -40,7 +40,9 @@ from analysis.results_viewer.probe_similarity_data import (
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
-from schmidt.evaluation.protocol_probe_response import ProtocolProbeResponse
+from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.response_models import (
+    ProtocolProbeResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -98,22 +100,6 @@ class GridRow(NamedTuple):
     cells_by_column_key: dict[str, GridCell]
     row_score: float | None
     row_score_label: str
-
-
-def _natural_sort_key(text: str) -> list[object]:
-    """Sort key that orders mixed alpha/numeric strings in human-natural order.
-
-    Splits ``text`` into runs of digits and non-digits, casting the digit
-    runs to ``int`` so e.g. ``q2`` sorts before ``q10``. Used for ordering
-    probe ``question_id`` values in the grid rows.
-    """
-    parts: list[object] = []
-    for chunk in re.split(r"(\d+)", text):
-        if chunk.isdigit():
-            parts.append(int(chunk))
-        else:
-            parts.append(chunk)
-    return parts
 
 
 def _format_cutoff(cutoff_round: int | None) -> str:
@@ -238,7 +224,7 @@ def _questions_for_agent(
         for cell in cells
         if cell.cell_id.run_id == run_id and cell.cell_id.agent_id == agent_id
     }
-    return sorted(matched, key=_natural_sort_key)
+    return sorted(matched, key=natural_sort_key)
 
 
 def _is_single_team_run(probe_run: ProbeSimilarityRun) -> bool:
@@ -676,7 +662,7 @@ def _render_replica_self_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
             )
             if self_score is not None:
                 scores_per_agent.setdefault(agent_id, []).append(self_score)
-        rows.sort(key=lambda row: _natural_sort_key(row.row_key))
+        rows.sort(key=lambda row: natural_sort_key(row.row_key))
         head = agent_cells[0]
         grids_per_agent[agent_id] = _ReplicaSelfAgentGrid(
             heading=(
@@ -799,7 +785,7 @@ def _render_compare_runs_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
                 for cell in cells_at_eor
                 if cell.cell_id.agent_id == agent_id
             },
-            key=_natural_sort_key,
+            key=natural_sort_key,
         )
         rows: list[GridRow] = []
         for question_id in question_ids:
@@ -824,7 +810,7 @@ def _render_compare_runs_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
             )
             if score is not None:
                 scores_per_agent.setdefault(agent_id, []).append(score)
-        rows.sort(key=lambda row: _natural_sort_key(row.row_key))
+        rows.sort(key=lambda row: natural_sort_key(row.row_key))
         if rows:
             rows_per_agent[agent_id] = rows
     _render_compare_runs_medians(scores_per_agent=scores_per_agent)
@@ -1211,7 +1197,7 @@ def _render_cross_team_grid(
                 for cell in cells
                 if cell.cell_id.agent_id == agent_id and cell.cell_id.cutoff_round is None
             },
-            key=_natural_sort_key,
+            key=natural_sort_key,
         )
         rows: list[GridRow] = []
         for question_id in question_ids:
@@ -1251,7 +1237,7 @@ def _render_cross_team_grid(
             scores_vs_b.append(score_vs_b)
         if not rows:
             continue
-        rows.sort(key=lambda row: _natural_sort_key(row.row_key))
+        rows.sort(key=lambda row: natural_sort_key(row.row_key))
         if not rendered_any:
             st.markdown(f"### {section_title}")
             st.markdown(section_explanation)

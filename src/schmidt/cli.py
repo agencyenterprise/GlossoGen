@@ -36,7 +36,7 @@ from schmidt.cross_run_replace_agent import cross_run_replace_agent_in_run
 from schmidt.cross_run_replace_manifest import read_cross_run_replace_manifest
 from schmidt.eval_manifest import delete_eval_manifest, write_eval_manifest
 from schmidt.evaluation.log_reader import extract_scenario_config, load_events
-from schmidt.evaluation.metric_run_options import MetricRunOptions
+from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
 from schmidt.event_bus import EventBus
 from schmidt.event_logger import EventLogger
 from schmidt.logging_format import EventBusLogHandler, JsonLineFormatter

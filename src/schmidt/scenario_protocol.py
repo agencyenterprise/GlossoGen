@@ -9,9 +9,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Protocol, Self
 
-from schmidt.evaluation.evaluation_report import EvaluationReport
-from schmidt.evaluation.generic_metric_names import GENERIC_METRIC_NAMES
-from schmidt.evaluation.metric_run_options import MetricRunOptions
+from schmidt.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
+from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
+from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 from schmidt.event_logger import EventLogger
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel

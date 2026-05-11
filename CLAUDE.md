@@ -45,25 +45,31 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/message_history_builder.py` — reconstructs pydantic-ai ModelMessage history from JSONL events for fork/resume
 - `src/schmidt/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
 - `src/schmidt/evaluation/` — generic metrics and evaluation infrastructure
-  - `metric_protocol.py` — `Metric` ABC; `compute(events, agent_configs, scenario, llm_provider, run_dir, options)` is the only entry point. Most metrics ignore `options`; metrics that need per-invocation flags (e.g. `protocol_probe`) read them off the passed `MetricRunOptions`.
-  - `metric_run_options.py` — `MetricRunOptions` Pydantic model carrying per-invocation flags (`probe_round`, `probe_replicas`); built by the CLI from argparse and threaded into `scenario.run_evaluation(...)`.
-  - `metric_registry.py` — `dict[str, type[Metric]]` mapping metric names to their classes; `cls()` builds an instance and `cls.compute(..., options=options)` runs it.
-  - `protocol_probe_response.py` — `ProtocolProbeOutput` (the structured-output schema enforced on each probe LLM call), `ProtocolProbeResponse` (the JSONL row schema), `ProtocolProbeCallResult` (per-call output + token usage), and `ProtocolProbeUsageReport` (the `protocol_probe_usage.json` schema with per-model token usage and cost).
-  - `measurement.py` — `Measurement`, `RoundObservation`, `AgentObservation`, and judge-side `RoundNote` Pydantic models
-  - `generic_metric_names.py` — canonical name list (avoids circular imports with `scenario_protocol`)
-  - `round_transcript_builder.py` — builds per-round message transcripts from events (used by all generic LLM-judge metrics)
-  - `language_strangeness_metric.py` — detects unusual grammar, structure, formatting (not codes/slang/neologisms)
-  - `slang_emergence_metric.py` — detects informal register shifts and colloquial expressions
-  - `neologism_metric.py` — detects genuinely invented words (not abbreviations or codes)
-  - `shorthand_codes_metric.py` — detects abbreviation systems and symbol-to-meaning mappings
-  - `round_ended_idle_metric.py` — flags rounds ending via the `all_agents_idle` trigger
-  - `round_ended_timeout_metric.py` — flags rounds ending via the `round_timeout` trigger
-  - `content_filter_refusal_metric.py` — counts ``ContentFilterError`` refusals across the run, with per-round + per-agent breakdowns
-  - `perplexity_metric.py` — mean per-token surprisal of primary-channel messages under `gpt2`
-  - `mcr_metric.py` — mean total characters per round on the primary channel
-  - `mcm_metric.py` — mean characters per message on the primary channel
-  - `round_end_trigger_detection.py` — shared helpers for reading `RoundEnded` events
-  - `prompts/` — Jinja2 templates for LLM judge prompts
+  - `metric_core/` — the Metric contract + I/O types
+    - `metric_protocol.py` — `Metric` ABC; `compute(events, agent_configs, scenario, llm_provider, run_dir, options)` is the only entry point. Most metrics ignore `options`; metrics that need per-invocation flags (e.g. `protocol_probe`) read them off the passed `MetricRunOptions`.
+    - `metric_run_options.py` — `MetricRunOptions` Pydantic model carrying per-invocation flags (`probe_round`, `probe_replicas`); built by the CLI from argparse and threaded into `scenario.run_evaluation(...)`.
+    - `metric_registry.py` — `dict[str, type[Metric]]` mapping metric names to their classes; `cls()` builds an instance and `cls.compute(..., options=options)` runs it.
+    - `measurement.py` — `Measurement`, `RoundObservation`, `AgentObservation`, and judge-side `RoundNote` Pydantic models
+    - `generic_metric_names.py` — canonical name list (avoids circular imports with `scenario_protocol`)
+  - `reports/` — on-disk report shape
+    - `evaluation_report.py` — `EvaluationReport` schema, plus `load_report` / `write_report` / `merge_evaluation_costs` helpers
+    - `evaluation_cost.py` — `EvaluationTokenUsage`, `EvaluationCost`, and `compute_evaluation_cost`
+  - `metrics/` — concrete Metric implementations
+    - `language_strangeness_metric.py` — detects unusual grammar, structure, formatting (not codes/slang/neologisms)
+    - `slang_emergence_metric.py` — detects informal register shifts and colloquial expressions
+    - `neologism_metric.py` — detects genuinely invented words (not abbreviations or codes)
+    - `shorthand_codes_metric.py` — detects abbreviation systems and symbol-to-meaning mappings
+    - `content_filter_refusal_metric.py` — counts ``ContentFilterError`` refusals across the run, with per-round + per-agent breakdowns
+    - `perplexity_metric.py` — mean per-token surprisal of primary-channel messages under `gpt2`
+    - `mcr_metric.py` — mean total characters per round on the primary channel
+    - `mcm_metric.py` — mean characters per message on the primary channel
+    - `round_ended/` — round-end trigger metrics
+      - `round_ended_idle_metric.py` — flags rounds ending via the `all_agents_idle` trigger
+      - `round_ended_timeout_metric.py` — flags rounds ending via the `round_timeout` trigger
+      - `trigger_detection.py` — shared helpers for reading `RoundEnded` events
+  - `log_reader.py` — JSONL event loading + scenario/agent config extraction (cross-cutting; used by CLI, server, runtime, and metrics)
+  - `round_transcript_builder.py` — builds per-round message transcripts from events (used by all generic LLM-judge metrics + veyru `language_emergence`)
+  - `prompts/` — Jinja2 templates for LLM judge prompts + the `prompt_renderer.py` loader
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
   - `password_auth_middleware.py` — pure ASGI middleware for shared-password authentication
   - `runs/fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
@@ -726,7 +732,7 @@ Each metric returns zero or more `Measurement` entries written into `<scenario>_
 
 Metrics that DO emit a zero-score Measurement keep doing so when the count is a legitimate observation: `round_ended_idle`, `round_ended_timeout`, and `content_filter_refusal` all use `score = 0` to mean "this run had zero rounds/refusals with the trigger."
 
-**`evaluation_cost` accumulates across invocations.** Each call to `schmidt evaluate` adds its provider usage onto the existing report's `evaluation_cost.usage` (via `merge_evaluation_costs` in [evaluation_report.py](src/schmidt/evaluation/evaluation_report.py)) when the `(model, provider_name)` pair matches. Mismatched model/provider resets the cumulative cost to the new invocation's value (a mid-stream judge swap invalidates the running total). The `estimated_cost_usd` is recomputed each write from the summed usage. Implication: a re-run with no real LLM calls (e.g. a metric that errors before generating, or a not-applicable invocation) no longer clobbers prior cost data to zero.
+**`evaluation_cost` accumulates across invocations.** Each call to `schmidt evaluate` adds its provider usage onto the existing report's `evaluation_cost.usage` (via `merge_evaluation_costs` in [evaluation_report.py](src/schmidt/evaluation/reports/evaluation_report.py)) when the `(model, provider_name)` pair matches. Mismatched model/provider resets the cumulative cost to the new invocation's value (a mid-stream judge swap invalidates the running total). The `estimated_cost_usd` is recomputed each write from the summed usage. Implication: a re-run with no real LLM calls (e.g. a metric that errors before generating, or a not-applicable invocation) no longer clobbers prior cost data to zero.
 
 Metrics no longer write `eval:` labels into `labels.json` — filter on `score` or on the `per_round` list directly.
 
