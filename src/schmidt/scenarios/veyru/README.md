@@ -190,6 +190,62 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
 
 `analysis/communication_ontology/` is gitignored: the consolidated ontology JSONs are regenerable from the per-run open-coding sidecars (which themselves live under the gitignored `runs/` tree). Pass them around out-of-band rather than committing.
 
+### Communication-feature analysis: quickstart for new runs
+
+Three flows, picked by what comparability you need.
+
+**A — One new run, score it against the current ontology (most common, ~$0.07, ~60s).**
+
+Most-recent ontology JSON in `analysis/communication_ontology/` is the reference. Both passes in a single command — pass 1 writes the open-coding sidecar, pass 3 reads it implicitly via the same run dir.
+
+```bash
+LOG_LEVEL=INFO VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  --run-dir ./runs/veyru/<new_id> \
+  --metrics communication_open_coding,communication_feature_presence \
+  --ontology-path analysis/communication_ontology/<latest_version>.json \
+  --model claude-haiku-4-5-20251001 --provider anthropic
+```
+
+Output: `runs/veyru/<new_id>/communication_open_coding.json` + `communication_feature_presence.json`. The feature-presence vector is directly comparable to every prior run scored against the same ontology version.
+
+**B — A batch of new runs, score them all against the current ontology.**
+
+Use the orchestrator. Idempotent: each phase only touches runs that don't already have the relevant sidecar; phase 3 picks the newest ontology automatically.
+
+```bash
+bash scripts/run_communication_pipeline.sh --phase 1    # open coding on new runs only
+bash scripts/run_communication_pipeline.sh --phase 3    # feature presence on new runs only
+```
+
+Skip phase 2 — the ontology stays fixed so new vectors remain comparable to prior runs.
+
+**C — Refresh the ontology from the full pool, then re-score everything.**
+
+Use this when the open-coding labels from new runs surface mechanisms the current ontology doesn't cover. Bumps the ontology version and invalidates every existing feature-presence vector.
+
+```bash
+bash scripts/run_communication_pipeline.sh --phase 2   # re-consolidate; writes a new versioned ontology JSON
+rm runs/veyru/*/communication_feature_presence.json    # drop now-stale vectors
+bash scripts/run_communication_pipeline.sh --phase 3   # re-score every run against the new ontology
+```
+
+Cost: ~$0.20 for the consolidation call + ~$0.03 per run for relabeling. At 440 runs that's ~$13 plus ~25 minutes of wall time at the default `CONCURRENCY=10`.
+
+**Operational knobs** for the orchestrator (all environment variables, all optional):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CONCURRENCY` | `10` | Max parallel eval subprocesses per phase. |
+| `JUDGE_MODEL` | `claude-haiku-4-5-20251001` | Canonical judge per `CLAUDE.md`. Override at your own risk. |
+| `JUDGE_PROVIDER` | `anthropic` | Same. |
+| `RUNS_DIR` | `runs` | Root containing `veyru/<id>/` run dirs. |
+| `ONTOLOGY_DIR` | `analysis/communication_ontology` | Where phase 2 writes and phase 3 reads. |
+| `STATUS_LOG` | `/tmp/communication_pipeline_status.log` | Append-only TSV: `timestamp run_id phase exit_code duration_seconds`. |
+| `LOG_LEVEL` | `INFO` | Per-eval log verbosity. Set to `DEBUG` to capture verbatim LLM prompts in `/tmp/pipeline_<id>_<phase>.log`. |
+| `LLM_MAX_TOKENS` | `16384` | Per-call output-token cap; bump if structured outputs truncate. |
+
+Failure auditing: every non-zero exit row in `STATUS_LOG` corresponds to a `/tmp/pipeline_<id>_<phase>.log` with the full traceback. Re-running the same phase re-attempts the failed runs (sidecar presence is the idempotency key).
+
 ## Knobs
 
 | Knob | Description |
