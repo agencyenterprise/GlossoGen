@@ -153,6 +153,43 @@ The generic `mean_chars_per_message` metric normalizes MCR by message count: it 
 
 The `veyru_case_started` event is emitted once per round at round start by `VeyruScenario.on_round_advanced` and carries the full case payload: `case_number`, `failure_name`, `time_budget_seconds`, `stellar_reading`, and per-stage `(motif_name, observable_symptoms, treatment_motif_name, judge_expected_actions)`. Metrics that need ground truth read it directly from the log.
 
+**`communication_open_coding`** — Pass 1 of the open-coding → ontology → relabel pipeline. One LLM call per run feeds the judge every link-channel message plus per-round agent-side ground truth (split into "what the observer saw" — raw symptom text only — and "what the engineer saw" — the per-motif stellar table this round). The judge emits free-form short labels naming communication-pattern features, **with no pre-specified vocabulary**, and cites every round in which each feature is clearly observable (multi-round evidence per label, ≥1 citation each). Writes `communication_open_coding.json` to the run dir. `score` = number of free-form labels.
+
+**`communication_feature_presence`** — Pass 3 of the same pipeline. Requires `--ontology-path PATH` pointing at a consolidated ontology JSON (produced by `scripts/consolidate_communication_ontology.py`). One LLM call per run re-reads the same per-round agent-side view and emits one 0–1 confidence per ontology category. Writes `communication_feature_presence.json` (full vector + ontology provenance). `score` = number of categories scoring ≥0.5. Passes 1 and 3 use the same `build_link_rounds()` transcript view so confidences and free-form labels are commensurable.
+
+### Communication-feature analysis: running the full pipeline
+
+Always set `LOG_LEVEL=DEBUG` in the environment and pipe stderr to a file during development — both metrics and the consolidation script log the verbatim system prompt, user prompt (with the per-round transcripts), and structured judge output at DEBUG. That file is the source of truth for "did the judge get the right data and nothing else".
+
+```bash
+# 1. Open-coding (pass 1): per run
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  --run-dir ./runs/veyru/<id> \
+  --metrics communication_open_coding \
+  --model claude-haiku-4-5-20251001 --provider anthropic \
+  2>> /tmp/veyru_eval_debug.log
+
+# 2. Consolidation (pass 2): cross-run, one LLM call
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.py \
+  --run-id veyru/<id1> --run-id veyru/<id2> --run-id veyru/<id3> \
+  --runs-dir ./runs \
+  --output analysis/communication_ontology/<version>.json \
+  --model claude-haiku-4-5-20251001 --provider anthropic \
+  2>> /tmp/veyru_consolidate_debug.log
+
+# 3. Relabel (pass 3): per run, against the consolidated ontology
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  --run-dir ./runs/veyru/<id> \
+  --metrics communication_feature_presence \
+  --ontology-path analysis/communication_ontology/<version>.json \
+  --model claude-haiku-4-5-20251001 --provider anthropic \
+  2>> /tmp/veyru_eval_debug.log
+```
+
+`LOG_LEVEL` defaults to `INFO`; set it to `DEBUG` only when you want to capture the full prompt/response. Run-id selection for consolidation is **explicit only** (`--run-id REPEATED` or `--run-ids-file PATH`) to avoid accidental inclusion of unrelated runs. The ontology output filename's stem becomes the `version` field on the JSON document and is recorded on every downstream feature-presence sidecar.
+
+`analysis/communication_ontology/` is gitignored: the consolidated ontology JSONs are regenerable from the per-run open-coding sidecars (which themselves live under the gitignored `runs/` tree). Pass them around out-of-band rather than committing.
+
 ## Knobs
 
 | Knob | Description |

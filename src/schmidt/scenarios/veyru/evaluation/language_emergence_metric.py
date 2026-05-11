@@ -84,17 +84,8 @@ class LanguageEmergenceMetric(Metric):
         )
 
         if not round_transcripts:
-            logger.warning("LanguageEmergenceMetric: no round transcripts found")
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="rounds with novel language patterns",
-                    summary="no messages found in the simulation",
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info("%s: skipping — no round transcripts found", self.name)
+            return []
 
         judge_prompt = render_veyru_prompt(
             template_name="language_emergence_user.jinja",

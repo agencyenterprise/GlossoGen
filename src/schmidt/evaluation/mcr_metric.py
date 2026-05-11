@@ -55,35 +55,20 @@ class MCRMetric(Metric):
         _ = agent_configs, llm_provider, run_dir, options
         primary_channel_id = scenario.get_primary_channel_id()
         if primary_channel_id is None:
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="chars/round",
-                    summary="scenario has no primary channel; mcr metric skipped",
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info("%s: skipping — scenario has no primary channel", self.name)
+            return []
 
         round_counts = _collect_round_char_counts(
             events=events,
             primary_channel_id=primary_channel_id,
         )
         if not round_counts:
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="chars/round",
-                    summary=(
-                        f"no messages found on primary channel {primary_channel_id!r}; "
-                        "mcr metric has nothing to score"
-                    ),
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info(
+                "%s: skipping — no messages on primary channel %r",
+                self.name,
+                primary_channel_id,
+            )
+            return []
 
         per_round_totals = [float(rc.total_chars) for rc in round_counts]
         total_chars = sum(rc.total_chars for rc in round_counts)

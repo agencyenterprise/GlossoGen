@@ -62,17 +62,8 @@ class NeologismMetric(Metric):
         )
 
         if not round_transcripts:
-            logger.warning("NeologismMetric: no messages found")
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="rounds with detected neologisms",
-                    summary="no messages found in the simulation",
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info("%s: skipping — no messages found", self.name)
+            return []
 
         agent_prompts = [
             {"role_name": config.role_name, "system_prompt": config.system_prompt}

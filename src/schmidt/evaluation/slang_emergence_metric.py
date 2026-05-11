@@ -65,17 +65,8 @@ class SlangEmergenceMetric(Metric):
         )
 
         if not round_transcripts:
-            logger.warning("SlangEmergenceMetric: no messages found")
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="rounds with slang emergence",
-                    summary="no messages found in the simulation",
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info("%s: skipping — no messages found", self.name)
+            return []
 
         judge_prompt = render_evaluator_prompt(
             template_name="slang_emergence_user.jinja",

@@ -193,9 +193,63 @@ Generic metrics (available to all scenarios). Both deterministic and LLM-driven 
 
 Scenario-specific metrics:
 
-- **veyru**: `language_emergence` (novel language in a fictional domain), `round_success` (per-round stabilization rate; emits one Measurement per team in two-team mode), `round_success_after_resume`, `protocol_learned_after_swap` (LLM judge), `protocol_probe` (probe each agent under its original model on a fixed test bank; writes `protocol_probe_responses.jsonl`; requires `--probe-replicas N`, optional `--probe-round R`), `protocol_probe_replica_self_similarity` / `protocol_probe_agent_pair_similarity` / `protocol_probe_cutoff_trajectory` (Levenshtein-based similarity over the probe responses; each writes its own matrix artifact for the streamlit "Probe similarity" tab)
+- **veyru**: `language_emergence` (novel language in a fictional domain), `round_success` (per-round stabilization rate; emits one Measurement per team in two-team mode), `round_success_after_resume`, `protocol_learned_after_swap` (LLM judge), `protocol_probe` (probe each agent under its original model on a fixed test bank; writes `protocol_probe_responses.jsonl`; requires `--probe-replicas N`, optional `--probe-round R`), `protocol_probe_replica_self_similarity` / `protocol_probe_agent_pair_similarity` / `protocol_probe_cutoff_trajectory` (Levenshtein-based similarity over the probe responses; each writes its own matrix artifact for the streamlit "Probe similarity" tab), and the open-coding → ontology → relabel pipeline (see below).
 
 Output is a JSON report under the `measurements` field; metrics no longer write `eval:*` labels to `labels.json`. Filter on `score` or on the `per_round` / `per_agent` lists directly.
+
+### Auditing LLM-judge calls
+
+LLM-judge metrics emit their full system prompt, user prompt, and structured output via stdlib `logger.debug`. Set `LOG_LEVEL=DEBUG` in the environment and pipe stderr to a file to capture the exact text the judge saw and returned. The capture is the source of truth for "did the evaluator get all the data it needed and nothing else" — review it whenever a metric's output looks surprising.
+
+```bash
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  --run-dir ./runs/veyru/1742234567 \
+  --metrics communication_open_coding \
+  --model claude-haiku-4-5-20251001 --provider anthropic \
+  2> /tmp/veyru_eval_debug.log
+```
+
+The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth motif tables) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `schmidt evaluate` and by `scripts/consolidate_communication_ontology.py` (see below). Without it the harness defaults to `INFO`. Both are dotenv-friendly — set them in `.env` for a persistent default or inline as shown above.
+
+If the judge's structured output truncates (you'll see a `Field required ... input_value={}` validation warning followed by a metric failure), bump the per-call output-token cap by setting `LLM_MAX_TOKENS=32768` (or higher) in `.env` or inline. The default of `16384` covers the verbose communication-feature outputs but pathological runs with many labels × many evidence citations can still exceed it.
+
+### Communication-feature analysis (open coding → ontology → relabel)
+
+A two-phase LLM-judge pipeline that surfaces and scores emergent communication-pattern features on Veyru's link channel without committing to a pre-specified vocabulary. Three steps:
+
+```bash
+# 1. Open-coding pass: per run, one LLM call. Writes
+#    runs/veyru/<id>/communication_open_coding.json with free-form labels +
+#    multi-round evidence citations.
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  --run-dir ./runs/veyru/<id> \
+  --metrics communication_open_coding \
+  --model claude-haiku-4-5-20251001 --provider anthropic \
+  2>> /tmp/veyru_eval_debug.log
+
+# 2. Consolidation: one LLM call across N runs. Produces a versioned
+#    taxonomy committed under analysis/communication_ontology/.
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.py \
+  --run-id veyru/<id1> --run-id veyru/<id2> --run-id veyru/<id3> \
+  --runs-dir ./runs \
+  --output analysis/communication_ontology/<version>.json \
+  --model claude-haiku-4-5-20251001 --provider anthropic \
+  2>> /tmp/veyru_consolidate_debug.log
+
+# 3. Relabel pass: per run, one LLM call against the ontology. Writes
+#    runs/veyru/<id>/communication_feature_presence.json with a 0-1
+#    confidence per ontology category.
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  --run-dir ./runs/veyru/<id> \
+  --metrics communication_feature_presence \
+  --ontology-path analysis/communication_ontology/<version>.json \
+  --model claude-haiku-4-5-20251001 --provider anthropic \
+  2>> /tmp/veyru_eval_debug.log
+```
+
+Always run with `LOG_LEVEL=DEBUG` and a stderr redirect during development so the prompt and the structured judge output land in an auditable file. Both passes use the same per-round transcript view (link-channel messages + per-agent ground-truth split into "what the observer saw" / "what the engineer saw") so the open-coding labels and feature-presence confidences are commensurable.
+
+`analysis/communication_ontology/` is gitignored (treated like `runs/` — regenerable from the open-coding sidecars). The directory carries a `.gitkeep` so the path exists in a fresh clone; the consolidation script writes the versioned JSON files into it locally. To share an ontology across machines, attach the JSON file out-of-band rather than committing it.
 
 ## Results Viewer (Streamlit)
 

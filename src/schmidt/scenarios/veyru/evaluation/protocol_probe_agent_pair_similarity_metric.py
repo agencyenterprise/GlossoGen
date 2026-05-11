@@ -178,19 +178,11 @@ class ProtocolProbeAgentPairSimilarityMetric(Metric):
         _ = events, agent_configs, scenario, llm_provider, options
         rows = load_probe_rows(run_dir=run_dir)
         if not rows:
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="similarity",
-                    summary=(
-                        "protocol_probe_responses.jsonl missing or empty; run "
-                        "schmidt evaluate ... --metrics protocol_probe first."
-                    ),
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info(
+                "%s: skipping — protocol_probe_responses.jsonl missing or empty",
+                self.name,
+            )
+            return []
         grouped = _group_rows(rows=rows)
         sorted_keys = sorted(
             grouped.keys(),
@@ -206,20 +198,12 @@ class ProtocolProbeAgentPairSimilarityMetric(Metric):
             if built is not None:
                 groups.append(built)
         if not groups:
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="similarity",
-                    summary=(
-                        "No (question, cutoff) group has ≥ 2 agents matching its "
-                        "role filter; this is a single-team run, agent-pair "
-                        "similarity does not apply."
-                    ),
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info(
+                "%s: skipping — single-team run (no ≥2-agent group), agent-pair "
+                "similarity does not apply",
+                self.name,
+            )
+            return []
         overall = sum(group.mean_similarity for group in groups) / len(groups)
         artifact = AgentPairSimArtifact(
             schema_version=ARTIFACT_SCHEMA_VERSION,

@@ -15,6 +15,7 @@ from huggingface_hub.inference._generated.types.chat_completion import (
 from pydantic import BaseModel
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
+from schmidt.llm.max_tokens import resolve_max_tokens
 from schmidt.llm.provider import LLMMessage, LLMProvider, T
 
 logger = logging.getLogger(__name__)
@@ -104,7 +105,7 @@ class HuggingFaceProvider(LLMProvider):
         tool_choice = ChatCompletionInputToolChoiceClass(function=function_choice)  # pyright: ignore[reportCallIssue]  # fmt: skip
         kwargs: dict[str, Any] = {
             "messages": openai_messages,
-            "max_tokens": 4096,
+            "max_tokens": resolve_max_tokens(),
             "stream": False,
             "tools": [tool_def],
             "tool_choice": tool_choice,

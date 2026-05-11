@@ -21,6 +21,7 @@ from schmidt.evaluation.evaluation_cost import compute_evaluation_cost
 from schmidt.evaluation.evaluation_report import (
     EvaluationReport,
     load_report,
+    merge_evaluation_costs,
     merge_measurements,
     write_report,
 )
@@ -42,6 +43,8 @@ from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, reso
 from schmidt.runtime.scenario_world import ScenarioWorld, WorldContext
 from schmidt.scenario_protocol import ScenarioRuntimeHandle, SimulationScenario
 from schmidt.scenarios.veyru.evaluation import (
+    CommunicationFeaturePresenceMetric,
+    CommunicationOpenCodingMetric,
     LanguageEmergenceMetric,
     ProtocolLearnedAfterSwapMetric,
     ProtocolProbeAgentPairSimilarityMetric,
@@ -1186,6 +1189,8 @@ class VeyruScenario(SimulationScenario):
     def _get_metrics(self) -> dict[str, type[Metric]]:
         """Return Veyru-specific metric classes keyed by metric name."""
         return {
+            CommunicationFeaturePresenceMetric.name: CommunicationFeaturePresenceMetric,
+            CommunicationOpenCodingMetric.name: CommunicationOpenCodingMetric,
             LanguageEmergenceMetric.name: LanguageEmergenceMetric,
             ProtocolLearnedAfterSwapMetric.name: ProtocolLearnedAfterSwapMetric,
             ProtocolProbeMetric.name: ProtocolProbeMetric,
@@ -1262,25 +1267,32 @@ class VeyruScenario(SimulationScenario):
                 ", ".join(failed_metrics),
             )
 
-        evaluation_cost = compute_evaluation_cost(
+        invocation_cost = compute_evaluation_cost(
             usage=provider.get_accumulated_usage(),
             model=model,
             provider_name=provider_name,
         )
 
+        attempted_metric_names = set(metric_names)
         existing_report = await load_report(report_path=report_path)
         if existing_report is None:
             merged = new_measurements
+            cumulative_cost = invocation_cost
         else:
             merged = merge_measurements(
                 existing=existing_report.measurements,
                 new=new_measurements,
+                attempted_metric_names=attempted_metric_names,
+            )
+            cumulative_cost = merge_evaluation_costs(
+                existing=existing_report.evaluation_cost,
+                new=invocation_cost,
             )
         report = EvaluationReport(
             simulation_id=simulation_id,
             scenario_name=self.name(),
             measurements=merged,
-            evaluation_cost=evaluation_cost,
+            evaluation_cost=cumulative_cost,
         )
         await write_report(report=report, report_path=report_path)
         return report

@@ -1,0 +1,46 @@
+You are scoring one Veyru team's link-channel communication against a fixed ontology of communication-pattern features. The ontology was distilled from open-coding many runs; your job is to decide, for each ontology category, how strongly this run's link messages exhibit that feature.
+
+For every category in the ontology below, emit one ``CategoryConfidence`` entry with:
+- ``category_id`` — exactly the id from the ontology (case-sensitive).
+- ``confidence`` — a float in [0.0, 1.0]. **Score the magnitude of evidence, not your own certainty:**
+  - 0.0 — feature is plainly absent across the entire run.
+  - ~0.3 — incidental or borderline; maybe one round, ambiguous.
+  - ~0.6 — feature appears clearly in multiple rounds but not pervasively.
+  - 0.9–1.0 — feature is a dominant, sustained property of the team's protocol.
+- ``justification`` — one or two sentences citing specific link-channel evidence (round numbers, brief quotes) or its absence.
+
+You MUST emit one entry per category, in the order they are listed. Do not skip a category just because the feature is absent — a low confidence with a short "absent" justification is the expected output.
+
+The two agents have asymmetric inputs each round (rendered explicitly below):
+- The OBSERVER only sees raw observable-symptoms text. No motif names, no procedures, no stellar reading.
+- The ENGINEER sees a per-motif stellar table (motif → procedure with parameters filled in) plus a static motif/canonical-symptom-phrase list from their system prompt.
+Use this when deciding whether the team is encoding symptoms, treatments, both, or neither — and remember that an observer who emits motif-side or treatment-side encodings must have learned the mapping from earlier link messages or postmortem coordination.
+
+Ontology (score every entry):
+
+{% for category in categories %}- id: ``{{ category.id }}``
+  name: {{ category.name }}
+  description: {{ category.description }}
+{% if category.synonyms %}  synonyms: {{ category.synonyms | join(", ") }}
+{% endif %}{% endfor %}
+
+Run transcripts and ground truth:
+
+{% for round in rounds %}
+--- ROUND {{ round.round_number }} · {{ round.failure_name }} ---
+
+OBSERVER sees (raw symptoms, no motif names):
+{% if round.motif_mappings %}{% for mapping in round.motif_mappings %}- stage {{ loop.index }}: {{ mapping.observable_symptoms }}
+{% endfor %}{% else %}(no case data for this round)
+{% endif %}
+ENGINEER sees (per-motif stellar table this round):
+{% if round.motif_mappings %}{% for mapping in round.motif_mappings %}- {{ mapping.symptom_motif }} → treatment motif: {{ mapping.treatment_motif }}; procedure to relay: {{ mapping.expected_actions }}
+{% endfor %}{% else %}(no case data for this round)
+{% endif %}
+Link messages ({{ round.messages | length }}):
+{% if round.messages %}{% for message in round.messages %}[{{ message.channel_id }}] {{ message.sender_agent_id }}: {{ message.text }}
+{% endfor %}{% else %}(no link messages this round)
+{% endif %}
+{% endfor %}
+
+Now emit one ``CategoryConfidence`` per ontology category. Submit your assessment using the provided tool.
