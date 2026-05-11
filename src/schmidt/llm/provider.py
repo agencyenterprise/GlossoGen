@@ -9,7 +9,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel
 
-from schmidt.evaluation.evaluation_cost import EvaluationTokenUsage
+from schmidt.evaluation.reports.evaluation_cost import EvaluationTokenUsage
 
 T = TypeVar("T", bound=BaseModel)
 

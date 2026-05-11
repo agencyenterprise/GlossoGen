@@ -13,7 +13,7 @@ import httpx
 import orjson
 from fastapi import APIRouter, HTTPException, Request
 
-from schmidt.evaluation.evaluation_report import EvaluationReport, load_report
+from schmidt.evaluation.reports.evaluation_report import EvaluationReport, load_report
 from schmidt.server.runs.bundle_router import build_bundle_bytes
 from schmidt.server.runs.discovery import compose_run_id, resolve_run
 from schmidt.server.runs.models import (

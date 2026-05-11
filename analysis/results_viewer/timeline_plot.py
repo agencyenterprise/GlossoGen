@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from analysis.results_viewer.event_extractor import RunTimeline, TimelineEventKind
-from schmidt.evaluation.evaluation_report import EvaluationReport
+from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 
 
 class _ProminentStyle(NamedTuple):

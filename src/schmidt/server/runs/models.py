@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Discriminator
 
-from schmidt.evaluation.evaluation_report import EvaluationReport
+from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 from schmidt.models.event import RunStatus
 from schmidt.server.response_models import LaunchStatus
 

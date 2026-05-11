@@ -17,19 +17,19 @@ import random
 from pathlib import Path
 from typing import Any, NamedTuple, Self
 
-from schmidt.evaluation.evaluation_cost import compute_evaluation_cost
-from schmidt.evaluation.evaluation_report import (
+from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
+from schmidt.evaluation.metric_core.measurement import Measurement
+from schmidt.evaluation.metric_core.metric_protocol import Metric
+from schmidt.evaluation.metric_core.metric_registry import GENERIC_METRIC_REGISTRY
+from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
+from schmidt.evaluation.reports.evaluation_cost import compute_evaluation_cost
+from schmidt.evaluation.reports.evaluation_report import (
     EvaluationReport,
     load_report,
     merge_evaluation_costs,
     merge_measurements,
     write_report,
 )
-from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
-from schmidt.evaluation.measurement import Measurement
-from schmidt.evaluation.metric_protocol import Metric
-from schmidt.evaluation.metric_registry import GENERIC_METRIC_REGISTRY
-from schmidt.evaluation.metric_run_options import MetricRunOptions
 from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry

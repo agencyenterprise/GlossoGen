@@ -16,8 +16,8 @@ from analysis.results_viewer.timeline_plot import (
     collect_value_metrics,
     palette_color_for_index,
 )
-from schmidt.evaluation.evaluation_report import EvaluationReport
-from schmidt.evaluation.measurement import Measurement
+from schmidt.evaluation.metric_core.measurement import Measurement
+from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 
 _METRIC_CHECKBOXES_PER_ROW = 4
 

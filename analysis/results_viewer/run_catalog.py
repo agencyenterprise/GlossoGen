@@ -17,7 +17,7 @@ from typing import Any, NamedTuple
 
 import orjson
 
-from schmidt.evaluation.evaluation_report import EvaluationReport
+from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 
 
 class _RunCacheKey(NamedTuple):

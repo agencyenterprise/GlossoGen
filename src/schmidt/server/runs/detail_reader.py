@@ -9,8 +9,8 @@ import aiofiles
 import orjson
 
 from schmidt.eval_manifest import read_eval_manifest
-from schmidt.evaluation.evaluation_report import EvaluationReport
 from schmidt.evaluation.log_reader import load_events
+from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 from schmidt.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,

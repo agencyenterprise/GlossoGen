@@ -305,7 +305,7 @@ Same as replace-agent, the supervisor calls `write_resume_context_files` at resu
 - `message_rewind.py` — `AgentHistoryFilter` extended with `imported: ImportedHistory | None`; `_find_imported_registration` looks up the imported agent's `AgentRegistered` in the imported event stream
 - `server/runs/cross_run_replace_agent_router.py` — `POST /api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent` thin HTTP wrapper; resolves `--source-b-round-end` and `--model`/`--provider` defaults at the edge
 - `cli.py` `_run_cross_run_replace_agent` + `_resolve_source_b_max_round` + `_resolve_imported_model_from_source_b` — CLI subcommand implementation
-- `scenarios/veyru/evaluation/round_success_after_resume_metric.py` — reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (so the same metric works for both flows)
+- `scenarios/veyru/evaluation/metrics/round_success/round_success_after_resume_metric.py` — reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (so the same metric works for both flows)
 
 ### Provenance
 
@@ -372,7 +372,7 @@ The filter applies to every caller that builds an agent history with a `FromRoun
 - `models/event.py` — `AgentSwappedMidRun`, `PostmortemDisabledMidRun` event types
 - `message_history_builder.py` — notification round-floor derivation + filter
 - `resume_context_writer.py` — `write_swap_resume_context_file`
-- `scenarios/veyru/evaluation/round_success_after_resume_metric.py` — walks every `AgentSwappedMidRun` event and emits one Measurement per anchor (named `round_success_after_resume_round_<R>_<agent_id>`); the in-run baseline window is the previous phase in the same run
+- `scenarios/veyru/evaluation/metrics/round_success/round_success_after_resume_metric.py` — walks every `AgentSwappedMidRun` event and emits one Measurement per anchor (named `round_success_after_resume_round_<R>_<agent_id>`); the in-run baseline window is the previous phase in the same run
 
 ### FE Per-Agent-Instance Tabs
 

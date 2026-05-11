@@ -21,7 +21,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import AnyHttpUrl
 
-from schmidt.evaluation.evaluation_report import EvaluationReport
+from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 from schmidt.scenarios import SCENARIO_REGISTRY
 from schmidt.server.mcp.models import (
     McpAgent,
