@@ -17,6 +17,7 @@ from tenacity import (
     wait_fixed,
 )
 
+from schmidt.llm.max_tokens import resolve_max_tokens
 from schmidt.llm.provider import LLMMessage, LLMProvider, T
 
 logger = logging.getLogger(__name__)
@@ -107,7 +108,7 @@ class ClaudeProvider(LLMProvider):
 
         kwargs: dict[str, Any] = {
             "model": self._model,
-            "max_tokens": 4096,
+            "max_tokens": resolve_max_tokens(),
             "system": system_with_cache,
             "messages": anthropic_messages,
             "tools": [tool_def],

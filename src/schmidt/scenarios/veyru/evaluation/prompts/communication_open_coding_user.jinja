@@ -1,0 +1,75 @@
+You are doing **open coding** on the link-channel communication of a Veyru team. The team is trying to stabilize failing entities by exchanging short messages on a single comm link. Your job is to emit free-form **short labels** naming the *linguistic and communicative phenomena* you observe — the mechanisms of language emergence, not the Veyru domain content they happen to operate over.
+
+**Core rule: label the MECHANISM, not the REFERENT.**
+
+Each label must describe a feature of *how* the team is using language — a linguistic mechanism that could in principle appear in any domain. Do NOT label *what* the team happens to be talking about. Veyru has faces, motifs, treatments, stellar offsets, tools — those are accidents of this scenario, not phenomena worth coding. The same mechanism applied to "face" and to "treatment" and to "tool" is ONE phenomenon, not three.
+
+Examples of the *kind* of label that's appropriate (not a vocabulary — invent your own when you see a phenomenon not on this list):
+
+  Compression / abbreviation:
+  - "first-letter abbreviation" (one initial stands for a referent)
+  - "syllable-truncation abbreviation" (a prefix stands for the word)
+  - "vowel-deletion abbreviation" (consonant skeleton replaces full word)
+  - "numeric substitution for quantities" (digits replace number words)
+  - "telegraphic ellipsis" (articles, verbs, prepositions dropped)
+
+  Syntactic structure:
+  - "positional slot ordering" (meaning carried by position, not by labels)
+  - "punctuation as inline separator" (e.g. /, +, |, x repurposed as operators)
+  - "implicit conjunction" (sequential steps with no connector)
+  - "fixed message template across rounds"
+  - "two-letter mnemonic / acronym coinage"
+
+  Pragmatics:
+  - "single-token acknowledgement" (one letter / word for ack / fail / retry)
+  - "explicit definition (X = Y)" (introducing a code with its expansion)
+  - "clarification request"
+  - "register shift on failure" (expansion back to full natural language)
+  - "metalinguistic comment about the protocol"
+
+  Convergence dynamics:
+  - "lexical reuse across rounds" (same coined token reappears later)
+  - "compression accelerates across rounds" (later rounds shorter than earlier)
+  - "asymmetric adoption" (one role compresses; the other does not)
+  - "self-correction without prompting"
+
+**Anti-patterns (do NOT do these):**
+
+- ❌ `"face abbreviation"` / `"treatment abbreviation"` / `"tool abbreviation"` — these all describe the same mechanism (first-letter or syllable-truncation abbreviation) applied to different Veyru referents. Collapse to ONE mechanism label. If you find yourself writing two labels that differ only by their domain referent, you have not yet abstracted enough.
+- ❌ `"engineer relays motif-specific procedural steps with parameter substitution"` — this describes the engineer following their job description, not a language phenomenon.
+- ❌ `"uses spatial face/edge references with directional prefixes"` — too domain-coupled. The mechanism here is "abbreviation of spatial vocabulary" — and even that might already be covered by a more general "syllable-truncation abbreviation" label.
+- ❌ `"uses lamp-type encoding for illumination procedure"` — pure domain-coupled noise.
+- ❌ Quality judgements: `"uses good abbreviations"`, `"uses helpful clarifications"`. Stick to descriptive mechanism names.
+
+**Operational guidelines:**
+
+- Do NOT pre-judge labels against any external taxonomy. If you see a mechanism that doesn't fit the list above, invent a label for it — as long as it's still mechanism-level and not referent-level.
+- For each label, cite **every** round where the feature is clearly observable on the link channel — not just one. A pervasive mechanism accumulates many citations; a one-off accumulates exactly one. This distribution is the signal that downstream consolidation uses to tell stable phenomena from incidental noise. Each citation is a (round_number, short verbatim quote) pair.
+- Skip labels for features that are absent — only positive observations.
+
+Important: the two agents do NOT see the same data each round. The observer and engineer have asymmetric inputs, so a single "ground truth" rendering would be misleading. For each round below you receive two distinct views plus the link transcript:
+
+- **What the OBSERVER sees** at round start: only the raw observable-symptoms text for each stage of the case. The observer has no motif names, no procedure templates, and no stellar reading. They must describe what they perceive in their own words and trust the engineer to diagnose.
+- **What the ENGINEER sees** at round start: a per-motif "stellar table" — for every failure motif this round, the engineer is told the exact procedure to apply (with parameters already substituted by the stellar reading). The engineer's job is to match the observer's description to a motif, then relay that motif's procedure. The engineer additionally has a STATIC reference list in their system prompt mapping motif names to canonical symptom phrases and procedure templates — that static list is not repeated per round but is always available to them.
+- **`failure_name`** — the case's overall failure label, useful as a row anchor when grouping observations across rounds.
+
+Use this asymmetry when labelling. For example: a label like "observer sends the first letter of the treatment motif" only makes sense if the observer has somehow learned the mapping in earlier rounds (via prior link messages or postmortem coordination), because the observer never has direct access to the motif → treatment mapping on their own.
+
+{% for round in rounds %}
+--- ROUND {{ round.round_number }} · {{ round.failure_name }} ---
+
+OBSERVER sees (raw symptoms, no motif names):
+{% if round.motif_mappings %}{% for mapping in round.motif_mappings %}- stage {{ loop.index }}: {{ mapping.observable_symptoms }}
+{% endfor %}{% else %}(no case data for this round)
+{% endif %}
+ENGINEER sees (per-motif stellar table this round):
+{% if round.motif_mappings %}{% for mapping in round.motif_mappings %}- {{ mapping.symptom_motif }} → treatment motif: {{ mapping.treatment_motif }}; procedure to relay: {{ mapping.expected_actions }}
+{% endfor %}{% else %}(no case data for this round)
+{% endif %}
+Link messages ({{ round.messages | length }}):
+{% if round.messages %}{% for message in round.messages %}[{{ message.channel_id }}] {{ message.sender_agent_id }}: {{ message.text }}
+{% endfor %}{% else %}(no link messages this round)
+{% endif %}
+{% endfor %}
+
+Now emit your labels. Submit your assessment using the provided tool.

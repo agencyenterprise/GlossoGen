@@ -172,6 +172,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "(agent, question). Required when --metrics includes protocol_probe."
         ),
     )
+    evaluate_parser.add_argument(
+        "--ontology-path",
+        dest="ontology_path",
+        type=str,
+        default=None,
+        help=(
+            "Path to a consolidated communication-feature ontology JSON file. "
+            "Required when --metrics includes communication_feature_presence."
+        ),
+    )
 
     serve_parser = subparsers.add_parser("serve", help="Start the web server")
     serve_parser.add_argument(
@@ -375,8 +385,10 @@ def main() -> None:
 
     load_dotenv()
 
+    log_level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
+    log_level = getattr(logging, log_level_name, logging.INFO)
     logging.basicConfig(
-        level=logging.INFO,
+        level=log_level,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
     parser = _build_parser()
@@ -781,6 +793,7 @@ async def _run_evaluation(
     options = MetricRunOptions(
         probe_round=args.probe_round,
         probe_replicas=args.probe_replicas,
+        ontology_path=Path(args.ontology_path) if args.ontology_path else None,
     )
 
     write_eval_manifest(run_dir=run_dir, pid=os.getpid())

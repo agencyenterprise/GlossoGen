@@ -170,19 +170,11 @@ class ProtocolProbeReplicaSelfSimilarityMetric(Metric):
         _ = events, agent_configs, scenario, llm_provider, options
         rows = load_probe_rows(run_dir=run_dir)
         if not rows:
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="similarity",
-                    summary=(
-                        "protocol_probe_responses.jsonl missing or empty; run "
-                        "schmidt evaluate ... --metrics protocol_probe first."
-                    ),
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info(
+                "%s: skipping — protocol_probe_responses.jsonl missing or empty",
+                self.name,
+            )
+            return []
         rows_by_key = _group_rows(rows=rows)
         sorted_keys = sorted(
             rows_by_key.keys(),
@@ -194,19 +186,11 @@ class ProtocolProbeReplicaSelfSimilarityMetric(Metric):
             if built is not None:
                 groups.append(built)
         if not groups:
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="similarity",
-                    summary=(
-                        "No (agent, question, cutoff) group has ≥ 2 replicas; "
-                        "rerun protocol_probe with --probe-replicas ≥ 2."
-                    ),
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info(
+                "%s: skipping — no (agent, question, cutoff) group has ≥2 replicas",
+                self.name,
+            )
+            return []
         overall = sum(group.mean_similarity for group in groups) / len(groups)
         artifact = ReplicaSelfSimArtifact(
             schema_version=ARTIFACT_SCHEMA_VERSION,

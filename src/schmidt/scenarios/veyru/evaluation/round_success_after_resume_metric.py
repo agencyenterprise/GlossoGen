@@ -198,19 +198,12 @@ class RoundSuccessAfterResumeMetric(Metric):
         _ = llm_provider, options
         anchors = _read_resume_anchors(events=events, run_dir=run_dir)
         if not anchors:
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="fraction of post-resume rounds stabilized",
-                    summary=(
-                        "Run has no replace-agent manifest and no AgentSwappedMidRun "
-                        "events; round_success_after_resume does not apply."
-                    ),
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info(
+                "%s: skipping — run has no replace-agent manifest and no "
+                "AgentSwappedMidRun events",
+                self.name,
+            )
+            return []
 
         measurements: list[Measurement] = []
         for anchor in anchors:

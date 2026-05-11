@@ -102,19 +102,11 @@ class ProtocolLearnedAfterSwapMetric(Metric):
         config = extract_scenario_config(events=events)
         window = _detect_boundary_window(config=config, events=events)
         if window is None:
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="post-boundary rounds with protocol use",
-                    summary=(
-                        "Scenario did not use two-team swap mode, intern mode, or in-run "
-                        "scheduled swaps; no personnel change boundary to evaluate."
-                    ),
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info(
+                "%s: skipping — no two-team swap, intern, or scheduled-swap boundary",
+                self.name,
+            )
+            return []
 
         # ``intern`` and ``scheduled_swap`` both place the boundary AT the
         # newcomer's first round (post = round >= boundary). Two-team
@@ -127,19 +119,13 @@ class ProtocolLearnedAfterSwapMetric(Metric):
         )
 
         if not pre_rounds or not post_rounds:
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="post-boundary rounds with protocol use",
-                    summary=(
-                        f"Insufficient messages around the boundary (pre={len(pre_rounds)}, "
-                        f"post={len(post_rounds)}). Cannot evaluate protocol transfer."
-                    ),
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info(
+                "%s: skipping — insufficient messages around boundary " "(pre=%d, post=%d)",
+                self.name,
+                len(pre_rounds),
+                len(post_rounds),
+            )
+            return []
 
         judge_prompt = render_veyru_prompt(
             template_name="protocol_learned_after_swap_user.jinja",

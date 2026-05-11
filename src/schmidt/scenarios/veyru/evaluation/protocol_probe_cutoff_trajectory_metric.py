@@ -192,19 +192,11 @@ class ProtocolProbeCutoffTrajectoryMetric(Metric):
         _ = events, agent_configs, scenario, llm_provider, options
         rows = load_probe_rows(run_dir=run_dir)
         if not rows:
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="similarity",
-                    summary=(
-                        "protocol_probe_responses.jsonl missing or empty; run "
-                        "schmidt evaluate ... --metrics protocol_probe first."
-                    ),
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info(
+                "%s: skipping — protocol_probe_responses.jsonl missing or empty",
+                self.name,
+            )
+            return []
         grouped = _group_rows(rows=rows)
         groups: list[CutoffTrajectoryGroup] = []
         for key in sorted(grouped.keys()):
@@ -212,20 +204,11 @@ class ProtocolProbeCutoffTrajectoryMetric(Metric):
             if built is not None:
                 groups.append(built)
         if not groups:
-            return [
-                Measurement(
-                    metric_name=self.name,
-                    score=0.0,
-                    score_unit="similarity",
-                    summary=(
-                        "Probe JSONL contains only one cutoff_round value; rerun "
-                        "protocol_probe with multiple --probe-round settings to "
-                        "build a trajectory."
-                    ),
-                    per_round=[],
-                    per_agent=[],
-                )
-            ]
+            logger.info(
+                "%s: skipping — probe JSONL contains only one cutoff_round value",
+                self.name,
+            )
+            return []
         all_pair_means = [pair.mean_similarity for group in groups for pair in group.pairs]
         overall = sum(all_pair_means) / len(all_pair_means) if all_pair_means else 0.0
         artifact = CutoffTrajectoryArtifact(

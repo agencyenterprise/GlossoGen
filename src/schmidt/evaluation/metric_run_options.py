@@ -4,6 +4,8 @@ Lives in its own module so ``scenario_protocol.py`` can import the type without
 forming a circular dependency with ``metric_protocol.py``.
 """
 
+from pathlib import Path
+
 from pydantic import BaseModel, Field
 
 
@@ -14,7 +16,8 @@ class MetricRunOptions(BaseModel):
     value and instantiate their metric with no constructor arguments.
     Every field is optional; the factory of any metric that requires a
     given option raises when the user has not supplied it. The
-    ``protocol_probe`` metric reads ``probe_round`` and ``probe_replicas``.
+    ``protocol_probe`` metric reads ``probe_round`` and ``probe_replicas``;
+    the ``communication_feature_presence`` metric reads ``ontology_path``.
     """
 
     probe_round: int | None = Field(
@@ -31,6 +34,14 @@ class MetricRunOptions(BaseModel):
         description=(
             "Number of independent probe-LLM calls to make per (agent, "
             "question) pair. Required when running the ``protocol_probe`` "
+            "metric; ignored otherwise."
+        ),
+    )
+    ontology_path: Path | None = Field(
+        description=(
+            "Path to a consolidated communication-feature ontology JSON file "
+            "(typically ``analysis/communication_ontology/<version>.json``). "
+            "Required when running the ``communication_feature_presence`` "
             "metric; ignored otherwise."
         ),
     )
