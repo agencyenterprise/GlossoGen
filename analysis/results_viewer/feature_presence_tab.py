@@ -1,25 +1,30 @@
 """Streamlit "Language features" tab — three subtabs over communication_feature_presence.
 
 Top of the tab carries four horizontal-checkbox cohort filters (model,
-postmortem on/off, run kind, budget) plus a confidence-threshold
-slider — the same idiom the Verbosity tab uses, so the two tabs feel
-consistent. Below that, three subtabs:
+postmortem on/off, run kind, budget) plus two threshold sliders:
+``Confidence threshold`` (binarizes per-category confidence into
+present/absent) and ``Round-success threshold`` (drops cohort runs
+whose ``round_success`` is below the cutoff or missing). Every subtab
+renders over the post-filter cohort, so the displayed signal always
+reads as "among winning runs that match the metadata filters". Three
+subtabs:
 
-* **Per-feature frequency** — for each ontology category, fraction of
-  cohort runs whose confidence sits at or above the threshold. Bars
-  sorted descending so the most-prevalent mechanisms read first.
+* **Per-feature frequency** — for each ontology category, bar = fraction
+  of cohort runs whose confidence is ≥ the confidence threshold. Bars
+  sorted descending; sample justifications expand below.
 * **Feature-conditioned outcomes** — pick a Group A category set and
-  a Group B category set; show paired bars of mean in-team
-  ``round_success`` for runs whose feature vector hits each group at
-  the current threshold.
-* **Per-run lookup** — pick one run; show its 19-category vector +
-  the judge's justifications (ordered to match the bar chart) + a
-  deep-link back to the schmidt frontend run viewer.
+  a Group B category set; bars show the fraction of cohort runs whose
+  feature vector hits each group at the confidence threshold (i.e.
+  share of winners that developed each feature class).
+* **Per-run lookup** — pick one run; horizontal bar chart of its
+  19-category vector with bars coloured by the confidence threshold,
+  vertical dashed line at the threshold, win/loss caption from the
+  success threshold, and the judge's justifications (ordered to match
+  the bar chart) + deep-link to the run viewer.
 """
 
 import logging
 import statistics
-from typing import NamedTuple
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -69,23 +74,6 @@ def _postmortem_enabled_at_start(run: FeaturePresenceRun) -> bool:
     enabled = bool(run.scenario_config.get("postmortem_enabled", False))
     disabled_override = bool(run.scenario_config.get("postmortem_disabled_at_start", False))
     return enabled and not disabled_override
-
-
-class _OutcomeStats(NamedTuple):
-    """Summary statistics for one feature-group's outcome metric."""
-
-    n: int
-    mean: float
-    std: float
-
-
-def _make_outcome_stats(values: list[float]) -> _OutcomeStats:
-    """Aggregate raw outcome floats into n/mean/std (std=0 when n<2)."""
-    if not values:
-        return _OutcomeStats(n=0, mean=0.0, std=0.0)
-    mean = statistics.mean(values)
-    std = statistics.stdev(values) if len(values) > 1 else 0.0
-    return _OutcomeStats(n=len(values), mean=mean, std=std)
 
 
 def _render_model_filter(runs: list[FeaturePresenceRun]) -> set[str]:
@@ -173,6 +161,7 @@ def _render_budget_filter(runs: list[FeaturePresenceRun]) -> set[int | None]:
 
 
 _FREQUENCY_JUSTIFICATION_SAMPLES = 10
+_WIN_COLOR = "#5B8FF9"
 
 
 def _render_frequency_section(
@@ -180,7 +169,12 @@ def _render_frequency_section(
     ontology: OntologyView,
     threshold: float,
 ) -> None:
-    """Section 1: bar chart of per-category presence fraction + sample justifications."""
+    """Section 1: bar chart of per-category presence fraction + sample justifications.
+
+    The cohort is already filtered upstream by the success threshold,
+    so every run shown here meets the success bar. Bars read directly
+    as "fraction of qualifying runs that exhibit this mechanism".
+    """
     if not runs:
         st.info("No runs in the current cohort.")
         return
@@ -204,7 +198,7 @@ def _render_frequency_section(
                 for r in rows
             ],
             hoverinfo="text",
-            marker={"color": "#5B8FF9"},
+            marker={"color": _WIN_COLOR},
         )
     )
     fig.update_layout(
@@ -284,34 +278,19 @@ def _render_feature_class_picker(
     return set(chosen)
 
 
-def _add_paired_outcome_bars(
-    fig: go.Figure,
-    title: str,
-    group_a: _OutcomeStats,
-    group_b: _OutcomeStats,
-) -> None:
-    """Add A-vs-B mean bars with std error bars to ``fig``."""
-    fig.add_trace(
-        go.Bar(
-            x=[f"Group A (n={group_a.n})", f"Group B (n={group_b.n})"],
-            y=[group_a.mean, group_b.mean],
-            error_y={
-                "type": "data",
-                "array": [group_a.std, group_b.std],
-                "visible": True,
-            },
-            marker={"color": ["#5B8FF9", "#F6BD16"]},
-            name=title,
-        )
-    )
-
-
 def _render_outcomes_section(
     runs: list[FeaturePresenceRun],
     ontology: OntologyView,
     threshold: float,
+    success_threshold: float,
 ) -> None:
-    """Section 2: in-team ``round_success`` for Group A vs Group B feature-class cohorts."""
+    """Section 2: feature-class prevalence within the winners-only cohort.
+
+    Bars show the fraction of cohort runs whose feature vector hits
+    Group A vs Group B at the confidence threshold. Since the cohort is
+    pre-filtered by the success threshold, this reads as "share of
+    winning runs that developed each feature class".
+    """
     if not runs:
         st.info("No runs in the current cohort.")
         return
@@ -352,45 +331,35 @@ def _render_outcomes_section(
         threshold=threshold,
         require_all=require_all,
     )
+    fraction_a = len(cohort_a) / len(runs)
+    fraction_b = len(cohort_b) / len(runs)
 
-    in_team_a = _make_outcome_stats(
-        values=[
-            run.in_team_round_success for run in cohort_a if run.in_team_round_success is not None
-        ]
+    st.markdown(
+        f"**Feature-class prevalence among winners** "
+        f"(round_success ≥ {success_threshold:g}, n_cohort = {len(runs)})"
     )
-    in_team_b = _make_outcome_stats(
-        values=[
-            run.in_team_round_success for run in cohort_b if run.in_team_round_success is not None
-        ]
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            x=[f"Group A (n={len(cohort_a)})", f"Group B (n={len(cohort_b)})"],
+            y=[fraction_a, fraction_b],
+            marker={"color": ["#5B8FF9", "#F6BD16"]},
+        )
     )
-
-    st.markdown("**In-team `round_success`**")
-    in_team_fig = go.Figure()
-    _add_paired_outcome_bars(
-        fig=in_team_fig, title="round_success", group_a=in_team_a, group_b=in_team_b
-    )
-    in_team_fig.update_layout(
-        yaxis={"range": [0, 1], "title": "round_success"},
+    fig.update_layout(
+        yaxis={
+            "range": [0, 1],
+            "title": "fraction of cohort exhibiting the group",
+        },
         showlegend=False,
         height=400,
         margin={"l": 40, "r": 20, "t": 20, "b": 40},
     )
-    st.plotly_chart(in_team_fig, use_container_width=True)
-    st.caption(_outcome_caption(group_a=in_team_a, group_b=in_team_b))
-
-
-def _outcome_caption(group_a: _OutcomeStats, group_b: _OutcomeStats) -> str:
-    """One-line caption summarizing the A-vs-B delta."""
-    if group_a.n == 0 and group_b.n == 0:
-        return "No qualifying runs."
-    if group_a.n == 0:
-        return f"Group A empty · B: n={group_b.n}, mean={group_b.mean:.3f}"
-    if group_b.n == 0:
-        return f"Group B empty · A: n={group_a.n}, mean={group_a.mean:.3f}"
-    delta = group_a.mean - group_b.mean
-    return (
-        f"A: n={group_a.n}, mean={group_a.mean:.3f} · "
-        f"B: n={group_b.n}, mean={group_b.mean:.3f} · Δ(A−B) = {delta:+.3f}"
+    st.plotly_chart(fig, use_container_width=True)
+    st.caption(
+        f"A: {fraction_a:.2%} ({len(cohort_a)}/{len(runs)}) · "
+        f"B: {fraction_b:.2%} ({len(cohort_b)}/{len(runs)}) · "
+        f"Δ(A−B) = {fraction_a - fraction_b:+.2%}"
     )
 
 
@@ -398,8 +367,15 @@ def _render_lookup_section(
     runs: list[FeaturePresenceRun],
     ontology: OntologyView,
     frontend_base: str,
+    threshold: float,
+    success_threshold: float,
 ) -> None:
-    """Section 3: per-run inspector showing the full 19-category vector + justifications."""
+    """Section 3: per-run inspector showing the full 19-category vector + justifications.
+
+    The bar chart marks the confidence threshold with a vertical line so
+    it's obvious which categories the run is considered to exhibit. The
+    header row tags the run as a win/loss based on the success threshold.
+    """
     if not runs:
         st.info("No runs in the current cohort.")
         return
@@ -416,7 +392,11 @@ def _render_lookup_section(
         f"[Open in run viewer]({run_url(frontend_base=frontend_base, run_id=chosen.run_id)})"
     )
     if chosen.in_team_round_success is not None:
-        st.caption(f"round_success: {chosen.in_team_round_success:.3f}")
+        verdict = "Win" if chosen.in_team_round_success >= success_threshold else "Loss"
+        st.caption(
+            f"round_success: {chosen.in_team_round_success:.3f} → **{verdict}** "
+            f"(threshold {success_threshold:g})"
+        )
     if chosen.after_resume_round_success is not None:
         st.caption(f"round_success_after_resume: {chosen.after_resume_round_success:.3f}")
     if chosen.notes:
@@ -426,13 +406,24 @@ def _render_lookup_section(
         ontology.categories,
         key=lambda cat: -chosen.scores.get(cat.id, 0.0),
     )
+    bar_colors = [
+        _WIN_COLOR if chosen.scores.get(cat.id, 0.0) >= threshold else "#B0BEC5"
+        for cat in category_rows
+    ]
     fig = go.Figure(
         go.Bar(
             x=[chosen.scores.get(cat.id, 0.0) for cat in category_rows],
             y=[cat.id for cat in category_rows],
             orientation="h",
-            marker={"color": "#5B8FF9"},
+            marker={"color": bar_colors},
         )
+    )
+    fig.add_vline(
+        x=threshold,
+        line_dash="dash",
+        line_color="#444",
+        annotation_text=f"threshold {threshold:g}",
+        annotation_position="top right",
     )
     fig.update_layout(
         xaxis={"range": [0, 1], "title": "Confidence"},
@@ -486,14 +477,36 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     selected_postmortem = _render_postmortem_filter(runs=runs)
     selected_kinds = _render_kind_filter(runs=runs)
     selected_budgets = _render_budget_filter(runs=runs)
-    threshold = st.slider(
-        label="Confidence threshold",
-        min_value=0.0,
-        max_value=1.0,
-        value=0.5,
-        step=0.05,
-        key="feature_presence_threshold",
-    )
+    threshold_cols = st.columns(2)
+    with threshold_cols[0]:
+        threshold = st.slider(
+            label="Confidence threshold",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.5,
+            step=0.05,
+            key="feature_presence_threshold",
+            help=(
+                "Cutoff for the per-category confidence score. A run counts as "
+                "exhibiting a category when its confidence is >= this value."
+            ),
+        )
+    with threshold_cols[1]:
+        success_threshold = st.slider(
+            label="Round-success threshold",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.5,
+            step=0.05,
+            key="feature_presence_success_threshold",
+            help=(
+                "Cohort filter: drop runs whose round_success is below this "
+                "value (and runs with no round_success score). Every subtab "
+                "renders over the surviving cohort, so the per-feature "
+                "frequency reads as 'fraction of winning runs that exhibit "
+                "this mechanism'."
+            ),
+        )
     if not selected_models:
         st.info("Select at least one model.")
         return
@@ -506,7 +519,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     if not selected_budgets:
         st.info("Select at least one budget bucket.")
         return
-    filtered_runs = [
+    metadata_filtered = [
         run
         for run in runs
         if run.primary_model in selected_models
@@ -514,17 +527,38 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         and _kind_of(run=run) in selected_kinds
         and _budget_of(run=run) in selected_budgets
     ]
-    st.caption(f"Cohort size: {len(filtered_runs)} / {len(runs)} runs match.")
+    filtered_runs = [
+        run
+        for run in metadata_filtered
+        if run.in_team_round_success is not None and run.in_team_round_success >= success_threshold
+    ]
+    excluded = len(metadata_filtered) - len(filtered_runs)
+    st.caption(
+        f"Cohort size: {len(filtered_runs)} / {len(runs)} runs match "
+        f"(metadata-pass: {len(metadata_filtered)}; "
+        f"dropped {excluded} below round_success {success_threshold:g})."
+    )
     frequency_panel, outcomes_panel, lookup_panel = st.tabs(
         ["Per-feature frequency", "Feature-conditioned outcomes", "Per-run lookup"]
     )
     with frequency_panel:
-        _render_frequency_section(runs=filtered_runs, ontology=ontology, threshold=threshold)
+        _render_frequency_section(
+            runs=filtered_runs,
+            ontology=ontology,
+            threshold=threshold,
+        )
     with outcomes_panel:
         _render_outcomes_section(
             runs=filtered_runs,
             ontology=ontology,
             threshold=threshold,
+            success_threshold=success_threshold,
         )
     with lookup_panel:
-        _render_lookup_section(runs=filtered_runs, ontology=ontology, frontend_base=frontend_base)
+        _render_lookup_section(
+            runs=filtered_runs,
+            ontology=ontology,
+            frontend_base=frontend_base,
+            threshold=threshold,
+            success_threshold=success_threshold,
+        )
