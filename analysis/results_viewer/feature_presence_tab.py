@@ -30,7 +30,6 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from analysis.results_viewer.feature_presence_data import (
-    FEATURE_CLASS_PRESETS,
     ONTOLOGY_DEFAULT_DIR,
     FeaturePresenceRun,
     OntologyView,
@@ -38,6 +37,7 @@ from analysis.results_viewer.feature_presence_data import (
     resolve_ontology,
     runs_matching_feature_class,
 )
+from analysis.results_viewer.natural_sort import natural_sort_key
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
 from analysis.results_viewer.series_plot import render_horizontal_checkboxes
@@ -211,17 +211,48 @@ def _render_frequency_section(
     st.plotly_chart(fig, use_container_width=True)
     st.caption(f"n_cohort = {len(runs)} runs · ontology version `{ontology.version}`")
 
+    _render_justifications_by_category(
+        runs=runs,
+        ontology=ontology,
+        category_summaries=[
+            (row[0], _frequency_expander_header(row=row, threshold=threshold)) for row in rows
+        ],
+    )
+
+
+def _frequency_expander_header(
+    row: tuple[str, float, float, float],
+    threshold: float,
+) -> str:
+    """Header line for one category's justifications expander in the frequency view."""
+    category_id, fraction, mean, std = row
+    return (
+        f"{category_id} — {fraction:.0%} of runs ≥ {threshold:g} "
+        f"(mean {mean:.2f}, std {std:.2f})"
+    )
+
+
+def _render_justifications_by_category(
+    runs: list[FeaturePresenceRun],
+    ontology: OntologyView,
+    category_summaries: list[tuple[str, str]],
+) -> None:
+    """Render a `Justifications by category` section over ``category_summaries``.
+
+    Each ``(category_id, header)`` pair becomes one expander showing
+    the category's ontology description plus up to
+    ``_FREQUENCY_JUSTIFICATION_SAMPLES`` runs' justifications sorted by
+    descending confidence on that category.
+    """
+    if not category_summaries:
+        return
     st.markdown("### Justifications by category")
     st.caption(
         f"Up to {_FREQUENCY_JUSTIFICATION_SAMPLES} sample justifications per category, "
         "drawn from the highest-confidence cohort runs first."
     )
-    for category_id, fraction, mean, std in rows:
+    for category_id, header in category_summaries:
         category_meta = ontology.by_id.get(category_id)
-        header = (
-            f"{category_id} — {fraction:.0%} of runs ≥ {threshold:g} "
-            f"(mean {mean:.2f}, std {std:.2f})"
-        )
         with st.expander(header):
             if category_meta is not None:
                 st.markdown(f"_{category_meta.description}_")
@@ -251,29 +282,20 @@ def _render_frequency_section(
 def _render_feature_class_picker(
     label: str,
     ontology: OntologyView,
-    preset_key: str,
-    default_preset: str,
+    key_prefix: str,
 ) -> set[str]:
-    """Preset dropdown + multiselect for a feature class; returns the resolved ids."""
-    available_ids = [cat.id for cat in ontology.categories]
-    preset_options = ["(custom)"] + list(FEATURE_CLASS_PRESETS.keys())
-    chosen_preset = st.selectbox(
-        label=f"{label} preset",
-        options=preset_options,
-        index=preset_options.index(default_preset) if default_preset in preset_options else 0,
-        key=f"{preset_key}_preset",
-    )
-    if chosen_preset == "(custom)":
-        default_ids: list[str] = []
-    else:
-        default_ids = [
-            cat_id for cat_id in FEATURE_CLASS_PRESETS[chosen_preset] if cat_id in available_ids
-        ]
+    """Multiselect of ontology categories for a feature class; returns the chosen ids."""
+    available_ids = sorted((cat.id for cat in ontology.categories), key=natural_sort_key)
     chosen = st.multiselect(
         label=f"{label} categories",
         options=available_ids,
-        default=default_ids,
-        key=f"{preset_key}_categories",
+        default=[],
+        key=f"{key_prefix}_categories",
+        help=(
+            "Each category is one mechanism from the ontology. Pick any subset; "
+            "a run hits the group if its confidence on any (or all) of these "
+            "is >= the confidence threshold."
+        ),
     )
     return set(chosen)
 
@@ -299,15 +321,13 @@ def _render_outcomes_section(
         group_a_ids = _render_feature_class_picker(
             label="Group A",
             ontology=ontology,
-            preset_key="feature_presence_group_a",
-            default_preset="Abbreviation family",
+            key_prefix="feature_presence_group_a",
         )
     with col_b:
         group_b_ids = _render_feature_class_picker(
             label="Group B",
             ontology=ontology,
-            preset_key="feature_presence_group_b",
-            default_preset="Arbitrary mapping family",
+            key_prefix="feature_presence_group_b",
         )
     require_all = st.checkbox(
         label="Require all selected categories (default: any)",
@@ -315,52 +335,107 @@ def _render_outcomes_section(
         key="feature_presence_require_all",
     )
 
-    if not group_a_ids or not group_b_ids:
-        st.info("Pick at least one category for each group to render comparisons.")
-        return
-
-    cohort_a = runs_matching_feature_class(
-        runs=runs,
-        category_ids=group_a_ids,
-        threshold=threshold,
-        require_all=require_all,
-    )
-    cohort_b = runs_matching_feature_class(
-        runs=runs,
-        category_ids=group_b_ids,
-        threshold=threshold,
-        require_all=require_all,
-    )
-    fraction_a = len(cohort_a) / len(runs)
-    fraction_b = len(cohort_b) / len(runs)
-
-    st.markdown(
-        f"**Feature-class prevalence among winners** "
-        f"(round_success ≥ {success_threshold:g}, n_cohort = {len(runs)})"
-    )
-    fig = go.Figure()
-    fig.add_trace(
-        go.Bar(
-            x=[f"Group A (n={len(cohort_a)})", f"Group B (n={len(cohort_b)})"],
-            y=[fraction_a, fraction_b],
-            marker={"color": ["#5B8FF9", "#F6BD16"]},
+    if group_a_ids and group_b_ids:
+        cohort_a = runs_matching_feature_class(
+            runs=runs,
+            category_ids=group_a_ids,
+            threshold=threshold,
+            require_all=require_all,
         )
+        cohort_b = runs_matching_feature_class(
+            runs=runs,
+            category_ids=group_b_ids,
+            threshold=threshold,
+            require_all=require_all,
+        )
+        fraction_a = len(cohort_a) / len(runs)
+        fraction_b = len(cohort_b) / len(runs)
+
+        st.markdown(
+            f"**Feature-class prevalence among winners** "
+            f"(round_success ≥ {success_threshold:g}, n_cohort = {len(runs)})"
+        )
+        fig = go.Figure()
+        fig.add_trace(
+            go.Bar(
+                x=[f"Group A (n={len(cohort_a)})", f"Group B (n={len(cohort_b)})"],
+                y=[fraction_a, fraction_b],
+                marker={"color": ["#5B8FF9", "#F6BD16"]},
+            )
+        )
+        fig.update_layout(
+            yaxis={
+                "range": [0, 1],
+                "title": "fraction of cohort exhibiting the group",
+            },
+            showlegend=False,
+            height=400,
+            margin={"l": 40, "r": 20, "t": 20, "b": 40},
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption(
+            f"A: {fraction_a:.2%} ({len(cohort_a)}/{len(runs)}) · "
+            f"B: {fraction_b:.2%} ({len(cohort_b)}/{len(runs)}) · "
+            f"Δ(A−B) = {fraction_a - fraction_b:+.2%}"
+        )
+    else:
+        st.caption("Bar comparison hidden — pick categories for both groups to compare them.")
+
+    sorted_category_ids = sorted(
+        (cat.id for cat in ontology.categories),
+        key=natural_sort_key,
     )
-    fig.update_layout(
-        yaxis={
-            "range": [0, 1],
-            "title": "fraction of cohort exhibiting the group",
-        },
-        showlegend=False,
-        height=400,
-        margin={"l": 40, "r": 20, "t": 20, "b": 40},
+    _render_justifications_by_category(
+        runs=runs,
+        ontology=ontology,
+        category_summaries=[
+            (
+                category_id,
+                _outcomes_expander_header(
+                    category_id=category_id,
+                    group_labels=_groups_containing(
+                        category_id=category_id,
+                        group_a_ids=group_a_ids,
+                        group_b_ids=group_b_ids,
+                    ),
+                    runs=runs,
+                    threshold=threshold,
+                ),
+            )
+            for category_id in sorted_category_ids
+        ],
     )
-    st.plotly_chart(fig, use_container_width=True)
-    st.caption(
-        f"A: {fraction_a:.2%} ({len(cohort_a)}/{len(runs)}) · "
-        f"B: {fraction_b:.2%} ({len(cohort_b)}/{len(runs)}) · "
-        f"Δ(A−B) = {fraction_a - fraction_b:+.2%}"
-    )
+
+
+def _groups_containing(
+    category_id: str,
+    group_a_ids: set[str],
+    group_b_ids: set[str],
+) -> str:
+    """Tag for which groups a category is part of (``A``, ``B``, ``A + B``, or empty)."""
+    in_a = category_id in group_a_ids
+    in_b = category_id in group_b_ids
+    if in_a and in_b:
+        return "A + B"
+    if in_a:
+        return "A"
+    if in_b:
+        return "B"
+    return ""
+
+
+def _outcomes_expander_header(
+    category_id: str,
+    group_labels: str,
+    runs: list[FeaturePresenceRun],
+    threshold: float,
+) -> str:
+    """Header line for one category's justifications expander in the outcomes view."""
+    values = [run.scores.get(category_id, 0.0) for run in runs]
+    present = sum(1 for v in values if v >= threshold)
+    fraction = present / len(values) if values else 0.0
+    group_tag = f" [Group {group_labels}]" if group_labels else ""
+    return f"{category_id}{group_tag} — {fraction:.0%} of runs ≥ {threshold:g}"
 
 
 def _render_lookup_section(
