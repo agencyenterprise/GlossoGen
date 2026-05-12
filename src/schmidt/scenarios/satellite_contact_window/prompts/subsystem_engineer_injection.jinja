@@ -1,0 +1,19 @@
+{% if previous_outcome is not none %}
+--- PREVIOUS ROUND RESULT ---
+Round {{ round_number - 1 }}: {% if previous_outcome.recovered %}SATELLITE RECOVERED ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s of {{ previous_outcome.contact_window_seconds }}s window){% elif previous_outcome.window_closed %}NOT RECOVERED — contact window closed ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s, window was {{ previous_outcome.contact_window_seconds }}s).{% elif previous_outcome.judge_passed %}NOT RECOVERED — command sequence correct but the contact window had already closed.{% else %}NOT RECOVERED — command sequence rejected: {{ previous_outcome.judge_explanation }}{% endif %}
+{% endif %}
+{% if current_case is not none %}
+--- LIVE COMMAND RESOLVER ---
+Round {{ round_number }}
+Contact window: {{ current_case.contact_window_seconds }}s (one character = one second; total across all three of you)
+
+Telemetry patterns currently active on the satellite (in required execution order):
+{% for pattern in current_case.patterns %}
+{{ loop.index }}. {{ pattern.pattern_name }}
+   Observable readings: {{ pattern.observable_readings | join(" ") }}
+   Required command sequence:
+{% for step in pattern.command_sequence %}     - action={{ step.action }} wait_seconds={{ step.wait_seconds }}
+{% endfor %}{% endfor %}
+
+The telemetry operator can only describe what they see in the readings. Match their observations to the pattern list above and relay the full ordered command sequence verbatim, including the wait_seconds for each step. Confirm every step against the flight director before the operator submits the sequence.
+{% endif %}

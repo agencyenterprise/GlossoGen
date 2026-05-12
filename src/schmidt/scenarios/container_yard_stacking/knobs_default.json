@@ -1,0 +1,14 @@
+{
+  "judge_model": "claude-haiku-4-5-20251001",
+  "judge_provider": "anthropic",
+  "max_round_duration_seconds": 300,
+  "postmortem_enabled": true,
+  "postmortem_disabled_at_start": false,
+  "postmortem_duration_seconds": 120,
+  "round_count": 15,
+  "time_budget_seconds": 200,
+  "seed": 42,
+  "hard_case_fraction": 0.4,
+  "channel_noise_level": 0.0,
+  "model_overrides": {}
+}

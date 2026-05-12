@@ -1,45 +1,31 @@
 """Pydantic models representing discrete events emitted during a simulation run.
 
-Each event type captures a specific occurrence (e.g. an agent connecting, a message
-being sent, an LLM response completing) and is tagged with a literal ``event_type``
-discriminator. The ``SimulationEvent`` union at the bottom collects all concrete
-event types for serialization and dispatch.
+Core platform event subclasses live here. Scenario-specific event subclasses
+live in ``schmidt/scenarios/<scenario>/events.py``. At module load time
+:func:`_discover_scenario_event_types` walks the ``schmidt.scenarios``
+namespace package, imports every ``events`` submodule, and assembles them
+together with the core events into :data:`SIMULATION_EVENT_ADAPTER` — a
+discriminated-union :class:`pydantic.TypeAdapter` used by the JSONL
+parser. Scenario authors register new event types by adding them to
+their scenario's ``events.py``; no edit to this module is required.
+
+``EventBase`` and ``TokenUsage`` live in :mod:`schmidt.models.event_base`
+so scenario event modules can subclass ``EventBase`` without a circular
+dependency on this module.
 """
 
-from datetime import UTC, datetime
+import importlib
+import pkgutil
 from enum import Enum
-from typing import Annotated, Any, Literal, Union
-from uuid import uuid4
+from typing import Annotated, Any, Literal, TypeAlias, Union
 
-from pydantic import AliasChoices, BaseModel, Discriminator, Field
+from pydantic import Discriminator, TypeAdapter
 
+import schmidt.scenarios
+from schmidt.models.event_base import EventBase, TokenUsage
 from schmidt.models.message import SimulationMessage
 from schmidt.models.tool_definition import ToolCallRequest
 from schmidt.runtime.scheduled_events import ChannelVisibility
-
-
-class TokenUsage(BaseModel):
-    """Token counts returned by the LLM for a single request/response cycle."""
-
-    input_tokens: int
-    output_tokens: int
-    cache_read_input_tokens: int
-    cache_creation_input_tokens: int
-
-
-class EventBase(BaseModel):
-    """Base model for all simulation events, providing a unique ID, UTC timestamp, and round.
-
-    ``round_number`` is the round in which the event occurred. Lifecycle
-    events that fire before round 1 (``SimulationStarted``,
-    ``AgentRegistered``) carry ``round_number=0`` as a sentinel; every
-    other event carries the round it was emitted in. Subclasses do not
-    re-declare this field.
-    """
-
-    event_id: str = Field(default_factory=lambda: str(uuid4()))
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
-    round_number: int
 
 
 class SimulationStarted(EventBase):
@@ -50,7 +36,7 @@ class SimulationStarted(EventBase):
     scenario_name: str
     scenario_description: str
     channel_ids: list[str]
-    scenario_config: dict[str, Any] = Field(default_factory=dict)
+    scenario_config: dict[str, Any] = {}
     provider: str
 
 
@@ -219,40 +205,6 @@ class SimulationEnded(EventBase):
     total_cost_usd: float
 
 
-class VeyruStellarReading(BaseModel):
-    """Per-round stellar parameters derived from the position of star SAGWE392."""
-
-    offset: int
-    hold_duration: int
-    starting_face: str
-    intensity_level: str = Field(validation_alias=AliasChoices("intensity_level", "pressure_level"))
-
-
-class VeyruCaseStage(BaseModel):
-    """One stage of a Veyru case, with ground-truth symptoms and procedure."""
-
-    motif_name: str
-    observable_symptoms: str
-    treatment_motif_name: str
-    judge_expected_actions: str
-
-
-class VeyruCaseStarted(EventBase):
-    """Emitted once at round start with full ground-truth case data.
-
-    Evaluators read per-stage `observable_symptoms` and `judge_expected_actions`
-    directly from this event, decoupling them from the real observer's
-    stabilize_veyru tool calls.
-    """
-
-    event_type: Literal["veyru_case_started"] = "veyru_case_started"
-    case_number: int
-    failure_name: str
-    time_budget_seconds: int
-    stages: list[VeyruCaseStage]
-    stellar_reading: VeyruStellarReading
-
-
 class AgentSwappedMidRun(EventBase):
     """Emitted when the in-run scheduler swaps one agent for a fresh instance.
 
@@ -281,45 +233,73 @@ class PostmortemDisabledMidRun(EventBase):
     event_type: Literal["postmortem_disabled_mid_run"] = "postmortem_disabled_mid_run"
 
 
-class VeyruStabilizationJudged(EventBase):
-    """Emitted by the veyru scenario after the stabilization judge rules on a stabilize_veyru call.
+_CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
+    SimulationStarted,
+    AgentRegistered,
+    AgentConnected,
+    MessageSent,
+    LLMResponseReceived,
+    ToolCallInvoked,
+    ToolResultReceived,
+    RoundAdvanced,
+    AgentRunCycleFailed,
+    RoundEnded,
+    InjectionDelivered,
+    PostmortemStarted,
+    ChannelHistoryCleared,
+    ChannelMembershipChanged,
+    WorldEventDelivered,
+    SimulationEnded,
+    AgentSwappedMidRun,
+    PostmortemDisabledMidRun,
+)
 
-    Captures the expected procedure fed to the LLM judge and the judge's
-    verdict + explanation, so the frontend can show ground-truth context
-    alongside the corresponding ``ToolResultReceived``. Correlated to the
-    tool result by (agent_id, FIFO order) because MCP does not expose the
-    pydantic-ai tool_call_id inside the executor.
+
+def _discover_scenario_event_types() -> tuple[type[EventBase], ...]:
+    """Discover every ``EventBase`` subclass exported by a scenario ``events`` module.
+
+    Walks the ``schmidt.scenarios`` namespace package, imports each
+    ``<scenario_pkg>.events`` submodule when present, and collects every
+    module member that subclasses ``EventBase``. Scenario authors register
+    new event types by adding them to their scenario's ``events.py`` —
+    no edit to this module is required.
     """
+    collected: list[type[EventBase]] = []
+    for module_info in pkgutil.iter_modules(schmidt.scenarios.__path__):
+        if not module_info.ispkg:
+            continue
+        events_module_name = f"schmidt.scenarios.{module_info.name}.events"
+        try:
+            events_module = importlib.import_module(events_module_name)
+        except ModuleNotFoundError:
+            continue
+        for attr_name in dir(events_module):
+            attr = getattr(events_module, attr_name)
+            if (
+                isinstance(attr, type)
+                and issubclass(attr, EventBase)
+                and attr is not EventBase
+                and attr not in collected
+            ):
+                collected.append(attr)
+    return tuple(collected)
 
-    event_type: Literal["veyru_stabilization_judged"] = "veyru_stabilization_judged"
-    agent_id: str
-    expected_actions: str
-    judge_match: bool
-    judge_explanation: str
 
+_SCENARIO_EVENT_TYPES: tuple[type[EventBase], ...] = _discover_scenario_event_types()
 
-SimulationEvent = Annotated[
-    Union[
-        SimulationStarted,
-        AgentRegistered,
-        AgentConnected,
-        MessageSent,
-        LLMResponseReceived,
-        ToolCallInvoked,
-        ToolResultReceived,
-        RoundAdvanced,
-        AgentRunCycleFailed,
-        RoundEnded,
-        InjectionDelivered,
-        PostmortemStarted,
-        ChannelHistoryCleared,
-        ChannelMembershipChanged,
-        WorldEventDelivered,
-        SimulationEnded,
-        AgentSwappedMidRun,
-        PostmortemDisabledMidRun,
-        VeyruStabilizationJudged,
-        VeyruCaseStarted,
-    ],
-    Discriminator("event_type"),
-]
+_ALL_EVENT_TYPES: tuple[type[EventBase], ...] = (*_CORE_EVENT_TYPES, *_SCENARIO_EVENT_TYPES)
+
+# Statically-typed alias used by consumers. ``EventBase`` declares the
+# ``event_type`` discriminator, so type-checked code can read it on a generic
+# event without narrowing to a concrete subclass via ``isinstance`` first.
+# Concrete-subclass-specific fields still require ``isinstance`` narrowing.
+SimulationEvent: TypeAlias = EventBase
+
+# Runtime parsing uses the full discriminated union built from the discovered
+# scenario event types. ``Union`` accepts a tuple of types at runtime; the
+# ``Any`` cast hides this from the static type checker since the tuple is
+# only known at runtime.
+_simulation_event_union: Any = Union[_ALL_EVENT_TYPES]
+SIMULATION_EVENT_ADAPTER: TypeAdapter[EventBase] = TypeAdapter(
+    Annotated[_simulation_event_union, Discriminator("event_type")]
+)

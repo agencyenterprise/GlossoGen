@@ -1,0 +1,16 @@
+{% if previous_outcome is not none %}
+--- PREVIOUS ROUND RESULT ---
+Round {{ round_number - 1 }}: {% if previous_outcome.recovered %}ROBOT RECOVERED{% elif previous_outcome.budget_exceeded %}NOT RECOVERED — communication budget exceeded ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s, budget was {{ previous_outcome.time_budget_seconds }}s).{% elif previous_outcome.judge_passed %}NOT RECOVERED — recovery action correct but budget was already exhausted.{% else %}NOT RECOVERED — recovery action rejected: {{ previous_outcome.judge_explanation }}{% endif %}
+{% endif %}
+{% if current_case is not none %}
+--- NEW STOPPED ROBOT ---
+Round {{ round_number }}
+Time budget: {{ current_case.time_budget_seconds }}s (one character = one second; total across all three of you)
+
+A robot has stopped in {{ current_case.aisle }}, {{ current_case.bay }}.
+
+What you see and hear at the robot:
+{% for fault in current_case.faults %}{% for phrase in fault.observable_symptoms %}- {{ phrase }}
+{% endfor %}{% endfor %}
+You cannot tell from here what robot model or firmware it is running, what its diagnostic profile says, or whether the aisle is safe. Coordinate with the engineer and the safety coordinator before performing any recovery action.
+{% endif %}

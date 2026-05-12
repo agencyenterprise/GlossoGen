@@ -11,7 +11,8 @@ event.
 
 from typing import NamedTuple
 
-from schmidt.models.event import MessageSent, SimulationEvent, VeyruCaseStarted
+from schmidt.models.event import MessageSent, SimulationEvent
+from schmidt.scenarios.veyru.events import VeyruCaseStarted
 
 LINK_CHANNEL_IDS = frozenset({"link", "link_a", "link_b"})
 

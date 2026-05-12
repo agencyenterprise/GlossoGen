@@ -1,0 +1,17 @@
+{% if previous_outcome is not none %}
+--- PREVIOUS ROUND RESULT ---
+Round {{ round_number - 1 }}: {% if previous_outcome.round_succeeded %}SUCCESS — container {{ previous_outcome.incoming_container_id }} placed at {{ previous_outcome.target_position_text }} ({{ previous_outcome.characters_used }} chars / {{ previous_outcome.time_budget_seconds }}s budget){% elif previous_outcome.budget_exceeded %}FAILED — communication budget exceeded ({{ previous_outcome.characters_used }} chars, budget was {{ previous_outcome.time_budget_seconds }}s){% else %}FAILED — {{ previous_outcome.failure_reason }}{% endif %}
+{% endif %}
+{% if current_case is not none %}
+--- NEW INCOMING CONTAINER ---
+Round {{ round_number }}
+Time budget: {{ current_case.time_budget_seconds }}s (one character = one second; total across all three of you)
+
+You see one new container on the inbound lane:
+- Container ID: {{ current_case.incoming_container.container_id }}
+- Size class: {{ current_case.incoming_container.size_class }}
+- Loaded weight: {{ current_case.incoming_container.weight_tons }} metric tons
+- Departure group: {{ current_case.incoming_container.departure_group }}
+
+You cannot see this round's yard map, active crane stations, or where this container is supposed to go. The logistics planner sees all of that. Coordinate before calling move_truck_to_crane_spot.
+{% endif %}

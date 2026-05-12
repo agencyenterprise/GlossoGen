@@ -334,6 +334,37 @@ Two agents (Field Observer, Stabilization Engineer) stabilize failing Veyru enti
 
 ![Veyru scenario overview](images/veyru_overview.webp)
 
+### Warehouse Robot Recovery
+
+Three agents (Floor Associate, Robotics Engineer, Fleet Safety Coordinator) coordinate over a shared radio channel to recover stopped warehouse robots. Per-character communication budget; recovery procedures rotate per round with random wait times, intensities, and surfaces drawn from rotating parameter pools. See the [scenario README](src/schmidt/scenarios/warehouse_robot_recovery/README.md).
+
+### Satellite Contact Window
+
+Three agents (Telemetry Operator, Subsystem Engineer, Flight Director) submit ordered command sequences during a limited satellite contact window. Per-character budget on the comm link; the operator submits the sequence in a single judged call against the engineer's resolver and the flight director's authorization envelope. See the [scenario README](src/schmidt/scenarios/satellite_contact_window/README.md).
+
+### Container Yard Stacking
+
+Three agents (Yard Operator, Logistics Planner, Crane Operator) place one incoming container per round into its correct stack slot. Per-round changing yard map prevents postmortem memorization: the planner alone sees the active crane stations and stack layout, the yard operator alone sees the incoming container's manifest, the crane operator executes one physical move per `crane_move` call. See the [scenario README](src/schmidt/scenarios/container_yard_stacking/README.md).
+
+### Adding a New Scenario
+
+Scenarios are discovered automatically — to add one, drop a new package under `src/schmidt/scenarios/<your_scenario>/` and register the scenario class in `src/schmidt/scenario_registry.py`. The minimal package layout is:
+
+```
+src/schmidt/scenarios/<your_scenario>/
+├── __init__.py              # leave empty
+├── scenario.py              # your SimulationScenario subclass
+├── ids.py                   # agent IDs, channel IDs, tool names, markers
+├── knobs.py                 # your Pydantic knobs model extending BaseKnobs
+├── knobs_default.json       # canonical preset
+├── events.py                # your scenario-specific EventBase subclasses
+├── world.py                 # your ScenarioWorld subclass
+├── prompts/                 # Jinja2 templates (system prompts, injections, judge prompts)
+└── evaluation/              # your scenario-specific Metric subclasses
+```
+
+**Event types are auto-discovered.** Any `EventBase` subclass declared in your scenario's `events.py` is automatically picked up by `schmidt.models.event` at load time and registered in the discriminated-union JSONL parser — you don't need to edit `schmidt/models/event.py`. The discovery loop walks the `schmidt.scenarios` namespace package and imports every `<scenario>.events` submodule. To avoid circular imports, your `events.py` must import only from `schmidt.models.event_base` (where `EventBase` and `TokenUsage` live), never from `schmidt.models.event`, and your scenario package's `__init__.py` must stay empty.
+
 ## Project Structure
 
 ```
@@ -361,9 +392,13 @@ src/schmidt/
     communication_protocol.py  # Shared prompts for agent communication
 
   models/                      # Pydantic data models
+    event_base.py              # EventBase + TokenUsage (imported by scenario events)
+    event.py                   # Core platform events + scenario-event auto-discovery
   llm/                         # LLM provider abstraction (used by evaluation)
   evaluation/                  # Post-hoc Metric / Measurement infrastructure
-  scenarios/                   # One folder per scenario (class + Jinja2 prompts + README)
+  scenario_registry.py         # SCENARIO_REGISTRY (separate from scenarios/__init__.py
+                               #   to keep event discovery cycle-free)
+  scenarios/                   # One folder per scenario (class + events + prompts + README)
 
 modal/                         # Self-hosted LLM endpoint deployable to Modal (vLLM + Llama 3.3)
   serve_llama.py               # Modal app exposing OpenAI-compatible chat-completions API

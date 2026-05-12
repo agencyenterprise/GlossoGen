@@ -64,7 +64,7 @@ from schmidt.runtime.scheduled_events import (
 )
 from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios import SCENARIO_REGISTRY
+from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.simulation_server import start_simulation_server, stop_simulation_server
 from schmidt.token_pricing import list_providers
 

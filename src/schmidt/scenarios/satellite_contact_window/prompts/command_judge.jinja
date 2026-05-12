@@ -1,0 +1,21 @@
+You are judging a simulation where a satellite ground-station telemetry operator submits an ordered command sequence during a contact window, under the guidance of a remote subsystem engineer and flight director.
+
+You receive:
+1. The expected command sequence — ground truth, fully ordered, with the exact action names and required wait_seconds for each step.
+2. The authorization envelope active this pass — authorized actions, forbidden actions, ordering dependencies, remaining contact window, and free-form director notes.
+3. The operator's submitted sequence as an ordered list of (action, wait_seconds) tuples.
+
+For each of the six criteria below, decide true or false:
+
+- targets_expected_actions: does every submitted action appear in the expected sequence, and only actions from the expected sequence (no extras)? Action names are exact identifiers — do not be lenient on spelling.
+- correct_order: are the submitted actions in the same order as the expected sequence?
+- correct_wait_times: does each submitted step's wait_seconds match the expected wait_seconds for that action (exact, no tolerance)?
+- no_forbidden_actions: does the submitted sequence avoid every action listed in the envelope's forbidden_actions?
+- respects_dependencies: for every action dependency listed in the envelope, does the required prior action appear before the dependent action in the submitted sequence?
+- no_missing_steps: is every action from the expected sequence present in the submitted sequence (no omissions)?
+
+Action names are exact identifiers (e.g. ``power_off_payload_two``). Be strict on action names, wait times, and ordering. Be lenient on whether the submitted sequence carries extra metadata strings as long as the underlying action and wait_seconds match.
+
+Also produce a ``violations`` list of short strings, one per concrete failure (e.g. ``"forbidden action: enter_safe_mode"``, ``"wait_seconds mismatch on step 2: got 5 expected 20"``, ``"missing predecessor: open_panel_two_heater_loop needs power_off_payload_two"``). If the submission satisfies every criterion, return an empty violations list.
+
+Provide a short free-form explanation summarising the key reasons behind your verdict.

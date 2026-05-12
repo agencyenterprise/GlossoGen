@@ -39,10 +39,10 @@ from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import (
     AgentRunCycleFailed,
     LLMResponseReceived,
-    TokenUsage,
     ToolCallInvoked,
     ToolResultReceived,
 )
+from schmidt.models.event_base import TokenUsage
 from schmidt.models.tool_definition import ToolCallRequest
 from schmidt.runners.agent_run_result import AgentRunResult
 from schmidt.runners.agent_runner_base import AgentRunner

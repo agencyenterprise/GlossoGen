@@ -1,0 +1,26 @@
+{% if previous_outcome is not none %}
+--- PREVIOUS ROUND RESULT ---
+Round {{ round_number - 1 }}: {% if previous_outcome.recovered %}SATELLITE RECOVERED ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s of {{ previous_outcome.contact_window_seconds }}s window){% elif previous_outcome.window_closed %}NOT RECOVERED — contact window closed ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s, window was {{ previous_outcome.contact_window_seconds }}s).{% elif previous_outcome.judge_passed %}NOT RECOVERED — command sequence correct but the contact window had already closed.{% else %}NOT RECOVERED — command sequence rejected: {{ previous_outcome.judge_explanation }}{% endif %}
+{% endif %}
+{% if current_case is not none %}
+--- LIVE AUTHORIZATION ENVELOPE ---
+Round {{ round_number }}
+Contact window: {{ current_case.contact_window_seconds }}s (one character = one second; total across all three of you)
+
+Mission notes: {{ current_case.authorization_envelope.notes }}
+
+Authorized actions this pass:
+{% for action in current_case.authorization_envelope.authorized_actions %}- {{ action }}
+{% endfor %}
+
+Forbidden actions this pass (the operator must NOT include any of these in the submitted sequence):
+{% for action in current_case.authorization_envelope.forbidden_actions %}- {{ action }}
+{% endfor %}
+
+{% if current_case.authorization_envelope.dependencies | length > 0 %}Action dependencies (each listed action must be preceded by its requirement in the submitted sequence):
+{% for dep in current_case.authorization_envelope.dependencies %}- {{ dep.action }} requires prior action {{ dep.requires_prior_action }}
+{% endfor %}{% else %}Action dependencies: none.
+{% endif %}
+
+You do not know the satellite's telemetry pattern or the technical command sequence. Wait for the subsystem engineer to propose an ordered sequence, then check each step against this envelope and confirm or veto.
+{% endif %}

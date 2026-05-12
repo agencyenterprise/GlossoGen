@@ -16,7 +16,7 @@ from starlette.responses import StreamingResponse
 
 from schmidt.eval_manifest import read_eval_manifest
 from schmidt.models.event import RunStatus, SimulationEnded
-from schmidt.scenarios import SCENARIO_REGISTRY
+from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.server.response_models import LaunchStatus
 from schmidt.server.runs.detail_reader import (
     debug_log_path_for,

@@ -33,12 +33,6 @@ from schmidt.evaluation.reports.evaluation_report import (
 from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
-from schmidt.models.event import (
-    VeyruCaseStage,
-    VeyruCaseStarted,
-    VeyruStabilizationJudged,
-    VeyruStellarReading,
-)
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld, WorldContext
 from schmidt.scenario_protocol import ScenarioRuntimeHandle, SimulationScenario
@@ -53,6 +47,12 @@ from schmidt.scenarios.veyru.evaluation import (
     ProtocolProbeReplicaSelfSimilarityMetric,
     RoundSuccessAfterResumeMetric,
     RoundSuccessMetric,
+)
+from schmidt.scenarios.veyru.events import (
+    VeyruCaseStage,
+    VeyruCaseStarted,
+    VeyruStabilizationJudged,
+    VeyruStellarReading,
 )
 from schmidt.scenarios.veyru.ids import (
     FIELD_OBSERVER_A_ROLE,

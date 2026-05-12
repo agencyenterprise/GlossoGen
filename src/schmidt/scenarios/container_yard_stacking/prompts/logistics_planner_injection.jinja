@@ -1,0 +1,22 @@
+{% if previous_outcome is not none %}
+--- PREVIOUS ROUND RESULT ---
+Round {{ round_number - 1 }}: {% if previous_outcome.round_succeeded %}SUCCESS — container {{ previous_outcome.incoming_container_id }} placed at {{ previous_outcome.target_position_text }} ({{ previous_outcome.characters_used }} chars / {{ previous_outcome.time_budget_seconds }}s budget){% elif previous_outcome.budget_exceeded %}FAILED — communication budget exceeded ({{ previous_outcome.characters_used }} chars, budget was {{ previous_outcome.time_budget_seconds }}s){% else %}FAILED — {{ previous_outcome.failure_reason }}{% endif %}
+{% endif %}
+{% if current_case is not none %}
+--- NEW YARD MAP ---
+Round {{ round_number }}
+Time budget: {{ current_case.time_budget_seconds }}s (one character = one second; total across all three of you)
+
+ACTIVE CRANE STATIONS:
+{% for station in current_case.active_crane_stations %}- {{ station.station_name }} ({{ station.transfer_pad }}) — can reach stacks: {{ station.reachable_stacks | join(', ') }}
+{% endfor %}
+CURRENT STACK LAYOUT (Block Delta, Bay Seven; each stack listed bottom-to-top):
+{% for stack_index, contents in current_case.initial_stacks.items() %}- Stack {{ stack_index }}: {% if contents | length == 0 %}empty{% else %}{% for cid in contents %}Tier {{ loop.index }} = {{ cid }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}
+{% endfor %}
+TARGET FINAL POSITION FOR THE INCOMING CONTAINER:
+{{ current_case.target_position.block }}, {{ current_case.target_position.bay }}, Stack {{ current_case.target_position.stack }}, Tier {{ current_case.target_position.tier }}
+
+AVAILABLE TEMP HOLDING SLOTS: {{ current_case.temp_slot_names | join(', ') }}
+
+You do not yet know the incoming container's identity, size, weight, or departure group. The yard operator does — wait for them to report it before deciding the crane plan.
+{% endif %}

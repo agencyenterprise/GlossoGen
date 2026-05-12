@@ -1,0 +1,5 @@
+{% if channel_noise_level > 0 %}
+
+UNRELIABLE RADIO:
+The radio channel is not perfectly reliable. Each character you send has an independent chance of being dropped in transit; dropped characters appear as the underscore symbol "_". Corruption is applied once at send time, so when you read back the channel you see exactly what the other side received — no need to guess what they got. Treat "_" as missing data, never as a meaningful character.
+{% endif %}

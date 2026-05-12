@@ -24,6 +24,7 @@ from schmidt.models.event import (
     SimulationStarted,
     ToolResultReceived,
 )
+from schmidt.models.event_base import event_type_of
 from schmidt.run_repository import RunRepository
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ _NON_COMMITTABLE_TYPES: frozenset[str] = frozenset(
 
 def _build_commit_message(event: SimulationEvent) -> str:
     """Build a structured git commit message for a simulation event."""
-    event_type = event.event_type
+    event_type = event_type_of(event=event)
     event_id = event.event_id
     timestamp = event.timestamp.isoformat()
 
@@ -131,7 +132,7 @@ class EventLogger:
         async with self._write_lock:
             await self._file.write(data)
             await self._file.flush()
-            if self._repo is not None and event.event_type not in _NON_COMMITTABLE_TYPES:
+            if self._repo is not None and event_type_of(event=event) not in _NON_COMMITTABLE_TYPES:
                 await self._commit_event(event=event)
         self._event_bus.publish(event=event_dict)
 

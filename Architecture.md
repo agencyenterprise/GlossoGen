@@ -143,6 +143,37 @@ The `SimulationScenario` ABC defines a contract for scenario plug-ins.
 
 The game clock uses the timing methods to manage round progression and termination; injection delivery is triggered by the clock and performed by the runtime via `deliver_round_injections` / `deliver_postmortem_injections`, which read scenario-defined injection content and push it onto agent sessions.
 
+### Scenario Package Layout
+
+Each scenario is a Python sub-package under `schmidt/scenarios/<name>/` with intentionally-empty `__init__.py` files at the namespace and scenario-package levels. The empty inits matter — see "Scenario Event Discovery" below.
+
+```
+src/schmidt/scenarios/<scenario_name>/
+├── __init__.py              # empty (avoids eager-load circular import)
+├── scenario.py              # the SimulationScenario subclass
+├── ids.py                   # agent IDs, channel IDs, tool names, markers
+├── knobs.py                 # the Pydantic knobs model extending BaseKnobs
+├── knobs_default.json       # canonical preset
+├── events.py                # scenario-specific EventBase subclasses
+├── world.py                 # scenario-specific ScenarioWorld
+├── prompts/                 # Jinja2 templates for system prompts and injections
+└── evaluation/              # scenario-specific Metric subclasses
+```
+
+`SCENARIO_REGISTRY` lives in `schmidt/scenario_registry.py` (not in `schmidt/scenarios/__init__.py`) so importing event-related modules doesn't trigger eager loading of every scenario.
+
+### Scenario Event Discovery
+
+Scenarios register new event types by adding them to their `events.py` — no edit to `schmidt/models/event.py` is required.
+
+At module load time, `schmidt.models.event._discover_scenario_event_types()` walks the `schmidt.scenarios` namespace package via `pkgutil.iter_modules`, imports every `<scenario_pkg>.events` submodule when present, and collects every module member that subclasses `EventBase`. The discovered classes are combined with the core platform events into `_ALL_EVENT_TYPES`, which is then wrapped in a discriminated-union `TypeAdapter` exposed as `SIMULATION_EVENT_ADAPTER` for the JSONL parser.
+
+The auto-discovery works because:
+
+1. **Scenario `events.py` modules only import from `schmidt.models.event_base`** (where `EventBase` and `TokenUsage` live), never from `schmidt.models.event`. This breaks the would-be cycle.
+2. **Scenario package `__init__.py` files are empty**, so importing `schmidt.scenarios.<name>.events` does NOT cascade into loading `scenario.py` (which imports `schmidt.models.event` and would re-enter the partial module).
+3. **`SimulationEvent` is typed as `EventBase`** statically — the runtime-built discriminated union cannot be expressed as a static type. Concrete subclass attributes still require `isinstance(event, ConcreteEvent)` narrowing at use sites. The discriminator field `event_type: str` is declared on `EventBase` with `model_config = ConfigDict(frozen=True)` so subclasses can override it with `Literal[...]` covariantly.
+
 ## Agent Prompt Framing
 
 Agents are framed as AI assistants helping a person in a role — not as the role itself.

@@ -1,0 +1,15 @@
+You are judging a simulation where a yard operator sends a robotic truck carrying one incoming container to a crane station for transfer.
+
+You receive:
+1. The correct crane station the truck must arrive at (e.g. "Crane Station Two").
+2. The correct transfer pad at that station (e.g. "east transfer pad").
+3. The incoming container's identity (e.g. "Orion-742").
+4. The yard operator's free-text truck destination argument, as passed to the truck tool.
+
+For each criterion below, decide true or false:
+
+- targets_correct_station: does the destination text identify the correct crane station? Be lenient on phrasing ("Crane Two", "station 2", "C2") as long as the station is unambiguous from this round's options.
+- targets_correct_pad: does the destination text identify the correct transfer pad at that station?
+- carries_correct_container: does the destination text reference the correct incoming container by ID (or unambiguous shorthand)?
+
+Be lenient on wording, strict on identity. The truck must go to a specific station, a specific pad, with the specific incoming container. Provide a short free-form explanation summarising the key reasons behind your verdict.

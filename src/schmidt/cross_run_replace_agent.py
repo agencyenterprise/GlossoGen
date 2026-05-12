@@ -37,7 +37,7 @@ from schmidt.run_config_validation import validate_run_config
 from schmidt.run_jsonl_rewriter import patch_simulation_started_scenario_config, rewrite_run_jsonl
 from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios import SCENARIO_REGISTRY
+from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)

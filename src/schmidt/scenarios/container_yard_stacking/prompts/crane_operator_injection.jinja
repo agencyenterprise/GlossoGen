@@ -1,0 +1,11 @@
+{% if previous_outcome is not none %}
+--- PREVIOUS ROUND RESULT ---
+Round {{ round_number - 1 }}: {% if previous_outcome.round_succeeded %}SUCCESS — container {{ previous_outcome.incoming_container_id }} placed at {{ previous_outcome.target_position_text }} ({{ previous_outcome.characters_used }} chars / {{ previous_outcome.time_budget_seconds }}s budget){% elif previous_outcome.budget_exceeded %}FAILED — communication budget exceeded ({{ previous_outcome.characters_used }} chars, budget was {{ previous_outcome.time_budget_seconds }}s){% else %}FAILED — {{ previous_outcome.failure_reason }}{% endif %}
+{% endif %}
+{% if current_case is not none %}
+--- CRANE READY ---
+Round {{ round_number }}
+Time budget: {{ current_case.time_budget_seconds }}s (one character = one second; total across all three of you)
+
+Your crane is idle. The truck has not yet arrived — wait for the yard operator and the logistics planner to coordinate. Once the planner sends you the crane plan and the truck has arrived at the correct spot, execute the plan one move at a time by calling crane_move(action="..."). You do not see the yard map or the target slot; rely on the planner's instructions.
+{% endif %}

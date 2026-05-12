@@ -26,9 +26,8 @@ from schmidt.models.event import (
     SimulationStarted,
     ToolCallInvoked,
     ToolResultReceived,
-    VeyruCaseStarted,
-    VeyruStabilizationJudged,
 )
+from schmidt.scenarios.veyru.events import VeyruCaseStarted, VeyruStabilizationJudged
 from schmidt.scenarios.veyru.ids import (
     INTERN_JOIN_REASON,
     INTERN_TAKEOVER_REASON,

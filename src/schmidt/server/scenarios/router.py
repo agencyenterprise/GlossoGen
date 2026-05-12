@@ -10,7 +10,7 @@ from pathlib import Path
 import orjson
 from fastapi import APIRouter, HTTPException, Request
 
-from schmidt.scenarios import SCENARIO_REGISTRY
+from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.server.response_models import LaunchStatus
 from schmidt.server.run_launcher import launch_simulation
 from schmidt.server.scenarios.models import (

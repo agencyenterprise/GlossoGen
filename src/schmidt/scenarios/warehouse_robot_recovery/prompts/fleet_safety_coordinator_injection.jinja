@@ -1,0 +1,25 @@
+{% if previous_outcome is not none %}
+--- PREVIOUS ROUND RESULT ---
+Round {{ round_number - 1 }}: {% if previous_outcome.recovered %}ROBOT RECOVERED{% elif previous_outcome.budget_exceeded %}NOT RECOVERED — communication budget exceeded ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s, budget was {{ previous_outcome.time_budget_seconds }}s).{% elif previous_outcome.judge_passed %}NOT RECOVERED — recovery action correct but budget was already exhausted.{% else %}NOT RECOVERED — recovery action rejected: {{ previous_outcome.judge_explanation }}{% endif %}
+{% endif %}
+{% if current_case is not none %}
+--- LIVE SAFETY STATE ---
+Round {{ round_number }}
+Time budget: {{ current_case.time_budget_seconds }}s (one character = one second; total across all three of you)
+
+Robot location: {{ current_case.aisle }}, {{ current_case.bay }}.
+Fleet mode: {{ current_case.fleet_mode }}.
+Aisle status: {% if current_case.safety_state.aisle_locked %}LOCKED — another robot is currently passing through this aisle{% else %}CLEAR — no nearby robot traffic{% endif %}.
+
+Live notes:
+{% for note in current_case.safety_state.notes %}- {{ note }}
+{% endfor %}
+
+Forbidden actions this round (the floor associate must NOT perform any of these):
+{% for action in current_case.safety_state.forbidden_actions %}- {{ action }}
+{% endfor %}
+
+Other physical actions (cleaning sensors, centering the carried bin, scanning labels, manual wheel recovery, holding the diagnostic / mute / heading-reset buttons, polishing the camera, opening the payload vent, removing obstructions) are permitted unless explicitly listed above.
+
+You do not know the robot's fault or the recovery procedure. Wait for the engineer to propose a step list, then check each step against this live state and confirm or veto.
+{% endif %}
