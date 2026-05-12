@@ -9,13 +9,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from schmidt.server.runs.models import (
-    AgentDetail,
-    ChannelMessage,
-    ReasoningEntry,
-    RunDetailResponse,
-    ToolUseEntry,
-)
+from schmidt.server.runs.models import ReasoningEntry, RunDetailResponse, ToolUseEntry
+from schmidt.server.runs.run_detail_types import AgentDetail, ChannelMessage
 
 # ---------------------------------------------------------------------------
 # Color palettes — hex equivalents of Tailwind classes in agent-colors.ts

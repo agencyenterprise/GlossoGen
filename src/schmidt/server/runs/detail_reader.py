@@ -15,8 +15,6 @@ from schmidt.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,
     AgentSwappedMidRun,
-    ChannelHistoryCleared,
-    ChannelMembershipChanged,
     LLMResponseReceived,
     MessageSent,
     RoundEnded,
@@ -27,37 +25,25 @@ from schmidt.models.event import (
     ToolCallInvoked,
     ToolResultReceived,
 )
-from schmidt.scenarios.veyru.events import VeyruCaseStarted, VeyruStabilizationJudged
-from schmidt.scenarios.veyru.ids import (
-    INTERN_JOIN_REASON,
-    INTERN_TAKEOVER_REASON,
-    OBSERVER_SWAP_REASON,
-)
 from schmidt.server.runs.models import (
-    AgentDetail,
     AgentObservationResponse,
     AgentRunCycleFailedEntry,
     AgentSwapEventDTO,
-    ChannelMessage,
     CrossRunReplaceAgentSource,
     DebugLogEntry,
     EvalCostResponse,
     EvalReportResponse,
     ForkSource,
-    InternAnchor,
     MeasurementResponse,
     ReasoningEntry,
     ReplaceAgentSource,
     RoundEnding,
     RoundObservationResponse,
     RunDetailResponse,
-    SwapPoint,
     ToolUseEntry,
-    VeyruCaseStageDTO,
-    VeyruCaseSummary,
-    VeyruStabilizeMetadata,
-    VeyruStellarReadingDTO,
 )
+from schmidt.server.runs.run_detail_types import AgentDetail, ChannelMessage
+from schmidt.server.runs.scenario_extension import SCENARIO_RUN_EXTENSIONS
 from schmidt.stream_manifest import delete_manifest, read_manifest
 from schmidt.token_pricing import TokenPricing, find_pricing
 
@@ -216,7 +202,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     reasoning: list[ReasoningEntry] = []
     tool_use: list[ToolUseEntry] = []
     run_cycle_failures: list[AgentRunCycleFailedEntry] = []
-    veyru_cases: list[VeyruCaseSummary] = []
     round_endings: list[RoundEnding] = []
     total_messages = 0
     total_cost_usd = 0.0
@@ -225,20 +210,12 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
 
     tool_use_by_call_id: dict[str, ToolUseEntry] = {}
     pending_tool_results_by_call_id: dict[str, ToolResultReceived] = {}
-    pending_stabilize_metadata_by_agent: dict[str, list[VeyruStabilizeMetadata]] = {}
-    pending_stabilize_metadata_by_call_id: dict[str, VeyruStabilizeMetadata] = {}
     total_input_tokens = 0
     total_output_tokens = 0
     total_cache_read_tokens = 0
     total_cache_write_tokens = 0
     pricing_by_agent: dict[str, TokenPricing | None] = {}
     cost_from_tokens = 0.0
-    swap_cleared_round: int | None = None
-    swap_cleared_timestamp: datetime | None = None
-    intern_join_round: int | None = None
-    intern_join_timestamp: datetime | None = None
-    intern_takeover_round: int | None = None
-    intern_takeover_timestamp: datetime | None = None
 
     for event in events:
         if isinstance(event, SimulationStarted):
@@ -295,9 +272,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                 tu_entry.result = pending_result.result
                 tu_entry.result_timestamp = pending_result.timestamp
                 tu_entry.result_round_number = pending_result.round_number
-            pending_metadata = pending_stabilize_metadata_by_call_id.pop(event.call_id, None)
-            if pending_metadata is not None:
-                tu_entry.stabilize_metadata = pending_metadata
             tool_use.append(tu_entry)
             tool_use_by_call_id[event.call_id] = tu_entry
 
@@ -361,9 +335,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     tu_entry.result = pending_result.result
                     tu_entry.result_timestamp = pending_result.timestamp
                     tu_entry.result_round_number = pending_result.round_number
-                pending_metadata = pending_stabilize_metadata_by_call_id.pop(tc.call_id, None)
-                if pending_metadata is not None:
-                    tu_entry.stabilize_metadata = pending_metadata
                 tool_use.append(tu_entry)
                 tool_use_by_call_id[tc.call_id] = tu_entry
 
@@ -376,15 +347,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             else:
                 # Some runs log tool results before the parent LLM response block.
                 pending_tool_results_by_call_id[event.call_id] = event
-            if event.tool_name == "stabilize_veyru":
-                queue = pending_stabilize_metadata_by_agent.get(event.agent_id)
-                if queue:
-                    metadata = queue.pop(0)
-                    target = tool_use_by_call_id.get(event.call_id)
-                    if target is not None:
-                        target.stabilize_metadata = metadata
-                    else:
-                        pending_stabilize_metadata_by_call_id[event.call_id] = metadata
 
         elif isinstance(event, AgentRunCycleFailed):
             run_cycle_failures.append(
@@ -396,15 +358,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     cycle=event.cycle,
                     error_type=event.error_type,
                     message=event.message,
-                )
-            )
-
-        elif isinstance(event, VeyruStabilizationJudged):
-            pending_stabilize_metadata_by_agent.setdefault(event.agent_id, []).append(
-                VeyruStabilizeMetadata(
-                    expected_actions=event.expected_actions,
-                    judge_match=event.judge_match,
-                    judge_explanation=event.judge_explanation,
                 )
             )
 
@@ -420,44 +373,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     timestamp=msg.timestamp,
                     round_number=event.round_number,
                     token_count=event.token_count,
-                )
-            )
-
-        elif isinstance(event, ChannelHistoryCleared):
-            if event.reason == OBSERVER_SWAP_REASON and swap_cleared_round is None:
-                swap_cleared_round = event.round_number
-                swap_cleared_timestamp = event.timestamp
-
-        elif isinstance(event, ChannelMembershipChanged):
-            if event.reason == INTERN_JOIN_REASON and intern_join_round is None:
-                intern_join_round = event.round_number
-                intern_join_timestamp = event.timestamp
-            elif event.reason == INTERN_TAKEOVER_REASON and intern_takeover_round is None:
-                intern_takeover_round = event.round_number
-                intern_takeover_timestamp = event.timestamp
-
-        elif isinstance(event, VeyruCaseStarted):
-            veyru_cases.append(
-                VeyruCaseSummary(
-                    round_number=event.round_number,
-                    case_number=event.case_number,
-                    failure_name=event.failure_name,
-                    time_budget_seconds=event.time_budget_seconds,
-                    stages=[
-                        VeyruCaseStageDTO(
-                            motif_name=stage.motif_name,
-                            observable_symptoms=stage.observable_symptoms,
-                            treatment_motif_name=stage.treatment_motif_name,
-                            judge_expected_actions=stage.judge_expected_actions,
-                        )
-                        for stage in event.stages
-                    ],
-                    stellar_reading=VeyruStellarReadingDTO(
-                        offset=event.stellar_reading.offset,
-                        hold_duration=event.stellar_reading.hold_duration,
-                        starting_face=event.stellar_reading.starting_face,
-                        intensity_level=event.stellar_reading.intensity_level,
-                    ),
                 )
             )
 
@@ -510,22 +425,14 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
     evaluation_in_progress = eval_manifest is not None
     has_eval_log_file = (run_dir / "eval_stdout.log").exists()
 
-    swap_point = _build_swap_point(
-        swap_round=swap_cleared_round,
-        swap_timestamp=swap_cleared_timestamp,
-        messages=messages,
-        agents_by_id=agents_by_id,
-    )
-    intern_join = _build_intern_anchor(
-        round_number=intern_join_round,
-        anchor_timestamp=intern_join_timestamp,
-        messages=messages,
-    )
-    intern_takeover = _build_intern_anchor(
-        round_number=intern_takeover_round,
-        anchor_timestamp=intern_takeover_timestamp,
-        messages=messages,
-    )
+    extension = SCENARIO_RUN_EXTENSIONS.get(scenario_name)
+    if extension is not None:
+        scenario_extras = extension.build_extras(
+            events=events, agents_by_id=agents_by_id, messages=messages
+        )
+    else:
+        scenario_extras = None
+
     labels = await _read_labels_async(run_dir=run_dir)
     note = await _read_note(run_dir=run_dir)
 
@@ -562,77 +469,16 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         fork_source=fork_source,
         replace_agent_source=replace_agent_source,
         cross_run_replace_agent_source=cross_run_replace_agent_source,
-        swap_point=swap_point,
-        intern_join=intern_join,
-        intern_takeover=intern_takeover,
         labels=labels,
         note=note,
-        veyru_cases=veyru_cases,
         round_endings=round_endings,
+        scenario_extras=scenario_extras,
     )
 
 
 def debug_log_path_for(log_path: Path, scenario_name: str) -> Path:
     """Return the debug JSONL path corresponding to the main event log."""
     return log_path.with_name(f"{scenario_name}_debug.jsonl")
-
-
-OBSERVER_A_ID = "observer_a"
-OBSERVER_B_ID = "observer_b"
-
-
-def _build_swap_point(
-    swap_round: int | None,
-    swap_timestamp: datetime | None,
-    messages: list[ChannelMessage],
-    agents_by_id: dict[str, AgentDetail],
-) -> SwapPoint | None:
-    """Return a SwapPoint anchored on the first post-swap link message, or None."""
-    if swap_round is None or swap_timestamp is None:
-        return None
-    target_message_id: str | None = None
-    for msg in messages:
-        if msg.timestamp < swap_timestamp:
-            continue
-        if not msg.channel_id.startswith("link"):
-            continue
-        target_message_id = msg.message_id
-        break
-    if target_message_id is None:
-        return None
-    observer_a = agents_by_id.get(OBSERVER_A_ID)
-    observer_b = agents_by_id.get(OBSERVER_B_ID)
-    if observer_a is None or observer_b is None:
-        return None
-    return SwapPoint(
-        round_number=swap_round,
-        target_message_id=target_message_id,
-        swapped_observer_display_names=[observer_a.role_name, observer_b.role_name],
-    )
-
-
-def _build_intern_anchor(
-    round_number: int | None,
-    anchor_timestamp: datetime | None,
-    messages: list[ChannelMessage],
-) -> InternAnchor | None:
-    """Return an InternAnchor anchored on the first post-event link message, or None."""
-    if round_number is None or anchor_timestamp is None:
-        return None
-    target_message_id: str | None = None
-    for msg in messages:
-        if msg.timestamp < anchor_timestamp:
-            continue
-        if not msg.channel_id.startswith("link"):
-            continue
-        target_message_id = msg.message_id
-        break
-    if target_message_id is None:
-        return None
-    return InternAnchor(
-        round_number=round_number,
-        target_message_id=target_message_id,
-    )
 
 
 async def _read_note(run_dir: Path) -> str | None:

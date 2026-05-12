@@ -20,14 +20,7 @@ import {
   validatePhaseBuilder,
   type PhaseBuilderState,
 } from "./phase-builder";
-import { VeyruKnobsForm } from "./veyru/veyru-knobs-form";
-import {
-  buildPayload as buildVeyruPayload,
-  validateState as validateVeyruState,
-  type VeyruKnobsState,
-} from "./veyru/veyru-knobs-state";
-
-const VEYRU_SCENARIO = "veyru";
+import { getScenarioPlugin } from "./scenario-registry";
 
 type KnobsMap = Record<string, unknown>;
 type KnobPreview = { key: string; value: string };
@@ -156,7 +149,7 @@ export function NewSimulationForm() {
   }
   const [knobsFile, setKnobsFile] = useState("");
   const [knobs, setKnobs] = useState<KnobsMap | null>(null);
-  const [veyruState, setVeyruState] = useState<VeyruKnobsState | null>(null);
+  const [pluginState, setPluginState] = useState<unknown>(null);
   const [phaseBuilder, setPhaseBuilder] = useState<PhaseBuilderState>(emptyPhaseBuilderState());
   const [labels, setLabels] = useState<string[]>([]);
   const [labelInput, setLabelInput] = useState("");
@@ -181,7 +174,8 @@ export function NewSimulationForm() {
     },
   });
 
-  const isVeyru = scenario === VEYRU_SCENARIO;
+  const plugin = getScenarioPlugin(scenario);
+  const pluginKnobsForm = plugin.knobsForm;
 
   const knobsQuery = useQuery({
     queryKey: ["knobs", scenario, knobsFile],
@@ -195,7 +189,7 @@ export function NewSimulationForm() {
       setKnobs({ ...data.knobs });
       return data;
     },
-    enabled: !!scenario && !!knobsFile && !isVeyru,
+    enabled: !!scenario && !!knobsFile && pluginKnobsForm === null,
   });
 
   const selectedScenario = data?.scenarios.find(s => s.scenario_name === scenario);
@@ -204,14 +198,14 @@ export function NewSimulationForm() {
   const hasSelectedModel = model !== "" && provider !== "";
 
   const effectiveKnobsForAgents = useMemo<KnobsMap | null>(() => {
-    if (isVeyru) {
-      if (!veyruState) {
+    if (pluginKnobsForm !== null) {
+      if (pluginState === null) {
         return null;
       }
-      return buildVeyruPayload({ state: veyruState, modelOverrides: {} });
+      return pluginKnobsForm.buildPayload({ state: pluginState, modelOverrides: {} });
     }
     return knobs;
-  }, [isVeyru, veyruState, knobs]);
+  }, [pluginKnobsForm, pluginState, knobs]);
 
   const agentRolesQuery = useQuery({
     queryKey: ["agentRoles", scenario, effectiveKnobsForAgents],
@@ -228,12 +222,12 @@ export function NewSimulationForm() {
     enabled: !!scenario && (!needsKnobs || !!effectiveKnobsForAgents),
   });
 
-  const veyruErrors = useMemo(() => {
-    if (!isVeyru || !veyruState) {
+  const pluginFormErrors = useMemo(() => {
+    if (pluginKnobsForm === null || pluginState === null) {
       return [];
     }
-    return validateVeyruState(veyruState);
-  }, [isVeyru, veyruState]);
+    return pluginKnobsForm.validate(pluginState);
+  }, [pluginKnobsForm, pluginState]);
 
   const startMutation = useMutation({
     mutationFn: async () => {
@@ -242,11 +236,11 @@ export function NewSimulationForm() {
       const existingIds = new Set((before.data?.runs ?? []).map(r => r.run_id));
 
       let knobsPayload: KnobsMap | null;
-      if (isVeyru) {
-        if (!veyruState) {
-          throw new Error("Veyru settings have not loaded yet");
+      if (pluginKnobsForm !== null) {
+        if (pluginState === null) {
+          throw new Error("Scenario-specific settings have not loaded yet");
         }
-        knobsPayload = buildVeyruPayload({ state: veyruState, modelOverrides });
+        knobsPayload = pluginKnobsForm.buildPayload({ state: pluginState, modelOverrides });
       } else {
         knobsPayload = knobs ? { ...knobs } : null;
         if (Object.keys(modelOverrides).length > 0) {
@@ -334,8 +328,8 @@ export function NewSimulationForm() {
     if (phaseBuilderErrors.length > 0) {
       return false;
     }
-    if (isVeyru) {
-      return veyruState !== null && veyruErrors.length === 0;
+    if (pluginKnobsForm !== null) {
+      return pluginState !== null && pluginFormErrors.length === 0;
     }
     return !needsKnobs || !!knobs;
   })();
@@ -352,7 +346,7 @@ export function NewSimulationForm() {
     setScenario(value);
     setKnobsFile("");
     setKnobs(null);
-    setVeyruState(null);
+    setPluginState(null);
     setModelOverrides({});
     setPhaseBuilder(emptyPhaseBuilderState());
   }
@@ -410,12 +404,12 @@ export function NewSimulationForm() {
         onSelect={handleModelSelect}
       />
 
-      {isVeyru ? (
-        <VeyruKnobsForm
-          state={veyruState}
+      {pluginKnobsForm !== null ? (
+        <pluginKnobsForm.Component
+          state={pluginState}
           models={data?.models ?? []}
-          errors={veyruErrors}
-          onChange={setVeyruState}
+          errors={pluginFormErrors}
+          onChange={setPluginState}
         />
       ) : (
         <div className="space-y-2">

@@ -1125,20 +1125,6 @@ export interface components {
             run_dir: string;
         };
         /**
-         * InternAnchor
-         * @description Anchor for a timeline event in the Veyru intern-mode lifecycle.
-         *
-         *     Used for both the intern-join moment and the intern-takeover moment.
-         *     ``target_message_id`` is the first ``MessageSent`` on the link channel
-         *     after the anchor fired, so the frontend can scroll to that point.
-         */
-        InternAnchor: {
-            /** Round Number */
-            round_number: number;
-            /** Target Message Id */
-            target_message_id: string;
-        };
-        /**
          * KnobsContentResponse
          * @description Response containing the parsed contents of a knobs JSON file.
          */
@@ -1443,17 +1429,14 @@ export interface components {
             fork_source: components["schemas"]["ForkSource"] | null;
             replace_agent_source: components["schemas"]["ReplaceAgentSource"] | null;
             cross_run_replace_agent_source: components["schemas"]["CrossRunReplaceAgentSource"] | null;
-            swap_point: components["schemas"]["SwapPoint"] | null;
-            intern_join: components["schemas"]["InternAnchor"] | null;
-            intern_takeover: components["schemas"]["InternAnchor"] | null;
             /** Labels */
             labels: string[];
             /** Note */
             note: string | null;
-            /** Veyru Cases */
-            veyru_cases: components["schemas"]["VeyruCaseSummary"][];
             /** Round Endings */
             round_endings: components["schemas"]["RoundEnding"][];
+            /** Scenario Extras */
+            scenario_extras: components["schemas"]["VeyruRunExtras"] | null;
         };
         /**
          * RunListResponse
@@ -1959,23 +1942,6 @@ export interface components {
             status: components["schemas"]["LaunchStatus"];
         };
         /**
-         * SwapPoint
-         * @description Anchor for the moment agents were swapped between teams.
-         *
-         *     ``target_message_id`` is the first ``MessageSent`` on a link channel
-         *     after the swap fired, used by the frontend to scroll the timeline
-         *     to that exact point. ``swapped_observer_display_names`` are the
-         *     two observers who exchanged teams, in stable order.
-         */
-        SwapPoint: {
-            /** Round Number */
-            round_number: number;
-            /** Target Message Id */
-            target_message_id: string;
-            /** Swapped Observer Display Names */
-            swapped_observer_display_names: string[];
-        };
-        /**
          * SyncMetadataRequest
          * @description Body for the per-run metadata-only ingest endpoint.
          *
@@ -2044,7 +2010,6 @@ export interface components {
             round_number: number;
             /** Result Round Number */
             result_round_number: number | null;
-            stabilize_metadata?: components["schemas"]["VeyruStabilizeMetadata"] | null;
         };
         /**
          * UpdateLabelsRequest
@@ -2109,8 +2074,8 @@ export interface components {
          * VeyruCaseSummary
          * @description Per-round Veyru case metadata used by the round timeline modal.
          *
-         *     One entry per round when the scenario is Veyru. Mirrors the
-         *     ``VeyruCaseStarted`` event emitted at each round start.
+         *     One entry per round. Mirrors the ``VeyruCaseStarted`` event emitted
+         *     at each round start.
          */
         VeyruCaseSummary: {
             /** Round Number */
@@ -2126,12 +2091,46 @@ export interface components {
             stellar_reading: components["schemas"]["VeyruStellarReadingDTO"];
         };
         /**
+         * VeyruInternAnchor
+         * @description Anchor for a timeline event in the Veyru intern-mode lifecycle.
+         *
+         *     Used for both the intern-join moment and the intern-takeover moment.
+         *     ``target_message_id`` is the first ``MessageSent`` on the link channel
+         *     after the anchor fired, so the frontend can scroll to that point.
+         */
+        VeyruInternAnchor: {
+            /** Round Number */
+            round_number: number;
+            /** Target Message Id */
+            target_message_id: string;
+        };
+        /**
+         * VeyruRunExtras
+         * @description Scenario-specific run-detail payload surfaced for Veyru runs.
+         */
+        VeyruRunExtras: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            scenario_name: "veyru";
+            /** Cases */
+            cases: components["schemas"]["VeyruCaseSummary"][];
+            swap_point: components["schemas"]["VeyruSwapPoint"] | null;
+            intern_join: components["schemas"]["VeyruInternAnchor"] | null;
+            intern_takeover: components["schemas"]["VeyruInternAnchor"] | null;
+            /** Stabilize Metadata By Call Id */
+            stabilize_metadata_by_call_id: {
+                [key: string]: components["schemas"]["VeyruStabilizeMetadata"];
+            };
+        };
+        /**
          * VeyruStabilizeMetadata
          * @description Judge context captured for a single ``stabilize_veyru`` call.
          *
          *     Attached to the corresponding ``ToolUseEntry`` so the frontend can show
          *     the expected procedure and the LLM judge's verdict alongside the raw
-         *     tool call. Present only on ``stabilize_veyru`` entries.
+         *     tool call.
          */
         VeyruStabilizeMetadata: {
             /** Expected Actions */
@@ -2154,6 +2153,23 @@ export interface components {
             starting_face: string;
             /** Intensity Level */
             intensity_level: string;
+        };
+        /**
+         * VeyruSwapPoint
+         * @description Anchor for the moment agents were swapped between teams.
+         *
+         *     ``target_message_id`` is the first ``MessageSent`` on a link channel
+         *     after the swap fired, used by the frontend to scroll the timeline
+         *     to that exact point. ``swapped_observer_display_names`` are the
+         *     two observers who exchanged teams, in stable order.
+         */
+        VeyruSwapPoint: {
+            /** Round Number */
+            round_number: number;
+            /** Target Message Id */
+            target_message_id: string;
+            /** Swapped Observer Display Names */
+            swapped_observer_display_names: string[];
         };
     };
     responses: never;

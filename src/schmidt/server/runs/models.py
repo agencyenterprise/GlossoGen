@@ -9,6 +9,24 @@ from pydantic import BaseModel, ConfigDict, Discriminator
 from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 from schmidt.models.event import RunStatus
 from schmidt.server.response_models import LaunchStatus
+from schmidt.server.runs.run_detail_types import AgentDetail, ChannelMessage
+from schmidt.server.runs.scenario_extension import SCENARIO_RUN_EXTENSIONS, ScenarioRunExtrasBase
+
+_SCENARIO_EXTRAS_TYPES: tuple[type[ScenarioRunExtrasBase], ...] = tuple(
+    ext.extras_model_cls for ext in SCENARIO_RUN_EXTENSIONS.values()
+)
+
+# ``ScenarioRunExtras`` is a runtime-built discriminated union over every
+# ``ScenarioRunExtrasBase`` subclass advertised by a scenario's
+# ``run_detail_extension`` module. ``Union`` accepts a tuple at runtime;
+# the ``Any`` cast hides this from the static type checker since the
+# tuple is only known at runtime. When no scenario advertises extras the
+# union falls back to the base class so the OpenAPI schema stays valid.
+if _SCENARIO_EXTRAS_TYPES:
+    _scenario_extras_union: Any = Union[_SCENARIO_EXTRAS_TYPES]
+else:
+    _scenario_extras_union = ScenarioRunExtrasBase
+ScenarioRunExtras = Annotated[_scenario_extras_union, Discriminator("scenario_name")]
 
 
 class ForkSource(BaseModel):
@@ -57,32 +75,6 @@ class CrossRunReplaceAgentSource(BaseModel):
     replaced_at: datetime
 
 
-class SwapPoint(BaseModel):
-    """Anchor for the moment agents were swapped between teams.
-
-    ``target_message_id`` is the first ``MessageSent`` on a link channel
-    after the swap fired, used by the frontend to scroll the timeline
-    to that exact point. ``swapped_observer_display_names`` are the
-    two observers who exchanged teams, in stable order.
-    """
-
-    round_number: int
-    target_message_id: str
-    swapped_observer_display_names: list[str]
-
-
-class InternAnchor(BaseModel):
-    """Anchor for a timeline event in the Veyru intern-mode lifecycle.
-
-    Used for both the intern-join moment and the intern-takeover moment.
-    ``target_message_id`` is the first ``MessageSent`` on the link channel
-    after the anchor fired, so the frontend can scroll to that point.
-    """
-
-    round_number: int
-    target_message_id: str
-
-
 class AgentModelSummary(BaseModel):
     """Per-agent model and provider info for run summary display."""
 
@@ -124,18 +116,6 @@ class RunListResponse(BaseModel):
     runs: list[RunSummary]
 
 
-class AgentDetail(BaseModel):
-    """Full agent information for the run detail endpoint."""
-
-    agent_id: str
-    role_name: str
-    channel_ids: list[str]
-    tool_names: list[str]
-    model: str
-    provider: str
-    system_prompt: str
-
-
 class AgentSwapEventDTO(BaseModel):
     """One in-run agent swap, surfaced for per-instance tab rendering on the FE.
 
@@ -151,64 +131,6 @@ class AgentSwapEventDTO(BaseModel):
     new_model: str
     new_provider: str
     system_prompt: str
-
-
-class ChannelMessage(BaseModel):
-    """A message sent by an agent to a channel."""
-
-    message_id: str
-    channel_id: str
-    sender_agent_id: str
-    text: str
-    timestamp: datetime
-    round_number: int
-    token_count: int
-
-
-class VeyruStabilizeMetadata(BaseModel):
-    """Judge context captured for a single ``stabilize_veyru`` call.
-
-    Attached to the corresponding ``ToolUseEntry`` so the frontend can show
-    the expected procedure and the LLM judge's verdict alongside the raw
-    tool call. Present only on ``stabilize_veyru`` entries.
-    """
-
-    expected_actions: str
-    judge_match: bool
-    judge_explanation: str
-
-
-class VeyruStellarReadingDTO(BaseModel):
-    """Per-round stellar parameters shaping the Veyru procedure mapping."""
-
-    offset: int
-    hold_duration: int
-    starting_face: str
-    intensity_level: str
-
-
-class VeyruCaseStageDTO(BaseModel):
-    """One stage of a Veyru case with symptoms and the expected procedure."""
-
-    motif_name: str
-    observable_symptoms: str
-    treatment_motif_name: str
-    judge_expected_actions: str
-
-
-class VeyruCaseSummary(BaseModel):
-    """Per-round Veyru case metadata used by the round timeline modal.
-
-    One entry per round when the scenario is Veyru. Mirrors the
-    ``VeyruCaseStarted`` event emitted at each round start.
-    """
-
-    round_number: int
-    case_number: int
-    failure_name: str
-    time_budget_seconds: int
-    stages: list[VeyruCaseStageDTO]
-    stellar_reading: VeyruStellarReadingDTO
 
 
 class RoundEnding(BaseModel):
@@ -248,7 +170,6 @@ class ToolUseEntry(BaseModel):
     result_timestamp: datetime | None
     round_number: int
     result_round_number: int | None
-    stabilize_metadata: VeyruStabilizeMetadata | None = None
 
 
 class ReasoningEntry(BaseModel):
@@ -364,13 +285,10 @@ class RunDetailResponse(BaseModel):
     fork_source: ForkSource | None
     replace_agent_source: ReplaceAgentSource | None
     cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
-    swap_point: SwapPoint | None
-    intern_join: InternAnchor | None
-    intern_takeover: InternAnchor | None
     labels: list[str]
     note: str | None
-    veyru_cases: list[VeyruCaseSummary]
     round_endings: list[RoundEnding]
+    scenario_extras: ScenarioRunExtras | None
 
 
 class DebugLogsResponse(BaseModel):
@@ -812,35 +730,27 @@ class SSEAgentRunCycleFailed(BaseModel):
     message: str
 
 
-class SSEVeyruStabilizationJudged(BaseModel):
-    """SSE event carrying the veyru stabilization judge's verdict for a stabilize_veyru call."""
+_CORE_SSE_TYPES: tuple[type[BaseModel], ...] = (
+    SSESimulationStarted,
+    SSEAgentRegistered,
+    SSEAgentConnected,
+    SSEMessageSent,
+    SSELLMResponseReceived,
+    SSEToolCallInvoked,
+    SSEToolResultReceived,
+    SSERoundAdvanced,
+    SSEInjectionDelivered,
+    SSESimulationEnded,
+    SSEAgentCostUpdated,
+    SSEDebugLog,
+    SSEAgentRunCycleFailed,
+)
 
-    event_type: Literal["veyru_stabilization_judged"]
-    event_id: str
-    timestamp: datetime
-    agent_id: str
-    round_number: int
-    expected_actions: str
-    judge_match: bool
-    judge_explanation: str
+_SCENARIO_SSE_TYPES: tuple[type[BaseModel], ...] = tuple(
+    cls
+    for ext in SCENARIO_RUN_EXTENSIONS.values()
+    for cls in ext.sse_event_classes
+)
 
-
-SSEEvent = Annotated[
-    Union[
-        SSESimulationStarted,
-        SSEAgentRegistered,
-        SSEAgentConnected,
-        SSEMessageSent,
-        SSELLMResponseReceived,
-        SSEToolCallInvoked,
-        SSEToolResultReceived,
-        SSERoundAdvanced,
-        SSEInjectionDelivered,
-        SSESimulationEnded,
-        SSEAgentCostUpdated,
-        SSEDebugLog,
-        SSEAgentRunCycleFailed,
-        SSEVeyruStabilizationJudged,
-    ],
-    Discriminator("event_type"),
-]
+_sse_event_union: Any = Union[(*_CORE_SSE_TYPES, *_SCENARIO_SSE_TYPES)]
+SSEEvent = Annotated[_sse_event_union, Discriminator("event_type")]

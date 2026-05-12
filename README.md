@@ -209,7 +209,7 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
   2> /tmp/veyru_eval_debug.log
 ```
 
-The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth motif tables) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `schmidt evaluate` and by `scripts/consolidate_communication_ontology.py` (see below). Without it the harness defaults to `INFO`. Both are dotenv-friendly — set them in `.env` for a persistent default or inline as shown above.
+The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth motif tables) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `schmidt evaluate` and by `src/schmidt/scenarios/veyru/scripts/consolidate_communication_ontology.py` (see below). Without it the harness defaults to `INFO`. Both are dotenv-friendly — set them in `.env` for a persistent default or inline as shown above.
 
 If the judge's structured output truncates (you'll see a `Field required ... input_value={}` validation warning followed by a metric failure), bump the per-call output-token cap by setting `LLM_MAX_TOKENS=32768` (or higher) in `.env` or inline. The default of `16384` covers the verbose communication-feature outputs but pathological runs with many labels × many evidence citations can still exceed it.
 
@@ -229,7 +229,7 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
 
 # 2. Consolidation: one LLM call across N runs. Produces a versioned
 #    taxonomy committed under analysis/communication_ontology/.
-LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.py \
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python src/schmidt/scenarios/veyru/scripts/consolidate_communication_ontology.py \
   --run-id veyru/<id1> --run-id veyru/<id2> --run-id veyru/<id3> \
   --runs-dir ./runs \
   --output analysis/communication_ontology/<version>.json \
@@ -364,6 +364,12 @@ src/schmidt/scenarios/<your_scenario>/
 ```
 
 **Event types are auto-discovered.** Any `EventBase` subclass declared in your scenario's `events.py` is automatically picked up by `schmidt.models.event` at load time and registered in the discriminated-union JSONL parser — you don't need to edit `schmidt/models/event.py`. The discovery loop walks the `schmidt.scenarios` namespace package and imports every `<scenario>.events` submodule. To avoid circular imports, your `events.py` must import only from `schmidt.models.event_base` (where `EventBase` and `TokenUsage` live), never from `schmidt.models.event`, and your scenario package's `__init__.py` must stay empty.
+
+**Custom run-detail data (optional).** To surface per-round ground truth, judge metadata, or scenario-specific SSE events on the run-detail API, add `src/schmidt/scenarios/<your_scenario>/run_detail_extension.py` with a `ScenarioRunExtrasBase` subclass and a `ScenarioRunDetailExtension` subclass that emits it. The platform auto-discovers them at startup and adds your `XxxRunExtras` variant to the `RunDetailResponse.scenario_extras` discriminated union (and your `sse_event_classes` to the SSE event union). See [scenarios/veyru/run_detail_extension.py](src/schmidt/scenarios/veyru/run_detail_extension.py) for a worked example. Skip this file if your scenario has no custom run-detail data — `scenario_extras` resolves to `None` for unregistered scenarios.
+
+**Custom frontend UI (optional).** To replace the standard knobs picker with a bespoke form, render a per-round detail panel in the timeline modal, or pre-fill the replace-agent dialog with default knobs, ship a `ScenarioPlugin` at `frontend/src/features/runs/<your_scenario>/plugin.tsx` and add it to [scenario-registry.ts](frontend/src/features/runs/scenario-registry.ts). The plug-in contract is defined in [scenario-plugin.ts](frontend/src/features/runs/scenario-plugin.ts). Scenarios without a registered plug-in fall back to the default no-op implementation, so the standard preset picker is used.
+
+**Per-scenario scripts and analysis.** One-off scripts that import directly from your scenario (smoke runners, probe-bank generators, scenario-specific orchestrators) live under `src/schmidt/scenarios/<your_scenario>/scripts/`, not in the repo-root `scripts/` folder. Cross-scenario scripts (the OpenAPI exporter, generic diagnostic tools) stay in `scripts/`. Phase 3 of the platformification refactor moved every veyru-only script (`build_probe_questions.py`, `consolidate_communication_ontology.py`, `run_communication_pipeline.sh`, baseline runners, repro scripts) into [scenarios/veyru/scripts/](src/schmidt/scenarios/veyru/scripts/). The Streamlit `analysis/results_viewer/` is still scenario-aware (its tabs import veyru constants for the link-channel ID, swap reason strings, etc.) — refactoring it to a plug-in-driven structure is tracked tech debt.
 
 ## Project Structure
 

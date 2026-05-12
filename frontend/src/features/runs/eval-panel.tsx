@@ -35,9 +35,9 @@ export function EvalPanel({
           </button>
         </div>
         <div className="divide-y divide-border">
-          {evaluation.measurements.map(measurement => (
+          {evaluation.measurements.map((measurement, index) => (
             <button
-              key={measurement.metric_name}
+              key={`${measurement.metric_name}::${index}`}
               className="flex w-full items-center justify-between gap-2 py-1.5 text-left transition-colors hover:bg-muted/50"
               onClick={() => setExpandedMeasurement(measurement)}
             >
