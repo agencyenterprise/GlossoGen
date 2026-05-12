@@ -348,28 +348,7 @@ Three agents (Yard Operator, Logistics Planner, Crane Operator) place one incomi
 
 ### Adding a New Scenario
 
-Scenarios are discovered automatically — to add one, drop a new package under `src/schmidt/scenarios/<your_scenario>/` and register the scenario class in `src/schmidt/scenario_registry.py`. The minimal package layout is:
-
-```
-src/schmidt/scenarios/<your_scenario>/
-├── __init__.py              # leave empty
-├── scenario.py              # your SimulationScenario subclass
-├── ids.py                   # agent IDs, channel IDs, tool names, markers
-├── knobs.py                 # your Pydantic knobs model extending BaseKnobs
-├── knobs_default.json       # canonical preset
-├── events.py                # your scenario-specific EventBase subclasses
-├── world.py                 # your ScenarioWorld subclass
-├── prompts/                 # Jinja2 templates (system prompts, injections, judge prompts)
-└── evaluation/              # your scenario-specific Metric subclasses
-```
-
-**Event types are auto-discovered.** Any `EventBase` subclass declared in your scenario's `events.py` is automatically picked up by `schmidt.models.event` at load time and registered in the discriminated-union JSONL parser — you don't need to edit `schmidt/models/event.py`. The discovery loop walks the `schmidt.scenarios` namespace package and imports every `<scenario>.events` submodule. To avoid circular imports, your `events.py` must import only from `schmidt.models.event_base` (where `EventBase` and `TokenUsage` live), never from `schmidt.models.event`, and your scenario package's `__init__.py` must stay empty.
-
-**Custom run-detail data (optional).** To surface per-round ground truth, judge metadata, or scenario-specific SSE events on the run-detail API, add `src/schmidt/scenarios/<your_scenario>/run_detail_extension.py` with a `ScenarioRunExtrasBase` subclass and a `ScenarioRunDetailExtension` subclass that emits it. The platform auto-discovers them at startup and adds your `XxxRunExtras` variant to the `RunDetailResponse.scenario_extras` discriminated union (and your `sse_event_classes` to the SSE event union). See [scenarios/veyru/run_detail_extension.py](src/schmidt/scenarios/veyru/run_detail_extension.py) for a worked example. Skip this file if your scenario has no custom run-detail data — `scenario_extras` resolves to `None` for unregistered scenarios.
-
-**Custom frontend UI (optional).** To replace the standard knobs picker with a bespoke form, render a per-round detail panel in the timeline modal, or pre-fill the replace-agent dialog with default knobs, ship a `ScenarioPlugin` at `frontend/src/features/runs/<your_scenario>/plugin.tsx` and add it to [scenario-registry.ts](frontend/src/features/runs/scenario-registry.ts). The plug-in contract is defined in [scenario-plugin.ts](frontend/src/features/runs/scenario-plugin.ts). Scenarios without a registered plug-in fall back to the default no-op implementation, so the standard preset picker is used.
-
-**Per-scenario scripts and analysis.** One-off scripts that import directly from your scenario (smoke runners, probe-bank generators, scenario-specific orchestrators) live under `src/schmidt/scenarios/<your_scenario>/scripts/`, not in the repo-root `scripts/` folder. Cross-scenario scripts (the OpenAPI exporter, generic diagnostic tools) stay in `scripts/`. Phase 3 of the platformification refactor moved every veyru-only script (`build_probe_questions.py`, `consolidate_communication_ontology.py`, `run_communication_pipeline.sh`, baseline runners, repro scripts) into [scenarios/veyru/scripts/](src/schmidt/scenarios/veyru/scripts/). The Streamlit `analysis/results_viewer/` is still scenario-aware (its tabs import veyru constants for the link-channel ID, swap reason strings, etc.) — refactoring it to a plug-in-driven structure is tracked tech debt.
+See [docs/creating-a-scenario.md](docs/creating-a-scenario.md) for the full step-by-step guide — package layout, every optional extension surface (run-detail API hook, frontend plug-in, per-scenario scripts), the canonical smoke-test recipe, and a pre-flight checklist.
 
 ## Project Structure
 
