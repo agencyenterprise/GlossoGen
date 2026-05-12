@@ -1,0 +1,17 @@
+{
+  "channel_noise_level": 0.0,
+  "contact_window_seconds": 200,
+  "judge_model": "claude-haiku-4-5-20251001",
+  "judge_provider": "anthropic",
+  "max_round_duration_seconds": 300,
+  "model_overrides": {},
+  "pattern_count_max": 3,
+  "pattern_count_min": 1,
+  "postmortem_disabled_at_start": false,
+  "postmortem_enabled": true,
+  "replace_agent_default_channel_visibility": {
+    "postmortem": false
+  },
+  "round_count": 15,
+  "seed": 42
+}

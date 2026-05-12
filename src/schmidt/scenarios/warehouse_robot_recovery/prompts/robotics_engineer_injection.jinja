@@ -1,0 +1,21 @@
+{% if previous_outcome is not none %}
+--- PREVIOUS ROUND RESULT ---
+Round {{ round_number - 1 }}: {% if previous_outcome.recovered %}ROBOT RECOVERED{% elif previous_outcome.budget_exceeded %}NOT RECOVERED — communication budget exceeded ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s, budget was {{ previous_outcome.time_budget_seconds }}s).{% elif previous_outcome.judge_passed %}NOT RECOVERED — recovery action correct but budget was already exhausted.{% else %}NOT RECOVERED — recovery action rejected: {{ previous_outcome.judge_explanation }}{% endif %}
+{% endif %}
+{% if current_case is not none %}
+--- LIVE RECOVERY SHEET ---
+Round {{ round_number }}
+Time budget: {{ current_case.time_budget_seconds }}s (one character = one second; total across all three of you)
+
+Robot ID: {{ current_case.robot_id }}
+Robot model: {{ current_case.robot_model }}
+Firmware state: {{ current_case.firmware_state }}
+Fleet mode: {{ current_case.fleet_mode }}
+
+Live faults present on this robot (in required recovery order):
+{% for fault in current_case.faults %}
+{{ loop.index }}. {{ fault.fault_name }} — recovery: {{ fault.recovery_procedure }}
+{% endfor %}
+
+The floor associate can only describe what they see and hear. Match their observations to the fault list above and relay the full procedure verbatim, including the wait times. Confirm every step against the safety coordinator before the floor associate executes anything.
+{% endif %}

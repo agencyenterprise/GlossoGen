@@ -22,7 +22,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import AnyHttpUrl
 
 from schmidt.evaluation.reports.evaluation_report import EvaluationReport
-from schmidt.scenarios import SCENARIO_REGISTRY
+from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.server.mcp.models import (
     McpAgent,
     McpAgentModel,

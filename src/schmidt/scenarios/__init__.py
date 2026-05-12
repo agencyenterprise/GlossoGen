@@ -1,12 +1,9 @@
-"""Registry of available simulation scenarios.
+"""Namespace package for simulation scenarios.
 
-Maps scenario name strings to their implementing classes, used by the CLI
-to look up and instantiate the requested scenario.
+Empty by design: importing ``schmidt.scenarios.<name>.events`` from
+:mod:`schmidt.models.event` would otherwise eagerly load every scenario's
+``scenario.py`` (which imports ``schmidt.models.event``) and create a
+circular dependency. The eager registry of available scenarios lives in
+:mod:`schmidt.scenario_registry` and is imported only by top-level
+consumers (CLI, server, replace-agent flow).
 """
-
-from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.veyru import VeyruScenario
-
-SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
-    "veyru": VeyruScenario,
-}

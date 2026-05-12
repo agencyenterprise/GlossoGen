@@ -24,7 +24,7 @@ from schmidt.run_jsonl_rewriter import (
     rewrite_run_jsonl,
 )
 from schmidt.run_repository import RunRepository, claim_run_dir
-from schmidt.scenarios import SCENARIO_REGISTRY
+from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.server.runs.discovery import compose_run_id, resolve_run
 from schmidt.server.runs.models import ForkRequest, ForkResponse
 from schmidt.token_pricing import list_providers

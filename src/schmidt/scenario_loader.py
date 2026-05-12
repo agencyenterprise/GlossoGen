@@ -3,7 +3,7 @@
 import logging
 
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios import SCENARIO_REGISTRY
+from schmidt.scenario_registry import SCENARIO_REGISTRY
 
 logger = logging.getLogger(__name__)
 

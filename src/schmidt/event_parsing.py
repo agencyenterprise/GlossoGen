@@ -14,11 +14,10 @@ the running round across the file and backfills with the correct value.
 from typing import Any
 
 import orjson
-from pydantic import TypeAdapter
 
-from schmidt.models.event import SimulationEvent
+from schmidt.models.event import SIMULATION_EVENT_ADAPTER, SimulationEvent
 
-EVENT_ADAPTER: TypeAdapter[SimulationEvent] = TypeAdapter(SimulationEvent)
+EVENT_ADAPTER = SIMULATION_EVENT_ADAPTER
 
 
 def parse_event(raw: dict[str, Any]) -> SimulationEvent:

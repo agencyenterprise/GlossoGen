@@ -1,5 +1,7 @@
-"""Veyru stabilization simulation scenario."""
+"""Veyru stabilization scenario package.
 
-from schmidt.scenarios.veyru.scenario import VeyruScenario
-
-__all__ = ["VeyruScenario"]
+Intentionally empty. Import the scenario class directly from
+``schmidt.scenarios.veyru.scenario`` and event types from
+``schmidt.scenarios.veyru.events``. See
+:mod:`schmidt.scenarios.__init__` for why eager loading is avoided.
+"""
