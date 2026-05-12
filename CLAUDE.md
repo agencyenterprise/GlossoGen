@@ -19,6 +19,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 
 ## Project Structure
 
+- For a step-by-step guide on adding a new scenario, see [docs/creating-a-scenario.md](docs/creating-a-scenario.md).
 - `src/` — application source code
 - `src/schmidt/scenarios/<scenario_name>/` — one folder per scenario, containing:
   - `README.md` — scenario documentation
@@ -42,6 +43,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `pydantic_ai_model_factory.py` — per-provider mapping from `(model, provider)` to a pydantic-ai `model=` argument and default `ModelSettings`; shared by the runner and the post-simulation `protocol_probe` helper
   - `communication_protocol.py` — shared prompts and constants for the agent communication protocol
 - `src/schmidt/config_overrides.py` — Hydra-style dot-notation config override parser
+- `src/schmidt/scenario_registry.py` — maps scenario name strings to `SimulationScenario` classes; lives outside `schmidt.scenarios` package init so importing event-related modules doesn't trigger eager loading of every scenario
 - `src/schmidt/autonomous_supervisor.py` — autonomous mode orchestrator (supports resume via `RewindState`)
 - `src/schmidt/message_rewind.py` — reconstructs simulation state at any message for fork/resume
 - `src/schmidt/run_repository.py` — git-backed repository for run directories (init, commit, clone, checkout)
@@ -76,6 +78,8 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
   - `password_auth_middleware.py` — pure ASGI middleware for shared-password authentication
   - `runs/fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
+  - `runs/scenario_extension.py` — `ScenarioRunDetailExtension` ABC + auto-discovery of every scenario's optional `run_detail_extension.py`; powers the discriminated-union `scenario_extras` field on `RunDetailResponse`
+  - `runs/run_detail_types.py` — leaf DTOs (`AgentDetail`, `ChannelMessage`) shared by `models.py` and scenario-side extensions so extensions can import them without re-entering `models.py` during its discovery-time import
   - `mcp/browser.py` — MCP server mounted at `/mcp` for programmatic run browsing and launching (Claude Code, Cursor)
   - `mcp/oauth_provider.py` — OAuth 2.0 authorization server provider for MCP
   - `mcp/oauth_storage.py` — SQLite-backed storage for OAuth clients, codes, and tokens
@@ -90,6 +94,8 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `frontend/` — Next.js web application
   - `src/features/auth/` — authentication gate and login page
   - `src/features/mcp-config/` — MCP integration modal with connection instructions
+  - `src/features/runs/scenario-plugin.ts` — `ScenarioPlugin` interface (knobs form, round-detail panel, replace-agent defaults, tool-metadata renderer) — form state is `unknown` at the boundary so the registry can hold every plug-in under a single type
+  - `src/features/runs/scenario-registry.ts` — eager-imports each scenario's optional `<scenario>/plugin.tsx`; `getScenarioPlugin(name)` resolves an unknown name to the default no-op plug-in
 
 ### Prompt Templates
 
