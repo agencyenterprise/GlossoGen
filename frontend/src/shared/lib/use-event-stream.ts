@@ -43,6 +43,10 @@ export interface EventStreamState {
   totalCostUsd: number;
   /** Duration in seconds from the simulation_ended event. */
   durationSeconds: number;
+  /** Veyru-only: stabilize-judge metadata keyed by tool ``call_id``. Empty
+   *  for non-veyru runs. Mirrors ``VeyruRunExtras.stabilize_metadata_by_call_id``
+   *  but accumulated live from the SSE stream. */
+  stabilizeMetadataByCallId: Record<string, VeyruStabilizeMetadata>;
 }
 
 /**
@@ -71,6 +75,9 @@ export function useEventStream(
   const [isConnected, setIsConnected] = useState(false);
   const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
   const [runCycleFailures, setRunCycleFailures] = useState<AgentRunCycleFailedEntry[]>([]);
+  const [stabilizeMetadataByCallId, setStabilizeMetadataByCallId] = useState<
+    Record<string, VeyruStabilizeMetadata>
+  >({});
 
   const agentCostsRef = useRef<Map<string, number>>(new Map());
   const seenSseIdsRef = useRef<Set<string>>(new Set());
@@ -90,6 +97,7 @@ export function useEventStream(
     setStatus(null);
     setDebugLogs([]);
     setRunCycleFailures([]);
+    setStabilizeMetadataByCallId({});
     agentCostsRef.current = new Map();
     seenSseIdsRef.current = new Set();
     pendingStabilizeMetadataRef.current = new Map();
@@ -220,7 +228,6 @@ export function useEventStream(
             result_timestamp: null,
             round_number: data.round_number,
             result_round_number: null,
-            stabilize_metadata: null,
           };
           return [...prev, entry];
         });
@@ -229,11 +236,16 @@ export function useEventStream(
       eventSource.addEventListener("tool_result_received", (e: MessageEvent) => {
         const data: SSEToolResultReceived = JSON.parse(e.data);
         if (isDuplicate(data.event_id)) return;
-        let attachedMetadata: VeyruStabilizeMetadata | null = null;
         if (data.tool_name === "stabilize_veyru") {
           const queue = pendingStabilizeMetadataRef.current.get(data.agent_id);
           if (queue && queue.length > 0) {
-            attachedMetadata = queue.shift() ?? null;
+            const attachedMetadata = queue.shift();
+            if (attachedMetadata !== undefined) {
+              setStabilizeMetadataByCallId(prev => ({
+                ...prev,
+                [data.call_id]: attachedMetadata,
+              }));
+            }
           }
         }
         setToolUse(prev => {
@@ -246,7 +258,6 @@ export function useEventStream(
                     result: data.result,
                     result_timestamp: data.timestamp,
                     result_round_number: data.round_number,
-                    stabilize_metadata: attachedMetadata ?? t.stabilize_metadata,
                   }
                 : t
             );
@@ -264,7 +275,6 @@ export function useEventStream(
             result_timestamp: data.timestamp,
             round_number: data.round_number,
             result_round_number: data.round_number,
-            stabilize_metadata: attachedMetadata,
           };
           return [...prev, entry];
         });
@@ -359,5 +369,6 @@ export function useEventStream(
     runCycleFailures,
     totalCostUsd,
     durationSeconds,
+    stabilizeMetadataByCallId,
   };
 }

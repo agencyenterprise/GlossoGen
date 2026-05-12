@@ -60,12 +60,18 @@ const EMPTY_ENTRY_DEFAULTS = {
 };
 
 /** Merge channel messages, reasoning entries, tool uses, and run-cycle
- *  failures into a single sorted array. */
+ *  failures into a single sorted array.
+ *
+ *  ``stabilizeMetadataByCallId`` carries the veyru-only stabilize-judge
+ *  metadata keyed by tool ``call_id``. It is empty for non-veyru runs.
+ *  Plumbed in by the run-detail page from
+ *  ``RunDetailResponse.scenario_extras`` and the live SSE stream. */
 export function mergeEntries(
   messages: ChannelMessage[],
   reasoning: ReasoningEntry[],
   toolUse: ToolUseEntry[],
-  runCycleFailures: AgentRunCycleFailedEntry[]
+  runCycleFailures: AgentRunCycleFailedEntry[],
+  stabilizeMetadataByCallId: Record<string, VeyruStabilizeMetadata>
 ): DisplayEntry[] {
   const channelEntries: DisplayEntry[] = messages.map(m => ({
     ...EMPTY_ENTRY_DEFAULTS,
@@ -127,7 +133,7 @@ export function mergeEntries(
       tool_result: split ? null : t.result,
       call_id: t.call_id,
       paired_message_id: split ? resultMessageId : "",
-      stabilize_metadata: t.stabilize_metadata ?? null,
+      stabilize_metadata: stabilizeMetadataByCallId[t.call_id] ?? null,
     });
     if (split && t.result_timestamp !== null) {
       toolEntries.push({

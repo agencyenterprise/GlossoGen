@@ -174,6 +174,18 @@ The auto-discovery works because:
 2. **Scenario package `__init__.py` files are empty**, so importing `schmidt.scenarios.<name>.events` does NOT cascade into loading `scenario.py` (which imports `schmidt.models.event` and would re-enter the partial module).
 3. **`SimulationEvent` is typed as `EventBase`** statically — the runtime-built discriminated union cannot be expressed as a static type. Concrete subclass attributes still require `isinstance(event, ConcreteEvent)` narrowing at use sites. The discriminator field `event_type: str` is declared on `EventBase` with `model_config = ConfigDict(frozen=True)` so subclasses can override it with `Literal[...]` covariantly.
 
+### Scenario Run-Detail Extensions
+
+Scenarios that want to surface custom data on the run-detail API (per-round case ground truth, judge metadata keyed by tool `call_id`, scenario-specific SSE events) ship an optional `schmidt/scenarios/<name>/run_detail_extension.py` exporting a `ScenarioRunDetailExtension` subclass plus a `ScenarioRunExtrasBase` payload class.
+
+The discovery pipeline at `schmidt/server/runs/scenario_extension.py` walks `schmidt.scenarios.*` at module load, imports each `run_detail_extension` submodule when present, and instantiates every `ScenarioRunDetailExtension` it finds. The platform's [server/runs/models.py](src/schmidt/server/runs/models.py) builds `RunDetailResponse.scenario_extras` as a discriminated union over every discovered `ScenarioRunExtrasBase` subclass (discriminated by `scenario_name`), and the SSE event union is similarly extended by every extension's `sse_event_classes`. After the generic event walk, [server/runs/detail_reader.py](src/schmidt/server/runs/detail_reader.py) calls `extension.build_extras(events, agents_by_id, messages)` for the run's scenario and attaches the result.
+
+Veyru is the canonical example — see [scenarios/veyru/run_detail_extension.py](src/schmidt/scenarios/veyru/run_detail_extension.py) for `VeyruRunExtras`, the FIFO `(agent_id, call_id)` matcher that builds `stabilize_metadata_by_call_id`, the observer-swap / intern-join / intern-takeover anchors, and the per-round `VeyruCaseSummary` projection.
+
+### Scenario Frontend Plug-ins
+
+On the frontend side, each scenario optionally ships a `ScenarioPlugin` at `frontend/src/features/runs/<scenario>/plugin.tsx` and registers it in [scenario-registry.ts](frontend/src/features/runs/scenario-registry.ts). Platform components look the plug-in up via `getScenarioPlugin(scenarioName)` and route scenario-specific concerns through it instead of hardcoding `scenarioName === "veyru"` checks. The contract — `knobsForm`, `RoundDetailPanel`, `defaultReplaceAgentKnobs`, `renderToolMetadata` — lives in [scenario-plugin.ts](frontend/src/features/runs/scenario-plugin.ts); the default plug-in returns null/empty for every slot. Form state is typed `unknown` at the boundary so the registry can store every plug-in under a single type; each plug-in narrows internally.
+
 ## Agent Prompt Framing
 
 Agents are framed as AI assistants helping a person in a role — not as the role itself.

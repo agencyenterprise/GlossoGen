@@ -5,8 +5,9 @@ Feeds the LLM judge the run's link-channel messages and the per-round
 short labels naming the communication-pattern features the team
 exhibits. Persists the result as ``communication_open_coding.json`` in
 the run directory; the consolidation script under
-``scripts/consolidate_communication_ontology.py`` reads those sidecars
-across many runs to produce the shared taxonomy used by pass 3.
+``src/schmidt/scenarios/veyru/scripts/consolidate_communication_ontology.py``
+reads those sidecars across many runs to produce the shared taxonomy
+used by pass 3.
 """
 
 import logging

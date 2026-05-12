@@ -43,7 +43,7 @@ import { RoundTimelineModal } from "./round-timeline-modal";
 import type { PendingEdit } from "./use-fork";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
-type VeyruCaseSummary = components["schemas"]["VeyruCaseSummary"];
+type VeyruRunExtras = components["schemas"]["VeyruRunExtras"];
 type RoundEnding = components["schemas"]["RoundEnding"];
 
 interface ChatPaneProps {
@@ -95,8 +95,10 @@ interface ChatPaneProps {
   crossRunSourceARunId: string | null;
   /** Source B run id the imported agent came from (only set when crossRunReplaceRoundStart is set). */
   crossRunSourceBRunId: string | null;
-  /** Per-round Veyru case metadata (empty for non-Veyru scenarios). */
-  veyruCases: VeyruCaseSummary[];
+  /** Scenario name, used to dispatch to the scenario plug-in for the round-detail modal. */
+  scenarioName: string;
+  /** Scenario-specific run extras (e.g. veyru per-round case metadata). Null for scenarios with no extras. */
+  scenarioExtras: VeyruRunExtras | null;
   /** One entry per completed round describing why its main phase ended. */
   roundEndings: RoundEnding[];
   /** ISO timestamp at which the resume happened (replace-agent / fork). Turns and rounds with earlier timestamps are rendered faded so users see they were inherited from the source run. Null for non-resumed runs. */
@@ -217,7 +219,8 @@ export function ChatPane({
   crossRunReplacedAgentId,
   crossRunSourceARunId,
   crossRunSourceBRunId,
-  veyruCases,
+  scenarioName,
+  scenarioExtras,
   roundEndings,
   resumeCutoffTimestamp,
   agentSwapDividers,
@@ -313,14 +316,6 @@ export function ChatPane({
     }
     return byRound;
   }, [messages]);
-
-  const caseByRound = useMemo(() => {
-    const byRound = new Map<number, VeyruCaseSummary>();
-    for (const c of veyruCases) {
-      byRound.set(c.round_number, c);
-    }
-    return byRound;
-  }, [veyruCases]);
 
   const endingByRound = useMemo(() => {
     const byRound = new Map<number, RoundEnding>();
@@ -747,7 +742,8 @@ export function ChatPane({
         <RoundTimelineModal
           roundNumber={timelineRound}
           messages={messagesByRound.get(timelineRound) ?? []}
-          veyruCase={caseByRound.get(timelineRound) ?? null}
+          scenarioName={scenarioName}
+          scenarioExtras={scenarioExtras}
           roundEnding={endingByRound.get(timelineRound) ?? null}
           onClose={() => setTimelineRound(null)}
         />

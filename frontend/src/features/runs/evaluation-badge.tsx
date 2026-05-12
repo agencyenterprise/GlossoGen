@@ -123,8 +123,11 @@ export function EvaluationBadge({ runId }: { runId: string }) {
                 <span className="text-muted-foreground">No measurements recorded.</span>
               ) : (
                 <div className="space-y-0.5">
-                  {data.measurements.map(m => (
-                    <div key={m.metric_name} className="flex items-baseline justify-between gap-4">
+                  {data.measurements.map((m, index) => (
+                    <div
+                      key={`${m.metric_name}::${index}`}
+                      className="flex items-baseline justify-between gap-4"
+                    >
                       <span>{humanize(m.metric_name)}</span>
                       <span className="font-mono text-muted-foreground">
                         {m.score.toFixed(2)}

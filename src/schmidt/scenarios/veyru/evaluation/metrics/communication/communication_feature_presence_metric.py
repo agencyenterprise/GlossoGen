@@ -1,7 +1,8 @@
 """Pass 3 of the communication-feature analysis pipeline.
 
 Reads a consolidated ontology JSON file (produced by
-``scripts/consolidate_communication_ontology.py``) and asks the LLM
+``src/schmidt/scenarios/veyru/scripts/consolidate_communication_ontology.py``)
+and asks the LLM
 judge to score each ontology category on this run's link-channel
 messages. The result is a per-run feature-presence vector written to
 ``communication_feature_presence.json`` alongside the run's other

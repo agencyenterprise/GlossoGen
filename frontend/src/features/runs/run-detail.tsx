@@ -70,6 +70,7 @@ import { ConfigValueModal } from "./config-value-modal";
 import { AgentModelOverrides, type AgentModelOverride } from "./agent-model-overrides";
 import { LabelPickerModal } from "./label-picker-modal";
 import { NoteEditorModal } from "./note-editor-modal";
+import { getScenarioPlugin } from "./scenario-registry";
 
 function extractModelOverridesFromScenarioConfig(args: {
   scenarioConfig: Record<string, unknown>;
@@ -368,13 +369,27 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     const seenFailureIds = new Set(restRunCycleFailures.map(f => f.message_id));
     const newFailures = sse.runCycleFailures.filter(f => !seenFailureIds.has(f.message_id));
 
+    const restStabilizeMetadata = restData?.scenario_extras?.stabilize_metadata_by_call_id ?? {};
+    const stabilizeMetadataByCallId = {
+      ...restStabilizeMetadata,
+      ...sse.stabilizeMetadataByCallId,
+    };
+
     return mergeEntries(
       [...restMessages, ...newMessages],
       [...restReasoning, ...newReasoning],
       [...restToolUse, ...newToolUse],
-      [...restRunCycleFailures, ...newFailures]
+      [...restRunCycleFailures, ...newFailures],
+      stabilizeMetadataByCallId
     );
-  }, [restData, sse.messages, sse.reasoning, sse.toolUse, sse.runCycleFailures]);
+  }, [
+    restData,
+    sse.messages,
+    sse.reasoning,
+    sse.toolUse,
+    sse.runCycleFailures,
+    sse.stabilizeMetadataByCallId,
+  ]);
 
   // Auto-highlight a message from ?highlight= query param (e.g. from branches viewer)
   const highlightParam = searchParams.get("highlight");
@@ -805,10 +820,14 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             onReplaceAgentFromRound={handleReplaceAgentFromRound}
             onCrossRunReplaceFromRound={handleCrossRunReplaceFromRound}
             forkPointMessageId={restData.fork_source?.target_message_id ?? null}
-            swapRoundNumber={restData.swap_point?.round_number ?? null}
-            swappedObserverDisplayNames={restData.swap_point?.swapped_observer_display_names ?? []}
-            internJoinRoundNumber={restData.intern_join?.round_number ?? null}
-            internTakeoverRoundNumber={restData.intern_takeover?.round_number ?? null}
+            swapRoundNumber={restData.scenario_extras?.swap_point?.round_number ?? null}
+            swappedObserverDisplayNames={
+              restData.scenario_extras?.swap_point?.swapped_observer_display_names ?? []
+            }
+            internJoinRoundNumber={restData.scenario_extras?.intern_join?.round_number ?? null}
+            internTakeoverRoundNumber={
+              restData.scenario_extras?.intern_takeover?.round_number ?? null
+            }
             replaceAgentRoundStart={restData.replace_agent_source?.round_start ?? null}
             replaceAgentReplacedAgentId={restData.replace_agent_source?.replaced_agent_id ?? null}
             replaceAgentReplacementModel={restData.replace_agent_source?.replacement_model ?? null}
@@ -818,7 +837,8 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             }
             crossRunSourceARunId={restData.cross_run_replace_agent_source?.source_a_run_id ?? null}
             crossRunSourceBRunId={restData.cross_run_replace_agent_source?.source_b_run_id ?? null}
-            veyruCases={restData.veyru_cases}
+            scenarioName={restData.scenario_name}
+            scenarioExtras={restData.scenario_extras ?? null}
             roundEndings={restData.round_endings}
             resumeCutoffTimestamp={
               restData.replace_agent_source?.replaced_at ?? restData.fork_source?.forked_at ?? null
@@ -983,12 +1003,15 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
       ) : null}
 
       {(() => {
+        const veyruExtras = restData.scenario_extras ?? null;
+        const swapPoint = veyruExtras?.swap_point ?? null;
+        const internJoin = veyruExtras?.intern_join ?? null;
+        const internTakeover = veyruExtras?.intern_takeover ?? null;
         let nextStackIndex = 0;
         const forkStackIndex = restData.fork_source !== null ? nextStackIndex++ : null;
-        const swapStackIndex = restData.swap_point !== null ? nextStackIndex++ : null;
-        const internJoinStackIndex = restData.intern_join !== null ? nextStackIndex++ : null;
-        const internTakeoverStackIndex =
-          restData.intern_takeover !== null ? nextStackIndex++ : null;
+        const swapStackIndex = swapPoint !== null ? nextStackIndex++ : null;
+        const internJoinStackIndex = internJoin !== null ? nextStackIndex++ : null;
+        const internTakeoverStackIndex = internTakeover !== null ? nextStackIndex++ : null;
         const replaceAgentStackIndex =
           restData.replace_agent_source !== null ? nextStackIndex++ : null;
         const crossRunReplaceStackIndex =
@@ -1041,26 +1064,26 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
               />
             ) : null}
 
-            {restData.swap_point && swapStackIndex !== null ? (
+            {swapPoint && swapStackIndex !== null ? (
               <SwapPointFab
                 stackIndex={swapStackIndex}
-                roundNumber={restData.swap_point.round_number}
+                roundNumber={swapPoint.round_number}
                 onClick={() => scrollToDivider("swap-divider")}
               />
             ) : null}
 
-            {restData.intern_join && internJoinStackIndex !== null ? (
+            {internJoin && internJoinStackIndex !== null ? (
               <InternJoinFab
                 stackIndex={internJoinStackIndex}
-                roundNumber={restData.intern_join.round_number}
+                roundNumber={internJoin.round_number}
                 onClick={() => scrollToDivider("intern-join-divider")}
               />
             ) : null}
 
-            {restData.intern_takeover && internTakeoverStackIndex !== null ? (
+            {internTakeover && internTakeoverStackIndex !== null ? (
               <InternTakeoverFab
                 stackIndex={internTakeoverStackIndex}
-                roundNumber={restData.intern_takeover.round_number}
+                roundNumber={internTakeover.round_number}
                 onClick={() => scrollToDivider("intern-takeover-divider")}
               />
             ) : null}
@@ -1230,7 +1253,7 @@ function ReplaceAgentModal({
     sourceRoundCount !== null ? Math.max(1, sourceRoundCount - roundStart) : 1;
   const [roundsAfterSwap, setRoundsAfterSwap] = useState<number>(defaultRoundsAfterSwap);
 
-  const isVeyru = scenarioName === "veyru";
+  const plugin = getScenarioPlugin(scenarioName);
 
   const { data } = useQuery({
     queryKey: ["scenarios"],
@@ -1261,9 +1284,9 @@ function ReplaceAgentModal({
 
   function handleConfirmClick() {
     const visibleChannels = currentAgent?.channel_ids ?? [];
-    const knobs: Record<string, unknown> | null = isVeyru
-      ? { postmortem_disabled_at_start: true }
-      : null;
+    const defaults = plugin.defaultReplaceAgentKnobs;
+    const knobs: Record<string, unknown> | null =
+      Object.keys(defaults).length > 0 ? { ...defaults } : null;
     onConfirm(replacedAgentId, model, provider, roundsAfterSwap, visibleChannels, knobs);
   }
 

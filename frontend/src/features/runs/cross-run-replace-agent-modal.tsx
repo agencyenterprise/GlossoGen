@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/shared/lib/api-client";
 import { ModelPicker } from "./model-picker";
+import { getScenarioPlugin } from "./scenario-registry";
 
 interface SourceAgent {
   agent_id: string;
@@ -63,7 +64,7 @@ export function CrossRunReplaceAgentModal({
     sourceRoundCount !== null ? Math.max(1, sourceRoundCount - roundStart) : 1;
   const [roundsAfterSwap, setRoundsAfterSwap] = useState<number>(defaultRoundsAfterSwap);
 
-  const isVeyru = scenarioName === "veyru";
+  const plugin = getScenarioPlugin(scenarioName);
 
   const { data: candidateRuns, isLoading: candidatesLoading } = useQuery({
     queryKey: ["cross-run-candidates", scenarioName, replacedAgentId],
@@ -144,9 +145,9 @@ export function CrossRunReplaceAgentModal({
 
   function handleConfirmClick() {
     const visibleChannels = currentAgent?.channel_ids ?? [];
-    const knobs: Record<string, unknown> | null = isVeyru
-      ? { postmortem_disabled_at_start: true }
-      : null;
+    const defaults = plugin.defaultReplaceAgentKnobs;
+    const knobs: Record<string, unknown> | null =
+      Object.keys(defaults).length > 0 ? { ...defaults } : null;
     onConfirm({
       sourceBRunId,
       replacedAgentId,

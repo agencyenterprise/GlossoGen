@@ -2461,25 +2461,6 @@
         "title": "ImportBundleResponse",
         "description": "Response after successfully importing a run bundle."
       },
-      "InternAnchor": {
-        "properties": {
-          "round_number": {
-            "type": "integer",
-            "title": "Round Number"
-          },
-          "target_message_id": {
-            "type": "string",
-            "title": "Target Message Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "round_number",
-          "target_message_id"
-        ],
-        "title": "InternAnchor",
-        "description": "Anchor for a timeline event in the Veyru intern-mode lifecycle.\n\nUsed for both the intern-join moment and the intern-takeover moment.\n``target_message_id`` is the first ``MessageSent`` on the link channel\nafter the anchor fired, so the frontend can scroll to that point."
-      },
       "KnobsContentResponse": {
         "properties": {
           "knobs": {
@@ -3089,36 +3070,6 @@
               }
             ]
           },
-          "swap_point": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SwapPoint"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "intern_join": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/InternAnchor"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "intern_takeover": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/InternAnchor"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "labels": {
             "items": {
               "type": "string"
@@ -3137,19 +3088,33 @@
             ],
             "title": "Note"
           },
-          "veyru_cases": {
-            "items": {
-              "$ref": "#/components/schemas/VeyruCaseSummary"
-            },
-            "type": "array",
-            "title": "Veyru Cases"
-          },
           "round_endings": {
             "items": {
               "$ref": "#/components/schemas/RoundEnding"
             },
             "type": "array",
             "title": "Round Endings"
+          },
+          "scenario_extras": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/VeyruRunExtras"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "scenario_name",
+                  "mapping": {
+                    "veyru": "#/components/schemas/VeyruRunExtras"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Extras"
           }
         },
         "type": "object",
@@ -3177,13 +3142,10 @@
           "fork_source",
           "replace_agent_source",
           "cross_run_replace_agent_source",
-          "swap_point",
-          "intern_join",
-          "intern_takeover",
           "labels",
           "note",
-          "veyru_cases",
-          "round_endings"
+          "round_endings",
+          "scenario_extras"
         ],
         "title": "RunDetailResponse",
         "description": "Full detail of a simulation run including agents, messages, and evaluation."
@@ -4182,33 +4144,6 @@
         "title": "StartRunResponse",
         "description": "Response after successfully launching a new simulation."
       },
-      "SwapPoint": {
-        "properties": {
-          "round_number": {
-            "type": "integer",
-            "title": "Round Number"
-          },
-          "target_message_id": {
-            "type": "string",
-            "title": "Target Message Id"
-          },
-          "swapped_observer_display_names": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Swapped Observer Display Names"
-          }
-        },
-        "type": "object",
-        "required": [
-          "round_number",
-          "target_message_id",
-          "swapped_observer_display_names"
-        ],
-        "title": "SwapPoint",
-        "description": "Anchor for the moment agents were swapped between teams.\n\n``target_message_id`` is the first ``MessageSent`` on a link channel\nafter the swap fired, used by the frontend to scroll the timeline\nto that exact point. ``swapped_observer_display_names`` are the\ntwo observers who exchanged teams, in stable order."
-      },
       "SyncMetadataRequest": {
         "properties": {
           "labels": {
@@ -4351,16 +4286,6 @@
               }
             ],
             "title": "Result Round Number"
-          },
-          "stabilize_metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VeyruStabilizeMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "type": "object",
@@ -4549,7 +4474,90 @@
           "stellar_reading"
         ],
         "title": "VeyruCaseSummary",
-        "description": "Per-round Veyru case metadata used by the round timeline modal.\n\nOne entry per round when the scenario is Veyru. Mirrors the\n``VeyruCaseStarted`` event emitted at each round start."
+        "description": "Per-round Veyru case metadata used by the round timeline modal.\n\nOne entry per round. Mirrors the ``VeyruCaseStarted`` event emitted\nat each round start."
+      },
+      "VeyruInternAnchor": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "target_message_id": {
+            "type": "string",
+            "title": "Target Message Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "target_message_id"
+        ],
+        "title": "VeyruInternAnchor",
+        "description": "Anchor for a timeline event in the Veyru intern-mode lifecycle.\n\nUsed for both the intern-join moment and the intern-takeover moment.\n``target_message_id`` is the first ``MessageSent`` on the link channel\nafter the anchor fired, so the frontend can scroll to that point."
+      },
+      "VeyruRunExtras": {
+        "properties": {
+          "scenario_name": {
+            "type": "string",
+            "const": "veyru",
+            "title": "Scenario Name",
+            "default": "veyru"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/VeyruCaseSummary"
+            },
+            "type": "array",
+            "title": "Cases"
+          },
+          "swap_point": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VeyruSwapPoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "intern_join": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VeyruInternAnchor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "intern_takeover": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VeyruInternAnchor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stabilize_metadata_by_call_id": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/VeyruStabilizeMetadata"
+            },
+            "type": "object",
+            "title": "Stabilize Metadata By Call Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cases",
+          "swap_point",
+          "intern_join",
+          "intern_takeover",
+          "stabilize_metadata_by_call_id"
+        ],
+        "title": "VeyruRunExtras",
+        "description": "Scenario-specific run-detail payload surfaced for Veyru runs."
       },
       "VeyruStabilizeMetadata": {
         "properties": {
@@ -4573,7 +4581,7 @@
           "judge_explanation"
         ],
         "title": "VeyruStabilizeMetadata",
-        "description": "Judge context captured for a single ``stabilize_veyru`` call.\n\nAttached to the corresponding ``ToolUseEntry`` so the frontend can show\nthe expected procedure and the LLM judge's verdict alongside the raw\ntool call. Present only on ``stabilize_veyru`` entries."
+        "description": "Judge context captured for a single ``stabilize_veyru`` call.\n\nAttached to the corresponding ``ToolUseEntry`` so the frontend can show\nthe expected procedure and the LLM judge's verdict alongside the raw\ntool call."
       },
       "VeyruStellarReadingDTO": {
         "properties": {
@@ -4603,6 +4611,33 @@
         ],
         "title": "VeyruStellarReadingDTO",
         "description": "Per-round stellar parameters shaping the Veyru procedure mapping."
+      },
+      "VeyruSwapPoint": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "target_message_id": {
+            "type": "string",
+            "title": "Target Message Id"
+          },
+          "swapped_observer_display_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Swapped Observer Display Names"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "target_message_id",
+          "swapped_observer_display_names"
+        ],
+        "title": "VeyruSwapPoint",
+        "description": "Anchor for the moment agents were swapped between teams.\n\n``target_message_id`` is the first ``MessageSent`` on a link channel\nafter the swap fired, used by the frontend to scroll the timeline\nto that exact point. ``swapped_observer_display_names`` are the\ntwo observers who exchanged teams, in stable order."
       }
     }
   }
