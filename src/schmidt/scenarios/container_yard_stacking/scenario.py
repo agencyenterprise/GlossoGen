@@ -44,6 +44,7 @@ from schmidt.scenarios.container_yard_stacking.evaluation.build_communication_ro
 )
 from schmidt.scenarios.container_yard_stacking.events import (
     ContainerYardCaseStarted,
+    ContainerYardCaseStep,
     ContainerYardCraneMoveJudged,
     ContainerYardCraneMoveStep,
     ContainerYardCraneMoveVerdict,
@@ -81,6 +82,7 @@ from schmidt.scenarios.container_yard_stacking.ids import (
 from schmidt.scenarios.container_yard_stacking.knobs import ContainerYardStackingKnobs
 from schmidt.scenarios.container_yard_stacking.world import ContainerYardWorld, YardOutcome
 from schmidt.scenarios.container_yard_stacking.yard_cases import (
+    CaseStep,
     TruckAssignment,
     YardCase,
     get_cases,
@@ -114,13 +116,31 @@ def _truck_assignment_to_event(
     )
 
 
-def _correct_station_pads(case: YardCase) -> list[str]:
-    """Return the list of transfer pads at this round's correct crane station."""
+def _correct_station_pads_for_step(case: YardCase, step: CaseStep) -> list[str]:
+    """Return the list of transfer pads at the step's correct crane station."""
     for station in case.active_crane_stations:
-        if station.station_name == case.correct_crane_station:
+        if station.station_name == step.correct_crane_station:
             return list(station.pads)
     raise ValueError(
-        f"correct station {case.correct_crane_station} not found among active stations"
+        f"correct station {step.correct_crane_station} not found among active stations"
+    )
+
+
+def _case_step_to_event(step: CaseStep) -> ContainerYardCaseStep:
+    """Convert the case namedtuple step into the event-log BaseModel form."""
+    return ContainerYardCaseStep(
+        step_index=step.step_index,
+        incoming_container_id=step.incoming_container_id,
+        target_position=ContainerYardStackPosition(
+            stack=step.target_position.stack,
+            tier=step.target_position.tier,
+        ),
+        correct_crane_station=step.correct_crane_station,
+        truck_assignments=[
+            _truck_assignment_to_event(assignment=assignment)
+            for assignment in step.truck_assignments
+        ],
+        expected_move_sequence=list(step.expected_move_sequence),
     )
 
 
@@ -392,12 +412,14 @@ class ContainerYardStackingScenario(SimulationScenario):
         self._world.enter_postmortem()
 
     def get_early_round_end_trigger(self) -> str | None:
-        """End the round once placement completes or the world rules the round failed."""
+        """End the round once every step has succeeded or the world rules the round failed."""
         case = self._world.current_case
         if case is None:
             return None
-        if self._world.target_placed and self._world.accepted_move_count == len(
-            case.expected_move_sequence
+        if (
+            self._world.current_step is None
+            and not self._world.round_failed_terminally
+            and not self._world.round_budget_exceeded
         ):
             return "round_completed"
         if self._world.round_failed_terminally:
@@ -432,7 +454,6 @@ class ContainerYardStackingScenario(SimulationScenario):
             event=ContainerYardCaseStarted(
                 round_number=round_number,
                 case_number=case.case_number,
-                incoming_container_id=case.incoming_container_id,
                 active_crane_stations=[
                     ContainerYardCraneStation(
                         station_name=station.station_name,
@@ -441,7 +462,6 @@ class ContainerYardStackingScenario(SimulationScenario):
                     )
                     for station in case.active_crane_stations
                 ],
-                correct_crane_station=case.correct_crane_station,
                 initial_stacks=[
                     ContainerYardStackSnapshot(
                         stack=stack_index,
@@ -449,16 +469,8 @@ class ContainerYardStackingScenario(SimulationScenario):
                     )
                     for stack_index, containers in sorted(case.initial_stacks.items())
                 ],
-                target_position=ContainerYardStackPosition(
-                    stack=case.target_position.stack,
-                    tier=case.target_position.tier,
-                ),
-                truck_assignments=[
-                    _truck_assignment_to_event(assignment=assignment)
-                    for assignment in case.truck_assignments
-                ],
-                expected_move_sequence=list(case.expected_move_sequence),
                 time_budget_seconds=case.time_budget_seconds,
+                steps=[_case_step_to_event(step=step) for step in case.steps],
                 manifest=[
                     ContainerYardManifestEntry(
                         container_id=entry.container_id,
@@ -547,9 +559,10 @@ class ContainerYardStackingScenario(SimulationScenario):
             if self._world.round_failed_terminally:
                 return "Round has already failed terminally; no more truck commits accepted."
             case = self._world.current_case
-            if case is None:
-                return "No active yard case."
-            correct_station_pads = _correct_station_pads(case=case)
+            current_step = self._world.current_step
+            if case is None or current_step is None:
+                return "No active yard step."
+            correct_station_pads = _correct_station_pads_for_step(case=case, step=current_step)
             assignment = self._world.find_assignment(truck_role=truck_role)
             role_matches_active_assignment = assignment is not None
             targets_correct_station = (
@@ -593,6 +606,7 @@ class ContainerYardStackingScenario(SimulationScenario):
                     event=ContainerYardTruckJudged(
                         agent_id=agent_id,
                         round_number=self._runtime.current_round,
+                        step_index=current_step.step_index,
                         submitted_truck_role=truck_role,
                         submitted_station_name=station_name,
                         submitted_pad=pad,
@@ -634,15 +648,16 @@ class ContainerYardStackingScenario(SimulationScenario):
                 return (
                     f"{MOVE_REJECTED_MARKER}. The round has already failed; no more moves accepted."
                 )
-            case = self._world.current_case
-            if case is None:
-                return "No active yard case."
-            next_index = self._world.accepted_move_count
-            if next_index >= len(case.expected_move_sequence):
+            current_step = self._world.current_step
+            if current_step is None:
+                return f"{MOVE_REJECTED_MARKER}. No active yard step."
+            next_index = self._world.step_accepted_move_count
+            if next_index >= len(current_step.expected_move_sequence):
                 return (
-                    f"{MOVE_REJECTED_MARKER}. All expected crane moves have already been executed."
+                    f"{MOVE_REJECTED_MARKER}. All expected crane moves for this step have "
+                    "already been executed."
                 )
-            expected_step = case.expected_move_sequence[next_index]
+            expected_step = current_step.expected_move_sequence[next_index]
             missing_role = _next_step_missing_truck_role(world=self._world, step=expected_step)
             if missing_role is not None:
                 return (
@@ -709,6 +724,7 @@ class ContainerYardStackingScenario(SimulationScenario):
                     event=ContainerYardCraneMoveJudged(
                         agent_id=agent_id,
                         round_number=self._runtime.current_round,
+                        step_index=current_step.step_index,
                         move_index=expected_step.move_index,
                         submitted_move=submitted_move,
                         verdict=verdict,

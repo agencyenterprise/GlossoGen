@@ -61,14 +61,14 @@ def build_communication_rounds(events: list[SimulationEvent]) -> list[Communicat
 
 
 def _render_header(case: ContainerYardCaseStarted | None) -> str:
-    """One-line row anchor for each round (difficulty + target slot)."""
+    """One-line row anchor for each round (step count + target slots)."""
     if case is None:
         return "(unknown)"
-    difficulty = "hard" if len(case.truck_assignments) >= 2 else "easy"
-    return (
-        f"{difficulty} · target Stack {case.target_position.stack} "
-        f"Tier {case.target_position.tier}"
+    targets = " | ".join(
+        f"step{step.step_index}→Stack {step.target_position.stack} Tier {step.target_position.tier}"
+        for step in case.steps
     )
+    return f"{len(case.steps)} container(s) · {targets}"
 
 
 def _render_ground_truth_block(case: ContainerYardCaseStarted | None) -> str:
@@ -76,20 +76,27 @@ def _render_ground_truth_block(case: ContainerYardCaseStarted | None) -> str:
     if case is None:
         return "(no case data for this round)"
     sections: list[str] = []
-    sections.append("YARD OPERATOR sees (only the incoming container's ID):")
-    sections.append(f"- {case.incoming_container_id}")
+    sections.append(
+        "YARD OPERATOR sees (one incoming container ID at a time, revealed step by step):"
+    )
+    for step in case.steps:
+        sections.append(f"- step {step.step_index}: {step.incoming_container_id}")
     sections.append("")
-    sections.append("LOGISTICS PLANNER sees (yard map + target slot + shift manifest):")
+    sections.append("LOGISTICS PLANNER sees (yard map + shift manifest + per-step targets):")
     sections.append(
         "- active crane stations: "
         + "; ".join(_render_station(station=station) for station in case.active_crane_stations)
     )
-    sections.append(f"- correct crane station this round: {case.correct_crane_station}")
-    sections.append("- current stack layout:")
+    sections.append("- current stack layout (round start):")
     sections.extend(f"    {_render_stack_snapshot(stack=stack)}" for stack in case.initial_stacks)
-    sections.append(f"- target slot: {_render_stack_position(case.target_position)}")
+    sections.append("- per-step ground truth:")
+    for step in case.steps:
+        sections.append(
+            f"    step {step.step_index}: target {_render_stack_position(step.target_position)} "
+            f"via {step.correct_crane_station}"
+        )
     sections.append(
-        "- shift manifest (id → target slot, only ONE entry matches the active container):"
+        "- shift manifest (id → target slot; the real entries map one-to-one to active steps):"
     )
     sections.extend(
         f"    {entry.container_id} → {_render_stack_position(entry.target_position)}"
@@ -98,15 +105,19 @@ def _render_ground_truth_block(case: ContainerYardCaseStarted | None) -> str:
     sections.append("")
     sections.append("CRANE OPERATOR sees: nothing case-specific (relies on planner relay).")
     sections.append("")
-    sections.append("Expected this round:")
-    sections.append(
-        "- truck commitments: "
-        + ", ".join(
-            _render_truck_assignment(assignment=assignment) for assignment in case.truck_assignments
+    sections.append("Expected per step:")
+    for step in case.steps:
+        sections.append(
+            f"  step {step.step_index} trucks: "
+            + ", ".join(
+                _render_truck_assignment(assignment=assignment)
+                for assignment in step.truck_assignments
+            )
         )
-    )
-    sections.append("- crane plan (in order):")
-    sections.extend(f"    {_render_crane_step(step=step)}" for step in case.expected_move_sequence)
+        sections.append(f"  step {step.step_index} crane plan:")
+        sections.extend(
+            f"    {_render_crane_step(step=move)}" for move in step.expected_move_sequence
+        )
     return "\n".join(sections)
 
 

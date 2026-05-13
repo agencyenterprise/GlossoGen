@@ -1,15 +1,19 @@
 """World simulation for the container_yard_stacking scenario.
 
-Tracks the four-stack yard state, the per-truck positions and contents
-(inbound truck always; outbound truck whenever the round needs a
-blocker moved aside), the per-round running character count on the link
-channel, and the crane-move history. The world is mutated synchronously
-by the two scenario tools: structured ``move_truck`` args feed
-``record_truck_commit`` and structured ``crane_move`` args feed
-``record_crane_move``. Round success is deterministic: every expected
-truck must arrive at the correct spot, the expected crane plan must
-complete on the live world state, and the communication budget must not
-have been exceeded.
+Tracks the four-stack yard state, the per-step (per-container) truck
+positions and contents, the per-round running character count on the
+link channel, and the crane-move history. The world is mutated
+synchronously by the two scenario tools: structured ``move_truck`` args
+feed ``record_truck_commit`` and structured ``crane_move`` args feed
+``record_crane_move``.
+
+A round delivers one or more incoming containers. Each delivery is one
+"step": the yard operator commits trucks for the step, the crane operator
+executes the step's planned moves, and once the incoming container reaches
+its target the world advances to the next step and privately notifies the
+yard operator of the next container's ID. Round success requires every
+step to complete with its expected trucks and moves and the round budget
+not to have been exceeded.
 """
 
 import asyncio
@@ -34,17 +38,20 @@ from schmidt.scenarios.container_yard_stacking.ids import (
     ROUND_SUCCESS_MARKER,
     TRUCK_ARRIVED_MARKER,
     TRUCK_WRONG_SPOT_MARKER,
+    YARD_OPERATOR_ID,
 )
-from schmidt.scenarios.container_yard_stacking.yard_cases import TruckAssignment, YardCase
+from schmidt.scenarios.container_yard_stacking.yard_cases import CaseStep, TruckAssignment, YardCase
 
 logger = logging.getLogger(__name__)
 
 THRESHOLD_BUDGET_EXCEEDED = "budget_exceeded"
 THRESHOLD_CRITICAL = "critical"
 
+NEXT_CONTAINER_MARKER = "NEXT INCOMING CONTAINER"
+
 
 class TruckState(NamedTuple):
-    """Live per-round position and contents of one truck."""
+    """Live per-step position and contents of one truck."""
 
     truck_role: str
     arrived: bool
@@ -61,23 +68,36 @@ class TruckCommitResult(NamedTuple):
     duplicate: bool
 
 
+class StepOutcome(NamedTuple):
+    """One step's recorded outcome within a completed round."""
+
+    step_index: int
+    incoming_container_id: str
+    target_position_text: str
+    succeeded: bool
+    expected_move_count: int
+    accepted_move_count: int
+    expected_truck_count: int
+    correctly_committed_truck_count: int
+
+
 class YardOutcome(NamedTuple):
     """Result of a single yard case after a round completes."""
 
     case_number: int
-    incoming_container_id: str
-    target_position_text: str
-    expected_move_count: int
-    accepted_move_count: int
-    trucks_arrived_at_correct_spot: bool
-    expected_truck_count: int
-    correctly_committed_truck_count: int
-    target_placed: bool
+    step_count: int
+    steps_succeeded: int
+    step_outcomes: tuple[StepOutcome, ...]
+    total_expected_move_count: int
+    total_accepted_move_count: int
+    total_expected_truck_count: int
+    total_correctly_committed_truck_count: int
     budget_exceeded: bool
     characters_used: int
     time_budget_seconds: int
     round_succeeded: bool
     failure_reason: str
+    failure_step_index: int | None
 
 
 class ContainerYardWorld(ScenarioWorld):
@@ -100,11 +120,13 @@ class ContainerYardWorld(ScenarioWorld):
         self._outcomes: list[YardOutcome] = []
         self._current_stacks: dict[int, list[str]] = {}
         self._truck_states: dict[str, TruckState] = {}
-        self._accepted_moves: list[ContainerYardCraneMoveStep] = []
-        self._target_placed: bool = False
         self._round_failed_terminally: bool = False
         self._failure_reason: str = ""
         self._round_outcome_marked: bool = False
+        self._current_step_index: int = 0
+        self._step_accepted_move_count: int = 0
+        self._step_correctly_committed_truck_count: int = 0
+        self._step_outcomes: list[StepOutcome] = []
 
     @property
     def context(self) -> WorldContext:
@@ -115,6 +137,16 @@ class ContainerYardWorld(ScenarioWorld):
     def current_case(self) -> YardCase | None:
         """The yard case for the current round."""
         return self._current_case
+
+    @property
+    def current_step(self) -> CaseStep | None:
+        """The step the round is currently expecting trucks / moves for, if any."""
+        case = self._current_case
+        if case is None:
+            return None
+        if self._current_step_index >= len(case.steps):
+            return None
+        return case.steps[self._current_step_index]
 
     @property
     def in_postmortem(self) -> bool:
@@ -137,14 +169,9 @@ class ContainerYardWorld(ScenarioWorld):
         return self._round_budget_exceeded
 
     @property
-    def accepted_move_count(self) -> int:
-        """Number of crane moves accepted so far this round."""
-        return len(self._accepted_moves)
-
-    @property
-    def target_placed(self) -> bool:
-        """Whether the incoming container has been placed at its target slot."""
-        return self._target_placed
+    def step_accepted_move_count(self) -> int:
+        """Crane moves accepted for the current step so far."""
+        return self._step_accepted_move_count
 
     @property
     def round_failed_terminally(self) -> bool:
@@ -156,31 +183,8 @@ class ContainerYardWorld(ScenarioWorld):
         """Historical per-round outcomes."""
         return self._outcomes
 
-    def all_trucks_arrived_correctly(self) -> bool:
-        """Whether every expected truck for this round has arrived at the correct spot.
-
-        A truck counts as correctly arrived when it is parked at the
-        correct station's pads (any pad chosen by the planner) and the
-        world accepted the commitment. The planner-chosen pad is recorded
-        in ``truck_states[role].pad`` at commit time; we treat any
-        non-empty pad here as valid because ``record_truck_commit`` only
-        stores accepted commits.
-        """
-        case = self._current_case
-        if case is None:
-            return False
-        for assignment in case.truck_assignments:
-            state = self._truck_states.get(assignment.truck_role)
-            if state is None or not state.arrived:
-                return False
-            if state.station_name != assignment.station_name:
-                return False
-            if state.pad == "":
-                return False
-        return True
-
     def truck_arrived(self, truck_role: str) -> bool:
-        """Whether the named truck role has arrived at its correct spot this round."""
+        """Whether the named truck role has arrived at its correct spot for the current step."""
         state = self._truck_states.get(truck_role)
         if state is None:
             return False
@@ -211,11 +215,11 @@ class ContainerYardWorld(ScenarioWorld):
         return self._outcomes[-1]
 
     def find_assignment(self, truck_role: str) -> TruckAssignment | None:
-        """Return the ground-truth assignment for ``truck_role`` this round, if any."""
-        case = self._current_case
-        if case is None:
+        """Return the current step's ground-truth assignment for ``truck_role``."""
+        step = self.current_step
+        if step is None:
             return None
-        for assignment in case.truck_assignments:
+        for assignment in step.truck_assignments:
             if assignment.truck_role == truck_role:
                 return assignment
         return None
@@ -231,13 +235,11 @@ class ContainerYardWorld(ScenarioWorld):
     ) -> TruckCommitResult:
         """Update world state with the verdict for one ``move_truck`` call.
 
-        ``parsed_pad`` is the canonical pad string resolved from the
-        operator's structured ``move_truck`` argument; it is stored in
-        ``truck_states[role].pad`` when the commit is accepted so
-        subsequent crane-move validation can reference it.
+        Operates on the current step's truck assignments. Truck state is
+        scoped to the step, so the same role can be re-committed for a
+        later step after the previous step's container has been placed.
         """
-        case = self._current_case
-        if case is None:
+        if self._current_case is None or self.current_step is None:
             return TruckCommitResult(
                 truck_role=parsed_truck_role,
                 accepted=False,
@@ -298,6 +300,7 @@ class ContainerYardWorld(ScenarioWorld):
             pad=parsed_pad,
             container_id=accepted_assignment.container_id,
         )
+        self._step_correctly_committed_truck_count += 1
         await self._context.send_update_to_channel(
             channel_id=LINK_CHANNEL_ID,
             text=(
@@ -313,7 +316,7 @@ class ContainerYardWorld(ScenarioWorld):
         )
 
     def pads_already_committed(self) -> list[str]:
-        """Return non-empty pads currently bound to a truck this round."""
+        """Return non-empty pads currently bound to a truck for the current step."""
         return [
             state.pad for state in self._truck_states.values() if state.arrived and state.pad != ""
         ]
@@ -369,11 +372,13 @@ class ContainerYardWorld(ScenarioWorld):
         notification with success marker emitted). Returns False otherwise and
         marks the round as terminally failed.
         """
-        case = self._current_case
-        if case is None:
+        step = self.current_step
+        if step is None:
             return False
         round_already_failed = self._round_failed_terminally
-        sequence_already_exhausted = self.accepted_move_count >= len(case.expected_move_sequence)
+        sequence_already_exhausted = self._step_accepted_move_count >= len(
+            step.expected_move_sequence
+        )
         structural_invariant_holds = self._structural_invariants_hold(
             container_id=parsed_move.container_id,
             source_kind=parsed_source_kind,
@@ -409,21 +414,54 @@ class ContainerYardWorld(ScenarioWorld):
             destination_kind=parsed_destination_kind,
             destination_stack=parsed_destination_stack,
         )
-        self._accepted_moves.append(parsed_move)
-        if self._incoming_container_at_target():
-            self._target_placed = True
+        self._step_accepted_move_count += 1
+        if self._incoming_container_at_target_for_step(step=step):
             target_text = _stack_position_text(
-                stack=case.target_position.stack,
-                tier=case.target_position.tier,
+                stack=step.target_position.stack,
+                tier=step.target_position.tier,
             )
             await self._context.send_update_to_channel(
                 channel_id=LINK_CHANNEL_ID,
                 text=(
-                    f"{CONTAINER_PLACED_MARKER}. {case.incoming_container_id} "
+                    f"{CONTAINER_PLACED_MARKER}. {step.incoming_container_id} "
                     f"is now at {target_text}."
                 ),
             )
+            await self._advance_step()
         return True
+
+    async def _advance_step(self) -> None:
+        """Close the current step and reveal the next step's incoming container ID."""
+        case = self._current_case
+        step = self.current_step
+        assert case is not None and step is not None
+        self._step_outcomes.append(
+            StepOutcome(
+                step_index=step.step_index,
+                incoming_container_id=step.incoming_container_id,
+                target_position_text=_stack_position_text(
+                    stack=step.target_position.stack, tier=step.target_position.tier
+                ),
+                succeeded=True,
+                expected_move_count=len(step.expected_move_sequence),
+                accepted_move_count=self._step_accepted_move_count,
+                expected_truck_count=len(step.truck_assignments),
+                correctly_committed_truck_count=self._step_correctly_committed_truck_count,
+            )
+        )
+        self._current_step_index += 1
+        self._truck_states = {}
+        self._step_accepted_move_count = 0
+        self._step_correctly_committed_truck_count = 0
+        next_step = self.current_step
+        if next_step is not None:
+            await self._context.send_update_to_agent(
+                agent_id=YARD_OPERATOR_ID,
+                text=(
+                    f"{NEXT_CONTAINER_MARKER}: {next_step.incoming_container_id}. "
+                    "Share this with the planner the same way you shared the first."
+                ),
+            )
 
     def _structural_invariants_hold(
         self,
@@ -470,23 +508,15 @@ class ContainerYardWorld(ScenarioWorld):
             return False
         return True
 
-    def _incoming_container_at_target(self) -> bool:
-        """Return True when the live world state has the incoming container at the target slot.
-
-        Reads ``self._current_stacks`` directly, so the check is grounded
-        in the world's mutated state rather than the rendered
-        ``parsed_move.destination`` string.
-        """
-        case = self._current_case
-        if case is None:
-            return False
-        stack_contents = self._current_stacks.get(case.target_position.stack)
+    def _incoming_container_at_target_for_step(self, step: CaseStep) -> bool:
+        """Return True when ``step``'s incoming container has reached its target slot."""
+        stack_contents = self._current_stacks.get(step.target_position.stack)
         if stack_contents is None:
             return False
-        if len(stack_contents) < case.target_position.tier:
+        if len(stack_contents) < step.target_position.tier:
             return False
-        tier_index = case.target_position.tier - 1
-        return stack_contents[tier_index] == case.incoming_container_id
+        tier_index = step.target_position.tier - 1
+        return stack_contents[tier_index] == step.incoming_container_id
 
     def _apply_move_to_state(
         self,
@@ -529,13 +559,7 @@ class ContainerYardWorld(ScenarioWorld):
         self._truck_states[truck_role] = state._replace(container_id=container_id)
 
     def mark_round_outcome(self, round_number: int) -> None:
-        """Append the outcome for ``round_number`` to the outcomes list.
-
-        Idempotent — safe to call from both ``on_round_ended`` (so the
-        postmortem injection can read the just-ended round's result) and
-        ``finalize_round_sync`` (defensive fallback). The
-        ``_round_outcome_marked`` guard prevents double-marking.
-        """
+        """Append the outcome for ``round_number`` to the outcomes list."""
         if self._round_outcome_marked:
             return
         self._mark_outcome(case_number=round_number)
@@ -551,11 +575,13 @@ class ContainerYardWorld(ScenarioWorld):
         self._round_budget_exceeded = False
         self._notified_thresholds = set()
         self._truck_states = {}
-        self._accepted_moves = []
-        self._target_placed = False
         self._round_failed_terminally = False
         self._failure_reason = ""
         self._round_outcome_marked = False
+        self._current_step_index = 0
+        self._step_accepted_move_count = 0
+        self._step_correctly_committed_truck_count = 0
+        self._step_outcomes = []
         next_case = self._cases[round_number - 1]
         self._current_case = next_case
         self._current_stacks = {
@@ -564,16 +590,14 @@ class ContainerYardWorld(ScenarioWorld):
         }
 
     def _round_succeeded(self) -> bool:
-        """Return True when every success criterion for the current round is met."""
+        """Return True when every step of the current round has completed within budget."""
         case = self._current_case
         if case is None:
             return False
         return (
-            self.all_trucks_arrived_correctly()
-            and self._target_placed
+            self._current_step_index == len(case.steps)
             and not self._round_budget_exceeded
             and not self._round_failed_terminally
-            and self.accepted_move_count == len(case.expected_move_sequence)
         )
 
     def _mark_outcome(self, case_number: int) -> None:
@@ -581,38 +605,70 @@ class ContainerYardWorld(ScenarioWorld):
         case = self._current_case
         if case is None:
             return
-        all_trucks_correct = self.all_trucks_arrived_correctly()
-        round_succeeded = self._round_succeeded()
-        target_text = _stack_position_text(
-            stack=case.target_position.stack,
-            tier=case.target_position.tier,
-        )
-        correctly_committed = sum(
-            1
-            for assignment in case.truck_assignments
-            if (
-                (state := self._truck_states.get(assignment.truck_role)) is not None
-                and state.arrived
-                and state.station_name == assignment.station_name
-                and state.pad != ""
+        all_step_outcomes: list[StepOutcome] = list(self._step_outcomes)
+        if self._current_step_index < len(case.steps):
+            in_progress_step = case.steps[self._current_step_index]
+            all_step_outcomes.append(
+                StepOutcome(
+                    step_index=in_progress_step.step_index,
+                    incoming_container_id=in_progress_step.incoming_container_id,
+                    target_position_text=_stack_position_text(
+                        stack=in_progress_step.target_position.stack,
+                        tier=in_progress_step.target_position.tier,
+                    ),
+                    succeeded=False,
+                    expected_move_count=len(in_progress_step.expected_move_sequence),
+                    accepted_move_count=self._step_accepted_move_count,
+                    expected_truck_count=len(in_progress_step.truck_assignments),
+                    correctly_committed_truck_count=self._step_correctly_committed_truck_count,
+                )
             )
+        for remaining in case.steps[self._current_step_index + 1 :]:
+            all_step_outcomes.append(
+                StepOutcome(
+                    step_index=remaining.step_index,
+                    incoming_container_id=remaining.incoming_container_id,
+                    target_position_text=_stack_position_text(
+                        stack=remaining.target_position.stack,
+                        tier=remaining.target_position.tier,
+                    ),
+                    succeeded=False,
+                    expected_move_count=len(remaining.expected_move_sequence),
+                    accepted_move_count=0,
+                    expected_truck_count=len(remaining.truck_assignments),
+                    correctly_committed_truck_count=0,
+                )
+            )
+        steps_succeeded = sum(1 for step in all_step_outcomes if step.succeeded)
+        round_succeeded = self._round_succeeded()
+        total_expected_moves = sum(s.expected_move_count for s in all_step_outcomes)
+        total_accepted_moves = sum(s.accepted_move_count for s in all_step_outcomes)
+        total_expected_trucks = sum(s.expected_truck_count for s in all_step_outcomes)
+        total_correctly_committed_trucks = sum(
+            s.correctly_committed_truck_count for s in all_step_outcomes
         )
+        failure_step_index: int | None = None
+        if not round_succeeded:
+            for step in all_step_outcomes:
+                if not step.succeeded:
+                    failure_step_index = step.step_index
+                    break
         self._outcomes.append(
             YardOutcome(
                 case_number=case_number,
-                incoming_container_id=case.incoming_container_id,
-                target_position_text=target_text,
-                expected_move_count=len(case.expected_move_sequence),
-                accepted_move_count=self.accepted_move_count,
-                trucks_arrived_at_correct_spot=all_trucks_correct,
-                expected_truck_count=len(case.truck_assignments),
-                correctly_committed_truck_count=correctly_committed,
-                target_placed=self._target_placed,
+                step_count=len(case.steps),
+                steps_succeeded=steps_succeeded,
+                step_outcomes=tuple(all_step_outcomes),
+                total_expected_move_count=total_expected_moves,
+                total_accepted_move_count=total_accepted_moves,
+                total_expected_truck_count=total_expected_trucks,
+                total_correctly_committed_truck_count=total_correctly_committed_trucks,
                 budget_exceeded=self._round_budget_exceeded,
                 characters_used=self._current_round_characters,
                 time_budget_seconds=case.time_budget_seconds,
                 round_succeeded=round_succeeded,
                 failure_reason=self._failure_reason,
+                failure_step_index=failure_step_index,
             )
         )
         self._round_outcome_marked = True
@@ -680,22 +736,19 @@ class ContainerYardWorld(ScenarioWorld):
             )
 
     async def emit_round_terminal_notification(self) -> None:
-        """Emit the per-round success or failure marker for the metric to pick up.
-
-        Called by the scenario at round-end so every round closes with one
-        unambiguous notification carrying ``ROUND_SUCCESS_MARKER`` or
-        ``ROUND_FAILED_MARKER``.
-        """
+        """Emit the per-round success or failure marker for the metric to pick up."""
         case = self._current_case
         if case is None:
             return
         if self._round_succeeded():
-            text = f"{ROUND_SUCCESS_MARKER}. Container placed correctly within budget."
+            text = (
+                f"{ROUND_SUCCESS_MARKER}. Placed all {len(case.steps)} container(s) within budget."
+            )
         else:
             if self._failure_reason != "":
                 reason = self._failure_reason
             else:
-                reason = "Round did not complete the placement."
+                reason = "Round did not complete every delivery."
             text = f"{ROUND_FAILED_MARKER}. {reason}"
         await self._context.send_update_to_channel(
             channel_id=LINK_CHANNEL_ID,
@@ -720,7 +773,7 @@ def _truck_failure_reason(
     """Build a specific failure-reason string from the truck verdict's per-criterion booleans."""
     reasons: list[str] = []
     if not role_matches_active_assignment:
-        reasons.append("role does not match any active assignment for this round")
+        reasons.append("role does not match any active assignment for this step")
     elif not role_known:
         reasons.append(f"no assignment matches the parsed role {parsed_truck_role!r}")
     if not targets_correct_station:
@@ -730,7 +783,7 @@ def _truck_failure_reason(
     if not carries_correct_container:
         reasons.append("inbound text does not name the correct incoming container")
     if pad_already_used:
-        reasons.append("destination pad is already used by another truck this round")
+        reasons.append("destination pad is already used by another truck this step")
     if not reasons:
         return f"{parsed_truck_role} truck did not arrive at the correct spot."
     return (
@@ -757,7 +810,7 @@ def _crane_failure_reason(
     if round_already_failed:
         reasons.append("round was already terminally failed before this move")
     if sequence_already_exhausted:
-        reasons.append("all expected crane moves have already been executed")
+        reasons.append("all expected moves for this step have already been executed")
     if not structural_invariant_holds:
         reasons.append("parsed source/destination did not match the live world state")
     if not reasons:

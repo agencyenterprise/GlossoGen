@@ -9,12 +9,14 @@
  * UI is always safe to call into.
  */
 
+import { containerYardStackingPlugin } from "./container_yard_stacking/plugin";
 import { DEFAULT_SCENARIO_PLUGIN } from "./default-plugin";
 import type { ScenarioPlugin } from "./scenario-plugin";
 import { veyruPlugin } from "./veyru/plugin";
 
 const SCENARIO_PLUGINS: Record<string, ScenarioPlugin> = {
   [veyruPlugin.scenarioName]: veyruPlugin,
+  [containerYardStackingPlugin.scenarioName]: containerYardStackingPlugin,
 };
 
 /** Return the plug-in registered for ``scenarioName`` or the default no-op plug-in. */
