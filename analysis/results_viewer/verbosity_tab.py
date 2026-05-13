@@ -36,6 +36,21 @@ from analysis.results_viewer.verbosity_data import (
 )
 
 
+_SCENARIOS_WITH_VERBOSITY: tuple[str, ...] = ("veyru", "container_yard_stacking")
+
+
+def _render_scenario_selector() -> str:
+    """Radio selector letting the user pick which scenario's runs to view."""
+    chosen = st.radio(
+        label="Scenario",
+        options=_SCENARIOS_WITH_VERBOSITY,
+        index=0,
+        horizontal=True,
+        key="verbosity_scenario_selector",
+    )
+    return chosen
+
+
 def _render_metric_selector() -> VerbosityMetricOption:
     """Radio selector + info popover letting the user pick the X-axis metric."""
     radio_col, info_col = st.columns([8, 1])
@@ -554,11 +569,13 @@ def _render_summary_table(
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Verbosity tab body."""
-    all_runs = list_verbosity_runs(evaluated_runs=evaluated)
+    scenario_name = _render_scenario_selector()
+    all_runs = list_verbosity_runs(evaluated_runs=evaluated, scenario_name=scenario_name)
     if not all_runs:
         st.info(
-            "No baseline or resume runs evaluated yet. Add the 'baseline' or "
-            "'resume' label and run `schmidt evaluate` with the language metrics."
+            f"No baseline or resume runs in scenario `{scenario_name}` evaluated yet. "
+            "Add the 'baseline' or 'resume' label and run `schmidt evaluate` with "
+            "the language metrics."
         )
         return
     metric = _render_metric_selector()

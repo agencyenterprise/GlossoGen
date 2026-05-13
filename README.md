@@ -209,47 +209,48 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
   2> /tmp/veyru_eval_debug.log
 ```
 
-The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth motif tables) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `schmidt evaluate` and by `src/schmidt/scenarios/veyru/scripts/consolidate_communication_ontology.py` (see below). Without it the harness defaults to `INFO`. Both are dotenv-friendly — set them in `.env` for a persistent default or inline as shown above.
+The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth blocks) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `schmidt evaluate` and by `scripts/consolidate_communication_ontology.py` (see below). Without it the harness defaults to `INFO`. Both are dotenv-friendly — set them in `.env` for a persistent default or inline as shown above.
 
 If the judge's structured output truncates (you'll see a `Field required ... input_value={}` validation warning followed by a metric failure), bump the per-call output-token cap by setting `LLM_MAX_TOKENS=32768` (or higher) in `.env` or inline. The default of `16384` covers the verbose communication-feature outputs but pathological runs with many labels × many evidence citations can still exceed it.
 
 ### Communication-feature analysis (open coding → ontology → relabel)
 
-A two-phase LLM-judge pipeline that surfaces and scores emergent communication-pattern features on Veyru's link channel without committing to a pre-specified vocabulary. Three steps:
+A two-phase LLM-judge pipeline that surfaces and scores emergent communication-pattern features on the primary channel without committing to a pre-specified vocabulary. Scenario-agnostic: any scenario that implements `SimulationScenario.build_communication_rounds(events)` participates. Three steps:
 
 ```bash
 # 1. Open-coding pass: per run, one LLM call. Writes
-#    runs/veyru/<id>/communication_open_coding.json with free-form labels +
+#    runs/<scenario>/<id>/communication_open_coding.json with free-form labels +
 #    multi-round evidence citations.
-LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
-  --run-dir ./runs/veyru/<id> \
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
+  --run-dir ./runs/<scenario>/<id> \
   --metrics communication_open_coding \
   --model claude-haiku-4-5-20251001 --provider anthropic \
-  2>> /tmp/veyru_eval_debug.log
+  2>> /tmp/communication_eval_debug.log
 
-# 2. Consolidation: one LLM call across N runs. Produces a versioned
-#    taxonomy committed under analysis/communication_ontology/.
-LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python src/schmidt/scenarios/veyru/scripts/consolidate_communication_ontology.py \
-  --run-id veyru/<id1> --run-id veyru/<id2> --run-id veyru/<id3> \
+# 2. Consolidation: one LLM call across N runs of one scenario. Produces a
+#    versioned taxonomy under analysis/communication_ontology/<scenario>/.
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.py \
+  --scenario-name <scenario> \
+  --run-id <scenario>/<id1> --run-id <scenario>/<id2> --run-id <scenario>/<id3> \
   --runs-dir ./runs \
-  --output analysis/communication_ontology/<version>.json \
+  --version <version> \
   --model claude-haiku-4-5-20251001 --provider anthropic \
-  2>> /tmp/veyru_consolidate_debug.log
+  2>> /tmp/communication_consolidate_debug.log
 
 # 3. Relabel pass: per run, one LLM call against the ontology. Writes
-#    runs/veyru/<id>/communication_feature_presence.json with a 0-1
+#    runs/<scenario>/<id>/communication_feature_presence.json with a 0-1
 #    confidence per ontology category.
-LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
-  --run-dir ./runs/veyru/<id> \
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
+  --run-dir ./runs/<scenario>/<id> \
   --metrics communication_feature_presence \
-  --ontology-path analysis/communication_ontology/<version>.json \
+  --ontology-path analysis/communication_ontology/<scenario>/<version>.json \
   --model claude-haiku-4-5-20251001 --provider anthropic \
-  2>> /tmp/veyru_eval_debug.log
+  2>> /tmp/communication_eval_debug.log
 ```
 
-Always run with `LOG_LEVEL=DEBUG` and a stderr redirect during development so the prompt and the structured judge output land in an auditable file. Both passes use the same per-round transcript view (link-channel messages + per-agent ground-truth split into "what the observer saw" / "what the engineer saw") so the open-coding labels and feature-presence confidences are commensurable.
+Always run with `LOG_LEVEL=DEBUG` and a stderr redirect during development so the prompt and the structured judge output land in an auditable file. Both passes use the same per-round view (primary-channel messages + the scenario-rendered per-agent ground truth) so the open-coding labels and feature-presence confidences are commensurable.
 
-`analysis/communication_ontology/` is gitignored (treated like `runs/` — regenerable from the open-coding sidecars). The directory carries a `.gitkeep` so the path exists in a fresh clone; the consolidation script writes the versioned JSON files into it locally. To share an ontology across machines, attach the JSON file out-of-band rather than committing it.
+`analysis/communication_ontology/<scenario_name>/` is gitignored (treated like `runs/` — regenerable from the open-coding sidecars). To share an ontology across machines, attach the JSON file out-of-band rather than committing it.
 
 ## Results Viewer (Streamlit)
 

@@ -30,7 +30,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from analysis.results_viewer.feature_presence_data import (
-    ONTOLOGY_DEFAULT_DIR,
+    ONTOLOGY_ROOT_DIR,
     FeaturePresenceRun,
     OntologyView,
     list_feature_presence_runs,
@@ -55,11 +55,28 @@ def _kind_of(run: FeaturePresenceRun) -> str:
     return _KIND_BASELINE
 
 
+_BUDGET_KNOB_NAMES_BY_SCENARIO: dict[str, str] = {
+    "veyru": "round_time_budget_seconds",
+    "container_yard_stacking": "time_budget_seconds",
+}
+
+
 def _budget_of(run: FeaturePresenceRun) -> int | None:
-    """Pull ``round_time_budget_seconds`` from the run's scenario_config."""
-    value = run.scenario_config.get("round_time_budget_seconds")
-    if isinstance(value, (int, float)):
-        return int(value)
+    """Pull the per-round time budget from the run's scenario_config.
+
+    The knob name is scenario-specific (veyru: ``round_time_budget_seconds``,
+    container_yard_stacking: ``time_budget_seconds``), so we look up the
+    name by scenario and fall back to whichever exists.
+    """
+    knob_name = _BUDGET_KNOB_NAMES_BY_SCENARIO.get(run.scenario_name)
+    if knob_name is not None:
+        value = run.scenario_config.get(knob_name)
+        if isinstance(value, (int, float)):
+            return int(value)
+    for fallback in ("round_time_budget_seconds", "time_budget_seconds"):
+        value = run.scenario_config.get(fallback)
+        if isinstance(value, (int, float)):
+            return int(value)
     return None
 
 
@@ -527,18 +544,43 @@ def _format_run_picker_option(run: FeaturePresenceRun) -> str:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the "Language features" tab end to end."""
-    runs = list_feature_presence_runs(evaluated_runs=evaluated)
-    if not runs:
+    all_runs = list_feature_presence_runs(evaluated_runs=evaluated)
+    if not all_runs:
         st.info(
             "No `communication_feature_presence.json` sidecars found. Run the "
-            "communication-feature pipeline (`scripts/run_communication_pipeline.sh`) first."
+            "communication-feature pipeline (`scripts/run_communication_pipeline.sh "
+            "--scenario <name>`) first."
         )
         return
-    ontology = resolve_ontology(runs=runs, ontology_dir=ONTOLOGY_DEFAULT_DIR)
+    scenario_counts: dict[str, int] = {}
+    for run in all_runs:
+        scenario_counts[run.scenario_name] = scenario_counts.get(run.scenario_name, 0) + 1
+    scenario_options = sorted(scenario_counts.keys())
+    selected_scenario = st.radio(
+        label="Scenario",
+        options=scenario_options,
+        format_func=lambda name: f"{name} ({scenario_counts[name]} runs)",
+        key="feature_presence_scenario",
+        horizontal=True,
+    )
+    if selected_scenario is None:
+        st.info("Select a scenario.")
+        return
+    runs = [run for run in all_runs if run.scenario_name == selected_scenario]
+    if not runs:
+        st.info(f"No feature-presence sidecars found for scenario `{selected_scenario}`.")
+        return
+    ontology = resolve_ontology(
+        runs=runs,
+        scenario_name=selected_scenario,
+        ontology_root=ONTOLOGY_ROOT_DIR,
+    )
     if ontology is None:
         st.error(
-            f"No ontology JSON found under `{ONTOLOGY_DEFAULT_DIR}`. Run the consolidation "
-            "phase (`scripts/run_communication_pipeline.sh --phase 2`) first."
+            f"No ontology JSON found under `{ONTOLOGY_ROOT_DIR / selected_scenario}`. "
+            f"Run the consolidation phase "
+            f"(`scripts/run_communication_pipeline.sh --scenario {selected_scenario} --phase 2`) "
+            "first."
         )
         return
     versions = {run.ontology_version for run in runs}

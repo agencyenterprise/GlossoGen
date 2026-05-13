@@ -7,6 +7,12 @@ caller can instantiate with ``cls()`` and then pass per-invocation
 """
 
 from schmidt.evaluation.metric_core.metric_protocol import Metric
+from schmidt.evaluation.metrics.communication.communication_feature_presence_metric import (
+    CommunicationFeaturePresenceMetric,
+)
+from schmidt.evaluation.metrics.communication.communication_open_coding_metric import (
+    CommunicationOpenCodingMetric,
+)
 from schmidt.evaluation.metrics.content_filter_refusal_metric import ContentFilterRefusalMetric
 from schmidt.evaluation.metrics.language_strangeness_metric import LanguageStrangenessMetric
 from schmidt.evaluation.metrics.mcm_metric import MCMMetric
@@ -21,6 +27,8 @@ from schmidt.evaluation.metrics.shorthand_codes_metric import ShorthandCodesMetr
 from schmidt.evaluation.metrics.slang_emergence_metric import SlangEmergenceMetric
 
 _GENERIC_METRICS: list[type[Metric]] = [
+    CommunicationFeaturePresenceMetric,
+    CommunicationOpenCodingMetric,
     ContentFilterRefusalMetric,
     LanguageStrangenessMetric,
     MCMMetric,

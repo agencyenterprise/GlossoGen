@@ -3,9 +3,9 @@
 The open-coding metric writes ``CommunicationOpenCodingSidecar`` to each
 run directory; the consolidation script reads those sidecars and writes
 a ``CommunicationOntology`` JSON file under
-``analysis/communication_ontology/``; the feature-presence metric reads
-the ontology and writes ``CommunicationFeaturePresenceSidecar`` back to
-the run directory.
+``analysis/communication_ontology/<scenario_name>/``; the
+feature-presence metric reads the ontology and writes
+``CommunicationFeaturePresenceSidecar`` back to the run directory.
 """
 
 from datetime import datetime
@@ -17,12 +17,12 @@ class EvidenceCitation(BaseModel):
     """One round-level citation backing a free-form label."""
 
     round_number: int = Field(
-        description="Round number whose link messages exemplify the parent label.",
+        description="Round number whose primary-channel messages exemplify the parent label.",
     )
     quote: str = Field(
         description=(
             "Short verbatim quote (one message body) from this round on the "
-            "link channel that supports the parent label."
+            "primary channel that supports the parent label."
         ),
     )
 
@@ -33,16 +33,16 @@ class CommunicationLabel(BaseModel):
     text: str = Field(
         description=(
             "Short label naming one communication-pattern feature "
-            "(e.g. 'uses single-letter codes', 'first-letter encoding of treatment'). "
+            "(e.g. 'uses single-letter codes', 'positional slot ordering'). "
             "Multiple labels per run are expected."
         ),
     )
     evidence: list[EvidenceCitation] = Field(
         description=(
-            "All rounds in which this feature is clearly observable on the link "
-            "channel. Cite every round with clear evidence — not just one. A "
-            "pervasive feature should accumulate many citations; a one-off "
-            "should accumulate exactly one. Minimum one citation."
+            "All rounds in which this feature is clearly observable on the "
+            "primary channel. Cite every round with clear evidence — not "
+            "just one. A pervasive feature should accumulate many citations; "
+            "a one-off should accumulate exactly one. Minimum one citation."
         ),
         min_length=1,
     )
@@ -54,7 +54,7 @@ class CommunicationOpenCodingOutput(BaseModel):
     labels: list[CommunicationLabel] = Field(
         description=(
             "All free-form short labels describing communication-pattern features "
-            "observed in this run's link-channel messages. Avoid quality "
+            "observed in this run's primary-channel messages. Avoid quality "
             "judgements ('uses ad-hoc abbreviations' is fine; 'uses good "
             "abbreviations' is not). Capture every distinct feature once; do "
             "not pad the list with synonyms."
@@ -113,7 +113,7 @@ class CommunicationOntology(BaseModel):
         description=(
             "Human-chosen version string (e.g. '2026-05-11_baseline_oss'). "
             "Matches the output filename stem under "
-            "``analysis/communication_ontology/``."
+            "``analysis/communication_ontology/<scenario_name>/``."
         ),
     )
     generated_at: datetime
@@ -148,15 +148,15 @@ class CategoryConfidence(BaseModel):
     )
     confidence: float = Field(
         description=(
-            "0.0 to 1.0 — judge's confidence that this run's link messages "
-            "exhibit the feature defined by this category."
+            "0.0 to 1.0 — judge's confidence that this run's primary-channel "
+            "messages exhibit the feature defined by this category."
         ),
         ge=0.0,
         le=1.0,
     )
     justification: str = Field(
         description=(
-            "Short reasoning citing specific link-channel evidence (or its "
+            "Short reasoning citing specific primary-channel evidence (or its "
             "absence) for this confidence."
         ),
     )

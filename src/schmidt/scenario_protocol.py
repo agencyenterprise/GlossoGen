@@ -11,10 +11,12 @@ from typing import Any, Protocol, Self
 
 from schmidt.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
+from schmidt.evaluation.metrics.communication.round_view import CommunicationRoundView
 from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 from schmidt.event_logger import EventLogger
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel
+from schmidt.models.event import SimulationEvent
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.runtime.scenario_world import ScenarioWorld
 
@@ -255,6 +257,25 @@ class SimulationScenario(ABC):
         if no single channel is primary.
         """
         return None
+
+    def build_communication_rounds(
+        self, events: list[SimulationEvent]
+    ) -> list[CommunicationRoundView]:
+        """Build per-round views for the communication-feature analysis pipeline.
+
+        Each returned ``CommunicationRoundView`` joins the round's
+        primary-channel messages with a scenario-rendered ground-truth
+        block describing the round's case and agent information
+        asymmetry. The open-coding and feature-presence metrics consume
+        these views directly — the metric code never branches on
+        scenario.
+
+        The default returns ``[]``, which causes both metrics to skip
+        with no Measurement emitted. Override to opt the scenario into
+        the communication pipeline.
+        """
+        _ = events
+        return []
 
     def transform_outgoing_message(self, agent_id: str, channel_id: str, text: str) -> str:
         """Transform a message before it is stored and delivered to the channel.

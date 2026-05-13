@@ -1,13 +1,17 @@
 """Pass 3 of the communication-feature analysis pipeline.
 
 Reads a consolidated ontology JSON file (produced by
-``src/schmidt/scenarios/veyru/scripts/consolidate_communication_ontology.py``)
-and asks the LLM
-judge to score each ontology category on this run's link-channel
+``scripts/consolidate_communication_ontology.py``) and asks the LLM
+judge to score each ontology category on this run's primary-channel
 messages. The result is a per-run feature-presence vector written to
 ``communication_feature_presence.json`` alongside the run's other
 sidecars, and one ``Measurement`` whose ``score`` is the number of
 categories above the 0.5 confidence threshold.
+
+Scenario-agnostic: the metric calls
+``scenario.build_communication_rounds(events)`` and only sees
+``CommunicationRoundView`` rows. Scenarios that do not implement the
+hook return ``[]`` and the metric quietly skips with no Measurement.
 """
 
 import logging
@@ -18,20 +22,16 @@ from schmidt.evaluation.log_reader import extract_simulation_id
 from schmidt.evaluation.metric_core.measurement import Measurement
 from schmidt.evaluation.metric_core.metric_protocol import Metric
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
+from schmidt.evaluation.metrics.communication.label_models import (
+    CommunicationFeaturePresenceOutput,
+    CommunicationFeaturePresenceSidecar,
+    CommunicationOntology,
+)
 from schmidt.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.veyru.evaluation.metrics.communication.label_models import (
-    CommunicationFeaturePresenceOutput,
-    CommunicationFeaturePresenceSidecar,
-    CommunicationOntology,
-)
-from schmidt.scenarios.veyru.evaluation.metrics.communication.transcript_builder import (
-    build_link_rounds,
-)
-from schmidt.scenarios.veyru.evaluation.prompts.prompt_renderer import render_veyru_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ _PRESENCE_THRESHOLD = 0.5
 
 
 class CommunicationFeaturePresenceMetric(Metric):
-    """Scores each ontology category's presence on one run's link messages."""
+    """Scores each ontology category's presence on one run's primary-channel messages."""
 
     name = "communication_feature_presence"
 
@@ -54,7 +54,7 @@ class CommunicationFeaturePresenceMetric(Metric):
         options: MetricRunOptions,
     ) -> list[Measurement]:
         """Run the relabel judge against the supplied ontology and persist the vector."""
-        _ = agent_configs, scenario
+        _ = agent_configs
         if options.ontology_path is None:
             raise ValueError("communication_feature_presence requires --ontology-path PATH")
         ontology_path = options.ontology_path
@@ -66,15 +66,16 @@ class CommunicationFeaturePresenceMetric(Metric):
         if not ontology.categories:
             raise ValueError(f"Ontology at {ontology_path} has no categories")
 
-        rounds = build_link_rounds(events=events)
+        rounds = scenario.build_communication_rounds(events=events)
         if not rounds:
             logger.info(
-                "%s: skipping — no link-channel messages or case data in the run",
+                "%s: skipping — scenario %s produced no communication rounds",
                 self.name,
+                scenario.name(),
             )
             return []
 
-        judge_prompt = render_veyru_prompt(
+        judge_prompt = render_evaluator_prompt(
             template_name="communication_feature_presence_user.jinja",
             template_variables={
                 "rounds": rounds,

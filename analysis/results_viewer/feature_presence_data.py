@@ -24,7 +24,7 @@ from typing import NamedTuple
 import orjson
 
 from analysis.results_viewer.run_catalog import EvaluatedRun
-from schmidt.scenarios.veyru.evaluation.metrics.communication.label_models import (
+from schmidt.evaluation.metrics.communication.label_models import (
     CommunicationFeaturePresenceSidecar,
     CommunicationOntology,
     OntologyCategory,
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 FEATURE_PRESENCE_SIDECAR_FILENAME = "communication_feature_presence.json"
 CROSS_RUN_MANIFEST_FILENAME = "cross_run_replace_manifest.json"
 LABELS_FILENAME = "labels.json"
-ONTOLOGY_DEFAULT_DIR = Path("analysis/communication_ontology")
+ONTOLOGY_ROOT_DIR = Path("analysis/communication_ontology")
 
 
 class _FeaturePresenceCacheKey(NamedTuple):
@@ -55,6 +55,7 @@ class FeaturePresenceRun(NamedTuple):
 
     run_id: str
     run_dir: Path
+    scenario_name: str
     primary_model: str
     scenario_config: dict[str, object]
     labels: list[str]
@@ -189,6 +190,7 @@ def _build_feature_presence_run(evaluated: EvaluatedRun) -> FeaturePresenceRun |
     run = FeaturePresenceRun(
         run_id=evaluated.run_id,
         run_dir=evaluated.run_dir,
+        scenario_name=evaluated.scenario_name,
         primary_model=evaluated.metadata.primary_model,
         scenario_config=dict(evaluated.metadata.scenario_config),
         labels=_read_labels(run_dir=evaluated.run_dir),
@@ -274,28 +276,31 @@ def _load_ontology_from_path(ontology_path: Path) -> OntologyView | None:
 
 def resolve_ontology(
     runs: list[FeaturePresenceRun],
-    ontology_dir: Path,
+    scenario_name: str,
+    ontology_root: Path,
 ) -> OntologyView | None:
     """Pick the ontology JSON that matches the most-common sidecar version.
 
-    The sidecars carry ``ontology_version`` (the version stem written by
-    the consolidation script). We find the ontology JSON whose stem
-    matches that version; failing that we fall back to the most recently
-    written JSON in ``ontology_dir`` so the tab still loads with some
-    category metadata even when versions drift.
+    Searches ``ontology_root / scenario_name`` for a JSON whose stem
+    matches the cohort's most-common ``ontology_version`` field;
+    failing that, falls back to the most recently written JSON in that
+    per-scenario directory so the tab still loads with some category
+    metadata even when versions drift. Returns ``None`` when the
+    per-scenario directory does not exist or contains no parseable JSON.
     """
-    if not ontology_dir.exists():
+    scenario_dir = ontology_root / scenario_name
+    if not scenario_dir.exists():
         return None
     if runs:
         most_common_version = Counter(run.ontology_version for run in runs).most_common(1)
         if most_common_version:
             preferred_stem = most_common_version[0][0]
-            candidate = ontology_dir / f"{preferred_stem}.json"
+            candidate = scenario_dir / f"{preferred_stem}.json"
             view = _load_ontology_from_path(ontology_path=candidate)
             if view is not None:
                 return view
     json_files = sorted(
-        ontology_dir.glob("*.json"),
+        scenario_dir.glob("*.json"),
         key=lambda p: p.stat().st_mtime_ns,
         reverse=True,
     )

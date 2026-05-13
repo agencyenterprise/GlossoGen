@@ -1,9 +1,5 @@
 """Veyru scenario-specific metrics."""
 
-from schmidt.scenarios.veyru.evaluation.metrics.communication import (
-    CommunicationFeaturePresenceMetric,
-    CommunicationOpenCodingMetric,
-)
 from schmidt.scenarios.veyru.evaluation.metrics.language_emergence_metric import (
     LanguageEmergenceMetric,
 )
@@ -22,8 +18,6 @@ from schmidt.scenarios.veyru.evaluation.metrics.round_success import (
 )
 
 __all__ = [
-    "CommunicationFeaturePresenceMetric",
-    "CommunicationOpenCodingMetric",
     "LanguageEmergenceMetric",
     "ProtocolLearnedAfterSwapMetric",
     "ProtocolProbeAgentPairSimilarityMetric",
