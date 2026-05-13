@@ -182,14 +182,14 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communi
 LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
   --run-dir ./runs/veyru/<id> \
   --metrics communication_feature_presence \
-  --ontology-path analysis/communication_ontology/veyru/<version>.json \
+  --ontology-path runs/veyru/_ontology/<version>.json \
   --model claude-haiku-4-5-20251001 --provider anthropic \
   2>> /tmp/veyru_eval_debug.log
 ```
 
-`LOG_LEVEL` defaults to `INFO`; set it to `DEBUG` only when you want to capture the full prompt/response. Run-id selection for consolidation is **explicit only** (`--run-id REPEATED` or `--run-ids-file PATH`) to avoid accidental inclusion of unrelated runs. The `--version` value becomes the `version` field on the JSON document, is the output filename stem (under `analysis/communication_ontology/veyru/`), and is recorded on every downstream feature-presence sidecar.
+`LOG_LEVEL` defaults to `INFO`; set it to `DEBUG` only when you want to capture the full prompt/response. Run-id selection for consolidation is **explicit only** (`--run-id REPEATED` or `--run-ids-file PATH`) to avoid accidental inclusion of unrelated runs. The `--version` value becomes the `version` field on the JSON document, is the output filename stem (under `runs/veyru/_ontology/`), and is recorded on every downstream feature-presence sidecar.
 
-`analysis/communication_ontology/` is gitignored: the consolidated ontology JSONs are regenerable from the per-run open-coding sidecars (which themselves live under the gitignored `runs/` tree). Pass them around out-of-band rather than committing.
+The consolidated ontology JSONs live under `runs/veyru/_ontology/` so they travel with any export of the runs tree. The whole `runs/` directory is gitignored — the ontology JSONs are regenerable from the per-run open-coding sidecars; ship them alongside the runs they were derived from rather than committing them.
 
 ### Communication-feature analysis: quickstart for new runs
 
@@ -197,13 +197,13 @@ Three flows, picked by what comparability you need.
 
 **A — One new run, score it against the current ontology (most common, ~$0.07, ~60s).**
 
-Most-recent ontology JSON in `analysis/communication_ontology/veyru/` is the reference. Both passes in a single command — pass 1 writes the open-coding sidecar, pass 3 reads it implicitly via the same run dir.
+Most-recent ontology JSON in `runs/veyru/_ontology/` is the reference. Both passes in a single command — pass 1 writes the open-coding sidecar, pass 3 reads it implicitly via the same run dir.
 
 ```bash
 LOG_LEVEL=INFO VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
   --run-dir ./runs/veyru/<new_id> \
   --metrics communication_open_coding,communication_feature_presence \
-  --ontology-path analysis/communication_ontology/veyru/<latest_version>.json \
+  --ontology-path runs/veyru/_ontology/<latest_version>.json \
   --model claude-haiku-4-5-20251001 --provider anthropic
 ```
 
@@ -240,7 +240,7 @@ Cost: ~$0.20 for the consolidation call + ~$0.03 per run for relabeling. At 440 
 | `JUDGE_MODEL` | `claude-haiku-4-5-20251001` | Canonical judge per `CLAUDE.md`. Override at your own risk. |
 | `JUDGE_PROVIDER` | `anthropic` | Same. |
 | `RUNS_DIR` | `runs` | Root containing `veyru/<id>/` run dirs. |
-| `ONTOLOGY_DIR` | `analysis/communication_ontology` | Where phase 2 writes and phase 3 reads. |
+| _ontology dir_ | `$RUNS_DIR/<scenario>/_ontology` | Where phase 2 writes and phase 3 reads — derived from `RUNS_DIR`, not separately configurable. |
 | `STATUS_LOG` | `/tmp/communication_pipeline_status.log` | Append-only TSV: `timestamp run_id phase exit_code duration_seconds`. |
 | `LOG_LEVEL` | `INFO` | Per-eval log verbosity. Set to `DEBUG` to capture verbatim LLM prompts in `/tmp/pipeline_<id>_<phase>.log`. |
 | `LLM_MAX_TOKENS` | `16384` | Per-call output-token cap; bump if structured outputs truncate. |
