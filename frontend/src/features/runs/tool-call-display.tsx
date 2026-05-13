@@ -6,6 +6,8 @@ import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 
 type VeyruStabilizeMetadata = components["schemas"]["VeyruStabilizeMetadata"];
+type ContainerYardTruckMetadata = components["schemas"]["ContainerYardTruckMetadata"];
+type ContainerYardCraneMetadata = components["schemas"]["ContainerYardCraneMetadata"];
 
 /** Strip the MCP prefix from tool names for display. */
 function cleanToolName(name: string): string {
@@ -34,6 +36,114 @@ interface ToolCallDisplayProps {
   arguments: Record<string, unknown>;
   result: string | null;
   stabilizeMetadata?: VeyruStabilizeMetadata | null;
+  truckMetadata?: ContainerYardTruckMetadata | null;
+  craneMetadata?: ContainerYardCraneMetadata | null;
+}
+
+function ExpectedVsSubmittedRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span className="font-medium text-muted-foreground">{label}:</span>{" "}
+      <span className="whitespace-pre-wrap">{value}</span>
+    </div>
+  );
+}
+
+function YardTruckMetadataBlock({ metadata }: { metadata: ContainerYardTruckMetadata }) {
+  const expectedLines = metadata.expected_truck_assignments.map(a => {
+    const cidSuffix = a.container_id !== "" ? ` (${a.container_id})` : "";
+    return `${a.truck_role} → ${a.station_name}${cidSuffix}`;
+  });
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Yard Verdict (step {metadata.step_index})
+      </div>
+      <div className="space-y-1 rounded bg-muted p-2 font-mono text-[10px]">
+        <ExpectedVsSubmittedRow label="expected trucks" value={expectedLines.join("\n")} />
+        <ExpectedVsSubmittedRow
+          label="submitted"
+          value={`${metadata.submitted_truck_role} → ${metadata.submitted_station_name}/${metadata.submitted_pad}${metadata.submitted_container_id !== "" ? ` (${metadata.submitted_container_id})` : ""}`}
+        />
+        <div>
+          <span className="font-medium text-muted-foreground">accepted:</span>{" "}
+          <span
+            className={cn(
+              "font-medium",
+              metadata.overall_success ? "text-emerald-500" : "text-red-500"
+            )}
+          >
+            {String(metadata.overall_success)}
+          </span>
+        </div>
+        <div>
+          <span className="font-medium text-muted-foreground">verdict:</span>{" "}
+          <span>
+            role={String(metadata.verdict.role_matches_active_assignment)}, station=
+            {String(metadata.verdict.targets_correct_station)}, pad=
+            {String(metadata.verdict.targets_correct_pad)}, container=
+            {String(metadata.verdict.carries_correct_container)}
+          </span>
+        </div>
+        {metadata.explanation !== "" ? (
+          <ExpectedVsSubmittedRow label="explanation" value={metadata.explanation} />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function describeCraneMove(move: components["schemas"]["ContainerYardCraneMoveStep"]): string {
+  const source =
+    move.source_kind === "stack_tier"
+      ? `stack ${move.source_stack}/tier ${move.source_tier}`
+      : move.source_kind;
+  const dest =
+    move.destination_kind === "stack_tier"
+      ? `stack ${move.destination_stack}/tier ${move.destination_tier}`
+      : move.destination_kind;
+  return `${move.container_id}: ${source} → ${dest}`;
+}
+
+function YardCraneMetadataBlock({ metadata }: { metadata: ContainerYardCraneMetadata }) {
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Crane Verdict (step {metadata.step_index}, move {metadata.move_index})
+      </div>
+      <div className="space-y-1 rounded bg-muted p-2 font-mono text-[10px]">
+        {metadata.expected_move !== null ? (
+          <ExpectedVsSubmittedRow
+            label="expected move"
+            value={describeCraneMove(metadata.expected_move)}
+          />
+        ) : null}
+        <ExpectedVsSubmittedRow
+          label="submitted move"
+          value={describeCraneMove(metadata.submitted_move)}
+        />
+        <div>
+          <span className="font-medium text-muted-foreground">accepted:</span>{" "}
+          <span
+            className={cn("font-medium", metadata.accepted ? "text-emerald-500" : "text-red-500")}
+          >
+            {String(metadata.accepted)}
+          </span>
+        </div>
+        <div>
+          <span className="font-medium text-muted-foreground">verdict:</span>{" "}
+          <span>
+            matches_expected={String(metadata.verdict.matches_expected_next_move)}, source_holds=
+            {String(metadata.verdict.source_currently_holds_container)}, dest_empty=
+            {String(metadata.verdict.destination_currently_empty)}
+          </span>
+        </div>
+        {metadata.explanation !== "" ? (
+          <ExpectedVsSubmittedRow label="explanation" value={metadata.explanation} />
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 /** Renders a single tool call as a collapsible row. */
@@ -42,6 +152,8 @@ export function ToolCallDisplay({
   arguments: args,
   result,
   stabilizeMetadata,
+  truckMetadata,
+  craneMetadata,
 }: ToolCallDisplayProps) {
   const [expanded, setExpanded] = useState(false);
   const displayName = cleanToolName(toolName);
@@ -131,6 +243,9 @@ export function ToolCallDisplay({
               </div>
             </div>
           ) : null}
+
+          {truckMetadata ? <YardTruckMetadataBlock metadata={truckMetadata} /> : null}
+          {craneMetadata ? <YardCraneMetadataBlock metadata={craneMetadata} /> : null}
         </div>
       ) : null}
     </div>

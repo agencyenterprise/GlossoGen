@@ -16,7 +16,6 @@
  */
 
 import type { ComponentType, ReactNode } from "react";
-import type { components } from "@/types/api.gen";
 import type { AgentModelOverride } from "./agent-model-overrides";
 
 type KnobsMap = Record<string, unknown>;
@@ -51,10 +50,16 @@ export interface ScenarioKnobsForm {
   }) => KnobsMap;
 }
 
-/** Props for the per-scenario round-detail panel mounted inside the round timeline modal. */
+/** Props for the per-scenario round-detail panel mounted inside the round timeline modal.
+ *
+ * ``extras`` is the run's ``scenario_extras`` payload typed as ``unknown``
+ * so the registry can hold every plug-in under a single type without
+ * variance conflicts. Each plug-in narrows it internally with a single
+ * cast to its own discriminated-union variant.
+ */
 export interface RoundDetailPanelProps {
   roundNumber: number;
-  extras: components["schemas"]["VeyruRunExtras"] | null;
+  extras: unknown;
 }
 
 /**
@@ -74,12 +79,11 @@ export interface ScenarioPlugin {
   defaultReplaceAgentKnobs: KnobsMap;
   /**
    * Render scenario-specific supplementary content for a tool-use entry
-   * (e.g. judge verdict for veyru's stabilize_veyru). Returns null when
-   * the plug-in has nothing to add for this tool.
+   * (e.g. judge verdict for veyru's stabilize_veyru, truck/crane verdicts
+   * for container_yard_stacking). Returns null when the plug-in has
+   * nothing to add for this tool. ``extras`` is the run's
+   * ``scenario_extras`` payload typed as ``unknown`` — each plug-in
+   * narrows it internally to its own variant.
    */
-  renderToolMetadata: (args: {
-    toolName: string;
-    callId: string;
-    extras: components["schemas"]["VeyruRunExtras"] | null;
-  }) => ReactNode;
+  renderToolMetadata: (args: { toolName: string; callId: string; extras: unknown }) => ReactNode;
 }

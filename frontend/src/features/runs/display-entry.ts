@@ -6,6 +6,8 @@ type ReasoningEntry = components["schemas"]["ReasoningEntry"];
 type ToolUseEntry = components["schemas"]["ToolUseEntry"];
 type AgentRunCycleFailedEntry = components["schemas"]["AgentRunCycleFailedEntry"];
 type VeyruStabilizeMetadata = components["schemas"]["VeyruStabilizeMetadata"];
+type ContainerYardTruckMetadata = components["schemas"]["ContainerYardTruckMetadata"];
+type ContainerYardCraneMetadata = components["schemas"]["ContainerYardCraneMetadata"];
 
 /** Unified display type used by ChatPane and AgentDrawer to render
  *  channel messages, reasoning entries, tool uses, and run-cycle failures
@@ -37,6 +39,8 @@ export interface DisplayEntry {
   /** Paired entry's message_id for click-to-scroll (empty when there is no pair). */
   paired_message_id: string;
   stabilize_metadata: VeyruStabilizeMetadata | null;
+  truck_metadata: ContainerYardTruckMetadata | null;
+  crane_metadata: ContainerYardCraneMetadata | null;
   /** Exception class name for run-cycle failure entries (empty otherwise). */
   error_type: string;
   /** Retry-loop cycle index for run-cycle failure entries (0 otherwise). */
@@ -55,6 +59,8 @@ const EMPTY_ENTRY_DEFAULTS = {
   call_id: "",
   paired_message_id: "",
   stabilize_metadata: null as VeyruStabilizeMetadata | null,
+  truck_metadata: null as ContainerYardTruckMetadata | null,
+  crane_metadata: null as ContainerYardCraneMetadata | null,
   error_type: "",
   cycle: 0,
 };
@@ -63,15 +69,19 @@ const EMPTY_ENTRY_DEFAULTS = {
  *  failures into a single sorted array.
  *
  *  ``stabilizeMetadataByCallId`` carries the veyru-only stabilize-judge
- *  metadata keyed by tool ``call_id``. It is empty for non-veyru runs.
- *  Plumbed in by the run-detail page from
+ *  metadata keyed by tool ``call_id`` (empty for non-veyru runs).
+ *  ``truckMetadataByCallId`` and ``craneMetadataByCallId`` carry the
+ *  container-yard-only truck and crane verdicts keyed by tool ``call_id``
+ *  (empty for non-yard runs). Plumbed in by the run-detail page from
  *  ``RunDetailResponse.scenario_extras`` and the live SSE stream. */
 export function mergeEntries(
   messages: ChannelMessage[],
   reasoning: ReasoningEntry[],
   toolUse: ToolUseEntry[],
   runCycleFailures: AgentRunCycleFailedEntry[],
-  stabilizeMetadataByCallId: Record<string, VeyruStabilizeMetadata>
+  stabilizeMetadataByCallId: Record<string, VeyruStabilizeMetadata>,
+  truckMetadataByCallId: Record<string, ContainerYardTruckMetadata>,
+  craneMetadataByCallId: Record<string, ContainerYardCraneMetadata>
 ): DisplayEntry[] {
   const channelEntries: DisplayEntry[] = messages.map(m => ({
     ...EMPTY_ENTRY_DEFAULTS,
@@ -134,6 +144,8 @@ export function mergeEntries(
       call_id: t.call_id,
       paired_message_id: split ? resultMessageId : "",
       stabilize_metadata: stabilizeMetadataByCallId[t.call_id] ?? null,
+      truck_metadata: truckMetadataByCallId[t.call_id] ?? null,
+      crane_metadata: craneMetadataByCallId[t.call_id] ?? null,
     });
     if (split && t.result_timestamp !== null) {
       toolEntries.push({

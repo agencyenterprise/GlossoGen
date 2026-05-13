@@ -163,20 +163,22 @@ def _count_total_rounds(events: list[SimulationEvent]) -> int:
 
 
 def _expected_moves_per_round(events: list[SimulationEvent]) -> dict[int, int]:
-    """Return per-round expected crane move count from ContainerYardCaseStarted events."""
+    """Return per-round total expected crane move count across all steps."""
     counts: dict[int, int] = {}
     for event in events:
         if isinstance(event, ContainerYardCaseStarted):
-            counts[event.round_number] = len(event.expected_move_sequence)
+            counts[event.round_number] = sum(
+                len(step.expected_move_sequence) for step in event.steps
+            )
     return counts
 
 
 def _expected_truck_count_per_round(events: list[SimulationEvent]) -> dict[int, int]:
-    """Return per-round expected truck count from ContainerYardCaseStarted events."""
+    """Return per-round total expected truck count across all steps."""
     counts: dict[int, int] = {}
     for event in events:
         if isinstance(event, ContainerYardCaseStarted):
-            counts[event.round_number] = len(event.truck_assignments)
+            counts[event.round_number] = sum(len(step.truck_assignments) for step in event.steps)
     return counts
 
 

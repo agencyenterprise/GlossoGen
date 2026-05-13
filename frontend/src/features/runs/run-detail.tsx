@@ -369,18 +369,32 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     const seenFailureIds = new Set(restRunCycleFailures.map(f => f.message_id));
     const newFailures = sse.runCycleFailures.filter(f => !seenFailureIds.has(f.message_id));
 
-    const restStabilizeMetadata = restData?.scenario_extras?.stabilize_metadata_by_call_id ?? {};
+    const scenarioExtras = restData?.scenario_extras ?? null;
+    const restStabilizeMetadata =
+      scenarioExtras !== null && scenarioExtras.scenario_name === "veyru"
+        ? scenarioExtras.stabilize_metadata_by_call_id
+        : {};
     const stabilizeMetadataByCallId = {
       ...restStabilizeMetadata,
       ...sse.stabilizeMetadataByCallId,
     };
+    const truckMetadataByCallId =
+      scenarioExtras !== null && scenarioExtras.scenario_name === "container_yard_stacking"
+        ? scenarioExtras.truck_metadata_by_call_id
+        : {};
+    const craneMetadataByCallId =
+      scenarioExtras !== null && scenarioExtras.scenario_name === "container_yard_stacking"
+        ? scenarioExtras.crane_metadata_by_call_id
+        : {};
 
     return mergeEntries(
       [...restMessages, ...newMessages],
       [...restReasoning, ...newReasoning],
       [...restToolUse, ...newToolUse],
       [...restRunCycleFailures, ...newFailures],
-      stabilizeMetadataByCallId
+      stabilizeMetadataByCallId,
+      truckMetadataByCallId,
+      craneMetadataByCallId
     );
   }, [
     restData,
@@ -535,6 +549,10 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   }
 
   const maxRound = displayEntries.reduce((max, m) => Math.max(max, m.round_number), 0);
+  const veyruExtrasForChat =
+    restData.scenario_extras !== null && restData.scenario_extras.scenario_name === "veyru"
+      ? restData.scenario_extras
+      : null;
   const uniqueModelKeys = [...new Set(allAgents.map(a => `${a.provider}:${a.model}`))];
   let modelLabel: string;
   if (uniqueModelKeys.length === 1) {
@@ -820,14 +838,12 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             onReplaceAgentFromRound={handleReplaceAgentFromRound}
             onCrossRunReplaceFromRound={handleCrossRunReplaceFromRound}
             forkPointMessageId={restData.fork_source?.target_message_id ?? null}
-            swapRoundNumber={restData.scenario_extras?.swap_point?.round_number ?? null}
+            swapRoundNumber={veyruExtrasForChat?.swap_point?.round_number ?? null}
             swappedObserverDisplayNames={
-              restData.scenario_extras?.swap_point?.swapped_observer_display_names ?? []
+              veyruExtrasForChat?.swap_point?.swapped_observer_display_names ?? []
             }
-            internJoinRoundNumber={restData.scenario_extras?.intern_join?.round_number ?? null}
-            internTakeoverRoundNumber={
-              restData.scenario_extras?.intern_takeover?.round_number ?? null
-            }
+            internJoinRoundNumber={veyruExtrasForChat?.intern_join?.round_number ?? null}
+            internTakeoverRoundNumber={veyruExtrasForChat?.intern_takeover?.round_number ?? null}
             replaceAgentRoundStart={restData.replace_agent_source?.round_start ?? null}
             replaceAgentReplacedAgentId={restData.replace_agent_source?.replaced_agent_id ?? null}
             replaceAgentReplacementModel={restData.replace_agent_source?.replacement_model ?? null}
@@ -1003,7 +1019,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
       ) : null}
 
       {(() => {
-        const veyruExtras = restData.scenario_extras ?? null;
+        const veyruExtras = veyruExtrasForChat;
         const swapPoint = veyruExtras?.swap_point ?? null;
         const internJoin = veyruExtras?.intern_join ?? null;
         const internTakeover = veyruExtras?.intern_takeover ?? null;

@@ -43,7 +43,8 @@ import { RoundTimelineModal } from "./round-timeline-modal";
 import type { PendingEdit } from "./use-fork";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
-type VeyruRunExtras = components["schemas"]["VeyruRunExtras"];
+type RunDetailResponse = components["schemas"]["RunDetailResponse"];
+type ScenarioExtras = NonNullable<RunDetailResponse["scenario_extras"]>;
 type RoundEnding = components["schemas"]["RoundEnding"];
 
 interface ChatPaneProps {
@@ -98,7 +99,7 @@ interface ChatPaneProps {
   /** Scenario name, used to dispatch to the scenario plug-in for the round-detail modal. */
   scenarioName: string;
   /** Scenario-specific run extras (e.g. veyru per-round case metadata). Null for scenarios with no extras. */
-  scenarioExtras: VeyruRunExtras | null;
+  scenarioExtras: ScenarioExtras | null;
   /** One entry per completed round describing why its main phase ended. */
   roundEndings: RoundEnding[];
   /** ISO timestamp at which the resume happened (replace-agent / fork). Turns and rounds with earlier timestamps are rendered faded so users see they were inherited from the source run. Null for non-resumed runs. */
@@ -1428,6 +1429,8 @@ function ToolOrNotification({ entry }: { entry: DisplayEntry }) {
       arguments={entry.tool_arguments}
       result={entry.tool_result}
       stabilizeMetadata={entry.stabilize_metadata}
+      truckMetadata={entry.truck_metadata}
+      craneMetadata={entry.crane_metadata}
     />
   );
 }

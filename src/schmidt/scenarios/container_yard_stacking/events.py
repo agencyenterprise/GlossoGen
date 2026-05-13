@@ -75,19 +75,33 @@ class ContainerYardManifestEntry(BaseModel):
     target_position: ContainerYardStackPosition
 
 
+class ContainerYardCaseStep(BaseModel):
+    """One container delivery within a multi-step round."""
+
+    step_index: int
+    incoming_container_id: str
+    target_position: ContainerYardStackPosition
+    correct_crane_station: str
+    truck_assignments: list[ContainerYardTruckAssignment]
+    expected_move_sequence: list[ContainerYardCraneMoveStep]
+
+
 class ContainerYardCaseStarted(EventBase):
-    """Emitted once at round start with full ground-truth case data."""
+    """Emitted once at round start with full ground-truth case data.
+
+    ``steps`` carries the ordered per-container deliveries; the
+    yard operator only sees ``steps[0].incoming_container_id`` at round
+    start and learns each subsequent step's container ID via a world
+    notification when the prior step's incoming container reaches its
+    target.
+    """
 
     event_type: Literal["container_yard_case_started"] = "container_yard_case_started"
     case_number: int
-    incoming_container_id: str
     active_crane_stations: list[ContainerYardCraneStation]
-    correct_crane_station: str
     initial_stacks: list[ContainerYardStackSnapshot]
-    target_position: ContainerYardStackPosition
-    truck_assignments: list[ContainerYardTruckAssignment]
-    expected_move_sequence: list[ContainerYardCraneMoveStep]
     time_budget_seconds: int
+    steps: list[ContainerYardCaseStep]
     manifest: list[ContainerYardManifestEntry]
 
 
@@ -116,6 +130,7 @@ class ContainerYardTruckJudged(EventBase):
 
     event_type: Literal["container_yard_truck_judged"] = "container_yard_truck_judged"
     agent_id: str
+    step_index: int
     submitted_truck_role: Literal["inbound", "outbound"]
     submitted_station_name: str
     submitted_pad: str
@@ -179,6 +194,7 @@ class ContainerYardCraneMoveJudged(EventBase):
 
     event_type: Literal["container_yard_crane_move_judged"] = "container_yard_crane_move_judged"
     agent_id: str
+    step_index: int
     move_index: int
     submitted_move: ContainerYardCraneMoveStep
     verdict: ContainerYardCraneMoveVerdict

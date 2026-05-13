@@ -4,6 +4,6 @@
 Round {{ round_number }}
 Inspection window: {{ current_case.time_budget_seconds }}s before the customs slot is missed (one character = one second; total across all three of you)
 
-You see one new container on the inbound lane:
-- Container ID: {{ current_case.incoming_container_id }}
+Current incoming container:
+- Container ID: {{ current_case.steps[0].incoming_container_id }}
 {% endif %}

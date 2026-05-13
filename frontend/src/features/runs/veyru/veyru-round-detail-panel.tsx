@@ -4,14 +4,21 @@ import type { components } from "@/types/api.gen";
 
 type VeyruRunExtras = components["schemas"]["VeyruRunExtras"];
 
+function isVeyruExtras(extras: unknown): extras is VeyruRunExtras {
+  if (typeof extras !== "object" || extras === null) return false;
+  const tagged = extras as { scenario_name?: string };
+  return tagged.scenario_name === "veyru";
+}
+
 interface VeyruRoundDetailPanelProps {
   roundNumber: number;
-  extras: VeyruRunExtras | null;
+  extras: unknown;
 }
 
 /** Veyru case-detail header rendered at the top of the round-timeline modal. */
 export function VeyruRoundDetailPanel({ roundNumber, extras }: VeyruRoundDetailPanelProps) {
-  const veyruCase = extras?.cases.find(c => c.round_number === roundNumber) ?? null;
+  if (!isVeyruExtras(extras)) return null;
+  const veyruCase = extras.cases.find(c => c.round_number === roundNumber) ?? null;
   if (veyruCase === null) {
     return null;
   }

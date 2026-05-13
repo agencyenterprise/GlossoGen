@@ -8,14 +8,17 @@ import type { DisplayEntry } from "./display-entry";
 import { formatTime, humanize } from "./format";
 import { getScenarioPlugin } from "./scenario-registry";
 
-type VeyruRunExtras = components["schemas"]["VeyruRunExtras"];
+type RunDetailResponse = components["schemas"]["RunDetailResponse"];
+type ScenarioExtras = NonNullable<RunDetailResponse["scenario_extras"]>;
 type RoundEnding = components["schemas"]["RoundEnding"];
+type ContainerYardCraneMoveStep = components["schemas"]["ContainerYardCraneMoveStep"];
+type ContainerYardTruckAssignment = components["schemas"]["ContainerYardTruckAssignment"];
 
 interface RoundTimelineModalProps {
   roundNumber: number;
   messages: DisplayEntry[];
   scenarioName: string;
-  scenarioExtras: VeyruRunExtras | null;
+  scenarioExtras: ScenarioExtras | null;
   roundEnding: RoundEnding | null;
   onClose: () => void;
 }
@@ -23,12 +26,51 @@ interface RoundTimelineModalProps {
 interface TimelineRow {
   key: string;
   timestamp: string;
-  kind: "message" | "stabilize" | "end";
+  kind: "message" | "judged_tool";
   sender: string;
   text: string;
-  judgeMatch: boolean | null;
-  judgeExpected: string;
-  judgeExplanation: string;
+  toolName: string;
+  verdictAccepted: boolean | null;
+  expected: string;
+  explanation: string;
+}
+
+function formatTruckArgs(args: Record<string, unknown>): string {
+  const role = typeof args.truck_role === "string" ? args.truck_role : "?";
+  const station = typeof args.station_name === "string" ? args.station_name : "?";
+  const pad = typeof args.pad === "string" ? args.pad : "?";
+  const cid = typeof args.container_id === "string" ? args.container_id : "";
+  const cidSuffix = cid !== "" ? ` (${cid})` : "";
+  return `${role} → ${station}/${pad}${cidSuffix}`;
+}
+
+function formatCraneArgs(toolName: string, args: Record<string, unknown>): string {
+  const cid = typeof args.container_id === "string" ? args.container_id : "?";
+  const stack = typeof args.stack === "number" ? args.stack : "?";
+  const tier = typeof args.tier === "number" ? args.tier : "?";
+  return `${toolName}(${cid}, stack ${stack}, tier ${tier})`;
+}
+
+function formatExpectedTrucks(assignments: ContainerYardTruckAssignment[]): string {
+  if (assignments.length === 0) return "";
+  return assignments
+    .map(a => {
+      const cidSuffix = a.container_id !== "" ? ` (${a.container_id})` : "";
+      return `${a.truck_role} → ${a.station_name}${cidSuffix}`;
+    })
+    .join("; ");
+}
+
+function formatCraneMove(move: ContainerYardCraneMoveStep): string {
+  const source =
+    move.source_kind === "stack_tier"
+      ? `stack ${move.source_stack}/tier ${move.source_tier}`
+      : move.source_kind;
+  const dest =
+    move.destination_kind === "stack_tier"
+      ? `stack ${move.destination_stack}/tier ${move.destination_tier}`
+      : move.destination_kind;
+  return `${move.container_id}: ${source} → ${dest}`;
 }
 
 function buildTimelineRows(messages: DisplayEntry[]): TimelineRow[] {
@@ -43,12 +85,44 @@ function buildTimelineRows(messages: DisplayEntry[]): TimelineRow[] {
       rows.push({
         key: m.message_id,
         timestamp: m.timestamp,
-        kind: "stabilize",
+        kind: "judged_tool",
         sender: m.sender_agent_id,
         text: action,
-        judgeMatch: m.stabilize_metadata?.judge_match ?? null,
-        judgeExpected: m.stabilize_metadata?.expected_actions ?? "",
-        judgeExplanation: m.stabilize_metadata?.judge_explanation ?? "",
+        toolName: "stabilize_veyru",
+        verdictAccepted: m.stabilize_metadata?.judge_match ?? null,
+        expected: m.stabilize_metadata?.expected_actions ?? "",
+        explanation: m.stabilize_metadata?.judge_explanation ?? "",
+      });
+      continue;
+    }
+    if (m.is_tool_use && m.truck_metadata !== null) {
+      rows.push({
+        key: m.message_id,
+        timestamp: m.timestamp,
+        kind: "judged_tool",
+        sender: m.sender_agent_id,
+        text: formatTruckArgs(m.tool_arguments),
+        toolName: "move_truck",
+        verdictAccepted: m.truck_metadata.overall_success,
+        expected: formatExpectedTrucks(m.truck_metadata.expected_truck_assignments),
+        explanation: m.truck_metadata.explanation,
+      });
+      continue;
+    }
+    if (m.is_tool_use && m.crane_metadata !== null) {
+      rows.push({
+        key: m.message_id,
+        timestamp: m.timestamp,
+        kind: "judged_tool",
+        sender: m.sender_agent_id,
+        text: formatCraneArgs(m.tool_name, m.tool_arguments),
+        toolName: m.tool_name,
+        verdictAccepted: m.crane_metadata.accepted,
+        expected:
+          m.crane_metadata.expected_move !== null
+            ? formatCraneMove(m.crane_metadata.expected_move)
+            : "",
+        explanation: m.crane_metadata.explanation,
       });
       continue;
     }
@@ -60,21 +134,24 @@ function buildTimelineRows(messages: DisplayEntry[]): TimelineRow[] {
       kind: "message",
       sender: m.sender_agent_id,
       text: m.text,
-      judgeMatch: null,
-      judgeExpected: "",
-      judgeExplanation: "",
+      toolName: "",
+      verdictAccepted: null,
+      expected: "",
+      explanation: "",
     });
   }
   return rows;
 }
 
 function TriggerBadge({ trigger }: { trigger: string }) {
-  const tone =
-    trigger === "veyru_stabilized"
-      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-      : trigger === "veyru_collapsed"
-        ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
-        : "bg-amber-500/15 text-amber-600 dark:text-amber-400";
+  let tone: string;
+  if (trigger === "veyru_stabilized" || trigger === "round_completed") {
+    tone = "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
+  } else if (trigger === "veyru_collapsed" || trigger === "round_failed") {
+    tone = "bg-rose-500/15 text-rose-600 dark:text-rose-400";
+  } else {
+    tone = "bg-amber-500/15 text-amber-600 dark:text-amber-400";
+  }
   return (
     <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${tone}`}>
       {humanize(trigger)}
@@ -82,19 +159,19 @@ function TriggerBadge({ trigger }: { trigger: string }) {
   );
 }
 
-function JudgePill({ match }: { match: boolean }) {
-  if (match) {
+function VerdictPill({ accepted }: { accepted: boolean }) {
+  if (accepted) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
         <Check className="h-3 w-3" />
-        judge match
+        accepted
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:text-rose-400">
       <X className="h-3 w-3" />
-      judge mismatch
+      rejected
     </span>
   );
 }
@@ -155,56 +232,65 @@ export function RoundTimelineModal({
           </div>
           {rows.length === 0 ? (
             <div className="py-6 text-center text-xs text-muted-foreground">
-              No link messages or stabilize calls recorded for this round.
+              No link messages or judged tool calls recorded for this round.
             </div>
           ) : (
             <ol className="relative space-y-3 border-l border-border pl-4">
-              {rows.map(row => (
-                <li key={row.key} className="relative">
-                  <span
-                    className={`absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-background ${
-                      row.kind === "stabilize"
-                        ? row.judgeMatch === true
-                          ? "bg-emerald-500"
-                          : "bg-rose-500"
-                        : "bg-muted-foreground"
-                    }`}
-                  />
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span className="font-mono">{formatTime(row.timestamp)}</span>
-                    <span className="font-medium text-foreground">{humanize(row.sender)}</span>
-                    {row.kind === "stabilize" ? (
-                      <>
+              {rows.map(row => {
+                let dotClass: string;
+                if (row.kind === "judged_tool" && row.verdictAccepted === true) {
+                  dotClass = "bg-emerald-500";
+                } else if (row.kind === "judged_tool" && row.verdictAccepted === false) {
+                  dotClass = "bg-rose-500";
+                } else {
+                  dotClass = "bg-muted-foreground";
+                }
+                return (
+                  <li key={row.key} className="relative">
+                    <span
+                      className={`absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-background ${dotClass}`}
+                    />
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <span className="font-mono">{formatTime(row.timestamp)}</span>
+                      <span className="font-medium text-foreground">{humanize(row.sender)}</span>
+                      {row.kind === "judged_tool" ? (
+                        <>
+                          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                            {row.toolName}
+                          </span>
+                          {row.verdictAccepted !== null ? (
+                            <VerdictPill accepted={row.verdictAccepted} />
+                          ) : null}
+                        </>
+                      ) : (
                         <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
-                          stabilize_veyru
+                          #link
                         </span>
-                        {row.judgeMatch !== null ? <JudgePill match={row.judgeMatch} /> : null}
-                      </>
-                    ) : (
-                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
-                        #link
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-relaxed">
-                    {row.text}
-                  </div>
-                  {row.kind === "stabilize" && row.judgeExpected !== "" ? (
-                    <div className="mt-1.5 rounded-md border border-border/60 bg-muted/30 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-                      <div>
-                        <span className="text-[10px] uppercase tracking-wide">expected</span>{" "}
-                        {row.judgeExpected}
-                      </div>
-                      {row.judgeExplanation !== "" ? (
-                        <div className="mt-1">
-                          <span className="text-[10px] uppercase tracking-wide">judge</span>{" "}
-                          {row.judgeExplanation}
-                        </div>
-                      ) : null}
+                      )}
                     </div>
-                  ) : null}
-                </li>
-              ))}
+                    <div className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-relaxed">
+                      {row.text}
+                    </div>
+                    {row.kind === "judged_tool" &&
+                    (row.expected !== "" || row.explanation !== "") ? (
+                      <div className="mt-1.5 rounded-md border border-border/60 bg-muted/30 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+                        {row.expected !== "" ? (
+                          <div>
+                            <span className="text-[10px] uppercase tracking-wide">expected</span>{" "}
+                            {row.expected}
+                          </div>
+                        ) : null}
+                        {row.explanation !== "" ? (
+                          <div className="mt-1">
+                            <span className="text-[10px] uppercase tracking-wide">verdict</span>{" "}
+                            {row.explanation}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ol>
           )}
         </div>
