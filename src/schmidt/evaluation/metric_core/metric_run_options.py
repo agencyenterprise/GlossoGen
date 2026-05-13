@@ -41,7 +41,9 @@ class MetricRunOptions(BaseModel):
         description=(
             "Path to a consolidated communication-feature ontology JSON file "
             "(typically ``<runs_dir>/<scenario_name>/_ontology/<version>.json``). "
-            "Required when running the ``communication_feature_presence`` "
-            "metric; ignored otherwise."
+            "Optional for the ``communication_feature_presence`` metric: when "
+            "``None`` the metric auto-resolves the most recently modified "
+            "ontology JSON under that per-scenario directory. Ignored by "
+            "other metrics."
         ),
     )
