@@ -1,13 +1,18 @@
 """Pass 1 of the communication-feature analysis pipeline.
 
-Feeds the LLM judge the run's link-channel messages and the per-round
-``motif → treatment_motif`` ground truth, then asks for free-form
-short labels naming the communication-pattern features the team
-exhibits. Persists the result as ``communication_open_coding.json`` in
-the run directory; the consolidation script under
-``src/schmidt/scenarios/veyru/scripts/consolidate_communication_ontology.py``
-reads those sidecars across many runs to produce the shared taxonomy
-used by pass 3.
+Feeds the LLM judge the run's primary-channel messages and the
+per-round ground truth produced by the scenario, then asks for
+free-form short labels naming the communication-pattern features the
+team exhibits. Persists the result as
+``communication_open_coding.json`` in the run directory; the
+``scripts/consolidate_communication_ontology.py`` consolidator reads
+those sidecars across many runs to produce the shared taxonomy used by
+pass 3.
+
+Scenario-agnostic: the metric calls
+``scenario.build_communication_rounds(events)`` and only sees
+``CommunicationRoundView`` rows. Scenarios that do not implement the
+hook return ``[]`` and the metric quietly skips with no Measurement.
 """
 
 import logging
@@ -18,19 +23,15 @@ from schmidt.evaluation.log_reader import extract_simulation_id
 from schmidt.evaluation.metric_core.measurement import Measurement
 from schmidt.evaluation.metric_core.metric_protocol import Metric
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
+from schmidt.evaluation.metrics.communication.label_models import (
+    CommunicationOpenCodingOutput,
+    CommunicationOpenCodingSidecar,
+)
 from schmidt.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from schmidt.llm.provider import LLMMessage, LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.veyru.evaluation.metrics.communication.label_models import (
-    CommunicationOpenCodingOutput,
-    CommunicationOpenCodingSidecar,
-)
-from schmidt.scenarios.veyru.evaluation.metrics.communication.transcript_builder import (
-    build_link_rounds,
-)
-from schmidt.scenarios.veyru.evaluation.prompts.prompt_renderer import render_veyru_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -51,17 +52,18 @@ class CommunicationOpenCodingMetric(Metric):
         run_dir: Path,
         options: MetricRunOptions,
     ) -> list[Measurement]:
-        """Score one run's link-channel + ground-truth with the open-coding judge."""
-        _ = agent_configs, scenario, options
-        rounds = build_link_rounds(events=events)
+        """Score one run's primary-channel + ground-truth with the open-coding judge."""
+        _ = agent_configs, options
+        rounds = scenario.build_communication_rounds(events=events)
         if not rounds:
             logger.info(
-                "%s: skipping — no link-channel messages or case data in the run",
+                "%s: skipping — scenario %s produced no communication rounds",
                 self.name,
+                scenario.name(),
             )
             return []
 
-        judge_prompt = render_veyru_prompt(
+        judge_prompt = render_evaluator_prompt(
             template_name="communication_open_coding_user.jinja",
             template_variables={"rounds": rounds},
         )

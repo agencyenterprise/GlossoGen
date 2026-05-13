@@ -1,0 +1,62 @@
+You are doing **open coding** on the primary-channel communication of a team running a coordination simulation. The team exchanges short messages to coordinate a per-round task under a tight communication budget. Your job is to emit free-form **short labels** naming the *linguistic and communicative phenomena* you observe — the mechanisms of language emergence, not the scenario-domain content they happen to operate over.
+
+**Core rule: label the MECHANISM, not the REFERENT.**
+
+Each label must describe a feature of *how* the team is using language — a linguistic mechanism that could in principle appear in any task domain. Do NOT label *what* the team happens to be talking about. The scenario has its own domain vocabulary (objects, roles, locations, codes), but the same mechanism applied to two different domain referents is ONE phenomenon, not two.
+
+Examples of the *kind* of label that's appropriate (not a vocabulary — invent your own when you see a phenomenon not on this list):
+
+  Compression / abbreviation:
+  - "first-letter abbreviation" (one initial stands for a referent)
+  - "syllable-truncation abbreviation" (a prefix stands for the word)
+  - "vowel-deletion abbreviation" (consonant skeleton replaces full word)
+  - "numeric substitution for quantities" (digits replace number words)
+  - "telegraphic ellipsis" (articles, verbs, prepositions dropped)
+
+  Syntactic structure:
+  - "positional slot ordering" (meaning carried by position, not by labels)
+  - "punctuation as inline separator" (e.g. /, +, |, x repurposed as operators)
+  - "implicit conjunction" (sequential steps with no connector)
+  - "fixed message template across rounds"
+  - "two-letter mnemonic / acronym coinage"
+
+  Pragmatics:
+  - "single-token acknowledgement" (one letter / word for ack / fail / retry)
+  - "explicit definition (X = Y)" (introducing a code with its expansion)
+  - "clarification request"
+  - "register shift on failure" (expansion back to full natural language)
+  - "metalinguistic comment about the protocol"
+
+  Convergence dynamics:
+  - "lexical reuse across rounds" (same coined token reappears later)
+  - "compression accelerates across rounds" (later rounds shorter than earlier)
+  - "asymmetric adoption" (one role compresses; the other does not)
+  - "self-correction without prompting"
+
+**Anti-patterns (do NOT do these):**
+
+- ❌ Coupling a label to a scenario-specific referent: if you find yourself writing two labels that differ only by their domain referent (e.g. "<object-type-A> abbreviation" and "<object-type-B> abbreviation"), collapse to ONE mechanism label that names the shared linguistic operation.
+- ❌ Describing an agent doing their job: "the planner relays per-round instructions" is procedural, not linguistic.
+- ❌ Quality judgements: "uses good abbreviations", "uses helpful clarifications". Stick to descriptive mechanism names.
+
+**Operational guidelines:**
+
+- Do NOT pre-judge labels against any external taxonomy. If you see a mechanism that doesn't fit the list above, invent a label for it — as long as it's still mechanism-level and not referent-level.
+- For each label, cite **every** round where the feature is clearly observable on the primary channel — not just one. A pervasive mechanism accumulates many citations; a one-off accumulates exactly one. This distribution is the signal that downstream consolidation uses to tell stable phenomena from incidental noise. Each citation is a (round_number, short verbatim quote) pair.
+- Skip labels for features that are absent — only positive observations.
+
+The scenario typically has information asymmetry: different agents see different parts of the per-round ground truth. The per-round ground-truth block below tells you what each agent could see and what the round wanted, in the scenario's own vocabulary. Use that to decide which labels are sensible (e.g. a label like "agent X encodes value Y" only makes sense if agent X had access to value Y, either directly or via prior coordination).
+
+{% for round in rounds %}
+--- ROUND {{ round.round_number }} · {{ round.header }} ---
+
+Ground truth this round:
+{{ round.ground_truth_block }}
+
+Primary-channel messages ({{ round.messages | length }}):
+{% if round.messages %}{% for message in round.messages %}[{{ message.channel_id }}] {{ message.sender_agent_id }}: {{ message.text }}
+{% endfor %}{% else %}(no messages on the primary channel this round)
+{% endif %}
+{% endfor %}
+
+Now emit your labels. Submit your assessment using the provided tool.

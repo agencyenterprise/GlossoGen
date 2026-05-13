@@ -12,8 +12,6 @@ This module is streamlit-free so it can be reused by ad-hoc analysis scripts.
 from pathlib import Path
 from typing import NamedTuple
 
-import orjson
-
 from analysis.results_viewer.measurement_scores import (
     MCM_METRIC,
     MCR_METRIC,
@@ -88,8 +86,10 @@ VERBOSITY_METRIC_OPTIONS: list[VerbosityMetricOption] = [
             "**mean_chars_per_round (mcr)** — total characters of all "
             "primary-channel messages summed per round, then averaged "
             "across rounds. The headline channel-utilization number — "
-            "in Veyru it maps directly to `time_budget_seconds` since "
-            "one character costs one second of communication time.\n\n"
+            "in scenarios where one character on the primary channel costs "
+            "one second of a per-round communication budget (Veyru, "
+            "container_yard_stacking), MCR maps directly to "
+            "`time_budget_seconds`.\n\n"
             "Lower MCR = teams talk less per round overall."
         ),
     ),
@@ -180,51 +180,33 @@ def _collect_per_round(evaluated: EvaluatedRun) -> dict[str, list[RoundValue]]:
     return by_name
 
 
-def list_verbosity_runs(evaluated_runs: list[EvaluatedRun]) -> list[VerbosityRun]:
-    """Filter ``evaluated_runs`` to baseline and resume runs with success scores."""
+def list_verbosity_runs(
+    evaluated_runs: list[EvaluatedRun], scenario_name: str
+) -> list[VerbosityRun]:
+    """Filter ``evaluated_runs`` to ``scenario_name`` baseline / resume runs with success scores."""
     out: list[VerbosityRun] = []
     for run in evaluated_runs:
+        if run.scenario_name != scenario_name:
+            continue
         verbosity = build_verbosity_run(evaluated=run)
         if verbosity is not None:
             out.append(verbosity)
     return out
 
 
-_BUDGET_CACHE: dict[Path, tuple[int, int, int | None]] = {}
-
-
 def _resolve_budget(evaluated: EvaluatedRun) -> int | None:
-    """Resolve the run's character/time budget from its event log.
+    """Resolve the run's character/time budget from its scenario config.
 
-    Reads the first ``veyru_case_started`` event in the run's JSONL and
-    returns its ``time_budget_seconds``. Veyru's character budget equals
-    its time budget (one char = one second), and the budget stays
-    constant across cases within a run. Memoized per ``jsonl_path``
-    keyed on the file's size + mtime, so repeat renders skip the file
-    I/O. Returns ``None`` when no case-started event exists (e.g. a run
-    that crashed before round 1).
+    Scenarios with a per-round communication budget (Veyru,
+    container_yard_stacking) carry ``time_budget_seconds`` in the
+    ``scenario_config`` written into the JSONL at simulation start; one
+    character on the primary channel costs one second against that
+    budget. Returns ``None`` when the scenario doesn't expose the field.
     """
-    scenario_name = evaluated.run_id.split("/", 1)[0]
-    jsonl_path = evaluated.run_dir / f"{scenario_name}.jsonl"
-    try:
-        stat = jsonl_path.stat()
-    except FileNotFoundError:
-        return None
-    cached = _BUDGET_CACHE.get(jsonl_path)
-    if cached is not None and cached[0] == stat.st_size and cached[1] == stat.st_mtime_ns:
-        return cached[2]
-    budget: int | None = None
-    with jsonl_path.open("rb") as f:
-        for line in f:
-            event = orjson.loads(line)
-            if event.get("event_type") != "veyru_case_started":
-                continue
-            value = event.get("time_budget_seconds")
-            if isinstance(value, (int, float)):
-                budget = int(value)
-            break
-    _BUDGET_CACHE[jsonl_path] = (stat.st_size, stat.st_mtime_ns, budget)
-    return budget
+    value = evaluated.metadata.scenario_config.get("time_budget_seconds")
+    if isinstance(value, (int, float)):
+        return int(value)
+    return None
 
 
 def _is_two_team(evaluated: EvaluatedRun) -> bool:

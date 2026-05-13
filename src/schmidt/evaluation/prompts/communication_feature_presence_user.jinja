@@ -1,0 +1,38 @@
+You are scoring one team's primary-channel communication against a fixed ontology of communication-pattern features. The ontology was distilled from open-coding many runs of this scenario; your job is to decide, for each ontology category, how strongly this run's primary-channel messages exhibit that feature.
+
+For every category in the ontology below, emit one ``CategoryConfidence`` entry with:
+- ``category_id`` — exactly the id from the ontology (case-sensitive).
+- ``confidence`` — a float in [0.0, 1.0]. **Score the magnitude of evidence, not your own certainty:**
+  - 0.0 — feature is plainly absent across the entire run.
+  - ~0.3 — incidental or borderline; maybe one round, ambiguous.
+  - ~0.6 — feature appears clearly in multiple rounds but not pervasively.
+  - 0.9–1.0 — feature is a dominant, sustained property of the team's protocol.
+- ``justification`` — one or two sentences citing specific primary-channel evidence (round numbers, brief quotes) or its absence.
+
+You MUST emit one entry per category, in the order they are listed. Do not skip a category just because the feature is absent — a low confidence with a short "absent" justification is the expected output.
+
+The scenario typically has information asymmetry: different agents see different parts of the per-round ground truth. The per-round ground-truth block below tells you what each agent could see and what the round wanted. Use that when deciding whether the team is encoding scenario-specific values, hand-offs between roles, or neither — and remember that an agent who emits content based on data they cannot see directly must have learned the mapping from earlier primary-channel messages or out-of-band coordination.
+
+Ontology (score every entry):
+
+{% for category in categories %}- id: ``{{ category.id }}``
+  name: {{ category.name }}
+  description: {{ category.description }}
+{% if category.synonyms %}  synonyms: {{ category.synonyms | join(", ") }}
+{% endif %}{% endfor %}
+
+Run transcripts and ground truth:
+
+{% for round in rounds %}
+--- ROUND {{ round.round_number }} · {{ round.header }} ---
+
+Ground truth this round:
+{{ round.ground_truth_block }}
+
+Primary-channel messages ({{ round.messages | length }}):
+{% if round.messages %}{% for message in round.messages %}[{{ message.channel_id }}] {{ message.sender_agent_id }}: {{ message.text }}
+{% endfor %}{% else %}(no messages on the primary channel this round)
+{% endif %}
+{% endfor %}
+
+Now emit one ``CategoryConfidence`` per ontology category. Submit your assessment using the provided tool.

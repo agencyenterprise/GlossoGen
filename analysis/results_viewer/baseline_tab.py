@@ -34,6 +34,20 @@ from analysis.results_viewer.series_plot import (
     series_color_map,
 )
 
+_SCENARIOS_WITH_BASELINE: tuple[str, ...] = ("veyru", "container_yard_stacking")
+
+
+def _render_scenario_selector() -> str:
+    """Radio selector letting the user pick which scenario's baseline runs to view."""
+    chosen = st.radio(
+        label="Scenario",
+        options=_SCENARIOS_WITH_BASELINE,
+        index=0,
+        horizontal=True,
+        key="baseline_scenario_selector",
+    )
+    return chosen
+
 
 def _render_metric_selector() -> MetricOption:
     """Radio selector + info popover letting the user pick the Y-axis metric.
@@ -302,11 +316,12 @@ def _render_included_runs(
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Baseline tab body."""
-    all_baseline = list_baseline_runs(evaluated_runs=evaluated)
+    scenario_name = _render_scenario_selector()
+    all_baseline = list_baseline_runs(evaluated_runs=evaluated, scenario_name=scenario_name)
     if not all_baseline:
         st.info(
-            "No runs labeled 'baseline' found. "
-            "Add the 'baseline' label to runs you want in this view."
+            f"No runs in scenario `{scenario_name}` labeled 'baseline' found. "
+            "Add the 'baseline' label and a 'budget=<N>' label to runs you want in this view."
         )
         return
     metric = _render_metric_selector()

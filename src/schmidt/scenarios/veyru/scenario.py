@@ -22,6 +22,7 @@ from schmidt.evaluation.metric_core.measurement import Measurement
 from schmidt.evaluation.metric_core.metric_protocol import Metric
 from schmidt.evaluation.metric_core.metric_registry import GENERIC_METRIC_REGISTRY
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
+from schmidt.evaluation.metrics.communication.round_view import CommunicationRoundView
 from schmidt.evaluation.reports.evaluation_cost import compute_evaluation_cost
 from schmidt.evaluation.reports.evaluation_report import (
     EvaluationReport,
@@ -33,12 +34,11 @@ from schmidt.evaluation.reports.evaluation_report import (
 from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
+from schmidt.models.event import SimulationEvent
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld, WorldContext
 from schmidt.scenario_protocol import ScenarioRuntimeHandle, SimulationScenario
 from schmidt.scenarios.veyru.evaluation import (
-    CommunicationFeaturePresenceMetric,
-    CommunicationOpenCodingMetric,
     LanguageEmergenceMetric,
     ProtocolLearnedAfterSwapMetric,
     ProtocolProbeAgentPairSimilarityMetric,
@@ -48,6 +48,7 @@ from schmidt.scenarios.veyru.evaluation import (
     RoundSuccessAfterResumeMetric,
     RoundSuccessMetric,
 )
+from schmidt.scenarios.veyru.evaluation.build_communication_rounds import build_communication_rounds
 from schmidt.scenarios.veyru.events import (
     VeyruCaseStage,
     VeyruCaseStarted,
@@ -1016,6 +1017,12 @@ class VeyruScenario(SimulationScenario):
             return None
         return LINK_CHANNEL_ID
 
+    def build_communication_rounds(
+        self, events: list[SimulationEvent]
+    ) -> list[CommunicationRoundView]:
+        """Join link-channel messages with the round's motif/treatment ground truth."""
+        return build_communication_rounds(events=events)
+
     def get_world(self) -> ScenarioWorld:
         """Return the Veyru world that monitors entity status."""
         return self._world
@@ -1189,8 +1196,6 @@ class VeyruScenario(SimulationScenario):
     def _get_metrics(self) -> dict[str, type[Metric]]:
         """Return Veyru-specific metric classes keyed by metric name."""
         return {
-            CommunicationFeaturePresenceMetric.name: CommunicationFeaturePresenceMetric,
-            CommunicationOpenCodingMetric.name: CommunicationOpenCodingMetric,
             LanguageEmergenceMetric.name: LanguageEmergenceMetric,
             ProtocolLearnedAfterSwapMetric.name: ProtocolLearnedAfterSwapMetric,
             ProtocolProbeMetric.name: ProtocolProbeMetric,

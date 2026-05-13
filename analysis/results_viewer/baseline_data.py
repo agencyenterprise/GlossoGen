@@ -162,11 +162,12 @@ METRIC_OPTIONS: list[MetricOption] = [
         y_axis_label="round_success (# of rounds stabilized)",
         y_axis_kind="round_count",
         description=(
-            "**round_success** — number of rounds the team stabilized the Veyru "
-            "before collapse, out of `total_rounds`.\n\n"
-            "Deterministic (no LLM): scans `ToolResultReceived` and "
-            "`WorldEventDelivered` events for success and collapse markers. "
-            "In two-team mode a round counts only when both teams succeed."
+            "**round_success** — number of rounds the team completed "
+            "successfully, out of `total_rounds`. Scenario-defined success "
+            "criterion.\n\n"
+            "Deterministic (no LLM): scenarios emit per-round success markers "
+            "in the event log and the metric counts them. In Veyru two-team "
+            "mode a round counts only when both teams succeed."
         ),
     ),
     MetricOption(
@@ -207,9 +208,7 @@ METRIC_OPTIONS: list[MetricOption] = [
             "Deterministic (no LLM): reads `{scenario}_debug.jsonl` for ERROR "
             "entries from `schmidt.runners.pydantic_ai_runner` whose message "
             "contains `ContentFilterError`. The runner retries on refusal, so "
-            "a single round can accumulate many. Useful on the Veyru "
-            "stabilization-engineer role, whose physical-manipulation prompt "
-            "sometimes trips Claude's safety classifier."
+            "a single round can accumulate many."
         ),
     ),
     MetricOption(
@@ -225,12 +224,13 @@ METRIC_OPTIONS: list[MetricOption] = [
             "across rounds that had at least one message. Per-round total "
             "and message count are reported in the evidence.\n\n"
             "Captures channel utilization — how much of the per-round "
-            "character budget agents actually use. In Veyru this maps "
-            "directly to `time_budget_seconds`, since one character costs "
-            "one second of communication time. Misleading when rounds need "
-            "more back-and-forth: more messages inflate the round total "
-            "without saying anything about per-message verbosity. Use MCM "
-            "to normalize that out."
+            "character budget agents actually use. In scenarios where one "
+            "character on the primary channel costs one second of a per-round "
+            "communication budget (Veyru, container_yard_stacking), MCR maps "
+            "directly to that budget. Misleading when rounds need more "
+            "back-and-forth: more messages inflate the round total without "
+            "saying anything about per-message verbosity. Use MCM to normalize "
+            "that out."
         ),
     ),
     MetricOption(
@@ -259,7 +259,7 @@ METRIC_OPTIONS: list[MetricOption] = [
             "**perplexity** — mean per-token surprisal (in nats) of "
             "primary-channel messages under a fixed `gpt2` language model.\n\n"
             "Deterministic (no LLM judge): scopes to the scenario's primary "
-            "channel (Veyru: `#link`, the budget-constrained one), scores each "
+            "channel (the budget-constrained one), scores each "
             "message with `minicons.IncrementalLMScorer` using "
             "`reduction = -x.mean(0)` (length-normalized), then averages "
             "per-message surprisal across the run.\n\n"
@@ -361,10 +361,12 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
     )
 
 
-def list_baseline_runs(evaluated_runs: list[EvaluatedRun]) -> list[BaselineRun]:
-    """Filter ``evaluated_runs`` down to those labeled ``baseline`` with a budget."""
+def list_baseline_runs(evaluated_runs: list[EvaluatedRun], scenario_name: str) -> list[BaselineRun]:
+    """Filter ``evaluated_runs`` to ``scenario_name`` runs labeled ``baseline`` with a budget."""
     out: list[BaselineRun] = []
     for run in evaluated_runs:
+        if run.scenario_name != scenario_name:
+            continue
         baseline = build_baseline_run(evaluated=run)
         if baseline is not None:
             out.append(baseline)
