@@ -228,7 +228,7 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenar
   2>> /tmp/communication_eval_debug.log
 
 # 2. Consolidation: one LLM call across N runs of one scenario. Produces a
-#    versioned taxonomy under analysis/communication_ontology/<scenario>/.
+#    versioned taxonomy under runs/<scenario>/_ontology/.
 LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.py \
   --scenario-name <scenario> \
   --run-id <scenario>/<id1> --run-id <scenario>/<id2> --run-id <scenario>/<id3> \
@@ -243,14 +243,14 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communi
 LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
   --run-dir ./runs/<scenario>/<id> \
   --metrics communication_feature_presence \
-  --ontology-path analysis/communication_ontology/<scenario>/<version>.json \
+  --ontology-path runs/<scenario>/_ontology/<version>.json \
   --model claude-haiku-4-5-20251001 --provider anthropic \
   2>> /tmp/communication_eval_debug.log
 ```
 
 Always run with `LOG_LEVEL=DEBUG` and a stderr redirect during development so the prompt and the structured judge output land in an auditable file. Both passes use the same per-round view (primary-channel messages + the scenario-rendered per-agent ground truth) so the open-coding labels and feature-presence confidences are commensurable.
 
-`analysis/communication_ontology/<scenario_name>/` is gitignored (treated like `runs/` — regenerable from the open-coding sidecars). To share an ontology across machines, attach the JSON file out-of-band rather than committing it.
+Consolidated ontology JSONs live under `runs/<scenario_name>/_ontology/` so they ship with any export of the runs tree. The entire `runs/` directory is gitignored — the ontology JSONs are regenerable from the open-coding sidecars; pass them around alongside the runs they were derived from rather than committing them.
 
 ## Results Viewer (Streamlit)
 

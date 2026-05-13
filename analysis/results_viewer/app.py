@@ -68,7 +68,7 @@ def main() -> None:
     with probe_similarity_panel:
         probe_similarity_tab.render(evaluated=evaluated)
     with feature_presence_panel:
-        feature_presence_tab.render(evaluated=evaluated)
+        feature_presence_tab.render(evaluated=evaluated, runs_dir=runs_dir)
 
 
 main()

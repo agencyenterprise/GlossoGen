@@ -25,12 +25,12 @@ subtabs:
 
 import logging
 import statistics
+from pathlib import Path
 
 import plotly.graph_objects as go
 import streamlit as st
 
 from analysis.results_viewer.feature_presence_data import (
-    ONTOLOGY_ROOT_DIR,
     FeaturePresenceRun,
     OntologyView,
     list_feature_presence_runs,
@@ -41,6 +41,7 @@ from analysis.results_viewer.natural_sort import natural_sort_key
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
 from analysis.results_viewer.series_plot import render_horizontal_checkboxes
+from schmidt.evaluation.metrics.communication.label_models import ontology_dir_for_scenario
 
 logger = logging.getLogger(__name__)
 
@@ -542,7 +543,7 @@ def _format_run_picker_option(run: FeaturePresenceRun) -> str:
     return f"{run.run_id} ({run.primary_model}){label_suffix}"
 
 
-def render(evaluated: list[EvaluatedRun]) -> None:
+def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
     """Render the "Language features" tab end to end."""
     all_runs = list_feature_presence_runs(evaluated_runs=evaluated)
     if not all_runs:
@@ -573,11 +574,14 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     ontology = resolve_ontology(
         runs=runs,
         scenario_name=selected_scenario,
-        ontology_root=ONTOLOGY_ROOT_DIR,
+        runs_dir=runs_dir,
     )
     if ontology is None:
+        scenario_ontology_dir = ontology_dir_for_scenario(
+            runs_dir=runs_dir, scenario_name=selected_scenario
+        )
         st.error(
-            f"No ontology JSON found under `{ONTOLOGY_ROOT_DIR / selected_scenario}`. "
+            f"No ontology JSON found under `{scenario_ontology_dir}`. "
             f"Run the consolidation phase "
             f"(`scripts/run_communication_pipeline.sh --scenario {selected_scenario} --phase 2`) "
             "first."

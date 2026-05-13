@@ -3,14 +3,27 @@
 The open-coding metric writes ``CommunicationOpenCodingSidecar`` to each
 run directory; the consolidation script reads those sidecars and writes
 a ``CommunicationOntology`` JSON file under
-``analysis/communication_ontology/<scenario_name>/``; the
-feature-presence metric reads the ontology and writes
-``CommunicationFeaturePresenceSidecar`` back to the run directory.
+``<runs_dir>/<scenario_name>/_ontology/``; the feature-presence metric
+reads the ontology and writes ``CommunicationFeaturePresenceSidecar``
+back to the run directory.
 """
 
 from datetime import datetime
+from pathlib import Path
 
 from pydantic import BaseModel, Field
+
+ONTOLOGY_SUBDIR_NAME = "_ontology"
+
+
+def ontology_dir_for_scenario(runs_dir: Path, scenario_name: str) -> Path:
+    """Return ``<runs_dir>/<scenario_name>/_ontology``.
+
+    Single source of truth for where consolidated communication-feature
+    ontology JSONs live: alongside the scenario's run directories so an
+    export of the runs tree carries the ontology with it.
+    """
+    return runs_dir / scenario_name / ONTOLOGY_SUBDIR_NAME
 
 
 class EvidenceCitation(BaseModel):
@@ -113,7 +126,7 @@ class CommunicationOntology(BaseModel):
         description=(
             "Human-chosen version string (e.g. '2026-05-11_baseline_oss'). "
             "Matches the output filename stem under "
-            "``analysis/communication_ontology/<scenario_name>/``."
+            "``<runs_dir>/<scenario_name>/_ontology/``."
         ),
     )
     generated_at: datetime

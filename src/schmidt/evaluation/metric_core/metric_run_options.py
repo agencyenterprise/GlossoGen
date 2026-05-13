@@ -40,7 +40,7 @@ class MetricRunOptions(BaseModel):
     ontology_path: Path | None = Field(
         description=(
             "Path to a consolidated communication-feature ontology JSON file "
-            "(typically ``analysis/communication_ontology/<scenario_name>/<version>.json``). "
+            "(typically ``<runs_dir>/<scenario_name>/_ontology/<version>.json``). "
             "Required when running the ``communication_feature_presence`` "
             "metric; ignored otherwise."
         ),

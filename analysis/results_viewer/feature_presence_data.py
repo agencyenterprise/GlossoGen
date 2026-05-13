@@ -3,11 +3,11 @@
 The communication-feature pipeline writes one
 :class:`CommunicationFeaturePresenceSidecar` per run carrying a 0-1
 confidence per ontology category, plus the matching ontology JSON under
-``analysis/communication_ontology/``. This module reads both, joins
-each run's per-category scores with the run's labels, scenario config,
-and the report-derived in-team and cross-team round-success values, and
-exposes one :class:`FeaturePresenceRun` per run for the Streamlit
-"Language features" tab.
+``<runs_dir>/<scenario_name>/_ontology/``. This module reads both,
+joins each run's per-category scores with the run's labels, scenario
+config, and the report-derived in-team and cross-team round-success
+values, and exposes one :class:`FeaturePresenceRun` per run for the
+Streamlit "Language features" tab.
 
 Per-run reads run concurrently in worker threads via ``asyncio.gather``
 + ``asyncio.to_thread`` and are memoized in a module-level dict keyed
@@ -28,6 +28,7 @@ from schmidt.evaluation.metrics.communication.label_models import (
     CommunicationFeaturePresenceSidecar,
     CommunicationOntology,
     OntologyCategory,
+    ontology_dir_for_scenario,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,6 @@ logger = logging.getLogger(__name__)
 FEATURE_PRESENCE_SIDECAR_FILENAME = "communication_feature_presence.json"
 CROSS_RUN_MANIFEST_FILENAME = "cross_run_replace_manifest.json"
 LABELS_FILENAME = "labels.json"
-ONTOLOGY_ROOT_DIR = Path("analysis/communication_ontology")
 
 
 class _FeaturePresenceCacheKey(NamedTuple):
@@ -277,18 +277,18 @@ def _load_ontology_from_path(ontology_path: Path) -> OntologyView | None:
 def resolve_ontology(
     runs: list[FeaturePresenceRun],
     scenario_name: str,
-    ontology_root: Path,
+    runs_dir: Path,
 ) -> OntologyView | None:
     """Pick the ontology JSON that matches the most-common sidecar version.
 
-    Searches ``ontology_root / scenario_name`` for a JSON whose stem
-    matches the cohort's most-common ``ontology_version`` field;
+    Searches ``<runs_dir>/<scenario_name>/_ontology`` for a JSON whose
+    stem matches the cohort's most-common ``ontology_version`` field;
     failing that, falls back to the most recently written JSON in that
     per-scenario directory so the tab still loads with some category
     metadata even when versions drift. Returns ``None`` when the
     per-scenario directory does not exist or contains no parseable JSON.
     """
-    scenario_dir = ontology_root / scenario_name
+    scenario_dir = ontology_dir_for_scenario(runs_dir=runs_dir, scenario_name=scenario_name)
     if not scenario_dir.exists():
         return None
     if runs:
