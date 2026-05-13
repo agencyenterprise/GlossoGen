@@ -8,6 +8,11 @@ messages. The result is a per-run feature-presence vector written to
 sidecars, and one ``Measurement`` whose ``score`` is the number of
 categories above the 0.5 confidence threshold.
 
+The ontology path defaults to the most recently modified JSON under
+``<runs_dir>/<scenario>/_ontology/`` (derived from ``run_dir``);
+``--ontology-path`` only needs to be passed to pin to a specific
+version.
+
 Scenario-agnostic: the metric calls
 ``scenario.build_communication_rounds(events)`` and only sees
 ``CommunicationRoundView`` rows. Scenarios that do not implement the
@@ -26,6 +31,7 @@ from schmidt.evaluation.metrics.communication.label_models import (
     CommunicationFeaturePresenceOutput,
     CommunicationFeaturePresenceSidecar,
     CommunicationOntology,
+    ontology_dir_for_scenario,
 )
 from schmidt.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from schmidt.llm.provider import LLMMessage, LLMProvider
@@ -56,10 +62,17 @@ class CommunicationFeaturePresenceMetric(Metric):
         """Run the relabel judge against the supplied ontology and persist the vector."""
         _ = agent_configs
         if options.ontology_path is None:
-            raise ValueError("communication_feature_presence requires --ontology-path PATH")
-        ontology_path = options.ontology_path
-        if not ontology_path.exists():
-            raise FileNotFoundError(f"Ontology file not found: {ontology_path}")
+            ontology_path = _resolve_latest_ontology_path(
+                run_dir=run_dir, scenario_name=scenario.name()
+            )
+            logger.info(
+                "communication_feature_presence: auto-resolved ontology to %s",
+                ontology_path,
+            )
+        else:
+            ontology_path = options.ontology_path
+            if not ontology_path.exists():
+                raise FileNotFoundError(f"Ontology file not found: {ontology_path}")
         ontology = CommunicationOntology.model_validate_json(
             ontology_path.read_text(encoding="utf-8")
         )
@@ -176,3 +189,28 @@ def _run_id_from_events(events: list[SimulationEvent], run_dir: Path) -> str:
         return extract_simulation_id(events=events)
     except ValueError:
         return f"{run_dir.parent.name}/{run_dir.name}"
+
+
+def _resolve_latest_ontology_path(run_dir: Path, scenario_name: str) -> Path:
+    """Return the most recently modified ontology JSON for ``scenario_name``.
+
+    ``run_dir`` is ``<runs_dir>/<scenario_name>/<timestamp>``, so the
+    scenario's ontology directory is ``run_dir.parent / _ontology``.
+    Raises :class:`FileNotFoundError` when the directory is missing or
+    contains no JSON files.
+    """
+    scenario_ontology_dir = ontology_dir_for_scenario(
+        runs_dir=run_dir.parent.parent, scenario_name=scenario_name
+    )
+    candidates = sorted(
+        scenario_ontology_dir.glob("*.json"),
+        key=lambda p: p.stat().st_mtime_ns,
+        reverse=True,
+    )
+    if not candidates:
+        raise FileNotFoundError(
+            f"No --ontology-path supplied and no ontology JSON found under "
+            f"{scenario_ontology_dir}. Run "
+            f"`scripts/consolidate_communication_ontology.py` first."
+        )
+    return candidates[0]
