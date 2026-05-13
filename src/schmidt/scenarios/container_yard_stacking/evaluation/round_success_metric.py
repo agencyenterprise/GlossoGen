@@ -1,11 +1,13 @@
 """Metric that counts rounds where the incoming container reached its target slot.
 
-A round succeeds when (a) the yard operator's ``move_truck_to_crane_spot``
-call produced an ``overall_success=true`` ``ContainerYardTruckJudged`` event,
-(b) every expected ``crane_move`` was accepted in order, and (c) the
-communication budget did not run out. The scenario world emits a single
-terminal ``ROUND_SUCCESS_MARKER`` or ``ROUND_FAILED_MARKER`` notification per
-round; this metric corroborates that with the per-move judge events.
+A round succeeds when (a) every expected truck for the round produced an
+``overall_success=true`` ``ContainerYardTruckJudged`` event (so each
+``move_truck`` call landed on the correct station+pad with the correct
+container or empty load), (b) every expected ``crane_move`` was accepted
+in order, and (c) the communication budget did not run out. The scenario
+world emits a single terminal ``ROUND_SUCCESS_MARKER`` or
+``ROUND_FAILED_MARKER`` notification per round; this metric corroborates
+that with the per-truck and per-move verdict events.
 """
 
 import logging
@@ -56,71 +58,32 @@ class RoundSuccessMetric(Metric):
         if total_rounds == 0:
             return []
         expected_moves_per_round = _expected_moves_per_round(events=events)
-        truck_per_round = _latest_truck_judged(events=events)
+        expected_truck_count_per_round = _expected_truck_count_per_round(events=events)
+        truck_events_per_round = _truck_events_per_round(events=events)
         accepted_moves_per_round = _accepted_crane_moves_per_round(events=events)
         success_markers = _success_markers_per_round(events=events)
         budget_markers = _budget_markers_per_round(events=events)
         won = 0
         per_round: list[RoundObservation] = []
         for round_number in range(1, total_rounds + 1):
-            expected = expected_moves_per_round.get(round_number, 0)
-            truck = truck_per_round.get(round_number)
+            expected_moves = expected_moves_per_round.get(round_number, 0)
+            expected_trucks = expected_truck_count_per_round.get(round_number, 0)
+            truck_results = truck_events_per_round.get(round_number, [])
             accepted_count = accepted_moves_per_round.get(round_number, 0)
             saw_success_marker = success_markers.get(round_number, False)
             saw_budget_marker = budget_markers.get(round_number, False)
-            if truck is None or not truck.overall_success:
-                per_round.append(
-                    RoundObservation(
-                        round_number=round_number,
-                        value=0.0,
-                        note="truck did not arrive at the correct spot",
-                    )
-                )
-                continue
-            if saw_budget_marker:
-                per_round.append(
-                    RoundObservation(
-                        round_number=round_number,
-                        value=0.0,
-                        note="communication budget exceeded",
-                    )
-                )
-                continue
-            if expected == 0:
-                per_round.append(
-                    RoundObservation(
-                        round_number=round_number,
-                        value=0.0,
-                        note="no expected move sequence (case-started event missing)",
-                    )
-                )
-                continue
-            if accepted_count < expected:
-                per_round.append(
-                    RoundObservation(
-                        round_number=round_number,
-                        value=0.0,
-                        note=f"only {accepted_count}/{expected} crane moves accepted",
-                    )
-                )
-                continue
-            if not saw_success_marker:
-                per_round.append(
-                    RoundObservation(
-                        round_number=round_number,
-                        value=0.0,
-                        note="world did not emit ROUND_SUCCESS_MARKER",
-                    )
-                )
-                continue
-            won += 1
-            per_round.append(
-                RoundObservation(
-                    round_number=round_number,
-                    value=1.0,
-                    note=f"truck + {accepted_count} crane moves accepted within budget",
-                )
+            observation = _score_round(
+                round_number=round_number,
+                expected_moves=expected_moves,
+                expected_trucks=expected_trucks,
+                truck_results=truck_results,
+                accepted_count=accepted_count,
+                saw_success_marker=saw_success_marker,
+                saw_budget_marker=saw_budget_marker,
             )
+            per_round.append(observation)
+            if observation.value == 1.0:
+                won += 1
         score = won / total_rounds
         return [
             Measurement(
@@ -132,6 +95,62 @@ class RoundSuccessMetric(Metric):
                 per_agent=[],
             )
         ]
+
+
+def _score_round(
+    round_number: int,
+    expected_moves: int,
+    expected_trucks: int,
+    truck_results: list[ContainerYardTruckJudged],
+    accepted_count: int,
+    saw_success_marker: bool,
+    saw_budget_marker: bool,
+) -> RoundObservation:
+    """Apply the round-success rules and return a per-round observation."""
+    correctly_committed_roles = {
+        event.submitted_truck_role for event in truck_results if event.overall_success
+    }
+    if len(correctly_committed_roles) < expected_trucks:
+        return RoundObservation(
+            round_number=round_number,
+            value=0.0,
+            note=(
+                f"only {len(correctly_committed_roles)}/{expected_trucks} trucks "
+                "arrived at the correct spot"
+            ),
+        )
+    if saw_budget_marker:
+        return RoundObservation(
+            round_number=round_number,
+            value=0.0,
+            note="communication budget exceeded",
+        )
+    if expected_moves == 0:
+        return RoundObservation(
+            round_number=round_number,
+            value=0.0,
+            note="no expected move sequence (case-started event missing)",
+        )
+    if accepted_count < expected_moves:
+        return RoundObservation(
+            round_number=round_number,
+            value=0.0,
+            note=f"only {accepted_count}/{expected_moves} crane moves accepted",
+        )
+    if not saw_success_marker:
+        return RoundObservation(
+            round_number=round_number,
+            value=0.0,
+            note="world did not emit ROUND_SUCCESS_MARKER",
+        )
+    return RoundObservation(
+        round_number=round_number,
+        value=1.0,
+        note=(
+            f"{len(correctly_committed_roles)}/{expected_trucks} trucks + "
+            f"{accepted_count} crane moves accepted within budget"
+        ),
+    )
 
 
 def _count_total_rounds(events: list[SimulationEvent]) -> int:
@@ -152,15 +171,24 @@ def _expected_moves_per_round(events: list[SimulationEvent]) -> dict[int, int]:
     return counts
 
 
-def _latest_truck_judged(
+def _expected_truck_count_per_round(events: list[SimulationEvent]) -> dict[int, int]:
+    """Return per-round expected truck count from ContainerYardCaseStarted events."""
+    counts: dict[int, int] = {}
+    for event in events:
+        if isinstance(event, ContainerYardCaseStarted):
+            counts[event.round_number] = len(event.truck_assignments)
+    return counts
+
+
+def _truck_events_per_round(
     events: list[SimulationEvent],
-) -> dict[int, ContainerYardTruckJudged]:
-    """Return the most recent truck-judged event per round."""
-    latest: dict[int, ContainerYardTruckJudged] = {}
+) -> dict[int, list[ContainerYardTruckJudged]]:
+    """Return every truck-judged event grouped by round."""
+    by_round: dict[int, list[ContainerYardTruckJudged]] = {}
     for event in events:
         if isinstance(event, ContainerYardTruckJudged):
-            latest[event.round_number] = event
-    return latest
+            by_round.setdefault(event.round_number, []).append(event)
+    return by_round
 
 
 def _accepted_crane_moves_per_round(events: list[SimulationEvent]) -> dict[int, int]:

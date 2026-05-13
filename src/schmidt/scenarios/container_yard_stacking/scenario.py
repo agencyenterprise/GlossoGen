@@ -1,21 +1,21 @@
 """Container yard stacking simulation scenario.
 
-Three agents coordinate over one shared coordination channel: the yard
-operator (sees only the incoming container's manifest), the logistics
-planner (sees only the per-round yard map, active crane stations, and the
-target placement), and the crane operator (executes one physical crane
-move per tool call). The world judges the yard operator's
-``move_truck_to_crane_spot`` call once per round, then judges each
-``crane_move`` call against the next-expected move in the ordered plan and
-the live world state. Round success requires the truck reaches the correct
-spot, every expected crane move is accepted in order, and the
-communication budget on the coordination channel is not exceeded.
+Three agents coordinate over one shared link channel: the yard
+operator (sees only the incoming container's ID), the logistics planner
+(sees only the per-round yard map, active crane stations, and the target
+placement), and the crane operator (executes one physical crane move
+per tool call). Both action tools take structured Pydantic-typed args
+(no free-text parsing); the world validates each call deterministically
+against the round's truck assignments and the live world state. Round
+success requires every expected truck to arrive at the correct spot,
+every expected crane move to be accepted in order, and the
+communication budget on the link channel not to be exceeded.
 """
 
 import logging
 import random
 from pathlib import Path
-from typing import Any, NamedTuple, Self
+from typing import Any, Literal, NamedTuple, Self
 
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
 from schmidt.evaluation.metric_core.measurement import Measurement
@@ -39,32 +39,35 @@ from schmidt.scenario_protocol import ScenarioRuntimeHandle, SimulationScenario
 from schmidt.scenarios.container_yard_stacking.evaluation import RoundSuccessMetric
 from schmidt.scenarios.container_yard_stacking.events import (
     ContainerYardCaseStarted,
-    ContainerYardContainer,
     ContainerYardCraneMoveJudged,
     ContainerYardCraneMoveStep,
+    ContainerYardCraneMoveVerdict,
     ContainerYardCraneStation,
+    ContainerYardManifestEntry,
     ContainerYardStackPosition,
     ContainerYardStackSnapshot,
+    ContainerYardTruckAssignment,
+    ContainerYardTruckCommitVerdict,
     ContainerYardTruckJudged,
 )
 from schmidt.scenarios.container_yard_stacking.ids import (
-    COORDINATION_CHANNEL_ID,
     CRANE_OPERATOR_ID,
     CRANE_OPERATOR_INJECTION_TEMPLATE,
     CRANE_OPERATOR_ROLE,
     CRANE_OPERATOR_SYSTEM_TEMPLATE,
+    INBOUND_TRUCK_ROLE,
+    LINK_CHANNEL_ID,
     LOGISTICS_PLANNER_ID,
     LOGISTICS_PLANNER_INJECTION_TEMPLATE,
     LOGISTICS_PLANNER_ROLE,
     LOGISTICS_PLANNER_SYSTEM_TEMPLATE,
     MOVE_REJECTED_MARKER,
     MOVE_SUCCESS_MARKER,
+    OUTBOUND_TRUCK_ROLE,
     POSTMORTEM_CHANNEL_ID,
     TOOLS_CRANE_OPERATOR,
     TOOLS_LOGISTICS_PLANNER,
     TOOLS_YARD_OPERATOR,
-    TRUCK_ARRIVED_MARKER,
-    TRUCK_WRONG_SPOT_MARKER,
     YARD_OPERATOR_ID,
     YARD_OPERATOR_INJECTION_TEMPLATE,
     YARD_OPERATOR_ROLE,
@@ -72,10 +75,10 @@ from schmidt.scenarios.container_yard_stacking.ids import (
 )
 from schmidt.scenarios.container_yard_stacking.knobs import ContainerYardStackingKnobs
 from schmidt.scenarios.container_yard_stacking.world import ContainerYardWorld, YardOutcome
-from schmidt.scenarios.container_yard_stacking.yard_cases import CraneMoveStep, YardCase, get_cases
-from schmidt.scenarios.container_yard_stacking.yard_judge import (
-    judge_crane_move,
-    judge_truck_destination,
+from schmidt.scenarios.container_yard_stacking.yard_cases import (
+    TruckAssignment,
+    YardCase,
+    get_cases,
 )
 from schmidt.template_renderer import TemplateRenderer
 
@@ -95,24 +98,59 @@ class AgentDef(NamedTuple):
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 
-def _crane_move_to_event(step: CraneMoveStep) -> ContainerYardCraneMoveStep:
+def _truck_assignment_to_event(
+    assignment: TruckAssignment,
+) -> ContainerYardTruckAssignment:
     """Convert the case namedtuple form to the event-log BaseModel form."""
-    return ContainerYardCraneMoveStep(
-        move_index=step.move_index,
-        container_id=step.container_id,
-        source=step.source,
-        destination=step.destination,
+    return ContainerYardTruckAssignment(
+        truck_role=assignment.truck_role,
+        station_name=assignment.station_name,
+        container_id=assignment.container_id,
     )
 
 
-def _crane_event_to_move(event_step: ContainerYardCraneMoveStep) -> CraneMoveStep:
-    """Convert the event-log BaseModel form back to a case namedtuple."""
-    return CraneMoveStep(
-        move_index=event_step.move_index,
-        container_id=event_step.container_id,
-        source=event_step.source,
-        destination=event_step.destination,
+def _correct_station_pads(case: YardCase) -> list[str]:
+    """Return the list of transfer pads at this round's correct crane station."""
+    for station in case.active_crane_stations:
+        if station.station_name == case.correct_crane_station:
+            return list(station.pads)
+    raise ValueError(
+        f"correct station {case.correct_crane_station} not found among active stations"
     )
+
+
+def _explain_truck_rejection(verdict: ContainerYardTruckCommitVerdict) -> str:
+    """Build a human-readable rejection explanation from the per-criterion verdict."""
+    reasons: list[str] = []
+    if not verdict.role_matches_active_assignment:
+        reasons.append("the submitted truck_role is not active this round")
+    if not verdict.targets_correct_station:
+        reasons.append("the submitted station does not match the assignment")
+    if not verdict.targets_correct_pad:
+        reasons.append(
+            "the submitted pad is not one of the correct station's pads "
+            "or is already used by another truck"
+        )
+    if not verdict.carries_correct_container:
+        reasons.append("the submitted container_id does not match the assignment")
+    if not reasons:
+        return "Truck commit rejected."
+    return "Truck commit rejected: " + "; ".join(reasons) + "."
+
+
+def _next_step_missing_truck_role(
+    world: ContainerYardWorld, step: ContainerYardCraneMoveStep
+) -> str | None:
+    """Return a truck role required by ``step`` that has not yet arrived, or None."""
+    if step.source_kind == "inbound_truck" and not world.truck_arrived(
+        truck_role=INBOUND_TRUCK_ROLE
+    ):
+        return INBOUND_TRUCK_ROLE
+    if step.destination_kind == "outbound_truck" and not world.truck_arrived(
+        truck_role=OUTBOUND_TRUCK_ROLE
+    ):
+        return OUTBOUND_TRUCK_ROLE
+    return None
 
 
 class ContainerYardStackingScenario(SimulationScenario):
@@ -143,14 +181,13 @@ class ContainerYardStackingScenario(SimulationScenario):
         self._knobs = knobs
         self._runtime: ScenarioRuntimeHandle | None = None
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
-        self._postmortem_active: bool = (
+        self._postmortem_initially_active: bool = (
             knobs.postmortem_enabled and not knobs.postmortem_disabled_at_start
         )
         self._cases: list[YardCase] = get_cases(
             seed=knobs.seed,
             round_count=knobs.round_count,
             time_budget_seconds=knobs.time_budget_seconds,
-            hard_case_fraction=knobs.hard_case_fraction,
         )
         self._noise_rng = random.Random(knobs.seed)
         self._agent_display_names: dict[str, str] = {
@@ -160,18 +197,12 @@ class ContainerYardStackingScenario(SimulationScenario):
             "world": "Yard Monitor",
         }
         self._channel_display_names: dict[str, str] = {
-            COORDINATION_CHANNEL_ID: "coordination",
+            LINK_CHANNEL_ID: "link",
             POSTMORTEM_CHANNEL_ID: "team discussion",
         }
         self._world = ContainerYardWorld(
             cases=self._cases,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
-        )
-        self._judge_provider = create_provider(
-            provider_name=knobs.judge_provider,
-            model=knobs.judge_model,
-            inference_provider=None,
-            reasoning_effort=None,
         )
 
     def name(self) -> str:
@@ -189,8 +220,6 @@ class ContainerYardStackingScenario(SimulationScenario):
             template_variables={
                 "round_count": self._knobs.round_count,
                 "time_budget_seconds": self._knobs.time_budget_seconds,
-                "hard_case_fraction": self._knobs.hard_case_fraction,
-                "postmortem_enabled": self._postmortem_active,
             },
         )
 
@@ -208,8 +237,8 @@ class ContainerYardStackingScenario(SimulationScenario):
 
     def _agent_defs(self) -> list[AgentDef]:
         """Return the three-agent definition list for this scenario."""
-        team_channels: list[str] = [COORDINATION_CHANNEL_ID]
-        if self._postmortem_active:
+        team_channels: list[str] = [LINK_CHANNEL_ID]
+        if self._postmortem_initially_active:
             team_channels.append(POSTMORTEM_CHANNEL_ID)
         return [
             AgentDef(
@@ -250,7 +279,7 @@ class ContainerYardStackingScenario(SimulationScenario):
                             "channels": self._channel_template_data(
                                 agent_id=d.agent_id, channel_ids=d.channel_ids
                             ),
-                            "postmortem_enabled": self._postmortem_active,
+                            "postmortem_enabled": self._postmortem_initially_active,
                             "channel_noise_level": self._knobs.channel_noise_level,
                         },
                     ),
@@ -264,16 +293,16 @@ class ContainerYardStackingScenario(SimulationScenario):
         return agents
 
     def get_channels(self) -> list[Channel]:
-        """Return the coordination channel and (when enabled) the postmortem channel."""
+        """Return the link channel and (when enabled) the postmortem channel."""
         members = [YARD_OPERATOR_ID, LOGISTICS_PLANNER_ID, CRANE_OPERATOR_ID]
         channels: list[Channel] = [
             Channel(
-                channel_id=COORDINATION_CHANNEL_ID,
-                name="coordination",
+                channel_id=LINK_CHANNEL_ID,
+                name="link",
                 member_agent_ids=list(members),
             ),
         ]
-        if self._postmortem_active:
+        if self._postmortem_initially_active:
             channels.append(
                 Channel(
                     channel_id=POSTMORTEM_CHANNEL_ID,
@@ -293,7 +322,7 @@ class ContainerYardStackingScenario(SimulationScenario):
         return self._agent_display_names.get(agent_id, agent_id)
 
     def bind_runtime(self, runtime: ScenarioRuntimeHandle) -> None:
-        """Stash the runtime handle so the two yard tools can emit judge verdicts."""
+        """Stash the runtime handle so the two yard tools can emit verdict events."""
         self._runtime = runtime
 
     def _previous_outcome(self) -> YardOutcome | None:
@@ -310,8 +339,7 @@ class ContainerYardStackingScenario(SimulationScenario):
             template_name = CRANE_OPERATOR_INJECTION_TEMPLATE
         else:
             return None
-        case_index = (round_number - 1) % len(self._cases)
-        current_case = self._cases[case_index]
+        current_case = self._cases[round_number - 1]
         previous_outcome = self._previous_outcome()
         rendered = self._renderer.render(
             template_name=template_name,
@@ -347,6 +375,8 @@ class ContainerYardStackingScenario(SimulationScenario):
 
     def get_max_postmortem_duration_seconds(self) -> float:
         """Return the configured postmortem duration, or 0 when disabled."""
+        if not self._knobs.postmortem_enabled:
+            return 0.0
         if self._world.is_postmortem_disabled:
             return 0.0
         return self._knobs.postmortem_duration_seconds
@@ -370,9 +400,16 @@ class ContainerYardStackingScenario(SimulationScenario):
         return None
 
     async def on_round_ended(self, round_number: int, trigger: str) -> None:
-        """Emit a terminal success/failure notification at round end."""
-        _ = round_number, trigger
+        """Emit a terminal success/failure notification and record this round's outcome.
+
+        The outcome is recorded here (not in ``on_round_advanced``) so that
+        ``get_postmortem_injection`` for the just-ended round sees the
+        correct ``previous_outcome``. ``finalize_round_sync`` then skips
+        the redundant mark via the ``_round_outcome_marked`` guard.
+        """
+        _ = trigger
         await self._world.emit_round_terminal_notification()
+        self._world.mark_round_outcome(round_number=round_number)
 
     async def on_round_advanced(self, round_number: int) -> None:
         """Finalize the previous outcome, prepare the next case, log case-started."""
@@ -390,22 +427,16 @@ class ContainerYardStackingScenario(SimulationScenario):
             event=ContainerYardCaseStarted(
                 round_number=round_number,
                 case_number=case.case_number,
-                incoming_container=ContainerYardContainer(
-                    container_id=case.incoming_container.container_id,
-                    size_class=case.incoming_container.size_class,
-                    weight_tons=case.incoming_container.weight_tons,
-                    departure_group=case.incoming_container.departure_group,
-                ),
+                incoming_container_id=case.incoming_container_id,
                 active_crane_stations=[
                     ContainerYardCraneStation(
                         station_name=station.station_name,
-                        transfer_pad=station.transfer_pad,
+                        pads=list(station.pads),
                         reachable_stacks=list(station.reachable_stacks),
                     )
                     for station in case.active_crane_stations
                 ],
                 correct_crane_station=case.correct_crane_station,
-                correct_transfer_pad=case.correct_transfer_pad,
                 initial_stacks=[
                     ContainerYardStackSnapshot(
                         stack=stack_index,
@@ -414,16 +445,25 @@ class ContainerYardStackingScenario(SimulationScenario):
                     for stack_index, containers in sorted(case.initial_stacks.items())
                 ],
                 target_position=ContainerYardStackPosition(
-                    block=case.target_position.block,
-                    bay=case.target_position.bay,
                     stack=case.target_position.stack,
                     tier=case.target_position.tier,
                 ),
-                temp_slot_names=list(case.temp_slot_names),
-                expected_move_sequence=[
-                    _crane_move_to_event(step=step) for step in case.expected_move_sequence
+                truck_assignments=[
+                    _truck_assignment_to_event(assignment=assignment)
+                    for assignment in case.truck_assignments
                 ],
+                expected_move_sequence=list(case.expected_move_sequence),
                 time_budget_seconds=case.time_budget_seconds,
+                manifest=[
+                    ContainerYardManifestEntry(
+                        container_id=entry.container_id,
+                        target_position=ContainerYardStackPosition(
+                            stack=entry.target_position.stack,
+                            tier=entry.target_position.tier,
+                        ),
+                    )
+                    for entry in case.manifest
+                ],
             )
         )
 
@@ -438,26 +478,32 @@ class ContainerYardStackingScenario(SimulationScenario):
                     "The discussion channel is only available during the post-round "
                     "discussion phase. Wait for the discussion phase to begin."
                 )
-        if channel_id == COORDINATION_CHANNEL_ID and self._world.in_postmortem:
+        if channel_id == LINK_CHANNEL_ID and self._world.in_postmortem:
             return (
-                "The coordination channel is closed during the post-round discussion phase. "
+                "The link channel is closed during the post-round discussion phase. "
                 "Use the discussion channel instead."
             )
         return None
 
     def transform_outgoing_message(self, agent_id: str, channel_id: str, text: str) -> str:
-        """Apply per-character drop noise to messages on the coordination channel."""
+        """Apply per-character drop noise to messages on the link channel."""
         _ = agent_id
-        if channel_id != COORDINATION_CHANNEL_ID:
+        if channel_id != LINK_CHANNEL_ID:
             return text
         noise_level = self._knobs.channel_noise_level
         if noise_level == 0.0:
             return text
-        return "".join("_" if self._noise_rng.random() < noise_level else ch for ch in text)
+        chars: list[str] = []
+        for ch in text:
+            if self._noise_rng.random() < noise_level:
+                chars.append("_")
+            else:
+                chars.append(ch)
+        return "".join(chars)
 
     def get_primary_channel_id(self) -> str | None:
-        """Return the coordination channel where the communication budget applies."""
-        return COORDINATION_CHANNEL_ID
+        """Return the link channel where the communication budget applies."""
+        return LINK_CHANNEL_ID
 
     def get_world(self) -> ScenarioWorld:
         """Return the container yard world."""
@@ -466,8 +512,19 @@ class ContainerYardStackingScenario(SimulationScenario):
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:
         """Return the move_truck and crane_move tools."""
 
-        async def move_truck_to_crane_spot(ctx: ToolContext, destination: str) -> str:
-            """Send the robotic truck carrying the incoming container to a crane transfer spot."""
+        async def move_truck(
+            ctx: ToolContext,
+            truck_role: Literal["inbound", "outbound"],
+            station_name: str,
+            pad: str,
+            container_id: str,
+        ) -> str:
+            """Commit one truck (inbound or outbound) to a crane transfer pad.
+
+            Pass the truck role, the station name, the chosen pad, and the
+            container_id the truck carries (the incoming container's ID for
+            inbound; empty string for outbound).
+            """
             agent_id = resolve_agent_id(ctx=ctx)
             if self._world.in_postmortem:
                 return (
@@ -475,55 +532,85 @@ class ContainerYardStackingScenario(SimulationScenario):
                     "Wait for the next round to begin."
                 )
             if agent_id != YARD_OPERATOR_ID:
-                raise ValueError("Only the yard operator can move the truck")
-            if self._world.truck_judged:
-                return "The truck destination has already been committed for this round."
+                return "Only the yard operator can call move_truck."
+            if self._world.round_failed_terminally:
+                return "Round has already failed terminally; no more truck commits accepted."
             case = self._world.current_case
             if case is None:
                 return "No active yard case."
-            judge_result = await judge_truck_destination(
-                provider=self._judge_provider,
-                expected_station=case.correct_crane_station,
-                expected_pad=case.correct_transfer_pad,
-                expected_container_id=case.incoming_container.container_id,
-                submitted_destination_text=destination,
+            correct_station_pads = _correct_station_pads(case=case)
+            assignment = self._world.find_assignment(truck_role=truck_role)
+            role_matches_active_assignment = assignment is not None
+            targets_correct_station = (
+                assignment is not None and station_name == assignment.station_name
             )
-            judgment = judge_result.judgment
-            overall_success = (
-                judgment.targets_correct_station
-                and judgment.targets_correct_pad
-                and judgment.carries_correct_container
+            pads_in_use = self._world.pads_already_committed()
+            targets_correct_pad = pad in correct_station_pads and pad not in pads_in_use
+            carries_correct_container = (
+                assignment is not None and container_id == assignment.container_id
             )
+            verdict = ContainerYardTruckCommitVerdict(
+                role_matches_active_assignment=role_matches_active_assignment,
+                targets_correct_station=targets_correct_station,
+                targets_correct_pad=targets_correct_pad,
+                carries_correct_container=carries_correct_container,
+            )
+            commit_result = await self._world.record_truck_commit(
+                parsed_truck_role=truck_role,
+                parsed_pad=pad,
+                role_matches_active_assignment=role_matches_active_assignment,
+                targets_correct_station=targets_correct_station,
+                targets_correct_pad=targets_correct_pad,
+                carries_correct_container=carries_correct_container,
+            )
+            if commit_result.duplicate:
+                return f"{truck_role} truck has already been committed this round."
+            if commit_result.accepted:
+                assert assignment is not None
+                if assignment.container_id == "":
+                    container_clause = ""
+                else:
+                    container_clause = f" carrying {assignment.container_id}"
+                explanation = (
+                    f"{truck_role} truck committed to "
+                    f"{assignment.station_name}, {pad}{container_clause}."
+                )
+            else:
+                explanation = _explain_truck_rejection(verdict=verdict)
             if self._runtime is not None:
                 await self._runtime.event_logger.log(
                     event=ContainerYardTruckJudged(
                         agent_id=agent_id,
                         round_number=self._runtime.current_round,
-                        expected_station=case.correct_crane_station,
-                        expected_pad=case.correct_transfer_pad,
-                        expected_container_id=case.incoming_container.container_id,
-                        submitted_destination_text=destination,
-                        judgment=judgment,
-                        overall_success=overall_success,
-                        judge_explanation=judge_result.explanation,
+                        submitted_truck_role=truck_role,
+                        submitted_station_name=station_name,
+                        submitted_pad=pad,
+                        submitted_container_id=container_id,
+                        verdict=verdict,
+                        overall_success=commit_result.accepted,
+                        explanation=explanation,
                     )
                 )
-            arrived = await self._world.record_truck_destination(
-                targets_correct_station=judgment.targets_correct_station,
-                targets_correct_pad=judgment.targets_correct_pad,
-                carries_correct_container=judgment.carries_correct_container,
-                submitted_destination_text=destination,
-            )
-            if arrived:
-                return (
-                    f"{TRUCK_ARRIVED_MARKER}. The truck is positioned at "
-                    f"{case.correct_crane_station}, {case.correct_transfer_pad} "
-                    f"carrying {case.incoming_container.container_id}."
-                )
-            return f"{TRUCK_WRONG_SPOT_MARKER}. {judge_result.explanation}"
+            if commit_result.accepted:
+                return f"Accepted. {explanation} A world notification was broadcast."
+            return f"Rejected. {explanation}"
 
-        async def crane_move(ctx: ToolContext, action: str) -> str:
-            """Execute one physical crane move (one container) as described in ``action``."""
+        async def _execute_crane_move(
+            ctx: ToolContext,
+            container_id: str,
+            source_kind: Literal["inbound_truck", "stack_tier"],
+            destination_kind: Literal["outbound_truck", "stack_tier"],
+            stack: int,
+            tier: int,
+            tool_name: str,
+        ) -> str:
+            """Shared body for both crane tools.
+
+            ``source_kind`` / ``destination_kind`` are fixed by the calling
+            tool; ``stack`` / ``tier`` describe the stack_tier endpoint
+            (which is the source for ``lift_from_stack`` and the destination
+            for ``place_on_stack``).
+            """
             agent_id = resolve_agent_id(ctx=ctx)
             if self._world.in_postmortem:
                 return (
@@ -531,15 +618,10 @@ class ContainerYardStackingScenario(SimulationScenario):
                     "Wait for the next round to begin."
                 )
             if agent_id != CRANE_OPERATOR_ID:
-                raise ValueError("Only the crane operator can call the crane")
+                return f"Only the crane operator can call {tool_name}."
             if self._world.round_failed_terminally:
                 return (
                     f"{MOVE_REJECTED_MARKER}. The round has already failed; no more moves accepted."
-                )
-            if not self._world.truck_arrived_at_correct_spot:
-                return (
-                    f"{MOVE_REJECTED_MARKER}. The truck has not yet arrived at the correct "
-                    "crane spot. Wait for the yard operator to commit the truck before craning."
                 )
             case = self._world.current_case
             if case is None:
@@ -550,68 +632,159 @@ class ContainerYardStackingScenario(SimulationScenario):
                     f"{MOVE_REJECTED_MARKER}. All expected crane moves have already been executed."
                 )
             expected_step = case.expected_move_sequence[next_index]
-            expected_step_event = _crane_move_to_event(step=expected_step)
-            world_snapshot = self._world.render_world_snapshot()
-            judge_result = await judge_crane_move(
-                provider=self._judge_provider,
-                expected_next_move=expected_step_event,
+            missing_role = _next_step_missing_truck_role(world=self._world, step=expected_step)
+            if missing_role is not None:
+                return (
+                    f"{MOVE_REJECTED_MARKER}. The {missing_role} truck has not arrived at its "
+                    "spot yet. Wait for the yard operator to commit it before craning."
+                )
+            source_stack = stack if source_kind == "stack_tier" else None
+            source_tier = tier if source_kind == "stack_tier" else None
+            destination_stack = stack if destination_kind == "stack_tier" else None
+            destination_tier = tier if destination_kind == "stack_tier" else None
+            submitted_move = ContainerYardCraneMoveStep(
                 move_index=expected_step.move_index,
-                world_snapshot=world_snapshot,
-                submitted_action_text=action,
+                container_id=container_id,
+                source_kind=source_kind,
+                source_stack=source_stack,
+                source_tier=source_tier,
+                destination_kind=destination_kind,
+                destination_stack=destination_stack,
+                destination_tier=destination_tier,
             )
-            parsed_move_event = judge_result.parsed_move
-            parsed_move_step = _crane_event_to_move(event_step=parsed_move_event)
-            judgment = judge_result.judgment
+            verdict = ContainerYardCraneMoveVerdict(
+                matches_expected_next_move=(
+                    container_id == expected_step.container_id
+                    and source_kind == expected_step.source_kind
+                    and source_stack == expected_step.source_stack
+                    and source_tier == expected_step.source_tier
+                    and destination_kind == expected_step.destination_kind
+                    and destination_stack == expected_step.destination_stack
+                    and destination_tier == expected_step.destination_tier
+                ),
+                source_currently_holds_container=self._world.source_holds_container(
+                    kind=source_kind,
+                    stack=source_stack,
+                    container_id=container_id,
+                ),
+                destination_currently_empty=self._world.destination_is_free(
+                    kind=destination_kind,
+                    stack=destination_stack,
+                    tier=destination_tier,
+                ),
+                parsed_source_kind=source_kind,
+                parsed_source_stack=source_stack,
+                parsed_destination_kind=destination_kind,
+                parsed_destination_stack=destination_stack,
+            )
             accepted = await self._world.record_crane_move(
-                parsed_move=parsed_move_step,
-                matches_expected_next_move=judgment.matches_expected_next_move,
-                source_currently_holds_container=judgment.source_currently_holds_container,
-                destination_currently_empty=judgment.destination_currently_empty,
+                parsed_move=submitted_move,
+                parsed_source_kind=verdict.parsed_source_kind,
+                parsed_source_stack=verdict.parsed_source_stack,
+                parsed_destination_kind=verdict.parsed_destination_kind,
+                parsed_destination_stack=verdict.parsed_destination_stack,
+                matches_expected_next_move=verdict.matches_expected_next_move,
+                source_currently_holds_container=verdict.source_currently_holds_container,
+                destination_currently_empty=verdict.destination_currently_empty,
             )
-            marker = MOVE_SUCCESS_MARKER if accepted else MOVE_REJECTED_MARKER
+            if accepted:
+                marker = MOVE_SUCCESS_MARKER
+                explanation = f"Move {expected_step.move_index} executed: {container_id}."
+            else:
+                marker = MOVE_REJECTED_MARKER
+                explanation = self._world.last_failure_reason()
             if self._runtime is not None:
                 await self._runtime.event_logger.log(
                     event=ContainerYardCraneMoveJudged(
                         agent_id=agent_id,
                         round_number=self._runtime.current_round,
                         move_index=expected_step.move_index,
-                        expected_next_move=expected_step_event,
-                        submitted_action_text=action,
-                        parsed_move=parsed_move_event,
-                        judgment=judgment,
+                        submitted_move=submitted_move,
+                        verdict=verdict,
                         accepted=accepted,
                         marker=marker,
-                        judge_explanation=judge_result.explanation,
+                        explanation=explanation,
                     )
                 )
             if accepted:
-                return (
-                    f"{MOVE_SUCCESS_MARKER}. Move {expected_step.move_index} executed: "
-                    f"{parsed_move_step.container_id} from {parsed_move_step.source} to "
-                    f"{parsed_move_step.destination}."
-                )
-            return f"{MOVE_REJECTED_MARKER}. {judge_result.explanation}"
+                return f"{MOVE_SUCCESS_MARKER}. {explanation}"
+            return f"{MOVE_REJECTED_MARKER}. {explanation}"
+
+        async def place_on_stack(
+            ctx: ToolContext,
+            container_id: str,
+            stack: int,
+            tier: int,
+        ) -> str:
+            """Crane: take the incoming container off the inbound truck and place it at the slot.
+
+            ``tier`` must be the next-empty tier above the current top of
+            the destination stack.
+            """
+            return await _execute_crane_move(
+                ctx=ctx,
+                container_id=container_id,
+                source_kind="inbound_truck",
+                destination_kind="stack_tier",
+                stack=stack,
+                tier=tier,
+                tool_name="place_on_stack",
+            )
+
+        async def lift_from_stack(
+            ctx: ToolContext,
+            container_id: str,
+            stack: int,
+            tier: int,
+        ) -> str:
+            """Crane: lift the container at (stack, tier) onto the outbound truck.
+
+            ``tier`` must be the topmost occupied tier of the source stack.
+            The outbound truck leaves loaded with this container.
+            """
+            return await _execute_crane_move(
+                ctx=ctx,
+                container_id=container_id,
+                source_kind="stack_tier",
+                destination_kind="outbound_truck",
+                stack=stack,
+                tier=tier,
+                tool_name="lift_from_stack",
+            )
 
         return [
             ScenarioMcpTool(
-                name="move_truck_to_crane_spot",
+                name="move_truck",
                 description=(
-                    "Send the robotic truck carrying the incoming container to a crane "
-                    "transfer spot. Pass the destination as a single freetext sentence "
-                    "identifying the container, the crane station, and the transfer pad. "
-                    "This tool may only be called once per round."
+                    "Commit one truck (inbound or outbound) to a crane transfer pad. "
+                    "Args: truck_role ('inbound' or 'outbound'), station_name, pad, "
+                    "container_id (the incoming container's ID for inbound; empty "
+                    "string for outbound). Call once per truck per round; rounds with "
+                    "a blocker need both the inbound and an outbound commit."
                 ),
-                executor=move_truck_to_crane_spot,
+                executor=move_truck,
             ),
             ScenarioMcpTool(
-                name="crane_move",
+                name="place_on_stack",
                 description=(
-                    "Execute one physical crane move. Pass the action as a single "
-                    "freetext sentence naming the container to move, its current source "
-                    "location, and its destination. Call this tool once per physical "
-                    "move; the world updates after each accepted call."
+                    "Crane: take the incoming container off the inbound truck and "
+                    "place it at the given (stack, tier). Args: container_id, stack, "
+                    "tier. The tier must be the next-empty tier above the destination "
+                    "stack's current top. Call this once on rounds without a blocker; "
+                    "call it after lift_from_stack on rounds with a blocker."
                 ),
-                executor=crane_move,
+                executor=place_on_stack,
+            ),
+            ScenarioMcpTool(
+                name="lift_from_stack",
+                description=(
+                    "Crane: lift the container at (stack, tier) onto the outbound "
+                    "truck (which leaves loaded). Args: container_id, stack, tier. "
+                    "The tier must be the topmost occupied tier of the source stack. "
+                    "Only used on rounds where the target slot is currently occupied; "
+                    "call this before place_on_stack."
+                ),
+                executor=lift_from_stack,
             ),
         ]
 
