@@ -1,12 +1,9 @@
 {% include "_previous_round_result.jinja" %}
 {% if current_case is not none %}
---- NEW YARD MAP ---
+--- NEW MANIFEST + LAYOUT ---
 Round {{ round_number }}
 Inspection window: {{ current_case.time_budget_seconds }}s before the customs slot is missed (one character = one second; total across all three of you)
 
-ACTIVE CRANE STATIONS:
-{% for station in current_case.active_crane_stations %}- {{ station.station_name }} (pads: {{ station.pads | join(', ') }}) — can reach stacks: {{ station.reachable_stacks | join(', ') }}
-{% endfor %}
 CURRENT STACK LAYOUT (each stack listed bottom-to-top):
 {% for stack_index, contents in current_case.initial_stacks.items() %}- Stack {{ stack_index }}: {% if contents | length == 0 %}empty{% else %}{% for cid in contents %}Tier {{ loop.index }} = {{ cid }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}
 {% endfor %}

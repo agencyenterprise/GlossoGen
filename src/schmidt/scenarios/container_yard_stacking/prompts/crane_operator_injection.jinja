@@ -3,4 +3,8 @@
 --- CRANE READY ---
 Round {{ round_number }}
 Inspection window: {{ current_case.time_budget_seconds }}s before the customs slot is missed (one character = one second; total across all three of you)
+
+ACTIVE CRANE STATIONS:
+{% for station in current_case.active_crane_stations %}- {{ station.station_name }} (pads: {{ station.pads | join(', ') }}) — can reach stacks: {{ station.reachable_stacks | join(', ') }}
+{% endfor %}
 {% endif %}
