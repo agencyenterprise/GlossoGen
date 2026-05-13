@@ -1,15 +1,20 @@
 """Container yard stacking simulation scenario.
 
 Three agents coordinate over one shared link channel: the yard
-operator (sees only the incoming container's ID), the logistics planner
-(sees only the per-round yard map, active crane stations, and the target
-placement), and the crane operator (executes one physical crane move
-per tool call). Both action tools take structured Pydantic-typed args
-(no free-text parsing); the world validates each call deterministically
-against the round's truck assignments and the live world state. Round
-success requires every expected truck to arrive at the correct spot,
-every expected crane move to be accepted in order, and the
-communication budget on the link channel not to be exceeded.
+operator (sees only the incoming container's ID and dispatches trucks
+on the crane operator's orders), the logistics planner (sees only the
+stack layout and shift manifest and shares the target slot + crane plan),
+and the crane operator (sees the active crane stations with their pads
+and reachable stacks, orders each truck's station + pad to the yard
+operator, and executes one physical crane move per tool call). The
+information split forces crane↔yard communication: only the crane
+operator knows where to send each truck. Both action tools take
+structured Pydantic-typed args (no free-text parsing); the world
+validates each call deterministically against the round's truck
+assignments and the live world state. Round success requires every
+expected truck to arrive at the correct spot, every expected crane
+move to be accepted in order, and the communication budget on the
+link channel not to be exceeded.
 """
 
 import logging
