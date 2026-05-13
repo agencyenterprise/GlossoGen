@@ -35,7 +35,6 @@ from analysis.results_viewer.verbosity_data import (
     list_verbosity_runs,
 )
 
-
 _SCENARIOS_WITH_VERBOSITY: tuple[str, ...] = ("veyru", "container_yard_stacking")
 
 
