@@ -47,6 +47,29 @@ def _run_url(frontend_base: str, run_id: str) -> str:
     return f"{frontend_base}/runs/{run_id}"
 
 
+def _scenarios_with_cross_swap_runs(runs: list[CrossSwapRun]) -> list[str]:
+    """Return every scenario with at least one cross-swap run.
+
+    Auto-discovered from the loaded cross-swap runs.
+    """
+    return sorted({run.scenario_name for run in runs})
+
+
+def _render_scenario_selector(runs: list[CrossSwapRun]) -> str | None:
+    """Radio selector listing every scenario with at least one cross-swap run."""
+    options = _scenarios_with_cross_swap_runs(runs=runs)
+    if not options:
+        return None
+    chosen = st.radio(
+        label="Scenario",
+        options=options,
+        index=0,
+        horizontal=True,
+        key="cross_swap_scenario_selector",
+    )
+    return chosen
+
+
 def _swapped_series(run: CrossSwapRun) -> str:
     """Series key for the cross-run swapped line (the imported agent's model)."""
     return f"{run.imported_model} · swapped"
@@ -571,12 +594,20 @@ def render(evaluated: list[EvaluatedRun]) -> None:
             "Add the 'cross_team' label to cross-run replace-agent runs you want compared here."
         )
         return
+    scenario_name = _render_scenario_selector(runs=all_cross_swap)
+    if scenario_name is None:
+        st.info("No scenarios with cross-swap-labeled runs found.")
+        return
+    scenario_runs = [r for r in all_cross_swap if r.scenario_name == scenario_name]
+    if not scenario_runs:
+        st.info(f"No cross-swap runs in scenario `{scenario_name}`.")
+        return
     frontend_base = _render_frontend_base()
-    pairs = _distinct_source_pairs(runs=all_cross_swap)
+    pairs = _distinct_source_pairs(runs=scenario_runs)
     chosen_pair = _render_source_pair_selector(pairs=pairs)
     pair_runs = [
         run
-        for run in all_cross_swap
+        for run in scenario_runs
         if run.source_a_run_id == chosen_pair.source_a_run_id
         and run.source_b_run_id == chosen_pair.source_b_run_id
     ]
