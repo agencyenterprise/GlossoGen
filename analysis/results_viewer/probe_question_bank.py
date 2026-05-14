@@ -1,10 +1,10 @@
-"""Cached loader for the veyru protocol-probe question bank.
+"""Cached loader for per-scenario protocol-probe question banks.
 
-The bank lives at ``src/schmidt/scenarios/veyru/protocol_probe_questions.json``
-and ships 28 entries (14 motifs × {observer, engineer}). Probe rows reference
-each entry by ``question_id``; the streamlit probe-similarity tab uses this
-loader to surface the question's *prompt* alongside the agent's response so
-the reader does not have to cross-reference IDs in their head.
+Each scenario that opts into the protocol-probe metric family ships a
+``protocol_probe_questions.json`` file alongside its ``scenario.py``.
+The probe-similarity tab uses this loader to surface a question's
+prompt text alongside the agent's response so the reader does not have
+to cross-reference IDs in their head.
 
 The module is streamlit-free.
 """
@@ -15,22 +15,14 @@ from typing import NamedTuple
 
 import orjson
 
-_QUESTIONS_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "src"
-    / "schmidt"
-    / "scenarios"
-    / "veyru"
-    / "protocol_probe_questions.json"
-)
-
 
 class ProbeQuestionPrompt(NamedTuple):
     """Display-ready summary of one question-bank entry.
 
-    ``display_text`` is a single-line human-readable rendering of the
-    question's inputs (symptoms for observer questions, observer message
-    + matched motif + canonical action for engineer questions).
+    ``display_text`` renders the question's inputs as a single
+    human-readable line. The rendering is keyed off
+    ``agent_role_filter``; unknown filters fall through to a generic
+    ``key=value`` join.
     """
 
     question_id: str
@@ -39,25 +31,44 @@ class ProbeQuestionPrompt(NamedTuple):
 
 
 def _format_display_text(agent_role_filter: str, inputs: dict[str, str]) -> str:
-    """Render the bank-entry inputs as one human-readable line."""
+    """Render the bank-entry inputs as one human-readable line.
+
+    Falls back to a generic ``key=value`` summary when the filter is
+    not one veyru's known shapes, so a new scenario's bank renders
+    without requiring per-scenario formatting code.
+    """
     if agent_role_filter == "field_observer":
-        symptoms = inputs.get("symptoms", "")
-        return f"symptoms: {symptoms}"
-    observer_message = inputs.get("observer_message", "")
-    matched_motif = inputs.get("matched_motif", "")
-    stellar_action_text = inputs.get("stellar_action_text", "")
+        return f"symptoms: {inputs.get('symptoms', '')}"
+    if agent_role_filter == "stabilization_engineer":
+        observer_message = inputs.get("observer_message", "")
+        matched_motif = inputs.get("matched_motif", "")
+        stellar_action_text = inputs.get("stellar_action_text", "")
+        return (
+            f"obs msg: {observer_message}  ·  motif: {matched_motif}  ·  "
+            f"canon action: {stellar_action_text}"
+        )
+    return "  ·  ".join(f"{key}: {value}" for key, value in inputs.items())
+
+
+def _bank_path(scenario_name: str) -> Path:
+    """Resolve the per-scenario question-bank JSON path."""
     return (
-        f"obs msg: {observer_message}  ·  motif: {matched_motif}  ·  "
-        f"canon action: {stellar_action_text}"
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "schmidt"
+        / "scenarios"
+        / scenario_name
+        / "protocol_probe_questions.json"
     )
 
 
-@lru_cache(maxsize=1)
-def _load_question_bank() -> dict[str, ProbeQuestionPrompt]:
-    """Read the bank from disk once per process and index by ``question_id``."""
-    if not _QUESTIONS_PATH.exists():
+@lru_cache(maxsize=8)
+def _load_question_bank(scenario_name: str) -> dict[str, ProbeQuestionPrompt]:
+    """Read the bank from disk once per ``(scenario_name)`` and index by ``question_id``."""
+    bank_path = _bank_path(scenario_name=scenario_name)
+    if not bank_path.exists():
         return {}
-    raw = orjson.loads(_QUESTIONS_PATH.read_bytes())
+    raw = orjson.loads(bank_path.read_bytes())
     if not isinstance(raw, list):
         return {}
     out: dict[str, ProbeQuestionPrompt] = {}
@@ -84,14 +95,14 @@ def _load_question_bank() -> dict[str, ProbeQuestionPrompt]:
     return out
 
 
-def get_question_prompt(question_id: str) -> ProbeQuestionPrompt:
-    """Return the display-ready prompt for ``question_id``.
+def get_question_prompt(scenario_name: str, question_id: str) -> ProbeQuestionPrompt:
+    """Return the display-ready prompt for ``question_id`` in ``scenario_name``.
 
     Falls back to a placeholder entry when the bank file is unavailable
     or the id is unknown — this keeps the tab rendering even on an
     older run that references retired questions.
     """
-    bank = _load_question_bank()
+    bank = _load_question_bank(scenario_name=scenario_name)
     found = bank.get(question_id)
     if found is not None:
         return found

@@ -1,18 +1,16 @@
-"""Extracts scenario-event markers (swap, intern, collapse, stabilize) from a run log."""
+"""Extracts scenario-event markers (swap, intern, success/failure) from a run log.
+
+Scenario-agnostic: reads platform-level events (``round_result_recorded``,
+``agent_swapped_mid_run``, ``channel_history_cleared``) plus the knob-driven
+boundary anchors from ``simulation_started.scenario_config``. Works for any
+scenario that opts into ``judge_round_result``.
+"""
 
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import orjson
-
-from schmidt.scenarios.veyru.ids import (
-    INTERN_JOIN_REASON,
-    INTERN_TAKEOVER_REASON,
-    OBSERVER_SWAP_REASON,
-    VEYRU_COLLAPSED_MARKER,
-    VEYRU_STABILIZED_MARKER,
-)
 
 
 class TimelineEventKind(StrEnum):
@@ -55,7 +53,9 @@ def _scan_jsonl(jsonl_path: Path) -> tuple[dict[str, Any], int, list[TimelineEve
     collapsed_rounds: set[int] = set()
     stabilized_rounds: set[int] = set()
     postmortem_closed_rounds: set[int] = set()
+    scheduled_swap_rounds: list[tuple[int, str]] = []
     non_terminal_ended_rounds: set[int] = set()
+    round_results: dict[int, list[bool]] = {}
 
     with jsonl_path.open("rb") as f:
         for line in f:
@@ -72,24 +72,31 @@ def _scan_jsonl(jsonl_path: Path) -> tuple[dict[str, Any], int, list[TimelineEve
                 rnd = int(raw.get("round_number", 0))
                 if trigger in _NON_TERMINAL_ROUND_END_TRIGGERS:
                     non_terminal_ended_rounds.add(rnd)
-            elif event_type == "world_event_delivered":
-                text = raw.get("text") or ""
+            elif event_type == "round_result_recorded":
                 rnd = int(raw.get("round_number", 0))
-                if VEYRU_COLLAPSED_MARKER in text:
-                    collapsed_rounds.add(rnd)
-                elif VEYRU_STABILIZED_MARKER in text:
-                    stabilized_rounds.add(rnd)
+                round_results.setdefault(rnd, []).append(bool(raw.get("success", False)))
+            elif event_type == "agent_swapped_mid_run":
+                rnd = int(raw.get("round_number", 0))
+                agent_id = str(raw.get("agent_id") or "")
+                scheduled_swap_rounds.append((rnd, agent_id))
             elif event_type == "channel_history_cleared":
-                reason = raw.get("reason") or ""
                 rnd = int(raw.get("round_number", 0))
-                if reason in {OBSERVER_SWAP_REASON, INTERN_TAKEOVER_REASON}:
-                    postmortem_closed_rounds.add(rnd)
+                postmortem_closed_rounds.add(rnd)
 
-    # Backfill: rounds that ended via all_agents_idle / round_timeout without a
-    # terminal world event are implicit collapses (agents gave up before
-    # stabilizing and before blowing the budget). Newer runs emit the marker
-    # explicitly; this fallback covers older runs and keeps the timeline
-    # consistent across the dataset.
+    # Multi-team rounds emit one event per team. A round counts as
+    # stabilized only when every team succeeded; otherwise it's a
+    # collapse. This matches the "joint success" semantic the platform
+    # `round_success` metric uses for the per-round observation.
+    for rnd, successes in round_results.items():
+        if successes and all(successes):
+            stabilized_rounds.add(rnd)
+        else:
+            collapsed_rounds.add(rnd)
+
+    # Older runs (predating `round_result_recorded`) can still surface
+    # implicit collapses from rounds that ended via all_agents_idle /
+    # round_timeout without a corresponding result. New runs hit the
+    # `round_results` branch above and never need this fallback.
     inferred_collapsed = non_terminal_ended_rounds - collapsed_rounds - stabilized_rounds
     collapsed_rounds.update(inferred_collapsed)
 
@@ -98,7 +105,7 @@ def _scan_jsonl(jsonl_path: Path) -> tuple[dict[str, Any], int, list[TimelineEve
             TimelineEvent(
                 kind=TimelineEventKind.COLLAPSE,
                 round_number=rnd,
-                label="Veyru collapsed",
+                label="Round failed",
             )
         )
     for rnd in sorted(stabilized_rounds):
@@ -106,7 +113,7 @@ def _scan_jsonl(jsonl_path: Path) -> tuple[dict[str, Any], int, list[TimelineEve
             TimelineEvent(
                 kind=TimelineEventKind.STABILIZED,
                 round_number=rnd,
-                label="Veyru stabilized",
+                label="Round succeeded",
             )
         )
     for rnd in sorted(postmortem_closed_rounds):
@@ -115,6 +122,14 @@ def _scan_jsonl(jsonl_path: Path) -> tuple[dict[str, Any], int, list[TimelineEve
                 kind=TimelineEventKind.POSTMORTEM_CLOSED,
                 round_number=rnd,
                 label="Postmortem closed",
+            )
+        )
+    for rnd, agent_id in sorted(scheduled_swap_rounds):
+        events.append(
+            TimelineEvent(
+                kind=TimelineEventKind.SWAP,
+                round_number=rnd,
+                label=f"Scheduled swap ({agent_id})",
             )
         )
     return scenario_config, total_rounds, events
@@ -129,7 +144,7 @@ def _config_events(scenario_config: dict[str, Any]) -> list[TimelineEvent]:
             TimelineEvent(
                 kind=TimelineEventKind.SWAP,
                 round_number=swap_round,
-                label=f"Observer swap (round {swap_round})",
+                label=f"Two-team swap (round {swap_round})",
             )
         )
     intern_join_round = scenario_config.get("intern_join_round")
@@ -150,14 +165,12 @@ def _config_events(scenario_config: dict[str, Any]) -> list[TimelineEvent]:
                 label=f"Intern takeover (round {intern_takeover_round})",
             )
         )
-    # rely on INTERN_JOIN_REASON elsewhere; keep the constant import stable.
-    _ = INTERN_JOIN_REASON
     return events
 
 
-def load_run_timeline(run_dir: Path) -> RunTimeline:
+def load_run_timeline(run_dir: Path, scenario_name: str) -> RunTimeline:
     """Read a run's JSONL once and return everything the timeline chart needs."""
-    jsonl_path = run_dir / "veyru.jsonl"
+    jsonl_path = run_dir / f"{scenario_name}.jsonl"
     scenario_config, total_rounds, events = _scan_jsonl(jsonl_path=jsonl_path)
     events.extend(_config_events(scenario_config=scenario_config))
     events.sort(key=lambda e: (e.round_number, e.kind.value))

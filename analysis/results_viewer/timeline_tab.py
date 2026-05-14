@@ -240,7 +240,7 @@ def _render_value_metric_checkboxes(available: list[str]) -> list[str]:
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Timeline tab body."""
     if not evaluated:
-        st.info("No evaluated Veyru runs found. Run `schmidt evaluate veyru --run-dir ...` first.")
+        st.info("No evaluated runs found. Run `schmidt evaluate <scenario> --run-dir ...` first.")
         return
 
     selected_modes, selected_models = _render_prefilters(runs=evaluated)
@@ -258,7 +258,10 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     _render_selected_run_links(runs=selected)
 
     reports = {run.label: run.report for run in selected}
-    timelines = {run.label: load_run_timeline(run_dir=run.run_dir) for run in selected}
+    timelines = {
+        run.label: load_run_timeline(run_dir=run.run_dir, scenario_name=run.scenario_name)
+        for run in selected
+    }
 
     report_list = list(reports.values())
     flag_metrics = collect_flag_metrics(reports=report_list)
