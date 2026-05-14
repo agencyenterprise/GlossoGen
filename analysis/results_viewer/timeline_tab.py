@@ -45,6 +45,26 @@ def _render_checkbox_filter(
     return selected
 
 
+def _scenarios_with_evaluated_runs(evaluated: list[EvaluatedRun]) -> list[str]:
+    """Return every scenario that has at least one evaluated run."""
+    return sorted({run.scenario_name for run in evaluated})
+
+
+def _render_scenario_selector(evaluated: list[EvaluatedRun]) -> str | None:
+    """Radio selector listing every scenario with evaluated runs."""
+    options = _scenarios_with_evaluated_runs(evaluated=evaluated)
+    if not options:
+        return None
+    chosen = st.radio(
+        label="Scenario",
+        options=options,
+        index=0,
+        horizontal=True,
+        key="timeline_scenario_selector",
+    )
+    return chosen
+
+
 def _render_prefilters(runs: list[EvaluatedRun]) -> tuple[set[str], set[str]]:
     """Side-by-side pre-filters for execution mode and model, above the run picker."""
     mode_counts: dict[str, int] = {}
@@ -243,10 +263,16 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         st.info("No evaluated runs found. Run `schmidt evaluate <scenario> --run-dir ...` first.")
         return
 
-    selected_modes, selected_models = _render_prefilters(runs=evaluated)
+    scenario_name = _render_scenario_selector(evaluated=evaluated)
+    if scenario_name is None:
+        st.info("No evaluated runs found.")
+        return
+    scenario_runs = [run for run in evaluated if run.scenario_name == scenario_name]
+
+    selected_modes, selected_models = _render_prefilters(runs=scenario_runs)
     filtered = [
         run
-        for run in evaluated
+        for run in scenario_runs
         if run.execution_mode in selected_modes and run.metadata.primary_model in selected_models
     ]
 

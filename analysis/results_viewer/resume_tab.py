@@ -32,6 +32,30 @@ def _window_source_series(run: ResumeRun) -> str:
     return f"{run.replacement_model}{suffix} · source"
 
 
+def _scenarios_with_resume_runs(runs: list[ResumeRun]) -> list[str]:
+    """Return every scenario that has at least one resume run.
+
+    Auto-discovered from the loaded resume runs so a new scenario that
+    starts using replace-agent shows up in the selector for free.
+    """
+    return sorted({run.scenario_name for run in runs})
+
+
+def _render_scenario_selector(runs: list[ResumeRun]) -> str | None:
+    """Radio selector listing every scenario with at least one resume run."""
+    options = _scenarios_with_resume_runs(runs=runs)
+    if not options:
+        return None
+    chosen = st.radio(
+        label="Scenario",
+        options=options,
+        index=0,
+        horizontal=True,
+        key="resume_scenario_selector",
+    )
+    return chosen
+
+
 def _bucket_filter(runs: list[ResumeRun]) -> set[str]:
     """One checkbox per distinct resume-bucket key; returns selected keys."""
     counts: dict[str, int] = {}
@@ -263,12 +287,20 @@ def render(evaluated: list[EvaluatedRun]) -> None:
             "Add the 'resume' label to replace-agent runs you want compared here."
         )
         return
+    scenario_name = _render_scenario_selector(runs=all_resume)
+    if scenario_name is None:
+        st.info("No scenarios with resume-labeled runs found.")
+        return
+    scenario_runs = [r for r in all_resume if r.scenario_name == scenario_name]
+    if not scenario_runs:
+        st.info(f"No resume runs in scenario `{scenario_name}`.")
+        return
     frontend_base = render_frontend_base(streamlit_key="resume_frontend_base")
-    selected_buckets = _bucket_filter(runs=all_resume)
+    selected_buckets = _bucket_filter(runs=scenario_runs)
     if not selected_buckets:
         st.info("Select at least one resume bucket.")
         return
-    filtered = [r for r in all_resume if r.resumed_series_key() in selected_buckets]
+    filtered = [r for r in scenario_runs if r.resumed_series_key() in selected_buckets]
     if not filtered:
         st.info("No resume runs match the selected buckets.")
         return
