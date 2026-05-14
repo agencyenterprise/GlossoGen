@@ -107,15 +107,13 @@ def _score_round(
     saw_budget_marker: bool,
 ) -> RoundObservation:
     """Apply the round-success rules and return a per-round observation."""
-    correctly_committed_roles = {
-        event.submitted_truck_role for event in truck_results if event.overall_success
-    }
-    if len(correctly_committed_roles) < expected_trucks:
+    successful_truck_commits = sum(1 for event in truck_results if event.overall_success)
+    if successful_truck_commits < expected_trucks:
         return RoundObservation(
             round_number=round_number,
             value=0.0,
             note=(
-                f"only {len(correctly_committed_roles)}/{expected_trucks} trucks "
+                f"only {successful_truck_commits}/{expected_trucks} trucks "
                 "arrived at the correct spot"
             ),
         )
@@ -147,7 +145,7 @@ def _score_round(
         round_number=round_number,
         value=1.0,
         note=(
-            f"{len(correctly_committed_roles)}/{expected_trucks} trucks + "
+            f"{successful_truck_commits}/{expected_trucks} trucks + "
             f"{accepted_count} crane moves accepted within budget"
         ),
     )
