@@ -28,6 +28,13 @@ LINK_B_CHANNEL_ID = "link_b"
 POSTMORTEM_A_CHANNEL_ID = "postmortem_a"
 POSTMORTEM_B_CHANNEL_ID = "postmortem_b"
 
+LINK_CHANNEL_IDS: frozenset[str] = frozenset(
+    {LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNEL_ID}
+)
+POSTMORTEM_CHANNEL_IDS: frozenset[str] = frozenset(
+    {POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID}
+)
+
 FIELD_OBSERVER_ROLE = "Field Observer"
 STABILIZATION_ENGINEER_ROLE = "Stabilization Engineer"
 INTERN_ROLE = "Intern Observer"

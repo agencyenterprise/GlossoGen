@@ -10,12 +10,20 @@ the new pairings must re-establish their working protocol.
 Every character sent on a team's comm link costs simulated seconds;
 Veyru entities collapse when their team's total communication time
 exceeds the case's time budget.
+
+Heavy logic lives in dedicated sibling modules: :mod:`agent_factory`
+(agent/channel/team construction), :mod:`mcp_tools` (the
+``stabilize_veyru`` tool), :mod:`injection_rendering` (per-round and
+postmortem prompts), :mod:`team_lifecycle` (observer swap and intern
+join/takeover choreography), :mod:`case_event_conversion`
+(veyru-case → event-log adapters), and :mod:`team_routing`
+(agent/channel/team ID lookups).
 """
 
 import logging
 import random
 from pathlib import Path
-from typing import Any, NamedTuple, Self
+from typing import Any, Self
 
 from schmidt.evaluation.log_reader import extract_agent_configs, extract_simulation_id, load_events
 from schmidt.evaluation.metric_core.measurement import Measurement
@@ -35,80 +43,59 @@ from schmidt.evaluation.reports.evaluation_report import (
 )
 from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig, AgentRole
-from schmidt.models.channel import Channel, ChannelTemplateEntry
+from schmidt.models.channel import Channel
 from schmidt.models.event import SimulationEvent
-from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
-from schmidt.runtime.scenario_world import ScenarioWorld, WorldContext
+from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
+from schmidt.runtime.scenario_world import ScenarioWorld
 from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
-from schmidt.scenarios.veyru.evaluation.build_communication_rounds import build_communication_rounds
-from schmidt.scenarios.veyru.events import (
-    VeyruCaseStage,
-    VeyruCaseStarted,
-    VeyruStabilizationJudged,
-    VeyruStellarReading,
+from schmidt.scenarios.veyru.agent_factory import (
+    build_agent_display_names,
+    build_agents,
+    build_channel_display_names,
+    build_channels,
+    build_teams,
 )
+from schmidt.scenarios.veyru.case_event_conversion import case_started_event
+from schmidt.scenarios.veyru.evaluation.build_communication_rounds import build_communication_rounds
 from schmidt.scenarios.veyru.ids import (
     FIELD_OBSERVER_A_ROLE,
     FIELD_OBSERVER_B_ROLE,
     FIELD_OBSERVER_ID,
-    FIELD_OBSERVER_INJECTION_TEMPLATE,
     FIELD_OBSERVER_ROLE,
-    FIELD_OBSERVER_SYSTEM_TEMPLATE,
     INTERN_ID,
-    INTERN_JOIN_REASON,
     INTERN_ROLE,
-    INTERN_SYSTEM_TEMPLATE,
-    INTERN_TAKEOVER_REASON,
-    LINK_A_CHANNEL_ID,
-    LINK_B_CHANNEL_ID,
     LINK_CHANNEL_ID,
-    NEW_SYMPTOMS_MARKER,
+    LINK_CHANNEL_IDS,
     OBSERVER_A_ID,
     OBSERVER_B_ID,
-    OBSERVER_SWAP_REASON,
-    POSTMORTEM_A_CHANNEL_ID,
-    POSTMORTEM_B_CHANNEL_ID,
-    POSTMORTEM_CHANNEL_ID,
+    POSTMORTEM_CHANNEL_IDS,
     STABILIZATION_ENGINEER_A_ID,
     STABILIZATION_ENGINEER_A_ROLE,
     STABILIZATION_ENGINEER_B_ID,
     STABILIZATION_ENGINEER_B_ROLE,
     STABILIZATION_ENGINEER_ID,
-    STABILIZATION_ENGINEER_INJECTION_TEMPLATE,
     STABILIZATION_ENGINEER_ROLE,
-    STABILIZATION_ENGINEER_SYSTEM_TEMPLATE,
-    STABILIZATION_SUCCESS_MARKER,
     TEAM_A_ID,
     TEAM_B_ID,
     TEAM_SOLO_ID,
-    TOOLS_INTERN,
-    TOOLS_OBSERVER,
-    TOOLS_STABILIZATION_ENGINEER,
-    TeamId,
+)
+from schmidt.scenarios.veyru.injection_rendering import (
+    intern_has_taken_over,
+    render_postmortem_injection,
+    render_round_injection,
 )
 from schmidt.scenarios.veyru.knobs import VeyruKnobs
-from schmidt.scenarios.veyru.stabilization_judge import judge_stabilization
-from schmidt.scenarios.veyru.veyru_cases import (
-    FAILURE_MOTIFS,
-    VeyruCase,
-    get_cases,
-    get_stellar_treatment_mapping,
+from schmidt.scenarios.veyru.mcp_tools import build_mcp_tools
+from schmidt.scenarios.veyru.team_lifecycle import (
+    maybe_join_intern,
+    maybe_promote_intern,
+    maybe_swap_observers,
 )
-from schmidt.scenarios.veyru.world import TeamState, VeyruOutcome, VeyruWorld
+from schmidt.scenarios.veyru.veyru_cases import VeyruCase, get_cases
+from schmidt.scenarios.veyru.world import VeyruWorld
 from schmidt.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
-
-
-class AgentDef(NamedTuple):
-    """Lightweight definition of an agent before full AgentConfig construction."""
-
-    agent_id: str
-    role_name: str
-    channel_ids: list[str]
-    tool_names: list[str]
-    system_template: str
-
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -183,17 +170,17 @@ class VeyruScenario(SimulationScenario):
             round_time_budget_seconds=knobs.round_time_budget_seconds,
         )
         self._noise_rng = random.Random(knobs.seed)
-        self._agent_display_names: dict[str, str] = self._build_agent_display_names(
+        self._agent_display_names: dict[str, str] = build_agent_display_names(
             two_teams=knobs.two_teams,
             intern_enabled=knobs.intern_enabled,
         )
-        self._channel_display_names: dict[str, dict[str, str]] = self._build_channel_display_names(
+        self._channel_display_names: dict[str, dict[str, str]] = build_channel_display_names(
             two_teams=knobs.two_teams,
             intern_enabled=knobs.intern_enabled,
         )
         self._world = VeyruWorld(
             veyru_cases=self._veyru_cases,
-            teams=self._build_teams(knobs=knobs),
+            teams=build_teams(knobs=knobs),
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
         )
         self._judge_provider = create_provider(
@@ -202,117 +189,6 @@ class VeyruScenario(SimulationScenario):
             inference_provider=None,
             reasoning_effort=None,
         )
-
-    @staticmethod
-    def _build_agent_display_names(two_teams: bool, intern_enabled: bool) -> dict[str, str]:
-        """Return agent display names appropriate for the active mode."""
-        if two_teams:
-            return {
-                OBSERVER_A_ID: FIELD_OBSERVER_A_ROLE,
-                STABILIZATION_ENGINEER_A_ID: STABILIZATION_ENGINEER_A_ROLE,
-                OBSERVER_B_ID: FIELD_OBSERVER_B_ROLE,
-                STABILIZATION_ENGINEER_B_ID: STABILIZATION_ENGINEER_B_ROLE,
-                "world": "Veyru Monitor",
-            }
-        names: dict[str, str] = {
-            FIELD_OBSERVER_ID: FIELD_OBSERVER_ROLE,
-            STABILIZATION_ENGINEER_ID: STABILIZATION_ENGINEER_ROLE,
-            "world": "Veyru Monitor",
-        }
-        if intern_enabled:
-            names[INTERN_ID] = INTERN_ROLE
-        return names
-
-    @staticmethod
-    def _build_channel_display_names(
-        two_teams: bool, intern_enabled: bool
-    ) -> dict[str, dict[str, str]]:
-        """Return channel display names keyed by channel_id then agent_id."""
-        if two_teams:
-            return {
-                LINK_A_CHANNEL_ID: {
-                    OBSERVER_A_ID: "comm link",
-                    STABILIZATION_ENGINEER_A_ID: "comm link",
-                    OBSERVER_B_ID: "comm link",
-                    STABILIZATION_ENGINEER_B_ID: "comm link",
-                },
-                LINK_B_CHANNEL_ID: {
-                    OBSERVER_A_ID: "comm link",
-                    STABILIZATION_ENGINEER_A_ID: "comm link",
-                    OBSERVER_B_ID: "comm link",
-                    STABILIZATION_ENGINEER_B_ID: "comm link",
-                },
-                POSTMORTEM_A_CHANNEL_ID: {
-                    OBSERVER_A_ID: "team discussion",
-                    STABILIZATION_ENGINEER_A_ID: "team discussion",
-                    OBSERVER_B_ID: "team discussion",
-                    STABILIZATION_ENGINEER_B_ID: "team discussion",
-                },
-                POSTMORTEM_B_CHANNEL_ID: {
-                    OBSERVER_A_ID: "team discussion",
-                    STABILIZATION_ENGINEER_A_ID: "team discussion",
-                    OBSERVER_B_ID: "team discussion",
-                    STABILIZATION_ENGINEER_B_ID: "team discussion",
-                },
-            }
-        link_members = {
-            FIELD_OBSERVER_ID: "comm link",
-            STABILIZATION_ENGINEER_ID: "comm link",
-        }
-        postmortem_members = {
-            FIELD_OBSERVER_ID: "team discussion",
-            STABILIZATION_ENGINEER_ID: "team discussion",
-        }
-        if intern_enabled:
-            link_members[INTERN_ID] = "comm link"
-            postmortem_members[INTERN_ID] = "team discussion"
-        return {
-            LINK_CHANNEL_ID: link_members,
-            POSTMORTEM_CHANNEL_ID: postmortem_members,
-        }
-
-    def _build_teams(self, knobs: VeyruKnobs) -> dict[TeamId, TeamState]:
-        """Construct the world's initial team state dictionary."""
-        if not knobs.two_teams:
-            postmortem_id: str | None
-            if knobs.postmortem_enabled:
-                postmortem_id = POSTMORTEM_CHANNEL_ID
-            else:
-                postmortem_id = None
-            return {
-                TEAM_SOLO_ID: TeamState(
-                    team_id=TEAM_SOLO_ID,
-                    current_observer_id=FIELD_OBSERVER_ID,
-                    stabilization_engineer_id=STABILIZATION_ENGINEER_ID,
-                    link_channel_id=LINK_CHANNEL_ID,
-                    postmortem_channel_id=postmortem_id,
-                ),
-            }
-
-        postmortem_a: str | None
-        postmortem_b: str | None
-        if knobs.postmortem_enabled:
-            postmortem_a = POSTMORTEM_A_CHANNEL_ID
-            postmortem_b = POSTMORTEM_B_CHANNEL_ID
-        else:
-            postmortem_a = None
-            postmortem_b = None
-        return {
-            TEAM_A_ID: TeamState(
-                team_id=TEAM_A_ID,
-                current_observer_id=OBSERVER_A_ID,
-                stabilization_engineer_id=STABILIZATION_ENGINEER_A_ID,
-                link_channel_id=LINK_A_CHANNEL_ID,
-                postmortem_channel_id=postmortem_a,
-            ),
-            TEAM_B_ID: TeamState(
-                team_id=TEAM_B_ID,
-                current_observer_id=OBSERVER_B_ID,
-                stabilization_engineer_id=STABILIZATION_ENGINEER_B_ID,
-                link_channel_id=LINK_B_CHANNEL_ID,
-                postmortem_channel_id=postmortem_b,
-            ),
-        }
 
     @property
     def veyru_cases(self) -> list[VeyruCase]:
@@ -346,175 +222,20 @@ class VeyruScenario(SimulationScenario):
             },
         )
 
-    def _channel_template_data(
-        self, agent_id: str, channel_ids: list[str]
-    ) -> list[ChannelTemplateEntry]:
-        """Build channel entries for Jinja2 system prompt templates."""
-        return [
-            ChannelTemplateEntry(
-                display_name=self.get_channel_display_name(channel_id=cid, agent_id=agent_id),
-                channel_id=cid,
-            )
-            for cid in channel_ids
-        ]
-
-    def _agent_defs_single_team(self) -> list[AgentDef]:
-        """Return agent definitions for single-team mode."""
-        link_channels: list[str] = [LINK_CHANNEL_ID]
-        if self._postmortem_active:
-            link_channels.append(POSTMORTEM_CHANNEL_ID)
-        defs = [
-            AgentDef(
-                agent_id=FIELD_OBSERVER_ID,
-                role_name=FIELD_OBSERVER_ROLE,
-                channel_ids=list(link_channels),
-                tool_names=list(TOOLS_OBSERVER),
-                system_template=FIELD_OBSERVER_SYSTEM_TEMPLATE,
-            ),
-            AgentDef(
-                agent_id=STABILIZATION_ENGINEER_ID,
-                role_name=STABILIZATION_ENGINEER_ROLE,
-                channel_ids=list(link_channels),
-                tool_names=list(TOOLS_STABILIZATION_ENGINEER),
-                system_template=STABILIZATION_ENGINEER_SYSTEM_TEMPLATE,
-            ),
-        ]
-        if self._knobs.intern_enabled:
-            intern_channels: list[str] = [LINK_CHANNEL_ID]
-            if self._knobs.postmortem_enabled and self._knobs.postmortem_after_swap:
-                intern_channels.append(POSTMORTEM_CHANNEL_ID)
-            defs.append(
-                AgentDef(
-                    agent_id=INTERN_ID,
-                    role_name=INTERN_ROLE,
-                    channel_ids=intern_channels,
-                    tool_names=list(TOOLS_INTERN),
-                    system_template=INTERN_SYSTEM_TEMPLATE,
-                )
-            )
-        return defs
-
-    def _agent_defs_two_teams(self) -> list[AgentDef]:
-        """Return agent definitions for two-team mode."""
-        team_a_channels: list[str] = [LINK_A_CHANNEL_ID]
-        team_b_channels: list[str] = [LINK_B_CHANNEL_ID]
-        if self._postmortem_active:
-            team_a_channels.append(POSTMORTEM_A_CHANNEL_ID)
-            team_b_channels.append(POSTMORTEM_B_CHANNEL_ID)
-        return [
-            AgentDef(
-                agent_id=OBSERVER_A_ID,
-                role_name=FIELD_OBSERVER_A_ROLE,
-                channel_ids=list(team_a_channels),
-                tool_names=list(TOOLS_OBSERVER),
-                system_template=FIELD_OBSERVER_SYSTEM_TEMPLATE,
-            ),
-            AgentDef(
-                agent_id=STABILIZATION_ENGINEER_A_ID,
-                role_name=STABILIZATION_ENGINEER_A_ROLE,
-                channel_ids=list(team_a_channels),
-                tool_names=list(TOOLS_STABILIZATION_ENGINEER),
-                system_template=STABILIZATION_ENGINEER_SYSTEM_TEMPLATE,
-            ),
-            AgentDef(
-                agent_id=OBSERVER_B_ID,
-                role_name=FIELD_OBSERVER_B_ROLE,
-                channel_ids=list(team_b_channels),
-                tool_names=list(TOOLS_OBSERVER),
-                system_template=FIELD_OBSERVER_SYSTEM_TEMPLATE,
-            ),
-            AgentDef(
-                agent_id=STABILIZATION_ENGINEER_B_ID,
-                role_name=STABILIZATION_ENGINEER_B_ROLE,
-                channel_ids=list(team_b_channels),
-                tool_names=list(TOOLS_STABILIZATION_ENGINEER),
-                system_template=STABILIZATION_ENGINEER_SYSTEM_TEMPLATE,
-            ),
-        ]
-
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """Return agent configurations for the active single-team or two-team mode."""
-        if self._knobs.two_teams:
-            agent_defs = self._agent_defs_two_teams()
-        else:
-            agent_defs = self._agent_defs_single_team()
-
-        agents: list[AgentConfig] = []
-        for d in agent_defs:
-            agents.append(
-                AgentConfig(
-                    agent_id=d.agent_id,
-                    role_name=d.role_name,
-                    system_prompt=self._renderer.render(
-                        template_name=d.system_template,
-                        template_variables={
-                            "channels": self._channel_template_data(
-                                agent_id=d.agent_id, channel_ids=d.channel_ids
-                            ),
-                            "postmortem_enabled": self._postmortem_active,
-                            "intern_join_round": self._knobs.intern_join_round,
-                            "intern_takeover_round": self._knobs.intern_takeover_round,
-                            "failure_motifs": FAILURE_MOTIFS,
-                            "channel_noise_level": self._knobs.channel_noise_level,
-                        },
-                    ),
-                    channel_ids=d.channel_ids,
-                    tool_names=d.tool_names,
-                    model=default_model,
-                    provider=default_provider,
-                    max_tokens=self._knobs.agent_max_tokens,
-                )
-            )
-        return agents
+        return build_agents(
+            knobs=self._knobs,
+            postmortem_active=self._postmortem_active,
+            channel_display_names=self._channel_display_names,
+            renderer=self._renderer,
+            default_model=default_model,
+            default_provider=default_provider,
+        )
 
     def get_channels(self) -> list[Channel]:
         """Return communication channels appropriate for the active mode."""
-        if not self._knobs.two_teams:
-            channels: list[Channel] = [
-                Channel(
-                    channel_id=LINK_CHANNEL_ID,
-                    name="link",
-                    member_agent_ids=[FIELD_OBSERVER_ID, STABILIZATION_ENGINEER_ID],
-                ),
-            ]
-            if self._postmortem_active:
-                channels.append(
-                    Channel(
-                        channel_id=POSTMORTEM_CHANNEL_ID,
-                        name="postmortem",
-                        member_agent_ids=[FIELD_OBSERVER_ID, STABILIZATION_ENGINEER_ID],
-                    )
-                )
-            return channels
-
-        two_team_channels: list[Channel] = [
-            Channel(
-                channel_id=LINK_A_CHANNEL_ID,
-                name="link_a",
-                member_agent_ids=[OBSERVER_A_ID, STABILIZATION_ENGINEER_A_ID],
-            ),
-            Channel(
-                channel_id=LINK_B_CHANNEL_ID,
-                name="link_b",
-                member_agent_ids=[OBSERVER_B_ID, STABILIZATION_ENGINEER_B_ID],
-            ),
-        ]
-        if self._postmortem_active:
-            two_team_channels.append(
-                Channel(
-                    channel_id=POSTMORTEM_A_CHANNEL_ID,
-                    name="postmortem_a",
-                    member_agent_ids=[OBSERVER_A_ID, STABILIZATION_ENGINEER_A_ID],
-                )
-            )
-            two_team_channels.append(
-                Channel(
-                    channel_id=POSTMORTEM_B_CHANNEL_ID,
-                    name="postmortem_b",
-                    member_agent_ids=[OBSERVER_B_ID, STABILIZATION_ENGINEER_B_ID],
-                )
-            )
-        return two_team_channels
+        return build_channels(knobs=self._knobs, postmortem_active=self._postmortem_active)
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
         """Return the display name for a channel as seen by a specific agent."""
@@ -537,170 +258,27 @@ class VeyruScenario(SimulationScenario):
         """Stash the runtime handle so stabilize_veyru can emit judge verdicts."""
         self._runtime = runtime
 
-    def _get_previous_outcome_for_agent(
-        self,
-        agent_id: str,
-        round_number: int,
-    ) -> VeyruOutcome | None:
-        """Return the most recent outcome for the team the agent belongs to.
-
-        Returns None for an agent that was just swapped in at the start
-        of ``round_number`` — they did not participate in
-        ``round_number - 1`` and the ``PREVIOUS VEYRU RESULT`` block
-        would leak prior-round context they should not see.
-        """
-        if self._world.was_agent_just_swapped_in_round(
-            agent_id=agent_id,
-            round_number=round_number,
-        ):
-            return None
-        team_id = self._world.get_team_for_agent(agent_id=agent_id)
-        outcomes = self._world.get_outcomes_for_team(team_id=team_id)
-        if len(outcomes) == 0:
-            return None
-        return outcomes[-1]
-
-    def _get_partner_display_name(self, agent_id: str) -> str:
-        """Return the display name of the agent's current partner on their team."""
-        team_id = self._world.get_team_for_agent(agent_id=agent_id)
-        team = self._world.teams[team_id]
-        if agent_id == team.current_observer_id:
-            partner_id = team.stabilization_engineer_id
-        else:
-            partner_id = team.current_observer_id
-        return self.get_agent_display_name(agent_id=partner_id)
-
-    def _has_intern_taken_over(self) -> bool:
-        """Whether the intern has been promoted to field observer."""
-        if not self._knobs.intern_enabled:
-            return False
-        if TEAM_SOLO_ID not in self._world.teams:
-            return False
-        return self._world.teams[TEAM_SOLO_ID].current_observer_id == INTERN_ID
-
-    def _is_intern_in_observer_state(self) -> bool:
-        """Whether the intern has joined the link channel but has not yet taken over."""
-        if not self._knobs.intern_enabled:
-            return False
-        if self._knobs.intern_join_round is None:
-            return False
-        if self._runtime is None:
-            return False
-        if self._runtime.current_round < self._knobs.intern_join_round:
-            return False
-        return not self._has_intern_taken_over()
-
-    def _is_observer_agent(self, agent_id: str) -> bool:
-        """Whether this agent is acting as a field observer in the current round."""
-        if agent_id in (OBSERVER_A_ID, OBSERVER_B_ID):
-            return True
-        if agent_id == FIELD_OBSERVER_ID:
-            return not self._has_intern_taken_over()
-        if agent_id == INTERN_ID:
-            return self._has_intern_taken_over()
-        return False
-
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the injection message for an agent at a given round, or None."""
-        if agent_id == INTERN_ID and not self._has_intern_taken_over():
-            return None
-        if (
-            self._knobs.intern_enabled
-            and agent_id == FIELD_OBSERVER_ID
-            and self._has_intern_taken_over()
-        ):
-            return None
-
-        template_name: str | None
-        if self._is_observer_agent(agent_id=agent_id):
-            template_name = FIELD_OBSERVER_INJECTION_TEMPLATE
-        elif agent_id in (
-            STABILIZATION_ENGINEER_ID,
-            STABILIZATION_ENGINEER_A_ID,
-            STABILIZATION_ENGINEER_B_ID,
-        ):
-            template_name = STABILIZATION_ENGINEER_INJECTION_TEMPLATE
-        else:
-            template_name = None
-        if template_name is None:
-            return None
-
-        current_case_index = (round_number - 1) % len(self._veyru_cases)
-        current_case = self._veyru_cases[current_case_index]
-
-        previous_outcome = self._get_previous_outcome_for_agent(
-            agent_id=agent_id,
+        return render_round_injection(
             round_number=round_number,
+            agent_id=agent_id,
+            knobs=self._knobs,
+            veyru_cases=self._veyru_cases,
+            world=self._world,
+            agent_display_names=self._agent_display_names,
+            renderer=self._renderer,
         )
-
-        treatment_mapping = get_stellar_treatment_mapping(
-            stellar_reading=current_case.stellar_reading,
-        )
-
-        swap_just_happened = self._world.peek_swap_just_happened()
-        partner_display_name = self._get_partner_display_name(agent_id=agent_id)
-        intern_takeover_just_happened = agent_id == INTERN_ID and self._world.peek_intern_takeover()
-
-        rendered = self._renderer.render(
-            template_name=template_name,
-            template_variables={
-                "round_number": round_number,
-                "current_case": current_case,
-                "first_stage_symptoms": current_case.stages[0].observable_symptoms,
-                "previous_outcome": previous_outcome,
-                "knobs": self._knobs,
-                "treatment_mapping": treatment_mapping,
-                "swap_just_happened": swap_just_happened,
-                "announce_swap": self._knobs.announce_swap,
-                "partner_display_name": partner_display_name,
-                "intern_takeover_just_happened": intern_takeover_just_happened,
-                "intern_join_round": self._knobs.intern_join_round,
-            },
-        )
-        if not rendered:
-            return None
-        logger.debug(
-            "Injection for agent %s at round %d: %d chars",
-            agent_id,
-            round_number,
-            len(rendered),
-        )
-        return rendered
 
     def get_postmortem_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return postmortem injection when postmortem is enabled, None otherwise."""
-        if not self._knobs.postmortem_enabled:
-            return None
-        if self._world.is_postmortem_disabled:
-            return None
-        if self._knobs.intern_enabled:
-            if agent_id == INTERN_ID and not self._has_intern_taken_over():
-                return None
-            if agent_id == FIELD_OBSERVER_ID and self._has_intern_taken_over():
-                return None
-
-        team_id = self._world.get_team_for_agent(agent_id=agent_id)
-        outcome = self._world.compute_outcome_if_needed(
+        return render_postmortem_injection(
             round_number=round_number,
-            team_id=team_id,
+            agent_id=agent_id,
+            knobs=self._knobs,
+            world=self._world,
+            renderer=self._renderer,
         )
-
-        rendered = self._renderer.render(
-            template_name="postmortem_injection.jinja",
-            template_variables={
-                "round_number": round_number,
-                "previous_outcome": outcome,
-            },
-        )
-        if not rendered:
-            return None
-        logger.debug(
-            "Postmortem injection for agent %s at round %d: %d chars",
-            agent_id,
-            round_number,
-            len(rendered),
-        )
-        return rendered
 
     def get_max_postmortem_duration_seconds(self) -> float:
         """Return the configured postmortem duration from knobs, or 0 when disabled."""
@@ -833,72 +411,12 @@ class VeyruScenario(SimulationScenario):
         self._world.exit_postmortem()
         self._world.finalize_round_sync(round_number=round_number)
         await self._emit_case_started_event(round_number=round_number)
-        await self._maybe_swap_observers(round_number=round_number)
+        await maybe_swap_observers(world=self._world, knobs=self._knobs, round_number=round_number)
         if self._knobs.intern_enabled:
-            await self._maybe_join_intern(round_number=round_number)
-            await self._maybe_promote_intern(round_number=round_number)
-
-    async def _maybe_join_intern(self, round_number: int) -> None:
-        """At intern_join_round, add the intern to the link channel and announce."""
-        if self._knobs.intern_join_round is None:
-            return
-        if round_number != self._knobs.intern_join_round:
-            return
-
-        logger.info("Intern joining link channel at round %d", round_number)
-        context = self._world.context
-        await context.update_channel_members(
-            channel_id=LINK_CHANNEL_ID,
-            member_agent_ids=[FIELD_OBSERVER_ID, STABILIZATION_ENGINEER_ID, INTERN_ID],
-            reason=INTERN_JOIN_REASON,
-        )
-        await context.send_update_to_channel(
-            channel_id=LINK_CHANNEL_ID,
-            text=(
-                "An intern observer has joined the comm link and will silently "
-                "observe your work. They will not speak or act until further notice."
-            ),
-        )
-
-    async def _maybe_promote_intern(self, round_number: int) -> None:
-        """At intern_takeover_round, replace the field observer with the intern."""
-        if self._knobs.intern_takeover_round is None:
-            return
-        if round_number != self._knobs.intern_takeover_round:
-            return
-
-        displaced = self._world.promote_intern_to_observer(intern_id=INTERN_ID)
-        logger.info(
-            "Intern takeover fired at round %d: displaced observer=%s",
-            round_number,
-            displaced,
-        )
-
-        context = self._world.context
-        await context.update_channel_members(
-            channel_id=LINK_CHANNEL_ID,
-            member_agent_ids=[STABILIZATION_ENGINEER_ID, INTERN_ID],
-            reason=INTERN_TAKEOVER_REASON,
-        )
-        if self._knobs.postmortem_enabled:
-            if self._knobs.postmortem_after_swap:
-                await context.update_channel_members(
-                    channel_id=POSTMORTEM_CHANNEL_ID,
-                    member_agent_ids=[STABILIZATION_ENGINEER_ID, INTERN_ID],
-                    reason=INTERN_TAKEOVER_REASON,
-                )
-            else:
-                self._world.disable_postmortem_globally()
-
-        await context.send_update_to_channel(
-            channel_id=LINK_CHANNEL_ID,
-            text=(
-                "=== FIELD OBSERVER HANDOFF ===\n"
-                "The intern has taken over as the active field observer. "
-                "The previous field observer has left the comm link. "
-                "Continue the protocol with the new pairing."
-            ),
-        )
+            await maybe_join_intern(world=self._world, knobs=self._knobs, round_number=round_number)
+            await maybe_promote_intern(
+                world=self._world, knobs=self._knobs, round_number=round_number
+            )
 
     async def _emit_case_started_event(self, round_number: int) -> None:
         """Log a VeyruCaseStarted event carrying the full ground-truth case data."""
@@ -907,126 +425,18 @@ class VeyruScenario(SimulationScenario):
         case = self._world.current_case
         assert case is not None, "finalize_round_sync must populate current_case"
         await self._runtime.event_logger.log(
-            event=VeyruCaseStarted(
-                round_number=round_number,
-                case_number=case.case_number,
-                failure_name=case.failure_name,
-                time_budget_seconds=case.time_budget_seconds,
-                stages=[
-                    VeyruCaseStage(
-                        motif_name=stage.motif_name,
-                        observable_symptoms=stage.observable_symptoms,
-                        treatment_motif_name=stage.treatment_motif_name,
-                        judge_expected_actions=stage.judge_expected_actions,
-                    )
-                    for stage in case.stages
-                ],
-                stellar_reading=VeyruStellarReading(
-                    offset=case.stellar_reading.offset,
-                    hold_duration=case.stellar_reading.hold_duration,
-                    starting_face=case.stellar_reading.starting_face,
-                    intensity_level=case.stellar_reading.intensity_level,
-                ),
-            )
-        )
-
-    async def _maybe_swap_observers(self, round_number: int) -> None:
-        """Swap observers, clear channel histories, announce, and optionally close postmortem."""
-        if self._knobs.swap_round is None:
-            return
-        if round_number != self._knobs.swap_round + 1:
-            return
-
-        new_team_a_observer, new_team_b_observer = self._world.swap_observers()
-        logger.info(
-            "Veyru observer swap fired at round %d: team A observer=%s, team B observer=%s",
-            round_number,
-            new_team_a_observer,
-            new_team_b_observer,
-        )
-
-        team_a = self._world.teams[TEAM_A_ID]
-        team_b = self._world.teams[TEAM_B_ID]
-
-        context = self._world.context
-        await self._apply_swap_to_channel(
-            context=context,
-            channel_id=team_a.link_channel_id,
-            observer_id=team_a.current_observer_id,
-            stabilization_engineer_id=team_a.stabilization_engineer_id,
-        )
-        await self._apply_swap_to_channel(
-            context=context,
-            channel_id=team_b.link_channel_id,
-            observer_id=team_b.current_observer_id,
-            stabilization_engineer_id=team_b.stabilization_engineer_id,
-        )
-        if team_a.postmortem_channel_id is not None:
-            await self._apply_swap_to_channel(
-                context=context,
-                channel_id=team_a.postmortem_channel_id,
-                observer_id=team_a.current_observer_id,
-                stabilization_engineer_id=team_a.stabilization_engineer_id,
-            )
-        if team_b.postmortem_channel_id is not None:
-            await self._apply_swap_to_channel(
-                context=context,
-                channel_id=team_b.postmortem_channel_id,
-                observer_id=team_b.current_observer_id,
-                stabilization_engineer_id=team_b.stabilization_engineer_id,
-            )
-
-        if self._knobs.announce_swap:
-            self._world.mark_swap_just_happened()
-            announcement = (
-                "=== TEAM RECONFIGURATION ===\n"
-                "The field observers between the two teams have been swapped. "
-                "The channel history has been cleared."
-            )
-            await context.send_update_to_channel(
-                channel_id=team_a.link_channel_id,
-                text=announcement,
-            )
-            await context.send_update_to_channel(
-                channel_id=team_b.link_channel_id,
-                text=announcement,
-            )
-
-        if self._knobs.postmortem_enabled and not self._knobs.postmortem_after_swap:
-            self._world.disable_postmortem_globally()
-
-    @staticmethod
-    async def _apply_swap_to_channel(
-        context: WorldContext,
-        channel_id: str,
-        observer_id: str,
-        stabilization_engineer_id: str,
-    ) -> None:
-        """Apply membership update + history wipe to one channel as part of a swap."""
-        await context.update_channel_members(
-            channel_id=channel_id,
-            member_agent_ids=[observer_id, stabilization_engineer_id],
-            reason=OBSERVER_SWAP_REASON,
-        )
-        await context.clear_channel_history(
-            channel_id=channel_id,
-            reason=OBSERVER_SWAP_REASON,
+            event=case_started_event(round_number=round_number, case=case)
         )
 
     def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
         """Block messages to postmortem channels outside the discussion phase."""
         if self._knobs.intern_enabled and agent_id == INTERN_ID:
-            if not self._has_intern_taken_over():
+            if not intern_has_taken_over(world=self._world, knobs=self._knobs):
                 return (
                     "You are observing silently until you take over as the field "
                     "observer. Do not send messages."
                 )
-        postmortem_channel_ids = {
-            POSTMORTEM_CHANNEL_ID,
-            POSTMORTEM_A_CHANNEL_ID,
-            POSTMORTEM_B_CHANNEL_ID,
-        }
-        if channel_id in postmortem_channel_ids:
+        if channel_id in POSTMORTEM_CHANNEL_IDS:
             if self._world.is_postmortem_disabled:
                 return "The discussion channel has been closed for the remainder of the simulation."
             if not self._world.in_postmortem:
@@ -1034,8 +444,7 @@ class VeyruScenario(SimulationScenario):
                     "The discussion channel is only available during the post-round "
                     "discussion phase. Wait for the discussion phase to begin."
                 )
-        link_channel_ids = {LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNEL_ID}
-        if channel_id in link_channel_ids and self._world.in_postmortem:
+        if channel_id in LINK_CHANNEL_IDS and self._world.in_postmortem:
             return (
                 "The comm link is closed during the post-round discussion phase. "
                 "Use the discussion channel instead."
@@ -1051,14 +460,12 @@ class VeyruScenario(SimulationScenario):
         reproducibility.
         """
         _ = agent_id
-        if channel_id not in {LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNEL_ID}:
+        if channel_id not in LINK_CHANNEL_IDS:
             return text
         noise_level = self._knobs.channel_noise_level
         if noise_level == 0.0:
             return text
         return "".join("_" if self._noise_rng.random() < noise_level else ch for ch in text)
-
-    # --- World, MCP tools, timing ---
 
     def get_primary_channel_id(self) -> str | None:
         """Return the comm link channel where budget constraints apply.
@@ -1082,132 +489,12 @@ class VeyruScenario(SimulationScenario):
 
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:
         """Return the stabilize_veyru tool for field observers."""
-
-        async def stabilize_veyru(ctx: ToolContext, action: str) -> str:
-            """Apply a stabilization action to the caller's team Veyru."""
-            agent_id = resolve_agent_id(ctx=ctx)
-            if self._world.in_postmortem:
-                result_text = (
-                    "Cannot stabilize during the post-round discussion phase. "
-                    "Wait for the next round to begin."
-                )
-                await self._maybe_notify_intern_stabilize(
-                    caller_id=agent_id,
-                    action=action,
-                    result=result_text,
-                )
-                return result_text
-            team_id = self._world.get_team_for_agent(agent_id=agent_id)
-            team = self._world.teams[team_id]
-            if agent_id != team.current_observer_id:
-                raise ValueError("Only the field observer can stabilize Veyru entities")
-
-            if not self._world.is_veyru_alive(team_id=team_id):
-                result_text = "Cannot stabilize: Veyru has already collapsed."
-                await self._maybe_notify_intern_stabilize(
-                    caller_id=agent_id,
-                    action=action,
-                    result=result_text,
-                )
-                return result_text
-            if self._world.is_veyru_stabilized(team_id=team_id):
-                result_text = "Veyru has already been stabilized."
-                await self._maybe_notify_intern_stabilize(
-                    caller_id=agent_id,
-                    action=action,
-                    result=result_text,
-                )
-                return result_text
-
-            current_stage = self._world.get_current_stage(team_id=team_id)
-            if current_stage is None:
-                result_text = "No Veyru to stabilize."
-                await self._maybe_notify_intern_stabilize(
-                    caller_id=agent_id,
-                    action=action,
-                    result=result_text,
-                )
-                return result_text
-
-            judgment = await judge_stabilization(
-                provider=self._judge_provider,
-                expected_actions=current_stage.judge_expected_actions,
-                observer_action=action,
-            )
-
-            if self._runtime is not None:
-                await self._runtime.event_logger.log(
-                    event=VeyruStabilizationJudged(
-                        agent_id=agent_id,
-                        round_number=self._runtime.current_round,
-                        expected_actions=current_stage.judge_expected_actions,
-                        judge_match=judgment.match,
-                        judge_explanation=judgment.explanation,
-                    )
-                )
-
-            if judgment.match:
-                has_more = await self._world.stabilize_veyru(team_id=team_id)
-                if has_more:
-                    next_stage = self._world.get_current_stage(team_id=team_id)
-                    assert next_stage is not None
-                    result_text = (
-                        f"{STABILIZATION_SUCCESS_MARKER}, but {NEW_SYMPTOMS_MARKER}. "
-                        f"What you now observe: {next_stage.observable_symptoms} "
-                        f"Report these to the engineer."
-                    )
-                    await self._maybe_notify_intern_stabilize(
-                        caller_id=agent_id,
-                        action=action,
-                        result=result_text,
-                    )
-                    return result_text
-                result_text = f"{STABILIZATION_SUCCESS_MARKER}."
-                await self._maybe_notify_intern_stabilize(
-                    caller_id=agent_id,
-                    action=action,
-                    result=result_text,
-                )
-                return result_text
-
-            result_text = "Stabilization ineffective. Ask the engineer for guidance."
-            await self._maybe_notify_intern_stabilize(
-                caller_id=agent_id,
-                action=action,
-                result=result_text,
-            )
-            return result_text
-
-        return [
-            ScenarioMcpTool(
-                name="stabilize_veyru",
-                description=(
-                    "Apply a stabilization action to the current Veyru. "
-                    "Describe exactly what you are doing to stabilize it."
-                ),
-                executor=stabilize_veyru,
-            ),
-        ]
-
-    async def _maybe_notify_intern_stabilize(
-        self,
-        caller_id: str,
-        action: str,
-        result: str,
-    ) -> None:
-        """Notify the intern of a stabilize_veyru call + result while they observe.
-
-        Fires only while the intern is in the observer state (after
-        ``intern_join_round`` and before ``intern_takeover_round``). Delivered
-        to the intern alone so the engineer never sees the tool-call trace.
-        """
-        if not self._is_intern_in_observer_state():
-            return
-        caller_display = self.get_agent_display_name(agent_id=caller_id)
-        text = f'[stabilize_veyru] {caller_display} action="{action}"\nresult: {result}'
-        await self._world.context.send_update_to_agent(
-            agent_id=INTERN_ID,
-            text=text,
+        return build_mcp_tools(
+            world=self._world,
+            knobs=self._knobs,
+            judge_provider=self._judge_provider,
+            agent_display_names=self._agent_display_names,
+            get_runtime=lambda: self._runtime,
         )
 
     def get_round_count(self) -> int:
@@ -1226,7 +513,7 @@ class VeyruScenario(SimulationScenario):
         protocol; postmortem traffic is where agents discuss the protocol
         out-of-band, so it is stripped to keep the experiment honest.
         """
-        return frozenset({POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID})
+        return POSTMORTEM_CHANNEL_IDS
 
     def get_protocol_probe_config(self) -> ProtocolProbeConfig | None:
         """Point the platform probe metrics at Veyru's question bank and prompts."""
@@ -1251,8 +538,6 @@ class VeyruScenario(SimulationScenario):
                 "stabilization_engineer": "engineer_probe.jinja",
             },
         )
-
-    # --- Evaluation ---
 
     def _get_metrics(self) -> dict[str, type[Metric]]:
         """Return Veyru-specific metric classes keyed by metric name."""
@@ -1284,7 +569,6 @@ class VeyruScenario(SimulationScenario):
         registry.update(GENERIC_METRIC_REGISTRY)
         registry.update(self._get_metrics())
 
-        # Validate names up front so a typo fails fast before any LLM cost.
         for metric_name in metric_names:
             if metric_name not in registry:
                 available = ", ".join(sorted(registry.keys()))

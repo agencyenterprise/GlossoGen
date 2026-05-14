@@ -276,9 +276,13 @@ class AutonomousSupervisor:
             visibility_map = self._resume_state.replaced_agent_channel_visibility
             round_snapshots = self._resume_state.channel_message_count_at_round_start
             runtime.seed_round_snapshots(snapshots=round_snapshots)
+            # The source run may have channels the resumed world doesn't carry
+            # (e.g. ``postmortem`` dropped via ``postmortem_disabled_at_start``).
+            # Skip those — they have no message-count in the new router.
             current_counts: dict[str, int] = {
                 channel_id: runtime.channel_router.get_message_count(channel_id=channel_id)
                 for channel_id in self._resume_state.messages_by_channel
+                if runtime.channel_router.channel_exists(channel_id=channel_id)
             }
             for agent_id in replaced_ids:
                 # Translate per-channel visibility into concrete join indices and

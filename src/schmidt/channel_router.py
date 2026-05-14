@@ -77,6 +77,10 @@ class ChannelRouter:
         """Return the channel IDs for all channels the given agent belongs to."""
         return [ch.channel_id for ch in self._channels.values() if agent_id in ch.member_agent_ids]
 
+    def channel_exists(self, channel_id: str) -> bool:
+        """Return ``True`` if the channel is registered in the router."""
+        return channel_id in self._channels
+
     def validate_membership(self, agent_id: str, channel_id: str) -> bool:
         """Check whether the agent is a member of the specified channel.
 
