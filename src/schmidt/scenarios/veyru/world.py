@@ -12,11 +12,14 @@ keyed ``"solo"``. In two-team mode, teams ``"a"`` and ``"b"`` run in parallel
 on identical cases, with fully isolated communication channels. When the
 observer swap fires, the ``current_observer_id`` on each team is updated so
 stabilization calls and threshold notifications route to the new pairing.
+
+Heavy logic lives in dedicated sibling modules: :mod:`world_state` (the
+``TeamState`` / ``VeyruOutcome`` types) and :mod:`outcome_reconstruction`
+(both live outcome compute and event-log replay).
 """
 
 import asyncio
 import logging
-from typing import NamedTuple
 
 from schmidt.runtime.scenario_world import (
     MessageEvent,
@@ -35,7 +38,12 @@ from schmidt.scenarios.veyru.ids import (
     VEYRU_STABILIZED_MARKER,
     TeamId,
 )
+from schmidt.scenarios.veyru.outcome_reconstruction import (
+    compute_outcome_if_needed,
+    restore_outcomes_from_events,
+)
 from schmidt.scenarios.veyru.veyru_cases import VeyruCase, VeyruStage
+from schmidt.scenarios.veyru.world_state import StageOutcome, TeamState, VeyruOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -43,65 +51,12 @@ THRESHOLD_COLLAPSED = "collapsed"
 THRESHOLD_CRITICAL = "critical"
 
 
-class StageOutcome(NamedTuple):
-    """Result of a single stage within a composite case."""
-
-    motif_name: str
-    stabilized: bool
-
-
-class VeyruOutcome(NamedTuple):
-    """Result of a single Veyru case after a round completes."""
-
-    team_id: TeamId
-    case_number: int
-    failure_name: str
-    stabilized: bool
-    characters_used: int
-    time_elapsed_seconds: float
-    time_budget_seconds: int
-    stages_completed: int
-    total_stages: int
-    stage_outcomes: tuple[StageOutcome, ...]
-
-
-class TeamState:
-    """Mutable per-team state tracked by the Veyru world.
-
-    A team owns a communication channel, a stabilization engineer, and a (possibly
-    swappable) field observer. Per-round character usage, stabilization
-    progress, and historical outcomes are all team-scoped.
-    """
-
-    def __init__(
-        self,
-        team_id: TeamId,
-        current_observer_id: str,
-        stabilization_engineer_id: str,
-        link_channel_id: str,
-        postmortem_channel_id: str | None,
-    ) -> None:
-        self.team_id = team_id
-        self.current_observer_id = current_observer_id
-        self.stabilization_engineer_id = stabilization_engineer_id
-        self.link_channel_id = link_channel_id
-        self.postmortem_channel_id = postmortem_channel_id
-        self.current_round_characters: int = 0
-        self.veyru_alive: bool = True
-        self.veyru_stabilized: bool = False
-        self.notified_thresholds: set[str] = set()
-        self.current_stage_index: int = 0
-        self.stage_outcomes: list[StageOutcome] = []
-        self.outcomes: list[VeyruOutcome] = []
-
-    def reset_for_new_round(self) -> None:
-        """Clear per-round counters before a fresh case is loaded."""
-        self.current_round_characters = 0
-        self.veyru_alive = True
-        self.veyru_stabilized = False
-        self.notified_thresholds = set()
-        self.current_stage_index = 0
-        self.stage_outcomes = []
+__all__ = [
+    "StageOutcome",
+    "TeamState",
+    "VeyruOutcome",
+    "VeyruWorld",
+]
 
 
 class VeyruWorld(ScenarioWorld):
@@ -191,10 +146,10 @@ class VeyruWorld(ScenarioWorld):
     def on_agent_swapped_mid_run(self, agent_id: str, round_number: int) -> None:
         """Record that an agent was swapped at the start of ``round_number``.
 
-        Consulted by ``_get_previous_outcome_for_agent`` so the agent's
-        first injection skips the ``PREVIOUS VEYRU RESULT`` block — the
-        new agent did not participate in round ``round_number - 1`` and
-        leaking that result would hand them context they should not see.
+        Consulted by injection rendering so the agent's first injection skips
+        the ``PREVIOUS VEYRU RESULT`` block — the new agent did not
+        participate in round ``round_number - 1`` and leaking that result
+        would hand them context they should not see.
         """
         self._just_swapped_agent_round[agent_id] = round_number
 
@@ -279,47 +234,13 @@ class VeyruWorld(ScenarioWorld):
         return self._teams[team_id].outcomes
 
     def compute_outcome_if_needed(self, round_number: int, team_id: TeamId) -> VeyruOutcome | None:
-        """Compute and store the outcome for the given team/round if not already done.
-
-        Returns the outcome, or None if no outcome can be computed (round 0).
-        Used by postmortem injections to access results before the next round
-        resets state.
-        """
-        if round_number < 1:
-            return None
-
-        team = self._teams[team_id]
-        for existing in team.outcomes:
-            if existing.case_number == round_number:
-                return existing
-
-        case_index = (round_number - 1) % len(self._veyru_cases)
-        case = self._veyru_cases[case_index]
-        time_elapsed = team.current_round_characters
-
-        all_stage_outcomes = list(team.stage_outcomes)
-        for i in range(len(all_stage_outcomes), len(case.stages)):
-            all_stage_outcomes.append(
-                StageOutcome(
-                    motif_name=case.stages[i].motif_name,
-                    stabilized=False,
-                )
-            )
-
-        outcome = VeyruOutcome(
+        """Build and store the outcome for the given team/round if not already done."""
+        return compute_outcome_if_needed(
+            teams=self._teams,
+            veyru_cases=self._veyru_cases,
+            round_number=round_number,
             team_id=team_id,
-            case_number=round_number,
-            failure_name=case.failure_name,
-            stabilized=team.veyru_stabilized,
-            characters_used=team.current_round_characters,
-            time_elapsed_seconds=time_elapsed,
-            time_budget_seconds=case.time_budget_seconds,
-            stages_completed=len(team.stage_outcomes),
-            total_stages=len(case.stages),
-            stage_outcomes=tuple(all_stage_outcomes),
         )
-        team.outcomes.append(outcome)
-        return outcome
 
     def finalize_round_sync(self, round_number: int) -> None:
         """Compute previous round outcomes for all teams and reset per-round state.
@@ -335,96 +256,19 @@ class VeyruWorld(ScenarioWorld):
                     round_number=round_number - 1,
                     team_id=team_id,
                 )
-
         for team in self._teams.values():
             team.reset_for_new_round()
-
         case_index = (round_number - 1) % len(self._veyru_cases)
         self._current_case = self._veyru_cases[case_index]
 
     def restore_outcomes_from_events(self, events: list[object]) -> None:
-        """Seed per-team ``outcomes`` from a JSONL event list.
-
-        Used on resume so that the round-N injection's previous-outcome
-        block reflects the source run's actual round N-1 outcome rather
-        than a zero-valued default. Walks the events once, groups
-        per-round/per-team data, and appends a ``VeyruOutcome`` per
-        completed round (those whose ``round_ended`` was logged).
-        """
-        characters_by_round_team: dict[int, dict[TeamId, int]] = {}
-        matched_stages_by_round_team: dict[int, dict[TeamId, int]] = {}
-        round_ended_trigger: dict[int, str] = {}
-        for event in events:
-            event_type = getattr(event, "event_type", None)
-            round_number = getattr(event, "round_number", None)
-            if not isinstance(round_number, int) or round_number < 1:
-                continue
-            if event_type == "message_sent":
-                message = getattr(event, "message", None)
-                channel_id = getattr(message, "channel_id", None)
-                text = getattr(message, "text", "")
-                if isinstance(channel_id, str) and channel_id in self._channels_by_team:
-                    team_id = self._channels_by_team[channel_id]
-                    bucket = characters_by_round_team.setdefault(round_number, {})
-                    bucket[team_id] = bucket.get(team_id, 0) + len(text)
-            elif event_type == "veyru_stabilization_judged":
-                if not getattr(event, "judge_match", False):
-                    continue
-                agent_id = getattr(event, "agent_id", "")
-                if not isinstance(agent_id, str):
-                    continue
-                resolved_team_id = self._team_for_agent_id_lookup(agent_id=agent_id)
-                if resolved_team_id is None:
-                    continue
-                bucket = matched_stages_by_round_team.setdefault(round_number, {})
-                bucket[resolved_team_id] = bucket.get(resolved_team_id, 0) + 1
-            elif event_type == "round_ended":
-                trigger = getattr(event, "trigger", None)
-                if isinstance(trigger, str):
-                    round_ended_trigger[round_number] = trigger
-
-        for round_number in sorted(round_ended_trigger.keys()):
-            trigger = round_ended_trigger[round_number]
-            case_index = (round_number - 1) % len(self._veyru_cases)
-            case = self._veyru_cases[case_index]
-            stabilized_round = trigger == "veyru_stabilized"
-            chars_for_round = characters_by_round_team.get(round_number, {})
-            matched_for_round = matched_stages_by_round_team.get(round_number, {})
-            for team_id, team in self._teams.items():
-                if any(o.case_number == round_number for o in team.outcomes):
-                    continue
-                chars = chars_for_round.get(team_id, 0)
-                matched = matched_for_round.get(team_id, 0)
-                stage_outcomes = tuple(
-                    StageOutcome(
-                        motif_name=case.stages[i].motif_name,
-                        stabilized=i < matched,
-                    )
-                    for i in range(len(case.stages))
-                )
-                team.outcomes.append(
-                    VeyruOutcome(
-                        team_id=team_id,
-                        case_number=round_number,
-                        failure_name=case.failure_name,
-                        stabilized=stabilized_round and matched >= len(case.stages),
-                        characters_used=chars,
-                        time_elapsed_seconds=chars,
-                        time_budget_seconds=case.time_budget_seconds,
-                        stages_completed=matched,
-                        total_stages=len(case.stages),
-                        stage_outcomes=stage_outcomes,
-                    )
-                )
-
-    def _team_for_agent_id_lookup(self, agent_id: str) -> TeamId | None:
-        """Return the team whose observer or engineer is ``agent_id``, or None."""
-        for team_id, state in self._teams.items():
-            if state.current_observer_id == agent_id:
-                return team_id
-            if state.stabilization_engineer_id == agent_id:
-                return team_id
-        return None
+        """Seed per-team ``outcomes`` from a JSONL event list on resume."""
+        restore_outcomes_from_events(
+            teams=self._teams,
+            veyru_cases=self._veyru_cases,
+            channels_by_team=self._channels_by_team,
+            events=events,
+        )
 
     def get_current_stage(self, team_id: TeamId) -> VeyruStage | None:
         """Return the active stage for a team, or None if no case is loaded."""
@@ -456,11 +300,9 @@ class VeyruWorld(ScenarioWorld):
         """
         if self._current_case is None:
             return False
-
         team = self._teams[team_id]
         stage = self._current_case.stages[team.current_stage_index]
         team.stage_outcomes.append(StageOutcome(motif_name=stage.motif_name, stabilized=True))
-
         next_index = team.current_stage_index + 1
         if next_index >= len(self._current_case.stages):
             team.veyru_stabilized = True
@@ -469,7 +311,6 @@ class VeyruWorld(ScenarioWorld):
                 text=f"{VEYRU_STABILIZED_MARKER}. All issues resolved.",
             )
             return False
-
         team.current_stage_index = next_index
         await self._context.send_update_to_channel(
             channel_id=team.link_channel_id,
@@ -494,17 +335,14 @@ class VeyruWorld(ScenarioWorld):
         team_id = self._channels_by_team.get(channel_id)
         if team_id is None:
             return
-
         team = self._teams[team_id]
         team.current_round_characters += len(text)
-
         if self._current_case is None:
             return
         if not team.veyru_alive:
             return
         if team.veyru_stabilized:
             return
-
         time_elapsed = team.current_round_characters
         budget = self._current_case.time_budget_seconds
         if time_elapsed > budget:
@@ -538,11 +376,9 @@ class VeyruWorld(ScenarioWorld):
         """
         if self._current_case is None:
             return
-
         team = self._teams[team_id]
         time_elapsed = team.current_round_characters
         budget = self._current_case.time_budget_seconds
-
         if not team.veyru_alive and THRESHOLD_COLLAPSED not in team.notified_thresholds:
             team.notified_thresholds.update([THRESHOLD_COLLAPSED, THRESHOLD_CRITICAL])
             await context.send_update_to_channel(
