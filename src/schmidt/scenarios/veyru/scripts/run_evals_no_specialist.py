@@ -21,7 +21,6 @@ STDOUT_LOG_DIR.mkdir(parents=True, exist_ok=True)
 EVALUATORS = ",".join(
     [
         "content_filter_refusal",
-        "language_emergence",
         "language_strangeness",
         "neologism",
         "round_ended_idle",

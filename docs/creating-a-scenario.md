@@ -176,8 +176,19 @@ The `SimulationScenario` subclass — the entry point the registry hands to the 
 - `validate_outgoing_message(...)`, `transform_outgoing_message(...)` → enforce / mutate messages (budget enforcement, noise injection).
 - `get_primary_channel_id()` → tells generic metrics (perplexity, mean-chars-per-round, mean-chars-per-message) which channel to score.
 - `get_early_round_end_trigger()` → optional; returns a trigger string when the round should end early (e.g. once a `target_placed` flag and `executed_moves` count match the expected sequence).
+- `judge_round_result(round_number, trigger)` → return a list of `RoundResult(success, team_id, reason)`. The game clock writes one `RoundResultRecorded` event per element; the platform `round_success` metric reads these directly and emits one Measurement per `team_id` (single-team scenarios pass `team_id=None` and get one Measurement named `round_success`). Scenarios that don't override this hook get no round-success measurement.
+- `restore_state_from_events(events)` → optional. Called after a fork/resume rewind has been built and before the runtime starts. Walk the event list and seed any per-round outcomes you need so the first post-resume injection renders accurate "previous result" context (most scenarios need this only if their injection templates surface prior-round state).
 
 For scenarios with custom tools (anything beyond `send_message`), `get_mcp_tools()` returns one [`ScenarioMcpTool`](../src/schmidt/runtime/scenario_mcp_tool.py) per tool — that's where you wire up freetext-argument LLM judges, world state mutations, and the marker strings the tool result returns.
+
+### Optional platform hooks (post-simulation analysis)
+
+These are opt-in: implement them only if you want the corresponding platform metric to run on your scenario. Returning `None` / `[]` (the default) makes the metric skip with no Measurement.
+
+- `build_communication_rounds(events) -> list[CommunicationRoundView]` → opt the scenario into the `communication_open_coding` + `communication_feature_presence` pipeline. Each view joins one round's primary-channel messages with a scenario-rendered ground-truth block. Returning `[]` (default) skips both metrics.
+- `detect_protocol_boundary_window(events, agent_configs) -> ProtocolBoundaryWindow | None` → drives `protocol_learned_after_swap`. The default returns the first `AgentSwappedMidRun` boundary (scheduled in-run swaps). Override to detect scenario-specific boundaries first (intern takeover, two-team observer swap) and fall back to `super().detect_protocol_boundary_window(...)` for scheduled swaps.
+- `get_protocol_probe_config() -> ProtocolProbeConfig | None` → opts into the four-metric `protocol_probe` family. Returns a NamedTuple of (`questions_path`, `prompts_dir`, `role_groups`, `role_templates`). Ship the question bank as `<scenario>/protocol_probe_questions.json` and probe-prompt templates under `<scenario>/prompts/`. See [veyru/scenario.py](../src/schmidt/scenarios/veyru/scenario.py) for the canonical wiring and [veyru/scripts/build_probe_questions.py](../src/schmidt/scenarios/veyru/scripts/build_probe_questions.py) for a generator pattern.
+- `get_replace_agent_blocked_tool_call_channels() -> frozenset[str]` → channel IDs whose `send_message` / `read_channel` calls should be stripped from a replaced agent's reconstructed history (typically your postmortem / discussion channel).
 
 ### 8. Write `prompts/`
 
@@ -192,11 +203,19 @@ For scenarios with LLM judges, one `<judge_name>.jinja` per judge — these are 
 
 ### 9. (Optional) Write `evaluation/`
 
-The generic metrics (`perplexity`, `mean_chars_per_round`, `mean_chars_per_message`, `round_ended_idle`, `round_ended_timeout`, `content_filter_refusal`, and the four LLM-judge ones — `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`) all run automatically without scenario-specific code as long as `get_primary_channel_id()` is set.
+Most scoring is now scenario-agnostic. As soon as your scenario implements `get_primary_channel_id()` you get every generic metric for free:
 
-Add scenario-specific metrics — most importantly `round_success` — under `evaluation/`. The pattern is in [warehouse_robot_recovery/evaluation/round_success_metric.py](../src/schmidt/scenarios/warehouse_robot_recovery/evaluation/round_success_metric.py): grep the event log for `<Scenario>CaseStarted` and the `ROUND_SUCCESS_MARKER` / `ROUND_FAILED_MARKER` notifications the world emitted, count successes, return one `Measurement`.
+| Metric | Hook the scenario must implement |
+|---|---|
+| `perplexity`, `mean_chars_per_round`, `mean_chars_per_message`, `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes` | `get_primary_channel_id()` |
+| `round_ended_idle`, `round_ended_timeout`, `content_filter_refusal` | (nothing — read straight from `RoundEnded` / `AgentRunCycleFailed`) |
+| `round_success` | `judge_round_result(round_number, trigger)` |
+| `round_success_after_resume` | `judge_round_result(...)` + the run was launched via replace-agent / cross-run / scheduled swap |
+| `protocol_learned_after_swap` | `build_communication_rounds(events)` + `detect_protocol_boundary_window(...)` |
+| `communication_open_coding`, `communication_feature_presence` | `build_communication_rounds(events)` |
+| `protocol_probe` family (4 metrics) | `get_protocol_probe_config()` |
 
-`evaluation/__init__.py` should export your metric classes so the scenario can register them in its metric registry.
+Add a scenario-specific metric under `evaluation/` only when the platform doesn't already cover what you want to measure (a domain-specific signal that doesn't reduce to round-success or to language phenomena on the primary channel). If you do, `evaluation/__init__.py` should export the metric class so the scenario can register it in its metric registry.
 
 ### 10. (Optional) Add a run-detail extension
 
@@ -295,7 +314,7 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt run your_scenario \
 Monitor per the CLAUDE.md sleep-30-tail pattern. Pass criteria:
 
 1. The log finishes with `Simulation complete. Run directory: runs/your_scenario/<timestamp>`.
-2. The JSONL contains your `<Scenario>CaseStarted` event once per round and `ROUND_SUCCESS_MARKER` or `ROUND_FAILED_MARKER` markers exactly once per round.
+2. The JSONL contains your `<Scenario>CaseStarted` event once per round and one `RoundResultRecorded` event per round (or per team per round in multi-team scenarios).
 3. If you added a run-detail extension, loading the run in `make dev` + `make dev-frontend` shows your scenario-specific data in the round-timeline modal.
 
 Then evaluate:
@@ -318,7 +337,7 @@ Before opening a PR:
 - [ ] Every knobs field is required (no defaults); preset values live in `knobs_default.json`.
 - [ ] `judge_model = "claude-haiku-4-5-20251001"`, `judge_provider = "anthropic"`, `seed = 42` in the preset.
 - [ ] Prompts live in `prompts/*.jinja`, not in Python string literals.
-- [ ] World emits `ROUND_SUCCESS_MARKER` or `ROUND_FAILED_MARKER` exactly once per round.
+- [ ] `judge_round_result(round_number, trigger)` returns at least one `RoundResult` per round (single-team scenarios: one with `team_id=None`; multi-team: one per team). The game clock writes `RoundResultRecorded` events from these; the platform `round_success` metric reads them directly.
 - [ ] `get_primary_channel_id()` returns the comm-link channel (or `None` for two-team scenarios where the metric should no-op).
 - [ ] If you added a run-detail extension, re-run `make gen-api-types` so `frontend/src/types/api.gen.ts` includes your `XxxRunExtras` variant.
 - [ ] `make lint` is clean. Regenerate the vulture whitelist (`VIRTUAL_ENV= uv run --no-sync vulture src/ --min-confidence 60 --make-whitelist > vulture_whitelist.py`) if Pydantic fields or auto-discovered classes get flagged.

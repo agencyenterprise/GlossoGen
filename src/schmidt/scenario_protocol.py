@@ -7,20 +7,39 @@ its agents, channels, injections, timing parameters, and evaluation logic.
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Protocol, Self
+from typing import Any, NamedTuple, Protocol, Self
 
 from schmidt.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
+from schmidt.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
+from schmidt.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from schmidt.evaluation.metrics.communication.round_view import CommunicationRoundView
 from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 from schmidt.event_logger import EventLogger
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel
-from schmidt.models.event import SimulationEvent
+from schmidt.models.event import AgentSwappedMidRun, SimulationEvent
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.runtime.scenario_world import ScenarioWorld
 
 logger = logging.getLogger(__name__)
+
+
+class RoundResult(NamedTuple):
+    """One per-team (or single-side) round result verdict.
+
+    ``success`` is True when the round was successfully completed by the
+    scenario's rules for this team. ``team_id`` is None for single-team
+    scenarios; multi-team scenarios set it to the canonical team
+    identifier ("team_a", "team_b", ...) that is rendered into
+    measurement names. ``reason`` is a short human-readable note ("3/3
+    trucks + 3 crane moves accepted within budget", "Veyru collapsed",
+    etc.) shown in per-round observations.
+    """
+
+    success: bool
+    team_id: str | None
+    reason: str
 
 
 class ScenarioRuntimeHandle(Protocol):
@@ -348,6 +367,72 @@ class SimulationScenario(ABC):
         default is a no-op for scenarios without world state.
         """
         _ = events
+
+    def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
+        """Return per-team (or single-side) result verdicts for the round.
+
+        Called by the game clock after ``on_round_ended`` (so scenarios
+        that finalize per-round state in ``on_round_ended`` can rely on
+        that state being settled before judging). Each returned
+        ``RoundResult`` is logged as a ``RoundResultRecorded`` event
+        and read by the platform's generic ``round_success`` and
+        ``round_success_after_resume`` metrics.
+
+        Single-team scenarios return a one-element list with
+        ``team_id=None``. Multi-team scenarios return one result per
+        team. The default returns ``[]``, which opts the scenario out
+        — no ``RoundResultRecorded`` events are emitted and the generic
+        metrics return no Measurement for that run.
+        """
+        _ = round_number, trigger
+        return []
+
+    def detect_protocol_boundary_window(
+        self,
+        events: list[SimulationEvent],
+        agent_configs: list[AgentConfig],
+    ) -> ProtocolBoundaryWindow | None:
+        """Detect the first personnel-change boundary the protocol metric should evaluate.
+
+        Returns the boundary split where a newcomer takes over from an
+        existing agent. The default checks for the first
+        ``AgentSwappedMidRun`` event in the log (scheduled in-run swap).
+        Scenarios with additional knob-driven boundary modes (e.g. an
+        intern takeover round or a two-team observer swap) override to
+        detect those first and fall back to the scheduled-swap default.
+
+        Returns ``None`` when no boundary exists, in which case the
+        ``protocol_learned_after_swap`` metric skips with no Measurement.
+        Only the FIRST boundary in the run is reported — multi-swap
+        runs surface later boundaries via the JSONL directly.
+        """
+        _ = agent_configs
+        first_swap = next(
+            (event for event in events if isinstance(event, AgentSwappedMidRun)),
+            None,
+        )
+        if first_swap is None:
+            return None
+        return ProtocolBoundaryWindow(
+            mode_label="scheduled_swap",
+            boundary_round=first_swap.round_number,
+            pre_boundary_last_round=first_swap.round_number - 1,
+            post_boundary_first_round=first_swap.round_number,
+            newcomer_label=f"swapped-in {first_swap.agent_id}",
+            boundary_includes_round=True,
+        )
+
+    def get_protocol_probe_config(self) -> ProtocolProbeConfig | None:
+        """Return this scenario's protocol-probe configuration, or ``None`` to opt out.
+
+        Used by the platform's ``protocol_probe`` metric family. Scenarios
+        that want post-simulation probing implement this hook to point at
+        their question bank, probe prompts directory, and the mapping
+        from question ``agent_role_filter`` strings to scenario role
+        names. Returning ``None`` causes all four probe metrics to skip
+        with no Measurement.
+        """
+        return None
 
     @classmethod
     def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:

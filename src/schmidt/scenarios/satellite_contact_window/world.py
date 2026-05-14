@@ -201,8 +201,14 @@ class SatelliteWorld(ScenarioWorld):
             ),
         )
 
+    def mark_round_outcome(self, round_number: int) -> None:
+        """Append the outcome for ``round_number`` (idempotent via guard)."""
+        if self._round_outcome_marked:
+            return
+        self._mark_outcome(case_number=round_number)
+
     def finalize_round_sync(self, round_number: int) -> None:
-        """Compute the previous round's outcome and reset per-round state.
+        """Reset per-round state for the next case (back-fill any unmarked outcome).
 
         Called by the scenario's ``on_round_advanced`` before injections
         are delivered for the new round.

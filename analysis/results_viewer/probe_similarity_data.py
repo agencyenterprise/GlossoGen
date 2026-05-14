@@ -23,28 +23,26 @@ from typing import NamedTuple
 import orjson
 
 from analysis.results_viewer.run_catalog import EvaluatedRun
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.protocol_probe_agent_pair_similarity_metric import (  # noqa: E501
+from schmidt.evaluation.metrics.protocol_probe.protocol_probe_agent_pair_similarity_metric import (  # noqa: E501
     ARTIFACT_FILE_NAME as AGENT_PAIR_ARTIFACT_FILE_NAME,
 )
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.protocol_probe_agent_pair_similarity_metric import (  # noqa: E501
+from schmidt.evaluation.metrics.protocol_probe.protocol_probe_agent_pair_similarity_metric import (  # noqa: E501
     AgentPairSimArtifact,
 )
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.protocol_probe_cutoff_trajectory_metric import (  # noqa: E501
+from schmidt.evaluation.metrics.protocol_probe.protocol_probe_cutoff_trajectory_metric import (  # noqa: E501
     ARTIFACT_FILE_NAME as CUTOFF_TRAJECTORY_ARTIFACT_FILE_NAME,
 )
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.protocol_probe_cutoff_trajectory_metric import (  # noqa: E501
+from schmidt.evaluation.metrics.protocol_probe.protocol_probe_cutoff_trajectory_metric import (  # noqa: E501
     CutoffTrajectoryArtifact,
 )
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.protocol_probe_replica_self_similarity_metric import (  # noqa: E501
+from schmidt.evaluation.metrics.protocol_probe.protocol_probe_replica_self_similarity_metric import (  # noqa: E501
     ARTIFACT_FILE_NAME as REPLICA_SELF_ARTIFACT_FILE_NAME,
 )
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.protocol_probe_replica_self_similarity_metric import (  # noqa: E501
+from schmidt.evaluation.metrics.protocol_probe.protocol_probe_replica_self_similarity_metric import (  # noqa: E501
     ReplicaSelfSimArtifact,
 )
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.response_models import (
-    ProtocolProbeResponse,
-)
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.similarity_core import (
+from schmidt.evaluation.metrics.protocol_probe.response_models import ProtocolProbeResponse
+from schmidt.evaluation.metrics.protocol_probe.similarity_core import (
     ARTIFACT_SCHEMA_VERSION,
     PROBE_RESPONSES_FILE_NAME,
     load_probe_rows,

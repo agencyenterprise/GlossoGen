@@ -36,10 +36,9 @@ from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld
-from schmidt.scenario_protocol import ScenarioRuntimeHandle, SimulationScenario
+from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
 from schmidt.scenarios.satellite_contact_window.cases import CommandStep, SatelliteCase, get_cases
 from schmidt.scenarios.satellite_contact_window.command_judge import judge_command_sequence
-from schmidt.scenarios.satellite_contact_window.evaluation import RoundSuccessMetric
 from schmidt.scenarios.satellite_contact_window.events import (
     SatelliteActionDependency,
     SatelliteAuthorizationEnvelope,
@@ -378,21 +377,51 @@ class SatelliteContactWindowScenario(SimulationScenario):
         return None
 
     async def on_round_ended(self, round_number: int, trigger: str) -> None:
-        """Emit a terminal failure notification if no recovery was achieved."""
-        _ = round_number
-        if trigger == "satellite_recovered":
-            return
-        if trigger == "command_sequence_rejected":
-            return
+        """Emit terminal-failure notification and finalize this round's outcome.
+
+        The outcome is marked here (not in ``on_round_advanced``) so that
+        ``judge_round_result`` and ``get_postmortem_injection`` for the
+        just-ended round see the correct ``previous_outcome``.
+        """
         if trigger == "contact_window_closed":
-            reason = "Contact window closed before a successful command sequence was submitted."
+            await self._world.mark_round_failed_if_pending(
+                reason="Contact window closed before a successful command sequence was submitted.",
+            )
         elif trigger == "all_agents_idle":
-            reason = "Agents stopped acting before the satellite was recovered."
+            await self._world.mark_round_failed_if_pending(
+                reason="Agents stopped acting before the satellite was recovered.",
+            )
         elif trigger == "round_timeout":
-            reason = "Round duration limit reached before the satellite was recovered."
+            await self._world.mark_round_failed_if_pending(
+                reason="Round duration limit reached before the satellite was recovered.",
+            )
+        elif trigger not in ("satellite_recovered", "command_sequence_rejected"):
+            await self._world.mark_round_failed_if_pending(
+                reason="Round ended before the satellite was recovered.",
+            )
+        self._world.mark_round_outcome(round_number=round_number)
+
+    def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
+        """Return the just-ended round's success verdict from world state."""
+        _ = round_number, trigger
+        outcome = self._world.previous_outcome()
+        if outcome is None:
+            return []
+        if outcome.recovered:
+            reason = "recovered"
+        elif outcome.window_closed:
+            if outcome.judge_passed:
+                reason = "contact window closed; judge approved but too late"
+            else:
+                reason = "contact window closed before a successful command sequence"
+        elif not outcome.judge_passed:
+            if len(outcome.violations) > 0:
+                reason = f"judge rejected: {'; '.join(outcome.violations)}"
+            else:
+                reason = f"judge rejected: {outcome.judge_explanation}"
         else:
-            reason = "Round ended before the satellite was recovered."
-        await self._world.mark_round_failed_if_pending(reason=reason)
+            reason = "round ended before recovery"
+        return [RoundResult(success=outcome.recovered, team_id=None, reason=reason)]
 
     async def on_round_advanced(self, round_number: int) -> None:
         """Finalize the previous outcome, prepare the next case, log case-started."""
@@ -618,16 +647,9 @@ class SatelliteContactWindowScenario(SimulationScenario):
         """Hide the postmortem channel from any replaced agent's tool history."""
         return frozenset({POSTMORTEM_CHANNEL_ID})
 
-    @classmethod
-    def get_available_metric_names(cls) -> list[str]:
-        """Return generic and satellite-specific metric names."""
-        generic = super().get_available_metric_names()
-        specific = [RoundSuccessMetric.name]
-        return sorted(set(generic + specific))
-
     def _get_metrics(self) -> dict[str, type[Metric]]:
         """Return satellite-specific metric classes keyed by metric name."""
-        return {RoundSuccessMetric.name: RoundSuccessMetric}
+        return {}
 
     async def run_evaluation(
         self,

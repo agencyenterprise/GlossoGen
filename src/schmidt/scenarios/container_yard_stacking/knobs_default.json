@@ -7,5 +7,17 @@
   "time_budget_seconds": 200,
   "seed": 42,
   "channel_noise_level": 0.0,
-  "model_overrides": {}
+  "two_teams": false,
+  "swap_round": null,
+  "announce_swap": false,
+  "postmortem_after_swap": true,
+  "intern_enabled": false,
+  "intern_join_round": null,
+  "intern_takeover_round": null,
+  "model_overrides": {},
+  "replace_agent_default_channel_visibility": {
+    "postmortem": false,
+    "postmortem_a": false,
+    "postmortem_b": false
+  }
 }

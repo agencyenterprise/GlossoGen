@@ -26,6 +26,11 @@ from pydantic_ai.messages import ModelMessage
 from schmidt.evaluation.metric_core.measurement import Measurement
 from schmidt.evaluation.metric_core.metric_protocol import Metric
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
+from schmidt.evaluation.metrics.protocol_probe.probe_agent import run_protocol_probe
+from schmidt.evaluation.metrics.protocol_probe.response_models import (
+    ProtocolProbeResponse,
+    ProtocolProbeUsageReport,
+)
 from schmidt.evaluation.reports.evaluation_cost import EvaluationTokenUsage, compute_evaluation_cost
 from schmidt.llm.provider import LLMProvider
 from schmidt.message_history_builder import build_message_history
@@ -33,45 +38,12 @@ from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent
 from schmidt.runners.communication_protocol import build_full_system_prompt
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.probe_agent import run_protocol_probe
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.response_models import (
-    ProtocolProbeResponse,
-    ProtocolProbeUsageReport,
-)
-from schmidt.scenarios.veyru.ids import (
-    FIELD_OBSERVER_A_ROLE,
-    FIELD_OBSERVER_B_ROLE,
-    FIELD_OBSERVER_ROLE,
-    STABILIZATION_ENGINEER_A_ROLE,
-    STABILIZATION_ENGINEER_B_ROLE,
-    STABILIZATION_ENGINEER_ROLE,
-)
 from schmidt.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
 
-_PROBE_PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts" / "probe"
-_TEST_BANK_PATH = Path(__file__).resolve().parent.parent / "protocol_probe_questions.json"
 _RESPONSES_FILE_NAME = "protocol_probe_responses.jsonl"
 _USAGE_FILE_NAME = "protocol_probe_usage.json"
-
-_ROLE_FILTER_TO_ROLE_NAMES: dict[str, frozenset[str]] = {
-    "field_observer": frozenset(
-        {FIELD_OBSERVER_ROLE, FIELD_OBSERVER_A_ROLE, FIELD_OBSERVER_B_ROLE}
-    ),
-    "stabilization_engineer": frozenset(
-        {
-            STABILIZATION_ENGINEER_ROLE,
-            STABILIZATION_ENGINEER_A_ROLE,
-            STABILIZATION_ENGINEER_B_ROLE,
-        }
-    ),
-}
-
-_ROLE_FILTER_TO_TEMPLATE: dict[str, str] = {
-    "field_observer": "field_observer_probe.jinja",
-    "stabilization_engineer": "engineer_probe.jinja",
-}
 
 
 class ProbeQuestion(BaseModel):
@@ -109,13 +81,21 @@ class ProtocolProbeMetric(Metric):
         options: MetricRunOptions,
     ) -> list[Measurement]:
         """Probe matching agents on the test bank and stream rows to the JSONL."""
-        _ = scenario, llm_provider
+        _ = llm_provider
         if options.probe_replicas is None or options.probe_replicas < 1:
             raise ValueError("protocol_probe requires --probe-replicas N with N >= 1")
+        probe_config = scenario.get_protocol_probe_config()
+        if probe_config is None:
+            logger.info(
+                "%s: skipping — scenario %s did not provide a ProtocolProbeConfig",
+                self.name,
+                scenario.name(),
+            )
+            return []
         probe_round = options.probe_round
         probe_replicas = options.probe_replicas
-        renderer = TemplateRenderer(prompts_dirs=[_PROBE_PROMPTS_DIR])
-        questions = _load_test_bank()
+        renderer = TemplateRenderer(prompts_dirs=[probe_config.prompts_dir])
+        questions = _load_test_bank(path=probe_config.questions_path)
         responses_path = run_dir / _RESPONSES_FILE_NAME
         target_timestamp = _resolve_history_timestamp(events=events)
 
@@ -126,6 +106,7 @@ class ProtocolProbeMetric(Metric):
                 matching_agents = _match_agents(
                     agent_configs=agent_configs,
                     role_filter=question.agent_role_filter,
+                    role_groups=probe_config.role_groups,
                 )
                 if not matching_agents:
                     logger.info(
@@ -134,7 +115,14 @@ class ProtocolProbeMetric(Metric):
                         question.agent_role_filter,
                     )
                     continue
-                template_name = _ROLE_FILTER_TO_TEMPLATE[question.agent_role_filter]
+                template_name = probe_config.role_templates.get(question.agent_role_filter)
+                if template_name is None:
+                    logger.warning(
+                        "Skipping question %s: no template registered for role filter %r",
+                        question.id,
+                        question.agent_role_filter,
+                    )
+                    continue
                 probe_prompt = renderer.render(
                     template_name=template_name,
                     template_variables=dict(question.inputs),
@@ -251,15 +239,16 @@ class ProtocolProbeMetric(Metric):
         return rows_written
 
 
-def _load_test_bank() -> list[ProbeQuestion]:
+def _load_test_bank(path: Path) -> list[ProbeQuestion]:
     """Read the frozen test bank JSON and validate each entry."""
-    raw = json.loads(_TEST_BANK_PATH.read_text(encoding="utf-8"))
+    raw = json.loads(path.read_text(encoding="utf-8"))
     return [ProbeQuestion.model_validate(entry) for entry in raw]
 
 
 def _match_agents(
     agent_configs: list[AgentConfig],
     role_filter: str,
+    role_groups: dict[str, frozenset[str]],
 ) -> list[AgentConfig]:
     """Return one matching ``AgentConfig`` per distinct ``agent_id``.
 
@@ -270,7 +259,7 @@ def _match_agents(
     count. The latest registration wins (it carries the post-swap system
     prompt the probe should be reasoning under).
     """
-    role_names = _ROLE_FILTER_TO_ROLE_NAMES.get(role_filter)
+    role_names = role_groups.get(role_filter)
     if role_names is None:
         return []
     by_agent_id: dict[str, AgentConfig] = {}

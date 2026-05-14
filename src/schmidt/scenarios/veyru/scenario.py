@@ -22,6 +22,8 @@ from schmidt.evaluation.metric_core.measurement import Measurement
 from schmidt.evaluation.metric_core.metric_protocol import Metric
 from schmidt.evaluation.metric_core.metric_registry import GENERIC_METRIC_REGISTRY
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
+from schmidt.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
+from schmidt.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from schmidt.evaluation.metrics.communication.round_view import CommunicationRoundView
 from schmidt.evaluation.reports.evaluation_cost import compute_evaluation_cost
 from schmidt.evaluation.reports.evaluation_report import (
@@ -37,17 +39,7 @@ from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.models.event import SimulationEvent
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld, WorldContext
-from schmidt.scenario_protocol import ScenarioRuntimeHandle, SimulationScenario
-from schmidt.scenarios.veyru.evaluation import (
-    LanguageEmergenceMetric,
-    ProtocolLearnedAfterSwapMetric,
-    ProtocolProbeAgentPairSimilarityMetric,
-    ProtocolProbeCutoffTrajectoryMetric,
-    ProtocolProbeMetric,
-    ProtocolProbeReplicaSelfSimilarityMetric,
-    RoundSuccessAfterResumeMetric,
-    RoundSuccessMetric,
-)
+from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
 from schmidt.scenarios.veyru.evaluation.build_communication_rounds import build_communication_rounds
 from schmidt.scenarios.veyru.events import (
     VeyruCaseStage,
@@ -725,6 +717,67 @@ class VeyruScenario(SimulationScenario):
         """Seed the Veyru world's per-round outcomes from source events on resume."""
         self._world.restore_outcomes_from_events(events=events)
 
+    def detect_protocol_boundary_window(
+        self,
+        events: list[SimulationEvent],
+        agent_configs: list[AgentConfig],
+    ) -> ProtocolBoundaryWindow | None:
+        """Detect Veyru's knob-driven boundary modes before the scheduled-swap default.
+
+        Checks intern takeover first, then two-team swap, then falls
+        back to the platform default (first ``AgentSwappedMidRun`` event).
+        """
+        takeover = self._knobs.intern_takeover_round
+        if self._knobs.intern_enabled and takeover is not None:
+            return ProtocolBoundaryWindow(
+                mode_label="intern",
+                boundary_round=takeover,
+                pre_boundary_last_round=takeover - 1,
+                post_boundary_first_round=takeover,
+                newcomer_label="intern (now acting as field observer)",
+                boundary_includes_round=True,
+            )
+        swap_round = self._knobs.swap_round
+        if self._knobs.two_teams and swap_round is not None:
+            return ProtocolBoundaryWindow(
+                mode_label="swap",
+                boundary_round=swap_round,
+                pre_boundary_last_round=swap_round,
+                post_boundary_first_round=swap_round + 1,
+                newcomer_label=(
+                    "the swapped-in field observer in each team "
+                    "(observer_a on link_b, observer_b on link_a)"
+                ),
+                boundary_includes_round=False,
+            )
+        return super().detect_protocol_boundary_window(events=events, agent_configs=agent_configs)
+
+    def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
+        """Return per-team stabilization verdicts for the just-ended round."""
+        _ = round_number, trigger
+        teams = self._world.teams
+        if not teams:
+            return []
+        results: list[RoundResult] = []
+        for team_id, team in teams.items():
+            success = team.veyru_stabilized
+            if success:
+                reason = "stabilized"
+            elif not team.veyru_alive:
+                reason = "Veyru collapsed"
+            else:
+                reason = "did not stabilize before round end"
+            if team_id == TEAM_SOLO_ID:
+                result_team_id: str | None = None
+            elif team_id == TEAM_A_ID:
+                result_team_id = "team_a"
+            elif team_id == TEAM_B_ID:
+                result_team_id = "team_b"
+            else:
+                result_team_id = team_id
+            results.append(RoundResult(success=success, team_id=result_team_id, reason=reason))
+        return results
+
     def get_early_round_end_trigger(self) -> str | None:
         """Signal the game clock to end the round as soon as every team has a
         decisive Veyru outcome (stabilized or collapsed).
@@ -1175,36 +1228,35 @@ class VeyruScenario(SimulationScenario):
         """
         return frozenset({POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID})
 
-    # --- Evaluation ---
+    def get_protocol_probe_config(self) -> ProtocolProbeConfig | None:
+        """Point the platform probe metrics at Veyru's question bank and prompts."""
+        scenario_root = Path(__file__).resolve().parent
+        return ProtocolProbeConfig(
+            questions_path=scenario_root / "protocol_probe_questions.json",
+            prompts_dir=scenario_root / "prompts" / "probe",
+            role_groups={
+                "field_observer": frozenset(
+                    {FIELD_OBSERVER_ROLE, FIELD_OBSERVER_A_ROLE, FIELD_OBSERVER_B_ROLE}
+                ),
+                "stabilization_engineer": frozenset(
+                    {
+                        STABILIZATION_ENGINEER_ROLE,
+                        STABILIZATION_ENGINEER_A_ROLE,
+                        STABILIZATION_ENGINEER_B_ROLE,
+                    }
+                ),
+            },
+            role_templates={
+                "field_observer": "field_observer_probe.jinja",
+                "stabilization_engineer": "engineer_probe.jinja",
+            },
+        )
 
-    @classmethod
-    def get_available_metric_names(cls) -> list[str]:
-        """Return generic and Veyru-specific metric names."""
-        generic = super().get_available_metric_names()
-        specific = [
-            LanguageEmergenceMetric.name,
-            ProtocolLearnedAfterSwapMetric.name,
-            ProtocolProbeMetric.name,
-            ProtocolProbeAgentPairSimilarityMetric.name,
-            ProtocolProbeCutoffTrajectoryMetric.name,
-            ProtocolProbeReplicaSelfSimilarityMetric.name,
-            RoundSuccessAfterResumeMetric.name,
-            RoundSuccessMetric.name,
-        ]
-        return sorted(set(generic + specific))
+    # --- Evaluation ---
 
     def _get_metrics(self) -> dict[str, type[Metric]]:
         """Return Veyru-specific metric classes keyed by metric name."""
-        return {
-            LanguageEmergenceMetric.name: LanguageEmergenceMetric,
-            ProtocolLearnedAfterSwapMetric.name: ProtocolLearnedAfterSwapMetric,
-            ProtocolProbeMetric.name: ProtocolProbeMetric,
-            ProtocolProbeAgentPairSimilarityMetric.name: ProtocolProbeAgentPairSimilarityMetric,
-            ProtocolProbeCutoffTrajectoryMetric.name: ProtocolProbeCutoffTrajectoryMetric,
-            ProtocolProbeReplicaSelfSimilarityMetric.name: ProtocolProbeReplicaSelfSimilarityMetric,
-            RoundSuccessAfterResumeMetric.name: RoundSuccessAfterResumeMetric,
-            RoundSuccessMetric.name: RoundSuccessMetric,
-        }
+        return {}
 
     async def run_evaluation(
         self,

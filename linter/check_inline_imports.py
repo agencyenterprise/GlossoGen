@@ -8,6 +8,7 @@ which is against our coding standards.
 
 import argparse
 import ast
+import os
 import sys
 from pathlib import Path
 from typing import Union
@@ -136,6 +137,17 @@ def is_excluded(file_path: Path, patterns: list[str]) -> bool:
     return False
 
 
+def collect_python_files(target_dir: Path, exclude_patterns: list[str]) -> list[Path]:
+    """Walk target_dir collecting .py files, pruning excluded directories during traversal."""
+    collected: list[Path] = []
+    for root, dirs, files in os.walk(target_dir):
+        dirs[:] = [d for d in dirs if not any(pat and pat in d for pat in exclude_patterns)]
+        for name in files:
+            if name.endswith(".py"):
+                collected.append(Path(root) / name)
+    return collected
+
+
 def main() -> None:
     """Main function to check all Python files."""
     parser = argparse.ArgumentParser(description="Check Python files for inline imports")
@@ -155,17 +167,16 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if args.files:
-        # Check specific files passed as arguments
-        files_to_check = [Path(arg) for arg in args.files]
-    else:
-        # Check all Python files in the target directory and subdirectories
-        target_path = Path(args.target_dir)
-        files_to_check = list(target_path.rglob("*.py"))
-
-    # Build list of patterns to exclude
     exclude_patterns = [".venv", "__pycache__", ".git", "node_modules"]
     exclude_patterns.extend(normalize_exclude_patterns(patterns=args.exclude))
+
+    if args.files:
+        files_to_check = [Path(arg) for arg in args.files]
+    else:
+        target_path = Path(args.target_dir)
+        files_to_check = collect_python_files(
+            target_dir=target_path, exclude_patterns=exclude_patterns
+        )
 
     total_errors = 0
 

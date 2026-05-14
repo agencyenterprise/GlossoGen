@@ -42,8 +42,7 @@ from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.models.event import SimulationEvent
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld
-from schmidt.scenario_protocol import ScenarioRuntimeHandle, SimulationScenario
-from schmidt.scenarios.container_yard_stacking.evaluation import RoundSuccessMetric
+from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
 from schmidt.scenarios.container_yard_stacking.evaluation.build_communication_rounds import (
     build_communication_rounds,
 )
@@ -62,12 +61,26 @@ from schmidt.scenarios.container_yard_stacking.events import (
     ContainerYardTruckJudged,
 )
 from schmidt.scenarios.container_yard_stacking.ids import (
+    CRANE_OPERATOR_A_ID,
+    CRANE_OPERATOR_A_ROLE,
+    CRANE_OPERATOR_B_ID,
+    CRANE_OPERATOR_B_ROLE,
     CRANE_OPERATOR_ID,
     CRANE_OPERATOR_INJECTION_TEMPLATE,
     CRANE_OPERATOR_ROLE,
     CRANE_OPERATOR_SYSTEM_TEMPLATE,
     INBOUND_TRUCK_ROLE,
+    INTERN_ID,
+    INTERN_INJECTION_TEMPLATE,
+    INTERN_ROLE,
+    INTERN_SYSTEM_TEMPLATE,
+    LINK_A_CHANNEL_ID,
+    LINK_B_CHANNEL_ID,
     LINK_CHANNEL_ID,
+    LOGISTICS_PLANNER_A_ID,
+    LOGISTICS_PLANNER_A_ROLE,
+    LOGISTICS_PLANNER_B_ID,
+    LOGISTICS_PLANNER_B_ROLE,
     LOGISTICS_PLANNER_ID,
     LOGISTICS_PLANNER_INJECTION_TEMPLATE,
     LOGISTICS_PLANNER_ROLE,
@@ -75,10 +88,20 @@ from schmidt.scenarios.container_yard_stacking.ids import (
     MOVE_REJECTED_MARKER,
     MOVE_SUCCESS_MARKER,
     OUTBOUND_TRUCK_ROLE,
+    POSTMORTEM_A_CHANNEL_ID,
+    POSTMORTEM_B_CHANNEL_ID,
     POSTMORTEM_CHANNEL_ID,
+    TEAM_A_ID,
+    TEAM_B_ID,
+    TEAM_SOLO_ID,
     TOOLS_CRANE_OPERATOR,
+    TOOLS_INTERN,
     TOOLS_LOGISTICS_PLANNER,
     TOOLS_YARD_OPERATOR,
+    YARD_OPERATOR_A_ID,
+    YARD_OPERATOR_A_ROLE,
+    YARD_OPERATOR_B_ID,
+    YARD_OPERATOR_B_ROLE,
     YARD_OPERATOR_ID,
     YARD_OPERATOR_INJECTION_TEMPLATE,
     YARD_OPERATOR_ROLE,
@@ -169,18 +192,100 @@ def _explain_truck_rejection(verdict: ContainerYardTruckCommitVerdict) -> str:
 
 
 def _next_step_missing_truck_role(
-    world: ContainerYardWorld, step: ContainerYardCraneMoveStep
+    world: ContainerYardWorld, team_id: str, step: ContainerYardCraneMoveStep
 ) -> str | None:
-    """Return a truck role required by ``step`` that has not yet arrived, or None."""
+    """Return a truck role required by ``step`` that has not yet arrived for ``team_id``."""
     if step.source_kind == "inbound_truck" and not world.truck_arrived(
-        truck_role=INBOUND_TRUCK_ROLE
+        team_id=team_id, truck_role=INBOUND_TRUCK_ROLE
     ):
         return INBOUND_TRUCK_ROLE
     if step.destination_kind == "outbound_truck" and not world.truck_arrived(
-        truck_role=OUTBOUND_TRUCK_ROLE
+        team_id=team_id, truck_role=OUTBOUND_TRUCK_ROLE
     ):
         return OUTBOUND_TRUCK_ROLE
     return None
+
+
+_AGENT_ID_TO_TEAM_ID: dict[str, str] = {
+    YARD_OPERATOR_ID: TEAM_SOLO_ID,
+    LOGISTICS_PLANNER_ID: TEAM_SOLO_ID,
+    CRANE_OPERATOR_ID: TEAM_SOLO_ID,
+    INTERN_ID: TEAM_SOLO_ID,
+    YARD_OPERATOR_A_ID: TEAM_A_ID,
+    LOGISTICS_PLANNER_A_ID: TEAM_A_ID,
+    CRANE_OPERATOR_A_ID: TEAM_A_ID,
+    YARD_OPERATOR_B_ID: TEAM_B_ID,
+    LOGISTICS_PLANNER_B_ID: TEAM_B_ID,
+    CRANE_OPERATOR_B_ID: TEAM_B_ID,
+}
+
+_AGENT_ID_TO_ROLE_KIND: dict[str, str] = {
+    YARD_OPERATOR_ID: "yard_operator",
+    LOGISTICS_PLANNER_ID: "logistics_planner",
+    CRANE_OPERATOR_ID: "crane_operator",
+    INTERN_ID: "intern",
+    YARD_OPERATOR_A_ID: "yard_operator",
+    LOGISTICS_PLANNER_A_ID: "logistics_planner",
+    CRANE_OPERATOR_A_ID: "crane_operator",
+    YARD_OPERATOR_B_ID: "yard_operator",
+    LOGISTICS_PLANNER_B_ID: "logistics_planner",
+    CRANE_OPERATOR_B_ID: "crane_operator",
+}
+
+
+def _team_id_for_agent(agent_id: str) -> str:
+    """Map an agent_id to its team_id; raises KeyError on unknown agent."""
+    return _AGENT_ID_TO_TEAM_ID[agent_id]
+
+
+def _role_kind_for_agent(agent_id: str) -> str:
+    """Return ``yard_operator`` / ``logistics_planner`` / ``crane_operator`` for an agent."""
+    return _AGENT_ID_TO_ROLE_KIND[agent_id]
+
+
+def _yard_operator_id_for_team(team_id: str) -> str:
+    """Return the yard operator agent ID for ``team_id``."""
+    if team_id == TEAM_A_ID:
+        return YARD_OPERATOR_A_ID
+    if team_id == TEAM_B_ID:
+        return YARD_OPERATOR_B_ID
+    return YARD_OPERATOR_ID
+
+
+def _logistics_planner_id_for_team(team_id: str) -> str:
+    """Return the logistics planner agent ID for ``team_id``."""
+    if team_id == TEAM_A_ID:
+        return LOGISTICS_PLANNER_A_ID
+    if team_id == TEAM_B_ID:
+        return LOGISTICS_PLANNER_B_ID
+    return LOGISTICS_PLANNER_ID
+
+
+def _crane_operator_id_for_team(team_id: str) -> str:
+    """Return the crane operator agent ID for ``team_id``."""
+    if team_id == TEAM_A_ID:
+        return CRANE_OPERATOR_A_ID
+    if team_id == TEAM_B_ID:
+        return CRANE_OPERATOR_B_ID
+    return CRANE_OPERATOR_ID
+
+
+def _link_channel_id_for_team(team_id: str) -> str:
+    """Return the link channel ID for ``team_id``."""
+    if team_id == TEAM_A_ID:
+        return LINK_A_CHANNEL_ID
+    if team_id == TEAM_B_ID:
+        return LINK_B_CHANNEL_ID
+    return LINK_CHANNEL_ID
+
+
+def _postmortem_channel_id_for_team(team_id: str) -> str:
+    """Return the postmortem channel ID for ``team_id``."""
+    if team_id == TEAM_A_ID:
+        return POSTMORTEM_A_CHANNEL_ID
+    if team_id == TEAM_B_ID:
+        return POSTMORTEM_B_CHANNEL_ID
+    return POSTMORTEM_CHANNEL_ID
 
 
 class ContainerYardStackingScenario(SimulationScenario):
@@ -188,13 +293,30 @@ class ContainerYardStackingScenario(SimulationScenario):
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
-        """Return the fixed three-agent role list."""
-        _ = knobs
-        return [
+        """Return the role list: 3 for single-team, 4 with intern, 6 for two-team."""
+        if knobs is None:
+            two_teams = False
+            intern_enabled = False
+        else:
+            two_teams = bool(knobs.get("two_teams", False))
+            intern_enabled = bool(knobs.get("intern_enabled", False))
+        if two_teams:
+            return [
+                AgentRole(agent_id=YARD_OPERATOR_A_ID, role_name=YARD_OPERATOR_A_ROLE),
+                AgentRole(agent_id=LOGISTICS_PLANNER_A_ID, role_name=LOGISTICS_PLANNER_A_ROLE),
+                AgentRole(agent_id=CRANE_OPERATOR_A_ID, role_name=CRANE_OPERATOR_A_ROLE),
+                AgentRole(agent_id=YARD_OPERATOR_B_ID, role_name=YARD_OPERATOR_B_ROLE),
+                AgentRole(agent_id=LOGISTICS_PLANNER_B_ID, role_name=LOGISTICS_PLANNER_B_ROLE),
+                AgentRole(agent_id=CRANE_OPERATOR_B_ID, role_name=CRANE_OPERATOR_B_ROLE),
+            ]
+        roles = [
             AgentRole(agent_id=YARD_OPERATOR_ID, role_name=YARD_OPERATOR_ROLE),
             AgentRole(agent_id=LOGISTICS_PLANNER_ID, role_name=LOGISTICS_PLANNER_ROLE),
             AgentRole(agent_id=CRANE_OPERATOR_ID, role_name=CRANE_OPERATOR_ROLE),
         ]
+        if intern_enabled:
+            roles.append(AgentRole(agent_id=INTERN_ID, role_name=INTERN_ROLE))
+        return roles
 
     @classmethod
     def knobs_json_schema(cls) -> dict[str, Any]:
@@ -220,20 +342,53 @@ class ContainerYardStackingScenario(SimulationScenario):
             time_budget_seconds=knobs.time_budget_seconds,
         )
         self._noise_rng = random.Random(knobs.seed)
-        self._agent_display_names: dict[str, str] = {
-            YARD_OPERATOR_ID: YARD_OPERATOR_ROLE,
-            LOGISTICS_PLANNER_ID: LOGISTICS_PLANNER_ROLE,
-            CRANE_OPERATOR_ID: CRANE_OPERATOR_ROLE,
-            "world": "Yard Monitor",
-        }
-        self._channel_display_names: dict[str, str] = {
-            LINK_CHANNEL_ID: "link",
-            POSTMORTEM_CHANNEL_ID: "team discussion",
-        }
+        self._agent_display_names: dict[str, str] = self._build_agent_display_names(
+            two_teams=knobs.two_teams,
+            intern_enabled=knobs.intern_enabled,
+        )
+        self._channel_display_names: dict[str, str] = self._build_channel_display_names(
+            two_teams=knobs.two_teams,
+        )
         self._world = ContainerYardWorld(
             cases=self._cases,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
+            two_teams=knobs.two_teams,
         )
+        self._swap_applied: bool = False
+
+    @staticmethod
+    def _build_agent_display_names(two_teams: bool, intern_enabled: bool) -> dict[str, str]:
+        """Return ``agent_id`` → display-name map for the current mode."""
+        names: dict[str, str] = {"world": "Yard Monitor"}
+        if two_teams:
+            names[YARD_OPERATOR_A_ID] = YARD_OPERATOR_A_ROLE
+            names[LOGISTICS_PLANNER_A_ID] = LOGISTICS_PLANNER_A_ROLE
+            names[CRANE_OPERATOR_A_ID] = CRANE_OPERATOR_A_ROLE
+            names[YARD_OPERATOR_B_ID] = YARD_OPERATOR_B_ROLE
+            names[LOGISTICS_PLANNER_B_ID] = LOGISTICS_PLANNER_B_ROLE
+            names[CRANE_OPERATOR_B_ID] = CRANE_OPERATOR_B_ROLE
+        else:
+            names[YARD_OPERATOR_ID] = YARD_OPERATOR_ROLE
+            names[LOGISTICS_PLANNER_ID] = LOGISTICS_PLANNER_ROLE
+            names[CRANE_OPERATOR_ID] = CRANE_OPERATOR_ROLE
+            if intern_enabled:
+                names[INTERN_ID] = INTERN_ROLE
+        return names
+
+    @staticmethod
+    def _build_channel_display_names(two_teams: bool) -> dict[str, str]:
+        """Return ``channel_id`` → display-name map for the current mode."""
+        if two_teams:
+            return {
+                LINK_A_CHANNEL_ID: "link (Team A)",
+                LINK_B_CHANNEL_ID: "link (Team B)",
+                POSTMORTEM_A_CHANNEL_ID: "team discussion (Team A)",
+                POSTMORTEM_B_CHANNEL_ID: "team discussion (Team B)",
+            }
+        return {
+            LINK_CHANNEL_ID: "link",
+            POSTMORTEM_CHANNEL_ID: "team discussion",
+        }
 
     def name(self) -> str:
         """Return the scenario identifier."""
@@ -266,28 +421,56 @@ class ContainerYardStackingScenario(SimulationScenario):
         ]
 
     def _agent_defs(self) -> list[AgentDef]:
-        """Return the three-agent definition list for this scenario."""
-        team_channels: list[str] = [LINK_CHANNEL_ID]
+        """Return the agent definition list — 3 single-team, 4 with intern, 6 two-team."""
+        if self._knobs.two_teams:
+            return [
+                *self._agent_defs_for_team(team_id=TEAM_A_ID),
+                *self._agent_defs_for_team(team_id=TEAM_B_ID),
+            ]
+        defs = self._agent_defs_for_team(team_id=TEAM_SOLO_ID)
+        if self._knobs.intern_enabled:
+            team_channels = [LINK_CHANNEL_ID]
+            if self._postmortem_initially_active:
+                team_channels.append(POSTMORTEM_CHANNEL_ID)
+            defs.append(
+                AgentDef(
+                    agent_id=INTERN_ID,
+                    role_name=INTERN_ROLE,
+                    channel_ids=team_channels,
+                    tool_names=list(TOOLS_INTERN),
+                    system_template=INTERN_SYSTEM_TEMPLATE,
+                )
+            )
+        return defs
+
+    def _agent_defs_for_team(self, team_id: str) -> list[AgentDef]:
+        """Build the three role definitions scoped to one team."""
+        link_id = _link_channel_id_for_team(team_id=team_id)
+        postmortem_id = _postmortem_channel_id_for_team(team_id=team_id)
+        team_channels: list[str] = [link_id]
         if self._postmortem_initially_active:
-            team_channels.append(POSTMORTEM_CHANNEL_ID)
+            team_channels.append(postmortem_id)
+        yard_id = _yard_operator_id_for_team(team_id=team_id)
+        planner_id = _logistics_planner_id_for_team(team_id=team_id)
+        crane_id = _crane_operator_id_for_team(team_id=team_id)
         return [
             AgentDef(
-                agent_id=YARD_OPERATOR_ID,
-                role_name=YARD_OPERATOR_ROLE,
+                agent_id=yard_id,
+                role_name=self._agent_display_names[yard_id],
                 channel_ids=list(team_channels),
                 tool_names=list(TOOLS_YARD_OPERATOR),
                 system_template=YARD_OPERATOR_SYSTEM_TEMPLATE,
             ),
             AgentDef(
-                agent_id=LOGISTICS_PLANNER_ID,
-                role_name=LOGISTICS_PLANNER_ROLE,
+                agent_id=planner_id,
+                role_name=self._agent_display_names[planner_id],
                 channel_ids=list(team_channels),
                 tool_names=list(TOOLS_LOGISTICS_PLANNER),
                 system_template=LOGISTICS_PLANNER_SYSTEM_TEMPLATE,
             ),
             AgentDef(
-                agent_id=CRANE_OPERATOR_ID,
-                role_name=CRANE_OPERATOR_ROLE,
+                agent_id=crane_id,
+                role_name=self._agent_display_names[crane_id],
                 channel_ids=list(team_channels),
                 tool_names=list(TOOLS_CRANE_OPERATOR),
                 system_template=CRANE_OPERATOR_SYSTEM_TEMPLATE,
@@ -311,6 +494,8 @@ class ContainerYardStackingScenario(SimulationScenario):
                             ),
                             "postmortem_enabled": self._postmortem_initially_active,
                             "channel_noise_level": self._knobs.channel_noise_level,
+                            "intern_join_round": self._knobs.intern_join_round,
+                            "intern_takeover_round": self._knobs.intern_takeover_round,
                         },
                     ),
                     channel_ids=d.channel_ids,
@@ -323,20 +508,37 @@ class ContainerYardStackingScenario(SimulationScenario):
         return agents
 
     def get_channels(self) -> list[Channel]:
-        """Return the link channel and (when enabled) the postmortem channel."""
-        members = [YARD_OPERATOR_ID, LOGISTICS_PLANNER_ID, CRANE_OPERATOR_ID]
+        """Return per-team link + (optional) postmortem channels."""
+        if not self._knobs.two_teams:
+            return self._channels_for_team(team_id=TEAM_SOLO_ID)
+        return [
+            *self._channels_for_team(team_id=TEAM_A_ID),
+            *self._channels_for_team(team_id=TEAM_B_ID),
+        ]
+
+    def _channels_for_team(self, team_id: str) -> list[Channel]:
+        """Build link and (optional) postmortem channels scoped to one team."""
+        link_id = _link_channel_id_for_team(team_id=team_id)
+        postmortem_id = _postmortem_channel_id_for_team(team_id=team_id)
+        members = [
+            _yard_operator_id_for_team(team_id=team_id),
+            _logistics_planner_id_for_team(team_id=team_id),
+            _crane_operator_id_for_team(team_id=team_id),
+        ]
+        if team_id == TEAM_SOLO_ID and self._knobs.intern_enabled:
+            members.append(INTERN_ID)
         channels: list[Channel] = [
             Channel(
-                channel_id=LINK_CHANNEL_ID,
-                name="link",
+                channel_id=link_id,
+                name=self._channel_display_names[link_id],
                 member_agent_ids=list(members),
             ),
         ]
         if self._postmortem_initially_active:
             channels.append(
                 Channel(
-                    channel_id=POSTMORTEM_CHANNEL_ID,
-                    name="postmortem",
+                    channel_id=postmortem_id,
+                    name=self._channel_display_names[postmortem_id],
                     member_agent_ids=list(members),
                 )
             )
@@ -355,22 +557,28 @@ class ContainerYardStackingScenario(SimulationScenario):
         """Stash the runtime handle so the two yard tools can emit verdict events."""
         self._runtime = runtime
 
-    def _previous_outcome(self) -> YardOutcome | None:
-        """Return the most recent round outcome, or None on round 1."""
-        return self._world.previous_outcome()
+    def _previous_outcome(self, team_id: str) -> YardOutcome | None:
+        """Return the most recent round outcome for ``team_id``, or None on round 1."""
+        return self._world.previous_outcome(team_id=team_id)
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the per-round injection for one agent, or None."""
-        if agent_id == YARD_OPERATOR_ID:
-            template_name = YARD_OPERATOR_INJECTION_TEMPLATE
-        elif agent_id == LOGISTICS_PLANNER_ID:
-            template_name = LOGISTICS_PLANNER_INJECTION_TEMPLATE
-        elif agent_id == CRANE_OPERATOR_ID:
-            template_name = CRANE_OPERATOR_INJECTION_TEMPLATE
-        else:
+        role_kind = _AGENT_ID_TO_ROLE_KIND.get(agent_id)
+        if role_kind is None:
             return None
+        if agent_id == INTERN_ID and not self._intern_should_be_active(round_number=round_number):
+            return None
+        if role_kind == "yard_operator":
+            template_name = YARD_OPERATOR_INJECTION_TEMPLATE
+        elif role_kind == "logistics_planner":
+            template_name = LOGISTICS_PLANNER_INJECTION_TEMPLATE
+        elif role_kind == "intern":
+            template_name = INTERN_INJECTION_TEMPLATE
+        else:
+            template_name = CRANE_OPERATOR_INJECTION_TEMPLATE
+        team_id = _team_id_for_agent(agent_id=agent_id)
         current_case = self._cases[round_number - 1]
-        previous_outcome = self._previous_outcome()
+        previous_outcome = self._previous_outcome(team_id=team_id)
         rendered = self._renderer.render(
             template_name=template_name,
             template_variables={
@@ -378,25 +586,56 @@ class ContainerYardStackingScenario(SimulationScenario):
                 "current_case": current_case,
                 "previous_outcome": previous_outcome,
                 "knobs": self._knobs,
+                "team_id": team_id,
+                "intern_join_round": self._knobs.intern_join_round,
+                "intern_takeover_round": self._knobs.intern_takeover_round,
+                "intern_active": self._intern_has_taken_over(round_number=round_number),
             },
         )
         if not rendered:
             return None
         return rendered
 
+    def _intern_should_be_active(self, round_number: int) -> bool:
+        """Whether the intern should receive injections this round (joined and not retired)."""
+        if not self._knobs.intern_enabled:
+            return False
+        if self._knobs.intern_join_round is None:
+            return False
+        return round_number >= self._knobs.intern_join_round
+
+    def _intern_has_taken_over(self, round_number: int) -> bool:
+        """Whether the intern is now the active crane operator."""
+        if not self._knobs.intern_enabled:
+            return False
+        if self._knobs.intern_takeover_round is None:
+            return False
+        return round_number >= self._knobs.intern_takeover_round
+
+    def _is_intern_silent(self, agent_id: str) -> bool:
+        """Whether the intern should be blocked from sending messages right now."""
+        if not self._knobs.intern_enabled:
+            return False
+        if agent_id != INTERN_ID:
+            return False
+        if self._runtime is None:
+            return False
+        return not self._intern_has_taken_over(round_number=self._runtime.current_round)
+
     def get_postmortem_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the postmortem injection when postmortem is enabled, None otherwise."""
-        _ = agent_id
         if not self._knobs.postmortem_enabled:
             return None
         if self._world.is_postmortem_disabled:
             return None
-        previous_outcome = self._previous_outcome()
+        team_id = _team_id_for_agent(agent_id=agent_id)
+        previous_outcome = self._previous_outcome(team_id=team_id)
         rendered = self._renderer.render(
             template_name="postmortem_injection.jinja",
             template_variables={
                 "round_number": round_number,
                 "previous_outcome": previous_outcome,
+                "team_id": team_id,
             },
         )
         if not rendered:
@@ -416,38 +655,95 @@ class ContainerYardStackingScenario(SimulationScenario):
         _ = round_number
         self._world.enter_postmortem()
 
+    def restore_state_from_events(self, events: list[Any]) -> None:
+        """Seed the world's per-round outcomes from source events on resume."""
+        self._world.restore_outcomes_from_events(events=events)
+
+    def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
+        """Return per-team success verdicts from world state."""
+        _ = round_number, trigger
+        results: list[RoundResult] = []
+        for team_id in self._world.team_ids:
+            outcome = self._world.previous_outcome(team_id=team_id)
+            if outcome is None:
+                continue
+            reason = outcome.failure_reason if outcome.failure_reason else "all steps completed"
+            result_team_id: str | None
+            if team_id == TEAM_SOLO_ID:
+                result_team_id = None
+            else:
+                result_team_id = team_id
+            results.append(
+                RoundResult(
+                    success=outcome.round_succeeded,
+                    team_id=result_team_id,
+                    reason=reason,
+                )
+            )
+        return results
+
     def get_early_round_end_trigger(self) -> str | None:
-        """End the round once every step has succeeded or the world rules the round failed."""
+        """End the round once every team has either finished or terminally failed."""
         case = self._world.current_case
         if case is None:
             return None
-        if (
-            self._world.current_step is None
-            and not self._world.round_failed_terminally
-            and not self._world.round_budget_exceeded
-        ):
+        teams = self._world.team_ids
+        every_team_completed = all(
+            self._world.current_step(team_id=team_id) is None
+            and not self._world.round_failed_terminally(team_id=team_id)
+            and not self._world.round_budget_exceeded(team_id=team_id)
+            for team_id in teams
+        )
+        if every_team_completed:
             return "round_completed"
-        if self._world.round_failed_terminally:
+        every_team_done = all(
+            self._world.round_failed_terminally(team_id=team_id)
+            or self._world.current_step(team_id=team_id) is None
+            for team_id in teams
+        )
+        if every_team_done:
             return "round_failed"
         return None
 
     async def on_round_ended(self, round_number: int, trigger: str) -> None:
-        """Emit a terminal success/failure notification and record this round's outcome.
-
-        The outcome is recorded here (not in ``on_round_advanced``) so that
-        ``get_postmortem_injection`` for the just-ended round sees the
-        correct ``previous_outcome``. ``finalize_round_sync`` then skips
-        the redundant mark via the ``_round_outcome_marked`` guard.
-        """
+        """Emit a terminal success/failure notification and record this round's outcome."""
         _ = trigger
         await self._world.emit_round_terminal_notification()
         self._world.mark_round_outcome(round_number=round_number)
 
     async def on_round_advanced(self, round_number: int) -> None:
-        """Finalize the previous outcome, prepare the next case, log case-started."""
+        """Finalize the previous outcome, prepare the next case, log case-started, maybe swap."""
         self._world.exit_postmortem()
         self._world.finalize_round_sync(round_number=round_number)
+        await self._maybe_fire_crane_swap(round_number=round_number)
         await self._emit_case_started_event(round_number=round_number)
+
+    async def _maybe_fire_crane_swap(self, round_number: int) -> None:
+        """Swap the crane operators between team A and team B at ``swap_round + 1``.
+
+        Veyru-style: the swap fires at the start of the round AFTER the
+        configured ``swap_round`` so that round number completes before
+        the operators exchange. Announces in-channel when ``announce_swap``
+        is set. No-op in single-team mode or before the boundary.
+        """
+        if not self._knobs.two_teams:
+            return
+        if self._knobs.swap_round is None:
+            return
+        if self._swap_applied:
+            return
+        if round_number != self._knobs.swap_round + 1:
+            return
+        self._swap_applied = True
+        self._world.swap_crane_operators()
+        if not self._knobs.announce_swap:
+            return
+        message = (
+            f"At round {round_number}, the crane operators between Team A and Team B "
+            "have been swapped. The link channel history has been cleared."
+        )
+        for channel_id in (LINK_A_CHANNEL_ID, LINK_B_CHANNEL_ID):
+            await self._world.context.send_update_to_channel(channel_id=channel_id, text=message)
 
     async def _emit_case_started_event(self, round_number: int) -> None:
         """Log a ContainerYardCaseStarted event carrying the full ground-truth case."""
@@ -490,8 +786,12 @@ class ContainerYardStackingScenario(SimulationScenario):
         )
 
     def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
-        """Block messages to postmortem outside the discussion phase."""
-        _ = agent_id
+        """Block messages to postmortem outside the discussion phase, intern before takeover."""
+        if self._is_intern_silent(agent_id=agent_id):
+            return (
+                "Intern messages are blocked before the takeover round. Observe the link "
+                "channel silently until you officially take over the crane operator role."
+            )
         if channel_id == POSTMORTEM_CHANNEL_ID:
             if self._world.is_postmortem_disabled:
                 return "The discussion channel has been closed for the remainder of the simulation."
@@ -559,21 +859,22 @@ class ContainerYardStackingScenario(SimulationScenario):
                     "Cannot move the truck during the post-round discussion phase. "
                     "Wait for the next round to begin."
                 )
-            if agent_id != YARD_OPERATOR_ID:
+            if _role_kind_for_agent(agent_id=agent_id) != "yard_operator":
                 return "Only the yard operator can call move_truck."
-            if self._world.round_failed_terminally:
+            team_id = _team_id_for_agent(agent_id=agent_id)
+            if self._world.round_failed_terminally(team_id=team_id):
                 return "Round has already failed terminally; no more truck commits accepted."
             case = self._world.current_case
-            current_step = self._world.current_step
+            current_step = self._world.current_step(team_id=team_id)
             if case is None or current_step is None:
                 return "No active yard step."
             correct_station_pads = _correct_station_pads_for_step(case=case, step=current_step)
-            assignment = self._world.find_assignment(truck_role=truck_role)
+            assignment = self._world.find_assignment(team_id=team_id, truck_role=truck_role)
             role_matches_active_assignment = assignment is not None
             targets_correct_station = (
                 assignment is not None and station_name == assignment.station_name
             )
-            pads_in_use = self._world.pads_already_committed()
+            pads_in_use = self._world.pads_already_committed(team_id=team_id)
             targets_correct_pad = pad in correct_station_pads and pad not in pads_in_use
             carries_correct_container = (
                 assignment is not None and container_id == assignment.container_id
@@ -585,6 +886,7 @@ class ContainerYardStackingScenario(SimulationScenario):
                 carries_correct_container=carries_correct_container,
             )
             commit_result = await self._world.record_truck_commit(
+                team_id=team_id,
                 parsed_truck_role=truck_role,
                 parsed_pad=pad,
                 role_matches_active_assignment=role_matches_active_assignment,
@@ -647,23 +949,34 @@ class ContainerYardStackingScenario(SimulationScenario):
                     "Cannot move the crane during the post-round discussion phase. "
                     "Wait for the next round to begin."
                 )
-            if agent_id != CRANE_OPERATOR_ID:
+            role_kind = _role_kind_for_agent(agent_id=agent_id)
+            if role_kind == "intern":
+                current_round = self._runtime.current_round if self._runtime is not None else 0
+                if not self._intern_has_taken_over(round_number=current_round):
+                    return (
+                        f"The intern cannot call {tool_name} before the takeover round. "
+                        "Continue silent observation until takeover."
+                    )
+            elif role_kind != "crane_operator":
                 return f"Only the crane operator can call {tool_name}."
-            if self._world.round_failed_terminally:
+            team_id = _team_id_for_agent(agent_id=agent_id)
+            if self._world.round_failed_terminally(team_id=team_id):
                 return (
                     f"{MOVE_REJECTED_MARKER}. The round has already failed; no more moves accepted."
                 )
-            current_step = self._world.current_step
+            current_step = self._world.current_step(team_id=team_id)
             if current_step is None:
                 return f"{MOVE_REJECTED_MARKER}. No active yard step."
-            next_index = self._world.step_accepted_move_count
+            next_index = self._world.step_accepted_move_count(team_id=team_id)
             if next_index >= len(current_step.expected_move_sequence):
                 return (
                     f"{MOVE_REJECTED_MARKER}. All expected crane moves for this step have "
                     "already been executed."
                 )
             expected_step = current_step.expected_move_sequence[next_index]
-            missing_role = _next_step_missing_truck_role(world=self._world, step=expected_step)
+            missing_role = _next_step_missing_truck_role(
+                world=self._world, team_id=team_id, step=expected_step
+            )
             if missing_role is not None:
                 return (
                     f"{MOVE_REJECTED_MARKER}. The {missing_role} truck has not arrived at its "
@@ -694,11 +1007,13 @@ class ContainerYardStackingScenario(SimulationScenario):
                     and destination_tier == expected_step.destination_tier
                 ),
                 source_currently_holds_container=self._world.source_holds_container(
+                    team_id=team_id,
                     kind=source_kind,
                     stack=source_stack,
                     container_id=container_id,
                 ),
                 destination_currently_empty=self._world.destination_is_free(
+                    team_id=team_id,
                     kind=destination_kind,
                     stack=destination_stack,
                     tier=destination_tier,
@@ -709,6 +1024,7 @@ class ContainerYardStackingScenario(SimulationScenario):
                 parsed_destination_stack=destination_stack,
             )
             accepted = await self._world.record_crane_move(
+                team_id=team_id,
                 parsed_move=submitted_move,
                 parsed_source_kind=verdict.parsed_source_kind,
                 parsed_source_stack=verdict.parsed_source_stack,
@@ -723,7 +1039,7 @@ class ContainerYardStackingScenario(SimulationScenario):
                 explanation = f"Move {expected_step.move_index} executed: {container_id}."
             else:
                 marker = MOVE_REJECTED_MARKER
-                explanation = self._world.last_failure_reason()
+                explanation = self._world.last_failure_reason(team_id=team_id)
             if self._runtime is not None:
                 await self._runtime.event_logger.log(
                     event=ContainerYardCraneMoveJudged(
@@ -833,16 +1149,9 @@ class ContainerYardStackingScenario(SimulationScenario):
         """Hide the postmortem channel from any replaced agent's tool history."""
         return frozenset({POSTMORTEM_CHANNEL_ID})
 
-    @classmethod
-    def get_available_metric_names(cls) -> list[str]:
-        """Return generic and container-yard-specific metric names."""
-        generic = super().get_available_metric_names()
-        specific = [RoundSuccessMetric.name]
-        return sorted(set(generic + specific))
-
     def _get_metrics(self) -> dict[str, type[Metric]]:
         """Return container-yard-specific metric classes keyed by metric name."""
-        return {RoundSuccessMetric.name: RoundSuccessMetric}
+        return {}
 
     async def run_evaluation(
         self,

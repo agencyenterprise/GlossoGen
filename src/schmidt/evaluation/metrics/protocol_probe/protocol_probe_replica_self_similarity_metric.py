@@ -26,14 +26,8 @@ from pydantic import BaseModel
 from schmidt.evaluation.metric_core.measurement import AgentObservation, Measurement
 from schmidt.evaluation.metric_core.metric_protocol import Metric
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
-from schmidt.llm.provider import LLMProvider
-from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import SimulationEvent
-from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.response_models import (
-    ProtocolProbeResponse,
-)
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.similarity_core import (
+from schmidt.evaluation.metrics.protocol_probe.response_models import ProtocolProbeResponse
+from schmidt.evaluation.metrics.protocol_probe.similarity_core import (
     ARTIFACT_SCHEMA_VERSION,
     ProbeSimilarityCell,
     cutoff_sort_key,
@@ -42,6 +36,10 @@ from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.similarity_core i
     pairwise_similarity_matrix,
     upper_triangle_mean,
 )
+from schmidt.llm.provider import LLMProvider
+from schmidt.models.agent_config import AgentConfig
+from schmidt.models.event import SimulationEvent
+from schmidt.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 

@@ -40,7 +40,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/runners/` — autonomous mode agent runners:
   - `agent_runner_base.py` — abstract base class for agent runners
   - `pydantic_ai_runner.py` — Pydantic AI agent runner via pydantic-ai framework
-  - `pydantic_ai_model_factory.py` — per-provider mapping from `(model, provider)` to a pydantic-ai `model=` argument and default `ModelSettings`; shared by the runner and the post-simulation `protocol_probe` helper
+  - `pydantic_ai_model_factory.py` — per-provider mapping from `(model, provider)` to a pydantic-ai `model=` argument and default `ModelSettings`; shared by the runner and the platform's post-simulation `protocol_probe` helper
   - `communication_protocol.py` — shared prompts and constants for the agent communication protocol
 - `src/schmidt/config_overrides.py` — Hydra-style dot-notation config override parser
 - `src/schmidt/scenario_registry.py` — maps scenario name strings to `SimulationScenario` classes; lives outside `schmidt.scenarios` package init so importing event-related modules doesn't trigger eager loading of every scenario
@@ -68,12 +68,26 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
     - `perplexity_metric.py` — mean per-token surprisal of primary-channel messages under `gpt2`
     - `mcr_metric.py` — mean total characters per round on the primary channel
     - `mcm_metric.py` — mean characters per message on the primary channel
+    - `round_success_metric.py` — generic; reads `RoundResultRecorded` events written by the game clock from `SimulationScenario.judge_round_result`. Single-team scenarios emit one Measurement (`metric_name="round_success"`); multi-team scenarios emit one per `team_id` (`round_success_team_a`, etc.). Returns `[]` if the scenario doesn't override the hook.
+    - `round_success_after_resume_metric.py` — generic; re-scores `round_success` over the post-resume window. Reads `replace_manifest.json` / `cross_run_replace_manifest.json` and every `AgentSwappedMidRun` event; the per-window scoring delegates to the same `RoundResultRecorded` events as `round_success`. Returns `[]` on non-resume runs.
+    - `protocol_learned_after_swap_metric.py` — generic LLM-judge; calls the scenario's `detect_protocol_boundary_window` to find the pre/post split and `build_communication_rounds` to render transcripts. Returns `[]` when either hook opts out.
+    - `protocol_probe/` — generic protocol-probe metric family (4 metrics). Reads `SimulationScenario.get_protocol_probe_config()` for the per-scenario question bank and probe-prompt templates; returns `[]` when the hook returns `None`.
+      - `protocol_probe_metric.py` — runs the probe LLM calls and writes `protocol_probe_responses.jsonl`
+      - `protocol_probe_replica_self_similarity_metric.py` — within-(agent, question, cutoff) replica self-similarity
+      - `protocol_probe_agent_pair_similarity_metric.py` — agent × agent matrix per (question, cutoff); skips on single-team runs
+      - `protocol_probe_cutoff_trajectory_metric.py` — adjacent-cutoff drift per (agent, question)
+      - `probe_agent.py`, `similarity_core.py`, `response_models.py` — shared helpers
     - `round_ended/` — round-end trigger metrics
       - `round_ended_idle_metric.py` — flags rounds ending via the `all_agents_idle` trigger
       - `round_ended_timeout_metric.py` — flags rounds ending via the `round_timeout` trigger
       - `trigger_detection.py` — shared helpers for reading `RoundEnded` events
+  - `metric_core/` (additions):
+    - `round_result_index.py` — `per_round_joint_success(events)` builds round→bool from `RoundResultRecorded` events (multi-team joint = all teams succeeded)
+    - `protocol_boundary.py` — `ProtocolBoundaryWindow` NamedTuple returned by `detect_protocol_boundary_window`
+    - `protocol_probe_config.py` — `ProtocolProbeConfig` NamedTuple returned by `get_protocol_probe_config`
+    - `resume_anchors.py` — manifest + `AgentSwappedMidRun` reading helpers shared by `round_success_after_resume`
   - `log_reader.py` — JSONL event loading + scenario/agent config extraction (cross-cutting; used by CLI, server, runtime, and metrics)
-  - `round_transcript_builder.py` — builds per-round message transcripts from events (used by all generic LLM-judge metrics + veyru `language_emergence`)
+  - `round_transcript_builder.py` — builds per-round message transcripts from events (used by all generic LLM-judge metrics)
   - `prompts/` — Jinja2 templates for LLM judge prompts + the `prompt_renderer.py` loader
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
   - `password_auth_middleware.py` — pure ASGI middleware for shared-password authentication
@@ -319,11 +333,11 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── replace_config.json                # (replace-agent or cross-run runs only) merged scenario_config + model_overrides written by the orchestrator
 ├── resume_context_{agent_id}.json     # (resume / fork / replace-agent / cross-run runs) per-agent reconstructed pydantic-ai message history dumped at resume time for inspection
 ├── resume_context_{agent_id}_round_{R}.json  # (in-run scheduled swap) one file per AgentSwappedMidRun event capturing the swapped-in agent's seed history
-├── protocol_probe_responses.jsonl     # (veyru only, when protocol_probe metric is run) one row per (agent, question, replica)
-├── protocol_probe_usage.json          # (veyru only, when protocol_probe metric is run) per-model token usage + cost for that probe batch
-├── protocol_probe_replica_self_similarity.json  # (veyru only) within-run replica × replica matrices per (agent, question, cutoff)
-├── protocol_probe_agent_pair_similarity.json    # (veyru only) within-run agent × agent matrices per (question, cutoff); two-team runs
-├── protocol_probe_cutoff_trajectory.json        # (veyru only) per (agent, question) adjacent-cutoff series; multi-cutoff JSONLs
+├── protocol_probe_responses.jsonl     # (scenarios that implement get_protocol_probe_config) one row per (agent, question, replica)
+├── protocol_probe_usage.json          # (same) per-model token usage + cost for that probe batch
+├── protocol_probe_replica_self_similarity.json  # (same) within-run replica × replica matrices per (agent, question, cutoff)
+├── protocol_probe_agent_pair_similarity.json    # (same) within-run agent × agent matrices per (question, cutoff); two-team runs
+├── protocol_probe_cutoff_trajectory.json        # (same) per (agent, question) adjacent-cutoff series; multi-cutoff JSONLs
 ├── communication_open_coding.json               # (when communication_open_coding metric is run) free-form open-coding labels for this run
 ├── communication_feature_presence.json          # (when communication_feature_presence metric is run) per-category confidence vector against a consolidated ontology
 └── multi_swap_cache.json              # streamlit Multi-swap tab cache (per-phase round_success); regenerated whenever the JSONL's size or mtime changes
@@ -761,18 +775,26 @@ Generic metrics (available to all scenarios):
 - `content_filter_refusal` — counts `ContentFilterError` refusals across the run (deterministic, no LLM). `score` = total refusal count; `per_round` lists rounds with at least one refusal; `per_agent` lists per-agent counts.
 - `communication_open_coding` — pass 1 of the open-coding → ontology → relabel pipeline. One LLM call per run feeds the judge every primary-channel message plus the scenario-rendered per-round ground truth (via `SimulationScenario.build_communication_rounds`), and asks for free-form short labels naming communication-pattern features (multi-label per run, no pre-specified vocabulary). Writes `communication_open_coding.json` to the run dir with each label's evidence round and quote. `score` = number of free-form labels. Followed by `scripts/consolidate_communication_ontology.py` (one LLM call across N runs of one scenario, writes a versioned ontology under `runs/<scenario_name>/_ontology/<version>.json`) and then `communication_feature_presence` for relabel. **Returns `[]` (no Measurement)** when the scenario does not implement the `build_communication_rounds` hook.
 - `communication_feature_presence` — pass 3 of the same pipeline. Accepts `--ontology-path PATH` to pin a specific ontology JSON; when omitted the metric auto-resolves the most recently modified ontology JSON under `runs/<scenario>/_ontology/`. One LLM call per run re-reads the same per-round transcript view against the ontology's categories and emits a 0–1 confidence per category. Writes `communication_feature_presence.json` (full feature-presence vector + ontology provenance). `score` = number of categories scoring ≥0.5. Passes 1 and 3 read the same `CommunicationRoundView` rows so confidences are commensurable with the open-coding labels. **Returns `[]` (no Measurement)** when the scenario does not implement the `build_communication_rounds` hook.
+- `round_success` — generic; reads `RoundResultRecorded` events. Single-team scenarios emit one Measurement (`metric_name="round_success"`); multi-team scenarios emit one per `team_id` (`round_success_team_a`, etc.). **Returns `[]`** when the scenario doesn't override `judge_round_result`.
+- `round_success_after_resume` — generic; same accounting as `round_success` over the post-resume window. Reads `replace_manifest.json` / `cross_run_replace_manifest.json` and every `AgentSwappedMidRun` event; the comparison in `summary` is against the source run's same-window `round_success`. **Returns `[]`** on non-resume runs.
+- `protocol_learned_after_swap` — generic LLM judge; uses `detect_protocol_boundary_window` (default: first `AgentSwappedMidRun`) to find the pre/post split and `build_communication_rounds` to render transcripts. `score` = number of post-boundary rounds with observable newcomer protocol evidence. **Returns `[]`** when either hook opts out (no boundary, or scenario doesn't implement `build_communication_rounds`).
+- `protocol_probe` — generic; probes each agent post-simulation against the scenario's fixed test bank, writing one row per (agent, question, replica) to `protocol_probe_responses.jsonl`. Each agent is probed under its own original model (read from `AgentRegistered`), not the eval `--model`. The scenario supplies the question bank, probe-prompt templates, and role-name mapping via `get_protocol_probe_config()`. Requires `--probe-replicas N` (≥1); optional `--probe-round R` is an **exclusive** cutoff — every tool call with `round_number >= R` is dropped, so the reconstructed history covers rounds `1..R-1` (inclusive). To capture state at the END of round R, pass `--probe-round=R+1`. Token usage + dollar cost go to `protocol_probe_usage.json`. `score` = total probe rows written. **Returns `[]`** when `get_protocol_probe_config()` returns `None`.
+- `protocol_probe_replica_self_similarity` — generic; for each `(agent_id, question_id, cutoff_round)` group with ≥2 replicas, computes the upper-triangle mean of the replica × replica normalized-Levenshtein matrix on `response_text`. `score` = macro mean across groups; matrices persisted to `protocol_probe_replica_self_similarity.json`. Saturation at 1.0 is the expected signal for a converged protocol. **Returns `[]`** when `protocol_probe_responses.jsonl` is missing or no group has ≥2 replicas.
+- `protocol_probe_agent_pair_similarity` — generic; agent × agent matrix per (question, cutoff). `score` = macro mean across groups; persisted to `protocol_probe_agent_pair_similarity.json`. Only meaningful in two-team / cross-team runs. **Returns `[]`** on single-team runs.
+- `protocol_probe_cutoff_trajectory` — generic; for each `(agent_id, question_id)` pair where the JSONL contains rows from ≥2 distinct `cutoff_round` values, computes the mean cross-replica similarity between each adjacent cutoff snapshot. `score` = macro mean across all adjacent-cutoff pairs; persisted to `protocol_probe_cutoff_trajectory.json`. **Returns `[]`** when the JSONL has only one cutoff value.
 
-Scenario-specific metrics:
+Scenarios opt into the platform metrics by implementing the corresponding hooks on `SimulationScenario`:
 
-- **veyru**: generic + the following veyru-specific metrics:
-  - `language_emergence` — novel compressed language in the fictional domain (LLM judge); `score` = rounds with novel patterns.
-  - `round_success` — fraction of rounds the team stabilized the Veyru before collapse (deterministic, no LLM). Single-team mode emits one Measurement (`metric_name="round_success"`); two-team mode emits two Measurements (`round_success_team_a` and `round_success_team_b`).
-  - `round_success_after_resume` — same accounting as `round_success` but restricted to the rounds played after a replace-agent swap. Re-scores the source run over the same round window and includes the comparison in `summary`. Two-team mode splits into `round_success_after_resume_team_a` / `_team_b`. **Returns `[]` (no Measurement)** on non-resume runs (no replace-agent manifest, no `AgentSwappedMidRun` events).
-  - `protocol_learned_after_swap` — whether the newcomer adopted the pre-established protocol after an observer swap or intern takeover (LLM judge); `score` = number of post-boundary rounds with observable newcomer protocol evidence.
-  - `protocol_probe` — probes each agent post-simulation against a fixed test bank of hypothetical inputs ("if symptoms X, what do you send to #link?") and writes one row per (agent, question, replica) to `protocol_probe_responses.jsonl` under the run dir. Each agent is probed under its own original model (read from `AgentRegistered`), not the eval `--model`. The structured output schema enforces both `reasoning` and `message` fields. Test bank lives at `src/schmidt/scenarios/veyru/protocol_probe_questions.json` (28 questions: 14 motifs × {observer, engineer}); regenerate via `src/schmidt/scenarios/veyru/scripts/build_probe_questions.py`. Requires `--probe-replicas N` (≥1) on the eval CLI; optional `--probe-round R` is an **exclusive** cutoff — every tool call with `round_number >= R` is dropped, so the reconstructed history covers rounds `1..R-1` (inclusive). To capture state at the END of round R, pass `--probe-round=R+1`. Common pitfall: `--probe-round 15` on a run with phases ending at round 15 captures *one round before* the phase end, not the phase end itself; pass `--probe-round 16` instead. Token usage and dollar cost of every probe LLM call are aggregated per `(model, provider)` and written alongside the JSONL as `protocol_probe_usage.json`; the same total appears in the measurement's `summary`. (The eval report's top-level `evaluation_cost` only tracks the eval CLI's `--model`, so probe cost lives in the sidecar instead.) `score` = total probe rows written. Distance / similarity computation across the JSONL is downstream analysis, not part of this metric.
-  - `protocol_probe_replica_self_similarity` — for each `(agent_id, question_id, cutoff_round)` group with ≥2 replicas, computes the upper-triangle mean of the replica × replica normalized-Levenshtein matrix on `response_text`. `score` = macro mean across groups; full per-group matrices are persisted to `protocol_probe_replica_self_similarity.json`. Saturation at 1.0 is the expected signal for a converged protocol where every replica emits the same surface form. Reads `protocol_probe_responses.jsonl`; **returns `[]` (no Measurement)** when that file is missing or no group has ≥2 replicas.
-  - `protocol_probe_agent_pair_similarity` — for each `(question_id, cutoff_round)` group with ≥2 agents matching the question's role filter, computes the agent × agent matrix where each cell is the mean cross-replica similarity between two agents on that probe question. `score` = macro mean across groups; per-group matrices are persisted to `protocol_probe_agent_pair_similarity.json`. Only meaningful in two-team / cross-team runs; **returns `[]` (no Measurement)** on single-team runs.
-  - `protocol_probe_cutoff_trajectory` — for each `(agent_id, question_id)` pair where the JSONL contains rows from ≥2 distinct `cutoff_round` values, computes the mean cross-replica similarity between each adjacent cutoff snapshot. `score` = macro mean across all adjacent-cutoff pairs; per-group series are persisted to `protocol_probe_cutoff_trajectory.json`. Numeric cutoffs are sorted ascending; `cutoff_round=null` (full end-of-run probe) is treated as the latest cutoff. **Returns `[]` (no Measurement)** when the JSONL has only one cutoff value.
+| Hook | Enables |
+|---|---|
+| `judge_round_result(round_number, trigger) -> list[RoundResult]` | `round_success`, `round_success_after_resume` |
+| `build_communication_rounds(events) -> list[CommunicationRoundView]` | `communication_open_coding`, `communication_feature_presence`, `protocol_learned_after_swap` |
+| `detect_protocol_boundary_window(events, agent_configs) -> ProtocolBoundaryWindow \| None` | `protocol_learned_after_swap` (default returns first `AgentSwappedMidRun`; override to also detect scenario-specific boundaries like intern takeover / two-team observer swap) |
+| `get_protocol_probe_config() -> ProtocolProbeConfig \| None` | `protocol_probe`, `protocol_probe_replica_self_similarity`, `protocol_probe_agent_pair_similarity`, `protocol_probe_cutoff_trajectory` |
+| `restore_state_from_events(events)` | Accurate "previous round" injection context after fork / resume / replace-agent |
+| `get_replace_agent_blocked_tool_call_channels() -> frozenset[str]` | Strips scenario-private channel traffic (e.g. postmortem) from replaced agent's reconstructed history |
+
+There are no scenario-specific metrics left — every scoring concept (round-success, post-resume re-scoring, language emergence, protocol learning, protocol probing) is platform code that consumes scenario data through these hooks. Scenarios only ship their domain-specific events + the hooks that surface them.
 
 ## Destructive Actions
 

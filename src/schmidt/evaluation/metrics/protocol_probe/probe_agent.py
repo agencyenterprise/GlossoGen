@@ -21,14 +21,14 @@ from pydantic_ai import Agent
 from pydantic_ai.messages import CachePoint, ModelMessage
 from pydantic_ai.usage import RunUsage, UsageLimits
 
+from schmidt.evaluation.metrics.protocol_probe.response_models import (
+    ProtocolProbeCallResult,
+    ProtocolProbeOutput,
+)
 from schmidt.evaluation.reports.evaluation_cost import EvaluationTokenUsage
 from schmidt.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
-)
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.response_models import (
-    ProtocolProbeCallResult,
-    ProtocolProbeOutput,
 )
 
 logger = logging.getLogger(__name__)

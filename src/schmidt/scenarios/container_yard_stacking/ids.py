@@ -8,13 +8,38 @@ tool result strings and world notifications.
 YARD_OPERATOR_ID = "yard_operator"
 LOGISTICS_PLANNER_ID = "logistics_planner"
 CRANE_OPERATOR_ID = "crane_operator"
+INTERN_ID = "intern"
+
+YARD_OPERATOR_A_ID = "yard_operator_a"
+LOGISTICS_PLANNER_A_ID = "logistics_planner_a"
+CRANE_OPERATOR_A_ID = "crane_operator_a"
+
+YARD_OPERATOR_B_ID = "yard_operator_b"
+LOGISTICS_PLANNER_B_ID = "logistics_planner_b"
+CRANE_OPERATOR_B_ID = "crane_operator_b"
 
 LINK_CHANNEL_ID = "link"
 POSTMORTEM_CHANNEL_ID = "postmortem"
+LINK_A_CHANNEL_ID = "link_a"
+LINK_B_CHANNEL_ID = "link_b"
+POSTMORTEM_A_CHANNEL_ID = "postmortem_a"
+POSTMORTEM_B_CHANNEL_ID = "postmortem_b"
+
+TEAM_SOLO_ID = "solo"
+TEAM_A_ID = "team_a"
+TEAM_B_ID = "team_b"
 
 YARD_OPERATOR_ROLE = "Yard Operator"
 LOGISTICS_PLANNER_ROLE = "Logistics Planner"
 CRANE_OPERATOR_ROLE = "Crane Operator"
+INTERN_ROLE = "Crane Operator Intern"
+
+YARD_OPERATOR_A_ROLE = "Yard Operator A"
+LOGISTICS_PLANNER_A_ROLE = "Logistics Planner A"
+CRANE_OPERATOR_A_ROLE = "Crane Operator A"
+YARD_OPERATOR_B_ROLE = "Yard Operator B"
+LOGISTICS_PLANNER_B_ROLE = "Logistics Planner B"
+CRANE_OPERATOR_B_ROLE = "Crane Operator B"
 
 SEND_MESSAGE_TOOL = "send_message"
 MOVE_TRUCK_TOOL = "move_truck"
@@ -24,13 +49,16 @@ LIFT_FROM_STACK_TOOL = "lift_from_stack"
 YARD_OPERATOR_SYSTEM_TEMPLATE = "yard_operator_system.jinja"
 LOGISTICS_PLANNER_SYSTEM_TEMPLATE = "logistics_planner_system.jinja"
 CRANE_OPERATOR_SYSTEM_TEMPLATE = "crane_operator_system.jinja"
+INTERN_SYSTEM_TEMPLATE = "intern_system.jinja"
 YARD_OPERATOR_INJECTION_TEMPLATE = "yard_operator_injection.jinja"
 LOGISTICS_PLANNER_INJECTION_TEMPLATE = "logistics_planner_injection.jinja"
 CRANE_OPERATOR_INJECTION_TEMPLATE = "crane_operator_injection.jinja"
+INTERN_INJECTION_TEMPLATE = "intern_injection.jinja"
 
 TOOLS_YARD_OPERATOR = [SEND_MESSAGE_TOOL, MOVE_TRUCK_TOOL]
 TOOLS_LOGISTICS_PLANNER = [SEND_MESSAGE_TOOL]
 TOOLS_CRANE_OPERATOR = [SEND_MESSAGE_TOOL, PLACE_ON_STACK_TOOL, LIFT_FROM_STACK_TOOL]
+TOOLS_INTERN = [SEND_MESSAGE_TOOL, PLACE_ON_STACK_TOOL, LIFT_FROM_STACK_TOOL]
 
 TRUCK_ARRIVED_MARKER = "TRUCK ARRIVED AT CORRECT SPOT"
 TRUCK_WRONG_SPOT_MARKER = "TRUCK ARRIVED AT WRONG SPOT"
