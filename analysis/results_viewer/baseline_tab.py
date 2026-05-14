@@ -22,6 +22,7 @@ from analysis.results_viewer.baseline_data import (
     aggregate_by_budget,
     list_baseline_runs,
 )
+from analysis.results_viewer.measurement_scores import read_labels
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
 from analysis.results_viewer.series_plot import (
@@ -34,14 +35,29 @@ from analysis.results_viewer.series_plot import (
     series_color_map,
 )
 
-_SCENARIOS_WITH_BASELINE: tuple[str, ...] = ("veyru", "container_yard_stacking")
+
+def _scenarios_with_baseline_runs(evaluated: list[EvaluatedRun]) -> list[str]:
+    """Return every scenario that has at least one run labeled ``baseline``.
+
+    Auto-discovered from the loaded runs so any scenario whose runs ship
+    a ``baseline`` label appears in the radio selector without code
+    changes.
+    """
+    out: set[str] = set()
+    for run in evaluated:
+        if "baseline" in read_labels(run_dir=run.run_dir):
+            out.add(run.scenario_name)
+    return sorted(out)
 
 
-def _render_scenario_selector() -> str:
-    """Radio selector letting the user pick which scenario's baseline runs to view."""
+def _render_scenario_selector(evaluated: list[EvaluatedRun]) -> str | None:
+    """Radio selector listing every scenario that has baseline-labeled runs."""
+    options = _scenarios_with_baseline_runs(evaluated=evaluated)
+    if not options:
+        return None
     chosen = st.radio(
         label="Scenario",
-        options=_SCENARIOS_WITH_BASELINE,
+        options=options,
         index=0,
         horizontal=True,
         key="baseline_scenario_selector",
@@ -316,7 +332,13 @@ def _render_included_runs(
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Baseline tab body."""
-    scenario_name = _render_scenario_selector()
+    scenario_name = _render_scenario_selector(evaluated=evaluated)
+    if scenario_name is None:
+        st.info(
+            "No runs labeled 'baseline' found. Add the 'baseline' label and a "
+            "'budget=<N>' label to runs you want in this view."
+        )
+        return
     all_baseline = list_baseline_runs(evaluated_runs=evaluated, scenario_name=scenario_name)
     if not all_baseline:
         st.info(

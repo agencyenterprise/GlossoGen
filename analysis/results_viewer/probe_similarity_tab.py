@@ -564,13 +564,14 @@ def _render_text_grid(
 
 def _build_question_row(
     *,
+    scenario_name: str,
     question_id: str,
     cells_by_column_key: dict[str, GridCell],
     row_score: float | None,
     row_score_label: str,
 ) -> GridRow:
     """Wrap a per-column cell map into a ``GridRow`` keyed by question id."""
-    prompt = get_question_prompt(question_id=question_id)
+    prompt = get_question_prompt(scenario_name=scenario_name, question_id=question_id)
     return GridRow(
         row_key=question_id,
         title=question_id,
@@ -652,6 +653,7 @@ def _render_replica_self_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
                 )
             rows.append(
                 _build_question_row(
+                    scenario_name=chosen_run.scenario_name,
                     question_id=cell.cell_id.question_id,
                     cells_by_column_key=cells_by_column_key,
                     row_score=self_score,
@@ -800,6 +802,7 @@ def _render_compare_runs_subtab(probe_runs: list[ProbeSimilarityRun]) -> None:
             }
             rows.append(
                 _build_question_row(
+                    scenario_name=run_a.scenario_name,
                     question_id=question_id,
                     cells_by_column_key=cells_by_column_key,
                     row_score=score,
@@ -914,6 +917,7 @@ def _build_phase_columns(
 
 def _build_agent_rows_for_multi_swap(
     *,
+    scenario_name: str,
     agent_id: str,
     probe_run_id: str,
     phase_columns: list[_PhaseColumn],
@@ -958,6 +962,7 @@ def _build_agent_rows_for_multi_swap(
         if cells_by_column_key:
             rows.append(
                 _build_question_row(
+                    scenario_name=scenario_name,
                     question_id=question_id,
                     cells_by_column_key=cells_by_column_key,
                     row_score=None,
@@ -1069,6 +1074,7 @@ def _render_multi_swap_subtab(
     rows_per_agent: dict[str, list[GridRow]] = {}
     for agent_id in agent_ids:
         agent_rows = _build_agent_rows_for_multi_swap(
+            scenario_name=probe_run.scenario_name,
             agent_id=agent_id,
             probe_run_id=probe_run.run_id,
             phase_columns=phase_columns,
@@ -1225,6 +1231,7 @@ def _render_cross_team_grid(
             }
             rows.append(
                 _build_question_row(
+                    scenario_name=target.scenario_name,
                     question_id=question_id,
                     cells_by_column_key=cells_by_column_key,
                     row_score=row_score,

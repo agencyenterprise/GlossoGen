@@ -35,14 +35,26 @@ from analysis.results_viewer.verbosity_data import (
     list_verbosity_runs,
 )
 
-_SCENARIOS_WITH_VERBOSITY: tuple[str, ...] = ("veyru", "container_yard_stacking")
+
+def _scenarios_with_verbosity_runs(evaluated: list[EvaluatedRun]) -> list[str]:
+    """Return every scenario with at least one evaluated run.
+
+    The verbosity tab plots ``mean_chars_per_round`` / ``mean_chars_per_message``
+    against ``round_success`` — both come from the generic platform
+    registry, so any scenario that opts into ``get_primary_channel_id``
+    qualifies. Auto-discovered from the loaded runs.
+    """
+    return sorted({run.scenario_name for run in evaluated})
 
 
-def _render_scenario_selector() -> str:
-    """Radio selector letting the user pick which scenario's runs to view."""
+def _render_scenario_selector(evaluated: list[EvaluatedRun]) -> str | None:
+    """Radio selector listing every scenario that has evaluated runs."""
+    options = _scenarios_with_verbosity_runs(evaluated=evaluated)
+    if not options:
+        return None
     chosen = st.radio(
         label="Scenario",
-        options=_SCENARIOS_WITH_VERBOSITY,
+        options=options,
         index=0,
         horizontal=True,
         key="verbosity_scenario_selector",
@@ -568,7 +580,10 @@ def _render_summary_table(
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Verbosity tab body."""
-    scenario_name = _render_scenario_selector()
+    scenario_name = _render_scenario_selector(evaluated=evaluated)
+    if scenario_name is None:
+        st.info("No evaluated runs found.")
+        return
     all_runs = list_verbosity_runs(evaluated_runs=evaluated, scenario_name=scenario_name)
     if not all_runs:
         st.info(
