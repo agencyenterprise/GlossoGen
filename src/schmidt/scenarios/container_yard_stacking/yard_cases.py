@@ -129,9 +129,9 @@ _PAD_LABELS: list[str] = [
 
 # Per-round step-count distribution. Rounds 1-3 are forced to a single
 # step (mirrors veyru's ``_EASY_ROUND_NUMBERS`` bootstrap); from round 4
-# the count is drawn against ``_STEP_COUNT_WEIGHTS``. Mean ~= 1.85.
-_STEP_COUNT_VALUES: tuple[int, ...] = (1, 2, 3)
-_STEP_COUNT_WEIGHTS: tuple[int, ...] = (40, 35, 25)
+# the count is drawn against ``_STEP_COUNT_WEIGHTS``. Mean ~= 2.65.
+_STEP_COUNT_VALUES: tuple[int, ...] = (1, 2, 3, 4, 5)
+_STEP_COUNT_WEIGHTS: tuple[int, ...] = (20, 25, 20, 15, 15)
 _BOOTSTRAP_SINGLE_STEP_ROUNDS: frozenset[int] = frozenset({1, 2, 3})
 
 # Per-step blocker probability. Each step independently rolls whether
