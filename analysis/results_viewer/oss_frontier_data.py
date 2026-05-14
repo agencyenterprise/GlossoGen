@@ -13,14 +13,11 @@ from pathlib import Path
 from typing import NamedTuple
 
 from analysis.results_viewer.measurement_scores import (
-    measurement_score,
     perplexity_score,
     read_labels,
     round_success_score,
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun
-
-_LANGUAGE_EMERGENCE_METRIC = "language_emergence"
 
 _OSS_FRONTIER_LABEL = "oss_frontier"
 _BASELINE_OSS_LABEL = "baseline_oss"
@@ -49,7 +46,6 @@ class CellRun(NamedTuple):
     total_rounds: int
     round_success: float
     perplexity: float | None
-    language_emergence: float | None
     labels: list[str]
 
     def cell_key(self) -> str:
@@ -150,7 +146,6 @@ def list_oss_frontier_runs(evaluated: list[EvaluatedRun]) -> list[CellRun]:
         if score is None:
             continue
         ppl = perplexity_score(evaluated=run)
-        emergence = measurement_score(evaluated=run, metric_name=_LANGUAGE_EMERGENCE_METRIC)
         out.append(
             CellRun(
                 run_id=run.run_id,
@@ -163,7 +158,6 @@ def list_oss_frontier_runs(evaluated: list[EvaluatedRun]) -> list[CellRun]:
                 total_rounds=_total_rounds(evaluated=run),
                 round_success=float(score),
                 perplexity=float(ppl) if ppl is not None else None,
-                language_emergence=float(emergence) if emergence is not None else None,
                 labels=labels,
             )
         )

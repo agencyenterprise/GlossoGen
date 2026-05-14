@@ -147,6 +147,24 @@ class RoundEnded(EventBase):
     trigger: str
 
 
+class RoundResultRecorded(EventBase):
+    """Structured per-round result emitted by the scenario.
+
+    Emitted by the game clock immediately after ``on_round_ended`` runs,
+    one event per result returned by
+    :meth:`SimulationScenario.judge_round_result`. Single-team
+    scenarios emit one event per round with ``team_id=None``;
+    multi-team scenarios emit one event per team with ``team_id`` set.
+    Scenarios that do not override the hook emit nothing.
+    """
+
+    event_type: Literal["round_result_recorded"] = "round_result_recorded"
+    round_number: int
+    success: bool
+    team_id: str | None
+    reason: str
+
+
 class InjectionDelivered(EventBase):
     """Emitted when a scenario injection is delivered to an agent."""
 
@@ -244,6 +262,7 @@ _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
     RoundAdvanced,
     AgentRunCycleFailed,
     RoundEnded,
+    RoundResultRecorded,
     InjectionDelivered,
     PostmortemStarted,
     ChannelHistoryCleared,

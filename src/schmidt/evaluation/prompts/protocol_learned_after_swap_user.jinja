@@ -5,16 +5,17 @@ BOUNDARY ROUND: {{ boundary_round }}
 NEWCOMER AGENT(S): {{ newcomer_label }}
 
 Context by mode:
-- Two-team swap: Two isolated teams (Team A, Team B) each developed their own link-channel protocol over rounds 1..{{ boundary_round }}. After round {{ boundary_round }}, the two field observers were swapped between teams. Each team now has a new field observer who was not part of that team's protocol development. The swapped-in observer had been using their *own* team's protocol previously.
-- Intern takeover: A single team developed a link-channel protocol over rounds 1..{{ boundary_round - 1 }}. The silent intern observed these rounds. From round {{ boundary_round }} onwards, the intern replaced the field observer and now communicates on the link.
+- Two-team swap: Two isolated teams (Team A, Team B) each developed their own primary-channel protocol over rounds 1..{{ boundary_round }}. After round {{ boundary_round }}, the roles that swap between teams were swapped. Each team now has a new agent in that role who was not part of that team's protocol development. The swapped-in agent had been using their *own* team's protocol previously.
+- Intern takeover: A single team developed a primary-channel protocol over rounds 1..{{ boundary_round - 1 }}. The silent intern observed these rounds. From round {{ boundary_round }} onwards, the intern replaced the role they were shadowing and now communicates on the channel.
+- Scheduled swap: A specific agent was replaced mid-run via the platform's scheduled-events scheduler. The agent role stays the same; only the underlying instance changes. The new instance was instantiated at round {{ boundary_round }}.
 
 What counts as "the protocol":
-- Novel shorthand, abbreviations, letter/number codes for failure types or stabilization actions
+- Novel shorthand, abbreviations, letter/number codes for situations or actions
 - Structural conventions (e.g., "ACK"/"GO", numbered action lists, fixed slot orderings)
 - Coined terms or jargon that consistently map to specific domain concepts
 - Any regularity that the original pair clearly used to communicate efficiently
 
-Extending the convention counts as adoption: if the pre-boundary pattern was "two-letter state codes" and the newcomer introduces new two-letter codes that the engineer accepts without clarification, that is the newcomer using the protocol productively, not deviating from it.
+Extending the convention counts as adoption: if the pre-boundary pattern was "two-letter state codes" and the newcomer introduces new two-letter codes that the other agent accepts without clarification, that is the newcomer using the protocol productively, not deviating from it.
 
 Pre-boundary transcripts (rounds 1..{{ pre_boundary_last_round }}) — this is where the protocol was established:
 
@@ -42,11 +43,11 @@ Analyze:
 
 1. **Identify protocol elements**: What shorthand, codes, or conventions did the original pair(s) establish pre-boundary? Cite specific examples with round numbers. Set ``protocol_established`` to false if there is no identifiable protocol — there is nothing to transfer when this happens.
 
-2. **Identify the newcomer(s)**: In two-team swap mode, the newcomer in each team is the observer who swapped in from the other team. In intern mode, the newcomer is the intern acting as field observer. Look at who is sending messages in the post-boundary window.
+2. **Identify the newcomer(s)**: Look at who is sending messages in the post-boundary window. In two-team swap mode, the newcomer in each team is the agent who swapped in from the other team. In intern mode, the newcomer is the intern in their new role. In scheduled-swap mode, the newcomer is the swapped-in agent.
 
 3. **Per-round notes**: For EVERY post-boundary round where there is observable evidence of the newcomer either using the pre-established protocol or conspicuously failing to use it, return one entry in ``per_round_notes`` with the round number and a note describing the specific message(s) (with sender) and whether they extended, reverted from, or ignored the protocol. Include every round with observable evidence; skip rounds where the post-boundary newcomer did not contribute observable signal.
 
-   Grade functional protocol acquisition, not verbatim imitation. Coining new terms that follow the same convention (e.g., new two-letter state codes when that was the established pattern) counts as protocol use if the engineer accepts them without clarification. Repeated reversion to plain language, mid-round confusion that is not resolved, or imposing a different protocol counts as failing to use the protocol.
+   Grade functional protocol acquisition, not verbatim imitation. Coining new terms that follow the same convention (e.g., new two-letter state codes when that was the established pattern) counts as protocol use if the other agent accepts them without clarification. Repeated reversion to plain language, mid-round confusion that is not resolved, or imposing a different protocol counts as failing to use the protocol.
 
 4. **Explanation**: Provide a brief overall summary describing the newcomer's overall protocol-use behavior across the post-boundary window.
 

@@ -19,10 +19,23 @@ from schmidt.evaluation.metrics.mcm_metric import MCMMetric
 from schmidt.evaluation.metrics.mcr_metric import MCRMetric
 from schmidt.evaluation.metrics.neologism_metric import NeologismMetric
 from schmidt.evaluation.metrics.perplexity_metric import PerplexityMetric
+from schmidt.evaluation.metrics.protocol_learned_after_swap_metric import (
+    ProtocolLearnedAfterSwapMetric,
+)
+from schmidt.evaluation.metrics.protocol_probe import (
+    ProtocolProbeAgentPairSimilarityMetric,
+    ProtocolProbeCutoffTrajectoryMetric,
+    ProtocolProbeMetric,
+    ProtocolProbeReplicaSelfSimilarityMetric,
+)
 from schmidt.evaluation.metrics.round_ended.round_ended_idle_metric import RoundEndedIdleMetric
 from schmidt.evaluation.metrics.round_ended.round_ended_timeout_metric import (
     RoundEndedTimeoutMetric,
 )
+from schmidt.evaluation.metrics.round_success_after_resume_metric import (
+    RoundSuccessAfterResumeMetric,
+)
+from schmidt.evaluation.metrics.round_success_metric import RoundSuccessMetric
 from schmidt.evaluation.metrics.shorthand_codes_metric import ShorthandCodesMetric
 from schmidt.evaluation.metrics.slang_emergence_metric import SlangEmergenceMetric
 
@@ -35,8 +48,15 @@ _GENERIC_METRICS: list[type[Metric]] = [
     MCRMetric,
     NeologismMetric,
     PerplexityMetric,
+    ProtocolLearnedAfterSwapMetric,
+    ProtocolProbeMetric,
+    ProtocolProbeAgentPairSimilarityMetric,
+    ProtocolProbeCutoffTrajectoryMetric,
+    ProtocolProbeReplicaSelfSimilarityMetric,
     RoundEndedIdleMetric,
     RoundEndedTimeoutMetric,
+    RoundSuccessAfterResumeMetric,
+    RoundSuccessMetric,
     ShorthandCodesMetric,
     SlangEmergenceMetric,
 ]

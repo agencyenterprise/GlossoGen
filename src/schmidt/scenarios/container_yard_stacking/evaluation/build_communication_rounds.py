@@ -26,7 +26,13 @@ from schmidt.scenarios.container_yard_stacking.events import (
     ContainerYardStackSnapshot,
     ContainerYardTruckAssignment,
 )
-from schmidt.scenarios.container_yard_stacking.ids import LINK_CHANNEL_ID
+from schmidt.scenarios.container_yard_stacking.ids import (
+    LINK_A_CHANNEL_ID,
+    LINK_B_CHANNEL_ID,
+    LINK_CHANNEL_ID,
+)
+
+_LINK_CHANNEL_IDS = frozenset({LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNEL_ID})
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +197,7 @@ def _index_messages_by_round(
     for event in events:
         if not isinstance(event, MessageSent):
             continue
-        if event.message.channel_id != LINK_CHANNEL_ID:
+        if event.message.channel_id not in _LINK_CHANNEL_IDS:
             continue
         by_round.setdefault(event.round_number, []).append(
             CommunicationMessageLine(

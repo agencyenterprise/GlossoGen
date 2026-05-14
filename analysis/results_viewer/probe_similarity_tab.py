@@ -40,9 +40,7 @@ from analysis.results_viewer.probe_similarity_data import (
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.response_models import (
-    ProtocolProbeResponse,
-)
+from schmidt.evaluation.metrics.protocol_probe.response_models import ProtocolProbeResponse
 
 logger = logging.getLogger(__name__)
 

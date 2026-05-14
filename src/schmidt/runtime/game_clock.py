@@ -10,7 +10,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 
-from schmidt.models.event import RoundAdvanced, RoundEnded, RunStatus
+from schmidt.models.event import RoundAdvanced, RoundEnded, RoundResultRecorded, RunStatus
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.scenario_world import WorldContext
 from schmidt.runtime.simulation_state import SimulationRuntime
@@ -221,6 +221,18 @@ class GameClock:
                     round_number=self._runtime.current_round,
                     trigger=trigger,
                 )
+                for result in self._scenario.judge_round_result(
+                    round_number=self._runtime.current_round,
+                    trigger=trigger,
+                ):
+                    await self._event_logger.log(
+                        event=RoundResultRecorded(
+                            round_number=self._runtime.current_round,
+                            success=result.success,
+                            team_id=result.team_id,
+                            reason=result.reason,
+                        ),
+                    )
                 if self._runtime.has_postmortem_for_round(round_number=self._runtime.current_round):
                     self._in_postmortem = True
                     self._round_start_time = time.monotonic()

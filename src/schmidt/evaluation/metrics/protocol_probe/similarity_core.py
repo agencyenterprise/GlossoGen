@@ -6,9 +6,6 @@ all compute pairwise normalized Levenshtein similarity on ``response_text``.
 This module centralises:
 
 * JSONL loading (``load_probe_rows``).
-* Role-filter to role-name mapping (``ROLE_FILTER_TO_ROLE_NAMES``), shared
-  with ``protocol_probe_metric.py`` so question role filters map to the
-  same agent set used at probe time.
 * The pairwise similarity primitive (``pairwise_similarity_matrix``) on top
   of ``rapidfuzz.distance.Levenshtein.normalized_similarity``.
 * Pydantic artifact-row models reused across the three metrics
@@ -21,35 +18,12 @@ from pathlib import Path
 from pydantic import BaseModel
 from rapidfuzz.distance import Levenshtein
 
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.response_models import (
-    ProtocolProbeResponse,
-)
-from schmidt.scenarios.veyru.ids import (
-    FIELD_OBSERVER_A_ROLE,
-    FIELD_OBSERVER_B_ROLE,
-    FIELD_OBSERVER_ROLE,
-    STABILIZATION_ENGINEER_A_ROLE,
-    STABILIZATION_ENGINEER_B_ROLE,
-    STABILIZATION_ENGINEER_ROLE,
-)
+from schmidt.evaluation.metrics.protocol_probe.response_models import ProtocolProbeResponse
 
 logger = logging.getLogger(__name__)
 
 PROBE_RESPONSES_FILE_NAME = "protocol_probe_responses.jsonl"
 ARTIFACT_SCHEMA_VERSION = 1
-
-ROLE_FILTER_TO_ROLE_NAMES: dict[str, frozenset[str]] = {
-    "field_observer": frozenset(
-        {FIELD_OBSERVER_ROLE, FIELD_OBSERVER_A_ROLE, FIELD_OBSERVER_B_ROLE}
-    ),
-    "stabilization_engineer": frozenset(
-        {
-            STABILIZATION_ENGINEER_ROLE,
-            STABILIZATION_ENGINEER_A_ROLE,
-            STABILIZATION_ENGINEER_B_ROLE,
-        }
-    ),
-}
 
 
 class ProbeSimilarityCell(BaseModel):

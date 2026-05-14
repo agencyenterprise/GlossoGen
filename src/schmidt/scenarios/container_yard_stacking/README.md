@@ -33,12 +33,27 @@ Sees the round's active crane stations: their names, pads, and reachable-stack s
 
 ## Channels
 
+The scenario runs in one of three modes, selected by the `two_teams` / `intern_enabled` knobs (mutually exclusive).
+
+**Single-team mode (default)** — three agents, one link channel, one postmortem channel.
+
 | Channel ID    | Display Name     | Members                                       | Notes                      |
 |---------------|------------------|-----------------------------------------------|----------------------------|
 | link          | link             | Yard Operator, Logistics Planner, Crane Op    | Inspection-window-bound    |
 | postmortem    | team discussion  | Yard Operator, Logistics Planner, Crane Op    | Free discussion (when on)  |
 
-The link channel is the primary channel where character costs apply. The postmortem channel is available during the discussion phase and does not consume the window.
+**Two-team mode (`two_teams=true`)** — six agents (one yard operator, logistics planner, and crane operator per team) split across `team_a` and `team_b`. Each team has its own link and postmortem channel and works its own cases in parallel. At `swap_round + 1` the two crane operators swap teams (most procedural-knowledge-heavy role) so a team's protocol must be transmitted across that boundary.
+
+| Channel ID     | Members                                                |
+|----------------|--------------------------------------------------------|
+| link_a         | Yard Op A, Logistics Planner A, Crane Operator A → B   |
+| link_b         | Yard Op B, Logistics Planner B, Crane Operator B → A   |
+| postmortem_a   | Team A (subject to `postmortem_after_swap`)            |
+| postmortem_b   | Team B (subject to `postmortem_after_swap`)            |
+
+**Intern mode (`intern_enabled=true`)** — single team plus a silent intern. The intern joins the `link` channel at `intern_join_round` (read-only — every successful tool result is broadcast to the link channel for them to observe), and at `intern_takeover_round` replaces the crane operator for the rest of the run.
+
+The link channel (or each team's link channel in two-team mode) is the primary channel where character costs apply. Postmortem channels are available during the discussion phase and do not consume the window.
 
 ## Tools
 
@@ -108,16 +123,23 @@ A round only succeeds if every step completed: every step's expected trucks were
 
 ## Evaluation
 
-The scenario implements one specific metric and inherits all generic metrics through `_get_metrics()` + `super().get_available_metric_names()`.
+The scenario ships zero scenario-specific metrics — every measurement comes from the platform metric registry. The scenario opts in by implementing platform hooks:
 
-**`round_success`** — Deterministic; no LLM judge. Reads from the JSONL: `RoundAdvanced` (round count), `ContainerYardCaseStarted` (per-step expected truck and crane-move counts, summed across all steps for the round), `ContainerYardTruckJudged` (per-truck verdicts), `ContainerYardCraneMoveJudged` (per-round count of accepted moves), and `WorldEventDelivered` (matches `ROUND_SUCCESS_MARKER` and `BUDGET_EXCEEDED_MARKER`). A round counts as success only when the total accepted-truck and accepted-move counts hit the round's totals across all steps. Emits one Measurement with `score = succeeded / total_rounds`, plus a per-round observation explaining the first failure mode it sees.
+- `judge_round_result(round_number, trigger)` returns one `RoundResult` per team per round (single-team: one with `team_id=None`; two-team: one each for `team_a` and `team_b`). The game clock writes `RoundResultRecorded` events; the platform `round_success` metric reads them. Two-team mode emits `round_success_team_a` and `round_success_team_b` Measurements automatically.
+- `build_communication_rounds(events)` walks the JSONL and produces one `CommunicationRoundView` per round per link channel, joining link messages with the per-round case ground truth. Enables `communication_open_coding`, `communication_feature_presence`, and `protocol_learned_after_swap`.
+- `detect_protocol_boundary_window(events, agent_configs)` returns the crane-swap or intern-takeover boundary; falls back to the platform default (first `AgentSwappedMidRun`) otherwise.
+- `restore_state_from_events(events)` re-materialises per-team `YardOutcome` history on fork / resume / replace-agent so the first post-resume injection's "PREVIOUS RESULT" block reflects the source's actual round N-1 outcome.
 
-Useful generic metrics for this scenario:
+Useful platform metrics for this scenario:
 
+- **`round_success`** — Deterministic; fraction of rounds the team completed every truck and every crane move within the inspection window. Reads `RoundResultRecorded` events written from `judge_round_result`. Two-team mode emits `round_success_team_a` and `round_success_team_b`.
+- **`round_success_after_resume`** — Re-scores `round_success` over the post-resume window when the run was launched via replace-agent, cross-run replace-agent, or an in-run scheduled swap.
 - **`mean_chars_per_round`** — Total link-channel characters per round, averaged. Directly comparable to `time_budget_seconds` (one character = one second).
-- **`mean_chars_per_message`** — Per-message verbosity; removes the inflation that comes from round-by-round message count differences (blocker rounds need more back-and-forth than no-blocker rounds).
+- **`mean_chars_per_message`** — Per-message verbosity; removes the inflation from round-by-round message count differences (blocker rounds need more back-and-forth than no-blocker rounds).
 - **`perplexity`** — Mean per-token surprisal of link-channel messages under `gpt2`. Lower under heavy compression, higher under natural-language verbosity.
-- **`language_strangeness` / `slang_emergence` / `neologism` / `shorthand_codes`** — LLM-judged emergent-language metrics from the generic registry; the link channel returned by `get_primary_channel_id()` is what they read.
+- **`language_strangeness` / `slang_emergence` / `neologism` / `shorthand_codes`** — LLM-judged emergent-language metrics; the link channel returned by `get_primary_channel_id()` is what they read.
+- **`communication_open_coding` / `communication_feature_presence`** — Open-coding → ontology → relabel pipeline over the per-round transcript views.
+- **`protocol_learned_after_swap`** — Available in two-team mode (after the crane swap) and intern mode (after the intern takeover).
 - **`round_ended_idle` / `round_ended_timeout`** — Flag rounds that ended via agent idle vs wall-clock timeout (vs the more-common `round_completed` / `round_failed` scenario triggers).
 - **`content_filter_refusal`** — Counts `AgentRunCycleFailed` events with `error_type == ContentFilterError`.
 
@@ -135,7 +157,14 @@ Useful generic metrics for this scenario:
 | `max_round_duration_seconds`      | Wall-clock timeout per round (inherited)                                                                                           |
 | `model_overrides`                 | Per-agent model/provider overrides (inherited)                                                                                     |
 | `agent_max_tokens`                | Per-cycle output-token cap (inherited from `BaseKnobs`)                                                                            |
-| `replace_agent_default_channel_visibility` | Platform knob — empty by default, so both `link` and `postmortem` default to visible after a replace-agent swap. Postmortem tool calls in the replaced agent's reconstructed history are blocked separately via `get_replace_agent_blocked_tool_call_channels()` |
+| `two_teams`                       | Enables two-team mode (six agents, parallel `team_a` / `team_b` cases). Mutually exclusive with `intern_enabled`                   |
+| `swap_round`                      | Round at which the two teams' crane operators swap. Required when `two_teams=true`; must be `1..round_count-1`                     |
+| `announce_swap`                   | When true and `two_teams=true`, the world posts a swap notice on each team's link channel right after the swap fires              |
+| `postmortem_after_swap`           | When true, the swapped-in crane operators retain access to their new team's postmortem channel after the swap                      |
+| `intern_enabled`                  | Enables intern mode (4 agents: standard team + silent intern). Mutually exclusive with `two_teams`                                  |
+| `intern_join_round`               | Round at which the intern joins the link channel as a silent observer. Required when `intern_enabled=true`                          |
+| `intern_takeover_round`           | Round at which the intern replaces the crane operator. Required when `intern_enabled=true`; must be `> intern_join_round`           |
+| `replace_agent_default_channel_visibility` | Platform knob — `{"postmortem": false, "postmortem_a": false, "postmortem_b": false}` by default, so postmortem channels are dropped after a replace-agent swap. Postmortem tool calls in the replaced agent's reconstructed history are blocked separately via `get_replace_agent_blocked_tool_call_channels()` |
 | `scheduled_events`                | Platform knob — round-keyed `swap_agent` and `set_postmortem` events fired by the in-run scheduler                                 |
 
 ## Presets

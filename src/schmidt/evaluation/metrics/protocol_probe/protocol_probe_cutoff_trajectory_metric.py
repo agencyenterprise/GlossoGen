@@ -37,17 +37,15 @@ from rapidfuzz.distance import Levenshtein
 from schmidt.evaluation.metric_core.measurement import Measurement, RoundObservation
 from schmidt.evaluation.metric_core.metric_protocol import Metric
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
+from schmidt.evaluation.metrics.protocol_probe.response_models import ProtocolProbeResponse
+from schmidt.evaluation.metrics.protocol_probe.similarity_core import (
+    ARTIFACT_SCHEMA_VERSION,
+    load_probe_rows,
+)
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.response_models import (
-    ProtocolProbeResponse,
-)
-from schmidt.scenarios.veyru.evaluation.metrics.protocol_probe.similarity_core import (
-    ARTIFACT_SCHEMA_VERSION,
-    load_probe_rows,
-)
 
 logger = logging.getLogger(__name__)
 

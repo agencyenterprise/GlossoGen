@@ -21,17 +21,10 @@ import orjson
 
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from schmidt.evaluation.log_reader import extract_agent_configs, load_events
+from schmidt.evaluation.metric_core.resume_anchors import collect_advanced_round_numbers
+from schmidt.evaluation.metric_core.round_result_index import per_round_joint_success
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent
-from schmidt.scenarios.veyru.evaluation.metrics.round_success.scoring import (
-    TEAM_A_AGENT_IDS,
-    TEAM_B_AGENT_IDS,
-    collect_advanced_round_numbers,
-    compute_team_result,
-    filter_events_for_team,
-    is_two_team_mode,
-)
-from schmidt.scenarios.veyru.ids import LINK_A_CHANNEL_ID, LINK_B_CHANNEL_ID
 
 logger = logging.getLogger(__name__)
 
@@ -140,32 +133,13 @@ def _compute_round_outcomes(
     events: list[SimulationEvent],
     agent_configs: list[AgentConfig],
 ) -> dict[int, bool]:
-    """Per-round success boolean for every advanced round in ``events``."""
+    """Per-round joint-success boolean for every advanced round in ``events``."""
+    _ = agent_configs
     advanced = sorted(collect_advanced_round_numbers(events=events))
     if not advanced:
         return {}
-    if is_two_team_mode(agent_configs=agent_configs):
-        team_a_events = filter_events_for_team(
-            events=events,
-            agent_ids=TEAM_A_AGENT_IDS,
-            link_channel_id=LINK_A_CHANNEL_ID,
-        )
-        team_b_events = filter_events_for_team(
-            events=events,
-            agent_ids=TEAM_B_AGENT_IDS,
-            link_channel_id=LINK_B_CHANNEL_ID,
-        )
-        team_a_result = compute_team_result(
-            round_numbers=advanced, events=team_a_events, label="Team A"
-        )
-        team_b_result = compute_team_result(
-            round_numbers=advanced, events=team_b_events, label="Team B"
-        )
-        joint = set(team_a_result.won_rounds) & set(team_b_result.won_rounds)
-        return {round_number: round_number in joint for round_number in advanced}
-    solo_result = compute_team_result(round_numbers=advanced, events=events, label="solo")
-    won = set(solo_result.won_rounds)
-    return {round_number: round_number in won for round_number in advanced}
+    joint = per_round_joint_success(events=events)
+    return {round_number: joint.get(round_number, False) for round_number in advanced}
 
 
 _outcomes_cache: dict[Path, dict[int, bool]] = {}

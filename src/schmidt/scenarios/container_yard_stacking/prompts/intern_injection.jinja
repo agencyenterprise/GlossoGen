@@ -1,0 +1,14 @@
+{% include "_previous_round_result.jinja" %}
+{% if current_case is not none %}
+--- INTERN STATUS ---
+Round {{ round_number }}
+{% if intern_active %}
+You are the active crane operator from this round onwards. Inspection window: {{ current_case.time_budget_seconds }}s.
+
+ACTIVE CRANE STATIONS:
+{% for station in current_case.active_crane_stations %}- {{ station.station_name }} (pads: {{ station.pads | join(', ') }}) — can reach stacks: {{ station.reachable_stacks | join(', ') }}
+{% endfor %}
+{% else %}
+You are in silent-observation phase. Read everything on link. Do not call ``send_message`` — it will be rejected.
+{% endif %}
+{% endif %}

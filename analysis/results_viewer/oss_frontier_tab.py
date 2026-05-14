@@ -36,7 +36,6 @@ class _SeriesBucket(NamedTuple):
     n: int
     mean_round_success: float
     mean_perplexity: float | None
-    mean_language_emergence: float | None
 
 
 def _config_key(run: CellRun) -> str:
@@ -82,9 +81,6 @@ def _aggregate(runs: list[CellRun]) -> list[_SeriesBucket]:
         mean_ppl = _mean_or_none(
             values=[r.perplexity for r in replicas if r.perplexity is not None]
         )
-        mean_le = _mean_or_none(
-            values=[r.language_emergence for r in replicas if r.language_emergence is not None]
-        )
         out.append(
             _SeriesBucket(
                 config=config,
@@ -93,7 +89,6 @@ def _aggregate(runs: list[CellRun]) -> list[_SeriesBucket]:
                 n=len(replicas),
                 mean_round_success=mean_rs,
                 mean_perplexity=mean_ppl,
-                mean_language_emergence=mean_le,
             )
         )
     return out
@@ -109,13 +104,8 @@ def _format_cell_text(entry: _SeriesBucket | None) -> str:
         return "—"
     rs = f"rs: {entry.mean_round_success:.3f}"
     ppl = f"ppl: {entry.mean_perplexity:.2f}" if entry.mean_perplexity is not None else "ppl: —"
-    le = (
-        f"le: {entry.mean_language_emergence:.2f}"
-        if entry.mean_language_emergence is not None
-        else "le: —"
-    )
     n = f"n: {entry.n}"
-    return f"{rs}<br>{ppl}<br>{le}<br>{n}"
+    return f"{rs}<br>{ppl}<br>{n}"
 
 
 def _build_pivot_frames(
@@ -249,9 +239,6 @@ def _render_runs_table(runs: list[CellRun], frontend_base: str) -> None:
             "rounds": r.total_rounds,
             "round_success": float(r.round_success),
             "perplexity": (float(r.perplexity) if r.perplexity is not None else float("nan")),
-            "language_emergence": (
-                float(r.language_emergence) if r.language_emergence is not None else float("nan")
-            ),
             "run": f"{frontend_base}/runs/{r.run_id}",
         }
         for r in rows
@@ -266,7 +253,6 @@ def _render_runs_table(runs: list[CellRun], frontend_base: str) -> None:
         {
             "round_success": "{:.3f}",
             "perplexity": "{:.2f}",
-            "language_emergence": "{:.2f}",
         },
         na_rep="—",
     )
