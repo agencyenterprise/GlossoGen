@@ -120,7 +120,7 @@ For veyru cross-team experiments, set `--knobs` with `{"postmortem_disabled_at_s
 
 The cross-run API endpoint is `POST /api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent`. The path identifies Sim A; the body's `source_b_run_id` identifies Sim B.
 
-The same `round_success_after_resume` evaluator works for both replace-agent and cross-run flows; for cross-run runs the comparison is against Sim A over the same window.
+The same `round_success_after_resume` metric works for both replace-agent and cross-run flows; for cross-run runs the comparison is against Sim A over the same window.
 
 ## In-Run Agent Swaps via `scheduled_events`
 
@@ -144,7 +144,7 @@ Configure via the `scheduled_events` knob in the scenario config. Two event type
 
 `channel_visibility` is a per-channel discriminated union: `{"kind":"full"}` keeps all predecessor history visible; `{"kind":"none"}` hides the channel entirely; `{"kind":"from_round","round_floor":R}` windows the channel to round `R` onward. Channels not listed default to `Full`. Globally disabled channels (e.g. veyru's postmortem after `set_postmortem`) are forced to `none` by the runtime regardless of the swap config.
 
-Each swap emits an `AgentSwappedMidRun` event into the JSONL, writes a `resume_context_<agent_id>_round_<R>.json` file capturing the swapped-in agent's seed history, and invokes `ScenarioWorld.on_agent_swapped_mid_run` so the scenario can suppress prior-round injection content for the swapped-in agent's first turn. The frontend renders one tab per `(agent_id, generation)` and a dashed indigo divider in the chat pane between adjacent rounds that straddle a swap. The `round_success_after_resume` evaluator emits one Measurement per swap (named `round_success_after_resume_round_<R>_<agent_id>`) with the previous phase as the baseline. The Streamlit Multi-swap tab visualises per-phase round-success with Δ pp annotations between phases.
+Each swap emits an `AgentSwappedMidRun` event into the JSONL, writes a `resume_context_<agent_id>_round_<R>.json` file capturing the swapped-in agent's seed history, and invokes `ScenarioWorld.on_agent_swapped_mid_run` so the scenario can suppress prior-round injection content for the swapped-in agent's first turn. The frontend renders one tab per `(agent_id, generation)` and a dashed indigo divider in the chat pane between adjacent rounds that straddle a swap. The `round_success_after_resume` metric emits one Measurement per swap (named `round_success_after_resume_round_<R>_<agent_id>`) with the previous phase as the baseline. The Streamlit Multi-swap tab visualises per-phase round-success with Δ pp annotations between phases.
 
 ## Run Output Directory Structure
 
@@ -175,31 +175,42 @@ After a simulation completes, point `--run-dir` at the specific run directory. E
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
   --run-dir ./runs/veyru/1742234567 \
-  --metrics language_strangeness,language_emergence \
+  --metrics language_strangeness,shorthand_codes \
   --model claude-sonnet-4-6 --provider anthropic
 ```
 
-Generic metrics (available to all scenarios). Both deterministic and LLM-driven metrics return `Measurement` entries with `score`, `score_unit`, `summary`, structured `per_round`, and optional `per_agent` breakdowns:
+Generic metrics (available to every scenario, opt-in via the per-scenario hooks listed below). Both deterministic and LLM-driven metrics return `Measurement` entries with `score`, `score_unit`, `summary`, structured `per_round`, and optional `per_agent` breakdowns:
 
-- `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style (LLM judge)
-- `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames (LLM judge)
-- `neologism` — genuinely invented words with new meanings (LLM judge)
-- `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding (LLM judge)
-- `round_ended_idle` / `round_ended_timeout` — count rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger (deterministic, no LLM)
-- `content_filter_refusal` — counts LLM content-filter refusals during the run with per-agent breakdown
-- `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model (deterministic, no LLM judge)
-- `mean_chars_per_round` — mean total characters per round on the primary channel; the headline channel-utilization number that maps directly to Veyru's `time_budget_seconds` (deterministic, no LLM judge)
-- `mean_chars_per_message` — mean characters per primary-channel message, averaged across all messages; normalizes MCR by message count so rounds with more back-and-forth no longer inflate the score (deterministic, no LLM judge)
+Communication-style LLM judges (each scoped to one phenomenon so they don't overlap):
+- `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style
+- `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames
+- `neologism` — genuinely invented words with new meanings
+- `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding
 
-Scenario-specific metrics:
+Deterministic metrics (no LLM):
+- `round_ended_idle` / `round_ended_timeout` — count rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger
+- `content_filter_refusal` — counts LLM content-filter refusals with per-agent breakdown
+- `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model
+- `mean_chars_per_round` — mean total characters per round on the primary channel; the headline channel-utilization number that maps directly to Veyru's `time_budget_seconds`
+- `mean_chars_per_message` — mean characters per primary-channel message; normalizes MCR by message count so rounds with more back-and-forth no longer inflate the score
 
-- **veyru**: `language_emergence` (novel language in a fictional domain), `round_success` (per-round stabilization rate; emits one Measurement per team in two-team mode), `round_success_after_resume`, `protocol_learned_after_swap` (LLM judge), `protocol_probe` (probe each agent under its original model on a fixed test bank; writes `protocol_probe_responses.jsonl`; requires `--probe-replicas N`, optional `--probe-round R`), `protocol_probe_replica_self_similarity` / `protocol_probe_agent_pair_similarity` / `protocol_probe_cutoff_trajectory` (Levenshtein-based similarity over the probe responses; each writes its own matrix artifact for the streamlit "Probe similarity" tab), and the open-coding → ontology → relabel pipeline (see below).
+Round-success and post-swap metrics (powered by `judge_round_result` + manifests):
+- `round_success` — fraction of rounds judged a success by `judge_round_result`; one Measurement per `team_id` for multi-team scenarios
+- `round_success_after_resume` — same accounting restricted to the post-swap window of replace-agent / cross-run / in-run-swap runs, with a baseline comparison in `summary`
+
+Protocol metrics (powered by `build_communication_rounds`, `detect_protocol_boundary_window`, `get_protocol_probe_config`):
+- `protocol_learned_after_swap` — LLM judge: did the newcomer adopt the pre-existing protocol after a personnel change?
+- `protocol_probe` — probes each agent under its original model on a fixed scenario question bank; writes `protocol_probe_responses.jsonl`; requires `--probe-replicas N`, optional `--probe-round R`
+- `protocol_probe_replica_self_similarity` / `protocol_probe_agent_pair_similarity` / `protocol_probe_cutoff_trajectory` — Levenshtein-based similarity over the probe responses; each writes its own matrix artifact for the streamlit "Probe similarity" tab
+- `communication_open_coding` / `communication_feature_presence` — the open-coding → ontology → relabel pipeline (see below)
+
+Scenarios opt in by implementing the corresponding hook on `SimulationScenario`; a scenario without the hook returns `[]` for that metric and the measurement is simply absent from the report. Both Veyru and Salon currently implement every hook except `get_protocol_probe_config` (Salon does not yet ship a probe bank).
 
 Output is a JSON report under the `measurements` field; metrics no longer write `eval:*` labels to `labels.json`. Filter on `score` or on the `per_round` / `per_agent` lists directly.
 
 ### Auditing LLM-judge calls
 
-LLM-judge metrics emit their full system prompt, user prompt, and structured output via stdlib `logger.debug`. Set `LOG_LEVEL=DEBUG` in the environment and pipe stderr to a file to capture the exact text the judge saw and returned. The capture is the source of truth for "did the evaluator get all the data it needed and nothing else" — review it whenever a metric's output looks surprising.
+LLM-judge metrics emit their full system prompt, user prompt, and structured output via stdlib `logger.debug`. Set `LOG_LEVEL=DEBUG` in the environment and pipe stderr to a file to capture the exact text the judge saw and returned. The capture is the source of truth for "did the metric get all the data it needed and nothing else" — review it whenever a metric's output looks surprising.
 
 ```bash
 LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \

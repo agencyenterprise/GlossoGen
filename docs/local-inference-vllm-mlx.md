@@ -141,7 +141,7 @@ OPENAI_API_KEY=dummy
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
   --run-dir ./runs/veyru/<timestamp> \
-  --evaluators language_strangeness,language_emergence \
+  --metrics language_strangeness,shorthand_codes \
   --model mlx-community/Qwen2.5-14B-Instruct-4bit --provider openai
 ```
 

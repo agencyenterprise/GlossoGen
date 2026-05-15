@@ -462,6 +462,16 @@ Override values are auto-parsed as JSON: `rounds=5` becomes int, `enabled=true` 
 
 Check progress by reading the stdout log file or the JSONL event log.
 
+#### Knob co-dependencies: watch for cross-field validators
+
+Scenarios' knob Pydantic models can have cross-field validators that reject otherwise-valid-looking inline overrides. Toggling one knob without its sibling fails preflight validation, the schmidt run subprocess exits before claiming a run directory, and any orchestrator that simply launches and polls for a new dir will silently lose the spec.
+
+Known cases:
+
+- **veyru**: `postmortem_after_swap=true` requires `postmortem_enabled=true`. When sweeping with `postmortem_enabled=false`, also pass `postmortem_after_swap=false` (the default knobs JSON has it set to true).
+
+Defensive launcher pattern: when overriding a knob, also override every knob the scenario's `model_validator` checks against it. If you're unsure, run one foreground launch first to surface validation errors before queueing a sweep — those errors land in the launch's stdout/stderr log, not in the orchestrator log.
+
 ### Live Streaming
 
 Every `schmidt run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` manifest to the run directory. The `schmidt serve` process discovers this file and proxies the simulation's SSE stream to connected frontends. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing for the completed run.
