@@ -43,7 +43,7 @@ _MANIFEST_FILENAME = "bundle_manifest.json"
 
 
 def _should_include_in_bundle(path: Path, run_dir: Path) -> bool:
-    """Return True if the file should be included in the bundle tar.gz."""
+    """Return True if the file or directory should be included in the bundle tar.gz."""
     relative = path.relative_to(run_dir)
     name = relative.name
     if name in BUNDLE_EXCLUDED_NAMES:
@@ -83,13 +83,11 @@ def build_bundle_bytes(
     _pack_git_objects(run_dir=run_dir)
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
-        for file_path in sorted(run_dir.rglob("*")):
-            if not file_path.is_file():
+        for entry_path in sorted(run_dir.rglob("*")):
+            if not _should_include_in_bundle(path=entry_path, run_dir=run_dir):
                 continue
-            if not _should_include_in_bundle(path=file_path, run_dir=run_dir):
-                continue
-            arcname = str(file_path.relative_to(run_dir))
-            tar.add(name=str(file_path), arcname=arcname)
+            arcname = str(entry_path.relative_to(run_dir))
+            tar.add(name=str(entry_path), arcname=arcname, recursive=False)
 
         manifest = BundleManifest(
             run_id=run_id,
