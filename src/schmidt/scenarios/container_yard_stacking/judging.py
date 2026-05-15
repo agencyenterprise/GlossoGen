@@ -429,7 +429,20 @@ def _crane_failure_reason(
     sequence_already_exhausted: bool,
     structural_invariant_holds: bool,
 ) -> str:
-    """Build a specific failure-reason string from the crane verdict's per-criterion booleans."""
+    """Build a specific failure-reason string from the crane verdict's per-criterion booleans.
+
+    Short-circuit on root-cause conditions so we don't cascade the
+    move-correctness reasons (which become uninformative or misleading
+    once the round is already over, the step's sequence is done, or
+    the parsed input doesn't refer to anything in the live world state).
+    """
+    prefix = "Crane move rejected"
+    if round_already_failed:
+        return f"{prefix}: round was already terminally failed before this move."
+    if sequence_already_exhausted:
+        return f"{prefix}: all expected moves for this step have already been executed."
+    if not structural_invariant_holds:
+        return f"{prefix}: parsed source/destination did not match the live world state."
     reasons: list[str] = []
     if not matches_expected_next_move:
         reasons.append("move did not match the expected next step")
@@ -437,12 +450,6 @@ def _crane_failure_reason(
         reasons.append("source does not currently hold the named container")
     if not destination_currently_empty:
         reasons.append("destination is not currently empty")
-    if round_already_failed:
-        reasons.append("round was already terminally failed before this move")
-    if sequence_already_exhausted:
-        reasons.append("all expected moves for this step have already been executed")
-    if not structural_invariant_holds:
-        reasons.append("parsed source/destination did not match the live world state")
     if not reasons:
-        return "Crane move rejected."
-    return "Crane move rejected: " + "; ".join(reasons) + "."
+        return f"{prefix}."
+    return f"{prefix}: " + "; ".join(reasons) + "."
