@@ -108,7 +108,7 @@ def build_mcp_tools(
                 f"{assignment.station_name}, {pad}{container_clause}."
             )
         else:
-            explanation = _explain_truck_rejection(verdict=verdict)
+            explanation = _explain_truck_rejection(verdict=verdict, truck_role=truck_role)
         runtime = get_runtime()
         if runtime is not None:
             await runtime.event_logger.log(
@@ -350,11 +350,17 @@ def build_mcp_tools(
     ]
 
 
-def _explain_truck_rejection(verdict: ContainerYardTruckCommitVerdict) -> str:
-    """Build a human-readable rejection explanation from the per-criterion verdict."""
-    reasons: list[str] = []
+def _explain_truck_rejection(verdict: ContainerYardTruckCommitVerdict, truck_role: str) -> str:
+    """Build a human-readable rejection explanation from the per-criterion verdict.
+
+    When ``role_matches_active_assignment`` is False there is no assignment
+    to compare the station/pad/container against, so the other booleans
+    default to False and would produce a misleading cascade of reasons.
+    Short-circuit with one root-cause string in that case.
+    """
     if not verdict.role_matches_active_assignment:
-        reasons.append("the submitted truck_role is not active this round")
+        return "Truck commit rejected: the submitted truck_role is not active this round."
+    reasons: list[str] = []
     if not verdict.targets_correct_station:
         reasons.append("the submitted station does not match the assignment")
     if not verdict.targets_correct_pad:
@@ -363,7 +369,13 @@ def _explain_truck_rejection(verdict: ContainerYardTruckCommitVerdict) -> str:
             "or is already used by another truck"
         )
     if not verdict.carries_correct_container:
-        reasons.append("the submitted container_id does not match the assignment")
+        if truck_role == "outbound":
+            reasons.append(
+                "outbound truck must declare an empty container_id "
+                "(it leaves loaded by a later lift_from_stack call)"
+            )
+        else:
+            reasons.append("the submitted container_id does not match the assignment")
     if not reasons:
         return "Truck commit rejected."
     return "Truck commit rejected: " + "; ".join(reasons) + "."
