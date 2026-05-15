@@ -389,25 +389,36 @@ def _truck_failure_reason(
     role_known: bool,
     pad_already_used: bool,
 ) -> str:
-    """Build a specific failure-reason string from the truck verdict's per-criterion booleans."""
-    reasons: list[str] = []
+    """Build a specific failure-reason string from the truck verdict's per-criterion booleans.
+
+    When ``role_matches_active_assignment`` is False there is no assignment
+    to compare the station/pad/container against, so the other booleans
+    default to False and would produce a misleading cascade of reasons.
+    The function short-circuits in that case with one root-cause string.
+    """
+    prefix = f"{parsed_truck_role} truck did not arrive at the correct spot"
     if not role_matches_active_assignment:
-        reasons.append("role does not match any active assignment for this step")
-    elif not role_known:
-        reasons.append(f"no assignment matches the parsed role {parsed_truck_role!r}")
+        if role_known:
+            return f"{prefix}: role does not match any active assignment for this step."
+        return f"{prefix}: no assignment matches the parsed role {parsed_truck_role!r}."
+    reasons: list[str] = []
     if not targets_correct_station:
         reasons.append("destination text does not identify the correct crane station")
     if not targets_correct_pad:
         reasons.append("destination pad is not a free pad at the correct station")
     if not carries_correct_container:
-        reasons.append("inbound text does not name the correct incoming container")
+        if parsed_truck_role == "outbound":
+            reasons.append(
+                "outbound truck must declare an empty container_id "
+                "(it leaves loaded by a later lift_from_stack call)"
+            )
+        else:
+            reasons.append("container_id does not match the assignment's incoming container")
     if pad_already_used:
         reasons.append("destination pad is already used by another truck this step")
     if not reasons:
-        return f"{parsed_truck_role} truck did not arrive at the correct spot."
-    return (
-        f"{parsed_truck_role} truck did not arrive at the correct spot: " + "; ".join(reasons) + "."
-    )
+        return f"{prefix}."
+    return f"{prefix}: " + "; ".join(reasons) + "."
 
 
 def _crane_failure_reason(
