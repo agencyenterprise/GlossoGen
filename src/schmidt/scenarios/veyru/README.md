@@ -123,11 +123,11 @@ When `postmortem_enabled` is true, a discussion phase follows each round. Both a
 
 ## Evaluation
 
-Veyru metrics implement the generic `Metric` abstraction and return `Measurement` entries (`score`, `score_unit`, `summary`, `per_round`, `per_agent`).
+Veyru opts into platform metrics by implementing the scenario-level hooks (`judge_round_result`, `build_communication_rounds`, `detect_protocol_boundary_window`, `get_protocol_probe_config`, `restore_state_from_events`, `get_replace_agent_blocked_tool_call_channels`). Every metric described below is a platform metric living under [`src/schmidt/evaluation/metrics/`](../../evaluation/metrics/) — Veyru ships no scenario-private metric classes. All metrics return `Measurement` entries (`score`, `score_unit`, `summary`, `per_round`, `per_agent`).
 
-**`language_emergence`** — Did agents develop novel compressed language? Extracts per-round transcripts and uses an LLM judge to detect novel abbreviations or codes, compression over time, shared conventions adopted by both agents, and structural innovation. The `score` is the count of rounds where the judge observed novel language patterns; `per_round` carries one observation per flagged round with the judge's note.
+The communication-style metrics (`language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`) replace the older single `language_emergence` metric; each LLM-judge prompt scopes a single phenomenon so the metrics are non-overlapping.
 
-**`round_success`** — How many rounds did the team stabilize the Veyru before collapse? Deterministic (no LLM): scans `ToolResultReceived` and `WorldEventDelivered` events for success and collapse markers. Single-team mode emits one `Measurement` (`metric_name="round_success"`); two-team mode emits two — `round_success_team_a` and `round_success_team_b` — each with its own per-team `per_round` outcomes.
+**`round_success`** — How many rounds did the team stabilize the Veyru before collapse? Deterministic. The platform reads `RoundResultRecorded` events written by the game clock from `judge_round_result`. Single-team mode emits one `Measurement` (`metric_name="round_success"`); two-team mode emits two — `round_success_team_a` and `round_success_team_b` — each with its own per-team `per_round` outcomes.
 
 **`round_success_after_resume`** — Same accounting as `round_success` but restricted to the rounds played after a swap (either replace-agent or cross-run replace-agent). The metric reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor`. Re-scores the source run (Sim A in cross-run flows — i.e. the timeline that was modified) over the same round window and includes the resumed-vs-source delta in `summary`. Two-team mode splits into `round_success_after_resume_team_a` / `_team_b`. Returns a zero-score measurement on runs without either manifest.
 

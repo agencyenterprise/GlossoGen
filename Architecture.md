@@ -22,7 +22,7 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 | Run Storage         | Filesystem: `runs/{scenario}/{unix_timestamp}/`              |
 | End Conditions      | Scenario-defined round count + max round duration            |
 | Entrypoint          | CLI (`python -m schmidt run|evaluate|serve|replace-agent|cross-run-replace-agent`)   |
-| Metrics             | Post-hoc LLM-as-judge, user-selected evaluators, JSON report |
+| Metrics             | Post-hoc LLM-as-judge, user-selected metrics, JSON report   |
 | Web Server          | FastAPI with structured Pydantic response models             |
 | Frontend            | Next.js 16, React 19, TypeScript (strict), Tailwind CSS v4   |
 | API Client          | openapi-fetch with generated types from OpenAPI schema       |
@@ -344,11 +344,11 @@ Same as replace-agent, the supervisor calls `write_resume_context_files` at resu
 ### Key Modules
 
 - `cross_run_replace_agent.py` — `CrossRunReplaceAgentRequest`/`CrossRunReplaceAgentResult` named tuples, `_resolve_source_b_cutoff_event_id`, `_compute_blocked_tool_call_channels`, and `cross_run_replace_agent_in_run` (shared core called by both CLI and HTTP layers)
-- `cross_run_replace_manifest.py` — `CrossRunReplaceManifest` Pydantic model + `read_cross_run_replace_manifest` reader (kept separate from `replace_manifest.py` so evaluators / discovery can dispatch on file presence)
+- `cross_run_replace_manifest.py` — `CrossRunReplaceManifest` Pydantic model + `read_cross_run_replace_manifest` reader (kept separate from `replace_manifest.py` so metrics / discovery can dispatch on file presence)
 - `message_rewind.py` — `AgentHistoryFilter` extended with `imported: ImportedHistory | None`; `_find_imported_registration` looks up the imported agent's `AgentRegistered` in the imported event stream
 - `server/runs/cross_run_replace_agent_router.py` — `POST /api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent` thin HTTP wrapper; resolves `--source-b-round-end` and `--model`/`--provider` defaults at the edge
 - `cli.py` `_run_cross_run_replace_agent` + `_resolve_source_b_max_round` + `_resolve_imported_model_from_source_b` — CLI subcommand implementation
-- `scenarios/veyru/evaluation/metrics/round_success/round_success_after_resume_metric.py` — reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (so the same metric works for both flows)
+- `evaluation/metrics/round_success_after_resume_metric.py` — reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (so the same metric works for both flows)
 
 ### Provenance
 
@@ -415,7 +415,7 @@ The filter applies to every caller that builds an agent history with a `FromRoun
 - `models/event.py` — `AgentSwappedMidRun`, `PostmortemDisabledMidRun` event types
 - `message_history_builder.py` — notification round-floor derivation + filter
 - `resume_context_writer.py` — `write_swap_resume_context_file`
-- `scenarios/veyru/evaluation/metrics/round_success/round_success_after_resume_metric.py` — walks every `AgentSwappedMidRun` event and emits one Measurement per anchor (named `round_success_after_resume_round_<R>_<agent_id>`); the in-run baseline window is the previous phase in the same run
+- `evaluation/metrics/round_success_after_resume_metric.py` — walks every `AgentSwappedMidRun` event and emits one Measurement per anchor (named `round_success_after_resume_round_<R>_<agent_id>`); the in-run baseline window is the previous phase in the same run
 
 ### FE Per-Agent-Instance Tabs
 
@@ -447,10 +447,23 @@ The user selects which metrics to run — they are not automatically applied.
 - `mean_chars_per_round` — total characters of all primary-channel messages summed per round, then averaged across rounds with at least one message. Same scoping rule as `perplexity`. The score is the mean of per-round totals; `per_round` lists each round's total chars + message count. The headline channel-utilization number; in Veyru this is exactly the unit that ``time_budget_seconds`` is denominated in. No LLM judge.
 - `mean_chars_per_message` — characters per individual primary-channel message, averaged across all messages in the run (flattened, not mean of round means). Same scoping rule as `perplexity`. The score is the overall mean chars/message; `per_round` carries per-round mean+std+message_count. Normalizes MCR by message count, isolating per-message verbosity from message density — MCR is biased upward by rounds that simply need more back-and-forth. No LLM judge.
 
-The LLM-judge metrics (`language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`, `language_emergence`, `protocol_learned_after_swap`) share a common flow: build per-round transcripts from `MessageSent` events, render a Jinja2 prompt, call the LLM judge with a structured output schema (returning `per_round_notes: list[RoundNote]`), and turn each `RoundNote` into a `RoundObservation`. The deterministic metrics skip the prompt+LLM step entirely.
+The LLM-judge metrics (`language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`, `protocol_learned_after_swap`, `communication_open_coding`, `communication_feature_presence`) share a common flow: build per-round transcripts from `MessageSent` events (LLM-judge metrics that need ground-truth per-round case state go through `scenario.build_communication_rounds(events)` instead), render a Jinja2 prompt, call the LLM judge with a structured output schema (returning `per_round_notes: list[RoundNote]` or similar), and turn each note into a `RoundObservation`. The deterministic metrics skip the prompt+LLM step entirely.
 
-**Scenario-specific metrics:**
-- **veyru**: `language_emergence` (novel language in the Veyru domain), `protocol_learned_after_swap` (whether a newcomer adopted the pre-established protocol after a personnel change), `round_success` (per-round stabilization success — emits one `Measurement` per team in two-team mode), `round_success_after_resume` (same accounting restricted to post-replace-agent rounds, with source-run comparison in `summary`), `protocol_probe` (probes each agent against a fixed test bank under its original model; writes `protocol_probe_responses.jsonl`), `protocol_probe_replica_self_similarity` / `protocol_probe_agent_pair_similarity` / `protocol_probe_cutoff_trajectory` (deterministic Levenshtein-based similarity metrics that read the probe JSONL, write per-matrix JSON artifacts for the Streamlit "Probe similarity" tab, and emit zero-score Measurements when their prerequisites — ≥2 replicas, two-team agents in the same role, or ≥2 distinct cutoff_round values — are not met)
+**Scenario-specific metrics:** there are no scenario-private metric classes any more. Every scoring concept — round success, post-swap re-scoring, communication-feature analysis, protocol probing — is platform code that consumes scenario data through hooks on `SimulationScenario`:
+
+| Platform metric | Required scenario hook |
+|---|---|
+| `round_success`, `round_success_after_resume` | `judge_round_result(round_number, trigger) -> list[RoundResult]` |
+| `protocol_learned_after_swap` | `detect_protocol_boundary_window(...)` + `build_communication_rounds(events)` |
+| `communication_open_coding`, `communication_feature_presence` | `build_communication_rounds(events)` |
+| `protocol_probe`, `protocol_probe_*_similarity`, `protocol_probe_cutoff_trajectory` | `get_protocol_probe_config()` |
+
+A scenario that does not implement a given hook returns `[]` from the corresponding metric and the measurement is simply absent from the report — there is no zero-score sentinel.
+
+**Salon-specific metrics:**
+- `covert_success_rate` (deterministic; full-success rate from `submit_decode` / `submit_intercept` events compared against the seeded directive sequence)
+- `covertness_judge` (LLM judge on public-only transcripts; verdict ∈ {PASS, PARTIAL, FAIL} → `score` ∈ {1.0, 0.5, 0.0})
+- `protocol_stability` (LLM judge on primer + public transcripts; same verdict mapping)
 
 **No automatic labels**: Metrics no longer write `eval:*` labels into `labels.json`. Filter on `score` or on the `per_round` / `per_agent` lists directly.
 
@@ -490,7 +503,7 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 - CORS origins are read from the `ALLOWED_ORIGINS` environment variable (comma-separated). Defaults to `http://localhost:3000`.
 - Optional shared-password authentication via `APP_PASSWORD` environment variable. A pure ASGI middleware (`password_auth_middleware.py`) checks `Authorization: Bearer` headers and `?token=` query parameters (for SSE EventSource connections). All REST endpoints except `GET /api/health` are protected when enabled. The `/mcp` path and OAuth well-known endpoints are excluded from password auth — the MCP server uses its own OAuth-based authentication.
 - Every endpoint declares a `response_model` and returns a Pydantic model instance. No dicts or strings are returned.
-- Status-like fields use enums (`HealthStatus`, `RunStatus`, `Verdict`) instead of bare strings. `RunStatus` includes `IN_PROGRESS` for runs that have not yet completed.
+- Status-like fields use enums (`HealthStatus`, `RunStatus`) instead of bare strings. `RunStatus` includes `IN_PROGRESS` for runs that have not yet completed.
 - The run detail endpoint returns separate `messages` (ChannelMessage) and `reasoning` (ReasoningEntry) arrays, plus `debug_logs` (DebugLogEntry) parsed from the debug JSONL file.
 
 ### MCP Runs Browser
@@ -501,7 +514,7 @@ The MCP server exposes eight tools:
 
 | Tool                   | Description                                                                                      |
 | ---------------------- | ------------------------------------------------------------------------------------------------ |
-| `list_scenarios`       | Lists available scenarios with knobs files, evaluators, and supported models/providers           |
+| `list_scenarios`       | Lists available scenarios with knobs files, metrics, and supported models/providers              |
 | `list_runs`            | Paginated run listing with filtering by scenario, model, fork status, and run status             |
 | `get_run_metadata`     | Lightweight metadata for a single run: agents, channels, configuration, evaluation summary       |
 | `get_run`              | Full run content with messages; opt-in sections for reasoning, tool use, debug logs, system prompts; filtering by agent or channel |
@@ -548,11 +561,11 @@ The frontend includes an MCP integration modal (accessible via the **MCP** butto
 
 ## Results Viewer (Streamlit)
 
-A separate Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round evaluator scores across multiple evaluated runs. It is a read-only consumer of the standard run output (`runs/{scenario}/{ts}/{scenario}_report.json` plus the JSONL event log) — no API or backend coupling.
+A separate Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round metric scores across multiple evaluated runs. It is a read-only consumer of the standard run output (`runs/{scenario}/{ts}/{scenario}_report.json` plus the JSONL event log) — no API or backend coupling.
 
-- `run_catalog.py` — discovers runs that have an evaluator report.
+- `run_catalog.py` — discovers runs that have a metric report.
 - `event_extractor.py` — derives a per-round timeline from the JSONL events.
-- `timeline_plot.py` — builds a Plotly figure overlaying multiple runs' evaluator scores per round.
+- `timeline_plot.py` — builds a Plotly figure overlaying multiple runs' metric scores per round.
 - `multi_swap_data.py` / `multi_swap_tab.py` — per-phase round-success visualisation for runs with one or more `AgentSwappedMidRun` events. Renders one bar per phase plus Δ pp annotations between adjacent phases. Loads runs concurrently via `asyncio.gather` + `asyncio.to_thread`, skips non-multi-swap runs through a byte-level pre-scan for the swap-event marker, and persists per-run results to `multi_swap_cache.json` keyed on JSONL size + mtime.
 - `probe_similarity_data.py` / `probe_similarity_tab.py` — Levenshtein-based comparisons over the per-run `protocol_probe_*.json` artifacts and the raw `protocol_probe_responses.jsonl`. A single multi-select at the top of the tab drives four sub-views: replica self-similarity (per-run consistency across replicas), agent-pair similarity (cross-agent agreement in two-team runs), cross-run model-vs-model (live pairwise matrix on a user-chosen `(question_id, role)` slice — the only place this tab does live Levenshtein), and cutoff trajectory (adjacent-cutoff drift). The data layer is cache-free — the per-run metric classes already cached the heavy work to disk.
 - `app.py` — Streamlit entrypoint; reads `SCHMIDT_RUNS_DIR`, lets the user multiselect runs.
