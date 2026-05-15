@@ -27,6 +27,7 @@ from analysis.results_viewer.series_plot import (
     render_horizontal_checkboxes,
     series_color_map,
 )
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.timeline_plot import palette_color_for_index
 from analysis.results_viewer.verbosity_data import (
     VERBOSITY_METRIC_OPTIONS,
@@ -580,6 +581,8 @@ def _render_summary_table(
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Verbosity tab body."""
+    seed_mode = seed_mode_filter.render_radio(key_prefix="verbosity")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
     scenario_name = _render_scenario_selector(evaluated=evaluated)
     if scenario_name is None:
         st.info("No evaluated runs found.")

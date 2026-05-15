@@ -19,6 +19,7 @@ import pandas as pd
 import streamlit as st
 from matplotlib.colors import to_hex
 
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.oss_frontier_data import CellRun, list_oss_frontier_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
 
@@ -281,6 +282,8 @@ def _render_frontend_base() -> str:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the OSS-vs-Frontier comparison tab as a colored pivot table."""
+    seed_mode = seed_mode_filter.render_radio(key_prefix="oss_frontier")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
     st.header("OSS vs Frontier — round_success comparison")
     st.caption(
         "Mean round_success per configuration, with PM enabled / disabled merged "

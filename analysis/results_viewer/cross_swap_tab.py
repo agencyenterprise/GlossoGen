@@ -17,6 +17,7 @@ import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
 
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.cross_swap_data import CrossSwapRun, list_cross_swap_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.series_plot import (
@@ -587,6 +588,8 @@ def _render_included_runs(runs: list[CrossSwapRun]) -> None:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Cross-swap tab body."""
+    seed_mode = seed_mode_filter.render_radio(key_prefix="cross_swap")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
     all_cross_swap = list_cross_swap_runs(evaluated_runs=evaluated)
     if not all_cross_swap:
         st.info(

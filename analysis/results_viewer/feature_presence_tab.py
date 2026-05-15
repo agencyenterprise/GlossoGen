@@ -39,6 +39,7 @@ from analysis.results_viewer.feature_presence_data import (
 )
 from analysis.results_viewer.natural_sort import natural_sort_key
 from analysis.results_viewer.run_catalog import EvaluatedRun
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.run_link import render_frontend_base, run_url
 from analysis.results_viewer.series_plot import render_horizontal_checkboxes
 from schmidt.evaluation.metrics.communication.label_models import ontology_dir_for_scenario
@@ -545,6 +546,8 @@ def _format_run_picker_option(run: FeaturePresenceRun) -> str:
 
 def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
     """Render the "Language features" tab end to end."""
+    seed_mode = seed_mode_filter.render_radio(key_prefix="feature_presence")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
     all_runs = list_feature_presence_runs(evaluated_runs=evaluated)
     if not all_runs:
         st.info(
