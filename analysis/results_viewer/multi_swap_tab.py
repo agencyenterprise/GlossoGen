@@ -10,6 +10,7 @@ round count, wins, and score. Only runs containing at least one
 import plotly.graph_objects as go
 import streamlit as st
 
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.multi_swap_data import MultiSwapRun, PhaseScore, list_multi_swap_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
@@ -197,6 +198,8 @@ def _run_picker_label(multi_swap: MultiSwapRun) -> str:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the multi-swap tab body."""
+    seed_mode = seed_mode_filter.render_radio(key_prefix="multi_swap")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
     st.markdown(
         "Visualise per-phase round-success for runs with one or more in-run "
         "agent swaps. Each bar is one phase between adjacent swaps; Δ pp "

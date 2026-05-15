@@ -8,6 +8,7 @@ achieved over the same window. Only runs labeled ``resume`` are eligible.
 import plotly.graph_objects as go
 import streamlit as st
 
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.resume_data import ResumeRun, list_resume_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
@@ -280,6 +281,8 @@ def _render_included_runs(runs: list[ResumeRun], frontend_base: str) -> None:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Resume tab body."""
+    seed_mode = seed_mode_filter.render_radio(key_prefix="resume")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
     all_resume = list_resume_runs(evaluated_runs=evaluated)
     if not all_resume:
         st.info(

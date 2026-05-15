@@ -16,6 +16,7 @@ from analysis.results_viewer.timeline_plot import (
     collect_value_metrics,
     palette_color_for_index,
 )
+from analysis.results_viewer import seed_mode_filter
 from schmidt.evaluation.metric_core.measurement import Measurement
 from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 
@@ -259,6 +260,8 @@ def _render_value_metric_checkboxes(available: list[str]) -> list[str]:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Timeline tab body."""
+    seed_mode = seed_mode_filter.render_radio(key_prefix="timeline")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
     if not evaluated:
         st.info("No evaluated runs found. Run `schmidt evaluate <scenario> --run-dir ...` first.")
         return
