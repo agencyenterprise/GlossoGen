@@ -197,15 +197,18 @@ def list_verbosity_runs(
 def _resolve_budget(evaluated: EvaluatedRun) -> int | None:
     """Resolve the run's character/time budget from its scenario config.
 
-    Scenarios with a per-round communication budget (Veyru,
-    container_yard_stacking) carry ``time_budget_seconds`` in the
+    Scenarios with a per-round communication budget carry the budget in
     ``scenario_config`` written into the JSONL at simulation start; one
     character on the primary channel costs one second against that
-    budget. Returns ``None`` when the scenario doesn't expose the field.
+    budget. The knob name differs across scenarios (veyru uses
+    ``round_time_budget_seconds``; container_yard_stacking uses
+    ``time_budget_seconds``), so check both. Returns ``None`` when the
+    scenario doesn't expose either field.
     """
-    value = evaluated.metadata.scenario_config.get("time_budget_seconds")
-    if isinstance(value, (int, float)):
-        return int(value)
+    for budget_knob in ("round_time_budget_seconds", "time_budget_seconds"):
+        value = evaluated.metadata.scenario_config.get(budget_knob)
+        if isinstance(value, (int, float)):
+            return int(value)
     return None
 
 

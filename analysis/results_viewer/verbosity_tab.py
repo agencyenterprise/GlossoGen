@@ -17,6 +17,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
 from analysis.results_viewer.series_plot import (
@@ -27,7 +28,6 @@ from analysis.results_viewer.series_plot import (
     render_horizontal_checkboxes,
     series_color_map,
 )
-from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.timeline_plot import palette_color_for_index
 from analysis.results_viewer.verbosity_data import (
     VERBOSITY_METRIC_OPTIONS,
@@ -581,8 +581,8 @@ def _render_summary_table(
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Verbosity tab body."""
-    seed_mode = seed_mode_filter.render_radio(key_prefix="verbosity")
-    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
+    run_filter = seed_mode_filter.render_filters(key_prefix="verbosity")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     scenario_name = _render_scenario_selector(evaluated=evaluated)
     if scenario_name is None:
         st.info("No evaluated runs found.")

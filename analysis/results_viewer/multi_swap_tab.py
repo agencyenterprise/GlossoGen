@@ -198,8 +198,8 @@ def _run_picker_label(multi_swap: MultiSwapRun) -> str:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the multi-swap tab body."""
-    seed_mode = seed_mode_filter.render_radio(key_prefix="multi_swap")
-    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
+    run_filter = seed_mode_filter.render_filters(key_prefix="multi_swap")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     st.markdown(
         "Visualise per-phase round-success for runs with one or more in-run "
         "agent swaps. Each bar is one phase between adjacent swaps; Δ pp "
