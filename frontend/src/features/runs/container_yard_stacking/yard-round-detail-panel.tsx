@@ -55,7 +55,7 @@ export function YardRoundDetailPanel({ roundNumber, extras }: YardRoundDetailPan
           {yardCase.steps.length} delivery{yardCase.steps.length === 1 ? "" : "ies"}
         </span>
         <span className="ml-auto text-[11px] text-muted-foreground">
-          budget {yardCase.time_budget_seconds}s
+          budget {yardCase.round_time_budget_seconds}s
         </span>
       </div>
 
