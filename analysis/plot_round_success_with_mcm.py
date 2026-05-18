@@ -10,8 +10,6 @@ PNGs to the current working directory:
 * ``mean_chars_per_message.png`` — single-Y MCM-only chart.
 """
 
-from __future__ import annotations
-
 import json
 import math
 from collections import defaultdict
