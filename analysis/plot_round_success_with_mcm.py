@@ -3,11 +3,14 @@
 Reads every Veyru run carrying every label in ``_REQUIRED_LABELS``, pulls each
 run's per-round observations from ``round_success`` and
 ``mean_chars_per_message``, aggregates by round across runs, and writes three
-PNGs to the current working directory:
+PNGs to the ``analysis/`` directory:
 
-* ``round_success_with_mcm.png`` — dual-Y combined chart.
+* ``round_success_with_mcm.png`` — two stacked panels (success on top, MCM below).
 * ``round_success.png`` — single-Y success-rate-only chart.
 * ``mean_chars_per_message.png`` — single-Y MCM-only chart.
+
+All plots use the doubled font sizes in ``_LARGE_FONT_RCPARAMS`` so the
+chart text reads at presentation scale.
 """
 
 import json
@@ -20,6 +23,17 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.ticker import PercentFormatter
 
+# matplotlib defaults are ~10pt; doubling lands every label at presentation scale.
+_LARGE_FONT_RCPARAMS = {
+    "font.size": 29,
+    "axes.titlesize": 35,
+    "axes.labelsize": 31,
+    "xtick.labelsize": 29,
+    "ytick.labelsize": 29,
+    "legend.fontsize": 29,
+    "figure.titlesize": 41,
+}
+
 _SCENARIO_NAME = "veyru"
 _REQUIRED_LABELS = ("random_seed", "no_ordered_easy_rounds")
 _ROUND_SUCCESS_METRIC = "round_success"
@@ -29,11 +43,9 @@ _SUCCESS_PATH = Path("analysis/round_success.png")
 _MCM_PATH = Path("analysis/mean_chars_per_message.png")
 _RUN_TIMESTAMP_FLOOR = 1778877800  # first launch of the no_ordered_easy_rounds cohort
 
-_COMBINED_TITLE = "Success holds up across rounds while messages get shorter"
 _MCM_TITLE = "Message length compresses across rounds"
 
 _SUCCESS_COLOR = "#1f3a93"
-_MCM_COLOR = "#c1440e"
 
 
 def _read_labels(run_dir: Path) -> list[str]:
@@ -314,8 +326,10 @@ def _write_combined_plot(
     mcm_stds: list[float],
     mcm_by_round: dict[int, list[float]],
 ) -> None:
-    """Dual-Y chart: success rate (left) + MCM (right). Both axes carry replica dots."""
-    fig, ax_success = plt.subplots(figsize=(12, 5))
+    """Two stacked panels sharing the X axis: success rate on top, MCM below."""
+    fig, (ax_success, ax_mcm) = plt.subplots(
+        2, 1, figsize=(16, 14), sharex=True, gridspec_kw={"hspace": 0.18}
+    )
     _plot_success_axis(
         ax=ax_success,
         rounds=rounds,
@@ -324,26 +338,25 @@ def _write_combined_plot(
         yerr_high=success_ci_high,
         values_by_round=success_by_round,
     )
-    ax_mcm = ax_success.twinx()
+    ax_success.set_ylabel("Round success rate", color="black")
+    ax_success.tick_params(axis="y", labelcolor="black")
+    ax_success.tick_params(axis="x", labelbottom=True)
+    ax_success.set_xlabel("")
     _plot_mcm_axis(
         ax=ax_mcm,
         rounds=rounds,
         means=mcm_means,
         stds=mcm_stds,
         values_by_round=mcm_by_round,
-        line_color=_MCM_COLOR,
-        label_color=_MCM_COLOR,
+        line_color=_SUCCESS_COLOR,
+        label_color="black",
     )
-    fig.suptitle(_COMBINED_TITLE, fontsize=14, color=_SUCCESS_COLOR, y=0.98)
-    lines = []
-    labels = []
-    for ax in (ax_success, ax_mcm):
-        line_objs, line_labels = ax.get_legend_handles_labels()
-        lines.extend(line_objs)
-        labels.extend(line_labels)
-    ax_success.legend(lines, labels, loc="lower right")
-    fig.tight_layout(rect=(0, 0, 1, 0.94))
-    fig.savefig(_COMBINED_PATH, dpi=200)
+    ax_mcm.set_xlabel("Round")
+    ax_mcm.set_xticks(rounds)
+    ax_mcm.grid(axis="y", alpha=0.3)
+    fig.align_ylabels((ax_success, ax_mcm))
+    fig.tight_layout()
+    fig.savefig(_COMBINED_PATH, dpi=200, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
     print(f"Wrote {_COMBINED_PATH}")
 
@@ -356,7 +369,7 @@ def _write_success_plot(
     values_by_round: dict[int, list[float]],
 ) -> None:
     """Single-Y chart: round success rate only, with replica dots."""
-    fig, ax = plt.subplots(figsize=(12, 5))
+    fig, ax = plt.subplots(figsize=(16, 8))
     _plot_success_axis(
         ax=ax,
         rounds=rounds,
@@ -380,7 +393,7 @@ def _write_mcm_plot(
     values_by_round: dict[int, list[float]],
 ) -> None:
     """Single-Y chart: mean chars per message only, blue trace, black labels."""
-    fig, ax = plt.subplots(figsize=(12, 5))
+    fig, ax = plt.subplots(figsize=(16, 8))
     _plot_mcm_axis(
         ax=ax,
         rounds=rounds,
@@ -393,14 +406,16 @@ def _write_mcm_plot(
     ax.set_xlabel("Round")
     ax.grid(axis="y", alpha=0.3)
     ax.set_xticks(rounds)
-    fig.suptitle(_MCM_TITLE, fontsize=14, color="black", y=0.98)
-    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    fig.tight_layout()
+    fig.subplots_adjust(top=0.9)
+    fig.suptitle(_MCM_TITLE, color="black", y=0.955)
     fig.savefig(_MCM_PATH, dpi=200)
     plt.close(fig)
     print(f"Wrote {_MCM_PATH}")
 
 
 def main() -> None:
+    plt.rcParams.update(_LARGE_FONT_RCPARAMS)
     runs_root = Path("runs")
     run_dirs = _qualifying_run_dirs(runs_root=runs_root)
     print(f"Loaded {len(run_dirs)} qualifying runs.")

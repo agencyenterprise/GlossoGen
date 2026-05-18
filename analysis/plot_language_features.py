@@ -31,6 +31,11 @@ _ONTOLOGY_PATH = Path("runs/veyru/_ontology/20260511T142136Z_full.json")
 _OUTPUT_PATH = Path("analysis/language_features.png")
 _SIDECAR_FILENAME = "communication_feature_presence.json"
 _LABELS_FILENAME = "labels.json"
+# Drop categories whose max prevalence across cohorts is below this threshold
+# so the chart can breathe at presentation-scale fonts. At 0.5, the chart
+# keeps the strongly-shared mechanisms (both cohorts ≥ 50% on at least one
+# side) and drops the long tail that's rare in both.
+_MIN_PREVALENCE_TO_SHOW = 0.5
 
 
 def _humanize_category_id(category_id: str) -> str:
@@ -171,8 +176,12 @@ def _plot(
             "axes.titlecolor": "#222222",
             "xtick.color": "#222222",
             "ytick.color": "#222222",
-            "axes.titlesize": 13,
-            "axes.labelsize": 11,
+            "font.size": 26,
+            "axes.titlesize": 34,
+            "axes.labelsize": 28,
+            "xtick.labelsize": 24,
+            "ytick.labelsize": 24,
+            "legend.fontsize": 24,
         }
     )
 
@@ -180,10 +189,17 @@ def _plot(
         category_id: max(prevalence_by_cohort[cohort.name][category_id] for cohort in _COHORTS)
         for category_id in category_ids
     }
-    ordered_categories = sorted(category_ids, key=lambda category_id: max_per_category[category_id])
+    visible_categories = [
+        category_id
+        for category_id in category_ids
+        if max_per_category[category_id] >= _MIN_PREVALENCE_TO_SHOW
+    ]
+    ordered_categories = sorted(
+        visible_categories, key=lambda category_id: max_per_category[category_id]
+    )
     y_positions = np.arange(len(ordered_categories))
     bar_height = 0.4
-    fig, ax = plt.subplots(figsize=(11, 9))
+    fig, ax = plt.subplots(figsize=(20, max(10, len(ordered_categories) * 0.95)))
     fig.patch.set_facecolor("white")
     for offset, cohort in zip((bar_height / 2, -bar_height / 2), _COHORTS):
         widths = [
@@ -196,7 +212,7 @@ def _plot(
             height=bar_height,
             color=cohort.color,
             edgecolor="white",
-            linewidth=0.6,
+            linewidth=0.8,
             label=label,
         )
         for y_pos, width in zip(y_positions + offset, widths):
@@ -208,24 +224,23 @@ def _plot(
                 f"{width:.0%}",
                 va="center",
                 ha="left",
-                fontsize=8,
+                fontsize=18,
                 color=cohort.color,
             )
 
-    ax.set_xlim(0, 1.05)
+    ax.set_xlim(0, 1.08)
     ax.set_yticks(y_positions)
     ax.set_yticklabels([_humanize_category_id(c) for c in ordered_categories])
     ax.xaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=0))
     ax.set_xlabel(f"Share of cohort runs with confidence ≥ {_CONFIDENCE_THRESHOLD:g}")
-    ax.grid(axis="x", alpha=0.25, linestyle="--", linewidth=0.6)
+    ax.grid(axis="x", alpha=0.25, linestyle="--", linewidth=0.8)
     ax.set_axisbelow(True)
     ax.tick_params(axis="y", length=0)
-    ax.tick_params(axis="x", labelsize=10)
 
     ax.set_title(
-        "Shared language-emergence mechanisms across scenarios",
-        loc="left",
-        pad=18,
+        "Shared language-emergence mechanisms\nacross scenarios",
+        loc="center",
+        pad=22,
         fontweight="semibold",
     )
 
@@ -234,13 +249,18 @@ def _plot(
         frameon=True,
         framealpha=0.95,
         edgecolor="#cccccc",
-        fontsize=10,
     )
-    legend.get_frame().set_linewidth(0.6)
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
-    fig.savefig(_OUTPUT_PATH, dpi=200, facecolor=fig.get_facecolor())
+    legend.get_frame().set_linewidth(0.8)
+    fig.tight_layout()
+    fig.savefig(
+        _OUTPUT_PATH,
+        dpi=200,
+        facecolor=fig.get_facecolor(),
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
     plt.close(fig)
-    print(f"Wrote {_OUTPUT_PATH}")
+    print(f"Wrote {_OUTPUT_PATH} ({len(ordered_categories)} of {len(category_ids)} categories)")
 
 
 def main() -> None:
