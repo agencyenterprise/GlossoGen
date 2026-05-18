@@ -2,7 +2,7 @@
 {% if current_case is not none %}
 --- NEW INCOMING CONTAINER ---
 Round {{ round_number }}
-Inspection window: {{ current_case.time_budget_seconds }}s before the customs slot is missed (one character = one second; total across all three of you)
+Inspection window: {{ current_case.round_time_budget_seconds }}s before the customs slot is missed (one character = one second; total across all three of you)
 
 Current incoming container:
 - Container ID: {{ current_case.steps[0].incoming_container_id }}

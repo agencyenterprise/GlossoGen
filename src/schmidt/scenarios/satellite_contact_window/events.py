@@ -53,7 +53,7 @@ class SatelliteCaseStarted(EventBase):
     patterns: list[SatelliteTelemetryPatternInstance]
     expected_sequence: list[SatelliteCommandStep]
     authorization_envelope: SatelliteAuthorizationEnvelope
-    contact_window_seconds: int
+    round_time_budget_seconds: int
 
 
 class SatelliteCommandJudgment(BaseModel):

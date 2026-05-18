@@ -18,8 +18,8 @@ from schmidt.scenarios.base_knobs import BaseKnobs
 class ContainerYardStackingKnobs(BaseKnobs):
     """Configuration knobs for the container_yard_stacking scenario.
 
-    ``time_budget_seconds`` is the per-round character budget on the link
-    channel: every character sent costs one simulated second, and the
+    ``round_time_budget_seconds`` is the per-round character budget on the
+    link channel: every character sent costs one simulated second, and the
     round fails when the running total reaches the budget.
     ``channel_noise_level`` is the per-character drop probability on the
     link channel.
@@ -37,7 +37,6 @@ class ContainerYardStackingKnobs(BaseKnobs):
     postmortem_enabled: bool
     postmortem_disabled_at_start: bool
     round_count: int
-    time_budget_seconds: int
     seed: int
     channel_noise_level: float
     two_teams: bool = False

@@ -111,21 +111,14 @@ def _mode_label(scenario_config: dict[str, Any]) -> str:
 
 
 def _knob_fragments(scenario_config: dict[str, Any]) -> list[str]:
-    """Pick a handful of high-signal knobs to surface in the picker label.
-
-    The per-round budget knob is named ``round_time_budget_seconds`` in
-    veyru and ``time_budget_seconds`` in container_yard_stacking; read
-    whichever exists.
-    """
+    """Pick a handful of high-signal knobs to surface in the picker label."""
     fragments: list[str] = []
     round_count = scenario_config.get("round_count")
     if isinstance(round_count, int):
         fragments.append(f"r={round_count}")
-    for budget_knob in ("round_time_budget_seconds", "time_budget_seconds"):
-        budget_value = scenario_config.get(budget_knob)
-        if isinstance(budget_value, (int, float)):
-            fragments.append(f"b={int(budget_value)}s")
-            break
+    budget_value = scenario_config.get("round_time_budget_seconds")
+    if isinstance(budget_value, (int, float)):
+        fragments.append(f"b={int(budget_value)}s")
     seconds_per_token = scenario_config.get("seconds_per_token")
     if isinstance(seconds_per_token, (int, float)):
         fragments.append(f"spt={seconds_per_token:g}")

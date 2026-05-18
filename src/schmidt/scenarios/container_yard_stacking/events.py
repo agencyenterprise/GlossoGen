@@ -100,7 +100,7 @@ class ContainerYardCaseStarted(EventBase):
     case_number: int
     active_crane_stations: list[ContainerYardCraneStation]
     initial_stacks: list[ContainerYardStackSnapshot]
-    time_budget_seconds: int
+    round_time_budget_seconds: int
     steps: list[ContainerYardCaseStep]
     manifest: list[ContainerYardManifestEntry]
 

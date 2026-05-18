@@ -55,7 +55,6 @@ class VeyruKnobs(BaseKnobs):
     judge_provider: str
     postmortem_enabled: bool
     round_count: int
-    round_time_budget_seconds: int
     seed: int
     two_teams: bool
     swap_round: int | None

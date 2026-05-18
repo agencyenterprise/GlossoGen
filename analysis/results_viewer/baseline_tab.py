@@ -338,15 +338,16 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     scenario_name = _render_scenario_selector(evaluated=evaluated)
     if scenario_name is None:
         st.info(
-            "No runs labeled 'baseline' found. Add the 'baseline' label and a "
-            "'budget=<N>' label to runs you want in this view."
+            "No runs labeled 'baseline' found. Add the 'baseline' label and "
+            "ensure the scenario_config carries `round_time_budget_seconds`."
         )
         return
     all_baseline = list_baseline_runs(evaluated_runs=evaluated, scenario_name=scenario_name)
     if not all_baseline:
         st.info(
             f"No runs in scenario `{scenario_name}` labeled 'baseline' found. "
-            "Add the 'baseline' label and a 'budget=<N>' label to runs you want in this view."
+            "Add the 'baseline' label and ensure the scenario_config carries "
+            "`round_time_budget_seconds`."
         )
         return
     metric = _render_metric_selector()

@@ -1,11 +1,11 @@
 {% if previous_outcome is not none %}
 --- PREVIOUS ROUND RESULT ---
-Round {{ round_number - 1 }}: {% if previous_outcome.recovered %}SATELLITE RECOVERED ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s of {{ previous_outcome.contact_window_seconds }}s window){% elif previous_outcome.window_closed %}NOT RECOVERED — contact window closed ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s, window was {{ previous_outcome.contact_window_seconds }}s).{% elif previous_outcome.judge_passed %}NOT RECOVERED — command sequence correct but the contact window had already closed.{% else %}NOT RECOVERED — command sequence rejected: {{ previous_outcome.judge_explanation }}{% endif %}
+Round {{ round_number - 1 }}: {% if previous_outcome.recovered %}SATELLITE RECOVERED ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s of {{ previous_outcome.round_time_budget_seconds }}s window){% elif previous_outcome.window_closed %}NOT RECOVERED — contact window closed ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds | round(0) | int }}s, window was {{ previous_outcome.round_time_budget_seconds }}s).{% elif previous_outcome.judge_passed %}NOT RECOVERED — command sequence correct but the contact window had already closed.{% else %}NOT RECOVERED — command sequence rejected: {{ previous_outcome.judge_explanation }}{% endif %}
 {% endif %}
 {% if current_case is not none %}
 --- NEW SATELLITE PASS ---
 Round {{ round_number }}
-Contact window: {{ current_case.contact_window_seconds }}s (one character = one second; total across all three of you)
+Contact window: {{ current_case.round_time_budget_seconds }}s (one character = one second; total across all three of you)
 
 The satellite is now in view. Live telemetry from this pass:
 {% for pattern in current_case.patterns %}{% for reading in pattern.observable_readings %}- {{ reading }}

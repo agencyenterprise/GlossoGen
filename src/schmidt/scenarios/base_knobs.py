@@ -42,6 +42,12 @@ class BaseKnobs(BaseModel):
     emit <2K output tokens per cycle, so this can be lowered (e.g. 4096) in
     runs that hit ``vllm`` ``--max-model-len`` limits to reclaim input
     headroom.
+
+    ``round_time_budget_seconds`` is the canonical per-round communication
+    budget: one character on the scenario's primary channel costs one
+    simulated second, and the round fails when the running total exceeds
+    the budget. ``None`` means the scenario has no per-round budget (e.g.
+    Salon, whose pressure axis is the Inquisitor's guess count instead).
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -52,3 +58,4 @@ class BaseKnobs(BaseModel):
     replace_agent_default_channel_visibility: dict[str, bool] = {}
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
     agent_max_tokens: int = 16384
+    round_time_budget_seconds: int | None

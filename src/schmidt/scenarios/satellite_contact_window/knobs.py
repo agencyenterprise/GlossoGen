@@ -13,7 +13,7 @@ from schmidt.scenarios.base_knobs import BaseKnobs
 class SatelliteContactWindowKnobs(BaseKnobs):
     """Configuration knobs for the satellite contact window scenario.
 
-    ``contact_window_seconds`` is the fixed per-round budget applied to every
+    ``round_time_budget_seconds`` is the fixed per-round budget applied to every
     case: every character sent on the shared ``link`` channel costs one
     simulated second, and if the running total exceeds the budget the
     contact window closes and the round fails. ``seed`` controls the random
@@ -38,7 +38,6 @@ class SatelliteContactWindowKnobs(BaseKnobs):
     postmortem_enabled: bool
     postmortem_disabled_at_start: bool
     round_count: int
-    contact_window_seconds: int
     seed: int
     pattern_count_min: int
     pattern_count_max: int
@@ -53,10 +52,10 @@ class SatelliteContactWindowKnobs(BaseKnobs):
         return self
 
     @model_validator(mode="after")
-    def _validate_contact_window_seconds(self) -> "SatelliteContactWindowKnobs":
-        if self.contact_window_seconds <= 0:
+    def _validate_round_time_budget_seconds(self) -> "SatelliteContactWindowKnobs":
+        if self.round_time_budget_seconds is None or self.round_time_budget_seconds <= 0:
             raise ValueError(
-                f"contact_window_seconds must be > 0 (got {self.contact_window_seconds})"
+                f"round_time_budget_seconds must be > 0 " f"(got {self.round_time_budget_seconds})"
             )
         return self
 

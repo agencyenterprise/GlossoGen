@@ -38,7 +38,6 @@ class WarehouseRobotRecoveryKnobs(BaseKnobs):
     postmortem_enabled: bool
     postmortem_disabled_at_start: bool
     round_count: int
-    round_time_budget_seconds: int
     seed: int
     fault_count_min: int
     fault_count_max: int

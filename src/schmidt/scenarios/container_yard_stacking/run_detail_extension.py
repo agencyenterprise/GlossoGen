@@ -55,7 +55,7 @@ class ContainerYardCaseSummary(BaseModel):
 
     round_number: int
     case_number: int
-    time_budget_seconds: int
+    round_time_budget_seconds: int
     active_crane_stations: list[ContainerYardCraneStation]
     initial_stacks: list[ContainerYardStackSnapshot]
     manifest: list[ContainerYardManifestEntry]
@@ -105,7 +105,7 @@ def _build_case(event: ContainerYardCaseStarted) -> ContainerYardCaseSummary:
     return ContainerYardCaseSummary(
         round_number=event.round_number,
         case_number=event.case_number,
-        time_budget_seconds=event.time_budget_seconds,
+        round_time_budget_seconds=event.round_time_budget_seconds,
         active_crane_stations=event.active_crane_stations,
         initial_stacks=event.initial_stacks,
         manifest=event.manifest,
