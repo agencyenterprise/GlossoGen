@@ -588,8 +588,8 @@ def _render_included_runs(runs: list[CrossSwapRun]) -> None:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Cross-swap tab body."""
-    seed_mode = seed_mode_filter.render_radio(key_prefix="cross_swap")
-    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
+    run_filter = seed_mode_filter.render_filters(key_prefix="cross_swap")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     all_cross_swap = list_cross_swap_runs(evaluated_runs=evaluated)
     if not all_cross_swap:
         st.info(

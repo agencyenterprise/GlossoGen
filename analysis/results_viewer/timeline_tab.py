@@ -7,6 +7,7 @@ import pyperclip
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.event_extractor import load_run_timeline
 from analysis.results_viewer.run_catalog import EvaluatedRun, group_runs_by_day
 from analysis.results_viewer.timeline_plot import (
@@ -16,7 +17,6 @@ from analysis.results_viewer.timeline_plot import (
     collect_value_metrics,
     palette_color_for_index,
 )
-from analysis.results_viewer import seed_mode_filter
 from schmidt.evaluation.metric_core.measurement import Measurement
 from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 
@@ -260,8 +260,8 @@ def _render_value_metric_checkboxes(available: list[str]) -> list[str]:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Timeline tab body."""
-    seed_mode = seed_mode_filter.render_radio(key_prefix="timeline")
-    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
+    run_filter = seed_mode_filter.render_filters(key_prefix="timeline")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     if not evaluated:
         st.info("No evaluated runs found. Run `schmidt evaluate <scenario> --run-dir ...` first.")
         return

@@ -13,6 +13,7 @@ corresponding run in the schmidt frontend (URL is attached to each point as
 import plotly.graph_objects as go
 import streamlit as st
 
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.baseline_data import (
     METRIC_OPTIONS,
     BaselineRun,
@@ -22,7 +23,6 @@ from analysis.results_viewer.baseline_data import (
     aggregate_by_budget,
     list_baseline_runs,
 )
-from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.measurement_scores import read_labels
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
@@ -333,8 +333,8 @@ def _render_included_runs(
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Baseline tab body."""
-    seed_mode = seed_mode_filter.render_radio(key_prefix="baseline")
-    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
+    run_filter = seed_mode_filter.render_filters(key_prefix="baseline")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     scenario_name = _render_scenario_selector(evaluated=evaluated)
     if scenario_name is None:
         st.info(

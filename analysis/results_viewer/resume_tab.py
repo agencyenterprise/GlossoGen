@@ -281,8 +281,8 @@ def _render_included_runs(runs: list[ResumeRun], frontend_base: str) -> None:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Resume tab body."""
-    seed_mode = seed_mode_filter.render_radio(key_prefix="resume")
-    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
+    run_filter = seed_mode_filter.render_filters(key_prefix="resume")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     all_resume = list_resume_runs(evaluated_runs=evaluated)
     if not all_resume:
         st.info(

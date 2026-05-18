@@ -282,8 +282,8 @@ def _render_frontend_base() -> str:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the OSS-vs-Frontier comparison tab as a colored pivot table."""
-    seed_mode = seed_mode_filter.render_radio(key_prefix="oss_frontier")
-    evaluated = seed_mode_filter.apply(evaluated=evaluated, mode=seed_mode)
+    run_filter = seed_mode_filter.render_filters(key_prefix="oss_frontier")
+    evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     st.header("OSS vs Frontier — round_success comparison")
     st.caption(
         "Mean round_success per configuration, with PM enabled / disabled merged "
