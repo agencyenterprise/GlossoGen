@@ -1957,9 +1957,9 @@
             "type": "integer",
             "title": "Case Number"
           },
-          "time_budget_seconds": {
+          "round_time_budget_seconds": {
             "type": "integer",
-            "title": "Time Budget Seconds"
+            "title": "Round Time Budget Seconds"
           },
           "active_crane_stations": {
             "items": {
@@ -1994,7 +1994,7 @@
         "required": [
           "round_number",
           "case_number",
-          "time_budget_seconds",
+          "round_time_budget_seconds",
           "active_crane_stations",
           "initial_stacks",
           "manifest",

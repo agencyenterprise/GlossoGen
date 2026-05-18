@@ -876,8 +876,8 @@ export interface components {
             round_number: number;
             /** Case Number */
             case_number: number;
-            /** Time Budget Seconds */
-            time_budget_seconds: number;
+            /** Round Time Budget Seconds */
+            round_time_budget_seconds: number;
             /** Active Crane Stations */
             active_crane_stations: components["schemas"]["ContainerYardCraneStation"][];
             /** Initial Stacks */
