@@ -24,7 +24,6 @@ from analysis.results_viewer.run_catalog import EvaluatedRun
 _BASELINE_LABEL = "baseline"
 _BASELINE_OSS_LABEL = "baseline_oss"
 _BASELINE_LABELS = frozenset({_BASELINE_LABEL, _BASELINE_OSS_LABEL})
-_BUDGET_PREFIX = "budget="
 _ROUND_SUCCESS_METRIC = "round_success"
 _ROUND_ENDED_IDLE_METRIC = "round_ended_idle"
 _ROUND_ENDED_TIMEOUT_METRIC = "round_ended_timeout"
@@ -277,13 +276,16 @@ in its own section.
 """
 
 
-def _parse_budget(labels: list[str]) -> int | None:
-    """Extract the integer value from the first ``budget=<N>`` label, if any."""
-    for label in labels:
-        if label.startswith(_BUDGET_PREFIX):
-            value = label[len(_BUDGET_PREFIX) :]
-            if value.isdigit():
-                return int(value)
+def _budget_from_config(evaluated: EvaluatedRun) -> int | None:
+    """Extract the per-round budget from the run's scenario_config.
+
+    All scenarios with a per-round communication budget surface it as
+    ``round_time_budget_seconds`` (canonical on ``BaseKnobs``). Returns
+    ``None`` when the scenario has no per-round budget.
+    """
+    value = evaluated.metadata.scenario_config.get("round_time_budget_seconds")
+    if isinstance(value, (int, float)):
+        return int(value)
     return None
 
 
@@ -317,17 +319,17 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
     """Convert an ``EvaluatedRun`` into a ``BaselineRun`` if it qualifies.
 
     A run qualifies when it has the ``baseline`` or ``baseline_oss`` label,
-    a parseable ``budget=<N>`` label, and a ``round_success`` metric in its
-    evaluation report. The two round-end metrics default to 0.0 when missing
-    so older runs evaluated before they existed still render on the chart
-    (just as a flat zero line).
+    a budget knob in its scenario_config, and a ``round_success`` metric in
+    its evaluation report. The two round-end metrics default to 0.0 when
+    missing so older runs evaluated before they existed still render on
+    the chart (just as a flat zero line).
     """
     labels = read_labels(run_dir=evaluated.run_dir)
     matching = _BASELINE_LABELS.intersection(labels)
     if not matching:
         return None
     kind = _BASELINE_OSS_LABEL if _BASELINE_OSS_LABEL in matching else _BASELINE_LABEL
-    budget = _parse_budget(labels=labels)
+    budget = _budget_from_config(evaluated=evaluated)
     if budget is None:
         return None
     round_success = _flagged_round_count(evaluated=evaluated, metric_name=_ROUND_SUCCESS_METRIC)

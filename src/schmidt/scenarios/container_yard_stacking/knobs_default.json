@@ -4,7 +4,7 @@
   "postmortem_disabled_at_start": false,
   "postmortem_duration_seconds": 120,
   "round_count": 15,
-  "time_budget_seconds": 200,
+  "round_time_budget_seconds": 200,
   "seed": 42,
   "channel_noise_level": 0.0,
   "two_teams": false,

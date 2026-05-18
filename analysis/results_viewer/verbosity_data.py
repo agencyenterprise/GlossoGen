@@ -89,7 +89,7 @@ VERBOSITY_METRIC_OPTIONS: list[VerbosityMetricOption] = [
             "in scenarios where one character on the primary channel costs "
             "one second of a per-round communication budget (Veyru, "
             "container_yard_stacking), MCR maps directly to "
-            "`time_budget_seconds`.\n\n"
+            "`round_time_budget_seconds`.\n\n"
             "Lower MCR = teams talk less per round overall."
         ),
     ),
@@ -195,20 +195,17 @@ def list_verbosity_runs(
 
 
 def _resolve_budget(evaluated: EvaluatedRun) -> int | None:
-    """Resolve the run's character/time budget from its scenario config.
+    """Resolve the run's per-round communication budget from scenario_config.
 
-    Scenarios with a per-round communication budget carry the budget in
-    ``scenario_config`` written into the JSONL at simulation start; one
-    character on the primary channel costs one second against that
-    budget. The knob name differs across scenarios (veyru uses
-    ``round_time_budget_seconds``; container_yard_stacking uses
-    ``time_budget_seconds``), so check both. Returns ``None`` when the
-    scenario doesn't expose either field.
+    Scenarios with a per-round budget carry ``round_time_budget_seconds``
+    in the ``scenario_config`` written into the JSONL at simulation
+    start; one character on the primary channel costs one second against
+    that budget. Returns ``None`` when the scenario has no per-round
+    budget (e.g. Salon).
     """
-    for budget_knob in ("round_time_budget_seconds", "time_budget_seconds"):
-        value = evaluated.metadata.scenario_config.get(budget_knob)
-        if isinstance(value, (int, float)):
-            return int(value)
+    value = evaluated.metadata.scenario_config.get("round_time_budget_seconds")
+    if isinstance(value, (int, float)):
+        return int(value)
     return None
 
 

@@ -107,7 +107,7 @@ def _reconstruct_outcome(
     characters_used: int,
 ) -> YardOutcome:
     """Build a ``YardOutcome`` for a completed round from grouped events."""
-    budget_exceeded = characters_used >= case.time_budget_seconds
+    budget_exceeded = characters_used >= case.round_time_budget_seconds
     step_outcomes: list[StepOutcome] = []
     failure_step_index: int | None = None
     first_failure_explanation = ""
@@ -166,7 +166,7 @@ def _reconstruct_outcome(
         ),
         budget_exceeded=budget_exceeded,
         characters_used=characters_used,
-        time_budget_seconds=case.time_budget_seconds,
+        round_time_budget_seconds=case.round_time_budget_seconds,
         round_succeeded=round_succeeded,
         failure_reason=failure_reason,
         failure_step_index=failure_step_index,

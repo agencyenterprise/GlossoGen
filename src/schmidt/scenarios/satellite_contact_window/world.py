@@ -45,7 +45,7 @@ class SatelliteOutcome(NamedTuple):
     window_closed: bool
     characters_used: int
     time_elapsed_seconds: float
-    contact_window_seconds: int
+    round_time_budget_seconds: int
     pattern_count: int
     submitted_sequence: tuple[CommandStep, ...]
     violations: tuple[str, ...]
@@ -244,7 +244,7 @@ class SatelliteWorld(ScenarioWorld):
                 window_closed=self._round_window_closed,
                 characters_used=self._current_round_characters,
                 time_elapsed_seconds=float(self._current_round_characters),
-                contact_window_seconds=case.contact_window_seconds,
+                round_time_budget_seconds=case.round_time_budget_seconds,
                 pattern_count=len(case.patterns),
                 submitted_sequence=self._last_submitted_sequence,
                 violations=self._last_violations,
@@ -274,7 +274,7 @@ class SatelliteWorld(ScenarioWorld):
             return
         if self._round_recovered:
             return
-        if self._current_round_characters > self._current_case.contact_window_seconds:
+        if self._current_round_characters > self._current_case.round_time_budget_seconds:
             self._round_window_closed = True
 
     async def run(self, context: WorldContext) -> None:
@@ -297,7 +297,7 @@ class SatelliteWorld(ScenarioWorld):
         if self._current_case is None:
             return
         time_elapsed = self._current_round_characters
-        budget = self._current_case.contact_window_seconds
+        budget = self._current_case.round_time_budget_seconds
 
         if self._round_window_closed and THRESHOLD_WINDOW_CLOSED not in self._notified_thresholds:
             self._notified_thresholds.update([THRESHOLD_WINDOW_CLOSED, THRESHOLD_CRITICAL])

@@ -21,7 +21,6 @@ from analysis.results_viewer.run_catalog import EvaluatedRun
 
 _OSS_FRONTIER_LABEL = "oss_frontier"
 _BASELINE_OSS_LABEL = "baseline_oss"
-_BUDGET_PREFIX = "budget="
 _ENGINEER_PREFIX = "engineer="
 _FIELD_OBSERVER_PREFIX = "field_observer="
 
@@ -78,17 +77,6 @@ def _label_value(labels: list[str], prefix: str) -> str | None:
     return None
 
 
-def _budget_from_labels(labels: list[str]) -> int | None:
-    """Extract integer budget from a ``budget=<int>`` label, or ``None`` if absent."""
-    raw = _label_value(labels=labels, prefix=_BUDGET_PREFIX)
-    if raw is None:
-        return None
-    try:
-        return int(raw)
-    except ValueError:
-        return None
-
-
 def _total_rounds(evaluated: EvaluatedRun) -> int:
     """Total round count from scenario_config; ``0`` if absent."""
     return int(evaluated.metadata.scenario_config.get("round_count", 0))
@@ -105,21 +93,23 @@ def _postmortem_enabled(evaluated: EvaluatedRun) -> bool:
 
 
 def _budget_from_config(evaluated: EvaluatedRun) -> int | None:
-    """Read ``round_time_budget_seconds`` from scenario_config, or ``None`` if absent."""
-    raw = evaluated.metadata.scenario_config.get("round_time_budget_seconds")
-    if raw is None:
-        return None
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        return None
+    """Read the per-round budget from scenario_config.
+
+    All scenarios with a per-round communication budget surface it as
+    ``round_time_budget_seconds`` (canonical on ``BaseKnobs``). Returns
+    ``None`` when the scenario has no per-round budget.
+    """
+    value = evaluated.metadata.scenario_config.get("round_time_budget_seconds")
+    if isinstance(value, (int, float)):
+        return int(value)
+    return None
 
 
 def list_oss_frontier_runs(evaluated: list[EvaluatedRun]) -> list[CellRun]:
     """Project oss_frontier + baseline_oss runs that have round_success into ``CellRun``.
 
-    Drops runs without a ``round_success`` measurement, without a ``budget=``
-    label, or with no engineer/field_observer information.
+    Drops runs without a ``round_success`` measurement, without a budget
+    in scenario_config, or with no engineer/field_observer information.
     """
     out: list[CellRun] = []
     for run in evaluated:
@@ -137,9 +127,7 @@ def list_oss_frontier_runs(evaluated: list[EvaluatedRun]) -> list[CellRun]:
             obs = short
         else:
             continue
-        budget = _budget_from_labels(labels=labels)
-        if budget is None:
-            budget = _budget_from_config(evaluated=run)
+        budget = _budget_from_config(evaluated=run)
         if budget is None:
             continue
         score = round_success_score(evaluated=run)

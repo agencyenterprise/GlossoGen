@@ -156,7 +156,7 @@ class ContainerYardStackingScenario(SimulationScenario):
         self._cases = get_cases(
             seed=knobs.seed,
             round_count=knobs.round_count,
-            time_budget_seconds=knobs.time_budget_seconds,
+            round_time_budget_seconds=knobs.round_time_budget_seconds,
         )
         self._noise_rng = random.Random(knobs.seed)
         self._agent_display_names: dict[str, str] = build_agent_display_names(
@@ -187,7 +187,7 @@ class ContainerYardStackingScenario(SimulationScenario):
             template_name="description.jinja",
             template_variables={
                 "round_count": self._knobs.round_count,
-                "time_budget_seconds": self._knobs.time_budget_seconds,
+                "round_time_budget_seconds": self._knobs.round_time_budget_seconds,
             },
         )
 

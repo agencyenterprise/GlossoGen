@@ -7,5 +7,6 @@
   "postmortem_enabled": true,
   "primer_figure_count": 10,
   "round_count": 10,
+  "round_time_budget_seconds": null,
   "seed": 42
 }

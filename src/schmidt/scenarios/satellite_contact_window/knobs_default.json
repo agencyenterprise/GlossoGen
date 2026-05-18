@@ -1,6 +1,6 @@
 {
   "channel_noise_level": 0.0,
-  "contact_window_seconds": 200,
+  "round_time_budget_seconds": 200,
   "judge_model": "claude-haiku-4-5-20251001",
   "judge_provider": "anthropic",
   "max_round_duration_seconds": 300,

@@ -138,7 +138,7 @@ class SatelliteContactWindowScenario(SimulationScenario):
         self._cases: list[SatelliteCase] = get_cases(
             seed=knobs.seed,
             round_count=knobs.round_count,
-            contact_window_seconds=knobs.contact_window_seconds,
+            round_time_budget_seconds=knobs.round_time_budget_seconds,
             pattern_count_min=knobs.pattern_count_min,
             pattern_count_max=knobs.pattern_count_max,
         )
@@ -178,7 +178,7 @@ class SatelliteContactWindowScenario(SimulationScenario):
             template_name="description.jinja",
             template_variables={
                 "round_count": self._knobs.round_count,
-                "contact_window_seconds": self._knobs.contact_window_seconds,
+                "round_time_budget_seconds": self._knobs.round_time_budget_seconds,
                 "pattern_count_min": self._knobs.pattern_count_min,
                 "pattern_count_max": self._knobs.pattern_count_max,
                 "postmortem_enabled": self._postmortem_active,
@@ -475,7 +475,7 @@ class SatelliteContactWindowScenario(SimulationScenario):
                     remaining_window_seconds=envelope.remaining_window_seconds,
                     notes=envelope.notes,
                 ),
-                contact_window_seconds=case.contact_window_seconds,
+                round_time_budget_seconds=case.round_time_budget_seconds,
             )
         )
 

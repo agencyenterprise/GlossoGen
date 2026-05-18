@@ -453,7 +453,7 @@ class ContainerYardWorld(ScenarioWorld):
                 total_correctly_committed_truck_count=total_correctly_committed_trucks,
                 budget_exceeded=team.round_budget_exceeded,
                 characters_used=team.current_round_characters,
-                time_budget_seconds=case.time_budget_seconds,
+                round_time_budget_seconds=case.round_time_budget_seconds,
                 round_succeeded=round_succeeded,
                 failure_reason=team.failure_reason,
                 failure_step_index=failure_step_index,
@@ -488,7 +488,7 @@ class ContainerYardWorld(ScenarioWorld):
         team.current_round_characters += len(text)
         if self._current_case is None:
             return
-        if team.current_round_characters >= self._current_case.time_budget_seconds:
+        if team.current_round_characters >= self._current_case.round_time_budget_seconds:
             team.round_budget_exceeded = True
             team.round_failed_terminally = True
             if team.failure_reason == "":
@@ -516,7 +516,7 @@ class ContainerYardWorld(ScenarioWorld):
             return
         team = self._teams[team_id]
         time_elapsed = team.current_round_characters
-        budget = self._current_case.time_budget_seconds
+        budget = self._current_case.round_time_budget_seconds
         if team.round_budget_exceeded and THRESHOLD_BUDGET_EXCEEDED not in team.notified_thresholds:
             team.notified_thresholds.update([THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL])
             await context.send_update_to_channel(

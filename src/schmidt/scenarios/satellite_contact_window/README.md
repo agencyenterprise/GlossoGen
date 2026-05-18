@@ -115,7 +115,7 @@ Configured via `knobs_default.json` (and any custom `--config` JSON file):
 | Knob | Default | Description |
 |---|---|---|
 | `round_count` | 15 | Total rounds. |
-| `contact_window_seconds` | 200 | Per-round character budget on link. |
+| `round_time_budget_seconds` | 200 | Per-round character budget on link. |
 | `seed` | 42 | Deterministic seed for case generation. |
 | `pattern_count_min` / `pattern_count_max` | 1 / 3 | Per-round telemetry-pattern count bounds. |
 | `postmortem_enabled` | true | Whether the postmortem channel opens between rounds. |

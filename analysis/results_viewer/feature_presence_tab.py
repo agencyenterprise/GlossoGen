@@ -57,28 +57,16 @@ def _kind_of(run: FeaturePresenceRun) -> str:
     return _KIND_BASELINE
 
 
-_BUDGET_KNOB_NAMES_BY_SCENARIO: dict[str, str] = {
-    "veyru": "round_time_budget_seconds",
-    "container_yard_stacking": "time_budget_seconds",
-}
-
-
 def _budget_of(run: FeaturePresenceRun) -> int | None:
     """Pull the per-round time budget from the run's scenario_config.
 
-    The knob name is scenario-specific (veyru: ``round_time_budget_seconds``,
-    container_yard_stacking: ``time_budget_seconds``), so we look up the
-    name by scenario and fall back to whichever exists.
+    ``round_time_budget_seconds`` is the canonical knob on ``BaseKnobs``
+    surfaced by every budget-bearing scenario. Returns ``None`` when the
+    scenario has no per-round budget (e.g. Salon).
     """
-    knob_name = _BUDGET_KNOB_NAMES_BY_SCENARIO.get(run.scenario_name)
-    if knob_name is not None:
-        value = run.scenario_config.get(knob_name)
-        if isinstance(value, (int, float)):
-            return int(value)
-    for fallback in ("round_time_budget_seconds", "time_budget_seconds"):
-        value = run.scenario_config.get(fallback)
-        if isinstance(value, (int, float)):
-            return int(value)
+    value = run.scenario_config.get("round_time_budget_seconds")
+    if isinstance(value, (int, float)):
+        return int(value)
     return None
 
 

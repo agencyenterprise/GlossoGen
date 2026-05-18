@@ -106,7 +106,7 @@ class SatelliteCase(NamedTuple):
     expected_sequence: tuple[CommandStep, ...]
     parameters: CommandParameters
     authorization_envelope: AuthorizationEnvelope
-    contact_window_seconds: int
+    round_time_budget_seconds: int
 
 
 TELEMETRY_PATTERNS: list[TelemetryPattern] = [
@@ -384,7 +384,7 @@ def _render_pattern(
 def _build_authorization_envelope(
     rng: random.Random,
     expected_sequence: tuple[CommandStep, ...],
-    contact_window_seconds: int,
+    round_time_budget_seconds: int,
 ) -> AuthorizationEnvelope:
     """Procedurally build the round's authorization envelope.
 
@@ -422,7 +422,7 @@ def _build_authorization_envelope(
         authorized_actions=authorized,
         forbidden_actions=forbidden,
         dependencies=tuple(dependencies),
-        remaining_window_seconds=contact_window_seconds,
+        remaining_window_seconds=round_time_budget_seconds,
         notes=notes,
     )
 
@@ -430,7 +430,7 @@ def _build_authorization_envelope(
 def get_cases(
     seed: int,
     round_count: int,
-    contact_window_seconds: int,
+    round_time_budget_seconds: int,
     pattern_count_min: int,
     pattern_count_max: int,
 ) -> list[SatelliteCase]:
@@ -470,7 +470,7 @@ def get_cases(
         envelope = _build_authorization_envelope(
             rng=rng,
             expected_sequence=expected_sequence,
-            contact_window_seconds=contact_window_seconds,
+            round_time_budget_seconds=round_time_budget_seconds,
         )
 
         pattern_name = " + ".join(pattern.name for pattern in priority_sorted)
@@ -483,7 +483,7 @@ def get_cases(
                 expected_sequence=expected_sequence,
                 parameters=parameters,
                 authorization_envelope=envelope,
-                contact_window_seconds=contact_window_seconds,
+                round_time_budget_seconds=round_time_budget_seconds,
             )
         )
 

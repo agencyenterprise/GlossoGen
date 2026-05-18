@@ -92,7 +92,7 @@ class YardCase(NamedTuple):
     case_number: int
     active_crane_stations: tuple[CraneStation, ...]
     initial_stacks: dict[int, tuple[str, ...]]
-    time_budget_seconds: int
+    round_time_budget_seconds: int
     steps: tuple[CaseStep, ...]
     manifest: tuple[ManifestEntry, ...]
 
@@ -440,7 +440,7 @@ def _build_manifest(
 def get_cases(
     seed: int,
     round_count: int,
-    time_budget_seconds: int,
+    round_time_budget_seconds: int,
 ) -> list[YardCase]:
     """Generate per-round container yard cases deterministically.
 
@@ -464,7 +464,7 @@ def get_cases(
                 rng=rng,
                 case_number=case_number,
                 step_count=step_count,
-                time_budget_seconds=time_budget_seconds,
+                round_time_budget_seconds=round_time_budget_seconds,
                 taken_ids=taken_ids,
             )
         )
@@ -475,7 +475,7 @@ def _build_one_case(
     rng: random.Random,
     case_number: int,
     step_count: int,
-    time_budget_seconds: int,
+    round_time_budget_seconds: int,
     taken_ids: set[str],
 ) -> YardCase:
     """Generate one multi-step yard case end-to-end."""
@@ -498,7 +498,7 @@ def _build_one_case(
         case_number=case_number,
         active_crane_stations=active_stations,
         initial_stacks=initial_stacks,
-        time_budget_seconds=time_budget_seconds,
+        round_time_budget_seconds=round_time_budget_seconds,
         steps=steps,
         manifest=manifest,
     )

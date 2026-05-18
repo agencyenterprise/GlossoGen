@@ -56,7 +56,7 @@ class YardOutcome(NamedTuple):
     total_correctly_committed_truck_count: int
     budget_exceeded: bool
     characters_used: int
-    time_budget_seconds: int
+    round_time_budget_seconds: int
     round_succeeded: bool
     failure_reason: str
     failure_step_index: int | None

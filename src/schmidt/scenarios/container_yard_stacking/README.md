@@ -57,7 +57,7 @@ The link channel (or each team's link channel in two-team mode) is the primary c
 
 ## Tools
 
-**`send_message(channel_id: str, text: str)`** — All three agents. Sends a message to a channel. On the link channel, every character costs one simulated second against the round's `time_budget_seconds` inspection window.
+**`send_message(channel_id: str, text: str)`** — All three agents. Sends a message to a channel. On the link channel, every character costs one simulated second against the round's `round_time_budget_seconds` inspection window.
 
 **`move_truck(truck_role, station_name, pad, container_id)`** — Yard Operator only. Structured Pydantic-typed args, all compared by **strict equality** to the case ground truth (case-sensitive, no normalization, no shorthand):
 - `truck_role: Literal["inbound", "outbound"]` — which truck is being committed.
@@ -134,7 +134,7 @@ Useful platform metrics for this scenario:
 
 - **`round_success`** — Deterministic; fraction of rounds the team completed every truck and every crane move within the inspection window. Reads `RoundResultRecorded` events written from `judge_round_result`. Two-team mode emits `round_success_team_a` and `round_success_team_b`.
 - **`round_success_after_resume`** — Re-scores `round_success` over the post-resume window when the run was launched via replace-agent, cross-run replace-agent, or an in-run scheduled swap.
-- **`mean_chars_per_round`** — Total link-channel characters per round, averaged. Directly comparable to `time_budget_seconds` (one character = one second).
+- **`mean_chars_per_round`** — Total link-channel characters per round, averaged. Directly comparable to `round_time_budget_seconds` (one character = one second).
 - **`mean_chars_per_message`** — Per-message verbosity; removes the inflation from round-by-round message count differences (blocker rounds need more back-and-forth than no-blocker rounds).
 - **`perplexity`** — Mean per-token surprisal of link-channel messages under `gpt2`. Lower under heavy compression, higher under natural-language verbosity.
 - **`language_strangeness` / `slang_emergence` / `neologism` / `shorthand_codes`** — LLM-judged emergent-language metrics; the link channel returned by `get_primary_channel_id()` is what they read.
@@ -148,7 +148,7 @@ Useful platform metrics for this scenario:
 | Knob                              | Description                                                                                                                        |
 |-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
 | `round_count`                     | Number of rounds                                                                                                                   |
-| `time_budget_seconds`             | Per-round customs inspection window (one character on the link channel = one simulated second)                                     |
+| `round_time_budget_seconds`             | Per-round customs inspection window (one character on the link channel = one simulated second)                                     |
 | `seed`                            | Controls case generation (containers, stacks, stations, pads, manifest decoys, per-round step count, per-step blocker rolls)        |
 | `channel_noise_level`             | Per-character drop probability on the link channel only (postmortem stays clean). In `[0.0, 1.0]`. Dropped chars become `_`        |
 | `postmortem_enabled`              | Whether a discussion phase follows each round                                                                                      |

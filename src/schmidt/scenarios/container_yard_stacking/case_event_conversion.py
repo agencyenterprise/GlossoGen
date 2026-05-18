@@ -78,7 +78,7 @@ def case_started_event(round_number: int, case: YardCase) -> ContainerYardCaseSt
             )
             for stack_index, containers in sorted(case.initial_stacks.items())
         ],
-        time_budget_seconds=case.time_budget_seconds,
+        round_time_budget_seconds=case.round_time_budget_seconds,
         steps=[case_step_to_event(step=step) for step in case.steps],
         manifest=[
             ContainerYardManifestEntry(
