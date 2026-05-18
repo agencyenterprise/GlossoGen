@@ -168,6 +168,7 @@ class VeyruScenario(SimulationScenario):
             seed=knobs.seed,
             round_count=knobs.round_count,
             round_time_budget_seconds=knobs.round_time_budget_seconds,
+            easy_round_numbers=knobs.easy_round_numbers,
         )
         self._noise_rng = random.Random(knobs.seed)
         self._agent_display_names: dict[str, str] = build_agent_display_names(
