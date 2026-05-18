@@ -329,10 +329,11 @@ _LOCATIONS: list[str] = [
 # Weights for picking 1, 2, 3, 4, or 5 motifs per round.
 _MOTIF_COUNT_WEIGHTS: list[int] = [20, 25, 25, 20, 10]
 
-# Round numbers that are forced to be single-motif, priority-<=2 cases.
-# These give the agents slack early (rounds 1-3), a breather mid-run
-# (round 6), and one more before the final pressure (round 13).
-_EASY_ROUND_NUMBERS: frozenset[int] = frozenset({1, 2, 3, 6, 13})
+# Round numbers forced to be single-motif, priority-<=2 cases are
+# parameterized via ``get_cases(..., easy_round_numbers=...)``. The veyru
+# baseline default is ``{1, 2, 3, 6, 13}`` (rooted in knobs_default.json):
+# agents get slack early (rounds 1-3), a breather mid-run (round 6), and
+# one more before the final pressure (round 13).
 
 # Stellar parameter pools — each round draws one value from each pool.
 _HOLD_DURATIONS: list[int] = [5, 8, 10, 12, 15, 20]
@@ -413,6 +414,7 @@ def _select_motif_indices(
     rng: random.Random,
     round_number: int,
     easy_motif_indices: list[int],
+    easy_round_numbers: frozenset[int],
 ) -> list[int]:
     """Draw motif indices for one round, forcing easy rounds to a single motif.
 
@@ -427,7 +429,7 @@ def _select_motif_indices(
         pool_size,
     )
     selected_indices = rng.sample(range(pool_size), k=num_motifs)
-    if round_number in _EASY_ROUND_NUMBERS:
+    if round_number in easy_round_numbers:
         return [easy_motif_indices[selected_indices[0] % len(easy_motif_indices)]]
     return selected_indices
 
@@ -436,13 +438,15 @@ def get_cases(
     seed: int,
     round_count: int,
     round_time_budget_seconds: int,
+    easy_round_numbers: frozenset[int],
 ) -> list[VeyruCase]:
     """Generate unique failure cases for each round via seed-based selection.
 
     Most rounds get 1-5 failure motifs drawn from the 14-motif pool, with a
-    random location and stellar reading. Rounds in _EASY_ROUND_NUMBERS are
-    forced to a single priority-<=2 motif. Every round uses the same fixed
-    time budget.
+    random location and stellar reading. Rounds listed in
+    ``easy_round_numbers`` are forced to a single priority-<=2 motif (pass
+    an empty frozenset to disable the warmup constraint). Every round uses
+    the same fixed time budget.
     """
     rng = random.Random(seed)
     easy_motif_indices = [idx for idx, m in enumerate(FAILURE_MOTIFS) if m.priority <= 2]
@@ -453,6 +457,7 @@ def get_cases(
             rng=rng,
             round_number=i + 1,
             easy_motif_indices=easy_motif_indices,
+            easy_round_numbers=easy_round_numbers,
         )
         priority_order = sorted(
             ((idx, FAILURE_MOTIFS[idx]) for idx in selected_indices),

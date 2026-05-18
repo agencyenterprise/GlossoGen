@@ -45,6 +45,10 @@ class VeyruKnobs(BaseKnobs):
     ``0.0`` the channel is lossless (current behavior); at ``1.0`` every
     character is dropped. Dropped characters are replaced with ``_`` so
     agents can see where loss occurred.
+    ``easy_round_numbers`` is the set of round numbers forced to a single
+    priority-<=2 failure motif (single-stage warmup cases). Every other
+    round draws 1-5 motifs from the full pool. Set to an empty list to
+    disable the warmup constraint entirely.
     """
 
     judge_model: str
@@ -62,6 +66,7 @@ class VeyruKnobs(BaseKnobs):
     intern_join_round: int | None
     intern_takeover_round: int | None
     channel_noise_level: float
+    easy_round_numbers: frozenset[int]
 
     @model_validator(mode="after")
     def _validate_channel_noise_level(self) -> "VeyruKnobs":
