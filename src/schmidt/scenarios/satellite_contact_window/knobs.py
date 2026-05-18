@@ -38,6 +38,7 @@ class SatelliteContactWindowKnobs(BaseKnobs):
     postmortem_enabled: bool
     postmortem_disabled_at_start: bool
     round_count: int
+    round_time_budget_seconds: int  # pyright: ignore[reportIncompatibleVariableOverride]
     seed: int
     pattern_count_min: int
     pattern_count_max: int
@@ -53,9 +54,9 @@ class SatelliteContactWindowKnobs(BaseKnobs):
 
     @model_validator(mode="after")
     def _validate_round_time_budget_seconds(self) -> "SatelliteContactWindowKnobs":
-        if self.round_time_budget_seconds is None or self.round_time_budget_seconds <= 0:
+        if self.round_time_budget_seconds <= 0:
             raise ValueError(
-                f"round_time_budget_seconds must be > 0 " f"(got {self.round_time_budget_seconds})"
+                f"round_time_budget_seconds must be > 0 (got {self.round_time_budget_seconds})"
             )
         return self
 
