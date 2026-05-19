@@ -195,47 +195,51 @@ def _plot(
         if max_per_category[category_id] >= _MIN_PREVALENCE_TO_SHOW
     ]
     ordered_categories = sorted(
-        visible_categories, key=lambda category_id: max_per_category[category_id]
+        visible_categories, key=lambda category_id: -max_per_category[category_id]
     )
-    y_positions = np.arange(len(ordered_categories))
-    bar_height = 0.4
-    fig, ax = plt.subplots(figsize=(20, max(10, len(ordered_categories) * 0.95)))
+    x_positions = np.arange(len(ordered_categories))
+    bar_width = 0.4
+    fig, ax = plt.subplots(figsize=(max(14, len(ordered_categories) * 1.4), 12))
     fig.patch.set_facecolor("white")
-    for offset, cohort in zip((bar_height / 2, -bar_height / 2), _COHORTS):
-        widths = [
+    for offset, cohort in zip((-bar_width / 2, bar_width / 2), _COHORTS):
+        heights = [
             prevalence_by_cohort[cohort.name][category_id] for category_id in ordered_categories
         ]
         label = f"{cohort.display_name} (n={cohort_run_counts[cohort.name]})"
-        ax.barh(
-            y_positions + offset,
-            widths,
-            height=bar_height,
+        ax.bar(
+            x_positions + offset,
+            heights,
+            width=bar_width,
             color=cohort.color,
             edgecolor="white",
             linewidth=0.8,
             label=label,
         )
-        for y_pos, width in zip(y_positions + offset, widths):
-            if width <= 0.0:
+        for x_pos, height in zip(x_positions + offset, heights):
+            if height <= 0.0:
                 continue
             ax.text(
-                width + 0.012,
-                y_pos,
-                f"{width:.0%}",
-                va="center",
-                ha="left",
+                x_pos,
+                height + 0.012,
+                f"{height:.0%}",
+                va="bottom",
+                ha="center",
                 fontsize=18,
                 color=cohort.color,
             )
 
-    ax.set_xlim(0, 1.08)
-    ax.set_yticks(y_positions)
-    ax.set_yticklabels([_humanize_category_id(c) for c in ordered_categories])
-    ax.xaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=0))
-    ax.set_xlabel(f"Share of cohort runs with confidence ≥ {_CONFIDENCE_THRESHOLD:g}")
-    ax.grid(axis="x", alpha=0.25, linestyle="--", linewidth=0.8)
+    ax.set_ylim(0, 1.12)
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(
+        [_humanize_category_id(c) for c in ordered_categories],
+        rotation=35,
+        ha="right",
+        rotation_mode="anchor",
+    )
+    ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=0))
+    ax.grid(axis="y", alpha=0.25, linestyle="--", linewidth=0.8)
     ax.set_axisbelow(True)
-    ax.tick_params(axis="y", length=0)
+    ax.tick_params(axis="x", length=0)
 
     ax.set_title(
         "Shared language-emergence mechanisms\nacross scenarios",
@@ -245,7 +249,7 @@ def _plot(
     )
 
     legend = ax.legend(
-        loc="lower right",
+        loc="lower left",
         frameon=True,
         framealpha=0.95,
         edgecolor="#cccccc",
