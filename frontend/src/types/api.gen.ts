@@ -835,6 +835,8 @@ export interface components {
             channel_id: string;
             /** Sender Agent Id */
             sender_agent_id: string;
+            /** Sender Display Name */
+            sender_display_name: string;
             /** Text */
             text: string;
             /**

@@ -229,6 +229,7 @@ def _build_rewind_state_at_timestamp(
                     message_id=msg.message_id,
                     channel_id=msg.channel_id,
                     sender_agent_id=msg.sender_agent_id,
+                    sender_display_name=msg.sender_display_name,
                     text=message_edits[msg.message_id],
                     timestamp=msg.timestamp,
                     round_number=msg.round_number,

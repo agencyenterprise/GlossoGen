@@ -17,6 +17,12 @@ export interface DisplayEntry {
   channel_id: string;
   channel_ids: string[];
   sender_agent_id: string;
+  /** Display name resolved at message-send time. Populated server-side for
+   *  channel messages so historical messages from a rotating-identity slot
+   *  (e.g. surprise_party's friend) render under the name the slot held in
+   *  the message's round. Empty string on reasoning, tool, and run-cycle
+   *  failure entries — callers fall back to the agent's static role name. */
+  sender_display_name: string;
   text: string;
   timestamp: string;
   round_number: number;
@@ -48,6 +54,7 @@ export interface DisplayEntry {
 }
 
 const EMPTY_ENTRY_DEFAULTS = {
+  sender_display_name: "",
   is_reasoning: false,
   is_tool_use: false,
   is_notification_result: false,
@@ -89,6 +96,7 @@ export function mergeEntries(
     channel_id: m.channel_id,
     channel_ids: [m.channel_id],
     sender_agent_id: m.sender_agent_id,
+    sender_display_name: m.sender_display_name,
     text: m.text,
     timestamp: m.timestamp,
     round_number: m.round_number,

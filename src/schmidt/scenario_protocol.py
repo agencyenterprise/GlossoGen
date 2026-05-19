@@ -167,6 +167,19 @@ class SimulationScenario(ABC):
         """Return the human-readable display name for an agent."""
         ...
 
+    def get_agent_display_name_at_round(self, agent_id: str, round_number: int) -> str:
+        """Return the display name for an agent at a specific round.
+
+        Most scenarios assign a fixed name per agent ID; the default
+        delegates to ``get_agent_display_name`` and ignores ``round_number``.
+        Scenarios that rotate the identity behind a single ``agent_id`` slot
+        across rounds (e.g. a guest-of-the-week pattern) override this so
+        that historical messages render under the name the slot held when
+        they were sent.
+        """
+        _ = round_number
+        return self.get_agent_display_name(agent_id=agent_id)
+
     def get_scenario_config(self) -> dict[str, object]:
         """Return scenario configuration as a JSON-serializable dict for logging and display.
 

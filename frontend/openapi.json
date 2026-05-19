@@ -1872,6 +1872,10 @@
             "type": "string",
             "title": "Sender Agent Id"
           },
+          "sender_display_name": {
+            "type": "string",
+            "title": "Sender Display Name"
+          },
           "text": {
             "type": "string",
             "title": "Text"
@@ -1895,6 +1899,7 @@
           "message_id",
           "channel_id",
           "sender_agent_id",
+          "sender_display_name",
           "text",
           "timestamp",
           "round_number",

@@ -955,6 +955,10 @@ export function ChatPane({
               {round.turns.map((turn, turnIdx) => {
                 const agent = agentMap.get(turn.agentId);
                 const color = agentColorMap.get(turn.agentId);
+                const turnDisplayName =
+                  turn.entries.find(e => e.sender_display_name)?.sender_display_name ??
+                  agent?.role_name ??
+                  turn.agentId;
 
                 const isPreResume =
                   resumeCutoffTimestamp !== null && turn.timestamp < resumeCutoffTimestamp;
@@ -968,7 +972,7 @@ export function ChatPane({
                   >
                     <div className="flex w-7 shrink-0 flex-col items-start">
                       <button
-                        aria-label={`Open agent ${agent?.role_name ?? turn.agentId}`}
+                        aria-label={`Open agent ${turnDisplayName}`}
                         className={cn(
                           "flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[10px] font-semibold transition-opacity hover:opacity-75",
                           color?.bg,
@@ -990,7 +994,7 @@ export function ChatPane({
                           className="text-[13px] font-medium hover:underline"
                           onClick={() => onSelectAgent(turn.agentId)}
                         >
-                          {agent?.role_name ?? turn.agentId}
+                          {turnDisplayName}
                         </button>
                         <span className="text-[10px] text-muted-foreground">
                           {formatTime(turn.timestamp)}

@@ -1,0 +1,23 @@
+--- ROUND {{ round_number }} ---
+
+**Party details::**
+
+* WHERE: **{{ party_where }}**
+* WHEN: **{{ party_when }}**
+
+**This round's friend in the chat is named: {{ friend_name }}** (a fresh person — no memory of any prior round). Address them by name.
+
+**Chris** is also in the chat as always; he is the guest of honor and must not figure out where or when.
+{% if previous_outcome is not none %}
+
+Previous round result:
+{% if previous_outcome.label == "friend_correct" -%}
+✅ **{{ previous_outcome.friend_name }} (last round's friend) correctly guessed** — round success.
+{% elif previous_outcome.label == "chris_correct" -%}
+🚨 **Chris guessed correctly last round — the surprise is blown.** (The simulation is ending now.)
+{% else -%}
+⏳ Last round timed out — **{{ previous_outcome.friend_name }}** never guessed correctly, but Chris also did not figure it out. No win, no loss.
+{% endif -%}
+{% endif %}
+
+Go.

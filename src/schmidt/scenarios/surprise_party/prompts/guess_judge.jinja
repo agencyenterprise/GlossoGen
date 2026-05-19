@@ -1,0 +1,12 @@
+Ground truth:
+
+* WHERE: {{ ground_truth_where }}
+* WHEN: {{ ground_truth_when }}
+
+Agent's freetext guess:
+
+> {{ guess }}
+
+Decide whether the guess clearly identifies BOTH the place and the time of the ground truth. Be lenient: synonyms, casual phrasing, partial names that uniquely identify the place, and approximate times that fall in the same window all count as matches. A guess that only nails one half (place but not time, or time but not place) is INCORRECT — the agent has to land both to win the round.
+
+Return a strict JSON verdict matching the provided schema.
