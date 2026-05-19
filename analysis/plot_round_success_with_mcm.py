@@ -21,7 +21,6 @@ from typing import NamedTuple
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-from matplotlib.ticker import PercentFormatter
 
 # matplotlib defaults are ~10pt; doubling lands every label at presentation scale.
 _LARGE_FONT_RCPARAMS = {
@@ -263,7 +262,7 @@ def _plot_success_axis(
     yerr_high: list[float],
     values_by_round: dict[int, list[float]],
 ) -> None:
-    """Render success-rate replica dots + mean trace with Wilson 95% CI bars."""
+    """Render per-run binary outcomes (one dot per run, y∈{0,1}) + mean trace + CI bars."""
     _plot_replica_dots(ax=ax, rounds=rounds, values_by_round=values_by_round, color=_SUCCESS_COLOR)
     ax.errorbar(
         rounds,
@@ -276,11 +275,12 @@ def _plot_success_axis(
         label="round success rate (95% CI)",
         zorder=3,
     )
-    ax.set_ylim(-0.02, 1.02)
+    ax.set_ylim(-0.08, 1.08)
     ax.set_xlabel("Round")
-    ax.set_ylabel("Round success rate", color=_SUCCESS_COLOR)
+    ax.set_ylabel("Round success", color=_SUCCESS_COLOR)
     ax.tick_params(axis="y", labelcolor=_SUCCESS_COLOR)
-    ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=0))
+    ax.set_yticks([0, 1])
+    ax.set_yticklabels(["Collapsed", "Succeeded"])
     ax.grid(axis="y", alpha=0.3)
     ax.set_xticks(rounds)
 
@@ -442,7 +442,7 @@ def main() -> None:
         success_means.append(p_hat)
         success_ci_low.append(ci_low_v)
         success_ci_high.append(ci_high_v)
-        success_dots[round_number] = agg.cell_means
+        success_dots[round_number] = agg.raw_values
         agg = mcm_by_round.get(round_number, _RoundAggregate(raw_values=[], cell_means=[]))
         mean_v, std_v = _mean_and_std(values=agg.raw_values)
         mcm_means.append(mean_v)
