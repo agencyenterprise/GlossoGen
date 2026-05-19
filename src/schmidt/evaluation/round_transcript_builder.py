@@ -46,8 +46,9 @@ def build_round_transcripts(
         if not isinstance(event, MessageSent):
             continue
         rn = event.round_number
-        sender = scenario.get_agent_display_name(
+        sender = scenario.get_agent_display_name_at_round(
             agent_id=event.message.sender_agent_id,
+            round_number=rn,
         )
         channel_name = scenario.get_channel_display_name(
             channel_id=event.message.channel_id,

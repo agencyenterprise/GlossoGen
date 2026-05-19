@@ -30,6 +30,7 @@ class ChannelMessage(BaseModel):
     message_id: str
     channel_id: str
     sender_agent_id: str
+    sender_display_name: str
     text: str
     timestamp: datetime
     round_number: int

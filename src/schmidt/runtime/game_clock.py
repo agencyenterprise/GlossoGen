@@ -247,4 +247,10 @@ class GameClock:
                             self._max_rounds,
                         )
                         return RunStatus.SCENARIO_COMPLETE
+                    if self._scenario.is_finished_early():
+                        logger.info(
+                            "Scenario signalled early finish after round %d",
+                            self._runtime.current_round,
+                        )
+                        return RunStatus.SCENARIO_COMPLETE
                     await self._advance_round(trigger=trigger)

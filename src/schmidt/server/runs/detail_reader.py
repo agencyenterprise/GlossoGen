@@ -226,7 +226,6 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
             provider = event.provider
             timestamp = event.timestamp
             channel_ids = event.channel_ids
-
         elif isinstance(event, AgentRegistered):
             agents_by_id[event.agent_id] = AgentDetail(
                 agent_id=event.agent_id,
@@ -369,6 +368,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
                     message_id=msg.message_id,
                     channel_id=msg.channel_id,
                     sender_agent_id=msg.sender_agent_id,
+                    sender_display_name=msg.sender_display_name,
                     text=msg.text,
                     timestamp=msg.timestamp,
                     round_number=event.round_number,

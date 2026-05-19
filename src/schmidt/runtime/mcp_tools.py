@@ -294,13 +294,12 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                 message_count=absolute_count,
             )
             recent = visible[-last_n:]
-            display_name_fn = runtime.scenario.get_agent_display_name
             return ReadChannelResult(
                 current_round=runtime.current_round,
                 messages=[
                     ChannelMessage(
                         round=msg.round_number,
-                        sender=display_name_fn(agent_id=msg.sender_agent_id),
+                        sender=msg.sender_display_name,
                         text=msg.text,
                         timestamp=msg.timestamp.isoformat(),
                     )
@@ -343,8 +342,6 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                     current_round=runtime.current_round,
                 ).model_dump()
 
-            display_name_fn = runtime.scenario.get_agent_display_name
-
             # Count tokens before acquiring the lock to avoid holding the lock
             # during a potentially slow external API call.
             token_count = await runtime.count_tokens(agent_id=agent_id, text=text)
@@ -361,7 +358,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                     new_messages = [
                         ChannelMessage(
                             round=msg.round_number,
-                            sender=display_name_fn(agent_id=msg.sender_agent_id),
+                            sender=msg.sender_display_name,
                             text=msg.text,
                             timestamp=msg.timestamp.isoformat(),
                         )
@@ -396,6 +393,10 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                     message_id=str(uuid4()),
                     channel_id=channel_id,
                     sender_agent_id=agent_id,
+                    sender_display_name=runtime.scenario.get_agent_display_name_at_round(
+                        agent_id=agent_id,
+                        round_number=runtime.current_round,
+                    ),
                     text=transformed_text,
                     timestamp=datetime.now(tz=UTC),
                     round_number=runtime.current_round,
@@ -480,7 +481,10 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         return [
             {
                 "agent_id": mid,
-                "display_name": runtime.scenario.get_agent_display_name(agent_id=mid),
+                "display_name": runtime.scenario.get_agent_display_name_at_round(
+                    agent_id=mid,
+                    round_number=runtime.current_round,
+                ),
             }
             for mid in member_ids
         ]

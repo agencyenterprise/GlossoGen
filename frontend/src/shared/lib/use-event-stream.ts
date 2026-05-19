@@ -185,6 +185,7 @@ export function useEventStream(
           message_id: msg.message_id,
           channel_id: msg.channel_id,
           sender_agent_id: msg.sender_agent_id,
+          sender_display_name: "",
           text: msg.text,
           timestamp: msg.timestamp,
           round_number: data.round_number,
