@@ -64,7 +64,7 @@ from schmidt.scenarios.surprise_party.ids import (
 )
 from schmidt.scenarios.surprise_party.judge import GuessJudge
 from schmidt.scenarios.surprise_party.knobs import SurprisePartyKnobs
-from schmidt.scenarios.surprise_party.party_pool import draw_party
+from schmidt.scenarios.surprise_party.party_pool import PartyRng
 from schmidt.scenarios.surprise_party.world import SurprisePartyWorld
 from schmidt.template_renderer import TemplateRenderer
 
@@ -109,10 +109,10 @@ class SurprisePartyScenario(SimulationScenario):
     def __init__(self, knobs: SurprisePartyKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
-        self._party = draw_party(seed=knobs.seed)
+        self._party_rng = PartyRng(seed=knobs.seed)
         self._friend_name_order = build_friend_name_order(seed=knobs.seed)
         self._world = SurprisePartyWorld(
-            party=self._party,
+            party_rng=self._party_rng,
             friend_name_order=self._friend_name_order,
         )
         self._friend_swaps: list[SwapAgent] = [
@@ -124,12 +124,15 @@ class SurprisePartyScenario(SimulationScenario):
                 channel_visibility={
                     CHAT_CHANNEL_ID: ChannelVisibilityFromRound(round_floor=r),
                 },
+                system_prompt=self._render_friend_system_prompt(round_number=r),
             )
             for r in range(2, knobs.round_count + 1)
         ]
         self._runtime: ScenarioRuntimeHandle | None = None
-        self._party_logged: bool = False
+        self._initial_party_logged: bool = False
         self._friend_introduced_rounds: set[int] = set()
+        self._chris_model: str = ""
+        self._chris_provider: str = ""
 
     def name(self) -> str:
         """Return the scenario identifier."""
@@ -195,6 +198,16 @@ class SurprisePartyScenario(SimulationScenario):
             ),
         ]
 
+    def _render_friend_system_prompt(self, round_number: int) -> str:
+        """Render Friend's system prompt with the round's specific friend name."""
+        return self._renderer.render(
+            template_name=FRIEND_SYSTEM_TEMPLATE,
+            template_variables={
+                "channels": self._channel_template_data(agent_id=FRIEND_ID),
+                "friend_name": self._world.friend_name_at_round(round_number=round_number),
+            },
+        )
+
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
         """Return the three agent configurations with rendered system prompts."""
         agents: list[AgentConfig] = []
@@ -205,6 +218,7 @@ class SurprisePartyScenario(SimulationScenario):
             if agent_def.agent_id == FRIEND_ID:
                 model = self._knobs.friend_model
                 provider = self._knobs.friend_provider
+                system_prompt = self._render_friend_system_prompt(round_number=1)
             else:
                 override = self._knobs.model_overrides.get(agent_def.agent_id)
                 model = override.model if override is not None else default_model
@@ -213,14 +227,21 @@ class SurprisePartyScenario(SimulationScenario):
                     if override is not None and override.provider is not None
                     else default_provider
                 )
+                system_prompt = self._renderer.render(
+                    template_name=agent_def.system_template,
+                    template_variables=template_variables,
+                )
+            if agent_def.agent_id == CHRIS_ID:
+                # Stash Chris's resolved model so every chris swap triggered
+                # mid-run uses the same model the initial Chris was spawned
+                # with.
+                self._chris_model = model
+                self._chris_provider = provider
             agents.append(
                 AgentConfig(
                     agent_id=agent_def.agent_id,
                     role_name=agent_def.role_name,
-                    system_prompt=self._renderer.render(
-                        template_name=agent_def.system_template,
-                        template_variables=template_variables,
-                    ),
+                    system_prompt=system_prompt,
                     channel_ids=[CHAT_CHANNEL_ID],
                     tool_names=agent_def.tool_names,
                     model=model,
@@ -278,6 +299,8 @@ class SurprisePartyScenario(SimulationScenario):
             "label": last.label,
             "friend_name": last.friend_name,
             "round_number": str(last.round_number),
+            "party_where": last.party.where,
+            "party_when": last.party.when,
         }
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
@@ -286,16 +309,21 @@ class SurprisePartyScenario(SimulationScenario):
         if friend_name == "":
             return None
         previous_outcome = self._previous_outcome_for_template()
+        current_party = self._world.party_for_round(round_number=round_number)
+        chris_replaced = (
+            previous_outcome is not None and previous_outcome["label"] == "chris_correct"
+        )
 
         if agent_id == ALICE_ID:
             return self._renderer.render(
                 template_name=ALICE_INJECTION_TEMPLATE,
                 template_variables={
                     "round_number": round_number,
-                    "party_where": self._party.where,
-                    "party_when": self._party.when,
+                    "party_where": current_party.where,
+                    "party_when": current_party.when,
                     "friend_name": friend_name,
                     "previous_outcome": previous_outcome,
+                    "chris_replaced": chris_replaced,
                 },
             )
         if agent_id == FRIEND_ID:
@@ -312,36 +340,76 @@ class SurprisePartyScenario(SimulationScenario):
                 template_variables={
                     "round_number": round_number,
                     "friend_name": friend_name,
+                    "chris_replaced": chris_replaced,
                 },
             )
         return None
 
     async def on_round_advanced(self, round_number: int) -> None:
-        """Log the party (once) and the round's friend identity, then mark the round live."""
+        """Open a new party era when needed, log per-round events, mark round live.
+
+        At round 1 we log the initial party. After any round that ended
+        on ``chris_correct``, the world starts a fresh party era at this
+        round, which we also log so post-hoc tooling can read the active
+        party for each round.
+        """
         if self._runtime is None:
             return
-        if not self._party_logged:
-            await self._world.log_party_decided(event_logger=self._runtime.event_logger)
-            self._party_logged = True
+        if round_number == 1 and not self._initial_party_logged:
+            await self._world.log_party_decided(
+                party=self._world.party_for_round(round_number=1),
+                round_number=1,
+                event_logger=self._runtime.event_logger,
+            )
+            self._initial_party_logged = True
+        elif self._world.outcomes and self._world.outcomes[-1].label == "chris_correct":
+            new_party = self._world.begin_party_era(first_round_active=round_number)
+            await self._world.log_party_decided(
+                party=new_party,
+                round_number=round_number,
+                event_logger=self._runtime.event_logger,
+            )
         if round_number not in self._friend_introduced_rounds:
             await self._world.log_friend_introduced(
                 round_number=round_number,
                 event_logger=self._runtime.event_logger,
             )
             self._friend_introduced_rounds.add(round_number)
-        self._world.begin_round(new_round_number=round_number)
 
     async def on_round_ended(self, round_number: int, trigger: str) -> None:
-        """Settle the just-ended round's outcome before next-round injections render."""
-        self._world.finalize_round(ending_round_number=round_number, trigger=trigger)
+        """Settle the just-ended round and, on chris_correct, schedule his swap.
+
+        When Chris uncovers the party, the next round needs (a) a fresh
+        Chris with no chat history and (b) a fresh ``(where, when)``
+        draw. The chris swap is scheduled here so the round-boundary
+        dispatcher fires it before the next round's injections render;
+        the party redraw happens in ``on_round_advanced`` of the next
+        round (so it's idempotent under fork/resume).
+        """
+        label = self._world.finalize_round(ending_round_number=round_number)
+        if label != "chris_correct":
+            return
+        if self._runtime is None:
+            return
+        next_round = round_number + 1
+        if next_round > self._knobs.round_count:
+            return
+        self._runtime.schedule_event(
+            event=SwapAgent(
+                at_round=next_round,
+                agent_id=CHRIS_ID,
+                model=self._chris_model,
+                provider=self._chris_provider,
+                channel_visibility={
+                    CHAT_CHANNEL_ID: ChannelVisibilityFromRound(round_floor=next_round),
+                },
+            ),
+        )
+        _ = trigger
 
     def get_early_round_end_trigger(self) -> str | None:
         """End the round as soon as anyone has guessed correctly."""
         return self._world.should_end_round_early()
-
-    def is_finished_early(self) -> bool:
-        """Terminate the simulation once Chris has decoded the secret."""
-        return self._world.is_finished()
 
     def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
         """Emit one ``RoundResult`` per round. Success only if the friend guessed."""
@@ -351,7 +419,7 @@ class SurprisePartyScenario(SimulationScenario):
                 RoundResult(
                     success=True,
                     team_id=None,
-                    reason="Friend decoded the party from this round's chat",
+                    reason="Friend figured out the gathering is a surprise party for Chris",
                 )
             ]
         if trigger == TRIGGER_CHRIS_CORRECT:
@@ -359,7 +427,10 @@ class SurprisePartyScenario(SimulationScenario):
                 RoundResult(
                     success=False,
                     team_id=None,
-                    reason="Chris decoded the secret — surprise blown",
+                    reason=(
+                        "Chris realized he's the guest of honor — "
+                        "Alice will plan a new gathering"
+                    ),
                 )
             ]
         return [
@@ -373,8 +444,8 @@ class SurprisePartyScenario(SimulationScenario):
     def restore_state_from_events(self, events: list[Any]) -> None:
         """Re-seed world state from a JSONL log on fork / resume."""
         self._world.restore_state_from_events(events=events)
-        self._party = self._world.party
-        self._party_logged = True
+        if self._world.party_history:
+            self._initial_party_logged = True
 
     def get_world(self) -> ScenarioWorld:
         """Return the surprise_party world."""
@@ -390,6 +461,7 @@ class SurprisePartyScenario(SimulationScenario):
                 raise ValueError("Only the Friend or Chris may call submit_guess.")
             if self._runtime is None:
                 raise ValueError("Scenario runtime is not bound; cannot judge a guess.")
+            invoked_round = self._runtime.current_round
             judge = GuessJudge(
                 llm_provider=create_provider(
                     provider_name=self._knobs.judge_provider,
@@ -398,17 +470,21 @@ class SurprisePartyScenario(SimulationScenario):
                     reasoning_effort=None,
                 )
             )
-            verdict = await judge.judge(
-                ground_truth_where=self._party.where,
-                ground_truth_when=self._party.when,
-                guess=guess,
-            )
+            verdict = await judge.judge(guess=guess)
+            if invoked_round != self._runtime.current_round:
+                # Round advanced while the judge LLM call was in flight. The
+                # guess belongs to the old round, which has already been
+                # finalized — discard it so it can't pollute the new round.
+                return (
+                    f"{GUESS_INCORRECT_MARKER}: round ended before the judge "
+                    "verdict came back; guess discarded."
+                )
             await self._world.record_guess_judged(
                 agent_id=agent_id,
                 guess=guess,
                 correct=verdict.correct,
                 judge_explanation=verdict.explanation,
-                round_number=self._runtime.current_round,
+                round_number=invoked_round,
                 event_logger=self._runtime.event_logger,
             )
             marker = GUESS_CORRECT_MARKER if verdict.correct else GUESS_INCORRECT_MARKER

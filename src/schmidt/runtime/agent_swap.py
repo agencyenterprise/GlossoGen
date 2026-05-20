@@ -237,8 +237,11 @@ async def _build_seed_history(
     )
     if last_registration is None:
         raise ValueError(f"No AgentRegistered event for agent_id={spec.agent_id!r}")
+    base_prompt = (
+        spec.system_prompt if spec.system_prompt is not None else last_registration.system_prompt
+    )
     system_prompt = build_full_system_prompt(
-        base_prompt=last_registration.system_prompt,
+        base_prompt=base_prompt,
         role_name=last_registration.role_name,
     )
     history = build_message_history(

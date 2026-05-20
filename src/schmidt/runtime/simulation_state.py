@@ -18,6 +18,8 @@ from schmidt.models.event import InjectionDelivered, PostmortemStarted
 from schmidt.runtime.activity_notification import DoneNotification, NewInfoNotification
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.scenario_world import WorldContext
+from schmidt.runtime.scheduled_events import ScheduledEvent
+from schmidt.runtime.scheduler import RoundBoundaryScheduler
 from schmidt.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -35,6 +37,7 @@ class SimulationRuntime:
         agent_tool_allowlists: dict[str, frozenset[str]],
         world_context: WorldContext,
         agent_configs: list[AgentConfig],
+        scheduler: RoundBoundaryScheduler,
     ) -> None:
         self._scenario = scenario
         self._channel_router = ChannelRouter(channels=channels)
@@ -53,6 +56,18 @@ class SimulationRuntime:
         self._on_message_callbacks: list[Callable[[], None]] = []
         self._channel_message_count_at_round_start: dict[int, dict[str, int]] = {}
         self._last_injected_rounds: dict[str, int] = {}
+        self._scheduler = scheduler
+
+    def schedule_event(self, event: ScheduledEvent) -> None:
+        """Add a scheduled intervention at runtime.
+
+        Scenarios call this from ``on_round_ended`` (or any hook running
+        before the next round's boundary dispatch) to schedule an agent
+        swap or postmortem toggle conditionally based on in-simulation
+        state. ``event.at_round`` must be strictly greater than the
+        current round.
+        """
+        self._scheduler.add_event(event=event)
 
     @property
     def scenario(self) -> SimulationScenario:

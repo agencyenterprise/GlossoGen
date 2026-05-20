@@ -33,6 +33,15 @@ class AgentSession:
         self._terminated = False
         self._done_reason = ""
 
+    @property
+    def terminated(self) -> bool:
+        """True after a ``DoneNotification`` has been queued.
+
+        Used to reject incoming tool calls from agents being swapped out
+        so they cannot mutate simulation state mid-drain.
+        """
+        return self._terminated
+
     @contextlib.asynccontextmanager
     async def track_active_call(self) -> AsyncIterator[None]:
         """Mark the agent busy for the duration of a non-blocking tool call.

@@ -100,6 +100,24 @@ def _resolve_agent_from_context(ctx: ToolContext, runtime: SimulationRuntime) ->
     return runtime.resolve_session(agent_id=agent_id)
 
 
+def _reject_if_terminated(session: AgentSession, tool_name: str) -> None:
+    """Raise if the calling agent's session has been drained for a swap.
+
+    Once ``DoneNotification`` is queued on an ``AgentSession``, the agent
+    is being torn down to make room for its swapped-in successor. Any
+    state-mutating tool call from a runner that has not yet noticed the
+    Done signal would land under the new round / new occupant context
+    and corrupt the simulation, so this check rejects them at the MCP
+    boundary. ``read_notifications`` is exempt — the dying runner must
+    still be able to read its Done signal to exit cleanly.
+    """
+    if session.terminated:
+        raise ValueError(
+            f"Agent '{session.agent_id}' is being swapped out; "
+            f"tool '{tool_name}' rejected. Read your notifications to exit cleanly."
+        )
+
+
 def _build_guarded_executor(
     tool_name: str,
     original_executor: Callable[..., Awaitable[str]],
@@ -128,6 +146,7 @@ def _build_guarded_executor(
             )
             raise ValueError(f"Agent '{agent_id}' is not authorized to call tool '{tool_name}'")
         session = runtime.resolve_session(agent_id=agent_id)
+        _reject_if_terminated(session=session, tool_name=tool_name)
         async with session.track_active_call():
             return await original_executor(*args, **kwargs)
 
@@ -277,6 +296,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         flagged as new in subsequent send_message conflict checks.
         """
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
+        _reject_if_terminated(session=session, tool_name="read_channel")
         async with session.track_active_call():
             agent_id = session.agent_id
             if not runtime.channel_router.validate_membership(
@@ -321,6 +341,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
     ) -> dict[str, Any]:
         """Post a message with optimistic concurrency control."""
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
+        _reject_if_terminated(session=session, tool_name="send_message")
         async with session.track_active_call():
             agent_id = session.agent_id
             if not runtime.channel_router.validate_membership(

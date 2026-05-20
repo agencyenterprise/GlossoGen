@@ -84,6 +84,7 @@ class SwapAgent(BaseModel):
     model: str
     provider: str
     channel_visibility: dict[str, ChannelVisibility] = Field(default_factory=dict)
+    system_prompt: str | None = None
 
     @model_validator(mode="after")
     def _validate_round_floors(self) -> Self:

@@ -21,6 +21,7 @@ from schmidt.models.channel import Channel
 from schmidt.models.event import AgentSwappedMidRun, SimulationEvent
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.runtime.scenario_world import ScenarioWorld
+from schmidt.runtime.scheduled_events import ScheduledEvent
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +47,10 @@ class ScenarioRuntimeHandle(Protocol):
     """Read-only view of the simulation runtime exposed to scenarios.
 
     Scenarios receive this handle via ``bind_runtime`` and use it to log
-    custom events and read the current round number. Defined as a
-    Protocol to avoid an import cycle with ``SimulationRuntime``.
+    custom events, read the current round number, and schedule
+    round-boundary interventions in response to in-simulation state.
+    Defined as a Protocol to avoid an import cycle with
+    ``SimulationRuntime``.
     """
 
     @property
@@ -55,6 +58,16 @@ class ScenarioRuntimeHandle(Protocol):
 
     @property
     def current_round(self) -> int: ...
+
+    def schedule_event(self, event: ScheduledEvent) -> None:
+        """Schedule a round-boundary intervention at runtime.
+
+        ``event.at_round`` must be a round whose boundary has not yet
+        fired (typically ``current_round + 1`` or later). Used by
+        scenarios that need conditional swaps or postmortem toggles
+        triggered by what just happened in the round that's ending.
+        """
+        ...
 
 
 class SimulationScenario(ABC):
