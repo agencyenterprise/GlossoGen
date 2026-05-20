@@ -122,6 +122,29 @@ The cross-run API endpoint is `POST /api/runs/{scenario}/{run_dir_name}/cross-ru
 
 The same `round_success_after_resume` metric works for both replace-agent and cross-run flows; for cross-run runs the comparison is against Sim A over the same window.
 
+## Resume at a Round (Post-Hoc, No Agent Replacement)
+
+`schmidt resume-at-round` clones a finished run at the start of a chosen round and continues execution without restarting any agent. Every agent keeps its full reconstructed history; the resumed simulation differs from the source only through merged knob overrides. Useful for post-hoc multi-swap studies (inject new `scheduled_events`), toggling `postmortem_enabled` mid-experiment, extending `round_count` past where the source stopped, or just replaying a finished run with a different configuration.
+
+```bash
+VIRTUAL_ENV= uv run --no-sync python -m schmidt resume-at-round veyru \
+  --source-run-dir ./runs/veyru/<source_timestamp> \
+  --round-start 16 \
+  --runs-dir ./runs \
+  [--knobs path/to/overrides.json] \
+  [--rounds-after-resume K]
+```
+
+`--rounds-after-resume` defaults to `source_round_count - round_start` (the remaining rounds in the original after the boundary). The resumed simulation's `round_count` is set to `round_start + rounds_after_resume`.
+
+Internals: the flow reuses the `replace-agent` machinery with `replaced_agent_id=None`. Clones the source's git repo at the `RoundAdvanced(round_start)` commit, pins every agent to its source-active model via `model_overrides` (so resuming a multi-swap source picks up each agent's per-phase model), writes `replace_manifest.json` with `replaced_agent_id` / `replacement_model` / `replacement_provider` all `null`, and launches `schmidt run --resume`. The game clock's resume branch defers `deliver_round_injections` until after agent runners are launched and the boundary hook fires, so `scheduled_events` bucketed at `round_start` execute against a fully-wired runtime and the resulting round-start injection lands in the post-swap session.
+
+`--knobs` accepts a JSON file shallow-merged onto the source's `scenario_config`. Use it to flip `postmortem_enabled`, append new `scheduled_events` for post-hoc multi-swap studies, extend `round_count` beyond what the source ran, or override `model_overrides`. When the scenario's knobs schema gained a required field after the source was created, pass that field via `--knobs` so validation passes (example: veyru's `easy_round_numbers` was added later — older runs need `--knobs '{"easy_round_numbers": [1, 2, 3, 6, 13]}'`).
+
+Inherited `scheduled_events` semantics: events at `at_round < round_start` are silently skipped (the resumed clock never visits those rounds). Events at `at_round == round_start` fire on resume — by design — because the cloned JSONL is captured before the source dispatched that boundary's scheduler events. Boundaries that already fired in the source (or in a crashed-and-resumed run) are pre-seeded into the scheduler's `_fired_rounds` set so they are not re-dispatched.
+
+The resume API endpoint is `POST /api/runs/{scenario}/{run_dir_name}/resume-at-round` with body `{round_start, rounds_after_resume, knobs}`. Runs created this way appear with a green "↺ Resumed @ round N" badge linking back to the source. The chat-pane round divider exposes a circular-arrow icon at every round ≥ 2 to open a confirm modal with `rounds_after_resume` pre-filled and a JSON textarea for knob overrides. Multi-swap runs (whether direct via `scheduled_events` or inherited via resume) render one floating action button per swap so users can scroll directly to any boundary.
+
 ## In-Run Agent Swaps via `scheduled_events`
 
 The in-run scheduler swaps agents at scheduled round boundaries inside a single live simulation. Multiple swaps fire across the same run on one continuous timeline; a run with three swaps produces four phases (A → B → C → D) on the same timeline.

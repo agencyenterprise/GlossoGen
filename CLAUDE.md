@@ -92,6 +92,9 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
   - `password_auth_middleware.py` — pure ASGI middleware for shared-password authentication
   - `runs/fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
+  - `runs/replace_agent_router.py` — `POST /api/runs/{scenario}/{run_dir_name}/replace-agent` endpoint for round-level rewind with one fresh agent
+  - `runs/cross_run_replace_agent_router.py` — `POST /api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent` endpoint for round-level rewind importing an agent from a different completed run
+  - `runs/resume_at_round_router.py` — `POST /api/runs/{scenario}/{run_dir_name}/resume-at-round` endpoint for round-level rewind with no agent replacement (every agent keeps its full reconstructed history; knobs can be overridden)
   - `runs/scenario_extension.py` — `ScenarioRunDetailExtension` ABC + auto-discovery of every scenario's optional `run_detail_extension.py`; powers the discriminated-union `scenario_extras` field on `RunDetailResponse`
   - `runs/run_detail_types.py` — leaf DTOs (`AgentDetail`, `ChannelMessage`) shared by `models.py` and scenario-side extensions so extensions can import them without re-entering `models.py` during its discovery-time import
   - `mcp/browser.py` — MCP server mounted at `/mcp` for programmatic run browsing and launching (Claude Code, Cursor)
@@ -327,10 +330,10 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── labels.json                        # JSON array of label strings (e.g. ["baseline_oss"])
 ├── note.md                            # Optional free-text note for the run
 ├── fork_manifest.json                 # (forked runs only) provenance: source_run_id, target_message_id
-├── replace_manifest.json              # (replace-agent runs only) provenance + post-swap channel visibility
+├── replace_manifest.json              # (replace-agent or resume-at-round runs) provenance + post-swap channel visibility; replaced_agent_id/replacement_model/replacement_provider are null for resume-at-round
 ├── cross_run_replace_manifest.json    # (cross-run replace-agent runs only) source_a/source_b/imported_model + post-swap channel visibility
 ├── imported_history_source.jsonl      # (cross-run replace-agent runs only) verbatim copy of Sim B's JSONL used to mount the imported agent's history
-├── replace_config.json                # (replace-agent or cross-run runs only) merged scenario_config + model_overrides written by the orchestrator
+├── replace_config.json                # (replace-agent / cross-run / resume-at-round runs) merged scenario_config + model_overrides written by the orchestrator
 ├── resume_context_{agent_id}.json     # (resume / fork / replace-agent / cross-run runs) per-agent reconstructed pydantic-ai message history dumped at resume time for inspection
 ├── resume_context_{agent_id}_round_{R}.json  # (in-run scheduled swap) one file per AgentSwappedMidRun event capturing the swapped-in agent's seed history
 ├── protocol_probe_responses.jsonl     # (scenarios that implement get_protocol_probe_config) one row per (agent, question, replica)
@@ -571,6 +574,37 @@ schmidt cross-run-replace-agent veyru \
 **Label convention.** Cross-run runs are labelled `cross_team` plus a range tag like `15-25` (rounds played post-swap). The streamlit results viewer's "Cross-swap" tab filters on `cross_team` and plots `round_success_after_resume` per `(imported_model, round_start)` bucket against both Source A and Source B accuracy on the same rounds. Apply labels by writing `labels.json` directly *before* `schmidt evaluate` runs (the eval-derived labels merge into that file).
 
 **`round_success_after_resume` works for both flows.** The metric reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (`round_start`, `rounds_after_swap`, `source_run_id`, `source_run_dir`). For cross-run runs, the comparison is against Sim A (`source_a_*`) — i.e. "did the imported agent perform better/worse than what the original agent achieved over the same window?".
+
+### Resume at a Round (Post-Hoc, No Agent Replacement)
+
+Round-anchored resume clones a finished run at the start of a chosen round and continues execution without restarting any agent. Every agent keeps its full reconstructed history; the resumed simulation differs from the source only through merged knob overrides. Useful for post-hoc multi-swap studies (inject new `scheduled_events`), toggling `postmortem_enabled` mid-experiment, extending `round_count` past where the source stopped, or just replaying a finished run on a different configuration.
+
+```bash
+schmidt resume-at-round veyru \
+  --source-run-dir ./runs/veyru/<source_timestamp> \
+  --round-start 16 \
+  --runs-dir ./runs \
+  [--knobs path/to/overrides.json] \
+  [--rounds-after-resume K]
+```
+
+Required: `scenario_name` (positional), `--source-run-dir`, `--round-start` (≥ 2), `--runs-dir`. Optional: `--knobs <file.json>` (shallow-merged onto source `scenario_config`), `--rounds-after-resume K` (`round_count` is set to `round_start + rounds_after_resume`; default is `source_round_count - round_start`).
+
+**Mechanism.** The flow reuses the `replace-agent` machinery with `replaced_agent_id=None`. `resolve_round_start_anchor` finds the source's `RoundAdvanced(round_start)` event id, the git repo is cloned and checked out at that commit, `model_overrides` is built by pinning every agent to its source-active registration (so a multi-swap source's per-phase models survive the resume), the merged config writes `replace_config.json`, and the resumed subprocess launches via `schmidt run --resume`. The manifest is the standard `replace_manifest.json` with `replaced_agent_id`, `replacement_model`, `replacement_provider` all `null` and `channels_with_visible_history` / `blocked_tool_call_channels` empty.
+
+**Resume ordering on the boundary round.** The game clock's resume branch defers `deliver_round_injections` until after agent runners are launched and the boundary hook fires. The supervisor calls `dispatch_resume_boundary_events()` (which executes any `scheduled_events` bucketed at `round_start`) then `deliver_initial_round_injections()`. This mirrors the normal `_advance_round` order (boundary hook → injection delivery) and ensures that when a `swap_agent` event fires exactly at `round_start`, the round's injection lands in the post-swap session rather than the cancelled predecessor's queue. The `RoundBoundaryScheduler` is pre-seeded from `RewindState.rounds_with_fired_scheduler_events` (set of round numbers carrying `AgentSwappedMidRun` or `PostmortemDisabledMidRun` in the loaded events) so boundaries that already fired in the source — or in a crashed-and-resumed run — are not re-dispatched.
+
+**Inherited `scheduled_events` semantics.** When the source's config carries `scheduled_events`, those entries are preserved unless overridden. Events at `at_round < round_start` are silently skipped (the resumed clock never visits those rounds). Events at `at_round == round_start` fire on resume — by design — because the cloned JSONL captures the state at `RoundAdvanced(round_start)`, which is committed *before* the source's scheduler dispatches that boundary. Pass `--knobs '{"scheduled_events": [...]}'` to override the list (e.g. add a post-hoc swap at a later round, or clear the schedule entirely).
+
+**Picking the subprocess `--model`/`--provider`.** Since every agent is pinned via `model_overrides`, the top-level `--model`/`--provider` flags are unused. The CLI selects the first source-active registration's pair as the defaults so `schmidt run`'s required argparse flags are satisfied.
+
+**Knob-schema evolution caveat.** If the scenario's knobs schema gained a required field after the source was created, validation will reject the merged config until the missing key is supplied. Pass it via `--knobs` for that resume (example: veyru's `easy_round_numbers: frozenset[int]` was added later — older veyru runs need `--knobs '{"easy_round_numbers": [1, 2, 3, 6, 13]}'` to resume).
+
+**REST endpoint** is `POST /api/runs/{scenario}/{run_dir_name}/resume-at-round` with body `ResumeAtRoundRequest { round_start, rounds_after_resume, knobs }`. Response is `ResumeAtRoundResponse { new_run_id, new_run_dir }`. Discovery surfaces the manifest as `RunSummary.resume_at_round_source` / `RunDetailResponse.resume_at_round_source` (`ResumeAtRoundSource { source_run_id, round_start, rounds_after_resume, target_event_id, resumed_at }`); when `replaced_agent_id` is null, `replace_agent_source` is suppressed in favour of this field.
+
+**FE surfaces.** The chat-pane round divider exposes a circular-arrow icon at every round ≥ 2 alongside the existing replace-agent and cross-run icons; clicking opens a confirm modal with `rounds_after_resume` pre-filled to `source_round_count - round_start` and a JSON textarea for knob overrides. The run-detail header shows a green `Resumed @ round N (+K)` badge linking back to the source. The runs-list row shows a green `↺R{N}` badge. Multi-swap runs render one `AgentSwapPointFab` per scheduled swap so users can scroll directly to any boundary.
+
+**Lineage chain.** `replace_manifest.json` carries `source_run_id` + `source_run_dir`, so chaining resume-of-resume-of-resume is traceable: walk `source_run_id` recursively to reach the root. The same field powers the badge's link target.
 
 ### In-Run Agent Swaps via `scheduled_events`
 

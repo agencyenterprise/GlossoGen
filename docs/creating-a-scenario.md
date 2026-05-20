@@ -210,7 +210,7 @@ Most scoring is now scenario-agnostic. As soon as your scenario implements `get_
 | `perplexity`, `mean_chars_per_round`, `mean_chars_per_message`, `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes` | `get_primary_channel_id()` |
 | `round_ended_idle`, `round_ended_timeout`, `content_filter_refusal` | (nothing — read straight from `RoundEnded` / `AgentRunCycleFailed`) |
 | `round_success` | `judge_round_result(round_number, trigger)` |
-| `round_success_after_resume` | `judge_round_result(...)` + the run was launched via replace-agent / cross-run / scheduled swap |
+| `round_success_after_resume` | `judge_round_result(...)` + the run was launched via replace-agent / cross-run / scheduled swap / resume-at-round |
 | `protocol_learned_after_swap` | `build_communication_rounds(events)` + `detect_protocol_boundary_window(...)` |
 | `communication_open_coding`, `communication_feature_presence` | `build_communication_rounds(events)` |
 | `protocol_probe` family (4 metrics) | `get_protocol_probe_config()` |
