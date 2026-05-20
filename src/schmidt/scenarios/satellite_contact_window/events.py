@@ -1,8 +1,8 @@
 """Pydantic event types specific to the satellite_contact_window scenario."""
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from schmidt.models.event_base import EventBase
 
@@ -54,6 +54,17 @@ class SatelliteCaseStarted(EventBase):
     expected_sequence: list[SatelliteCommandStep]
     authorization_envelope: SatelliteAuthorizationEnvelope
     round_time_budget_seconds: int
+
+    @model_validator(mode="before")
+    @classmethod
+    def _backfill_round_time_budget_seconds(cls, data: Any) -> Any:
+        if (
+            isinstance(data, dict)
+            and "round_time_budget_seconds" not in data
+            and "time_budget_seconds" in data
+        ):
+            data = {**data, "round_time_budget_seconds": data["time_budget_seconds"]}
+        return data
 
 
 class SatelliteCommandJudgment(BaseModel):
