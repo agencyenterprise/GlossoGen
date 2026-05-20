@@ -1,18 +1,25 @@
 **surprise_party** — Alice, Chris, and a rotating Friend share one group chat.
 
-Alice knows the (where, when) of a surprise party being thrown for Chris and
-wants to tell the Friend without Chris finding out. The Friend slot is filled
-by a fresh agent with a different name every round; the Friend has no memory
-of prior rounds and starts every round cold. Chris stays in the chat from
-round 1 onwards and accumulates context across every round.
+Alice and the Friend are organizing a surprise party for Chris. Alice knows
+the `(where, when)` of the gathering and needs the Friend to understand that
+the gathering is actually a surprise party for Chris — without Chris
+figuring out that he's the guest of honor. The where/when itself can be
+discussed openly; only the surprise-party-for-Chris nature is secret. The
+Friend slot is filled by a fresh agent with a different name every round;
+the Friend has no memory of prior rounds and starts every round cold. Chris
+stays in the chat from round 1 onwards and accumulates context across every
+round.
 
 Both the Friend and Chris each have a `submit_guess` tool that takes a
-freetext `where` and `when`. An LLM judge compares the guess to the fixed
-ground truth. The round ends as soon as anyone guesses correctly:
+freetext guess. An LLM judge checks whether the guess shows the guesser has
+figured out that Alice is organizing a surprise party for Chris. The round
+ends as soon as anyone guesses correctly:
 
 * Friend correct → round success, swap in a new Friend, continue.
-* Chris correct → round failure, simulation terminates immediately.
-* Wall-clock timeout with no correct guess → round failure (no exposure).
+* Chris correct → round failure, Chris is replaced with a fresh agent
+  next round AND a new `(where, when)` gathering is picked — Alice has
+  to start over with a different cover plan.
+* Wall-clock timeout with no correct guess → round failure.
 
 Active configuration:
 

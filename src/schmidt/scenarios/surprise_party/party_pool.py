@@ -1,9 +1,9 @@
-"""Seeded ``(where, when)`` draw for the surprise_party scenario.
+"""Seeded ``(where, when)`` draws for the surprise_party scenario.
 
-Two fixed pools of plausible venues and times. The scenario draws one of
-each at construction time using ``knobs.seed`` so the same seed always
-yields the same party — Alice receives this fixed info as her round-1
-injection and must transmit it across every round.
+Two fixed pools of plausible venues and times. The scenario draws one
+``(where, when)`` per "party era" — the initial draw at construction time
+and a fresh draw every time Chris uncovers the current party. Each new
+draw avoids reusing the previously active ``(where, when)`` pair.
 """
 
 import random
@@ -11,7 +11,7 @@ from typing import NamedTuple
 
 
 class PartyDraw(NamedTuple):
-    """Ground-truth surprise party details."""
+    """Ground-truth surprise party details for one era of the simulation."""
 
     where: str
     when: str
@@ -48,9 +48,29 @@ _TIME_POOL: tuple[str, ...] = (
 )
 
 
-def draw_party(seed: int) -> PartyDraw:
-    """Pick a deterministic ``(where, when)`` pair for this seed."""
-    rng = random.Random(seed)
-    where = rng.choice(_VENUE_POOL)
-    when = rng.choice(_TIME_POOL)
-    return PartyDraw(where=where, when=when)
+class PartyRng:
+    """Deterministic source of ``(where, when)`` draws.
+
+    Wraps a seeded ``random.Random``. The first call to
+    ``draw_distinct_from`` returns the initial draw; subsequent calls
+    are guaranteed to produce a ``(where, when)`` pair that differs from
+    the supplied ``previous`` draw, so a new party never accidentally
+    matches the one Chris just decoded.
+    """
+
+    def __init__(self, seed: int) -> None:
+        self._rng = random.Random(seed)
+
+    def draw_distinct_from(self, previous: PartyDraw | None) -> PartyDraw:
+        """Draw a new ``(where, when)``; if non-None, must differ from ``previous``."""
+        for _ in range(64):
+            candidate = PartyDraw(
+                where=self._rng.choice(_VENUE_POOL),
+                when=self._rng.choice(_TIME_POOL),
+            )
+            if previous is None or candidate != previous:
+                return candidate
+        raise RuntimeError(
+            "Could not draw a distinct party after 64 attempts — "
+            "venue / time pools are too small or the RNG is exhausted."
+        )

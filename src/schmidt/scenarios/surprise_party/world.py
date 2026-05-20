@@ -1,9 +1,10 @@
 """World simulation for the surprise_party scenario.
 
-Tracks the fixed party draw, the deterministic per-round friend name
-shuffle, the current round's outcome state, whether Chris has decoded the
-secret (which terminates the whole simulation), and the history of
-resolved round outcomes.
+Tracks the per-round friend identity, the active surprise party (which
+gets re-drawn every time Chris catches the current one), and the history
+of resolved round outcomes. The world is otherwise deterministic — the
+``submit_guess`` MCP tool drives all state transitions via
+``record_guess_judged``.
 """
 
 import asyncio
@@ -19,13 +20,8 @@ from schmidt.scenarios.surprise_party.events import (
     GuessJudged,
     PartyDecided,
 )
-from schmidt.scenarios.surprise_party.ids import (
-    CHRIS_ID,
-    FRIEND_ID,
-    TRIGGER_CHRIS_CORRECT,
-    TRIGGER_FRIEND_CORRECT,
-)
-from schmidt.scenarios.surprise_party.party_pool import PartyDraw
+from schmidt.scenarios.surprise_party.ids import CHRIS_ID, FRIEND_ID
+from schmidt.scenarios.surprise_party.party_pool import PartyDraw, PartyRng
 
 logger = logging.getLogger(__name__)
 
@@ -44,23 +40,33 @@ class RoundOutcome(NamedTuple):
     round_number: int
     label: RoundOutcomeLabel
     friend_name: str
+    party: PartyDraw
+
+
+class PartyEra(NamedTuple):
+    """One ``(where, when)`` draw and the round it became active."""
+
+    first_round_active: int
+    party: PartyDraw
 
 
 class SurprisePartyWorld(ScenarioWorld):
-    """Tracks party draw, friend rotation, and per-round outcomes."""
+    """Tracks party history, friend rotation, and per-round outcomes."""
 
     _context: WorldContext
 
     def __init__(
         self,
-        party: PartyDraw,
+        party_rng: PartyRng,
         friend_name_order: tuple[str, ...],
     ) -> None:
-        self._party = party
+        self._party_rng = party_rng
+        initial_party = party_rng.draw_distinct_from(previous=None)
+        self._party_history: list[PartyEra] = [
+            PartyEra(first_round_active=1, party=initial_party),
+        ]
         self._friend_name_order = friend_name_order
-        self._current_round_number: int = 0
         self._pending_round_outcome: RoundOutcomeLabel = "open"
-        self._chris_caught_party: bool = False
         self._outcomes: list[RoundOutcome] = []
 
     @property
@@ -69,25 +75,44 @@ class SurprisePartyWorld(ScenarioWorld):
         return self._context
 
     @property
-    def party(self) -> PartyDraw:
-        """Ground-truth party (where, when)."""
-        return self._party
-
-    @property
     def outcomes(self) -> list[RoundOutcome]:
         """All resolved round outcomes in order."""
         return self._outcomes
 
     @property
-    def chris_caught_party(self) -> bool:
-        """Whether Chris has decoded the party — terminates the simulation."""
-        return self._chris_caught_party
+    def party_history(self) -> list[PartyEra]:
+        """Every ``(first_round_active, PartyDraw)`` era in order."""
+        return self._party_history
+
+    def party_for_round(self, round_number: int) -> PartyDraw:
+        """Return the party that's active during ``round_number``."""
+        active = self._party_history[0].party
+        for era in self._party_history:
+            if era.first_round_active <= round_number:
+                active = era.party
+            else:
+                break
+        return active
 
     def friend_name_at_round(self, round_number: int) -> str:
         """Return the rotating Friend's display name for ``round_number``."""
         if round_number < 1 or round_number > len(self._friend_name_order):
             return ""
         return self._friend_name_order[round_number - 1]
+
+    def begin_party_era(self, first_round_active: int) -> PartyDraw:
+        """Draw a fresh party and start a new era at ``first_round_active``.
+
+        Idempotent: a second call for the same ``first_round_active``
+        returns the existing era's party without re-drawing.
+        """
+        for era in self._party_history:
+            if era.first_round_active == first_round_active:
+                return era.party
+        previous = self._party_history[-1].party
+        new_party = self._party_rng.draw_distinct_from(previous=previous)
+        self._party_history.append(PartyEra(first_round_active=first_round_active, party=new_party))
+        return new_party
 
     async def record_guess_judged(
         self,
@@ -116,47 +141,34 @@ class SurprisePartyWorld(ScenarioWorld):
         )
         if not correct:
             return
-        if agent_id == FRIEND_ID:
-            self._pending_round_outcome = "friend_correct"
-        elif agent_id == CHRIS_ID:
+        if agent_id == CHRIS_ID:
+            # Chris exposure is sticky for the round: once he's caught the
+            # party, a later friend-correct guess cannot rescue the round.
             self._pending_round_outcome = "chris_correct"
-            if not self._chris_caught_party:
-                self._chris_caught_party = True
-                await event_logger.log(
-                    event=ChrisCaughtParty(
-                        round_number=round_number,
-                        guess=guess,
-                    )
+            await event_logger.log(
+                event=ChrisCaughtParty(
+                    round_number=round_number,
+                    guess=guess,
                 )
+            )
+            return
+        if agent_id == FRIEND_ID and self._pending_round_outcome != "chris_correct":
+            self._pending_round_outcome = "friend_correct"
 
     def should_end_round_early(self) -> str | None:
         """Trigger string when the current round should close, or ``None``."""
         if self._pending_round_outcome == "friend_correct":
-            return TRIGGER_FRIEND_CORRECT
+            return "friend_correct"
         if self._pending_round_outcome == "chris_correct":
-            return TRIGGER_CHRIS_CORRECT
+            return "chris_correct"
         return None
 
-    def is_finished(self) -> bool:
-        """Whole-sim termination once Chris has decoded the secret.
+    def finalize_round(self, ending_round_number: int) -> RoundOutcomeLabel:
+        """Lock in the just-ended round's outcome and return its label.
 
-        Gates on ``finalize_round`` having recorded a ``chris_correct``
-        outcome so the game clock emits the ``RoundEnded`` and
-        ``RoundResultRecorded`` events for the exposing round before the
-        simulation terminates.
-        """
-        if not self._chris_caught_party:
-            return False
-        if not self._outcomes:
-            return False
-        return self._outcomes[-1].label == "chris_correct"
-
-    def finalize_round(self, ending_round_number: int, trigger: str) -> None:
-        """Lock in the just-ended round's outcome before the next round opens.
-
-        Called from the scenario's ``on_round_ended`` hook (which fires
-        AFTER the ``RoundEnded`` event but BEFORE round advance). Resolves
-        ``timeout`` when the round closed without a correct guess.
+        Called from the scenario's ``on_round_ended`` hook. Resolves
+        ``timeout`` when the round closed without a correct guess and
+        clears ``_pending_round_outcome``.
         """
         label: RoundOutcomeLabel = self._pending_round_outcome
         if label == "open":
@@ -166,23 +178,24 @@ class SurprisePartyWorld(ScenarioWorld):
                 round_number=ending_round_number,
                 label=label,
                 friend_name=self.friend_name_at_round(round_number=ending_round_number),
+                party=self.party_for_round(round_number=ending_round_number),
             )
         )
         self._pending_round_outcome = "open"
-        _ = trigger
+        return label
 
-    def begin_round(self, new_round_number: int) -> None:
-        """Mark ``new_round_number`` as live and reset pending state."""
-        self._current_round_number = new_round_number
-        self._pending_round_outcome = "open"
-
-    async def log_party_decided(self, event_logger: EventLogger) -> None:
-        """Log the ground-truth party once at simulation start (round 0)."""
+    async def log_party_decided(
+        self,
+        party: PartyDraw,
+        round_number: int,
+        event_logger: EventLogger,
+    ) -> None:
+        """Log a ``PartyDecided`` event for an era's ``(where, when)``."""
         await event_logger.log(
             event=PartyDecided(
-                round_number=0,
-                where=self._party.where,
-                when=self._party.when,
+                round_number=round_number,
+                where=party.where,
+                when=party.when,
             ),
         )
 
@@ -200,37 +213,48 @@ class SurprisePartyWorld(ScenarioWorld):
         )
 
     def restore_state_from_events(self, events: list[Any]) -> None:
-        """Re-derive the party draw, friend order, and outcomes from a log.
+        """Re-derive party history, friend order, and outcomes from a JSONL log.
 
-        ``PartyDecided`` and ``FriendIntroduced`` events are authoritative
-        on resume. Per-round outcomes are reconstructed by walking
-        ``GuessJudged`` events for correct verdicts plus
-        ``RoundResultRecorded`` events to detect timeouts.
+        ``PartyDecided`` events are authoritative for party history (one
+        per era, each carrying the round it became active).
+        ``FriendIntroduced`` events are authoritative for the per-round
+        friend name. Per-round outcomes are inferred from
+        ``GuessJudged``/``RoundResultRecorded``.
         """
         seen_friend_names: dict[int, str] = {}
         per_round_outcome: dict[int, RoundOutcomeLabel] = {}
         recorded_rounds: list[int] = []
+        observed_parties: list[PartyEra] = []
 
         for event in events:
             if isinstance(event, PartyDecided):
-                self._party = PartyDraw(where=event.where, when=event.when)
+                first_round = event.round_number if event.round_number >= 1 else 1
+                observed_parties.append(
+                    PartyEra(
+                        first_round_active=first_round,
+                        party=PartyDraw(where=event.where, when=event.when),
+                    )
+                )
             elif isinstance(event, FriendIntroduced):
                 seen_friend_names[event.round_number] = event.friend_name
             elif isinstance(event, GuessJudged):
                 if not event.correct:
                     continue
-                if event.agent_id == FRIEND_ID:
-                    per_round_outcome[event.round_number] = "friend_correct"
-                elif event.agent_id == CHRIS_ID:
+                if event.agent_id == CHRIS_ID:
                     per_round_outcome[event.round_number] = "chris_correct"
-                    self._chris_caught_party = True
-            elif isinstance(event, ChrisCaughtParty):
-                self._chris_caught_party = True
+                elif event.agent_id == FRIEND_ID and (
+                    per_round_outcome.get(event.round_number) != "chris_correct"
+                ):
+                    per_round_outcome[event.round_number] = "friend_correct"
             elif isinstance(event, RoundResultRecorded):
                 recorded_rounds.append(event.round_number)
 
+        if observed_parties:
+            observed_parties.sort(key=lambda era: era.first_round_active)
+            self._party_history = observed_parties
+
         if seen_friend_names:
-            length = max(seen_friend_names) if seen_friend_names else 0
+            length = max(seen_friend_names)
             order: list[str] = []
             for r in range(1, length + 1):
                 name = seen_friend_names.get(r)
@@ -246,16 +270,13 @@ class SurprisePartyWorld(ScenarioWorld):
                 round_number=r,
                 label=per_round_outcome.get(r, "timeout"),
                 friend_name=seen_friend_names.get(r, self.friend_name_at_round(round_number=r)),
+                party=self.party_for_round(round_number=r),
             )
             for r in sorted(set(recorded_rounds))
         ]
 
     async def run(self, context: WorldContext) -> None:
-        """Consume world events to drain the queue.
-
-        The surprise_party world is deterministic — outcomes are settled by
-        the scenario's ``submit_guess`` tool calling ``record_guess_judged``.
-        """
+        """Drain world events; surprise_party has no time-based emissions."""
         self._context = context
         try:
             while True:

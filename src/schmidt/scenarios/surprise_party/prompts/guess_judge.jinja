@@ -1,12 +1,14 @@
-Ground truth:
-
-* WHERE: {{ ground_truth_where }}
-* WHEN: {{ ground_truth_when }}
-
 Agent's freetext guess:
 
 > {{ guess }}
 
-Decide whether the guess clearly identifies BOTH the place and the time of the ground truth. Be lenient: synonyms, casual phrasing, partial names that uniquely identify the place, and approximate times that fall in the same window all count as matches. A guess that only nails one half (place but not time, or time but not place) is INCORRECT — the agent has to land both to win the round.
+Decide whether this guess clearly indicates the guesser has figured out that **Alice is organizing a surprise party for Chris**. The guess must make it unambiguous that the guesser has identified BOTH:
+
+1. that the gathering being discussed is actually a surprise party / surprise celebration (not just a normal hangout); AND
+2. that **Chris** is the guest of honor / target / recipient of the surprise.
+
+Be lenient with phrasing — synonyms like "birthday party", "surprise gathering", "throwing him a party", "secret celebration for Chris" all count. The guess does NOT need to name a specific time or place; the secret is the surprise-party-for-Chris fact, not the venue or schedule.
+
+A guess that just describes a casual meetup, names a different person as the honoree, or is too vague to identify Chris as the target of the surprise is INCORRECT.
 
 Return a strict JSON verdict matching the provided schema.

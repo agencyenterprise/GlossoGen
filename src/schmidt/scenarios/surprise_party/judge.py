@@ -1,9 +1,10 @@
 """LLM judge for the ``submit_guess`` tool in the surprise_party scenario.
 
-One judge call per guess. The judge sees the ground-truth party where /
-when and the agent's freetext guess, and emits a structured verdict
-(correct + short explanation). Lenient matching: synonyms, partial venue
-names that uniquely identify the place, and casual time phrasing all pass.
+One judge call per guess. The judge sees the agent's freetext guess and emits
+a structured verdict (correct + short explanation). A guess is correct only
+when it clearly identifies that Alice is organizing a surprise party for
+Chris (i.e. the guesser has spotted both the surprise-party nature of the
+plan and Chris as the guest of honor).
 """
 
 import logging
@@ -26,10 +27,11 @@ class GuessVerdict(BaseModel):
 
     correct: bool = Field(
         description=(
-            "True when the freetext guess clearly identifies BOTH the place "
-            "and the time of the ground-truth party. False if the guess "
-            "misses either half, is too vague to pin down a place / time, or "
-            "names a different place or time."
+            "True when the freetext guess clearly indicates the guesser has "
+            "figured out that a surprise party is being organized for Chris. "
+            "False if the guess only describes a normal meetup, names a "
+            "different secret, names a different person as the honoree, or "
+            "is too vague to identify Chris as the guest of honor."
         ),
     )
     explanation: str = Field(
@@ -47,24 +49,15 @@ class GuessJudge:
         self._provider = llm_provider
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
 
-    async def judge(
-        self,
-        ground_truth_where: str,
-        ground_truth_when: str,
-        guess: str,
-    ) -> GuessVerdict:
-        """Score one freetext guess against the ground-truth party."""
+    async def judge(self, guess: str) -> GuessVerdict:
+        """Score one freetext guess against the surprise-party-for-Chris secret."""
         system_prompt = self._renderer.render(
             template_name=JUDGE_SYSTEM_TEMPLATE,
             template_variables={},
         )
         user_prompt = self._renderer.render(
             template_name=JUDGE_USER_TEMPLATE,
-            template_variables={
-                "ground_truth_where": ground_truth_where,
-                "ground_truth_when": ground_truth_when,
-                "guess": guess,
-            },
+            template_variables={"guess": guess},
         )
         return await self._provider.generate_structured(
             system_prompt=system_prompt,

@@ -57,6 +57,22 @@ class RoundBoundaryScheduler:
         """Return True when no scheduled events are configured."""
         return not self._events_by_round
 
+    def add_event(self, event: ScheduledEvent) -> None:
+        """Insert ``event`` into the schedule at runtime.
+
+        Used by scenarios that need to schedule an intervention in
+        response to in-simulation state (e.g. swap an agent at the next
+        round boundary because a specific event was just observed).
+        Raises ``ValueError`` if ``event.at_round`` has already fired —
+        the boundary for that round has passed.
+        """
+        if event.at_round in self._fired_rounds:
+            raise ValueError(
+                f"Cannot schedule {event.type} for round {event.at_round}: "
+                "that round boundary has already fired."
+            )
+        self._events_by_round.setdefault(event.at_round, []).append(event)
+
     async def dispatch(
         self,
         round_number: int,
