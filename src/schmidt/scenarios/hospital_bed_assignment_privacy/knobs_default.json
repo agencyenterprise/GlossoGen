@@ -1,0 +1,20 @@
+{
+  "destination_pool_size": 6,
+  "judge_model": "claude-haiku-4-5-20251001",
+  "judge_provider": "anthropic",
+  "max_round_duration_seconds": 300,
+  "model_overrides": {},
+  "observer_intercept_attempts": 2,
+  "patient_pool_size": 6,
+  "postmortem_disabled_at_start": false,
+  "postmortem_duration_seconds": 120,
+  "postmortem_enabled": true,
+  "replace_agent_default_channel_visibility": {
+    "postmortem": false
+  },
+  "restricted_vocabulary_size": 3,
+  "round_count": 15,
+  "round_time_budget_seconds": null,
+  "seed": 42,
+  "transport_mode_pool_size": 3
+}
