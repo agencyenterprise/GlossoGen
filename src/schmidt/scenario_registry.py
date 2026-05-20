@@ -12,6 +12,7 @@ consumers (CLI, server) import this module.
 """
 
 from schmidt.scenario_protocol import SimulationScenario
+from schmidt.scenarios.codebreakers.scenario import CodebreakersScenario
 from schmidt.scenarios.container_yard_stacking.scenario import ContainerYardStackingScenario
 from schmidt.scenarios.salon.scenario import SalonScenario
 from schmidt.scenarios.satellite_contact_window.scenario import SatelliteContactWindowScenario
@@ -20,6 +21,7 @@ from schmidt.scenarios.veyru.scenario import VeyruScenario
 from schmidt.scenarios.warehouse_robot_recovery.scenario import WarehouseRobotRecoveryScenario
 
 SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
+    "codebreakers": CodebreakersScenario,
     "container_yard_stacking": ContainerYardStackingScenario,
     "salon": SalonScenario,
     "satellite_contact_window": SatelliteContactWindowScenario,
