@@ -29,6 +29,7 @@ from schmidt.server.runs.fork_router import router as fork_router
 from schmidt.server.runs.metadata_router import router as metadata_router
 from schmidt.server.runs.prod_upload_router import router as prod_upload_router
 from schmidt.server.runs.replace_agent_router import router as replace_agent_router
+from schmidt.server.runs.resume_at_round_router import router as resume_at_round_router
 from schmidt.server.runs.router import router as runs_router
 from schmidt.server.scenarios.router import router as scenarios_router
 
@@ -110,6 +111,7 @@ app.include_router(runs_router)
 app.include_router(fork_router)
 app.include_router(replace_agent_router)
 app.include_router(cross_run_replace_agent_router)
+app.include_router(resume_at_round_router)
 app.include_router(pdf_export_router)
 app.include_router(artifact_export_router)
 app.include_router(bundle_router)

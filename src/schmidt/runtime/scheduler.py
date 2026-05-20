@@ -45,12 +45,16 @@ class RoundBoundaryScheduler:
     sees postmortem state.
     """
 
-    def __init__(self, events: list[ScheduledEvent]) -> None:
+    def __init__(
+        self,
+        events: list[ScheduledEvent],
+        already_fired_rounds: frozenset[int],
+    ) -> None:
         events_by_round: dict[int, list[ScheduledEvent]] = {}
         for event in events:
             events_by_round.setdefault(event.at_round, []).append(event)
         self._events_by_round = events_by_round
-        self._fired_rounds: set[int] = set()
+        self._fired_rounds: set[int] = set(already_fired_rounds)
 
     @property
     def empty(self) -> bool:

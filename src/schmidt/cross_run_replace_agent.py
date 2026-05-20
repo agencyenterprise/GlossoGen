@@ -31,6 +31,7 @@ from schmidt.replace_agent import (
     _build_model_overrides,
     _collect_source_agents,
     compose_run_id,
+    find_round_start_timestamp,
     resolve_round_start_anchor,
 )
 from schmidt.run_config_validation import validate_run_config
@@ -185,19 +186,6 @@ async def cross_run_replace_agent_in_run(
             f"source runs are {source_a_first_event.scenario_name!r}"
         )
 
-    source_a_agents = _collect_source_agents(events=source_a_events)
-    source_b_agents = _collect_source_agents(events=source_b_events)
-    if request.replaced_agent_id not in source_a_agents:
-        raise ValueError(
-            f"Agent {request.replaced_agent_id!r} not found in source A run "
-            f"(known agents: {sorted(source_a_agents)})"
-        )
-    if request.replaced_agent_id not in source_b_agents:
-        raise ValueError(
-            f"Agent {request.replaced_agent_id!r} not found in source B run "
-            f"(known agents: {sorted(source_b_agents)})"
-        )
-
     if request.source_b_round_end < 1:
         raise ValueError(f"source_b_round_end must be >= 1 (got {request.source_b_round_end})")
 
@@ -209,6 +197,36 @@ async def cross_run_replace_agent_in_run(
         source_b_events=source_b_events,
         source_b_round_end=request.source_b_round_end,
     )
+    source_a_boundary_timestamp = find_round_start_timestamp(
+        events=source_a_events,
+        target_event_id=target_event_id,
+    )
+    if source_b_cutoff_event_id:
+        source_b_boundary_timestamp = find_round_start_timestamp(
+            events=source_b_events,
+            target_event_id=source_b_cutoff_event_id,
+        )
+    else:
+        source_b_boundary_timestamp = source_b_events[-1].timestamp
+    source_a_agents = _collect_source_agents(
+        events=source_a_events,
+        boundary_timestamp=source_a_boundary_timestamp,
+    )
+    source_b_agents = _collect_source_agents(
+        events=source_b_events,
+        boundary_timestamp=source_b_boundary_timestamp,
+    )
+    if request.replaced_agent_id not in source_a_agents:
+        raise ValueError(
+            f"Agent {request.replaced_agent_id!r} not found in source A run "
+            f"as of round {request.round_start} (known agents: {sorted(source_a_agents)})"
+        )
+    if request.replaced_agent_id not in source_b_agents:
+        raise ValueError(
+            f"Agent {request.replaced_agent_id!r} not found in source B run "
+            f"as of round {request.source_b_round_end} "
+            f"(known agents: {sorted(source_b_agents)})"
+        )
 
     source_a_repo = RunRepository(run_dir=request.source_a_run_dir)
     target_sha = await source_a_repo.find_commit_for_event_id(

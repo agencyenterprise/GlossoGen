@@ -1,16 +1,21 @@
-"""Core implementation of the replace-agent operation.
+"""Core implementation of the replace-agent and round-anchored resume operations.
 
-Used by both the FastAPI endpoint and the ``schmidt replace-agent`` CLI
-subcommand. Clones a source run's git repo at a chosen message commit,
-strips one agent's LLM history events from the JSONL, writes a manifest,
-commits, and launches a resumed subprocess in which that agent restarts
-fresh while every other agent keeps its full reconstructed history.
+Used by both the FastAPI endpoints and the ``schmidt replace-agent`` /
+``schmidt resume-at-round`` CLI subcommands. Clones a source run's git
+repo at a chosen ``RoundAdvanced`` commit, writes a manifest, commits,
+and launches a resumed subprocess.
+
+When ``replaced_agent_id`` is set, that agent restarts fresh while every
+other agent keeps its full reconstructed history. When ``replaced_agent_id``
+is ``None`` (round-anchored resume), every agent keeps its full reconstructed
+history; only the JSONL clone, knob merge, and round-count adjustment happen.
 """
 
 import logging
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -30,34 +35,40 @@ logger = logging.getLogger(__name__)
 
 
 class ReplaceAgentRequest(NamedTuple):
-    """Input parameters for a replace-agent operation.
+    """Input parameters for a replace-agent or round-anchored resume operation.
 
-    The replacement boundary is the *start* of round ``round_start``: the
-    resumed simulation enters that round with the chosen agent reusing
-    only the prior agent's tool-call history (text and thinking are
-    stripped, postmortem tool calls/results are dropped). The exact
-    ``MessageSent`` that anchors the git rewind is resolved internally.
+    The boundary is the *start* of round ``round_start``: the resumed
+    simulation enters that round. The exact ``RoundAdvanced`` event that
+    anchors the git rewind is resolved internally.
 
     ``rounds_after_swap`` controls how many rounds the resumed
-    simulation will play following the replacement: round_count is set
-    to ``round_start + rounds_after_swap``, so rounds ``round_start +
-    1`` through ``round_start + rounds_after_swap`` play after the
-    replacement and the replacement itself enters at ``round_start``.
-    When ``None``, defaults to ``source_round_count - round_start``
-    (the remaining rounds in the original run after the replacement
-    boundary), so a 20-round source run with ``round_start=18`` plays
-    2 rounds by default.
+    simulation will play following the boundary: round_count is set
+    to ``round_start + rounds_after_swap``. When ``None``, defaults to
+    ``source_round_count - round_start`` (the remaining rounds in the
+    original run after the boundary).
+
+    When ``replaced_agent_id`` is set, that agent restarts with only the
+    prior agent's tool-call history (text and thinking stripped, blocked
+    channels dropped) and runs under ``model``/``provider``; every other
+    agent keeps its full reconstructed history pinned to its
+    source-active model.
+
+    When ``replaced_agent_id`` is ``None``, the operation is a pure
+    round-anchored resume: ``model``, ``provider``, and
+    ``channels_with_visible_history`` must also be ``None``, every agent
+    keeps its full reconstructed history pinned to its source-active
+    model, and knob overrides are the only behavioural change.
     """
 
     source_run_dir: Path
     scenario_name: str
     round_start: int
     rounds_after_swap: int | None
-    replaced_agent_id: str
-    model: str
-    provider: str
+    replaced_agent_id: str | None
+    model: str | None
+    provider: str | None
     knobs: dict[str, Any] | None
-    channels_with_visible_history: list[str]
+    channels_with_visible_history: list[str] | None
     runs_dir: Path
 
 
@@ -103,10 +114,38 @@ def resolve_round_start_anchor(
     )
 
 
-def _collect_source_agents(events: list[SimulationEvent]) -> dict[str, AgentRegistered]:
-    """Return a map of agent_id → its AgentRegistered event from the source run."""
+def find_round_start_timestamp(
+    events: list[SimulationEvent],
+    target_event_id: str,
+) -> datetime:
+    """Return the timestamp of the ``RoundAdvanced`` event with ``target_event_id``.
+
+    Used to recover the resume-boundary timestamp once
+    :func:`resolve_round_start_anchor` has returned its event id, so
+    downstream helpers can filter events that occurred at or before that
+    boundary in the source timeline.
+    """
+    for event in events:
+        if isinstance(event, RoundAdvanced) and event.event_id == target_event_id:
+            return event.timestamp
+    raise ValueError(f"No RoundAdvanced event with event_id={target_event_id!r} in source run")
+
+
+def _collect_source_agents(
+    events: list[SimulationEvent],
+    boundary_timestamp: datetime,
+) -> dict[str, AgentRegistered]:
+    """Return each agent's latest ``AgentRegistered`` at the resume boundary.
+
+    Filters to events whose timestamp is at or before
+    ``boundary_timestamp`` so resuming a multi-swap source picks up each
+    agent's model/system_prompt as it was at the chosen boundary — not
+    a later in-run swap registration that overwrote it.
+    """
     out: dict[str, AgentRegistered] = {}
     for event in events:
+        if event.timestamp > boundary_timestamp:
+            break
         if isinstance(event, AgentRegistered):
             out[event.agent_id] = event
     return out
@@ -114,15 +153,17 @@ def _collect_source_agents(events: list[SimulationEvent]) -> dict[str, AgentRegi
 
 def _build_model_overrides(
     source_agents: dict[str, AgentRegistered],
-    replaced_agent_id: str,
-    replacement_model: str,
-    replacement_provider: str,
+    replaced_agent_id: str | None,
+    replacement_model: str | None,
+    replacement_provider: str | None,
 ) -> dict[str, dict[str, str]]:
-    """Pin every source agent to its original model, then override the replaced one.
+    """Pin every source agent to its source-active model.
 
     Encoding every agent explicitly (rather than relying on the top-level
     ``--model``/``--provider`` defaults) keeps non-replaced agents on
-    their exact original models.
+    their exact source-active models. When ``replaced_agent_id`` is set,
+    its entry is overridden with ``replacement_model``/``replacement_provider``.
+    When ``None``, no agent is overridden — the round-anchored resume case.
     """
     overrides: dict[str, dict[str, str]] = {}
     for agent_id, registration in source_agents.items():
@@ -130,10 +171,16 @@ def _build_model_overrides(
             "model": registration.model,
             "provider": registration.provider,
         }
-    overrides[replaced_agent_id] = {
-        "model": replacement_model,
-        "provider": replacement_provider,
-    }
+    if replaced_agent_id is not None:
+        if replacement_model is None or replacement_provider is None:
+            raise ValueError(
+                "replacement_model and replacement_provider are required when "
+                "replaced_agent_id is set"
+            )
+        overrides[replaced_agent_id] = {
+            "model": replacement_model,
+            "provider": replacement_provider,
+        }
     return overrides
 
 
@@ -147,15 +194,78 @@ def _launch_subprocess(cmd: list[str], log_file: Any) -> None:
     )
 
 
-async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResult:
-    """Run the full replace-agent operation and launch the resumed subprocess.
+def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
+    """Enforce the request's ``replaced_agent_id`` invariant before any I/O.
 
-    Raises ``ValueError`` for caller-fixable errors (unknown provider /
-    scenario / agent / message ID) so the API and CLI layers can surface
-    a clear message without re-implementing validation.
+    When ``replaced_agent_id`` is set, ``model``, ``provider``, and
+    ``channels_with_visible_history`` must all be present and ``provider``
+    must be a known provider name. When ``replaced_agent_id`` is ``None``,
+    all three companion fields must also be ``None`` so the round-anchored
+    resume code path has no half-populated replacement state to interpret.
     """
+    if request.replaced_agent_id is None:
+        misset = [
+            field
+            for field, value in (
+                ("model", request.model),
+                ("provider", request.provider),
+                ("channels_with_visible_history", request.channels_with_visible_history),
+            )
+            if value is not None
+        ]
+        if misset:
+            raise ValueError(
+                f"replaced_agent_id is None but {', '.join(misset)} is set; "
+                "round-anchored resume requires all replacement fields to be None"
+            )
+        return
+    missing = [
+        field
+        for field, value in (
+            ("model", request.model),
+            ("provider", request.provider),
+            ("channels_with_visible_history", request.channels_with_visible_history),
+        )
+        if value is None
+    ]
+    if missing:
+        raise ValueError(
+            f"replaced_agent_id is set but {', '.join(missing)} is missing; "
+            "replace-agent requires all replacement fields to be provided"
+        )
     if request.provider not in list_providers():
         raise ValueError(f"Unknown provider: {request.provider}")
+
+
+def _pick_subprocess_default_model(
+    request: ReplaceAgentRequest,
+    source_agents: dict[str, AgentRegistered],
+) -> tuple[str, str]:
+    """Return the ``--model`` / ``--provider`` pair to launch the resumed subprocess with.
+
+    For replace-agent runs we forward the caller's replacement model so
+    the subprocess's ``run`` defaults match the replacement. For
+    round-anchored resume runs no agent uses the defaults (every agent
+    is pinned via ``model_overrides``) but ``schmidt run`` still requires
+    the flags; we pick the first source agent's registration arbitrarily.
+    """
+    if request.model is not None and request.provider is not None:
+        return request.model, request.provider
+    first_registration = next(iter(source_agents.values()), None)
+    if first_registration is None:
+        raise ValueError("Source run has no AgentRegistered events; cannot pick default model")
+    return first_registration.model, first_registration.provider
+
+
+async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResult:
+    """Run the full replace-agent or round-anchored resume operation.
+
+    Launches the resumed subprocess as a side-effect. Raises ``ValueError``
+    for caller-fixable errors (unknown provider / scenario / agent /
+    inconsistent ``replaced_agent_id`` payload) so the API and CLI layers
+    can surface a clear message without re-implementing validation.
+    """
+    _validate_replacement_payload(request=request)
     if request.scenario_name not in SCENARIO_REGISTRY:
         raise ValueError(f"Unknown scenario: {request.scenario_name}")
 
@@ -164,17 +274,24 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         raise ValueError(f"Source run JSONL not found: {source_log_path}")
 
     source_events = await load_events(log_path=source_log_path)
-    source_agents = _collect_source_agents(events=source_events)
-    if request.replaced_agent_id not in source_agents:
-        raise ValueError(
-            f"Agent {request.replaced_agent_id!r} not found in source run "
-            f"(known agents: {sorted(source_agents)})"
-        )
 
     target_event_id = resolve_round_start_anchor(
         events=source_events,
         round_start=request.round_start,
     )
+    boundary_timestamp = find_round_start_timestamp(
+        events=source_events,
+        target_event_id=target_event_id,
+    )
+    source_agents = _collect_source_agents(
+        events=source_events,
+        boundary_timestamp=boundary_timestamp,
+    )
+    if request.replaced_agent_id is not None and request.replaced_agent_id not in source_agents:
+        raise ValueError(
+            f"Agent {request.replaced_agent_id!r} not found in source run "
+            f"as of round {request.round_start} (known agents: {sorted(source_agents)})"
+        )
 
     source_repo = RunRepository(run_dir=request.source_run_dir)
     target_sha = await source_repo.find_commit_for_event_id(
@@ -248,10 +365,14 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         replacement_provider=request.provider,
     )
 
+    subprocess_model, subprocess_provider = _pick_subprocess_default_model(
+        request=request,
+        source_agents=source_agents,
+    )
     validated = validate_run_config(
         scenario_cls=scenario_cls,
         scenario_config=merged_scenario_config,
-        default_provider=request.provider,
+        default_provider=subprocess_provider,
         valid_providers=set(list_providers()),
     )
 
@@ -267,7 +388,15 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         scenario_name=request.scenario_name,
         run_dir_name=request.source_run_dir.name,
     )
-    blocked_tool_call_channels = sorted(scenario_cls.get_replace_agent_blocked_tool_call_channels())
+    if request.replaced_agent_id is None:
+        blocked_tool_call_channels: list[str] = []
+        visible_channels: list[str] = []
+    else:
+        blocked_tool_call_channels = sorted(
+            scenario_cls.get_replace_agent_blocked_tool_call_channels()
+        )
+        assert request.channels_with_visible_history is not None
+        visible_channels = list(request.channels_with_visible_history)
     manifest = ReplaceManifest(
         source_run_id=source_run_id,
         source_run_dir=str(request.source_run_dir),
@@ -277,19 +406,20 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
         replacement_provider=request.provider,
-        channels_with_visible_history=list(request.channels_with_visible_history),
+        channels_with_visible_history=visible_channels,
         blocked_tool_call_channels=blocked_tool_call_channels,
         replaced_at=time.time(),
     )
     manifest_path = new_run_dir / REPLACE_MANIFEST_FILENAME
     manifest_path.write_bytes(orjson.dumps(manifest.model_dump()))
 
-    await new_repo.commit(
-        message=(
+    if request.replaced_agent_id is None:
+        commit_message = f"resume-at-round: r{request.round_start}"
+    else:
+        commit_message = (
             f"replace: agent {request.replaced_agent_id} → " f"{request.model}/{request.provider}"
-        ),
-        paths=None,
-    )
+        )
+    await new_repo.commit(message=commit_message, paths=None)
 
     stdout_log = new_run_dir / f"{request.scenario_name}_stdout.log"
     cmd = [
@@ -299,9 +429,9 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         "run",
         request.scenario_name,
         "--model",
-        request.model,
+        subprocess_model,
         "--provider",
-        request.provider,
+        subprocess_provider,
         "--resume",
         str(new_run_dir),
         "--runs-dir",

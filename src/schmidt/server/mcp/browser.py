@@ -363,6 +363,7 @@ async def _tool_get_run(
             fork_source=detail.fork_source,
             replace_agent_source=detail.replace_agent_source,
             cross_run_replace_agent_source=detail.cross_run_replace_agent_source,
+            resume_at_round_source=detail.resume_at_round_source,
             labels=detail.labels,
             note=detail.note,
             round_endings=detail.round_endings,

@@ -13,12 +13,18 @@ REPLACE_MANIFEST_FILENAME = "replace_manifest.json"
 
 
 class ReplaceManifest(BaseModel):
-    """Persisted record of a replace-agent operation.
+    """Persisted record of a replace-agent or round-anchored resume operation.
 
-    Written once at replace-agent time into ``replace_manifest.json`` inside
+    Written once at operation time into ``replace_manifest.json`` inside
     the new run directory. The resume code path, evaluators, and inspection
     scripts read it to reconstruct what the replacement saw and which rounds
     were played after the swap.
+
+    ``replaced_agent_id`` is ``None`` for a round-anchored resume — every
+    agent keeps its full reconstructed history and no model/provider override
+    is applied. ``replacement_model`` and ``replacement_provider`` are ``None``
+    in the same case, and ``channels_with_visible_history`` /
+    ``blocked_tool_call_channels`` are empty lists.
     """
 
     source_run_id: str
@@ -26,9 +32,9 @@ class ReplaceManifest(BaseModel):
     round_start: int
     rounds_after_swap: int
     target_event_id: str
-    replaced_agent_id: str
-    replacement_model: str
-    replacement_provider: str
+    replaced_agent_id: str | None
+    replacement_model: str | None
+    replacement_provider: str | None
     channels_with_visible_history: list[str]
     blocked_tool_call_channels: list[str]
     replaced_at: float

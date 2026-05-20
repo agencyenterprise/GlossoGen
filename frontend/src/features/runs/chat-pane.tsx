@@ -21,6 +21,7 @@ import {
   Package,
   Pencil,
   RefreshCw,
+  RotateCcw,
   UserCog,
   UserPlus,
   Users,
@@ -72,6 +73,8 @@ interface ChatPaneProps {
   onReplaceAgentFromRound: ((roundNumber: number) => void) | null;
   /** Open the cross-run replace-agent modal pre-filled with the given round_start. Null disables the trigger. */
   onCrossRunReplaceFromRound: ((roundNumber: number) => void) | null;
+  /** Open the resume-at-round modal pre-filled with the given round_start. Null disables the trigger. */
+  onResumeAtRoundFromRound: ((roundNumber: number) => void) | null;
   /** The message_id that was the fork point, if this is a forked run. */
   forkPointMessageId: string | null;
   /** Round number where the first post-swap messages appear (if the run had an observer swap). */
@@ -208,6 +211,7 @@ export function ChatPane({
   onForkFromMessage,
   onReplaceAgentFromRound,
   onCrossRunReplaceFromRound,
+  onResumeAtRoundFromRound,
   forkPointMessageId,
   swapRoundNumber,
   swappedObserverDisplayNames,
@@ -876,6 +880,7 @@ export function ChatPane({
                 .map(swap => (
                   <button
                     key={swap.post_swap_instance_key}
+                    id={`agent-swap-divider-r${swap.round_number}-${swap.agent_id}`}
                     type="button"
                     onClick={() => onSelectAgent(swap.post_swap_instance_key)}
                     className="mx-4 my-4 block w-[calc(100%-2rem)] rounded-md border-2 border-dashed border-indigo-400/80 bg-indigo-50 px-4 py-3 text-left transition-colors hover:bg-indigo-100/70 dark:border-indigo-600/70 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/50"
@@ -946,6 +951,19 @@ export function ChatPane({
                       onClick={() => onCrossRunReplaceFromRound(round.roundNumber)}
                     >
                       <Users className="h-3 w-3" />
+                    </button>
+                  </Tooltip>
+                ) : null}
+                {forkEnabled && onResumeAtRoundFromRound !== null && round.roundNumber >= 2 ? (
+                  <Tooltip
+                    label={`Resume at start of round ${round.roundNumber} (no agent replaced)`}
+                  >
+                    <button
+                      aria-label={`Resume at start of round ${round.roundNumber}`}
+                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      onClick={() => onResumeAtRoundFromRound(round.roundNumber)}
+                    >
+                      <RotateCcw className="h-3 w-3" />
                     </button>
                   </Tooltip>
                 ) : null}
