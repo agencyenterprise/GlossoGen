@@ -21,6 +21,7 @@ from schmidt.server.runs.models import (
     CrossRunReplaceAgentSource,
     ForkSource,
     ReplaceAgentSource,
+    ResumeAtRoundSource,
     RunSummary,
 )
 from schmidt.stream_manifest import delete_manifest, read_manifest
@@ -191,7 +192,12 @@ _SUMMARY_CACHE_FILENAME = "run_summary_cache.json"
 
 
 class _SummaryCache(BaseModel):
-    """Immutable fields of a completed run, persisted to avoid re-scanning JSONL."""
+    """Immutable fields of a completed run, persisted to avoid re-scanning JSONL.
+
+    ``resume_at_round_source`` is the only field with a default so that
+    caches written before the round-anchored-resume feature still load
+    without forcing a JSONL rescan. Every other field is mandatory.
+    """
 
     scenario_name: str
     scenario_description: str
@@ -207,6 +213,7 @@ class _SummaryCache(BaseModel):
     fork_source: ForkSource | None
     replace_agent_source: ReplaceAgentSource | None
     cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
+    resume_at_round_source: ResumeAtRoundSource | None = None
 
 
 def _read_summary_cache(run_dir: Path) -> _SummaryCache | None:
@@ -298,11 +305,18 @@ def _read_fork_source(run_dir: Path) -> ForkSource | None:
 
 
 def _read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:
-    """Read replace-agent provenance from replace_manifest.json if it exists."""
+    """Read replace-agent provenance from replace_manifest.json if it exists.
+
+    Returns ``None`` when the manifest is absent or when ``replaced_agent_id``
+    is null (a round-anchored resume; surfaced separately via
+    :func:`_read_resume_at_round_source`).
+    """
     manifest_path = run_dir / "replace_manifest.json"
     if not manifest_path.exists():
         return None
     raw = orjson.loads(manifest_path.read_bytes())
+    if raw.get("replaced_agent_id") is None:
+        return None
     replaced_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
     target_event_id = raw.get("target_event_id") or raw.get("target_message_id", "")
     return ReplaceAgentSource(
@@ -313,6 +327,29 @@ def _read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:
         replacement_model=raw["replacement_model"],
         replacement_provider=raw["replacement_provider"],
         replaced_at=replaced_at,
+    )
+
+
+def _read_resume_at_round_source(run_dir: Path) -> ResumeAtRoundSource | None:
+    """Read round-anchored-resume provenance from replace_manifest.json.
+
+    Returns ``None`` when the manifest is absent or when ``replaced_agent_id``
+    is set (a replace-agent run; surfaced separately via
+    :func:`_read_replace_agent_source`).
+    """
+    manifest_path = run_dir / "replace_manifest.json"
+    if not manifest_path.exists():
+        return None
+    raw = orjson.loads(manifest_path.read_bytes())
+    if raw.get("replaced_agent_id") is not None:
+        return None
+    resumed_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
+    return ResumeAtRoundSource(
+        source_run_id=raw["source_run_id"],
+        round_start=raw["round_start"],
+        rounds_after_resume=raw["rounds_after_swap"],
+        target_event_id=raw["target_event_id"],
+        resumed_at=resumed_at,
     )
 
 
@@ -416,6 +453,7 @@ async def _build_summary(
             fork_source=cache.fork_source,
             replace_agent_source=cache.replace_agent_source,
             cross_run_replace_agent_source=cache.cross_run_replace_agent_source,
+            resume_at_round_source=cache.resume_at_round_source,
             models=cache.models,
             provider=cache.provider,
             agent_models=cache.agent_models,
@@ -429,6 +467,7 @@ async def _build_summary(
     cross_run_replace_agent_source = _read_cross_run_replace_agent_source(
         run_dir=timestamp_dir,
     )
+    resume_at_round_source = _read_resume_at_round_source(run_dir=timestamp_dir)
 
     try:
         scan = await scan_jsonl(file_path=jsonl_path)
@@ -451,6 +490,7 @@ async def _build_summary(
             fork_source is not None
             or replace_agent_source is not None
             or cross_run_replace_agent_source is not None
+            or resume_at_round_source is not None
         )
         start_time = run_timestamp if derived else first_event.timestamp
         duration_seconds = (scan.last_event.timestamp - start_time).total_seconds()
@@ -471,6 +511,7 @@ async def _build_summary(
                 fork_source=fork_source,
                 replace_agent_source=replace_agent_source,
                 cross_run_replace_agent_source=cross_run_replace_agent_source,
+                resume_at_round_source=resume_at_round_source,
             ),
         )
         return RunSummary(
@@ -489,6 +530,7 @@ async def _build_summary(
             fork_source=fork_source,
             replace_agent_source=replace_agent_source,
             cross_run_replace_agent_source=cross_run_replace_agent_source,
+            resume_at_round_source=resume_at_round_source,
             models=scan.unique_models,
             provider=first_event.provider,
             agent_models=scan.agent_models,
@@ -525,6 +567,7 @@ async def _build_summary(
         fork_source=fork_source,
         replace_agent_source=replace_agent_source,
         cross_run_replace_agent_source=cross_run_replace_agent_source,
+        resume_at_round_source=resume_at_round_source,
         models=scan.unique_models,
         provider=first_event.provider,
         agent_models=scan.agent_models,

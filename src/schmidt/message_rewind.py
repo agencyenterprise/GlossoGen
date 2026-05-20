@@ -27,8 +27,10 @@ from pydantic_ai.messages import ModelMessage
 from schmidt.message_history_builder import build_message_history
 from schmidt.models.event import (
     AgentRegistered,
+    AgentSwappedMidRun,
     InjectionDelivered,
     MessageSent,
+    PostmortemDisabledMidRun,
     RoundAdvanced,
     SimulationEvent,
     SimulationStarted,
@@ -104,6 +106,13 @@ class RewindState(NamedTuple):
     ``ChannelVisibilityFromRound(R)`` into a concrete
     ``member_join_index`` for windowed channel visibility on a
     swapped-in agent.
+
+    ``rounds_with_fired_scheduler_events`` lists every round whose
+    scheduler boundary already fired in the loaded events (any
+    ``AgentSwappedMidRun`` or ``PostmortemDisabledMidRun`` event marks
+    its round as fired). Used by the supervisor to pre-seed the
+    ``RoundBoundaryScheduler`` on resume so already-fired boundaries
+    are not re-dispatched.
     """
 
     round_number: int
@@ -116,6 +125,7 @@ class RewindState(NamedTuple):
     replaced_agent_ids: frozenset[str]
     replaced_agent_channel_visibility: dict[str, dict[str, ChannelVisibility]]
     channel_message_count_at_round_start: dict[int, dict[str, int]]
+    rounds_with_fired_scheduler_events: frozenset[int]
 
 
 def build_rewind_state(
@@ -201,6 +211,7 @@ def _build_rewind_state_at_timestamp(
     agent_registrations: list[AgentRegistered] = []
     channel_count_at_round_start: dict[int, dict[str, int]] = {}
     running_channel_counts: dict[str, int] = {}
+    rounds_with_fired_scheduler_events: set[int] = set()
 
     for event in events:
         if event.timestamp > target_timestamp:
@@ -216,6 +227,9 @@ def _build_rewind_state_at_timestamp(
         elif isinstance(event, RoundAdvanced):
             round_number = event.round_number
             channel_count_at_round_start[event.round_number] = dict(running_channel_counts)
+
+        elif isinstance(event, (AgentSwappedMidRun, PostmortemDisabledMidRun)):
+            rounds_with_fired_scheduler_events.add(event.round_number)
 
         elif isinstance(event, InjectionDelivered):
             current = injected_rounds.get(event.agent_id, 0)
@@ -295,6 +309,7 @@ def _build_rewind_state_at_timestamp(
         replaced_agent_ids=frozenset(),
         replaced_agent_channel_visibility={},
         channel_message_count_at_round_start=channel_count_at_round_start,
+        rounds_with_fired_scheduler_events=frozenset(rounds_with_fired_scheduler_events),
     )
 
 

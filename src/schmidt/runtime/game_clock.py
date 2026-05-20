@@ -135,9 +135,9 @@ class GameClock:
         if self._resuming:
             await self._scenario.on_round_advanced(round_number=self._runtime.current_round)
             self._world_context.signal_round_advanced(round_number=self._runtime.current_round)
-            await self._runtime.deliver_round_injections(round_number=self._runtime.current_round)
             logger.info(
-                "Game clock resumed at round %d/%d",
+                "Game clock resumed at round %d/%d (injections deferred until "
+                "after runners + boundary hook)",
                 self._runtime.current_round,
                 self._max_rounds,
             )
@@ -156,6 +156,40 @@ class GameClock:
                 self._runtime.current_round,
                 self._max_rounds,
             )
+
+    async def dispatch_resume_boundary_events(self) -> None:
+        """Fire the round-boundary hook for the resume round, after runners exist.
+
+        On a fresh-start simulation the boundary hook is fired inline by
+        ``_advance_round`` after each ``RoundAdvanced``. On resume, the
+        initial round was already advanced in the source so
+        ``start_initial_round`` cannot fire the hook — agent runners
+        don't exist yet, and ``execute_agent_swap`` requires a runner to
+        drain. The supervisor calls this method after launching runners
+        so any ``scheduled_events`` at ``round_start`` can fire against
+        a fully-wired runtime. The scheduler's pre-seeded
+        ``_fired_rounds`` set guarantees no double-firing of events that
+        already executed in the source's timeline.
+        """
+        if not self._resuming or self._on_round_boundary is None:
+            return
+        await self._on_round_boundary(self._runtime.current_round)
+
+    async def deliver_initial_round_injections(self) -> None:
+        """Deliver the resume round's injections after boundary events fire.
+
+        On resume the order must match the normal ``_advance_round`` flow:
+        boundary hook (which may swap agents) fires first, then injections
+        deliver into the post-swap sessions. ``start_initial_round`` defers
+        this delivery so the supervisor can sequence
+        ``dispatch_resume_boundary_events`` between runner launch and
+        injection delivery; without that ordering the round-N injection
+        lands in the about-to-be-cancelled predecessor's session and is
+        lost to the swapped-in agent.
+        """
+        if not self._resuming:
+            return
+        await self._runtime.deliver_round_injections(round_number=self._runtime.current_round)
 
     async def run(self) -> RunStatus:
         """Run the game clock polling loop. Returns the termination status.

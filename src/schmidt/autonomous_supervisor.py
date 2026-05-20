@@ -79,7 +79,15 @@ class AutonomousSupervisor:
             list(scheduled_events_raw_obj) if isinstance(scheduled_events_raw_obj, list) else []
         )
         scheduled = self._parse_scheduled_events(raw=scheduled_events_raw)
-        self._scheduler = RoundBoundaryScheduler(events=scheduled)
+        already_fired_rounds: frozenset[int] = (
+            resume_state.rounds_with_fired_scheduler_events
+            if resume_state is not None
+            else frozenset()
+        )
+        self._scheduler = RoundBoundaryScheduler(
+            events=scheduled,
+            already_fired_rounds=already_fired_rounds,
+        )
         self._runner_tasks: dict[str, asyncio.Task[Any]] = {}
         self._cost_tracker: dict[str, float] = {}
         self._mcp_server_url = ""
@@ -427,6 +435,15 @@ class AutonomousSupervisor:
                 )
             )
             logger.info("Launched agent %s (%s)", config.agent_id, config.role_name)
+
+        # On resume, fire any scheduled events bucketed at round_start that
+        # did not yet execute in the source, then deliver round_start's
+        # injections so they land in the post-swap sessions (matching the
+        # boundary-hook → deliver_injections order in _advance_round).
+        # The scheduler's pre-seeded _fired_rounds set protects against
+        # double-firing for rounds whose events already ran in the source.
+        await game_clock.dispatch_resume_boundary_events()
+        await game_clock.deliver_initial_round_injections()
 
         # Start the world simulation task.
         world = self._scenario.get_world()

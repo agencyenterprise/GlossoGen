@@ -37,6 +37,7 @@ import { LabelBadges } from "./eval-label-group";
 import { EvalLogPanel } from "./eval-log-panel";
 import { EvalPanel } from "./eval-panel";
 import {
+  AgentSwapPointFab,
   CrossRunReplaceAgentPointFab,
   ForkBadge,
   ForkPointFab,
@@ -63,9 +64,12 @@ import { ModelPicker } from "./model-picker";
 import { useFork } from "./use-fork";
 import { useReplaceAgent } from "./use-replace-agent";
 import { useCrossRunReplaceAgent } from "./use-cross-run-replace-agent";
+import { useResumeAtRound } from "./use-resume-at-round";
 import { ReplaceAgentBadge } from "./replace-agent-badge";
 import { CrossRunReplaceAgentBadge } from "./cross-run-replace-agent-badge";
 import { CrossRunReplaceAgentModal } from "./cross-run-replace-agent-modal";
+import { ResumeAtRoundBadge } from "./resume-at-round-badge";
+import { ResumeAtRoundModal } from "./resume-at-round-modal";
 import { ConfigValueModal } from "./config-value-modal";
 import { AgentModelOverrides, type AgentModelOverride } from "./agent-model-overrides";
 import { LabelPickerModal } from "./label-picker-modal";
@@ -144,6 +148,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
   const [replaceAgentRound, setReplaceAgentRound] = useState<number | null>(null);
   const [crossRunReplaceRound, setCrossRunReplaceRound] = useState<number | null>(null);
+  const [resumeAtRoundRound, setResumeAtRoundRound] = useState<number | null>(null);
   const [showEvalModal, setShowEvalModal] = useState(false);
   const [evalJustLaunched, setEvalJustLaunched] = useState(false);
   const [copiedRunId, setCopiedRunId] = useState(false);
@@ -155,6 +160,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const fork = useFork(runId);
   const replaceAgent = useReplaceAgent(runId);
   const crossRunReplace = useCrossRunReplaceAgent(runId);
+  const resumeAtRound = useResumeAtRound(runId);
 
   const handleSelectChannel = useCallback((ch: string | null) => {
     setSelectedChannel(ch);
@@ -517,6 +523,27 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     setCrossRunReplaceRound(null);
   }, [crossRunReplace]);
 
+  const handleResumeAtRoundFromRound = useCallback((roundNumber: number) => {
+    setResumeAtRoundRound(roundNumber);
+  }, []);
+
+  const handleConfirmResumeAtRound = useCallback(
+    (args: { roundsAfterResume: number; knobs: Record<string, unknown> | null }) => {
+      if (resumeAtRoundRound === null) return;
+      resumeAtRound.mutate({
+        roundStart: resumeAtRoundRound,
+        roundsAfterResume: args.roundsAfterResume,
+        knobs: args.knobs,
+      });
+    },
+    [resumeAtRoundRound, resumeAtRound]
+  );
+
+  const handleCloseResumeAtRound = useCallback(() => {
+    resumeAtRound.reset();
+    setResumeAtRoundRound(null);
+  }, [resumeAtRound]);
+
   const handleConfirmFork = useCallback(
     (model: string, provider: string, modelOverrides: Record<string, AgentModelOverride>) => {
       if (!forkModalMessageId) return;
@@ -610,6 +637,13 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
               importedModel={restData.cross_run_replace_agent_source.imported_model}
               roundStart={restData.cross_run_replace_agent_source.round_start}
               sourceBRoundEnd={restData.cross_run_replace_agent_source.source_b_round_end}
+            />
+          ) : null}
+          {restData.resume_at_round_source ? (
+            <ResumeAtRoundBadge
+              sourceRunId={restData.resume_at_round_source.source_run_id}
+              roundStart={restData.resume_at_round_source.round_start}
+              roundsAfterResume={restData.resume_at_round_source.rounds_after_resume}
             />
           ) : null}
           <span className="group/help relative">
@@ -837,6 +871,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             onForkFromMessage={handleForkFromMessage}
             onReplaceAgentFromRound={handleReplaceAgentFromRound}
             onCrossRunReplaceFromRound={handleCrossRunReplaceFromRound}
+            onResumeAtRoundFromRound={handleResumeAtRoundFromRound}
             forkPointMessageId={restData.fork_source?.target_message_id ?? null}
             swapRoundNumber={veyruExtrasForChat?.swap_point?.round_number ?? null}
             swappedObserverDisplayNames={
@@ -982,6 +1017,23 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
         />
       ) : null}
 
+      {/* Resume-at-round confirmation modal */}
+      {resumeAtRoundRound !== null ? (
+        <ResumeAtRoundModal
+          isPending={resumeAtRound.isPending}
+          isSuccess={resumeAtRound.isSuccess}
+          errorMessage={resumeAtRound.error?.message ?? null}
+          roundStart={resumeAtRoundRound}
+          sourceRoundCount={
+            typeof restData.scenario_config?.round_count === "number"
+              ? restData.scenario_config.round_count
+              : null
+          }
+          onConfirm={handleConfirmResumeAtRound}
+          onCancel={handleCloseResumeAtRound}
+        />
+      ) : null}
+
       {/* Fork confirmation modal */}
       {forkModalMessageId ? (
         <ForkModal
@@ -1119,6 +1171,18 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
                 onClick={() => scrollToDivider("cross-run-replace-agent-divider")}
               />
             ) : null}
+
+            {swapEvents.map(swap => (
+              <AgentSwapPointFab
+                key={`agent-swap-${swap.round_number}-${swap.agent_id}`}
+                stackIndex={nextStackIndex++}
+                roundNumber={swap.round_number}
+                agentId={swap.agent_id}
+                onClick={() =>
+                  scrollToDivider(`agent-swap-divider-r${swap.round_number}-${swap.agent_id}`)
+                }
+              />
+            ))}
           </>
         );
       })()}

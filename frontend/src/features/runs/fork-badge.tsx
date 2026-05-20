@@ -22,10 +22,21 @@ export function ForkBadge({ sourceRunId, targetMessageId: _targetMessageId }: Fo
   );
 }
 
-const STACK_BOTTOM_CLASSES = ["bottom-6", "bottom-20", "bottom-34", "bottom-48"] as const;
+const STACK_BOTTOM_CLASSES = [
+  "bottom-6",
+  "bottom-20",
+  "bottom-34",
+  "bottom-48",
+  "bottom-62",
+  "bottom-76",
+  "bottom-90",
+  "bottom-104",
+] as const;
 
 function bottomClass(stackIndex: number): string {
-  return STACK_BOTTOM_CLASSES[stackIndex] ?? STACK_BOTTOM_CLASSES[0];
+  const clamped = Math.min(Math.max(stackIndex, 0), STACK_BOTTOM_CLASSES.length - 1);
+  const cls = STACK_BOTTOM_CLASSES[clamped];
+  return cls ?? STACK_BOTTOM_CLASSES[0]!;
 }
 
 interface ForkPointFabProps {
@@ -127,6 +138,32 @@ export function ReplaceAgentPointFab({
     >
       <UserCog className="h-3.5 w-3.5" />
       Go to agent replacement (round {roundNumber})
+    </button>
+  );
+}
+
+interface AgentSwapPointFabProps {
+  onClick: () => void;
+  roundNumber: number;
+  agentId: string;
+  stackIndex: number;
+}
+
+/** Floating action button that scrolls to a scheduled-events in-run agent swap. */
+export function AgentSwapPointFab({
+  onClick,
+  roundNumber,
+  agentId,
+  stackIndex,
+}: AgentSwapPointFabProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`fixed ${bottomClass(stackIndex)} right-6 z-40 flex items-center gap-1.5 rounded-full border border-indigo-300/60 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 shadow-lg transition-all hover:bg-indigo-100 hover:shadow-xl dark:border-indigo-700/50 dark:bg-indigo-950/80 dark:text-indigo-300 dark:hover:bg-indigo-900/80`}
+      title={`Go to ${agentId} swap (round ${roundNumber})`}
+    >
+      <UserCog className="h-3.5 w-3.5" />
+      Go to {agentId} swap (r{roundNumber})
     </button>
   );
 }

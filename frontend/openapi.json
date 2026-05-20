@@ -902,6 +902,65 @@
         }
       }
     },
+    "/api/runs/{scenario}/{run_dir_name}/resume-at-round": {
+      "post": {
+        "summary": "Resume At Round",
+        "description": "Clone a finished run at the start of ``round_start`` and resume it.\n\nNo agent is replaced; every agent keeps its full reconstructed history.\n``body.knobs`` is shallow-merged onto the source's scenario config to\nlet callers reconfigure the post-resume simulation.",
+        "operationId": "resume_at_round_api_runs__scenario___run_dir_name__resume_at_round_post",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "run_dir_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Dir Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeAtRoundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeAtRoundResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs/{scenario}/{run_dir_name}/export/pdf": {
       "get": {
         "summary": "Export Run Pdf",
@@ -3404,6 +3463,100 @@
         "title": "ReplaceAgentSource",
         "description": "Provenance for a run created via the replace-agent endpoint.\n\nThe replacement boundary is the start of round ``round_start``.\n``target_event_id`` is the resolved anchor inside the source\nrun's git history (the ``RoundAdvanced`` event for ``round_start``),\nkept for traceability."
       },
+      "ResumeAtRoundRequest": {
+        "properties": {
+          "round_start": {
+            "type": "integer",
+            "title": "Round Start"
+          },
+          "rounds_after_resume": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounds After Resume"
+          },
+          "knobs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knobs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "round_start",
+          "rounds_after_resume",
+          "knobs"
+        ],
+        "title": "ResumeAtRoundRequest",
+        "description": "Request body for resuming a finished run at the start of a chosen round.\n\nNo agent is replaced \u2014 every agent keeps its full reconstructed history\non resume. ``knobs`` is shallow-merged onto the source run's scenario\nconfig (turn postmortem on/off, add post-hoc ``scheduled_events``,\nextend ``round_count``, etc.).\n\n``rounds_after_resume`` controls how many rounds the resumed simulation\nplays following the boundary: ``round_count`` is set to\n``round_start + rounds_after_resume``. When ``None``, defaults to\n``source_round_count - round_start``."
+      },
+      "ResumeAtRoundResponse": {
+        "properties": {
+          "new_run_id": {
+            "type": "string",
+            "title": "New Run Id"
+          },
+          "new_run_dir": {
+            "type": "string",
+            "title": "New Run Dir"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_run_id",
+          "new_run_dir"
+        ],
+        "title": "ResumeAtRoundResponse",
+        "description": "Response returned after a resume-at-round run is launched."
+      },
+      "ResumeAtRoundSource": {
+        "properties": {
+          "source_run_id": {
+            "type": "string",
+            "title": "Source Run Id"
+          },
+          "round_start": {
+            "type": "integer",
+            "title": "Round Start"
+          },
+          "rounds_after_resume": {
+            "type": "integer",
+            "title": "Rounds After Resume"
+          },
+          "target_event_id": {
+            "type": "string",
+            "title": "Target Event Id"
+          },
+          "resumed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Resumed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_run_id",
+          "round_start",
+          "rounds_after_resume",
+          "target_event_id",
+          "resumed_at"
+        ],
+        "title": "ResumeAtRoundSource",
+        "description": "Provenance for a run created via the resume-at-round endpoint.\n\nThe resume boundary is the start of round ``round_start``. No agent\nis replaced \u2014 every agent keeps its full reconstructed history; the\nresumed simulation differs from the source only via merged knob\noverrides (e.g. ``postmortem_enabled``, ``scheduled_events``,\n``round_count``)."
+      },
       "RoundEnding": {
         "properties": {
           "round_number": {
@@ -3617,6 +3770,16 @@
               }
             ]
           },
+          "resume_at_round_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResumeAtRoundSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "labels": {
             "items": {
               "type": "string"
@@ -3693,6 +3856,7 @@
           "fork_source",
           "replace_agent_source",
           "cross_run_replace_agent_source",
+          "resume_at_round_source",
           "labels",
           "note",
           "round_endings",
@@ -3811,6 +3975,16 @@
               }
             ]
           },
+          "resume_at_round_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResumeAtRoundSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "models": {
             "items": {
               "type": "string"
@@ -3862,6 +4036,7 @@
           "fork_source",
           "replace_agent_source",
           "cross_run_replace_agent_source",
+          "resume_at_round_source",
           "models",
           "provider",
           "agent_models",

@@ -55,6 +55,23 @@ class ReplaceAgentSource(BaseModel):
     replaced_at: datetime
 
 
+class ResumeAtRoundSource(BaseModel):
+    """Provenance for a run created via the resume-at-round endpoint.
+
+    The resume boundary is the start of round ``round_start``. No agent
+    is replaced — every agent keeps its full reconstructed history; the
+    resumed simulation differs from the source only via merged knob
+    overrides (e.g. ``postmortem_enabled``, ``scheduled_events``,
+    ``round_count``).
+    """
+
+    source_run_id: str
+    round_start: int
+    rounds_after_resume: int
+    target_event_id: str
+    resumed_at: datetime
+
+
 class CrossRunReplaceAgentSource(BaseModel):
     """Provenance for a run created via the cross-run replace-agent endpoint.
 
@@ -102,6 +119,7 @@ class RunSummary(BaseModel):
     fork_source: ForkSource | None
     replace_agent_source: ReplaceAgentSource | None
     cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
+    resume_at_round_source: ResumeAtRoundSource | None
     models: list[str]
     provider: str
     agent_models: list[AgentModelSummary]
@@ -285,6 +303,7 @@ class RunDetailResponse(BaseModel):
     fork_source: ForkSource | None
     replace_agent_source: ReplaceAgentSource | None
     cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
+    resume_at_round_source: ResumeAtRoundSource | None
     labels: list[str]
     note: str | None
     round_endings: list[RoundEnding]
@@ -437,6 +456,39 @@ class CrossRunReplaceAgentRequest(BaseModel):
 
 class CrossRunReplaceAgentResponse(BaseModel):
     """Response returned after a cross-run replace-agent run is launched."""
+
+    new_run_id: str
+    new_run_dir: str
+
+
+# ---------------------------------------------------------------------------
+# Resume-at-round request/response models
+# ---------------------------------------------------------------------------
+
+
+class ResumeAtRoundRequest(BaseModel):
+    """Request body for resuming a finished run at the start of a chosen round.
+
+    No agent is replaced — every agent keeps its full reconstructed history
+    on resume. ``knobs`` is shallow-merged onto the source run's scenario
+    config (turn postmortem on/off, add post-hoc ``scheduled_events``,
+    extend ``round_count``, etc.).
+
+    ``rounds_after_resume`` controls how many rounds the resumed simulation
+    plays following the boundary: ``round_count`` is set to
+    ``round_start + rounds_after_resume``. When ``None``, defaults to
+    ``source_round_count - round_start``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    round_start: int
+    rounds_after_resume: int | None
+    knobs: dict[str, Any] | None
+
+
+class ResumeAtRoundResponse(BaseModel):
+    """Response returned after a resume-at-round run is launched."""
 
     new_run_id: str
     new_run_dir: str

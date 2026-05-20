@@ -377,6 +377,68 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    resume_parser = subparsers.add_parser(
+        "resume-at-round",
+        help=(
+            "Clone a finished run at the start of a chosen round and resume "
+            "without replacing any agent; every agent keeps its full "
+            "reconstructed history. Optional knob overrides are merged onto "
+            "the source's scenario_config so the resumed simulation can flip "
+            "postmortem, add scheduled_events, extend round_count, etc."
+        ),
+    )
+    resume_parser.add_argument(
+        "scenario_name",
+        type=str,
+        choices=scenario_names,
+        help="Name of the scenario the source run belongs to",
+    )
+    resume_parser.add_argument(
+        "--source-run-dir",
+        type=str,
+        required=True,
+        help="Path to the source run directory (e.g. runs/veyru/1742234567)",
+    )
+    resume_parser.add_argument(
+        "--round-start",
+        dest="round_start",
+        type=int,
+        required=True,
+        help=(
+            "Round number that the resumed simulation should re-enter. "
+            "Rewinds to the source's RoundAdvanced commit for that round."
+        ),
+    )
+    resume_parser.add_argument(
+        "--runs-dir",
+        type=str,
+        required=True,
+        help="Root directory where the new run is written",
+    )
+    resume_parser.add_argument(
+        "--knobs",
+        type=str,
+        help=(
+            "Optional path to a JSON file with scenario knob overrides. "
+            "Shallow-merged onto the source's scenario_config; useful for "
+            "flipping postmortem_enabled, scheduling post-hoc swaps via "
+            "scheduled_events, or extending round_count beyond the source."
+        ),
+    )
+    resume_parser.add_argument(
+        "--rounds-after-resume",
+        dest="rounds_after_resume",
+        type=int,
+        default=None,
+        help=(
+            "Number of rounds the resumed simulation will play after the "
+            "resume boundary. round_count is set to round_start + "
+            "rounds_after_resume. When omitted, defaults to "
+            "source_round_count - round_start (the remaining rounds in the "
+            "original run after the resume boundary)."
+        ),
+    )
+
     return parser
 
 
@@ -409,6 +471,11 @@ def main() -> None:
     if known_args.command == "cross-run-replace-agent":
         args = parser.parse_args()
         asyncio.run(_run_cross_run_replace_agent(args=args))
+        return
+
+    if known_args.command == "resume-at-round":
+        args = parser.parse_args()
+        asyncio.run(_run_resume_at_round(args=args))
         return
 
     scenario_cls = get_scenario_class(name=known_args.scenario_name)
@@ -550,9 +617,14 @@ def _teardown_logging(
 
 
 class _ReplaceManifestInfo(NamedTuple):
-    """Replace-agent manifest fields needed to configure resume."""
+    """Replace-agent / round-anchored resume manifest fields needed at resume time.
 
-    replaced_agent_id: str
+    ``replaced_agent_id`` is ``None`` for a round-anchored resume; the
+    resume code path then treats every agent as a non-replaced agent
+    (full reconstructed history, no channel-visibility filtering).
+    """
+
+    replaced_agent_id: str | None
     channel_visibility: dict[str, ChannelVisibility]
     target_event_id: str
     round_start: int
@@ -681,28 +753,41 @@ async def _run_simulation(
                 cross_run_info.channel_visibility,
             )
         elif replace_info is not None:
-            agent_filters[replace_info.replaced_agent_id] = AgentHistoryFilter(
-                tool_calls_only=True,
-                channel_visibility=replace_info.channel_visibility,
-                imported=None,
-            )
-            base_state = build_rewind_state_at_event(
-                events=events,
-                target_event_id=replace_info.target_event_id,
-                cutoff_round=replace_info.round_start,
-                agent_filters=agent_filters,
-            )
-            resume_state = base_state._replace(
-                replaced_agent_ids=frozenset({replace_info.replaced_agent_id}),
-                replaced_agent_channel_visibility={
-                    replace_info.replaced_agent_id: replace_info.channel_visibility,
-                },
-            )
-            logger.info(
-                "Replace-agent run detected: %s resuming with channel_visibility=%s",
-                replace_info.replaced_agent_id,
-                replace_info.channel_visibility,
-            )
+            if replace_info.replaced_agent_id is None:
+                resume_state = build_rewind_state_at_event(
+                    events=events,
+                    target_event_id=replace_info.target_event_id,
+                    cutoff_round=None,
+                    agent_filters={},
+                )
+                logger.info(
+                    "Round-anchored resume detected: resuming at round %d "
+                    "with full reconstructed history for every agent",
+                    replace_info.round_start,
+                )
+            else:
+                agent_filters[replace_info.replaced_agent_id] = AgentHistoryFilter(
+                    tool_calls_only=True,
+                    channel_visibility=replace_info.channel_visibility,
+                    imported=None,
+                )
+                base_state = build_rewind_state_at_event(
+                    events=events,
+                    target_event_id=replace_info.target_event_id,
+                    cutoff_round=replace_info.round_start,
+                    agent_filters=agent_filters,
+                )
+                resume_state = base_state._replace(
+                    replaced_agent_ids=frozenset({replace_info.replaced_agent_id}),
+                    replaced_agent_channel_visibility={
+                        replace_info.replaced_agent_id: replace_info.channel_visibility,
+                    },
+                )
+                logger.info(
+                    "Replace-agent run detected: %s resuming with channel_visibility=%s",
+                    replace_info.replaced_agent_id,
+                    replace_info.channel_visibility,
+                )
         else:
             resume_state = build_rewind_state_from_last_message(
                 events=events,
@@ -873,6 +958,47 @@ async def _run_replace_agent(args: argparse.Namespace) -> None:
         result = await replace_agent_in_run(request=request)
     except ValueError as exc:
         raise SystemExit(f"replace-agent failed: {exc}") from exc
+
+    print(f"new_run_id={result.new_run_id}")
+    print(f"new_run_dir={result.new_run_dir}")
+
+
+async def _run_resume_at_round(args: argparse.Namespace) -> None:
+    """Drive the round-anchored resume operation from the CLI.
+
+    Loads optional knob overrides from ``--knobs`` and forwards them to
+    the shared replace-agent core with ``replaced_agent_id=None`` so no
+    agent is restarted. Every agent keeps its full reconstructed history
+    on resume.
+    """
+    knobs: dict[str, Any] | None = None
+    if args.knobs is not None:
+        knobs = json.loads(Path(args.knobs).read_text())
+
+    source_run_dir = Path(args.source_run_dir).resolve()
+
+    logger.info(
+        "Resume-at-round: source=%s round_start=%d",
+        source_run_dir,
+        args.round_start,
+    )
+
+    request = ReplaceAgentCoreRequest(
+        source_run_dir=source_run_dir,
+        scenario_name=args.scenario_name,
+        round_start=args.round_start,
+        rounds_after_swap=args.rounds_after_resume,
+        replaced_agent_id=None,
+        model=None,
+        provider=None,
+        knobs=knobs,
+        channels_with_visible_history=None,
+        runs_dir=Path(args.runs_dir).resolve(),
+    )
+    try:
+        result = await replace_agent_in_run(request=request)
+    except ValueError as exc:
+        raise SystemExit(f"resume-at-round failed: {exc}") from exc
 
     print(f"new_run_id={result.new_run_id}")
     print(f"new_run_dir={result.new_run_dir}")

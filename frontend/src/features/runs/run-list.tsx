@@ -9,6 +9,7 @@ import {
   Loader2,
   Package,
   Repeat,
+  RotateCcw,
   StickyNote,
   Sword,
   Tag,
@@ -522,6 +523,18 @@ export function RunList() {
                                   className="inline-flex items-center gap-0.5 text-violet-700 dark:text-violet-400"
                                 >
                                   <Repeat className="h-2.5 w-2.5" />R{cr.round_start}
+                                </span>
+                              );
+                            }
+                            if (run.resume_at_round_source) {
+                              const rr = run.resume_at_round_source;
+                              badges.push(
+                                <span
+                                  key="resumed"
+                                  title={`Resumed from start of round ${rr.round_start}, played ${rr.rounds_after_resume} round${rr.rounds_after_resume === 1 ? "" : "s"} after`}
+                                  className="inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-400"
+                                >
+                                  <RotateCcw className="h-2.5 w-2.5" />R{rr.round_start}
                                 </span>
                               );
                             }

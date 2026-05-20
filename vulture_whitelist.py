@@ -141,6 +141,7 @@ prod_upload_status  # unused function (src/schmidt/server/runs/prod_upload_route
 upload_run_to_prod  # unused function (src/schmidt/server/runs/prod_upload_router.py:134)
 sync_run_metadata_to_prod  # unused function (src/schmidt/server/runs/prod_upload_router.py:245)
 replace_agent  # unused function (src/schmidt/server/runs/replace_agent_router.py:20)
+resume_at_round  # unused function (src/schmidt/server/runs/resume_at_round_router.py:24)
 list_runs  # unused function (src/schmidt/server/runs/router.py:59)
 get_run_detail  # unused function (src/schmidt/server/runs/router.py:99)
 get_run_evaluation  # unused function (src/schmidt/server/runs/router.py:112)

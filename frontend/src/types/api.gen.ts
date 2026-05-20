@@ -326,6 +326,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{scenario}/{run_dir_name}/resume-at-round": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume At Round
+         * @description Clone a finished run at the start of ``round_start`` and resume it.
+         *
+         *     No agent is replaced; every agent keeps its full reconstructed history.
+         *     ``body.knobs`` is shallow-merged onto the source's scenario config to
+         *     let callers reconfigure the post-resume simulation.
+         */
+        post: operations["resume_at_round_api_runs__scenario___run_dir_name__resume_at_round_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{scenario}/{run_dir_name}/export/pdf": {
         parameters: {
             query?: never;
@@ -1588,6 +1612,65 @@ export interface components {
             replaced_at: string;
         };
         /**
+         * ResumeAtRoundRequest
+         * @description Request body for resuming a finished run at the start of a chosen round.
+         *
+         *     No agent is replaced — every agent keeps its full reconstructed history
+         *     on resume. ``knobs`` is shallow-merged onto the source run's scenario
+         *     config (turn postmortem on/off, add post-hoc ``scheduled_events``,
+         *     extend ``round_count``, etc.).
+         *
+         *     ``rounds_after_resume`` controls how many rounds the resumed simulation
+         *     plays following the boundary: ``round_count`` is set to
+         *     ``round_start + rounds_after_resume``. When ``None``, defaults to
+         *     ``source_round_count - round_start``.
+         */
+        ResumeAtRoundRequest: {
+            /** Round Start */
+            round_start: number;
+            /** Rounds After Resume */
+            rounds_after_resume: number | null;
+            /** Knobs */
+            knobs: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * ResumeAtRoundResponse
+         * @description Response returned after a resume-at-round run is launched.
+         */
+        ResumeAtRoundResponse: {
+            /** New Run Id */
+            new_run_id: string;
+            /** New Run Dir */
+            new_run_dir: string;
+        };
+        /**
+         * ResumeAtRoundSource
+         * @description Provenance for a run created via the resume-at-round endpoint.
+         *
+         *     The resume boundary is the start of round ``round_start``. No agent
+         *     is replaced — every agent keeps its full reconstructed history; the
+         *     resumed simulation differs from the source only via merged knob
+         *     overrides (e.g. ``postmortem_enabled``, ``scheduled_events``,
+         *     ``round_count``).
+         */
+        ResumeAtRoundSource: {
+            /** Source Run Id */
+            source_run_id: string;
+            /** Round Start */
+            round_start: number;
+            /** Rounds After Resume */
+            rounds_after_resume: number;
+            /** Target Event Id */
+            target_event_id: string;
+            /**
+             * Resumed At
+             * Format: date-time
+             */
+            resumed_at: string;
+        };
+        /**
          * RoundEnding
          * @description Reason a round's main phase ended.
          *
@@ -1686,6 +1769,7 @@ export interface components {
             fork_source: components["schemas"]["ForkSource"] | null;
             replace_agent_source: components["schemas"]["ReplaceAgentSource"] | null;
             cross_run_replace_agent_source: components["schemas"]["CrossRunReplaceAgentSource"] | null;
+            resume_at_round_source: components["schemas"]["ResumeAtRoundSource"] | null;
             /** Labels */
             labels: string[];
             /** Note */
@@ -1745,6 +1829,7 @@ export interface components {
             fork_source: components["schemas"]["ForkSource"] | null;
             replace_agent_source: components["schemas"]["ReplaceAgentSource"] | null;
             cross_run_replace_agent_source: components["schemas"]["CrossRunReplaceAgentSource"] | null;
+            resume_at_round_source: components["schemas"]["ResumeAtRoundSource"] | null;
             /** Models */
             models: string[];
             /** Provider */
@@ -2945,6 +3030,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CrossRunReplaceAgentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_at_round_api_runs__scenario___run_dir_name__resume_at_round_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario: string;
+                run_dir_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResumeAtRoundRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeAtRoundResponse"];
                 };
             };
             /** @description Validation Error */

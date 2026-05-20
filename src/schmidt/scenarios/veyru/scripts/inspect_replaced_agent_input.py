@@ -78,6 +78,11 @@ async def main() -> None:
     replace_info = _read_replace_manifest(run_dir=run_dir)
     if replace_info is None:
         raise SystemExit(f"No replace_manifest.json in {run_dir}")
+    if replace_info.replaced_agent_id is None:
+        raise SystemExit(
+            f"Run {run_dir} is a round-anchored resume (no agent replaced); "
+            "this script only applies to replace-agent runs."
+        )
     replaced = replace_info.replaced_agent_id
 
     events = await load_events(log_path=log_path)
