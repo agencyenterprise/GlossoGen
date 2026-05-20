@@ -55,6 +55,7 @@ total_expected_move_count  # unused variable (src/schmidt/scenarios/container_ya
 total_accepted_move_count  # unused variable (src/schmidt/scenarios/container_yard_stacking/world_state.py:54)
 total_expected_truck_count  # unused variable (src/schmidt/scenarios/container_yard_stacking/world_state.py:55)
 total_correctly_committed_truck_count  # unused variable (src/schmidt/scenarios/container_yard_stacking/world_state.py:56)
+_._validate_codebreakers_knobs  # unused method (src/schmidt/scenarios/codebreakers/knobs.py:30)
 _._validate_salon_knobs  # unused method (src/schmidt/scenarios/salon/knobs.py:38)
 _._validate_channel_noise_level  # unused method (src/schmidt/scenarios/satellite_contact_window/knobs.py:47)
 _._validate_round_time_budget_seconds  # unused method (src/schmidt/scenarios/satellite_contact_window/knobs.py:55)

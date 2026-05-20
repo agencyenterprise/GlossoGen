@@ -1,0 +1,13 @@
+{
+  "judge_model": "claude-haiku-4-5-20251001",
+  "judge_provider": "anthropic",
+  "round_count": 60,
+  "max_round_duration_seconds": 90,
+  "seed": 42,
+  "postmortem_enabled": true,
+  "postmortem_duration_seconds": 90,
+  "agent_max_tokens": 16384,
+  "model_overrides": {},
+  "scheduled_events": [],
+  "round_time_budget_seconds": null
+}
