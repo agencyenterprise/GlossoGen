@@ -1,8 +1,9 @@
 """Pydantic models representing messages exchanged between agents during a simulation."""
 
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class SimulationMessage(BaseModel):
@@ -22,3 +23,14 @@ class SimulationMessage(BaseModel):
     text: str
     timestamp: datetime
     round_number: int
+
+    @model_validator(mode="before")
+    @classmethod
+    def _backfill_sender_display_name(cls, data: Any) -> Any:
+        if (
+            isinstance(data, dict)
+            and "sender_display_name" not in data
+            and "sender_agent_id" in data
+        ):
+            data = {**data, "sender_display_name": data["sender_agent_id"]}
+        return data

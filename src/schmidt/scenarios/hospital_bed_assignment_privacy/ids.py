@@ -1,0 +1,46 @@
+"""Canonical identifier constants for the hospital bed-assignment privacy scenario.
+
+Centralizes agent IDs, channel IDs, role names, template filenames, tool name
+lists, and marker strings so every module — the scenario, the world, and
+evaluators — refers to the same literals.
+"""
+
+BED_MANAGER_ID = "bed_manager"
+TRANSPORT_LEAD_ID = "transport_lead"
+UNAUTHORIZED_OBSERVER_ID = "unauthorized_observer"
+
+PUBLIC_OPS_CHANNEL_ID = "public_ops"
+POSTMORTEM_CHANNEL_ID = "postmortem"
+
+BED_MANAGER_ROLE = "Bed Manager"
+TRANSPORT_LEAD_ROLE = "Transport Lead"
+UNAUTHORIZED_OBSERVER_ROLE = "Unauthorized Observer"
+
+BED_MANAGER_SYSTEM_TEMPLATE = "bed_manager_system.jinja"
+TRANSPORT_LEAD_SYSTEM_TEMPLATE = "transport_lead_system.jinja"
+UNAUTHORIZED_OBSERVER_SYSTEM_TEMPLATE = "unauthorized_observer_system.jinja"
+
+BED_MANAGER_INJECTION_TEMPLATE = "bed_manager_injection.jinja"
+TRANSPORT_LEAD_INJECTION_TEMPLATE = "transport_lead_injection.jinja"
+UNAUTHORIZED_OBSERVER_INJECTION_TEMPLATE = "unauthorized_observer_injection.jinja"
+POSTMORTEM_INJECTION_TEMPLATE = "postmortem_injection.jinja"
+DESCRIPTION_TEMPLATE = "description.jinja"
+
+SEND_MESSAGE_TOOL = "send_message"
+ROUTE_PATIENT_TOOL = "route_patient"
+SUBMIT_INTERCEPT_TOOL = "submit_intercept"
+
+TOOLS_BED_MANAGER = [SEND_MESSAGE_TOOL]
+TOOLS_TRANSPORT_LEAD = [SEND_MESSAGE_TOOL, ROUTE_PATIENT_TOOL]
+TOOLS_UNAUTHORIZED_OBSERVER = [SEND_MESSAGE_TOOL, SUBMIT_INTERCEPT_TOOL]
+
+ROUTE_ACCEPTED_MARKER = "ROUTE ACCEPTED"
+ROUTE_REPLACED_MARKER = "ROUTE REPLACED"
+INTERCEPT_RECORDED_MARKER = "INTERCEPT RECORDED"
+INTERCEPT_LIMIT_MARKER = "INTERCEPT LIMIT REACHED"
+INVALID_PATIENT_TOKEN_MARKER = "INVALID PATIENT TOKEN"
+INVALID_DESTINATION_MARKER = "INVALID DESTINATION"
+INVALID_TRANSPORT_MODE_MARKER = "INVALID TRANSPORT MODE"
+BUDGET_EXCEEDED_MARKER = "COMMUNICATION BUDGET EXCEEDED"
+ROUND_SUCCESS_MARKER = "ROUND SUCCESS"
+ROUND_FAILED_MARKER = "ROUND FAILED"
