@@ -42,7 +42,7 @@ from schmidt.scenarios.veyru.outcome_reconstruction import (
     compute_outcome_if_needed,
     restore_outcomes_from_events,
 )
-from schmidt.scenarios.veyru.veyru_cases import VeyruCase, VeyruStage
+from schmidt.scenarios.veyru.veyru_cases import AddendumEntry, VeyruCase, VeyruStage
 from schmidt.scenarios.veyru.world_state import StageOutcome, TeamState, VeyruOutcome
 
 logger = logging.getLogger(__name__)
@@ -86,9 +86,39 @@ class VeyruWorld(ScenarioWorld):
         self._swap_just_happened: bool = False
         self._intern_takeover_just_happened: bool = False
         self._just_swapped_agent_round: dict[str, int] = {}
+        self._case_overrides: dict[int, VeyruCase] = {}
+        self._engineer_addenda: dict[int, tuple[AddendumEntry, ...]] = {}
         self._channels_by_team: dict[str, TeamId] = self._build_channel_to_team_lookup(
             teams=teams,
         )
+
+    def set_case_override(
+        self,
+        round_number: int,
+        case: VeyruCase,
+        engineer_addendum: tuple[AddendumEntry, ...],
+    ) -> None:
+        """Store ``case`` + ``engineer_addendum`` so round-``round_number`` injection renders both.
+
+        Called by :meth:`VeyruScenario.inject_case_payload` after decoding an
+        ``InjectCase`` scheduled-event payload. The injection rendering picks
+        the override before falling back to the natural modular-index case;
+        the engineer's ``treatment_mapping`` is extended with one row per
+        addendum entry (with stellar parameters already substituted), and the
+        engineer also sees a per-round glossary block listing each addendum
+        entry's symptoms so symptom→motif diagnosis is possible for the
+        novel motifs and any decoys included alongside.
+        """
+        self._case_overrides[round_number] = case
+        self._engineer_addenda[round_number] = engineer_addendum
+
+    def get_case_override(self, round_number: int) -> VeyruCase | None:
+        """Return the overridden case for ``round_number``, or ``None``."""
+        return self._case_overrides.get(round_number)
+
+    def get_engineer_addendum(self, round_number: int) -> tuple[AddendumEntry, ...]:
+        """Return the engineer's round-scoped glossary addendum (empty when absent)."""
+        return self._engineer_addenda.get(round_number, ())
 
     @staticmethod
     def _build_channel_to_team_lookup(
@@ -240,6 +270,7 @@ class VeyruWorld(ScenarioWorld):
             veyru_cases=self._veyru_cases,
             round_number=round_number,
             team_id=team_id,
+            case_overrides=self._case_overrides,
         )
 
     def finalize_round_sync(self, round_number: int) -> None:
@@ -249,6 +280,16 @@ class VeyruWorld(ScenarioWorld):
         injections are delivered, so outcomes are available for templates.
         Each team survives only if its current field observer called
         ``stabilize_veyru`` during the round.
+
+        When ``_case_overrides`` carries a case for ``round_number`` (set by an
+        ``InjectCase`` scheduled event firing earlier this boundary), that
+        override becomes the round's ``_current_case``. Otherwise the
+        natural-cycle case is selected by modular index. Setting the override
+        on ``_current_case`` here is what makes the stabilize_veyru judge,
+        time-budget checks, and outcome computations all read the injected
+        case's stages instead of the natural one — without this, the
+        observer/engineer prompts would show the override but the judge
+        would silently compare against the wrong procedure.
         """
         if round_number >= 2:
             for team_id in self._teams:
@@ -258,8 +299,12 @@ class VeyruWorld(ScenarioWorld):
                 )
         for team in self._teams.values():
             team.reset_for_new_round()
-        case_index = (round_number - 1) % len(self._veyru_cases)
-        self._current_case = self._veyru_cases[case_index]
+        override = self._case_overrides.get(round_number)
+        if override is not None:
+            self._current_case = override
+        else:
+            case_index = (round_number - 1) % len(self._veyru_cases)
+            self._current_case = self._veyru_cases[case_index]
 
     def restore_outcomes_from_events(self, events: list[object]) -> None:
         """Seed per-team ``outcomes`` from a JSONL event list on resume."""

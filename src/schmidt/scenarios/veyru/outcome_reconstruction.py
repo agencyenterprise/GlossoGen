@@ -21,12 +21,16 @@ def compute_outcome_if_needed(
     veyru_cases: list[VeyruCase],
     round_number: int,
     team_id: TeamId,
+    case_overrides: dict[int, VeyruCase],
 ) -> VeyruOutcome | None:
     """Compute and store the outcome for ``team_id`` / ``round_number`` if not already done.
 
     Returns the outcome, or ``None`` when ``round_number < 1``. Idempotent:
     if an outcome for this round was already appended, returns it without
-    appending a duplicate.
+    appending a duplicate. ``case_overrides`` provides per-round case
+    overrides set by ``InjectCase`` scheduled events — when ``round_number``
+    has an override, the outcome's ``failure_name`` / ``stages`` / budget
+    reflect the injected case rather than the natural-cycle pick.
     """
     if round_number < 1:
         return None
@@ -34,8 +38,12 @@ def compute_outcome_if_needed(
     for existing in team.outcomes:
         if existing.case_number == round_number:
             return existing
-    case_index = (round_number - 1) % len(veyru_cases)
-    case = veyru_cases[case_index]
+    override = case_overrides.get(round_number)
+    if override is not None:
+        case = override
+    else:
+        case_index = (round_number - 1) % len(veyru_cases)
+        case = veyru_cases[case_index]
     all_stage_outcomes = list(team.stage_outcomes)
     for i in range(len(all_stage_outcomes), len(case.stages)):
         all_stage_outcomes.append(

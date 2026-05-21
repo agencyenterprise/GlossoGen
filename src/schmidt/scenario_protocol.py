@@ -294,6 +294,23 @@ class SimulationScenario(ABC):
         _ = agent_id, channel_id
         return None
 
+    async def inject_case_payload(self, round_number: int, payload: dict[str, Any]) -> None:
+        """Override the round-``round_number`` case with a scenario-decoded payload.
+
+        Called by the supervisor when an ``InjectCase`` scheduled event fires.
+        Scenarios that support case injection decode ``payload`` into their
+        case-data shape, store the override on the world so the next
+        round's injection-rendering picks it up, and (optionally) log a
+        scenario-specific event for traceability. The default raises
+        ``NotImplementedError`` so scenarios that don't support injection
+        surface a clear error if an ``InjectCase`` is scheduled against them.
+        """
+        _ = round_number, payload
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement inject_case_payload; "
+            "remove the InjectCase entry from scheduled_events or implement the hook."
+        )
+
     def get_primary_channel_id(self) -> str | None:
         """Return the channel ID that evaluators should focus on.
 

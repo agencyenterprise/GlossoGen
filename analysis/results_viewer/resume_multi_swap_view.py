@@ -322,9 +322,7 @@ def _render_round_message_samples(
         for round_number in sample_rounds:
             source_text = source_texts.get(round_number, "")
             for replica in replica_runs:
-                replica_texts = phase_round_texts(
-                    run=replica, phase_index=phase.phase_index
-                )
+                replica_texts = phase_round_texts(run=replica, phase_index=phase.phase_index)
                 replica_text = replica_texts.get(round_number, "")
                 sim = round_similarity(text_a=source_text, text_b=replica_text)
                 rows.append(

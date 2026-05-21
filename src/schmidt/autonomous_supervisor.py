@@ -20,6 +20,7 @@ from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import (
     AgentConnected,
     AgentRegistered,
+    CaseInjectedMidRun,
     PostmortemDisabledMidRun,
     RunStatus,
     SimulationEnded,
@@ -166,6 +167,21 @@ class AutonomousSupervisor:
         disable()
         await self._event_logger.log(event=PostmortemDisabledMidRun(round_number=round_number))
         logger.info("Postmortem disabled mid-run at round %d", round_number)
+
+    async def inject_case_payload(self, round_number: int, payload: dict[str, Any]) -> None:
+        """Scheduler-invoked hook: hand ``payload`` to the scenario to override the case.
+
+        Delegates payload decoding + world-state mutation to the scenario's
+        ``inject_case_payload`` (scenarios without an implementation raise
+        ``NotImplementedError``). After the scenario succeeds, emits a core
+        ``CaseInjectedMidRun`` event with the raw payload so resume-state
+        reconstruction skips re-firing this boundary on subsequent resumes.
+        """
+        await self._scenario.inject_case_payload(round_number=round_number, payload=payload)
+        await self._event_logger.log(
+            event=CaseInjectedMidRun(round_number=round_number, scenario_payload=payload)
+        )
+        logger.info("Case injected mid-run at round %d", round_number)
 
     async def run(self) -> None:
         """Execute the full simulation lifecycle."""

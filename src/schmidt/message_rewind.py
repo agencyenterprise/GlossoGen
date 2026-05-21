@@ -28,6 +28,7 @@ from schmidt.message_history_builder import build_message_history
 from schmidt.models.event import (
     AgentRegistered,
     AgentSwappedMidRun,
+    CaseInjectedMidRun,
     InjectionDelivered,
     MessageSent,
     PostmortemDisabledMidRun,
@@ -228,7 +229,7 @@ def _build_rewind_state_at_timestamp(
             round_number = event.round_number
             channel_count_at_round_start[event.round_number] = dict(running_channel_counts)
 
-        elif isinstance(event, (AgentSwappedMidRun, PostmortemDisabledMidRun)):
+        elif isinstance(event, (AgentSwappedMidRun, PostmortemDisabledMidRun, CaseInjectedMidRun)):
             rounds_with_fired_scheduler_events.add(event.round_number)
 
         elif isinstance(event, InjectionDelivered):

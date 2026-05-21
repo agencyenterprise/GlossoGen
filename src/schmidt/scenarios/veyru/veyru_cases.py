@@ -10,6 +10,8 @@ requiring iterative diagnosis and stabilization.
 import random
 from typing import NamedTuple
 
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class StellarReading(NamedTuple):
     """Per-round stellar parameters derived from the position of star SAGWE392.
@@ -432,6 +434,119 @@ def _select_motif_indices(
     if round_number in easy_round_numbers:
         return [easy_motif_indices[selected_indices[0] % len(easy_motif_indices)]]
     return selected_indices
+
+
+class _StellarReadingPayload(BaseModel):
+    """Pydantic shape for the stellar-reading slice of an ``InjectCase`` payload."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    offset: int
+    hold_duration: int
+    starting_face: str
+    intensity_level: str
+
+
+class _StagePayload(BaseModel):
+    """Pydantic shape for one stage inside an ``InjectCase`` case payload."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    motif_name: str
+    observable_symptoms: str
+    treatment_motif_name: str
+    judge_expected_actions: str
+
+
+class _AddendumEntryPayload(BaseModel):
+    """One symptom→motif entry the engineer learns.
+
+    Both ``symptom_phrases`` and ``judge_procedure_template`` are required so
+    the engineer can match the observer's description to a motif AND apply
+    its procedure. Decoys (motifs that aren't the actual case) share the
+    same shape, so the engineer can't tell decoys from the real motif
+    structurally — they have to match symptoms.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    motif_name: str
+    symptom_phrases: list[str] = Field(min_length=1)
+    judge_procedure_template: str
+
+
+class AddendumEntry(NamedTuple):
+    """One round-scoped extension to the engineer's failure-motif glossary."""
+
+    motif_name: str
+    symptom_phrases: tuple[str, ...]
+    judge_procedure_template: str
+
+
+class InjectCasePayload(BaseModel):
+    """Top-level Pydantic shape for an ``InjectCase`` event's payload.
+
+    Validates incoming JSON-serialised case overrides before they are stored
+    on ``VeyruWorld._case_overrides``. ``stages`` drives observer symptoms +
+    judge expectations; ``engineer_addendum`` (optional, may include decoys)
+    drives the engineer's per-round symptom→motif glossary and adds rows to
+    their stellar-mapping table. When ``engineer_addendum`` is empty the
+    engineer falls back to seeing just one extra row (the case's primary
+    motif → procedure) without symptom training — useful when the goal is
+    a pure-novelty pressure test.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    case_number: int = Field(ge=1)
+    failure_name: str
+    stages: list[_StagePayload] = Field(min_length=1)
+    time_budget_seconds: int = Field(ge=1)
+    stellar_reading: _StellarReadingPayload
+    engineer_addendum: list[_AddendumEntryPayload] = Field(default_factory=list)
+
+
+class InjectedCaseBundle(NamedTuple):
+    """The decoded case override + the engineer's round-scoped glossary addendum."""
+
+    case: VeyruCase
+    engineer_addendum: tuple[AddendumEntry, ...]
+
+
+def parse_inject_case_payload(payload: dict[str, object]) -> InjectedCaseBundle:
+    """Validate ``payload`` and convert it to an :class:`InjectedCaseBundle`."""
+    decoded = InjectCasePayload.model_validate(payload)
+    stages = tuple(
+        VeyruStage(
+            motif_name=stage.motif_name,
+            observable_symptoms=stage.observable_symptoms,
+            treatment_motif_name=stage.treatment_motif_name,
+            judge_expected_actions=stage.judge_expected_actions,
+        )
+        for stage in decoded.stages
+    )
+    stellar_reading = StellarReading(
+        offset=decoded.stellar_reading.offset,
+        hold_duration=decoded.stellar_reading.hold_duration,
+        starting_face=decoded.stellar_reading.starting_face,
+        intensity_level=decoded.stellar_reading.intensity_level,
+    )
+    case = VeyruCase(
+        case_number=decoded.case_number,
+        failure_name=decoded.failure_name,
+        stages=stages,
+        time_budget_seconds=decoded.time_budget_seconds,
+        stellar_reading=stellar_reading,
+    )
+    addendum = tuple(
+        AddendumEntry(
+            motif_name=entry.motif_name,
+            symptom_phrases=tuple(entry.symptom_phrases),
+            judge_procedure_template=entry.judge_procedure_template,
+        )
+        for entry in decoded.engineer_addendum
+    )
+    return InjectedCaseBundle(case=case, engineer_addendum=addendum)
 
 
 def get_cases(

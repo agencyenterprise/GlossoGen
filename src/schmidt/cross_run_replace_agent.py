@@ -286,11 +286,29 @@ async def cross_run_replace_agent_in_run(
     else:
         effective_rounds_after_swap = request.rounds_after_swap
     merged_scenario_config["round_count"] = request.round_start + effective_rounds_after_swap
+    # Honour any user-provided model_overrides from the merged knobs; anything
+    # the user didn't specify falls back to the source-A-active model.
+    raw_user_overrides = merged_scenario_config.get("model_overrides")
+    user_overrides: dict[str, dict[str, str]] | None = None
+    if isinstance(raw_user_overrides, dict):
+        coerced: dict[str, dict[str, str]] = {}
+        for agent_id, value in raw_user_overrides.items():
+            if not isinstance(value, dict) or "model" not in value or "provider" not in value:
+                raise ValueError(
+                    f"model_overrides[{agent_id!r}] must be an object with "
+                    "'model' and 'provider' string fields"
+                )
+            coerced[str(agent_id)] = {
+                "model": str(value["model"]),
+                "provider": str(value["provider"]),
+            }
+        user_overrides = coerced
     merged_scenario_config["model_overrides"] = _build_model_overrides(
         source_agents=source_a_agents,
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
         replacement_provider=request.provider,
+        user_overrides=user_overrides,
     )
 
     validated = validate_run_config(

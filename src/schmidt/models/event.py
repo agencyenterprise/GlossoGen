@@ -251,6 +251,21 @@ class PostmortemDisabledMidRun(EventBase):
     event_type: Literal["postmortem_disabled_mid_run"] = "postmortem_disabled_mid_run"
 
 
+class CaseInjectedMidRun(EventBase):
+    """Emitted when the in-run scheduler fires an ``InjectCase`` event.
+
+    The scenario decodes ``scenario_payload`` into its own case-data shape
+    and arranges for the round-``round_number`` injection to render that
+    case instead of the natural-cycle pick. Mirrors ``AgentSwappedMidRun``
+    and ``PostmortemDisabledMidRun`` so the resume-anchored metrics +
+    ``RewindState.rounds_with_fired_scheduler_events`` tracker treat this
+    boundary the same way (skip re-firing on resume past it).
+    """
+
+    event_type: Literal["case_injected_mid_run"] = "case_injected_mid_run"
+    scenario_payload: dict[str, Any]
+
+
 _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
     SimulationStarted,
     AgentRegistered,
@@ -271,6 +286,7 @@ _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
     SimulationEnded,
     AgentSwappedMidRun,
     PostmortemDisabledMidRun,
+    CaseInjectedMidRun,
 )
 
 

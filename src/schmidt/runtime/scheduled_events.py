@@ -13,7 +13,7 @@ binary blocked-channels set, so a swap can declare e.g. "show
 ``link`` only from round 16 onwards" without affecting other channels.
 """
 
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, model_validator
 
@@ -120,4 +120,26 @@ class SetPostmortem(BaseModel):
         return self
 
 
-ScheduledEvent = Annotated[SwapAgent | SetPostmortem, Discriminator("type")]
+class InjectCase(BaseModel):
+    """Override the round-N case with a scenario-supplied payload.
+
+    The runtime hands ``payload`` opaquely to the scenario's
+    ``inject_case_payload`` hook at the start of ``at_round``; the scenario
+    decodes the dict into whatever case-data shape it uses internally and
+    arranges for the next round's injection to render the override instead
+    of the natural-cycle case. Used by veyru to inject novel motifs at a
+    chosen round boundary; the payload schema is scenario-specific and
+    validated inside the scenario hook, not here.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["inject_case"] = "inject_case"
+    at_round: int = Field(ge=2)
+    payload: dict[str, Any]
+
+
+ScheduledEvent = Annotated[
+    SwapAgent | SetPostmortem | InjectCase,
+    Discriminator("type"),
+]

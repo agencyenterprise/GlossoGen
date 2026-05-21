@@ -41,6 +41,19 @@ class VeyruCaseStarted(EventBase):
     stellar_reading: VeyruStellarReading
 
 
+class VeyruCaseOverridden(EventBase):
+    """Emitted when an ``InjectCase`` payload overrides the natural-cycle case at a round.
+
+    Carries the decoded ``case_number`` and ``failure_name`` for FE display +
+    metric filtering. The raw scheduled payload also lives in the core
+    ``CaseInjectedMidRun`` event the supervisor emits alongside this one.
+    """
+
+    event_type: Literal["veyru_case_overridden"] = "veyru_case_overridden"
+    case_number: int
+    failure_name: str
+
+
 class VeyruStabilizationJudged(EventBase):
     """Emitted after the stabilization judge rules on a ``stabilize_veyru`` call.
 
