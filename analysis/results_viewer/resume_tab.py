@@ -2,7 +2,10 @@
 
 X = round_start, Y = mean fraction of post-swap rounds stabilized. One solid
 line per replacement model and a matched dashed line for what the source
-achieved over the same window. Only runs labeled ``resume`` are eligible.
+achieved over the same window. Every run with a ``replace_manifest.json`` is
+eligible (no label required); a Multi-swap subtab shows resumes whose JSONL
+fired at least one ``AgentSwappedMidRun`` event, and a No-swap subtab shows
+the rest.
 """
 
 import plotly.graph_objects as go
@@ -10,6 +13,7 @@ import streamlit as st
 
 from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.resume_data import ResumeRun, list_resume_runs
+from analysis.results_viewer.resume_multi_swap_view import render as render_multi_swap_subtab
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
 from analysis.results_viewer.series_plot import (
@@ -57,8 +61,12 @@ def _render_scenario_selector(runs: list[ResumeRun]) -> str | None:
     return chosen
 
 
-def _bucket_filter(runs: list[ResumeRun]) -> set[str]:
-    """One checkbox per distinct resume-bucket key; returns selected keys."""
+def _bucket_filter(runs: list[ResumeRun], key_prefix: str) -> set[str]:
+    """One checkbox per distinct resume-bucket key; returns selected keys.
+
+    ``key_prefix`` namespaces the underlying ``st.checkbox`` keys so the same
+    bucket label rendered in two parallel subtabs gets independent state.
+    """
     counts: dict[str, int] = {}
     for run in runs:
         key = run.resumed_series_key()
@@ -71,7 +79,7 @@ def _bucket_filter(runs: list[ResumeRun]) -> set[str]:
         if st.checkbox(
             label=f"{name} ({counts[name]} replicas)",
             value=True,
-            key=f"resume_bucket_filter::{name}",
+            key=f"{key_prefix}_bucket_filter::{name}",
         ):
             selected.add(name)
     return selected
@@ -219,8 +227,12 @@ def _build_window_figure(
     return fig
 
 
-def _render_window_view(runs: list[ResumeRun], frontend_base: str) -> None:
-    """Render the per-window aggregate accuracy chart + caption."""
+def _render_window_view(runs: list[ResumeRun], frontend_base: str, key_prefix: str) -> None:
+    """Render the per-window aggregate accuracy chart + caption.
+
+    ``key_prefix`` namespaces the Plotly chart key and click-tracking session
+    key so parallel subtabs each get their own widget state.
+    """
     st.caption(
         "Per replica, mean success across the rounds it actually played; "
         "the dashed line is what the source achieved over the same rounds."
@@ -235,11 +247,14 @@ def _render_window_view(runs: list[ResumeRun], frontend_base: str) -> None:
     chart_event = st.plotly_chart(
         fig,
         width="stretch",
-        key="resume_window_accuracy_chart",
+        key=f"{key_prefix}_window_accuracy_chart",
         on_select="rerun",
         selection_mode=("points",),
     )
-    maybe_open_clicked_run(chart_event=chart_event, session_key="resume_last_opened_url")
+    maybe_open_clicked_run(
+        chart_event=chart_event,
+        session_key=f"{key_prefix}_last_opened_url",
+    )
 
 
 def _render_included_runs(runs: list[ResumeRun], frontend_base: str) -> None:
@@ -279,15 +294,43 @@ def _render_included_runs(runs: list[ResumeRun], frontend_base: str) -> None:
         )
 
 
+def _render_subtab(
+    runs: list[ResumeRun],
+    frontend_base: str,
+    key_prefix: str,
+    empty_message: str,
+) -> None:
+    """Render a single Resume subtab: bucket filter + window chart + audit table.
+
+    ``key_prefix`` namespaces every Streamlit widget key inside the subtab
+    (bucket checkboxes, chart key, click-tracking session key) so the two
+    parallel subtabs maintain independent widget state.
+    """
+    if not runs:
+        st.info(empty_message)
+        return
+    selected_buckets = _bucket_filter(runs=runs, key_prefix=key_prefix)
+    if not selected_buckets:
+        st.info("Select at least one resume bucket.")
+        return
+    filtered = [r for r in runs if r.resumed_series_key() in selected_buckets]
+    if not filtered:
+        st.info("No resume runs match the selected buckets.")
+        return
+    _render_window_view(runs=filtered, frontend_base=frontend_base, key_prefix=key_prefix)
+    _render_included_runs(runs=filtered, frontend_base=frontend_base)
+
+
 def render(evaluated: list[EvaluatedRun]) -> None:
-    """Render the Resume tab body."""
+    """Render the Resume tab body with Multi-swap and No-swap subtabs."""
     run_filter = seed_mode_filter.render_filters(key_prefix="resume")
-    evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
-    all_resume = list_resume_runs(evaluated_runs=evaluated)
+    filtered_evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
+    all_resume = list_resume_runs(evaluated_runs=filtered_evaluated)
     if not all_resume:
         st.info(
-            "No runs labeled 'resume' found. "
-            "Add the 'resume' label to replace-agent runs you want compared here."
+            "No runs with a `replace_manifest.json` found. "
+            "Launch `schmidt replace-agent`, `schmidt cross-run-replace-agent`, "
+            "or `schmidt resume-at-round` to populate this tab."
         )
         return
     scenario_name = _render_scenario_selector(runs=all_resume)
@@ -299,13 +342,19 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         st.info(f"No resume runs in scenario `{scenario_name}`.")
         return
     frontend_base = render_frontend_base(streamlit_key="resume_frontend_base")
-    selected_buckets = _bucket_filter(runs=scenario_runs)
-    if not selected_buckets:
-        st.info("Select at least one resume bucket.")
-        return
-    filtered = [r for r in scenario_runs if r.resumed_series_key() in selected_buckets]
-    if not filtered:
-        st.info("No resume runs match the selected buckets.")
-        return
-    _render_window_view(runs=filtered, frontend_base=frontend_base)
-    _render_included_runs(runs=filtered, frontend_base=frontend_base)
+
+    multi_swap_panel, no_swap_panel = st.tabs(["Multi-swap", "No swap"])
+    with multi_swap_panel:
+        render_multi_swap_subtab(
+            multi_swap_resumes=[r for r in scenario_runs if r.has_in_run_swaps],
+            evaluated=filtered_evaluated,
+            frontend_base=frontend_base,
+            key_prefix="resume_multi",
+        )
+    with no_swap_panel:
+        _render_subtab(
+            runs=[r for r in scenario_runs if not r.has_in_run_swaps],
+            frontend_base=frontend_base,
+            key_prefix="resume_no_swap",
+            empty_message=(f"No resume runs without in-run swaps in scenario `{scenario_name}`."),
+        )

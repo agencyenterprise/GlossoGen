@@ -274,6 +274,17 @@ def _scan_jsonl_for_markers_sync(log_path: Path) -> tuple[bool, bool]:
     return has_swap, has_end
 
 
+def jsonl_has_in_run_swaps(log_path: Path) -> bool:
+    """Return True iff the JSONL at ``log_path`` logged at least one ``AgentSwappedMidRun`` event.
+
+    Wraps the cached byte-level marker scan shared with the Multi-swap tab,
+    so callers (e.g. the Resume tab's multi-swap vs no-swap split) pay no
+    additional I/O beyond what the Multi-swap tab already pays.
+    """
+    has_swap, _ = _scan_jsonl_for_markers_sync(log_path=log_path)
+    return has_swap
+
+
 def _cache_path(run_dir: Path) -> Path:
     """Path to the per-run multi-swap cache file."""
     return run_dir / _MULTI_SWAP_CACHE_FILENAME
