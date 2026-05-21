@@ -12,6 +12,13 @@ Veyru {{ round_number - 1 }}: {% if previous_outcome.stabilized %}STABILIZED{% e
 Veyru {{ round_number }}
 Time budget: {{ current_case.time_budget_seconds }}s (one character = one second; this is the total for both of you)
 
+{% if engineer_addendum %}
+ADDITIONAL FAILURE MOTIFS — extends the symptom glossary in your system prompt:
+{% for entry in engineer_addendum %}
+- {{ entry.motif_name }}: {{ entry.symptom_phrases | join(" ") }}
+{% endfor %}
+
+{% endif %}
 SAGWE392 STELLAR READING:
 The star's current position dictates the following action for each failure motif this round:
 {% for entry in treatment_mapping %}

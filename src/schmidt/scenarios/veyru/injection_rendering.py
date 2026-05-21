@@ -23,7 +23,11 @@ from schmidt.scenarios.veyru.ids import (
     TEAM_SOLO_ID,
 )
 from schmidt.scenarios.veyru.knobs import VeyruKnobs
-from schmidt.scenarios.veyru.veyru_cases import VeyruCase, get_stellar_treatment_mapping
+from schmidt.scenarios.veyru.veyru_cases import (
+    StellarMapping,
+    VeyruCase,
+    get_stellar_treatment_mapping,
+)
 from schmidt.scenarios.veyru.world import VeyruWorld
 from schmidt.scenarios.veyru.world_state import VeyruOutcome
 from schmidt.template_renderer import TemplateRenderer
@@ -132,8 +136,12 @@ def render_round_injection(
     if template_name is None:
         return None
 
-    current_case_index = (round_number - 1) % len(veyru_cases)
-    current_case = veyru_cases[current_case_index]
+    case_override = world.get_case_override(round_number=round_number)
+    if case_override is not None:
+        current_case = case_override
+    else:
+        current_case_index = (round_number - 1) % len(veyru_cases)
+        current_case = veyru_cases[current_case_index]
     previous_outcome = previous_outcome_for_agent(
         world=world,
         agent_id=agent_id,
@@ -142,6 +150,44 @@ def render_round_injection(
     treatment_mapping = get_stellar_treatment_mapping(
         stellar_reading=current_case.stellar_reading,
     )
+    engineer_addendum = world.get_engineer_addendum(round_number=round_number)
+    if engineer_addendum:
+        # Engineer's per-round glossary addendum: each entry's procedure is
+        # rendered with the current case's stellar params and added to the
+        # symptom_motif → action_text table. The matching ``observable_symptoms``
+        # block is passed through to the template so the engineer can
+        # diagnose new motifs by description rather than name-only inference.
+        existing_motif_names = {entry.symptom_motif for entry in treatment_mapping}
+        for addendum_entry in engineer_addendum:
+            if addendum_entry.motif_name in existing_motif_names:
+                continue
+            rendered_action = addendum_entry.judge_procedure_template.format(
+                hold_duration=current_case.stellar_reading.hold_duration,
+                starting_face=current_case.stellar_reading.starting_face,
+                intensity_level=current_case.stellar_reading.intensity_level,
+            )
+            treatment_mapping.append(
+                StellarMapping(
+                    symptom_motif=addendum_entry.motif_name,
+                    action_text=rendered_action,
+                )
+            )
+            existing_motif_names.add(addendum_entry.motif_name)
+    elif case_override is not None:
+        # Override active but the caller supplied no addendum — fall back to
+        # the name-only extension so the engineer at least has a procedure
+        # row for the override's motif (they won't have symptom training).
+        existing_motif_names = {entry.symptom_motif for entry in treatment_mapping}
+        for stage in case_override.stages:
+            if stage.motif_name in existing_motif_names:
+                continue
+            treatment_mapping.append(
+                StellarMapping(
+                    symptom_motif=stage.motif_name,
+                    action_text=stage.judge_expected_actions,
+                )
+            )
+            existing_motif_names.add(stage.motif_name)
     swap_just_happened = world.peek_swap_just_happened()
     partner = partner_display_name(
         world=world, agent_id=agent_id, agent_display_names=agent_display_names
@@ -157,6 +203,7 @@ def render_round_injection(
             "previous_outcome": previous_outcome,
             "knobs": knobs,
             "treatment_mapping": treatment_mapping,
+            "engineer_addendum": engineer_addendum,
             "swap_just_happened": swap_just_happened,
             "announce_swap": knobs.announce_swap,
             "partner_display_name": partner,

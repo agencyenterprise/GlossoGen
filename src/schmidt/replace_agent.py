@@ -156,14 +156,18 @@ def _build_model_overrides(
     replaced_agent_id: str | None,
     replacement_model: str | None,
     replacement_provider: str | None,
+    user_overrides: dict[str, dict[str, str]] | None,
 ) -> dict[str, dict[str, str]]:
-    """Pin every source agent to its source-active model.
+    """Pin every source agent to its source-active model, with user overrides on top.
 
     Encoding every agent explicitly (rather than relying on the top-level
     ``--model``/``--provider`` defaults) keeps non-replaced agents on
-    their exact source-active models. When ``replaced_agent_id`` is set,
-    its entry is overridden with ``replacement_model``/``replacement_provider``.
-    When ``None``, no agent is overridden — the round-anchored resume case.
+    their exact source-active models. Layering ``user_overrides`` on top
+    lets the resume caller pin specific agents to a different model (e.g.
+    haiku for cheap smoke tests) without losing the source-pin for the
+    remaining agents. When ``replaced_agent_id`` is set, the agent's entry
+    is forced to ``replacement_model``/``replacement_provider`` last so
+    the replacement payload always wins over the user-provided knob entry.
     """
     overrides: dict[str, dict[str, str]] = {}
     for agent_id, registration in source_agents.items():
@@ -171,6 +175,19 @@ def _build_model_overrides(
             "model": registration.model,
             "provider": registration.provider,
         }
+    if user_overrides is not None:
+        for agent_id, override in user_overrides.items():
+            if agent_id not in overrides:
+                # Pre-validation happens later; reject unknown agent IDs early
+                # so the user gets a clear error rather than a silently ignored entry.
+                raise ValueError(
+                    f"model_overrides references unknown agent_id={agent_id!r}; "
+                    f"known agents in source: {sorted(overrides)}"
+                )
+            overrides[agent_id] = {
+                "model": override["model"],
+                "provider": override["provider"],
+            }
     if replaced_agent_id is not None:
         if replacement_model is None or replacement_provider is None:
             raise ValueError(
@@ -358,11 +375,30 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
     else:
         effective_rounds_after_swap = request.rounds_after_swap
     merged_scenario_config["round_count"] = request.round_start + effective_rounds_after_swap
+    # Extract any user-provided model_overrides from the merged knobs so they
+    # survive the source-agent pinning that follows. Anything not specified by
+    # the user falls back to the source-active model.
+    raw_user_overrides = merged_scenario_config.get("model_overrides")
+    user_overrides: dict[str, dict[str, str]] | None = None
+    if isinstance(raw_user_overrides, dict):
+        coerced: dict[str, dict[str, str]] = {}
+        for agent_id, value in raw_user_overrides.items():
+            if not isinstance(value, dict) or "model" not in value or "provider" not in value:
+                raise ValueError(
+                    f"model_overrides[{agent_id!r}] must be an object with "
+                    "'model' and 'provider' string fields"
+                )
+            coerced[str(agent_id)] = {
+                "model": str(value["model"]),
+                "provider": str(value["provider"]),
+            }
+        user_overrides = coerced
     merged_scenario_config["model_overrides"] = _build_model_overrides(
         source_agents=source_agents,
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
         replacement_provider=request.provider,
+        user_overrides=user_overrides,
     )
 
     subprocess_model, subprocess_provider = _pick_subprocess_default_model(

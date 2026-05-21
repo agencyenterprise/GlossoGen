@@ -8,9 +8,9 @@ new agent receives the round's injection just like any other.
 """
 
 import logging
-from typing import Protocol
+from typing import Any, Protocol
 
-from schmidt.runtime.scheduled_events import ScheduledEvent, SetPostmortem, SwapAgent
+from schmidt.runtime.scheduled_events import InjectCase, ScheduledEvent, SetPostmortem, SwapAgent
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,10 @@ class SchedulerOps(Protocol):
 
     async def set_postmortem_enabled(self, round_number: int, enabled: bool) -> None:
         """Toggle postmortem at the given round boundary."""
+        ...
+
+    async def inject_case_payload(self, round_number: int, payload: dict[str, Any]) -> None:
+        """Hand ``payload`` to the scenario to override the round's case."""
         ...
 
 
@@ -107,4 +111,9 @@ class RoundBoundaryScheduler:
                 await ops.set_postmortem_enabled(
                     round_number=round_number,
                     enabled=event.enabled,
+                )
+            elif isinstance(event, InjectCase):
+                await ops.inject_case_payload(
+                    round_number=round_number,
+                    payload=event.payload,
                 )

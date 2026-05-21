@@ -219,9 +219,28 @@ neologism rounds. `slang` = slang_emergence rounds. `short` = shorthand_codes ro
 | **`postmortem_kept_on`** | **gpt-5.4** | 3 | **0.793** | 0.778, 0.800, 0.800 | **+6.7 pp** |
 | **`postmortem_kept_on`** | **sonnet** | 3 | **0.904** | 0.822, 0.956, 0.933 | **+12.6 pp** |
 | **`budget_decreased`** | **sonnet** | 3 | **0.333** | 0.422, 0.356, 0.222 | **-44.4 pp** |
-| `budget_decreased` | gpt-5.4 | 0 | _running r=51-58_ | — | _pending_ |
+| **`budget_decreased`** | **gpt-5.4** | 3 | **0.407** | 0.467, 0.244, 0.511 | **-31.9 pp** |
 | **`with_noise`** | **sonnet** | 3 | **0.644** | 0.556, 0.556, 0.822 | **-13.4 pp** |
-| `with_noise` | gpt-5.4 | 0 | _running r=26_ | — | _pending_ |
+| **`with_noise`** | **gpt-5.4** | 3 | **0.607** | 0.600, 0.600, 0.622 | **-11.9 pp** |
+
+### Headline (Phase 1 complete — 24 / 24 intervention runs evaluated)
+
+Sorted by absolute lift, both models:
+
+| Variant | gpt-5.4 Δ | sonnet Δ | direction |
+|---|---|---|---|
+| `budget_increased` (1500 s/round) | **+17.8** | **+20.0** | both models lift strongly |
+| `postmortem_kept_on` | +6.7 | +12.6 | both lift; sonnet larger |
+| `with_noise` (0.15 drop) | **-11.9** | **-13.4** | both regress mildly; gpt slightly more robust |
+| `budget_decreased` (150 s/round) | **-31.9** | **-44.4** | both collapse; sonnet worse |
+
+Notes:
+- gpt-5.4 budget_increased variance is tiny (stdev ≈ 0.013) — the 1500 s headroom removes
+  almost all timeout-driven collapses we identified in the gpt-5.4 budget=800 source diagnosis.
+- sonnet budget_increased hits ceiling (one replica = 1.000).
+- `budget_decreased` is the only intervention where gpt-5.4 outperforms sonnet (small mercy).
+- `with_noise` variance is asymmetric across models: sonnet shows 0.556/0.556/0.822 (one resilient
+  replica); gpt-5.4 clusters tightly at 0.60.
 
 **Headline findings:**
 

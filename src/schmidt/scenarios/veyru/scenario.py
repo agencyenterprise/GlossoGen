@@ -57,6 +57,7 @@ from schmidt.scenarios.veyru.agent_factory import (
 )
 from schmidt.scenarios.veyru.case_event_conversion import case_started_event
 from schmidt.scenarios.veyru.evaluation.build_communication_rounds import build_communication_rounds
+from schmidt.scenarios.veyru.events import VeyruCaseOverridden
 from schmidt.scenarios.veyru.ids import (
     FIELD_OBSERVER_A_ROLE,
     FIELD_OBSERVER_B_ROLE,
@@ -91,7 +92,7 @@ from schmidt.scenarios.veyru.team_lifecycle import (
     maybe_promote_intern,
     maybe_swap_observers,
 )
-from schmidt.scenarios.veyru.veyru_cases import VeyruCase, get_cases
+from schmidt.scenarios.veyru.veyru_cases import VeyruCase, get_cases, parse_inject_case_payload
 from schmidt.scenarios.veyru.world import VeyruWorld
 from schmidt.template_renderer import TemplateRenderer
 
@@ -418,6 +419,40 @@ class VeyruScenario(SimulationScenario):
             await maybe_promote_intern(
                 world=self._world, knobs=self._knobs, round_number=round_number
             )
+
+    async def inject_case_payload(self, round_number: int, payload: dict[str, object]) -> None:
+        """Decode an ``InjectCase`` payload and stage it as the round's case override.
+
+        Validates ``payload`` through :func:`parse_inject_case_payload`, stores
+        the resulting :class:`VeyruCase` on the world via
+        :meth:`VeyruWorld.set_case_override`, and emits a
+        :class:`VeyruCaseOverridden` event so the FE + downstream metrics can
+        identify which rounds were overridden. The core ``CaseInjectedMidRun``
+        event carrying the raw payload is logged by the supervisor right after
+        this hook returns.
+        """
+        bundle = parse_inject_case_payload(payload=payload)
+        self._world.set_case_override(
+            round_number=round_number,
+            case=bundle.case,
+            engineer_addendum=bundle.engineer_addendum,
+        )
+        if self._runtime is not None:
+            await self._runtime.event_logger.log(
+                event=VeyruCaseOverridden(
+                    round_number=round_number,
+                    case_number=bundle.case.case_number,
+                    failure_name=bundle.case.failure_name,
+                )
+            )
+        logger.info(
+            "Veyru case override staged at round %d: %s (%d stage(s), %d addendum entr%s)",
+            round_number,
+            bundle.case.failure_name,
+            len(bundle.case.stages),
+            len(bundle.engineer_addendum),
+            "y" if len(bundle.engineer_addendum) == 1 else "ies",
+        )
 
     async def _emit_case_started_event(self, round_number: int) -> None:
         """Log a VeyruCaseStarted event carrying the full ground-truth case data."""
