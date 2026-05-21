@@ -19,6 +19,7 @@ from typing import NamedTuple
 
 import orjson
 
+from analysis.results_viewer.multi_swap_data import jsonl_has_in_run_swaps
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from schmidt.evaluation.log_reader import extract_agent_configs, load_events
 from schmidt.evaluation.metric_core.resume_anchors import collect_advanced_round_numbers
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 _REPLACE_MANIFEST_FILENAME = "replace_manifest.json"
-_RESUME_LABEL = "resume"
+_NO_AGENT_REPLACED_LABEL = "no-agent-replaced"
 
 
 class _ManifestSummary(NamedTuple):
@@ -69,6 +70,7 @@ class ResumeRun(NamedTuple):
     resumed_round_outcomes: dict[int, bool]
     source_round_outcomes: dict[int, bool]
     labels: list[str]
+    has_in_run_swaps: bool
 
     def has_bugfix(self) -> bool:
         """Whether this run carries the ``bugfix`` label (cost-capture fix applied)."""
@@ -103,7 +105,12 @@ def _read_manifest_summary(run_dir: Path) -> _ManifestSummary | None:
         return None
     if not isinstance(rounds_after_swap, int):
         return None
-    if not isinstance(replacement_model, str):
+    # resume-at-round runs persist replacement_model=null (no agent was
+    # replaced); fold those into a single sentinel-keyed series so they
+    # still surface in the tab.
+    if replacement_model is None:
+        replacement_model = _NO_AGENT_REPLACED_LABEL
+    elif not isinstance(replacement_model, str):
         return None
     if not isinstance(source_run_id, str):
         return None
@@ -215,6 +222,8 @@ def build_resume_run(evaluated: EvaluatedRun) -> ResumeRun | None:
         )
         return None
     labels = _read_labels(run_dir=evaluated.run_dir)
+    log_path = evaluated.run_dir / f"{evaluated.scenario_name}.jsonl"
+    has_in_run_swaps = jsonl_has_in_run_swaps(log_path=log_path)
     return ResumeRun(
         run_id=evaluated.run_id,
         run_dir=evaluated.run_dir,
@@ -226,16 +235,19 @@ def build_resume_run(evaluated: EvaluatedRun) -> ResumeRun | None:
         resumed_round_outcomes=resumed_outcomes,
         source_round_outcomes=source_outcomes,
         labels=labels,
+        has_in_run_swaps=has_in_run_swaps,
     )
 
 
 def list_resume_runs(evaluated_runs: list[EvaluatedRun]) -> list[ResumeRun]:
-    """Filter ``evaluated_runs`` to runs labeled ``resume`` with a usable replace manifest."""
+    """Filter ``evaluated_runs`` to runs with a usable ``replace_manifest.json``.
+
+    Manifest presence is the single discriminator — every replace-agent and
+    resume-at-round run writes one, so labels do not need to be applied for
+    a run to surface in the Resume tab.
+    """
     out: list[ResumeRun] = []
     for run in evaluated_runs:
-        labels = _read_labels(run_dir=run.run_dir)
-        if _RESUME_LABEL not in labels:
-            continue
         resume = build_resume_run(evaluated=run)
         if resume is not None:
             out.append(resume)
