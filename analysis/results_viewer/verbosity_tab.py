@@ -552,7 +552,7 @@ def _render_summary_table(
                 "n": len(bucket),
                 f"mean {metric.display_name}": round(sum(xs) / len(xs), 3),
                 "mean success": round(sum(ys) / len(ys), 3),
-                "pearson(metric, success)": ("n/a" if pearson is None else round(pearson, 3)),
+                "pearson(metric, success)": ("n/a" if pearson is None else f"{pearson:.3f}"),
             }
         )
     if not rows:
@@ -571,7 +571,7 @@ def _render_summary_table(
             ),
             "mean success": (round(sum(overall_ys) / len(overall_ys), 3) if overall_ys else 0.0),
             "pearson(metric, success)": (
-                "n/a" if overall_pearson is None else round(overall_pearson, 3)
+                "n/a" if overall_pearson is None else f"{overall_pearson:.3f}"
             ),
         }
     )
