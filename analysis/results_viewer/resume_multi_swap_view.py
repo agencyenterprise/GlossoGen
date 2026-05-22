@@ -728,90 +728,88 @@ def _gather_sources_and_replicas(
     return out
 
 
-class _ModelPhaseAggregate(NamedTuple):
-    """Pooled per-(model, phase) scores aggregated across every source + replica.
+class _LineBucket(NamedTuple):
+    """All source-adjusted delta contributions for one (model, intervention, phase).
 
-    ``baseline_scores`` carries one entry per ``baseline``-tagged replica phase
-    (the unmodified resume-at-round control: same source, same knobs).
-    ``replica_scores`` carries one entry per **non-baseline** intervention
-    replica phase that passed the user's filters. The chart plots
-    ``mean(replica_scores) − mean(baseline_scores)`` per (model, phase).
-
-    ``intervention_run_ids`` records the source-of-truth replica run IDs whose
-    phase scores landed in ``replica_scores`` (1:1 parallel order). Used by the
-    delta table to surface clickable links back to each contributing run.
+    Each entry in ``deltas`` is ``replica_score − that_replica_source's_baseline_mean``
+    — i.e. the delta is computed *within* the replica's source, never across
+    sources. The chart line for ``(model, intervention)`` plots
+    ``mean(deltas)`` at each phase point. ``intervention_run_ids`` and
+    ``source_run_ids`` are parallel arrays to ``deltas``: index ``i`` records
+    which intervention replica produced that delta and which source's baseline
+    pool it was scored against.
     """
 
     model: str
+    intervention: str
     phase_index: int
     phase_label: str
-    baseline_scores: list[float]
-    replica_scores: list[float]
+    deltas: list[float]
     intervention_run_ids: list[str]
+    source_run_ids: list[str]
 
 
 def _aggregate_by_model(
     sources_data: list[tuple[str, MultiSwapRun, list[MultiSwapRun]]],
     baseline_replicas_by_source: dict[str, list[MultiSwapRun]],
     mode: ViewMode,
-) -> dict[tuple[str, int], _ModelPhaseAggregate]:
-    """Pool per-phase scores by ``(primary_model, phase_index)``.
+) -> dict[tuple[str, str, int], _LineBucket]:
+    """Source-relative per-replica deltas, bucketed by ``(model, intervention, phase)``.
 
-    For each source: every ``baseline``-tagged replica's phase score
-    contributes to ``baseline_scores`` (the pooled control mean). For each
-    non-baseline replica in ``sources_data``: every phase the replica reached
-    contributes to ``replica_scores``. The grouping key is the source's
-    ``primary_model``.
+    Each delta is computed *within* a single source: an intervention replica
+    from source A is scored against source A's own baseline pool, never against
+    a cross-source mean. Sources accumulate into the same line bucket only
+    because they share the same ``primary_model``.
 
-    Phases with ``swap is None`` (Phase A, the pre-first-swap window) are
-    skipped entirely: replicas start *after* the first swap so the rounds in
-    that window are inherited verbatim from the source via the JSONL clone
-    and contain no resume-side activity — comparing them is meaningless.
+    For ``round_success`` mode: delta = ``replica.phase.score − mean(source's
+    baseline replicas' phase.scores)``. For similarity modes: delta =
+    ``mean_similarity_to_pool(replica, source_baselines) −
+    pool_self_similarity(source_baselines)``.
 
-    The reference is the **pooled baseline-replica mean**, not the single
-    source trajectory, because a single source can land on a bad path (e.g.
-    veyru/1778525576 ran into a +22 pp self-vs-source artifact) that would
-    make every intervention look misleadingly good.
+    Phases with ``swap is None`` (Phase A) are skipped — replicas inherit
+    those rounds verbatim from the source clone so the comparison is
+    degenerate. Sources without a usable baseline pool are skipped silently.
     """
-    buckets: dict[tuple[str, int], _ModelPhaseAggregate] = {}
+    buckets: dict[tuple[str, str, int], _LineBucket] = {}
 
-    def _bucket_for(model: str, phase_index: int, label: str) -> _ModelPhaseAggregate:
-        key = (model, phase_index)
+    def _bucket_for(model: str, intervention: str, phase_index: int, label: str) -> _LineBucket:
+        key = (model, intervention, phase_index)
         existing = buckets.get(key)
         if existing is not None:
             return existing
-        agg = _ModelPhaseAggregate(
+        bucket = _LineBucket(
             model=model,
+            intervention=intervention,
             phase_index=phase_index,
             phase_label=label,
-            baseline_scores=[],
-            replica_scores=[],
+            deltas=[],
             intervention_run_ids=[],
+            source_run_ids=[],
         )
-        buckets[key] = agg
-        return agg
+        buckets[key] = bucket
+        return bucket
 
     is_similarity = _is_similarity_mode(mode=mode)
     score_fn = _score_fn_for(mode=mode) if is_similarity else None
     for source_id, source_run, replica_runs in sources_data:
         model = source_run.primary_model
         source_baselines = baseline_replicas_by_source.get(source_id, [])
+        if not source_baselines:
+            continue
         if is_similarity and score_fn is not None:
-            # baseline_scores becomes pool-self-similarity per source (one entry per source);
-            # replica_scores becomes each intervention replica's mean similarity to the pool.
+            # Per source × phase: compute the baseline reference once
+            # (pool_self_similarity of that source's baselines) and use it to
+            # adjust every intervention replica scored against that pool.
             for src_phase in source_run.phases:
                 if src_phase.swap is None:
                     continue
-                agg = _bucket_for(
-                    model=model, phase_index=src_phase.phase_index, label=src_phase.label
-                )
-                pool_self = pool_self_similarity(
+                source_baseline_mean = pool_self_similarity(
                     pool=source_baselines,
                     phase_index=src_phase.phase_index,
                     score_fn=score_fn,
                 )
-                if pool_self is not None:
-                    agg.baseline_scores.append(pool_self)
+                if source_baseline_mean is None:
+                    continue
                 for replica in replica_runs:
                     similarity = mean_similarity_to_pool(
                         run=replica,
@@ -819,108 +817,129 @@ def _aggregate_by_model(
                         phase_index=src_phase.phase_index,
                         score_fn=score_fn,
                     )
-                    if similarity is not None:
-                        agg.replica_scores.append(similarity)
-                        agg.intervention_run_ids.append(replica.run_id)
+                    if similarity is None:
+                        continue
+                    intervention = _extract_intervention_label(labels=replica.labels)
+                    bucket = _bucket_for(
+                        model=model,
+                        intervention=intervention,
+                        phase_index=src_phase.phase_index,
+                        label=src_phase.label,
+                    )
+                    bucket.deltas.append(similarity - source_baseline_mean)
+                    bucket.intervention_run_ids.append(replica.run_id)
+                    bucket.source_run_ids.append(source_id)
             continue
-        # round_success mode: replicate the original per-phase pooling.
+        # round_success mode: source baseline = mean of that source's baseline
+        # replica scores per phase. Computed once per source × phase, then used
+        # to adjust every intervention replica's score in that source.
+        source_baseline_phase_scores: dict[int, list[float]] = {}
         for baseline_replica in source_baselines:
             for bphase in baseline_replica.phases:
-                if bphase.swap is None:
+                if bphase.swap is None or bphase.total == 0:
                     continue
-                agg = _bucket_for(model=model, phase_index=bphase.phase_index, label=bphase.label)
-                if bphase.total > 0:
-                    agg.baseline_scores.append(bphase.score)
+                source_baseline_phase_scores.setdefault(bphase.phase_index, []).append(bphase.score)
+        source_baseline_means: dict[int, float] = {
+            phase_index: sum(scores) / len(scores)
+            for phase_index, scores in source_baseline_phase_scores.items()
+            if scores
+        }
         for replica in replica_runs:
+            intervention = _extract_intervention_label(labels=replica.labels)
             for rphase in replica.phases:
-                if rphase.swap is None:
+                if rphase.swap is None or rphase.total == 0:
                     continue
-                agg = _bucket_for(model=model, phase_index=rphase.phase_index, label=rphase.label)
-                if rphase.total > 0:
-                    agg.replica_scores.append(rphase.score)
-                    agg.intervention_run_ids.append(replica.run_id)
+                baseline_mean = source_baseline_means.get(rphase.phase_index)
+                if baseline_mean is None:
+                    continue
+                bucket = _bucket_for(
+                    model=model,
+                    intervention=intervention,
+                    phase_index=rphase.phase_index,
+                    label=rphase.label,
+                )
+                bucket.deltas.append(rphase.score - baseline_mean)
+                bucket.intervention_run_ids.append(replica.run_id)
+                bucket.source_run_ids.append(source_id)
     return buckets
 
 
+_MODEL_DASH_STYLES: dict[int, str] = {0: "solid", 1: "dash", 2: "dot", 3: "dashdot"}
+
+
 def _build_model_delta_chart(
-    buckets: dict[tuple[str, int], _ModelPhaseAggregate],
+    buckets: dict[tuple[str, str, int], _LineBucket],
     mode: ViewMode,
 ) -> go.Figure:
-    """Δ pp per phase, one bar group per model.
+    """One line per ``(model, intervention)`` with phases on the x-axis.
 
-    For ``mode='round_success'``: bar = mean(intervention round_success) −
-    mean(baseline round_success). For ``mode='message_similarity'``: bar =
-    mean(intervention-to-baseline-pool similarity) − baseline-self-similarity.
-    A *negative* bar in similarity mode means the intervention diverges more
-    from baseline language than baselines diverge from each other.
+    Y value at phase P = mean of source-relative per-replica deltas accumulated
+    in the ``(model, intervention, P)`` bucket. Each replica's delta was
+    computed against its *own* source's baseline pool — sources never mix on
+    the reference side, only on the line side. Colour codes the intervention;
+    dash style codes the model so two-model comparisons stay legible inside
+    one chart.
     """
     is_similarity = _is_similarity_mode(mode=mode)
-    models = sorted({k[0] for k in buckets})
-    phase_index_to_label: dict[int, str] = {}
-    for (_, idx), agg in buckets.items():
-        phase_index_to_label[idx] = agg.phase_label
+    models = sorted({key[0] for key in buckets})
+    interventions = sorted({key[1] for key in buckets})
+    intervention_color: dict[str, str] = {
+        iv: _OVERVIEW_PALETTE[i % len(_OVERVIEW_PALETTE)] for i, iv in enumerate(interventions)
+    }
+    phase_index_to_label: dict[int, str] = {
+        key[2]: bucket.phase_label for key, bucket in buckets.items()
+    }
     phase_indices = sorted(phase_index_to_label)
-    phase_labels = [phase_index_to_label[idx] for idx in phase_indices]
 
     # Track every plotted delta to clamp the y-axis range below — Plotly's auto-
-    # range otherwise zooms into floating-point noise (1e-14 pp) when all bars are
-    # truly zero (e.g. baseline-only intervention filter), and the noise looks
-    # like tall bars on the rendered chart.
+    # range otherwise zooms into floating-point noise (1e-14 pp) when all values
+    # are truly zero (e.g. baseline-only filter) and the noise looks like
+    # significant deltas on the rendered chart.
     all_plotted_deltas: list[float] = []
     fig = go.Figure()
-    for i, model in enumerate(models):
-        color = _OVERVIEW_PALETTE[i % len(_OVERVIEW_PALETTE)]
-        deltas: list[float | None] = []
-        hover: list[str] = []
-        text_labels: list[str] = []
-        for phase_index in phase_indices:
-            bucket = buckets.get((model, phase_index))
-            if bucket is None or not bucket.baseline_scores or not bucket.replica_scores:
-                deltas.append(None)
-                hover.append(f"{model} · {phase_index_to_label[phase_index]}<br>no data")
-                text_labels.append("")
+    for model_index, model in enumerate(models):
+        dash = _MODEL_DASH_STYLES.get(model_index, "solid")
+        for intervention in interventions:
+            xs: list[str] = []
+            ys: list[float] = []
+            hover: list[str] = []
+            for phase_index in phase_indices:
+                bucket = buckets.get((model, intervention, phase_index))
+                if bucket is None or not bucket.deltas:
+                    continue
+                mean_delta = sum(bucket.deltas) / len(bucket.deltas)
+                delta_pp = mean_delta * 100
+                # Snap floating-point residue (~1e-14 pp) to exact zero so chart
+                # heights agree with the labelled and hovered values.
+                if abs(delta_pp) < 1e-9:
+                    delta_pp = 0.0
+                all_plotted_deltas.append(delta_pp)
+                xs.append(phase_index_to_label[phase_index])
+                ys.append(delta_pp)
+                n_replicas = len(bucket.deltas)
+                n_sources = len(set(bucket.source_run_ids))
+                metric_word = "similarity" if is_similarity else "round_success"
+                hover.append(
+                    f"{model} · {intervention} · {bucket.phase_label}<br>"
+                    f"Δ {metric_word} = {delta_pp:+.1f} pp<br>"
+                    f"n = {n_replicas} replica(s) across {n_sources} source(s)<br>"
+                    f"(each replica vs its own source's baseline pool)"
+                )
+            if not xs:
                 continue
-            baseline_mean = sum(bucket.baseline_scores) / len(bucket.baseline_scores)
-            replica_mean = sum(bucket.replica_scores) / len(bucket.replica_scores)
-            delta_pp = (replica_mean - baseline_mean) * 100
-            # When baseline_scores and replica_scores compute the same arithmetic
-            # mean via different sums (e.g. baseline-only intervention filter,
-            # where ``pool_self_similarity`` and ``mean_similarity_to_pool`` are
-            # algebraically equivalent), the subtraction leaves O(1e-14) noise.
-            # Snap that to exact 0 so chart, hover, and label all agree.
-            if abs(delta_pp) < 1e-9:
-                delta_pp = 0.0
-            all_plotted_deltas.append(delta_pp)
-            deltas.append(delta_pp)
-            b_n = len(bucket.baseline_scores)
-            r_n = len(bucket.replica_scores)
-            if is_similarity:
-                hover.append(
-                    f"{model} · {bucket.phase_label}<br>"
-                    f"baseline self-similarity: {round(baseline_mean * 100)}% (n={b_n} sources)<br>"
-                    f"intervention→baseline: {round(replica_mean * 100)}% (n={r_n} replicas)<br>"
-                    f"Δ = {delta_pp:+.1f} pp"
+            colour = intervention_color[intervention]
+            fig.add_trace(
+                go.Scatter(
+                    x=xs,
+                    y=ys,
+                    mode="lines+markers",
+                    name=f"{intervention} · {model}",
+                    line=dict(color=colour, width=2.5, dash=dash),
+                    marker=dict(color=colour, size=10, symbol="circle"),
+                    hovertext=hover,
+                    hoverinfo="text",
                 )
-            else:
-                hover.append(
-                    f"{model} · {bucket.phase_label}<br>"
-                    f"baseline replicas: {round(baseline_mean * 100)}% (n={b_n})<br>"
-                    f"intervention replicas: {round(replica_mean * 100)}% (n={r_n})<br>"
-                    f"Δ = {delta_pp:+.1f} pp"
-                )
-            text_labels.append(f"{delta_pp:+.0f} pp")
-        fig.add_trace(
-            go.Bar(
-                x=phase_labels,
-                y=deltas,
-                marker_color=color,
-                text=text_labels,
-                textposition="outside",
-                name=model,
-                hovertext=hover,
-                hoverinfo="text",
             )
-        )
     if mode == _MODE_MESSAGE_SIMILARITY:
         overview_y_title = "Δ Levenshtein(intervention→baseline) − Levenshtein(baseline self), pp"
     elif mode == _MODE_NGRAM_OVERLAP:
@@ -958,41 +977,36 @@ def _build_model_delta_chart(
 
 
 def _render_model_delta_table(
-    buckets: dict[tuple[str, int], _ModelPhaseAggregate],
+    buckets: dict[tuple[str, str, int], _LineBucket],
     frontend_base: str,
 ) -> None:
-    """One row per (model, phase): baseline mean, intervention mean, Δ pp, sample sizes.
+    """One row per (model, intervention, phase): mean Δ + per-replica run links.
 
-    Rendered as a markdown table so each row's ``Intervention runs`` cell can
-    embed clickable ``[<id>](<url>)`` links back to every replica that
-    contributed to the bucket. Duplicate run IDs (one replica contributing to
-    multiple phase rows) are collapsed per row so the cell stays readable.
+    Each delta in a bucket is already source-adjusted (computed against its
+    replica's own source baseline), so the row's ``Mean Δ`` is the unweighted
+    average of those per-replica deltas. ``Sources`` counts how many distinct
+    source runs contributed replicas to this row, and ``Intervention runs``
+    surfaces each replica as a clickable link back to the frontend.
     """
     headers = [
         "Model",
+        "Intervention",
         "Phase",
-        "Baseline replica mean",
-        "Baseline n",
-        "Intervention replica mean",
-        "Intervention n",
-        "Δ (intervention − baseline)",
+        "Replicas (n)",
+        "Sources (n)",
+        "Mean Δ (replica − source baseline)",
         "Intervention runs",
     ]
     rows: list[list[str]] = []
-    for (model, _), agg in sorted(buckets.items(), key=lambda kv: (kv[0][0], kv[0][1])):
-        baseline_mean = (
-            sum(agg.baseline_scores) / len(agg.baseline_scores) if agg.baseline_scores else None
-        )
-        replica_mean = (
-            sum(agg.replica_scores) / len(agg.replica_scores) if agg.replica_scores else None
-        )
-        if baseline_mean is None or replica_mean is None:
-            delta_cell = "—"
-        else:
-            delta_cell = f"{(replica_mean - baseline_mean) * 100:+.1f} pp"
+    for key, bucket in sorted(buckets.items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][2])):
+        if not bucket.deltas:
+            continue
+        mean_delta_pp = (sum(bucket.deltas) / len(bucket.deltas)) * 100
+        if abs(mean_delta_pp) < 1e-9:
+            mean_delta_pp = 0.0
         unique_run_ids: list[str] = []
         seen: set[str] = set()
-        for run_id in agg.intervention_run_ids:
+        for run_id in bucket.intervention_run_ids:
             if run_id in seen:
                 continue
             seen.add(run_id)
@@ -1006,13 +1020,12 @@ def _render_model_delta_table(
             runs_cell = "—"
         rows.append(
             [
-                model,
-                agg.phase_label,
-                "—" if baseline_mean is None else f"{round(baseline_mean * 100)}%",
-                str(len(agg.baseline_scores)),
-                "—" if replica_mean is None else f"{round(replica_mean * 100)}%",
-                str(len(agg.replica_scores)),
-                delta_cell,
+                key[0],
+                key[1],
+                bucket.phase_label,
+                str(len(bucket.deltas)),
+                str(len(set(bucket.source_run_ids))),
+                f"{mean_delta_pp:+.1f} pp",
                 runs_cell,
             ]
         )
@@ -1258,7 +1271,7 @@ def render(
         title="Intervention (replica tag)",
         options=[(t, t, intervention_counts[t]) for t in sorted(intervention_counts)],
         key_prefix=f"{key_prefix}_overview_intervention_filter",
-        initial_state=False,
+        initial_state=True,
     )
     if not selected_interventions:
         st.info("Select at least one intervention to populate the overview chart.")
