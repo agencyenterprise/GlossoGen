@@ -108,9 +108,20 @@ class VeyruWorld(ScenarioWorld):
         engineer also sees a per-round glossary block listing each addendum
         entry's symptoms so symptom→motif diagnosis is possible for the
         novel motifs and any decoys included alongside.
+
+        Also updates ``_current_case`` directly so callers reading the
+        world's "live" case (``get_current_stage``, ``stabilize_veyru`` judge,
+        ``time_budget_seconds``) see the override even when ``set_case_override``
+        is called AFTER ``finalize_round_sync`` already locked in the natural
+        case. This happens on the resume-boundary path:
+        ``start_initial_round`` (resume branch) calls ``on_round_advanced``
+        BEFORE ``dispatch_resume_boundary_events`` fires ``inject_case``, so
+        without this assignment ``_current_case`` would stay on the natural
+        round-N case and the judge would compare against the wrong procedure.
         """
         self._case_overrides[round_number] = case
         self._engineer_addenda[round_number] = engineer_addendum
+        self._current_case = case
 
     def get_case_override(self, round_number: int) -> VeyruCase | None:
         """Return the overridden case for ``round_number``, or ``None``."""
