@@ -330,6 +330,50 @@ dip (-8.8 pp).
 fully by Phase D (back to baseline Phase D mean) — so the impact has a 15-30 round persistence
 window before stabilizing.
 
+## Phase 6 — budget=250 sweep (in flight 2026-05-22)
+
+**Goal.** Test whether the Phase 1+3 intervention effects hold when the source
+runs themselves were trained under a tighter time budget. The agents' protocol
+during rounds 1-15 was shaped by 250s/round (vs 450s in Phase 1+3), so we
+expect the protocol baseline to be *more* compressed/shorthand-heavy at the
+resume boundary. Interventions are then layered on top of that.
+
+**Sources** (cultural_transmission, budget=250, same scheduled_events shape
+as the Phase 1+3 sources — `set_postmortem(r=16, off)` + 3 `swap_agent` at
+r=16/31/46):
+
+- `veyru/1778173047` (gpt-5.4)
+- `veyru/1778172878` (claude-sonnet-4-6)
+
+**Replicas.** 6 variants × 2 sources × 3 replicas = **36 runs**.
+
+| Variant | Knob delta (vs source) | Effective resume-window budget | Knob file(s) |
+|---|---|---|---|
+| `baseline` | none (inherits source) | 250 | [baseline_b250.json](baseline_b250.json) |
+| `postmortem_kept_on` | drop `set_postmortem(r=16, off)` from scheduled_events; keep 3 swaps | 250 | [postmortem_kept_on_b250_gpt.json](postmortem_kept_on_b250_gpt.json), [postmortem_kept_on_b250_sonnet.json](postmortem_kept_on_b250_sonnet.json) |
+| `budget_increased` | `round_time_budget_seconds=1500` (absolute, matches Phase 1) | 1500 (6× source budget) | [budget_increased_b250.json](budget_increased_b250.json) |
+| `budget_decreased` | `round_time_budget_seconds=150` (absolute, matches Phase 1) | 150 (0.6× source budget) | [budget_decreased_b250.json](budget_decreased_b250.json) |
+| `with_noise` | `channel_noise_level=0.15` | 250 | [with_noise_b250.json](with_noise_b250.json) |
+| `new_motifs_injected` | 3 `inject_case` events at r=16/19/24, same motifs + decoys + stellar params as Phase 3 but with `time_budget_seconds=250` in each payload to match the source's budget | 250 | [new_motifs_injected_b250_gpt.json](new_motifs_injected_b250_gpt.json), [new_motifs_injected_b250_sonnet.json](new_motifs_injected_b250_sonnet.json) |
+
+**Labels per replica.** `["cultural_transmission", "budget=<actual>", "<intervention>"]`
+where `<actual>` is the effective resume-window budget (250 for most, 1500 / 150
+for the budget variants).
+
+**Launcher.** [launch_budget_250_sweep.sh](launch_budget_250_sweep.sh) — per-model
+parallelism cap of 3, writes labels.json after each launch.
+
+```bash
+nohup bash experiments/2026-05-21_veyru_pressure_interventions/launch_budget_250_sweep.sh \
+  > /tmp/phase6_launcher.stdout 2>&1 &
+disown
+```
+
+**Status.** _Pending launch — runs will populate this table as they land._
+
+| Run ID | Variant | Source | Status | rs | rs@16 | rs@31 | rs@46 |
+|---|---|---|---|---|---|---|---|
+
 ## Open questions / observations
 
 - **Sonnet is dramatically more robust to novel motifs than gpt-5.4.** Phase B (containing all 3
