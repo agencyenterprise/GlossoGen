@@ -611,17 +611,24 @@ _INTERVENTION_LABELS: frozenset[str] = frozenset(
 _BASELINE_INTERVENTION_LABEL = "baseline"
 
 
-def _extract_budget_label(labels: list[str]) -> str:
-    """Return the ``budget=*`` label from ``labels`` or a sentinel string.
+def _extract_source_budget_label(
+    source_id: str, evaluated_by_run_id: dict[str, EvaluatedRun]
+) -> str:
+    """Return ``budget=<N>`` for the *source's* ``round_time_budget_seconds`` knob.
 
-    Replicas tag their variant budget with ``budget=<N>`` (e.g. ``budget=450``,
-    ``budget=1500``). Runs missing the tag are bucketed under a single sentinel
-    so they remain filterable rather than silently dropped.
+    Filters by source budget instead of replica budget so all replicas of a
+    single source (baseline + every intervention) bucket together — a
+    ``budget_increased`` replica with knob 1500 still groups with its
+    budget=250 source's other replicas, since they share the rounds 1-15
+    cultural-transmission history that the chart is comparing against.
     """
-    for label in labels:
-        if label.startswith("budget="):
-            return label
-    return _NO_BUDGET_LABEL
+    evaluated = evaluated_by_run_id.get(source_id)
+    if evaluated is None:
+        return _NO_BUDGET_LABEL
+    raw = evaluated.metadata.scenario_config.get("round_time_budget_seconds")
+    if not isinstance(raw, (int, float)):
+        return _NO_BUDGET_LABEL
+    return f"budget={int(raw)}"
 
 
 def _extract_intervention_label(labels: list[str]) -> str:
@@ -639,19 +646,24 @@ def _extract_intervention_label(labels: list[str]) -> str:
     return _BASELINE_INTERVENTION_LABEL
 
 
-def _filter_resumes_by_budget(
+def _filter_resumes_by_source_budget(
     resumes_by_source: dict[str, list[ResumeRun]],
+    evaluated_by_run_id: dict[str, EvaluatedRun],
     selected_budgets: set[str],
 ) -> dict[str, list[ResumeRun]]:
-    """Drop replicas whose budget label is not in ``selected_budgets``.
+    """Drop sources whose ``round_time_budget_seconds`` is not in ``selected_budgets``.
 
-    Sources whose replicas all filter out are dropped from the returned mapping.
+    The filter is at the source level (not per-replica), because every replica
+    of a single source shares its rounds 1-15 cultural-transmission history
+    and is therefore tied to that source's budget.
     """
     out: dict[str, list[ResumeRun]] = {}
     for source_id, resumes in resumes_by_source.items():
-        kept = [r for r in resumes if _extract_budget_label(labels=r.labels) in selected_budgets]
-        if kept:
-            out[source_id] = kept
+        label = _extract_source_budget_label(
+            source_id=source_id, evaluated_by_run_id=evaluated_by_run_id
+        )
+        if label in selected_budgets:
+            out[source_id] = resumes
     return out
 
 
@@ -1281,22 +1293,45 @@ def render(
         selected_interventions=selected_interventions,
     )
 
+    # Source-budget filter: counts non-baseline replicas (which is what the
+    # chart actually plots — baselines are the implicit reference pool, not a
+    # data series). Budget tag comes from the *source's* round_time_budget_seconds
+    # knob, not from the replica's own budget=* label: a budget_increased
+    # replica (knob 1500) still buckets under its source's budget=250.
+    #
+    # Every source budget present in the data appears in the filter even when
+    # its non-baseline count is 0, so cells in progress (interventions launched
+    # but not yet evaluated) stay visible in the budget row — selecting one
+    # just shows an empty chart until evals land.
     budget_counts: dict[str, int] = {}
-    for resumes in intervention_filtered_resumes_by_source.values():
-        for resume in resumes:
-            budget = _extract_budget_label(labels=resume.labels)
-            budget_counts[budget] = budget_counts.get(budget, 0) + 1
+    for source_id, resumes in resumes_by_source.items():
+        label = _extract_source_budget_label(
+            source_id=source_id, evaluated_by_run_id=evaluated_by_run_id
+        )
+        non_baseline = sum(
+            1
+            for r in resumes
+            if _extract_intervention_label(labels=r.labels) != _BASELINE_INTERVENTION_LABEL
+        )
+        budget_counts[label] = budget_counts.get(label, 0) + non_baseline
+    # Make sure every source budget appears, even if non-baseline count is 0.
+    for source_id in resumes_by_source:
+        label = _extract_source_budget_label(
+            source_id=source_id, evaluated_by_run_id=evaluated_by_run_id
+        )
+        budget_counts.setdefault(label, 0)
     selected_budgets = render_horizontal_checkboxes(
-        title="Budget (replica tag)",
+        title="Original run budget",
         options=[(b, b, budget_counts[b]) for b in sorted(budget_counts)],
         key_prefix=f"{key_prefix}_overview_budget_filter",
         initial_state=True,
     )
     if not selected_budgets:
-        st.info("Select at least one budget to populate the overview chart.")
+        st.info("Select at least one original-run budget to populate the overview chart.")
         return
-    budget_filtered_resumes_by_source = _filter_resumes_by_budget(
+    budget_filtered_resumes_by_source = _filter_resumes_by_source_budget(
         resumes_by_source=intervention_filtered_resumes_by_source,
+        evaluated_by_run_id=evaluated_by_run_id,
         selected_budgets=selected_budgets,
     )
     sources_data = _gather_sources_and_replicas(

@@ -1,0 +1,8 @@
+{
+  "easy_round_numbers": [1, 2, 3, 6, 13],
+  "scheduled_events": [
+    {"type": "swap_agent", "at_round": 16, "agent_id": "field_observer", "model": "gpt-5.4", "provider": "openai", "channel_visibility": {"link": {"kind": "full"}}},
+    {"type": "swap_agent", "at_round": 31, "agent_id": "stabilization_engineer", "model": "gpt-5.4", "provider": "openai", "channel_visibility": {"link": {"kind": "from_round", "round_floor": 16}}},
+    {"type": "swap_agent", "at_round": 46, "agent_id": "field_observer", "model": "gpt-5.4", "provider": "openai", "channel_visibility": {"link": {"kind": "from_round", "round_floor": 31}}}
+  ]
+}

@@ -686,6 +686,17 @@ When running simulations, evaluations, or any long-running background process, *
 4. Repeat: `sleep 30`, check, report — until the process completes
 5. Never use `while` loops or polling constructs — use sequential sleep/check/report cycles
 
+**Sim runs cost money and time — actively monitor, do not just wait.** Every 1–2 minutes while a launcher or eval is running, tail its log, count running sims per model, and verify no errors / no stuck sims / no duplicate launches. Long unattended gaps are not acceptable: a launcher that's silently looping on a misconfigured spec, a sim caught in a death-spiral retry loop, or a duplicate launch can burn through hours of API spend before the user notices. If you've already launched something and have downtime, fill it with a check — don't wait for the user to ask.
+
+**Per-launch sanity checks** (after every launcher iteration, not just at the end):
+
+- Tail the orchestrator log (last 5-10 lines). Look for `WARN`, `ERROR`, `Traceback`, or empty `new_run_id=` (failed launch). Any of those = investigate immediately.
+- `pgrep -f "Python -m schmidt run veyru --model <model>"` for each provider. If a queue's count is below cap and there are unlaunched specs in that queue, the launcher is stuck or misconfigured — diagnose now.
+- For each launched run, audit `(labels.json, source_run_id, model)` against the spec list. Per-cell replica counts must match the plan exactly. Duplicates from re-launching, restarts, or buggy queue logic are the #1 wasted-spend bug.
+- Tail at least one sim's `<scenario>_stdout.log` to confirm rounds are advancing — `grep -c '"round_advanced"' <jsonl>` and verify the count is climbing between checks.
+
+**Never set wakeups longer than ~10 min while runs are active** unless the runs themselves take many hours. The user expects active oversight: short-interval checks that catch bugs in their first iteration, not 30-min snoozes that let 20 mis-specced sims run to completion before the next look.
+
 ### Launching Replace-Agent Runs in the Background
 
 `schmidt replace-agent` is a one-shot CLI that prepares the new run directory and spawns the simulation as a detached subprocess (`subprocess.Popen` with `start_new_session=True`). The CLI returns immediately with `new_run_id=...` and `new_run_dir=...`; the simulation runs independently and writes its own `<scenario>_stdout.log` inside the new run directory.
@@ -708,51 +719,80 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
 
 To run several replace-agent variants while keeping at most N simulations live, use a small bash orchestrator. Each `schmidt replace-agent` call returns in ~25s after spawning its detached `python -m schmidt run veyru ... --resume` subprocess; the orchestrator polls active simulations via `pgrep` against the `Python -m schmidt run ... --resume` cmdline, sleeps when full, and launches the next spec when a slot frees up.
 
-Save as `/tmp/replace_orchestrator.sh` (or anywhere outside the repo so it doesn't get committed):
+**Parallelism policy — per-provider, never shared.** Each provider has independent rate limits and capacity, so the orchestrator must:
+
+- **Cap per model at 6 concurrent sims** (the Anthropic + OpenAI accounts comfortably sustain this).
+- **Run a separate queue per model in parallel** so a paused `gpt-5.4` queue (waiting for an OpenAI slot) never holds back the `claude-sonnet-4-6` queue. Strict-sequential single-queue orchestrators are a bug: with mixed-model specs, the queue blocks on the current spec's model and idles every slot on the other provider until the current spec launches. Always use per-provider parallel queues — typically two background subshells joined by `wait`.
+
+Reference shape — per-provider parallel orchestrator (save as `/tmp/replace_orchestrator.sh` or anywhere outside the repo):
 
 ```bash
 #!/bin/bash
 cd /Users/nsander/workspace/schmidt-poc
 
-SOURCE=runs/veyru/<source_timestamp>
-KNOBS=/tmp/replace_knobs.json   # e.g. {"postmortem_disabled_at_start": true}
 RUNS_DIR=runs
-MAX_PARALLEL=3
 LOG=/tmp/replace_orchestrator.log
 
-# Each spec is "round_start rounds_after_swap".
-queue=(
-  "15 10"
-  "20 5"
-  "10 15"
+# Per-model specs (entries are scenario-specific — at minimum source + knobs).
+declare -a GPT_SPECS=(
+  "<source_a> /tmp/replace_knobs.json"
+  "<source_b> /tmp/replace_knobs.json"
+)
+declare -a SONNET_SPECS=(
+  "<source_c> /tmp/replace_knobs.json"
+  "<source_d> /tmp/replace_knobs.json"
 )
 
-count_running() {
-  # Match the python simulation processes only — capital "Python" comes from
-  # the homebrew python.framework binary path, so bash/pgrep subshells that
-  # mention the pattern as a literal string do not match.
-  pgrep -f "Python -m schmidt run veyru .* --resume" 2>/dev/null | wc -l | tr -d ' '
+count_running_for_model() {
+  # Match python simulation processes only — capital "Python" comes from the
+  # homebrew python.framework binary path, so bash/pgrep subshells that quote
+  # the pattern literally do not false-match.
+  pgrep -f "Python -m schmidt run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
+}
+
+launch_one() {
+  local model=$1 provider=$2 source=$3 knobs=$4
+  echo "$(date) [$model] launching source=$source knobs=$knobs" >> "$LOG"
+  VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
+    --source-run-dir "runs/veyru/$source" \
+    --round-start 15 --rounds-after-swap 10 \
+    --replaced-agent-id field_observer \
+    --model "$model" --provider "$provider" \
+    --runs-dir "$RUNS_DIR" \
+    --knobs "$knobs" >> "$LOG" 2>&1
+  sleep 2  # let claim_run_dir get a unique unix-second slot
+}
+
+process_queue_gpt() {
+  for spec in "${GPT_SPECS[@]}"; do
+    read -r source knobs <<< "$spec"
+    while [ "$(count_running_for_model gpt-5.4)" -ge 6 ]; do sleep 30; done
+    launch_one gpt-5.4 openai "$source" "$knobs"
+  done
+  echo "$(date) [gpt-5.4] queue complete" >> "$LOG"
+}
+
+process_queue_sonnet() {
+  for spec in "${SONNET_SPECS[@]}"; do
+    read -r source knobs <<< "$spec"
+    while [ "$(count_running_for_model claude-sonnet-4-6)" -ge 6 ]; do sleep 30; done
+    launch_one claude-sonnet-4-6 anthropic "$source" "$knobs"
+  done
+  echo "$(date) [sonnet] queue complete" >> "$LOG"
 }
 
 echo "=== Started at $(date) ===" >> "$LOG"
-for spec in "${queue[@]}"; do
-  read -r round_start rounds_after_swap <<< "$spec"
-  while [ "$(count_running)" -ge "$MAX_PARALLEL" ]; do
-    sleep 30
-  done
-  echo "$(date): launching round_start=$round_start rounds_after_swap=$rounds_after_swap" >> "$LOG"
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
-    --source-run-dir "$SOURCE" \
-    --round-start "$round_start" \
-    --rounds-after-swap "$rounds_after_swap" \
-    --replaced-agent-id field_observer \
-    --model gpt-5.4 --provider openai \
-    --runs-dir "$RUNS_DIR" \
-    --knobs "$KNOBS" >> "$LOG" 2>&1
-  sleep 2  # let claim_run_dir get a unique unix-second slot
-done
+process_queue_gpt &
+process_queue_sonnet &
+wait
 echo "$(date): all launches complete" >> "$LOG"
 ```
+
+**Key points:**
+- Two background subshells (`process_queue_gpt &`, `process_queue_sonnet &`) + `wait` to join — gpt and sonnet queues advance fully in parallel.
+- Each `count_running_for_model` query is tightly anchored on `--model <name>` so the two queues never count each other's sims.
+- `-ge 6` per model means at most 12 concurrent sims total across both providers.
+- If you only have a single-model workload, just remove the unused queue function — but never go back to a single shared `count_running` that mixes models.
 
 Launch the orchestrator detached so it survives the session:
 
