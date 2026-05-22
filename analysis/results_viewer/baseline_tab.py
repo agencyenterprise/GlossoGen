@@ -104,6 +104,7 @@ def _render_model_filter(runs: list[BaselineRun]) -> set[str]:
         title="Model",
         options=options,
         key_prefix="baseline_model_filter",
+        initial_state=True,
     )
 
 
@@ -121,6 +122,7 @@ def _render_postmortem_filter(runs: list[BaselineRun]) -> set[bool]:
         title="Postmortem",
         options=options,
         key_prefix="baseline_postmortem_filter",
+        initial_state=True,
     )
     selected: set[bool] = set()
     if "postmortem" in selected_keys:
@@ -140,6 +142,7 @@ def _render_kind_filter(runs: list[BaselineRun]) -> set[str]:
         title="Run kind",
         options=options,
         key_prefix="baseline_kind_filter",
+        initial_state=True,
     )
 
 

@@ -93,6 +93,7 @@ def _render_model_filter(runs: list[FeaturePresenceRun]) -> set[str]:
         title="Model",
         options=options,
         key_prefix="feature_presence_model_filter",
+        initial_state=True,
     )
 
 
@@ -110,6 +111,7 @@ def _render_postmortem_filter(runs: list[FeaturePresenceRun]) -> set[bool]:
         title="Postmortem",
         options=options,
         key_prefix="feature_presence_postmortem_filter",
+        initial_state=True,
     )
     selected: set[bool] = set()
     if "postmortem" in selected_keys:
@@ -130,6 +132,7 @@ def _render_kind_filter(runs: list[FeaturePresenceRun]) -> set[str]:
         title="Run kind",
         options=options,
         key_prefix="feature_presence_kind_filter",
+        initial_state=True,
     )
 
 
@@ -157,6 +160,7 @@ def _render_budget_filter(runs: list[FeaturePresenceRun]) -> set[int | None]:
         title="Budget per round",
         options=options,
         key_prefix="feature_presence_budget_filter",
+        initial_state=True,
     )
     selected: set[int | None] = set()
     for key in selected_keys:

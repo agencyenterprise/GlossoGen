@@ -736,6 +736,10 @@ class _ModelPhaseAggregate(NamedTuple):
     ``replica_scores`` carries one entry per **non-baseline** intervention
     replica phase that passed the user's filters. The chart plots
     ``mean(replica_scores) − mean(baseline_scores)`` per (model, phase).
+
+    ``intervention_run_ids`` records the source-of-truth replica run IDs whose
+    phase scores landed in ``replica_scores`` (1:1 parallel order). Used by the
+    delta table to surface clickable links back to each contributing run.
     """
 
     model: str
@@ -743,6 +747,7 @@ class _ModelPhaseAggregate(NamedTuple):
     phase_label: str
     baseline_scores: list[float]
     replica_scores: list[float]
+    intervention_run_ids: list[str]
 
 
 def _aggregate_by_model(
@@ -781,6 +786,7 @@ def _aggregate_by_model(
             phase_label=label,
             baseline_scores=[],
             replica_scores=[],
+            intervention_run_ids=[],
         )
         buckets[key] = agg
         return agg
@@ -815,6 +821,7 @@ def _aggregate_by_model(
                     )
                     if similarity is not None:
                         agg.replica_scores.append(similarity)
+                        agg.intervention_run_ids.append(replica.run_id)
             continue
         # round_success mode: replicate the original per-phase pooling.
         for baseline_replica in source_baselines:
@@ -831,6 +838,7 @@ def _aggregate_by_model(
                 agg = _bucket_for(model=model, phase_index=rphase.phase_index, label=rphase.label)
                 if rphase.total > 0:
                     agg.replica_scores.append(rphase.score)
+                    agg.intervention_run_ids.append(replica.run_id)
     return buckets
 
 
@@ -854,6 +862,11 @@ def _build_model_delta_chart(
     phase_indices = sorted(phase_index_to_label)
     phase_labels = [phase_index_to_label[idx] for idx in phase_indices]
 
+    # Track every plotted delta to clamp the y-axis range below — Plotly's auto-
+    # range otherwise zooms into floating-point noise (1e-14 pp) when all bars are
+    # truly zero (e.g. baseline-only intervention filter), and the noise looks
+    # like tall bars on the rendered chart.
+    all_plotted_deltas: list[float] = []
     fig = go.Figure()
     for i, model in enumerate(models):
         color = _OVERVIEW_PALETTE[i % len(_OVERVIEW_PALETTE)]
@@ -870,6 +883,14 @@ def _build_model_delta_chart(
             baseline_mean = sum(bucket.baseline_scores) / len(bucket.baseline_scores)
             replica_mean = sum(bucket.replica_scores) / len(bucket.replica_scores)
             delta_pp = (replica_mean - baseline_mean) * 100
+            # When baseline_scores and replica_scores compute the same arithmetic
+            # mean via different sums (e.g. baseline-only intervention filter,
+            # where ``pool_self_similarity`` and ``mean_similarity_to_pool`` are
+            # algebraically equivalent), the subtraction leaves O(1e-14) noise.
+            # Snap that to exact 0 so chart, hover, and label all agree.
+            if abs(delta_pp) < 1e-9:
+                delta_pp = 0.0
+            all_plotted_deltas.append(delta_pp)
             deltas.append(delta_pp)
             b_n = len(bucket.baseline_scores)
             r_n = len(bucket.replica_scores)
@@ -908,11 +929,16 @@ def _build_model_delta_chart(
         )
     else:
         overview_y_title = "Δ intervention-replica mean − baseline-replica mean (pp)"
+    # Floor the y-axis span so bars near zero (e.g. baseline-vs-baseline) render
+    # as visibly flat rather than getting auto-zoomed into floating-point noise.
+    max_abs_delta = max((abs(d) for d in all_plotted_deltas), default=0.0)
+    y_span = max(max_abs_delta * 1.15, 5.0)
     fig.update_layout(
         barmode="group",
         xaxis=dict(title="Phase"),
         yaxis=dict(
             title=overview_y_title,
+            range=[-y_span, y_span],
             zeroline=True,
             zerolinecolor="#475569",
             zerolinewidth=2,
@@ -933,9 +959,26 @@ def _build_model_delta_chart(
 
 def _render_model_delta_table(
     buckets: dict[tuple[str, int], _ModelPhaseAggregate],
+    frontend_base: str,
 ) -> None:
-    """One row per (model, phase): baseline mean, intervention mean, Δ pp, sample sizes."""
-    rows: list[dict[str, str]] = []
+    """One row per (model, phase): baseline mean, intervention mean, Δ pp, sample sizes.
+
+    Rendered as a markdown table so each row's ``Intervention runs`` cell can
+    embed clickable ``[<id>](<url>)`` links back to every replica that
+    contributed to the bucket. Duplicate run IDs (one replica contributing to
+    multiple phase rows) are collapsed per row so the cell stays readable.
+    """
+    headers = [
+        "Model",
+        "Phase",
+        "Baseline replica mean",
+        "Baseline n",
+        "Intervention replica mean",
+        "Intervention n",
+        "Δ (intervention − baseline)",
+        "Intervention runs",
+    ]
+    rows: list[list[str]] = []
     for (model, _), agg in sorted(buckets.items(), key=lambda kv: (kv[0][0], kv[0][1])):
         baseline_mean = (
             sum(agg.baseline_scores) / len(agg.baseline_scores) if agg.baseline_scores else None
@@ -944,25 +987,36 @@ def _render_model_delta_table(
             sum(agg.replica_scores) / len(agg.replica_scores) if agg.replica_scores else None
         )
         if baseline_mean is None or replica_mean is None:
-            delta = "—"
+            delta_cell = "—"
         else:
-            delta = f"{(replica_mean - baseline_mean) * 100:+.1f} pp"
+            delta_cell = f"{(replica_mean - baseline_mean) * 100:+.1f} pp"
+        unique_run_ids: list[str] = []
+        seen: set[str] = set()
+        for run_id in agg.intervention_run_ids:
+            if run_id in seen:
+                continue
+            seen.add(run_id)
+            unique_run_ids.append(run_id)
+        if unique_run_ids:
+            runs_cell = ", ".join(
+                f"[{rid.split('/')[-1]}]({run_url(frontend_base=frontend_base, run_id=rid)})"
+                for rid in unique_run_ids
+            )
+        else:
+            runs_cell = "—"
         rows.append(
-            {
-                "Model": model,
-                "Phase": agg.phase_label,
-                "Baseline replica mean": (
-                    "—" if baseline_mean is None else f"{round(baseline_mean * 100)}%"
-                ),
-                "Baseline n": str(len(agg.baseline_scores)),
-                "Intervention replica mean": (
-                    "—" if replica_mean is None else f"{round(replica_mean * 100)}%"
-                ),
-                "Intervention n": str(len(agg.replica_scores)),
-                "Δ (intervention − baseline)": delta,
-            }
+            [
+                model,
+                agg.phase_label,
+                "—" if baseline_mean is None else f"{round(baseline_mean * 100)}%",
+                str(len(agg.baseline_scores)),
+                "—" if replica_mean is None else f"{round(replica_mean * 100)}%",
+                str(len(agg.replica_scores)),
+                delta_cell,
+                runs_cell,
+            ]
         )
-    st.dataframe(rows, width="stretch", hide_index=True)
+    st.markdown(_build_markdown_table(headers=headers, rows=rows), unsafe_allow_html=False)
 
 
 def _format_source_option(
@@ -1190,15 +1244,21 @@ def render(
             "mean the intervention outperformed the baseline. Phase A (pre-first-swap rounds) "
             "is excluded — replicas inherit those rounds verbatim from the source JSONL clone."
         )
+    # `baseline` is the implicit reference pool (always compared against), so it
+    # is not offered as a checkbox — surfacing it would let the user compare
+    # baselines to themselves, which is always 0pp and adds nothing.
     intervention_counts: dict[str, int] = {}
     for resumes in resumes_by_source.values():
         for resume in resumes:
             tag = _extract_intervention_label(labels=resume.labels)
+            if tag == _BASELINE_INTERVENTION_LABEL:
+                continue
             intervention_counts[tag] = intervention_counts.get(tag, 0) + 1
     selected_interventions = render_horizontal_checkboxes(
         title="Intervention (replica tag)",
         options=[(t, t, intervention_counts[t]) for t in sorted(intervention_counts)],
         key_prefix=f"{key_prefix}_overview_intervention_filter",
+        initial_state=False,
     )
     if not selected_interventions:
         st.info("Select at least one intervention to populate the overview chart.")
@@ -1217,6 +1277,7 @@ def render(
         title="Budget (replica tag)",
         options=[(b, b, budget_counts[b]) for b in sorted(budget_counts)],
         key_prefix=f"{key_prefix}_overview_budget_filter",
+        initial_state=True,
     )
     if not selected_budgets:
         st.info("Select at least one budget to populate the overview chart.")
@@ -1241,6 +1302,7 @@ def render(
         title="Model",
         options=[(m, m, model_counts[m]) for m in sorted(model_counts)],
         key_prefix=f"{key_prefix}_overview_model_filter",
+        initial_state=True,
     )
     filtered_sources_data = [
         triple for triple in sources_data if triple[1].primary_model in selected_models
@@ -1279,4 +1341,4 @@ def render(
         return
     overview_fig = _build_model_delta_chart(buckets=buckets, mode=mode)
     st.plotly_chart(overview_fig, width="stretch", key=f"{key_prefix}_model_delta_chart_{mode}")
-    _render_model_delta_table(buckets=buckets)
+    _render_model_delta_table(buckets=buckets, frontend_base=frontend_base)

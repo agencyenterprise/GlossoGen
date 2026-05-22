@@ -165,12 +165,15 @@ def render_horizontal_checkboxes(
     title: str,
     options: list[tuple[str, str, int]],
     key_prefix: str,
+    initial_state: bool,
 ) -> set[str]:
     """Render a horizontal row of checkboxes; return the selected option keys.
 
     ``options`` is a list of ``(option_key, label, count)`` tuples. The label
     is what the user sees; the option_key is what's returned. Counts are
-    appended to the label in parentheses.
+    appended to the label in parentheses. ``initial_state`` is the default
+    checked state used on first render (subsequent renders read the user's
+    actual selection from ``st.session_state``).
     """
     if not options:
         return set()
@@ -180,7 +183,7 @@ def render_horizontal_checkboxes(
     for col, (key, label, count) in zip(cols, options):
         if col.checkbox(
             label=f"{label} ({count})",
-            value=True,
+            value=initial_state,
             key=f"{key_prefix}::{key}",
         ):
             selected.add(key)
