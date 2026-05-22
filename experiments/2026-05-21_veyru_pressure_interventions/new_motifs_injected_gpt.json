@@ -1,0 +1,123 @@
+{
+  "easy_round_numbers": [1, 2, 3, 6, 13],
+  "scheduled_events": [
+    {"type": "set_postmortem", "at_round": 16, "enabled": false},
+    {"type": "swap_agent", "at_round": 16, "agent_id": "field_observer", "model": "gpt-5.4", "provider": "openai", "channel_visibility": {"link": {"kind": "full"}}},
+    {"type": "swap_agent", "at_round": 31, "agent_id": "stabilization_engineer", "model": "gpt-5.4", "provider": "openai", "channel_visibility": {"link": {"kind": "from_round", "round_floor": 16}}},
+    {"type": "swap_agent", "at_round": 46, "agent_id": "field_observer", "model": "gpt-5.4", "provider": "openai", "channel_visibility": {"link": {"kind": "from_round", "round_floor": 31}}},
+    {
+      "type": "inject_case",
+      "at_round": 16,
+      "payload": {
+        "case_number": 9016,
+        "failure_name": "Echo Reversal",
+        "stages": [
+          {
+            "motif_name": "Echo Reversal",
+            "observable_symptoms": "A Veyru in a cool stone chamber. Sounds entering the room are pulled toward the Veyru and silenced before reaching the far wall. The hum is artificially quiet, as if dampened from the inside. The faces look slightly recessed, like surfaces seen through a long tunnel.",
+            "treatment_motif_name": "Echo Reversal",
+            "judge_expected_actions": "Strike a small bell 8 times near the top face at firm force. Wait between strikes for the previous ring to fully fade before the next."
+          }
+        ],
+        "time_budget_seconds": 450,
+        "stellar_reading": {"offset": 1, "hold_duration": 8, "starting_face": "top", "intensity_level": "firm"},
+        "engineer_addendum": [
+          {
+            "motif_name": "Echo Reversal",
+            "symptom_phrases": [
+              "Sounds entering the room are pulled toward the Veyru and silenced before reaching the far wall.",
+              "The hum is artificially quiet, as if dampened from the inside.",
+              "The faces look slightly recessed, like surfaces seen through a long tunnel."
+            ],
+            "judge_procedure_template": "Strike a small bell {hold_duration} times near the {starting_face} face at {intensity_level} force. Wait between strikes for the previous ring to fully fade before the next."
+          },
+          {
+            "motif_name": "Halo Bleed",
+            "symptom_phrases": [
+              "A glowing ring extends 2 to 3 cm beyond every edge into the surrounding air.",
+              "The hum spirals outward in widening circles, fading at the edge of the room.",
+              "Light bleeds off the faces into the air, painting faint trails when you move your hand near."
+            ],
+            "judge_procedure_template": "Encircle the Veyru at arm's distance with a {intensity_level} steady beam for {hold_duration} seconds, walking once around the Veyru and ending at the {starting_face}-facing point."
+          }
+        ]
+      }
+    },
+    {
+      "type": "inject_case",
+      "at_round": 19,
+      "payload": {
+        "case_number": 9019,
+        "failure_name": "Magnetic Pull",
+        "stages": [
+          {
+            "motif_name": "Magnetic Pull",
+            "observable_symptoms": "A Veyru on the workbench. All faces tilt their brightest spots toward a single edge, as if pulled by a hidden force. The hum sounds biased — louder in one direction. Edges curve subtly inward toward that same edge.",
+            "treatment_motif_name": "Magnetic Pull",
+            "judge_expected_actions": "Place a moderate-weight counterbalance opposite the front face for 12 seconds. Do not touch the Veyru itself."
+          }
+        ],
+        "time_budget_seconds": 450,
+        "stellar_reading": {"offset": 3, "hold_duration": 12, "starting_face": "front", "intensity_level": "moderate"},
+        "engineer_addendum": [
+          {
+            "motif_name": "Magnetic Pull",
+            "symptom_phrases": [
+              "All faces tilt their brightest spots toward a single edge, as if pulled by a hidden force.",
+              "The hum sounds biased — louder in one direction.",
+              "Edges curve subtly inward toward that same edge."
+            ],
+            "judge_procedure_template": "Place a {intensity_level}-weight counterbalance opposite the {starting_face} face for {hold_duration} seconds. Do not touch the Veyru itself."
+          },
+          {
+            "motif_name": "Crystal Tremor",
+            "symptom_phrases": [
+              "Hairline fracture-like lines flicker across each face, appearing and vanishing in irregular bursts.",
+              "The hum has a brittle, knife-edge sharpness that hurts to listen to.",
+              "Edges feel rigid and locked, as if the Veyru is bracing itself."
+            ],
+            "judge_procedure_template": "Tap rhythmically near the {starting_face} edge with a wooden mallet at {intensity_level} force, {hold_duration} taps total, pausing one second between each tap."
+          }
+        ]
+      }
+    },
+    {
+      "type": "inject_case",
+      "at_round": 24,
+      "payload": {
+        "case_number": 9024,
+        "failure_name": "Time Drag",
+        "stages": [
+          {
+            "motif_name": "Time Drag",
+            "observable_symptoms": "A Veyru on a slate slab. Patterns on each face shift in painfully slow motion, as if time has thickened around the Veyru. The hum is stretched, like a tape played at half speed. Edges seem to lag behind any visual change by a fraction of a second.",
+            "treatment_motif_name": "Time Drag",
+            "judge_expected_actions": "Trace each edge of the left face slowly with a chilled rod for 10 seconds at gentle pressure."
+          }
+        ],
+        "time_budget_seconds": 450,
+        "stellar_reading": {"offset": 7, "hold_duration": 10, "starting_face": "left", "intensity_level": "gentle"},
+        "engineer_addendum": [
+          {
+            "motif_name": "Time Drag",
+            "symptom_phrases": [
+              "Patterns on each face shift in painfully slow motion, as if time has thickened around the Veyru.",
+              "The hum is stretched, like a tape played at half speed.",
+              "Edges seem to lag behind any visual change by a fraction of a second."
+            ],
+            "judge_procedure_template": "Trace each edge of the {starting_face} face slowly with a chilled rod for {hold_duration} seconds at {intensity_level} pressure."
+          },
+          {
+            "motif_name": "Vapor Drift",
+            "symptom_phrases": [
+              "A faint condensation haze clings to the surfaces and won't wipe away.",
+              "The hum has a wet, gurgling quality, like air pushed through water.",
+              "Each face looks glassy, as if seen through a thin layer of mist."
+            ],
+            "judge_procedure_template": "Wave a {intensity_level} fan across the {starting_face} face and adjacent edges for {hold_duration} seconds. Repeat at the three faces opposite, working around the Veyru."
+          }
+        ]
+      }
+    }
+  ]
+}

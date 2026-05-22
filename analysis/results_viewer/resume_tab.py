@@ -11,7 +11,6 @@ the rest.
 import plotly.graph_objects as go
 import streamlit as st
 
-from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.resume_data import ResumeRun, list_resume_runs
 from analysis.results_viewer.resume_multi_swap_view import render as render_multi_swap_subtab
 from analysis.results_viewer.run_catalog import EvaluatedRun
@@ -323,9 +322,7 @@ def _render_subtab(
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Resume tab body with Multi-swap and No-swap subtabs."""
-    run_filter = seed_mode_filter.render_filters(key_prefix="resume")
-    filtered_evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
-    all_resume = list_resume_runs(evaluated_runs=filtered_evaluated)
+    all_resume = list_resume_runs(evaluated_runs=evaluated)
     if not all_resume:
         st.info(
             "No runs with a `replace_manifest.json` found. "
@@ -347,7 +344,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     with multi_swap_panel:
         render_multi_swap_subtab(
             multi_swap_resumes=[r for r in scenario_runs if r.has_in_run_swaps],
-            evaluated=filtered_evaluated,
+            evaluated=evaluated,
             frontend_base=frontend_base,
             key_prefix="resume_multi",
         )

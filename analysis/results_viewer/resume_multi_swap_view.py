@@ -16,26 +16,112 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from analysis.results_viewer.message_similarity import (
+    SimilarityScoreFn,
+    bigram_jaccard_score,
+    levenshtein_score,
     mean_similarity_to_pool,
     phase_round_texts,
     pool_self_similarity,
-    round_similarity,
     similarity_to_reference,
 )
 from analysis.results_viewer.multi_swap_data import MultiSwapRun, PhaseScore, build_multi_swap_run
 from analysis.results_viewer.resume_data import ResumeRun
 from analysis.results_viewer.run_catalog import EvaluatedRun
-from analysis.results_viewer.run_link import run_url
+from analysis.results_viewer.run_link import maybe_open_clicked_run, run_url
 from analysis.results_viewer.series_plot import render_horizontal_checkboxes
 
 _SOURCE_COLOR = "#0EA5E9"
 _REPLICA_MEAN_COLOR = "#A855F7"
 _REPLICA_DOT_COLOR = "#7E22CE"
 
-ViewMode = Literal["round_success", "message_similarity"]
+ViewMode = Literal["round_success", "message_similarity", "ngram_overlap"]
 
 _MODE_ROUND_SUCCESS: ViewMode = "round_success"
 _MODE_MESSAGE_SIMILARITY: ViewMode = "message_similarity"
+_MODE_NGRAM_OVERLAP: ViewMode = "ngram_overlap"
+
+_SIMILARITY_MODES: frozenset[ViewMode] = frozenset({_MODE_MESSAGE_SIMILARITY, _MODE_NGRAM_OVERLAP})
+
+_SCORE_FN_BY_MODE: dict[ViewMode, SimilarityScoreFn] = {
+    _MODE_MESSAGE_SIMILARITY: levenshtein_score,
+    _MODE_NGRAM_OVERLAP: bigram_jaccard_score,
+}
+
+
+def _is_similarity_mode(mode: ViewMode) -> bool:
+    """Return ``True`` for any of the link-text similarity modes (Levenshtein, Jaccard, …)."""
+    return mode in _SIMILARITY_MODES
+
+
+def _score_fn_for(mode: ViewMode) -> SimilarityScoreFn:
+    """Look up the per-pair score function for one of the similarity modes."""
+    return _SCORE_FN_BY_MODE[mode]
+
+
+class _MetricOption(NamedTuple):
+    """One entry in the metric radio: ``ViewMode`` + display label + popover body."""
+
+    mode: ViewMode
+    display_name: str
+    description: str
+
+
+_METRIC_OPTIONS: list[_MetricOption] = [
+    _MetricOption(
+        mode=_MODE_ROUND_SUCCESS,
+        display_name="Round success",
+        description=(
+            "**Round success** — fraction of phase rounds the judge marked stabilized.\n\n"
+            "Source bar vs replica-mean bar per phase, with each replica's score overlaid "
+            "as a dot. Phase A is shown (the cloned source rounds carry real outcomes)."
+        ),
+    ),
+    _MetricOption(
+        mode=_MODE_MESSAGE_SIMILARITY,
+        display_name="Message similarity (Levenshtein)",
+        description=(
+            "**Message similarity** — per round inside the phase, "
+            "`Levenshtein.normalized_similarity` of the concatenated link-channel messages, "
+            "averaged across rounds.\n\n"
+            "Edit-distance based: sensitive to message length and retry-count divergence. "
+            "A replica that runs extra retry exchanges in a round scores low even when the "
+            "shorthand vocabulary is identical to the source.\n\n"
+            "Rounds with empty link text on either side are skipped. Phase A is excluded "
+            "(replicas inherit it verbatim from the source clone)."
+        ),
+    ),
+    _MetricOption(
+        mode=_MODE_NGRAM_OVERLAP,
+        display_name="N-gram overlap (word bigrams, Jaccard)",
+        description=(
+            "**N-gram overlap** — per round inside the phase, Jaccard similarity over "
+            "word-level bigrams `(token_i, token_{i+1})`: `|A ∩ B| / |A ∪ B|` where A, B "
+            "are the lowercased bigram sets of the concatenated link text. Averaged across "
+            "rounds.\n\n"
+            "Set-based: mostly insensitive to transcript length, so it isolates shared "
+            "vocabulary / phrasing from retry-loop divergence. Complements Levenshtein for "
+            "diagnosing 'is the protocol the same?' vs. 'is the transcript trajectory the "
+            "same?'.\n\n"
+            "Rounds with empty link text on either side are skipped. Phase A is excluded."
+        ),
+    ),
+]
+
+
+def _metric_option_for(mode: ViewMode) -> _MetricOption:
+    """Look up the radio entry for a ``ViewMode``."""
+    for option in _METRIC_OPTIONS:
+        if option.mode == mode:
+            return option
+    raise KeyError(mode)
+
+
+def _mode_from_display_name(name: str) -> ViewMode:
+    """Map the user-facing radio label back to its ``ViewMode`` literal."""
+    for option in _METRIC_OPTIONS:
+        if option.display_name == name:
+            return option.mode
+    return _MODE_ROUND_SUCCESS
 
 
 class _ReplicaPhaseScore(NamedTuple):
@@ -91,19 +177,21 @@ def _align_phases(
 
     - ``round_success``: ``replica_phase.score`` (fraction of phase rounds
       stabilized) and ``source_score`` is the source's matching ``PhaseScore``.
-    - ``message_similarity``: ``Levenshtein.normalized_similarity`` between
-      the replica's and source's concatenated link-channel text for that
-      phase. Source self-similarity = 1.0 by construction. Replicas with no
-      link text inside the phase window are skipped.
+    - ``message_similarity`` / ``ngram_overlap``: the mean per-round similarity
+      to the source under the matching score function (Levenshtein or word-
+      bigram Jaccard). Source self-similarity = 1.0 by construction. Replicas
+      with no link text inside the phase window are skipped.
     """
+    is_similarity = _is_similarity_mode(mode=mode)
+    score_fn = _score_fn_for(mode=mode) if is_similarity else None
     aligned: list[_AlignedPhase] = []
     for src_phase in source_run.phases:
         # Phase A (pre-first-swap) is inherited verbatim from the source via
-        # the JSONL clone in similarity mode → every replica's link text equals
+        # the JSONL clone in similarity modes → every replica's link text equals
         # the source's text → similarity ≡ 1.0. Skip it to keep the chart
         # informative. Round-success mode still renders Phase A because the
         # cloned source rounds carry real round_success outcomes.
-        if mode == _MODE_MESSAGE_SIMILARITY and src_phase.swap is None:
+        if is_similarity and src_phase.swap is None:
             continue
         replica_scores: list[_ReplicaPhaseScore | None] = []
         for replica in replica_runs:
@@ -114,9 +202,12 @@ def _align_phases(
             if replica_phase is None or replica_phase.total == 0:
                 replica_scores.append(None)
                 continue
-            if mode == _MODE_MESSAGE_SIMILARITY:
+            if is_similarity and score_fn is not None:
                 similarity = similarity_to_reference(
-                    run=replica, reference_run=source_run, phase_index=src_phase.phase_index
+                    run=replica,
+                    reference_run=source_run,
+                    phase_index=src_phase.phase_index,
+                    score_fn=score_fn,
                 )
                 if similarity is None:
                     replica_scores.append(None)
@@ -140,7 +231,7 @@ def _align_phases(
                     url=run_url(frontend_base=frontend_base, run_id=replica.run_id),
                 )
             )
-        if mode == _MODE_MESSAGE_SIMILARITY:
+        if is_similarity:
             display_source = src_phase._replace(score=1.0, won=0, total=0)
         else:
             display_source = src_phase
@@ -169,11 +260,11 @@ def _replica_mean(scores: list[_ReplicaPhaseScore | None]) -> float | None:
 def _build_comparison_chart(aligned: list[_AlignedPhase], mode: ViewMode) -> go.Figure:
     """Source bar + replica-mean bar grouped per phase, with replica dots overlaid.
 
-    The source bar is suppressed in ``message_similarity`` mode because the
-    source-vs-source similarity is trivially 1.0 on every phase and adds noise
-    to the chart.
+    The source bar is suppressed in any similarity mode because the source-vs-
+    source similarity is trivially 1.0 on every phase and adds noise to the
+    chart.
     """
-    is_similarity = mode == _MODE_MESSAGE_SIMILARITY
+    is_similarity = _is_similarity_mode(mode=mode)
     labels = [p.label for p in aligned]
     replica_mean_y: list[float] = []
     replica_mean_text: list[str] = []
@@ -251,11 +342,12 @@ def _build_comparison_chart(aligned: list[_AlignedPhase], mode: ViewMode) -> go.
                 xaxis="x2",
             )
         )
-    y_title = (
-        "Normalized Levenshtein similarity to source (link-channel text, per phase)"
-        if is_similarity
-        else "Fraction of phase rounds stabilized"
-    )
+    if mode == _MODE_MESSAGE_SIMILARITY:
+        y_title = "Normalized Levenshtein similarity to source (link-channel text, per phase)"
+    elif mode == _MODE_NGRAM_OVERLAP:
+        y_title = "Word-bigram Jaccard overlap with source (link-channel text, per phase)"
+    else:
+        y_title = "Fraction of phase rounds stabilized"
     fig.update_layout(
         barmode="group",
         xaxis=dict(title="Phase"),
@@ -299,22 +391,46 @@ def _sample_round_numbers(phase: _AlignedPhase, per_phase: int = 3) -> list[int]
     return [rounds[round(i * step)] for i in range(per_phase)]
 
 
+_SCORE_LABEL_BY_MODE: dict[ViewMode, str] = {
+    _MODE_MESSAGE_SIMILARITY: "Levenshtein similarity",
+    _MODE_NGRAM_OVERLAP: "Word-bigram Jaccard",
+}
+
+_SCORE_FORMULA_BY_MODE: dict[ViewMode, str] = {
+    _MODE_MESSAGE_SIMILARITY: "`Levenshtein.normalized_similarity(source_text, replica_text)`",
+    _MODE_NGRAM_OVERLAP: (
+        "`|A ∩ B| / |A ∪ B|` where A, B are the word-bigram sets of "
+        "`source_text` and `replica_text`"
+    ),
+}
+
+
 def _render_round_message_samples(
     aligned: list[_AlignedPhase],
     source_run: MultiSwapRun,
     replica_runs: list[MultiSwapRun],
+    mode: ViewMode,
+    frontend_base: str,
 ) -> None:
-    """Per-round text samples + per-round Levenshtein similarity for sanity-checking.
+    """Per-round text samples + per-round similarity for sanity-checking.
 
-    Rendered as an expander below the comparison table when the view mode is
-    ``message_similarity``. For every aligned phase, picks 3 representative
-    rounds (first / middle / last) and shows one row per (round, replica) with
-    the source's truncated text, the replica's truncated text, and the
-    single-pair normalized Levenshtein similarity. Lets the user eyeball
-    whether the phase-averaged similarity numbers are reasonable.
+    Rendered as an expander below the comparison table when the view mode is a
+    similarity mode. For every aligned phase, picks 3 representative rounds
+    (first / middle / last) and shows one row per (round, replica) with the
+    source's truncated text, the replica's truncated text, and the single-pair
+    score under the chosen ``mode`` (Levenshtein or word-bigram Jaccard). Lets
+    the user eyeball whether the phase-averaged similarity numbers are
+    reasonable.
+
+    The replica column carries the replica's frontend URL and is rendered as a
+    clickable link via ``st.column_config.LinkColumn``.
     """
     if not aligned:
         return
+    score_fn = _score_fn_for(mode=mode)
+    score_label = _SCORE_LABEL_BY_MODE[mode]
+    score_formula = _SCORE_FORMULA_BY_MODE[mode]
+    source_url = run_url(frontend_base=frontend_base, run_id=source_run.run_id)
     rows: list[dict[str, str]] = []
     for phase in aligned:
         source_texts = phase_round_texts(run=source_run, phase_index=phase.phase_index)
@@ -324,12 +440,12 @@ def _render_round_message_samples(
             for replica in replica_runs:
                 replica_texts = phase_round_texts(run=replica, phase_index=phase.phase_index)
                 replica_text = replica_texts.get(round_number, "")
-                sim = round_similarity(text_a=source_text, text_b=replica_text)
+                sim = score_fn(source_text, replica_text)
                 rows.append(
                     {
                         "Phase": phase.label,
                         "Round": str(round_number),
-                        "Replica": replica.run_id,
+                        "Replica": run_url(frontend_base=frontend_base, run_id=replica.run_id),
                         "Source text": _truncate(text=source_text) if source_text else "—",
                         "Replica text": _truncate(text=replica_text) if replica_text else "—",
                         "Per-round sim": "—" if sim is None else f"{round(sim * 100)}%",
@@ -339,27 +455,91 @@ def _render_round_message_samples(
         return
     with st.expander(
         f"Per-round message samples — first/mid/last round of each phase × "
-        f"{len(replica_runs)} baseline replica(s)",
+        f"{len(replica_runs)} baseline replica(s) — source: {source_run.run_id} "
+        f"([open]({source_url}))",
         expanded=False,
     ):
         st.caption(
-            "One row per (sampled round × replica). 'Per-round sim' is "
-            "`Levenshtein.normalized_similarity(source_text, replica_text)` on the "
-            "concatenated link-channel messages of that round on each side. The "
-            "phase-level similarity number plotted above is the mean of these per-round "
-            "values across the whole phase. Texts truncated to "
-            f"{_MAX_SAMPLE_CHARS} chars; `⏎` marks a newline."
+            f"One row per (sampled round × replica). 'Per-round sim' is **{score_label}**: "
+            f"{score_formula}, computed on the concatenated link-channel messages of that "
+            "round on each side. The phase-level similarity number plotted above is the "
+            f"mean of these per-round values across the whole phase. Texts truncated to "
+            f"{_MAX_SAMPLE_CHARS} chars; `⏎` marks a newline. Click any Replica cell to "
+            "open that run."
         )
-        st.dataframe(rows, width="stretch", hide_index=True)
+        st.dataframe(
+            rows,
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "Replica": st.column_config.LinkColumn(
+                    "Replica",
+                    help="Click to open the replica run in the frontend.",
+                    display_text=r"runs/[^/]+/(\d+)$",
+                ),
+            },
+        )
 
 
-def _render_comparison_table(aligned: list[_AlignedPhase], mode: ViewMode) -> None:
-    """Comparison table with one row per phase: source vs each replica."""
+def _replica_id_per_column(aligned: list[_AlignedPhase]) -> list[tuple[str, str] | None]:
+    """Discover ``(run_id, url)`` per column position across all aligned phases.
+
+    A replica column index has a stable identity (same replica across every
+    phase) but any single phase might have a ``None`` cell for that column if
+    that replica didn't reach the phase. Walks all phases to find the first
+    non-``None`` cell per column and returns its run_id/url.
+    """
+    if not aligned:
+        return []
+    replica_count = len(aligned[0].replica_scores)
+    out: list[tuple[str, str] | None] = []
+    for index in range(replica_count):
+        first: tuple[str, str] | None = None
+        for phase in aligned:
+            cell = phase.replica_scores[index]
+            if cell is not None:
+                first = (cell.run_id, cell.url)
+                break
+        out.append(first)
+    return out
+
+
+def _render_comparison_table(
+    aligned: list[_AlignedPhase],
+    mode: ViewMode,
+    source_run: MultiSwapRun,
+    frontend_base: str,
+) -> None:
+    """Comparison table with one row per phase: source vs each replica.
+
+    Rendered as a markdown table so the source + replica run IDs in the column
+    headers can be hyperlinks back to the frontend. Each header reads
+    ``Source ([1778162284](url))`` / ``Rep 1 ([1779359865](url))`` so a click
+    opens the run.
+    """
     if not aligned:
         return
-    is_similarity = mode == _MODE_MESSAGE_SIMILARITY
+    is_similarity = _is_similarity_mode(mode=mode)
     replica_count = len(aligned[0].replica_scores)
-    rows: list[dict[str, str]] = []
+    replica_ids = _replica_id_per_column(aligned=aligned)
+    source_url = run_url(frontend_base=frontend_base, run_id=source_run.run_id)
+
+    headers = [
+        "Phase",
+        "Rounds",
+        "Boundary",
+        f"Source ([{source_run.run_id}]({source_url}))",
+    ]
+    for index in range(replica_count):
+        info = replica_ids[index]
+        if info is None:
+            headers.append(f"Rep {index + 1}")
+            continue
+        run_id, url = info
+        headers.append(f"Rep {index + 1} ([{run_id}]({url}))")
+    headers.append("Replica mean")
+
+    rows: list[list[str]] = []
     for phase in aligned:
         if is_similarity:
             source_cell = "self-sim = 100%"
@@ -368,27 +548,44 @@ def _render_comparison_table(aligned: list[_AlignedPhase], mode: ViewMode) -> No
                 f"{phase.source_score.won}/{phase.source_score.total} "
                 f"({round(phase.source_score.score * 100)}%)"
             )
-        row: dict[str, str] = {
-            "Phase": phase.label,
-            "Rounds": f"{phase.round_start}-{phase.round_end}",
-            "Boundary": phase.swap_label,
-            "Source": source_cell,
-        }
+        row: list[str] = [
+            phase.label,
+            f"{phase.round_start}-{phase.round_end}",
+            phase.swap_label,
+            source_cell,
+        ]
         for index in range(replica_count):
             replica = phase.replica_scores[index]
             if replica is None:
-                row[f"Rep {index + 1}"] = "—"
+                row.append("—")
                 continue
             if is_similarity:
-                row[f"Rep {index + 1}"] = f"{round(replica.score * 100)}%"
+                row.append(f"{round(replica.score * 100)}%")
             else:
-                row[f"Rep {index + 1}"] = (
-                    f"{replica.won}/{replica.total} ({round(replica.score * 100)}%)"
-                )
+                row.append(f"{replica.won}/{replica.total} ({round(replica.score * 100)}%)")
         mean = _replica_mean(scores=phase.replica_scores)
-        row["Replica mean"] = "—" if mean is None else f"{round(mean * 100)}%"
+        row.append("—" if mean is None else f"{round(mean * 100)}%")
         rows.append(row)
-    st.dataframe(rows, width="stretch", hide_index=True)
+
+    st.markdown(_build_markdown_table(headers=headers, rows=rows), unsafe_allow_html=False)
+
+
+def _build_markdown_table(headers: list[str], rows: list[list[str]]) -> str:
+    """Serialize ``rows`` (parallel to ``headers``) as a Github-flavored markdown table.
+
+    Pipe (``|``) characters inside cells are escaped (``\\|``) so they do not
+    break the column structure. Newlines inside cells are collapsed to ``<br>``.
+    """
+
+    def _escape(cell: str) -> str:
+        return cell.replace("|", "\\|").replace("\n", "<br>")
+
+    lines: list[str] = []
+    lines.append("| " + " | ".join(_escape(h) for h in headers) + " |")
+    lines.append("|" + "|".join(["---"] * len(headers)) + "|")
+    for row in rows:
+        lines.append("| " + " | ".join(_escape(cell) for cell in row) + " |")
+    return "\n".join(lines)
 
 
 _OVERVIEW_PALETTE = [
@@ -588,10 +785,12 @@ def _aggregate_by_model(
         buckets[key] = agg
         return agg
 
+    is_similarity = _is_similarity_mode(mode=mode)
+    score_fn = _score_fn_for(mode=mode) if is_similarity else None
     for source_id, source_run, replica_runs in sources_data:
         model = source_run.primary_model
         source_baselines = baseline_replicas_by_source.get(source_id, [])
-        if mode == _MODE_MESSAGE_SIMILARITY:
+        if is_similarity and score_fn is not None:
             # baseline_scores becomes pool-self-similarity per source (one entry per source);
             # replica_scores becomes each intervention replica's mean similarity to the pool.
             for src_phase in source_run.phases:
@@ -601,7 +800,9 @@ def _aggregate_by_model(
                     model=model, phase_index=src_phase.phase_index, label=src_phase.label
                 )
                 pool_self = pool_self_similarity(
-                    pool=source_baselines, phase_index=src_phase.phase_index
+                    pool=source_baselines,
+                    phase_index=src_phase.phase_index,
+                    score_fn=score_fn,
                 )
                 if pool_self is not None:
                     agg.baseline_scores.append(pool_self)
@@ -610,6 +811,7 @@ def _aggregate_by_model(
                         run=replica,
                         pool=source_baselines,
                         phase_index=src_phase.phase_index,
+                        score_fn=score_fn,
                     )
                     if similarity is not None:
                         agg.replica_scores.append(similarity)
@@ -644,7 +846,7 @@ def _build_model_delta_chart(
     A *negative* bar in similarity mode means the intervention diverges more
     from baseline language than baselines diverge from each other.
     """
-    is_similarity = mode == _MODE_MESSAGE_SIMILARITY
+    is_similarity = _is_similarity_mode(mode=mode)
     models = sorted({k[0] for k in buckets})
     phase_index_to_label: dict[int, str] = {}
     for (_, idx), agg in buckets.items():
@@ -698,11 +900,14 @@ def _build_model_delta_chart(
                 hoverinfo="text",
             )
         )
-    overview_y_title = (
-        "Δ (intervention→baseline) − (baseline self-similarity), pp"
-        if is_similarity
-        else "Δ intervention-replica mean − baseline-replica mean (pp)"
-    )
+    if mode == _MODE_MESSAGE_SIMILARITY:
+        overview_y_title = "Δ Levenshtein(intervention→baseline) − Levenshtein(baseline self), pp"
+    elif mode == _MODE_NGRAM_OVERLAP:
+        overview_y_title = (
+            "Δ bigram-Jaccard(intervention→baseline) − bigram-Jaccard(baseline self), pp"
+        )
+    else:
+        overview_y_title = "Δ intervention-replica mean − baseline-replica mean (pp)"
     fig.update_layout(
         barmode="group",
         xaxis=dict(title="Phase"),
@@ -883,23 +1088,22 @@ def render(
             "Run `schmidt evaluate` on its baseline resume runs so their phase scores load."
         )
         return
-    mode_choice = st.radio(
-        "Metric",
-        options=["Round success", "Message similarity (link channel)"],
-        index=0,
-        horizontal=True,
-        key=f"{key_prefix}_metric_mode",
-        help=(
-            "Round success: fraction of phase rounds stabilized. "
-            "Message similarity: for each round inside the phase, compute "
-            "Levenshtein.normalized_similarity between the replica's and source's "
-            "concatenated link-channel messages, then average across rounds. Rounds "
-            "with empty link text on either side are skipped."
-        ),
-    )
-    mode: ViewMode = (
-        _MODE_MESSAGE_SIMILARITY if mode_choice.startswith("Message") else _MODE_ROUND_SUCCESS
-    )
+    display_names = [opt.display_name for opt in _METRIC_OPTIONS]
+    radio_col, info_col = st.columns([8, 1])
+    with radio_col:
+        mode_choice = st.radio(
+            "Metric",
+            options=display_names,
+            index=0,
+            horizontal=True,
+            key=f"{key_prefix}_metric_mode",
+        )
+    mode: ViewMode = _mode_from_display_name(name=mode_choice)
+    selected_option = _metric_option_for(mode=mode)
+    with info_col:
+        st.markdown("&nbsp;")
+        with st.popover("ⓘ", help="How this metric is computed"):
+            st.markdown(selected_option.description)
     aligned = _align_phases(
         source_run=source_run,
         replica_runs=replica_runs,
@@ -914,31 +1118,67 @@ def render(
             "side are skipped. Phase score = arithmetic mean of surviving per-round sims. "
             "100% = identical per round, 0% = completely different."
         )
+    elif mode == _MODE_NGRAM_OVERLAP:
+        st.caption(
+            "Each replica's bar/dot shows the **mean per-round word-bigram Jaccard "
+            "overlap** with the source's link-channel text within the phase. Per round: "
+            "`|A ∩ B| / |A ∪ B|` where A, B are the lowercased word-bigram sets of the "
+            "concatenated link text on each side. Phase score = arithmetic mean of "
+            "surviving per-round overlaps. Mostly insensitive to transcript length, so "
+            "a long retry-heavy round still scores high if both sides reuse the same "
+            "vocabulary."
+        )
     else:
         st.caption(
             "Source bar vs replica-mean bar per phase, with each replica's score "
             "overlaid as a dot."
         )
     fig = _build_comparison_chart(aligned=aligned, mode=mode)
-    st.plotly_chart(fig, width="stretch", key=f"{key_prefix}_phase_comparison_chart_{mode}")
-    _render_comparison_table(aligned=aligned, mode=mode)
-    if mode == _MODE_MESSAGE_SIMILARITY:
+    chart_event = st.plotly_chart(
+        fig,
+        width="stretch",
+        on_select="rerun",
+        selection_mode=("points",),
+        key=f"{key_prefix}_phase_comparison_chart_{mode}",
+    )
+    maybe_open_clicked_run(
+        chart_event=chart_event,
+        session_key=f"{key_prefix}_multi_swap_last_opened_url",
+    )
+    _render_comparison_table(
+        aligned=aligned,
+        mode=mode,
+        source_run=source_run,
+        frontend_base=frontend_base,
+    )
+    if _is_similarity_mode(mode=mode):
         _render_round_message_samples(
             aligned=aligned,
             source_run=source_run,
             replica_runs=replica_runs,
+            mode=mode,
+            frontend_base=frontend_base,
         )
 
     st.markdown("---")
     st.subheader("Overview — Δ intervention vs baseline replicas, grouped by model")
     if mode == _MODE_MESSAGE_SIMILARITY:
         st.caption(
-            "Metric: **message similarity** (link channel). For each (model, phase): "
+            "Metric: **Levenshtein similarity** (link channel). For each (model, phase): "
             "bar = mean( intervention replica's similarity to the baseline-replica pool ) − "
             "mean pairwise similarity within the baseline-replica pool ('how similar are "
             "baselines to each other?'). A **negative** bar means the intervention diverges "
             "from baseline language more than baselines diverge from each other. Phase A is "
             "excluded (replicas inherit it verbatim from the source clone)."
+        )
+    elif mode == _MODE_NGRAM_OVERLAP:
+        st.caption(
+            "Metric: **word-bigram Jaccard overlap** (link channel). For each (model, "
+            "phase): bar = mean( intervention replica's bigram overlap with the baseline-"
+            "replica pool ) − mean pairwise bigram overlap within the baseline-replica "
+            "pool. A **negative** bar means the intervention's vocabulary/phrasing diverges "
+            "from baseline more than baselines diverge from each other. Phase A is "
+            "excluded."
         )
     else:
         st.caption(
