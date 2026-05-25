@@ -30,16 +30,26 @@ export function setActiveGroupSlug(slug: string | null): void {
  * Clerk) or before Clerk has finished initializing — the backend's
  * identity middleware treats those requests as the synthetic local
  * identity.
+ *
+ * Passes ``skipCache: true`` so the token reflects the user's currently
+ * active organization. Without it, ``getToken()`` returns whatever was
+ * cached at sign-in time — typically ``org_slug: null`` if the user
+ * picked their org after sign-in via ``<OrganizationList>`` / the org
+ * switcher. The backend then 403s every ``/api/g/<slug>/...`` call.
  */
 async function getClerkSessionToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
   const clerk = (
-    window as unknown as { Clerk?: { session?: { getToken: () => Promise<string | null> } } }
+    window as unknown as {
+      Clerk?: {
+        session?: { getToken: (opts?: { skipCache?: boolean }) => Promise<string | null> };
+      };
+    }
   ).Clerk;
   const session = clerk?.session;
   if (!session) return null;
   try {
-    return await session.getToken();
+    return await session.getToken({ skipCache: true });
   } catch {
     return null;
   }
@@ -51,6 +61,22 @@ function substituteGroupSlug(url: string): string {
   return url.replace("{group_slug}", encoded).replace("%7Bgroup_slug%7D", encoded);
 }
 
+/**
+ * Reject API URLs that still contain the literal `{group_slug}` placeholder.
+ *
+ * Happens during the brief window between page navigation and the
+ * ``<GroupProvider>`` ``useEffect`` running that primes ``_activeGroupSlug``.
+ * Letting such a request go out produces a backend 401 (or worse, a
+ * literal ``/api/g/{group_slug}/...`` row in the log). Throwing instead
+ * lets TanStack Query treat it as a transient error and retry once
+ * the slug is set.
+ */
+function assertGroupSlugSubstituted(url: string): void {
+  if (url.includes("{group_slug}") || url.includes("%7Bgroup_slug%7D")) {
+    throw new Error("Active group slug not yet initialized; the request will retry");
+  }
+}
+
 export function buildApiUrlWithToken({
   path,
   searchParams,
@@ -59,6 +85,7 @@ export function buildApiUrlWithToken({
   searchParams: URLSearchParams;
 }): string {
   const substituted = substituteGroupSlug(path);
+  assertGroupSlugSubstituted(substituted);
   const query = searchParams.toString();
   if (query.length > 0) {
     return `${API_URL}${substituted}?${query}`;
@@ -85,6 +112,7 @@ export async function downloadAuthenticatedFile({
   fallbackFilename: string;
 }): Promise<void> {
   const substituted = substituteGroupSlug(path);
+  assertGroupSlugSubstituted(substituted);
   const query = searchParams.toString();
   const url = query.length > 0 ? `${API_URL}${substituted}?${query}` : `${API_URL}${substituted}`;
   const headers: Record<string, string> = {};
@@ -112,6 +140,7 @@ export async function downloadAuthenticatedFile({
 api.use({
   async onRequest({ request }) {
     const substituted = substituteGroupSlug(request.url);
+    assertGroupSlugSubstituted(substituted);
     let outgoing = request;
     if (substituted !== request.url) {
       outgoing = new Request(substituted, request);
