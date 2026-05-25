@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthGate } from "@/features/auth/auth-gate";
+import { ClerkProviderWrapper } from "@/features/auth/clerk-provider-wrapper";
 import { QueryProvider } from "@/shared/providers/query-provider";
 
 const geistSans = Geist({
@@ -27,9 +28,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <QueryProvider>
-          <AuthGate>{children}</AuthGate>
-        </QueryProvider>
+        <ClerkProviderWrapper>
+          <QueryProvider>
+            <AuthGate>{children}</AuthGate>
+          </QueryProvider>
+        </ClerkProviderWrapper>
       </body>
     </html>
   );

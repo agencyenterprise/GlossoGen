@@ -17,12 +17,6 @@ class HealthResponse(BaseModel):
     status: HealthStatus
 
 
-class AuthVerifyResponse(BaseModel):
-    """Response model for the password verification endpoint."""
-
-    authenticated: bool
-
-
 class LaunchStatus(str, Enum):
     """Status value for subprocess launch responses."""
 

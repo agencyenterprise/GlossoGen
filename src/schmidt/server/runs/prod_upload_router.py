@@ -15,7 +15,8 @@ from fastapi import APIRouter, HTTPException, Request
 
 from schmidt.evaluation.reports.evaluation_report import EvaluationReport, load_report
 from schmidt.server.runs.bundle_router import build_bundle_bytes
-from schmidt.server.runs.discovery import compose_run_id, resolve_run
+from schmidt.server.runs.discovery import compose_run_id
+from schmidt.server.runs.lookup import resolve_run_or_404
 from schmidt.server.runs.models import (
     ProdUploadOutcome,
     ProdUploadResponse,
@@ -25,7 +26,7 @@ from schmidt.server.runs.models import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api/g/{group_slug}")
 
 _REQUEST_TIMEOUT_SECONDS = 600.0
 
@@ -114,10 +115,10 @@ async def _post_bundle(
     response.raise_for_status()
 
 
-async def _build_bundle_for_run(*, runs_dir: Path, scenario: str, run_dir_name: str) -> bytes:
-    resolved = resolve_run(
-        runs_dir=runs_dir,
-        scenario_name=scenario,
+async def _build_bundle_for_run(*, request: Request, scenario: str, run_dir_name: str) -> bytes:
+    resolved = await resolve_run_or_404(
+        request=request,
+        scenario=scenario,
         run_dir_name=run_dir_name,
     )
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
@@ -148,12 +149,12 @@ async def upload_run_to_prod(
     delete the remote run first and re-upload, returning ``overridden``.
     """
     prod_url, prod_password = _read_prod_credentials(request=request)
-    runs_dir: Path = request.app.state.runs_dir
 
-    try:
-        resolve_run(runs_dir=runs_dir, scenario_name=scenario, run_dir_name=run_dir_name)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Run not found")
+    await resolve_run_or_404(
+        request=request,
+        scenario=scenario,
+        run_dir_name=run_dir_name,
+    )
 
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
 
@@ -183,7 +184,7 @@ async def upload_run_to_prod(
 
         try:
             bundle_bytes = await _build_bundle_for_run(
-                runs_dir=runs_dir,
+                request=request,
                 scenario=scenario,
                 run_dir_name=run_dir_name,
             )
@@ -257,16 +258,12 @@ async def sync_run_metadata_to_prod(
     to the full ``upload-to-prod`` flow). 503 when prod is not configured.
     """
     prod_url, prod_password = _read_prod_credentials(request=request)
-    runs_dir: Path = request.app.state.runs_dir
 
-    try:
-        resolved = resolve_run(
-            runs_dir=runs_dir,
-            scenario_name=scenario,
-            run_dir_name=run_dir_name,
-        )
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Local run not found")
+    resolved = await resolve_run_or_404(
+        request=request,
+        scenario=scenario,
+        run_dir_name=run_dir_name,
+    )
 
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
 

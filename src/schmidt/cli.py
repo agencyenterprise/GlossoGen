@@ -17,6 +17,7 @@ import asyncio
 import json
 import logging
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NamedTuple, cast
 
@@ -34,6 +35,8 @@ from schmidt.config_overrides import (
 from schmidt.cross_run_replace_agent import CrossRunReplaceAgentRequest as CrossRunCoreRequest
 from schmidt.cross_run_replace_agent import cross_run_replace_agent_in_run
 from schmidt.cross_run_replace_manifest import read_cross_run_replace_manifest
+from schmidt.db.local_tenant import LOCAL_GROUP_SLUG
+from schmidt.db.run_registry import register_run_standalone
 from schmidt.eval_manifest import delete_eval_manifest, write_eval_manifest
 from schmidt.evaluation.log_reader import extract_scenario_config, load_events
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
@@ -48,7 +51,13 @@ from schmidt.message_rewind import (
     build_rewind_state_from_last_message,
 )
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import AgentRegistered, RoundAdvanced, SimulationEvent, SimulationStarted
+from schmidt.models.event import (
+    AgentRegistered,
+    RoundAdvanced,
+    RunStatus,
+    SimulationEvent,
+    SimulationStarted,
+)
 from schmidt.port_allocator import find_free_port
 from schmidt.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from schmidt.replace_agent import replace_agent_in_run
@@ -114,6 +123,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--config",
         type=str,
         help="Path to a JSON config file (scenario knobs + optional agents overrides)",
+    )
+    run_parser.add_argument(
+        "--group-slug",
+        type=str,
+        default=LOCAL_GROUP_SLUG,
+        help=f"Tenant group slug that owns the new run (default: {LOCAL_GROUP_SLUG})",
     )
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a simulation log")
@@ -712,6 +727,16 @@ async def _run_simulation(
     else:
         runs_dir = Path(args.runs_dir)
         run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
+        await register_run_standalone(
+            group_slug=args.group_slug,
+            scenario=scenario.name(),
+            run_dir_name=run_dir.name,
+            status=RunStatus.STARTING.value,
+            created_at=datetime.now(tz=UTC),
+            created_by_user_id=None,
+            source_run_scenario=None,
+            source_run_dir_name=None,
+        )
 
     scenario.set_run_dir(run_dir=run_dir)
     agents = scenario.get_agents(default_model=args.model, default_provider=args.provider)

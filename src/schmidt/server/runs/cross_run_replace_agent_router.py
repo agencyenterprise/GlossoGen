@@ -15,13 +15,13 @@ from fastapi import APIRouter, HTTPException, Request
 from schmidt.cross_run_replace_agent import CrossRunReplaceAgentRequest as CoreRequest
 from schmidt.cross_run_replace_agent import cross_run_replace_agent_in_run
 from schmidt.evaluation.log_reader import load_events
-from schmidt.models.event import AgentRegistered, RoundAdvanced
-from schmidt.server.runs.discovery import resolve_run
+from schmidt.models.event import AgentRegistered, RoundAdvanced, RunStatus
+from schmidt.server.runs.lookup import register_new_run, resolve_run_or_404
 from schmidt.server.runs.models import CrossRunReplaceAgentRequest, CrossRunReplaceAgentResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api/g/{group_slug}")
 
 
 def _split_run_id(run_id: str) -> tuple[str, str]:
@@ -99,14 +99,11 @@ async def cross_run_replace_agent(
     """
     runs_dir: Path = request.app.state.runs_dir
 
-    try:
-        source_a = resolve_run(
-            runs_dir=runs_dir,
-            scenario_name=scenario,
-            run_dir_name=run_dir_name,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Run not found") from exc
+    source_a = await resolve_run_or_404(
+        request=request,
+        scenario=scenario,
+        run_dir_name=run_dir_name,
+    )
 
     try:
         source_b_scenario, source_b_dir_name = _split_run_id(run_id=body.source_b_run_id)
@@ -122,14 +119,11 @@ async def cross_run_replace_agent(
             ),
         )
 
-    try:
-        source_b = resolve_run(
-            runs_dir=runs_dir,
-            scenario_name=source_b_scenario,
-            run_dir_name=source_b_dir_name,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Source B run not found") from exc
+    source_b = await resolve_run_or_404(
+        request=request,
+        scenario=source_b_scenario,
+        run_dir_name=source_b_dir_name,
+    )
 
     if (body.model is None) != (body.provider is None):
         raise HTTPException(
@@ -175,6 +169,15 @@ async def cross_run_replace_agent(
         result = await cross_run_replace_agent_in_run(request=core_request)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    await register_new_run(
+        request=request,
+        scenario=source_a.scenario_name,
+        run_dir_name=result.new_run_dir.name,
+        status=RunStatus.STARTING.value,
+        source_run_scenario=source_a.scenario_name,
+        source_run_dir_name=run_dir_name,
+    )
 
     return CrossRunReplaceAgentResponse(
         new_run_id=result.new_run_id,

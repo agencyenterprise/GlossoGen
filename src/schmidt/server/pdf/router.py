@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from pathlib import Path
 
 import weasyprint  # type: ignore[import-untyped]
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -11,11 +10,11 @@ from fastapi.responses import Response
 from schmidt.server.pdf.export_data import build_pdf_export_data
 from schmidt.server.pdf.html_renderer import render_pdf_html
 from schmidt.server.runs.detail_reader import load_run_detail
-from schmidt.server.runs.discovery import resolve_run
+from schmidt.server.runs.lookup import resolve_run_or_404
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api/g/{group_slug}")
 
 
 def _generate_pdf_bytes(html: str) -> bytes:
@@ -52,15 +51,11 @@ async def export_run_pdf(
     Generates a PDF containing messages, reasoning, and tool calls
     grouped by round and turn. Optionally filters to a single channel.
     """
-    runs_dir: Path = request.app.state.runs_dir
-    try:
-        resolved = resolve_run(
-            runs_dir=runs_dir,
-            scenario_name=scenario,
-            run_dir_name=run_dir_name,
-        )
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Run not found")
+    resolved = await resolve_run_or_404(
+        request=request,
+        scenario=scenario,
+        run_dir_name=run_dir_name,
+    )
 
     log_path = resolved.run_dir / f"{resolved.scenario_name}.jsonl"
 

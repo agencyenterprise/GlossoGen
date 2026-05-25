@@ -8,6 +8,7 @@ import { api } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
+import { useGroupPath } from "@/features/auth/group-context";
 import { buildAgentColorMap, buildChannelColorMap, deriveInitials } from "../runs/agent-colors";
 import { formatTime, humanize } from "../runs/format";
 import { type ForkInfo, ForkBranchCard } from "./fork-branch-card";
@@ -37,6 +38,7 @@ function groupMessagesByRound(messages: ChannelMessage[]): MessageGroup[] {
 }
 
 export function BranchesTimeline({ runId }: { runId: string }) {
+  const groupPath = useGroupPath();
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -59,7 +61,7 @@ export function BranchesTimeline({ runId }: { runId: string }) {
   } = useQuery({
     queryKey: ["run", runId],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/runs/{scenario}/{run_dir_name}", {
+      const { data, error } = await api.GET("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}", {
         params: { path: splitRunId(runId) },
       });
       if (error) {
@@ -72,7 +74,7 @@ export function BranchesTimeline({ runId }: { runId: string }) {
   const { data: allRuns } = useQuery({
     queryKey: ["runs"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/runs");
+      const { data, error } = await api.GET("/api/g/{group_slug}/runs");
       if (error) {
         throw new Error("Failed to fetch runs");
       }
@@ -187,7 +189,7 @@ export function BranchesTimeline({ runId }: { runId: string }) {
       {/* Header */}
       <div className="mb-8 flex items-center gap-3">
         <Link
-          href="/branches"
+          href={groupPath("/branches")}
           className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <ArrowLeft className="h-5 w-5" />

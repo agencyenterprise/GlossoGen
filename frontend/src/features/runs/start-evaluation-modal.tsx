@@ -28,7 +28,7 @@ export function StartEvaluationModal({
   const { data, isLoading } = useQuery({
     queryKey: ["scenarios"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/scenarios");
+      const { data, error } = await api.GET("/api/g/{group_slug}/scenarios");
       if (error) {
         throw new Error("Failed to fetch scenarios");
       }
@@ -76,14 +76,17 @@ export function StartEvaluationModal({
 
   const startMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await api.POST("/api/runs/{scenario}/{run_dir_name}/evaluate", {
-        params: { path: splitRunId(runId) },
-        body: {
-          model,
-          provider,
-          metrics: [...selectedMetrics],
-        },
-      });
+      const { error } = await api.POST(
+        "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/evaluate",
+        {
+          params: { path: splitRunId(runId) },
+          body: {
+            model,
+            provider,
+            metrics: [...selectedMetrics],
+          },
+        }
+      );
       if (error) {
         const detail =
           typeof error === "object" && error !== null && "detail" in error

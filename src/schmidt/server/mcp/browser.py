@@ -23,6 +23,7 @@ from pydantic import AnyHttpUrl
 
 from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 from schmidt.scenario_registry import SCENARIO_REGISTRY
+from schmidt.server.mcp.asgi_context import McpRunContextMiddleware
 from schmidt.server.mcp.models import (
     McpAgent,
     McpAgentModel,
@@ -47,19 +48,16 @@ from schmidt.server.mcp.models import (
     McpToolCall,
 )
 from schmidt.server.mcp.oauth_provider import SchmidtOAuthProvider
+from schmidt.server.mcp.run_context import get_run_context
 from schmidt.server.run_launcher import launch_simulation
 from schmidt.server.runs.detail_reader import debug_log_path_for, load_debug_logs, load_run_detail
-from schmidt.server.runs.discovery import discover_runs
+from schmidt.server.runs.listing import list_runs_owned_by_group
 from schmidt.server.runs.models import RunDetailResponse, RunSummary
 from schmidt.token_pricing import list_models, list_providers
 
 logger = logging.getLogger(__name__)
 
 _SCENARIOS_BASE = Path(__file__).resolve().parent.parent.parent / "scenarios"
-
-# Module-level state set by mount_mcp_browser().
-_runs_dir: Path = Path("./runs")
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -74,12 +72,23 @@ def _list_knobs_files(scenario_name: str) -> list[str]:
     return sorted(f.stem for f in scenario_dir.glob("knobs_*.json"))
 
 
+async def _list_runs_for_active_group(scenario_filter: str | None) -> list[RunSummary]:
+    """Return summaries for every run owned by the active group on this request."""
+    ctx = get_run_context()
+    return await list_runs_owned_by_group(
+        pool=ctx.pool,
+        runs_dir=ctx.runs_dir,
+        group_id=ctx.group_id,
+        scenario_filter=scenario_filter,
+    )
+
+
 async def _find_run_by_prefix(run_id_prefix: str) -> RunSummary:
-    """Find a unique run whose run_id starts with the given prefix.
+    """Find a unique run (within the active group) whose run_id starts with ``run_id_prefix``.
 
     Raises ValueError if zero or multiple runs match.
     """
-    all_runs = await discover_runs(runs_dir=_runs_dir)
+    all_runs = await _list_runs_for_active_group(scenario_filter=None)
     matches = [r for r in all_runs if r.run_id.startswith(run_id_prefix)]
     if len(matches) == 0:
         raise ValueError(f"No run found matching prefix '{run_id_prefix}'")
@@ -255,7 +264,7 @@ async def _tool_list_runs(
     status: str | None = None,
 ) -> McpListRunsResult:
     """List simulation runs with filtering and pagination."""
-    all_runs = await discover_runs(runs_dir=_runs_dir)
+    all_runs = await _list_runs_for_active_group(scenario_filter=None)
 
     filtered = all_runs
     if scenario is not None:
@@ -510,6 +519,7 @@ async def _tool_start_run(
         raise ValueError(f"Unknown scenario: {scenario_name}")
 
     scenario_cls = SCENARIO_REGISTRY[scenario_name]
+    ctx = get_run_context()
 
     launch_simulation(
         scenario_name=scenario_name,
@@ -517,7 +527,8 @@ async def _tool_start_run(
         provider=provider,
         scenario_cls=scenario_cls,
         knobs=knobs,
-        runs_dir=_runs_dir,
+        runs_dir=ctx.runs_dir,
+        group_slug=ctx.group_slug,
     )
 
     return McpStartRunResult(
@@ -651,15 +662,20 @@ def mount_mcp_browser(
 ) -> None:
     """Mount the MCP runs browser on the FastAPI app at /mcp.
 
-    Creates the Starlette sub-app and stores the session manager so the
-    main app lifespan can start it (sub-app lifespans do not run when
-    mounted inside FastAPI).
+    Wraps FastMCP's Starlette sub-app with :class:`McpRunContextMiddleware`,
+    which primes the per-request :class:`RunContext` (runs_dir, pool,
+    group_id, group_slug) from the OAuth token before each tool runs. The
+    session manager is stored so the main app lifespan can start it (sub-app
+    lifespans do not run when mounted inside FastAPI).
     """
-    global _runs_dir  # noqa: PLW0603
-    _runs_dir = runs_dir
-
     mcp = _build_mcp_server(oauth_provider=oauth_provider, issuer_url=issuer_url)
     starlette_app = mcp.streamable_http_app()
-    app.mount("/mcp", starlette_app)
+    wrapped = McpRunContextMiddleware(
+        app=starlette_app,
+        oauth_provider=oauth_provider,
+        get_pool=lambda: app.state.db_pool,
+        get_runs_dir=lambda: runs_dir,
+    )
+    app.mount("/mcp", wrapped)
     app.state.mcp_session_manager = mcp.session_manager
     logger.info("MCP runs browser mounted at /mcp")

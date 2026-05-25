@@ -3,6 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/shared/lib/api-client";
 import { splitRunId } from "@/shared/lib/run-id";
+import { useGroupPath } from "@/features/auth/group-context";
 
 interface ResumeAtRoundArgs {
   roundStart: number;
@@ -11,10 +12,11 @@ interface ResumeAtRoundArgs {
 }
 
 export function useResumeAtRound(runId: string) {
+  const groupPath = useGroupPath();
   return useMutation({
     mutationFn: async (args: ResumeAtRoundArgs) => {
       const { data, error } = await api.POST(
-        "/api/runs/{scenario}/{run_dir_name}/resume-at-round",
+        "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/resume-at-round",
         {
           params: { path: splitRunId(runId) },
           body: {
@@ -37,7 +39,7 @@ export function useResumeAtRound(runId: string) {
       return data;
     },
     onSuccess: data => {
-      window.location.href = `/runs/${data.new_run_id}`;
+      window.location.href = groupPath(`/runs/${data.new_run_id}`);
     },
   });
 }

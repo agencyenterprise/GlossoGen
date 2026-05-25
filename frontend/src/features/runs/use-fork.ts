@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/shared/lib/api-client";
 import { splitRunId } from "@/shared/lib/run-id";
+import { useGroupPath } from "@/features/auth/group-context";
 
 export interface PendingEdit {
   messageId: string;
@@ -11,6 +12,7 @@ export interface PendingEdit {
 }
 
 export function useFork(runId: string) {
+  const groupPath = useGroupPath();
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [pendingEdits, setPendingEdits] = useState<Map<string, PendingEdit>>(new Map());
 
@@ -53,16 +55,19 @@ export function useFork(runId: string) {
         new_text: e.newText,
       }));
 
-      const { data, error } = await api.POST("/api/runs/{scenario}/{run_dir_name}/fork", {
-        params: { path: splitRunId(runId) },
-        body: {
-          target_message_id: targetMessageId,
-          message_edits: edits,
-          model,
-          provider,
-          knobs: knobs ?? null,
-        },
-      });
+      const { data, error } = await api.POST(
+        "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/fork",
+        {
+          params: { path: splitRunId(runId) },
+          body: {
+            target_message_id: targetMessageId,
+            message_edits: edits,
+            model,
+            provider,
+            knobs: knobs ?? null,
+          },
+        }
+      );
       if (error) {
         throw new Error("Failed to create fork");
       }
@@ -70,7 +75,7 @@ export function useFork(runId: string) {
     },
     onSuccess: data => {
       clearEdits();
-      window.location.href = `/runs/${data.fork_run_id}`;
+      window.location.href = groupPath(`/runs/${data.fork_run_id}`);
     },
   });
 

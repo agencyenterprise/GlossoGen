@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Request
 from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.server.response_models import LaunchStatus
 from schmidt.server.run_launcher import launch_simulation
+from schmidt.server.runs.lookup import get_identity
 from schmidt.server.scenarios.models import (
     AgentRoleInfo,
     AgentRolesRequest,
@@ -28,7 +29,7 @@ from schmidt.token_pricing import list_models, list_providers
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api/g/{group_slug}")
 
 _SCENARIOS_BASE = Path(__file__).resolve().parent.parent.parent / "scenarios"
 
@@ -167,6 +168,7 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
         )
 
     scenario_cls = SCENARIO_REGISTRY[body.scenario_name]
+    identity = get_identity(request=request)
 
     try:
         launch_simulation(
@@ -176,6 +178,7 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
             scenario_cls=scenario_cls,
             knobs=body.knobs,
             runs_dir=runs_dir,
+            group_slug=identity.active_group_slug,
         )
     except (SystemExit, ValueError, TypeError) as exc:
         raise HTTPException(

@@ -47,9 +47,12 @@ def launch_simulation(
     scenario_cls: type[SimulationScenario],
     knobs: dict[str, Any] | None,
     runs_dir: Path,
+    group_slug: str,
 ) -> None:
     """Validate config and launch a simulation as a background subprocess.
 
+    ``group_slug`` is forwarded to the CLI so the subprocess registers the
+    new run row under the right tenant after ``claim_run_dir`` succeeds.
     Raises ValueError for invalid config, RuntimeError for launch failures.
     """
     if provider not in list_providers():
@@ -76,6 +79,8 @@ def launch_simulation(
         provider,
         "--runs-dir",
         str(runs_dir),
+        "--group-slug",
+        group_slug,
     ]
 
     config_path = build_config_file(knobs=validated.scenario_config)
