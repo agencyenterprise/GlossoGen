@@ -32,6 +32,11 @@ dependencies = [
     "transformers>=5.0.0rc3",
     "matplotlib>=3.10.9",
     "rapidfuzz>=3.10.0",
+    "psycopg[binary]>=3.2.0",
+    "psycopg-pool>=3.2.0",
+    "alembic>=1.13.0",
+    "svix>=1.40.0",
+    "clerk-backend-api>=3.0.0",
 ]
 
 [dependency-groups]
