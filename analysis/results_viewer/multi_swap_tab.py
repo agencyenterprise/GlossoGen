@@ -18,6 +18,7 @@ from statistics import mean, stdev
 
 import plotly.graph_objects as go
 import streamlit as st
+from rapidfuzz.distance import Levenshtein
 
 from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.multi_swap_data import MultiSwapRun, PhaseScore, list_multi_swap_runs
@@ -266,20 +267,65 @@ def _has_simulation_ended(jsonl_path: Path) -> bool:
     return False
 
 
-def _run_probe_phase_similarity(probe_path: Path) -> dict[str, float]:
-    """Reduce one run's replica-self-similarity payload to one scalar per phase."""
-    payload = json.loads(probe_path.read_text())
-    groups = payload.get("groups", [])
+_PHASE_A_CUTOFF = 11
+
+
+def _run_drift_from_phase_a(probe_jsonl_path: Path) -> dict[str, float]:
+    """Per phase, mean similarity between this phase's replica answers and the
+    Phase-A (cutoff=11) replica answers for the same (agent, question).
+
+    For Phase A (cutoff=11) the comparison is degenerate (reference vs itself),
+    so we plot the off-diagonal pairwise similarity of the 3 Phase-A replicas
+    — i.e. the agent's intra-replica noise floor at Phase A. For Phase B/C/D
+    we compute the mean similarity over all 9 cross-cutoff pairs (3 Phase-A
+    replicas × 3 current-phase replicas) and average across (agent, question).
+    """
+    # texts[(agent_id, question_id)][cutoff_round] = list of response_texts sorted by replica_index
+    texts: dict[tuple[str, str], dict[int, list[str]]] = defaultdict(lambda: defaultdict(list))
+    raw_rows: dict[tuple[str, str, int], list[tuple[int, str]]] = defaultdict(list)
+    with probe_jsonl_path.open() as fh:
+        for line in fh:
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            agent_id = row.get("agent_id")
+            question_id = row.get("question_id")
+            cutoff = row.get("cutoff_round")
+            replica = row.get("replica_index")
+            response = row.get("response_text", "")
+            if agent_id is None or question_id is None or cutoff is None or replica is None:
+                continue
+            raw_rows[(agent_id, question_id, int(cutoff))].append((int(replica), response))
+    for (agent_id, question_id, cutoff), rows in raw_rows.items():
+        rows.sort(key=lambda x: x[0])
+        texts[(agent_id, question_id)][cutoff] = [text for _, text in rows]
+
     by_phase: dict[str, list[float]] = {p: [] for p in _PHASE_ORDER}
-    for group in groups:
-        cutoff = group.get("cutoff_round")
-        phase = _PHASE_BY_CUTOFF.get(int(cutoff)) if cutoff is not None else None
-        if phase is None:
+    for _, per_cutoff in texts.items():
+        reference = per_cutoff.get(_PHASE_A_CUTOFF)
+        if not reference:
             continue
-        cells = group.get("cells", [])
-        values = [cell.get("value") for cell in cells if cell.get("value") is not None]
-        if values:
-            by_phase[phase].append(mean(values))
+        for cutoff, phase in _PHASE_BY_CUTOFF.items():
+            current = per_cutoff.get(cutoff)
+            if not current:
+                continue
+            pair_values: list[float] = []
+            if cutoff == _PHASE_A_CUTOFF:
+                # Off-diagonal within Phase A — the noise floor.
+                n = len(current)
+                for i in range(n):
+                    for j in range(i + 1, n):
+                        pair_values.append(
+                            Levenshtein.normalized_similarity(current[i], current[j])
+                        )
+            else:
+                # All cross-cutoff pairs: every Phase-A replica vs every current-phase replica.
+                for ref_text in reference:
+                    for cur_text in current:
+                        pair_values.append(Levenshtein.normalized_similarity(ref_text, cur_text))
+            if pair_values:
+                by_phase[phase].append(mean(pair_values))
     return {phase: (mean(values) if values else float("nan")) for phase, values in by_phase.items()}
 
 
@@ -440,14 +486,14 @@ def _build_phase_similarity_chart(
             )
         )
     fig.update_layout(
-        title="Probe replica self-similarity per phase",
+        title="Probe-answer drift from end of Phase A",
         xaxis=dict(
             title="Phase (probe cutoff at phase end)",
             tickmode="array",
             tickvals=x_positions,
             ticktext=[f"Phase {p}" for p in _PHASE_ORDER],
         ),
-        yaxis=dict(title="Mean replica self-similarity (Levenshtein)"),
+        yaxis=dict(title="Mean similarity to end-of-Phase-A answers (Levenshtein)"),
         height=430,
         margin=dict(t=70, b=80, l=60, r=20),
         legend=dict(orientation="h", yanchor="bottom", y=-0.22, xanchor="left", x=0),
@@ -516,12 +562,12 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
                 round_data.append(_per_round_success(jsonl_path=jsonl))
         cohort_round_data.append((label, round_data))
 
-        # Probe similarity: read protocol_probe_replica_self_similarity.json
+        # Probe drift-from-Phase-A: read protocol_probe_responses.jsonl directly
         probe_data: list[dict[str, float]] = []
         for run in runs:
-            probe_path = run.run_dir / "protocol_probe_replica_self_similarity.json"
+            probe_path = run.run_dir / "protocol_probe_responses.jsonl"
             if probe_path.exists():
-                probe_data.append(_run_probe_phase_similarity(probe_path=probe_path))
+                probe_data.append(_run_drift_from_phase_a(probe_jsonl_path=probe_path))
         cohort_probe_data.append((label, probe_data))
 
     # Summary table of cohort sizes
@@ -536,9 +582,7 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
                 and _has_simulation_ended(jsonl_path=(r.run_dir / f"{r.scenario_name}.jsonl"))
             ]
         )
-        probe_n = sum(
-            1 for r in runs if (r.run_dir / "protocol_probe_replica_self_similarity.json").exists()
-        )
+        probe_n = sum(1 for r in runs if (r.run_dir / "protocol_probe_responses.jsonl").exists())
         summary_rows.append(
             {
                 "Cohort": label,
@@ -560,17 +604,21 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
     st.plotly_chart(fig_rounds, use_container_width=True, key="multi_swap_cohort_rounds_chart")
 
     st.markdown("---")
-    st.subheader("Probe replica self-similarity per phase")
+    st.subheader("Probe-answer drift from end of Phase A")
     st.caption(
         "At each phase boundary we ask each agent the same probe question 3 times "
-        "(3 replicas under temperature). We then compare **each pair of those 3 "
-        "replica answers to each other** using normalized Levenshtein similarity, "
-        "and average per (agent, question), then across (agent, question) within "
-        "the run. **Higher = the agent gives the same answer when re-asked → its "
-        "internal protocol description is stable**; lower = the agent's answer "
-        "varies between identical re-asks. Probe cutoffs 11/21/31/41 map to the "
-        "end of phases A/B/C/D respectively (an exclusive round cutoff, so "
-        "cutoff=11 means the agent has seen rounds 1–10)."
+        "(3 replicas under temperature). For Phase B/C/D we then compare **the 3 "
+        "current-phase replica answers against the 3 end-of-Phase-A replica "
+        "answers for the same (agent, question)** — every cross pair (9 total) "
+        "scored with normalized Levenshtein similarity, then averaged per "
+        "(agent, question) and across (agent, question) within the run. The "
+        "Phase A point itself is the **noise floor**: off-diagonal pairwise "
+        "similarity among the 3 Phase-A replicas (no cross-phase reference yet). "
+        "**Higher = the agent still gives the same answer it gave at end of "
+        "Phase A → protocol unchanged**; lower = the agent's answer has drifted "
+        "since Phase A → language has shifted. Probe cutoffs 11/21/31/41 map "
+        "to the end of phases A/B/C/D respectively (an exclusive round cutoff, "
+        "so cutoff=11 means the agent has seen rounds 1–10)."
     )
     fig_sim = _build_phase_similarity_chart(cohorts=cohort_probe_data)
     st.plotly_chart(fig_sim, use_container_width=True, key="multi_swap_cohort_similarity_chart")
