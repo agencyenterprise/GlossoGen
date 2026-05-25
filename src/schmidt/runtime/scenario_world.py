@@ -51,8 +51,8 @@ class WorldContext:
     to broadcast notifications to all agents.
     """
 
-    _channel_router: ChannelRouter
-    _get_current_round: Callable[[], int]
+    channel_router: ChannelRouter
+    get_current_round: Callable[[], int]
 
     def __init__(
         self,
@@ -73,7 +73,7 @@ class WorldContext:
         Agents outside the channel do not receive the notification. One
         ``WorldEventDelivered`` event is logged per delivered agent.
         """
-        router = self._channel_router
+        router = self.channel_router
         member_ids = router.get_channel_member_ids(channel_id=channel_id)
         for agent_id in member_ids:
             session = self._agent_sessions.get(agent_id)
@@ -85,7 +85,7 @@ class WorldContext:
             await self._event_logger.log(
                 event=WorldEventDelivered(
                     agent_id=agent_id,
-                    round_number=self._get_current_round(),
+                    round_number=self.get_current_round(),
                     text=text,
                 )
             )
@@ -109,7 +109,7 @@ class WorldContext:
         await self._event_logger.log(
             event=WorldEventDelivered(
                 agent_id=agent_id,
-                round_number=self._get_current_round(),
+                round_number=self.get_current_round(),
                 text=text,
             )
         )
@@ -133,7 +133,7 @@ class WorldContext:
         rechecked on every ``send_message`` / ``read_channel`` call, so the
         change takes effect immediately for all subsequent tool invocations.
         """
-        router = self._channel_router
+        router = self.channel_router
         old_members = set(router.get_channel_member_ids(channel_id=channel_id))
         new_members = set(member_agent_ids)
         newly_added = new_members - old_members
@@ -153,7 +153,7 @@ class WorldContext:
         await self._event_logger.log(
             event=ChannelMembershipChanged(
                 channel_id=channel_id,
-                round_number=self._get_current_round(),
+                round_number=self.get_current_round(),
                 member_agent_ids=list(member_agent_ids),
                 reason=reason,
             )
@@ -165,14 +165,14 @@ class WorldContext:
         Agents' ``last_seen_count`` for this channel is reset to zero so that
         messages appended after the wipe are correctly flagged as new.
         """
-        router = self._channel_router
+        router = self.channel_router
         router.clear_history(channel_id=channel_id)
         for session in self._agent_sessions.values():
             session.set_last_seen_count(channel_id=channel_id, count=0)
         await self._event_logger.log(
             event=ChannelHistoryCleared(
                 channel_id=channel_id,
-                round_number=self._get_current_round(),
+                round_number=self.get_current_round(),
                 reason=reason,
             )
         )

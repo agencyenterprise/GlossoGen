@@ -472,7 +472,7 @@ def _render_lookup_section(
         format_func=_format_run_picker_option,
         key="feature_presence_run_picker",
     )
-    if chosen is None:
+    if chosen is None:  # pyright: ignore[reportUnnecessaryComparison]
         return
     st.markdown(
         f"[Open in run viewer]({run_url(frontend_base=frontend_base, run_id=chosen.run_id)})"
@@ -559,7 +559,7 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
         key="feature_presence_scenario",
         horizontal=True,
     )
-    if selected_scenario is None:
+    if selected_scenario is None:  # pyright: ignore[reportUnnecessaryComparison]
         st.info("Select a scenario.")
         return
     runs = [run for run in all_runs if run.scenario_name == selected_scenario]

@@ -19,7 +19,7 @@ import sys
 import time
 from collections import Counter
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 
 class Job(NamedTuple):
@@ -67,11 +67,12 @@ def count_existing_runs() -> Counter[tuple[int, str]]:
             continue
         if not isinstance(labels, list):
             continue
-        if not all(tag in labels for tag in LABELS_BASE):
+        typed_labels = cast(list[str], labels)
+        if not all(tag in typed_labels for tag in LABELS_BASE):
             continue
         budget = None
         pm_label = None
-        for label in labels:
+        for label in typed_labels:
             if label.startswith("budget="):
                 value = label.split("=", 1)[1]
                 if value.isdigit():

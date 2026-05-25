@@ -46,8 +46,8 @@ class SimulationRuntime:
         self._agent_tool_allowlists = agent_tool_allowlists
         self._world_context = world_context
         self._current_round = 1
-        world_context._channel_router = self._channel_router
-        world_context._get_current_round = lambda: self._current_round
+        world_context.channel_router = self._channel_router
+        world_context.get_current_round = lambda: self._current_round
         self._agent_configs_by_id = {c.agent_id: c for c in agent_configs}
         self._token_counters: dict[str, TokenCounter] = {}
         self._channel_locks: dict[str, asyncio.Lock] = {

@@ -166,14 +166,14 @@ def _link_reasoning_to_channels(
         for item in items:
             if isinstance(item, ChannelMessage):
                 for r in pending_reasoning:
-                    channels = set()
+                    channels: set[str] = set()
                     if prev_channel:
                         channels.add(prev_channel)
                     channels.add(item.channel_id)
                     r.channel_ids = sorted(channels)
                 pending_reasoning = []
                 prev_channel = item.channel_id
-            elif isinstance(item, ReasoningEntry):
+            else:
                 pending_reasoning.append(item)
 
         for r in pending_reasoning:

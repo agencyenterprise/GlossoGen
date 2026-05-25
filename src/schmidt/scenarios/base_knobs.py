@@ -56,6 +56,6 @@ class BaseKnobs(BaseModel):
     model_overrides: dict[str, AgentModelOverride]
     postmortem_duration_seconds: float = 120.0
     replace_agent_default_channel_visibility: dict[str, bool] = {}
-    scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
+    scheduled_events: list[ScheduledEvent] = Field(default_factory=list[ScheduledEvent])
     agent_max_tokens: int = 16384
     round_time_budget_seconds: int | None

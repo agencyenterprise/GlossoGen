@@ -27,12 +27,10 @@ def _is_retryable_hf_error(exc: BaseException) -> bool:
     """Return True for rate-limit (429) and server (5xx) errors from the HuggingFace API."""
     if not isinstance(exc, HfHubHTTPError):
         return False
-    response = exc.response
-    if response is None:
-        return False
-    if response.status_code == 429:
+    status = exc.response.status_code
+    if status == 429:
         return True
-    if response.status_code >= 500:
+    if status >= 500:
         return True
     return False
 
@@ -48,8 +46,11 @@ async def _chat_completion_with_retry(
     kwargs: dict[str, Any],
 ) -> ChatCompletionOutput:
     """Call the HuggingFace chat completion API with retry on transient errors."""
-    response: ChatCompletionOutput = await client.chat_completion(**kwargs)
-    return response
+    # `client.chat_completion` is overloaded on the `stream` literal; passing
+    # **kwargs hides that from pyright. We always call with stream=False.
+    client_any: Any = client
+    completion: ChatCompletionOutput = await client_any.chat_completion(**kwargs)
+    return completion
 
 
 class HuggingFaceProvider(LLMProvider):
@@ -118,13 +119,12 @@ class HuggingFaceProvider(LLMProvider):
         )
         response = await _chat_completion_with_retry(client=self._client, kwargs=kwargs)
 
-        if response.usage is not None:
-            self._record_usage(
-                input_tokens=response.usage.prompt_tokens,
-                output_tokens=response.usage.completion_tokens,
-                cache_read_input_tokens=0,
-                cache_creation_input_tokens=0,
-            )
+        self._record_usage(
+            input_tokens=response.usage.prompt_tokens,
+            output_tokens=response.usage.completion_tokens,
+            cache_read_input_tokens=0,
+            cache_creation_input_tokens=0,
+        )
 
         choice = response.choices[0]
         message = choice.message

@@ -14,7 +14,7 @@ import logging
 import time
 from io import BytesIO, StringIO
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple, cast
 
 import dulwich.porcelain as git
 
@@ -83,16 +83,17 @@ class RunRepository:
         repo_path = str(self._run_dir)
 
         if paths is None:
-            # Stage all tracked, modified, and untracked files
-            status = git.status(repo=repo_path)
+            # Stage all tracked, modified, and untracked files. dulwich's
+            # GitStatus exposes staged paths as bytes, untracked as str.
+            status: Any = git.status(repo=repo_path)
+            staged_groups = cast(dict[str, list[bytes]], status.staged)
+            unstaged_paths = cast(list[bytes], status.unstaged)
+            untracked_paths = cast(list[str], status.untracked)
             all_paths: list[str] = []
-            # Staged changes
-            for path_set in status.staged.values():
+            for path_set in staged_groups.values():
                 all_paths.extend(p.decode() for p in path_set)
-            # Unstaged changes
-            all_paths.extend(p.decode() for p in status.unstaged)
-            # Untracked files
-            all_paths.extend(status.untracked)
+            all_paths.extend(p.decode() for p in unstaged_paths)
+            all_paths.extend(untracked_paths)
             if not all_paths:
                 return self._get_head_sha_sync()
             git.add(repo=repo_path, paths=all_paths)

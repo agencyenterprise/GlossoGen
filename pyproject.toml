@@ -39,7 +39,6 @@ dependencies = [
 dev = [
     "black>=26.3.1",
     "isort==5.13.2",
-    "mypy==1.11.2",
     "pyright>=1.1.407",
     "ruff>=0.14.3",
     "vulture>=2.14",
@@ -74,16 +73,6 @@ target-version = ["py312"]
 profile = "black"
 line_length = 100
 
-[tool.mypy]
-python_version = "3.12"
-strict = true
-mypy_path = "src"
-explicit_package_bases = true
-
-[[tool.mypy.overrides]]
-module = ["plotly.*"]
-ignore_missing_imports = true
-
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -93,11 +82,29 @@ select = ["E", "F", "ARG"]
 
 [tool.pyright]
 pythonVersion = "3.12"
-typeCheckingMode = "standard"
+typeCheckingMode = "strict"
 venvPath = "."
 venv = ".venv"
 extraPaths = ["src", "."]
-ignore = ["vulture_whitelist.py", "runs"]
+ignore = ["vulture_whitelist.py", "runs", "modal"]
+
+# analysis/ is exploratory plotting code that talks to untyped libs
+# (pandas, plotly, matplotlib, streamlit). Relax the strict-only rules
+# that fire on inferred Unknown / missing-stub types there.
+[[tool.pyright.executionEnvironments]]
+root = "analysis"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownParameterType = "none"
+reportMissingTypeStubs = "none"
+reportMissingTypeArgument = "none"
+reportMissingParameterType = "none"
+reportPrivateUsage = "none"
+reportUntypedFunctionDecorator = "none"
+reportUntypedClassDecorator = "none"
+reportUnusedFunction = "none"
 
 [tool.vulture]
 min_confidence = 80

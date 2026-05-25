@@ -18,7 +18,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 import uvicorn
 from dotenv import load_dotenv
@@ -532,7 +532,7 @@ def _build_run_config(
         if existing_overrides is None:
             split.scenario_config["model_overrides"] = split.agent_overrides
         elif isinstance(existing_overrides, dict):
-            merged_overrides = dict(existing_overrides)
+            merged_overrides: dict[str, Any] = dict(cast(dict[str, Any], existing_overrides))
             merged_overrides.update(split.agent_overrides)
             split.scenario_config["model_overrides"] = merged_overrides
         else:
@@ -650,7 +650,7 @@ def _channel_visibility_from_manifest(
     return result
 
 
-def _read_replace_manifest(run_dir: Path) -> _ReplaceManifestInfo | None:
+def read_replace_manifest_info(run_dir: Path) -> _ReplaceManifestInfo | None:
     """Read ``replace_manifest.json`` if present and project to resume fields."""
     manifest = read_replace_manifest(run_dir=run_dir)
     if manifest is None:
@@ -735,7 +735,7 @@ async def _run_simulation(
     if resuming:
         logger.info("Loading rewind state from %s", log_path)
         events = await load_events(log_path=log_path)
-        replace_info = _read_replace_manifest(run_dir=run_dir)
+        replace_info = read_replace_manifest_info(run_dir=run_dir)
         cross_run_info = _read_cross_run_manifest(run_dir=run_dir)
         agent_filters: dict[str, AgentHistoryFilter] = {}
         if cross_run_info is not None:
@@ -1026,7 +1026,8 @@ async def _resolve_default_visible_channels(
             raw = event.scenario_config.get("replace_agent_default_channel_visibility", {})
             if isinstance(raw, dict):
                 visibility_map = {
-                    str(channel_id): bool(visible) for channel_id, visible in raw.items()
+                    str(channel_id): bool(visible)
+                    for channel_id, visible in cast(dict[Any, Any], raw).items()
                 }
         elif isinstance(event, AgentRegistered) and event.agent_id == replaced_agent_id:
             agent_channels = list(event.channel_ids)

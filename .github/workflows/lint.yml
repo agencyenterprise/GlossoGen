@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: make install-server
 
-      - name: Lint server (black, isort, ruff, mypy, pyright, vulture, custom linters)
+      - name: Lint server (black, isort, ruff, pyright, vulture, custom linters)
         run: make lint-server
 
   lint-frontend:

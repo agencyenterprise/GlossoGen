@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from typing import Any
+from typing import Any, cast
 
 import openai
 from pydantic import BaseModel
@@ -37,8 +37,10 @@ async def _responses_with_retry(
     kwargs: dict[str, Any],
 ) -> Any:
     """Call the OpenAI Responses API with exponential-backoff retry."""
-    response = await client.responses.create(**kwargs)
-    return response
+    # openai SDK responses.create is overloaded on `stream`; **kwargs hides
+    # the literal from pyright. We always call with stream=False.
+    client_any: Any = client
+    return await client_any.responses.create(**kwargs)
 
 
 class OpenAIProvider(LLMProvider):
@@ -157,7 +159,7 @@ def _enforce_strict_schema(schema: dict[str, Any]) -> None:
             _enforce_strict_schema(schema=prop_schema)
 
     if "items" in schema and isinstance(schema["items"], dict):
-        _enforce_strict_schema(schema=schema["items"])
+        _enforce_strict_schema(schema=cast(dict[str, Any], schema["items"]))
 
     if "$defs" in schema:
         for def_schema in schema["$defs"].values():

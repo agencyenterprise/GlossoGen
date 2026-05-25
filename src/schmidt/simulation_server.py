@@ -6,6 +6,10 @@ process discovers this server via the ``stream.json`` manifest and proxies
 its output to the frontend.
 """
 
+# FastAPI route handlers below are registered via the ``@app.get(...)``
+# decorator; pyright can't see the framework's runtime use of them.
+# pyright: reportUnusedFunction=false
+
 import asyncio
 import logging
 import os
@@ -45,7 +49,9 @@ def _create_simulation_app(event_bus: EventBus) -> FastAPI:
         return HealthResponse(status=HealthStatus.OK)
 
     @app.get("/events")
-    async def stream_events(request: Request) -> StreamingResponse:
+    async def stream_events(
+        request: Request,
+    ) -> StreamingResponse:
         """Stream live simulation events as SSE from the in-process EventBus."""
         bus: EventBus = request.app.state.event_bus
 

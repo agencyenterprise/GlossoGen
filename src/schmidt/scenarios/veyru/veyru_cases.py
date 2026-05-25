@@ -503,7 +503,9 @@ class InjectCasePayload(BaseModel):
     stages: list[_StagePayload] = Field(min_length=1)
     time_budget_seconds: int = Field(ge=1)
     stellar_reading: _StellarReadingPayload
-    engineer_addendum: list[_AddendumEntryPayload] = Field(default_factory=list)
+    engineer_addendum: list[_AddendumEntryPayload] = Field(
+        default_factory=list[_AddendumEntryPayload]
+    )
 
 
 class InjectedCaseBundle(NamedTuple):

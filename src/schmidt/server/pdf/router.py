@@ -24,7 +24,9 @@ def _generate_pdf_bytes(html: str) -> bytes:
     This is a synchronous CPU-bound operation, intended to be called
     via asyncio.to_thread() to avoid blocking the event loop.
     """
-    result: bytes | None = weasyprint.HTML(string=html).write_pdf()
+    result: bytes | None = weasyprint.HTML(
+        string=html
+    ).write_pdf()  # pyright: ignore[reportUnknownMemberType]
     if result is None:
         raise RuntimeError("weasyprint.write_pdf() returned None")
     return result

@@ -25,12 +25,7 @@ import asyncio
 import logging
 from typing import Any
 
-from schmidt.runtime.scenario_world import (
-    MessageEvent,
-    RoundAdvancedEvent,
-    ScenarioWorld,
-    WorldContext,
-)
+from schmidt.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
 from schmidt.scenarios.container_yard_stacking.events import ContainerYardCraneMoveStep
 from schmidt.scenarios.container_yard_stacking.ids import (
     BUDGET_EXCEEDED_MARKER,
@@ -502,11 +497,10 @@ class ContainerYardWorld(ScenarioWorld):
                 event = await context.next_event()
                 if isinstance(event, RoundAdvancedEvent):
                     continue
-                if isinstance(event, MessageEvent):
-                    team_id = team_id_for_channel(channel_id=event.channel_id)
-                    if team_id is None:
-                        continue
-                    await self._send_threshold_notifications(context=context, team_id=team_id)
+                team_id = team_id_for_channel(channel_id=event.channel_id)
+                if team_id is None:
+                    continue
+                await self._send_threshold_notifications(context=context, team_id=team_id)
         except asyncio.CancelledError:
             return
 

@@ -17,7 +17,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 import orjson
 
@@ -131,7 +131,7 @@ def find_round_start_timestamp(
     raise ValueError(f"No RoundAdvanced event with event_id={target_event_id!r} in source run")
 
 
-def _collect_source_agents(
+def collect_source_agents(
     events: list[SimulationEvent],
     boundary_timestamp: datetime,
 ) -> dict[str, AgentRegistered]:
@@ -151,7 +151,7 @@ def _collect_source_agents(
     return out
 
 
-def _build_model_overrides(
+def build_model_overrides(
     source_agents: dict[str, AgentRegistered],
     replaced_agent_id: str | None,
     replacement_model: str | None,
@@ -300,7 +300,7 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         events=source_events,
         target_event_id=target_event_id,
     )
-    source_agents = _collect_source_agents(
+    source_agents = collect_source_agents(
         events=source_events,
         boundary_timestamp=boundary_timestamp,
     )
@@ -382,18 +382,19 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
     user_overrides: dict[str, dict[str, str]] | None = None
     if isinstance(raw_user_overrides, dict):
         coerced: dict[str, dict[str, str]] = {}
-        for agent_id, value in raw_user_overrides.items():
+        for agent_id, value in cast(dict[Any, Any], raw_user_overrides).items():
             if not isinstance(value, dict) or "model" not in value or "provider" not in value:
                 raise ValueError(
                     f"model_overrides[{agent_id!r}] must be an object with "
                     "'model' and 'provider' string fields"
                 )
+            typed_value = cast(dict[str, Any], value)
             coerced[str(agent_id)] = {
-                "model": str(value["model"]),
-                "provider": str(value["provider"]),
+                "model": str(typed_value["model"]),
+                "provider": str(typed_value["provider"]),
             }
         user_overrides = coerced
-    merged_scenario_config["model_overrides"] = _build_model_overrides(
+    merged_scenario_config["model_overrides"] = build_model_overrides(
         source_agents=source_agents,
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,

@@ -16,7 +16,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 import orjson
 
@@ -28,8 +28,8 @@ from schmidt.cross_run_replace_manifest import (
 from schmidt.evaluation.log_reader import load_events
 from schmidt.models.event import RoundAdvanced, SimulationEvent, SimulationStarted
 from schmidt.replace_agent import (
-    _build_model_overrides,
-    _collect_source_agents,
+    build_model_overrides,
+    collect_source_agents,
     compose_run_id,
     find_round_start_timestamp,
     resolve_round_start_anchor,
@@ -208,11 +208,11 @@ async def cross_run_replace_agent_in_run(
         )
     else:
         source_b_boundary_timestamp = source_b_events[-1].timestamp
-    source_a_agents = _collect_source_agents(
+    source_a_agents = collect_source_agents(
         events=source_a_events,
         boundary_timestamp=source_a_boundary_timestamp,
     )
-    source_b_agents = _collect_source_agents(
+    source_b_agents = collect_source_agents(
         events=source_b_events,
         boundary_timestamp=source_b_boundary_timestamp,
     )
@@ -292,18 +292,19 @@ async def cross_run_replace_agent_in_run(
     user_overrides: dict[str, dict[str, str]] | None = None
     if isinstance(raw_user_overrides, dict):
         coerced: dict[str, dict[str, str]] = {}
-        for agent_id, value in raw_user_overrides.items():
+        for agent_id, value in cast(dict[Any, Any], raw_user_overrides).items():
             if not isinstance(value, dict) or "model" not in value or "provider" not in value:
                 raise ValueError(
                     f"model_overrides[{agent_id!r}] must be an object with "
                     "'model' and 'provider' string fields"
                 )
+            typed_value = cast(dict[str, Any], value)
             coerced[str(agent_id)] = {
-                "model": str(value["model"]),
-                "provider": str(value["provider"]),
+                "model": str(typed_value["model"]),
+                "provider": str(typed_value["provider"]),
             }
         user_overrides = coerced
-    merged_scenario_config["model_overrides"] = _build_model_overrides(
+    merged_scenario_config["model_overrides"] = build_model_overrides(
         source_agents=source_a_agents,
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,

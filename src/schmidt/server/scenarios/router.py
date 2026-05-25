@@ -59,7 +59,7 @@ def _resolve_knobs_path(scenario_name: str, knobs_name: str) -> Path:
 @router.get("/scenarios", response_model=ScenariosResponse)
 async def list_scenarios() -> ScenariosResponse:
     """List all available scenarios with their knobs files and supported providers."""
-    scenarios = []
+    scenarios: list[ScenarioInfo] = []
     for name in sorted(SCENARIO_REGISTRY.keys()):
         knobs_files = _list_knobs_files(scenario_name=name)
         scenario_cls = SCENARIO_REGISTRY[name]

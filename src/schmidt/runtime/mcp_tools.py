@@ -7,6 +7,10 @@ tools are wrapped with an authorization guard that checks the per-agent
 allowlist in ``SimulationRuntime`` before dispatching.
 """
 
+# FastMCP tool handlers below are registered via ``@mcp.tool(...)``;
+# pyright can't see the framework's runtime use of them.
+# pyright: reportUnusedFunction=false
+
 import asyncio
 import functools
 import inspect
@@ -174,7 +178,9 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
             "read_notifications again after handling the current one to drain the queue."
         ),
     )
-    async def read_notifications(ctx: ToolContext) -> dict[str, Any]:
+    async def read_notifications(
+        ctx: ToolContext,
+    ) -> dict[str, Any]:  # pyright: ignore[reportUnusedFunction]
         """Block until there is activity for the agent, then return it.
 
         For NewMessagesNotifications, filters out channels the agent has
@@ -289,7 +295,9 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         name="read_channel",
         description="Read the last N messages from a channel.",
     )
-    async def read_channel(ctx: ToolContext, channel_id: str, last_n: int) -> dict[str, Any]:
+    async def read_channel(
+        ctx: ToolContext, channel_id: str, last_n: int
+    ) -> dict[str, Any]:  # pyright: ignore[reportUnusedFunction]
         """Return recent messages and advance the agent's read position.
 
         Updates last_seen so that messages visible at read time are not
@@ -336,7 +344,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
             "Set force=true to send regardless of new messages."
         ),
     )
-    async def send_message(
+    async def send_message(  # pyright: ignore[reportUnusedFunction]
         ctx: ToolContext, channel_id: str, text: str, force: bool
     ) -> dict[str, Any]:
         """Post a message with optimistic concurrency control."""
@@ -469,7 +477,9 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         name="list_channels",
         description="See which channels you have access to.",
     )
-    async def list_channels(ctx: ToolContext) -> list[dict[str, str]]:
+    async def list_channels(
+        ctx: ToolContext,
+    ) -> list[dict[str, str]]:  # pyright: ignore[reportUnusedFunction]
         """Return the channels the agent belongs to with display names."""
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
         agent_id = session.agent_id
@@ -489,7 +499,9 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         name="get_channel_members",
         description="See who is in a channel.",
     )
-    async def get_channel_members(ctx: ToolContext, channel_id: str) -> list[dict[str, str]]:
+    async def get_channel_members(
+        ctx: ToolContext, channel_id: str
+    ) -> list[dict[str, str]]:  # pyright: ignore[reportUnusedFunction]
         """Return the members of a channel with display names."""
         session = _resolve_agent_from_context(ctx=ctx, runtime=runtime)
         agent_id = session.agent_id
