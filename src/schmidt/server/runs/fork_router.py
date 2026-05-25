@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from schmidt.evaluation.log_reader import load_events
 from schmidt.message_rewind import build_rewind_state
-from schmidt.models.event import SimulationStarted
+from schmidt.models.event import RunStatus, SimulationStarted
 from schmidt.run_archive import claim_run_dir, copy_run_at_event, find_message_offset
 from schmidt.run_config_validation import validate_run_config
 from schmidt.run_jsonl_rewriter import (
@@ -25,13 +25,14 @@ from schmidt.run_jsonl_rewriter import (
     rewrite_run_jsonl,
 )
 from schmidt.scenario_registry import SCENARIO_REGISTRY
-from schmidt.server.runs.discovery import compose_run_id, resolve_run
+from schmidt.server.runs.discovery import compose_run_id
+from schmidt.server.runs.lookup import register_new_run, resolve_run_or_404
 from schmidt.server.runs.models import ForkRequest, ForkResponse
 from schmidt.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api/g/{group_slug}")
 
 
 def _build_fork_config(
@@ -63,14 +64,11 @@ async def fork_run(
     background subprocess with ``--resume``.
     """
     runs_dir: Path = request.app.state.runs_dir
-    try:
-        resolved = resolve_run(
-            runs_dir=runs_dir,
-            scenario_name=scenario,
-            run_dir_name=run_dir_name,
-        )
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Run not found")
+    resolved = await resolve_run_or_404(
+        request=request,
+        scenario=scenario,
+        run_dir_name=run_dir_name,
+    )
 
     source_run_dir = resolved.run_dir
     scenario_name = resolved.scenario_name
@@ -110,6 +108,14 @@ async def fork_run(
         )
 
     new_run_dir = claim_run_dir(runs_dir=runs_dir, scenario_name=scenario_name)
+    await register_new_run(
+        request=request,
+        scenario=scenario_name,
+        run_dir_name=new_run_dir.name,
+        status=RunStatus.STARTING.value,
+        source_run_scenario=scenario_name,
+        source_run_dir_name=run_dir_name,
+    )
     new_log_filename = f"{scenario_name}.jsonl"
     await copy_run_at_event(
         source_dir=source_run_dir,

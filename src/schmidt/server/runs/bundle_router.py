@@ -11,20 +11,23 @@ import shutil
 import tarfile
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 
 import orjson
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from schmidt.event_parsing import parse_event_bytes
-from schmidt.models.event import SimulationStarted
+from schmidt.models.event import RunStatus, SimulationStarted
 from schmidt.run_archive import claim_run_dir, strip_legacy_git_dir
-from schmidt.server.runs.discovery import compose_run_id, discover_runs, resolve_run
+from schmidt.server.runs.discovery import compose_run_id
+from schmidt.server.runs.listing import list_runs_for_group
+from schmidt.server.runs.lookup import register_new_run, resolve_run_or_404
 from schmidt.server.runs.models import BundleManifest, ImportBundleResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api/g/{group_slug}")
 
 BUNDLE_EXCLUDED_NAMES: set[str] = {
     ".git",
@@ -99,15 +102,11 @@ async def export_run_bundle(
     request: Request,
 ) -> StreamingResponse:
     """Export a simulation run as a tar.gz bundle."""
-    runs_dir: Path = request.app.state.runs_dir
-    try:
-        resolved = resolve_run(
-            runs_dir=runs_dir,
-            scenario_name=scenario,
-            run_dir_name=run_dir_name,
-        )
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Run not found")
+    resolved = await resolve_run_or_404(
+        request=request,
+        scenario=scenario,
+        run_dir_name=run_dir_name,
+    )
 
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
     original_timestamp = int(resolved.run_dir.name.split("_")[0])
@@ -191,11 +190,23 @@ def _rename_to_original_timestamp(run_dir: Path, original_timestamp: int) -> Pat
         target_ts += 1
 
 
+class _BundleImportOutcome(NamedTuple):
+    """Result of a bundle import attempt.
+
+    ``freshly_extracted`` is ``False`` when the run was already present on
+    disk and the call short-circuited; the caller skips the ``runs`` row
+    insert in that case, since a row already exists.
+    """
+
+    response: ImportBundleResponse
+    freshly_extracted: bool
+
+
 def _extract_and_validate_bundle(
     tar_bytes: bytes,
     runs_dir: Path,
     existing_run_dirs: dict[str, str],
-) -> ImportBundleResponse:
+) -> _BundleImportOutcome:
     """Validate and extract a bundle tar.gz into the runs directory.
 
     Performs all validation before extraction, and cleans up on failure.
@@ -237,10 +248,13 @@ def _extract_and_validate_bundle(
                 manifest.run_id,
                 existing_dir,
             )
-            return ImportBundleResponse(
-                run_id=manifest.run_id,
-                scenario_name=manifest.scenario_name,
-                run_dir=existing_dir,
+            return _BundleImportOutcome(
+                response=ImportBundleResponse(
+                    run_id=manifest.run_id,
+                    scenario_name=manifest.scenario_name,
+                    run_dir=existing_dir,
+                ),
+                freshly_extracted=False,
             )
 
         run_dir = claim_run_dir(
@@ -265,10 +279,13 @@ def _extract_and_validate_bundle(
         original_timestamp=manifest.original_timestamp,
     )
 
-    return ImportBundleResponse(
-        run_id=manifest.run_id,
-        scenario_name=manifest.scenario_name,
-        run_dir=str(target_dir),
+    return _BundleImportOutcome(
+        response=ImportBundleResponse(
+            run_id=manifest.run_id,
+            scenario_name=manifest.scenario_name,
+            run_dir=str(target_dir),
+        ),
+        freshly_extracted=True,
     )
 
 
@@ -299,24 +316,32 @@ async def import_run_bundle(
     except tarfile.TarError:
         raise HTTPException(status_code=422, detail="File is not a valid tar.gz archive")
 
-    summaries = await discover_runs(runs_dir=runs_dir)
+    summaries = await list_runs_for_group(request=request, scenario_filter=None)
     existing_run_dirs = {s.run_id: s.run_dir for s in summaries}
 
-    result = await asyncio.to_thread(
+    outcome = await asyncio.to_thread(
         _extract_and_validate_bundle,
         tar_bytes,
         runs_dir,
         existing_run_dirs,
     )
 
-    run_dir = Path(result.run_dir)
-    strip_legacy_git_dir(run_dir=run_dir)
+    if outcome.freshly_extracted:
+        run_dir = Path(outcome.response.run_dir)
+        strip_legacy_git_dir(run_dir=run_dir)
+        await register_new_run(
+            request=request,
+            scenario=outcome.response.scenario_name,
+            run_dir_name=run_dir.name,
+            status=RunStatus.SCENARIO_COMPLETE.value,
+            source_run_scenario=None,
+            source_run_dir_name=None,
+        )
+        logger.info(
+            "Imported run %s (%s) to %s",
+            outcome.response.run_id,
+            outcome.response.scenario_name,
+            outcome.response.run_dir,
+        )
 
-    logger.info(
-        "Imported run %s (%s) to %s",
-        result.run_id,
-        result.scenario_name,
-        result.run_dir,
-    )
-
-    return result
+    return outcome.response

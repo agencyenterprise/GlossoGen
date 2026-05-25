@@ -1,13 +1,19 @@
-"""OAuth authorization server provider for the Schmidt MCP server.
+"""OAuth authorization server provider for the schmidt MCP server.
 
 Implements the ``OAuthAuthorizationServerProvider`` protocol from the MCP
-library, backed by :class:`OAuthStorage` for persistence. Delegates user
-authentication to :mod:`oauth_login_page` which serves a password form when
-``APP_PASSWORD`` is configured, or auto-approves when auth is disabled.
+library, backed by :class:`OAuthStorage` (Postgres). Every authorization
+code, access token, and refresh token is bound to a ``group_id`` at consent
+time; the binding is preserved through every exchange and refresh.
+
+Local mode (``CLERK_SECRET_KEY`` unset) auto-approves consent and binds
+issued tokens to the synthetic ``local`` group. The Clerk-session-gated
+consent UI ships with step 8 of the multi-tenancy rollout.
 """
 
 import logging
 import time
+from collections.abc import Callable
+from uuid import UUID
 
 from mcp.server.auth.provider import (
     AccessToken,
@@ -30,16 +36,22 @@ logger = logging.getLogger(__name__)
 
 
 class SchmidtOAuthProvider:
-    """OAuth provider backed by SQLite storage.
+    """OAuth provider backed by Postgres storage with per-group token binding.
 
-    When ``app_password`` is None the server runs without user authentication
-    and the authorize flow auto-approves every request.
+    In local mode the active-group resolver always returns the synthetic
+    ``local`` group; in Clerk mode it pulls the chosen group from the
+    Clerk-session-gated consent page (wired up in step 8).
     """
 
-    def __init__(self, storage: OAuthStorage, login_url: str, app_password: str | None) -> None:
+    def __init__(
+        self,
+        storage: OAuthStorage,
+        get_local_group_id: Callable[[], UUID],
+        is_local_mode: bool,
+    ) -> None:
         self._storage = storage
-        self._login_url = login_url
-        self._app_password = app_password
+        self._get_local_group_id = get_local_group_id
+        self._is_local_mode = is_local_mode
 
     # ------------------------------------------------------------------
     # Client registration
@@ -66,60 +78,37 @@ class SchmidtOAuthProvider:
     ) -> str:
         """Return a URL the user-agent is redirected to for authentication.
 
-        If no ``APP_PASSWORD`` is set the code is issued immediately and the
-        user is redirected straight to the client callback. Otherwise we
-        redirect to the login page which validates the password first.
+        In local mode the code is issued immediately for the local group
+        and the user is redirected straight to the client callback. Clerk
+        mode would redirect to a Clerk-gated consent page; that path lands
+        with step 8.
         """
-        if self._app_password is None:
-            return await self._auto_approve(client=client, params=params)
-        return self._build_login_redirect(client=client, params=params)
-
-    async def _auto_approve(
-        self, client: OAuthClientInformationFull, params: AuthorizationParams
-    ) -> str:
-        """Issue an authorization code without user interaction."""
-        code = await self._create_authorization_code(client=client, params=params)
+        if not self._is_local_mode:
+            raise AuthorizeError(
+                error="access_denied",
+                error_description=(
+                    "Clerk-gated MCP consent is not implemented yet "
+                    "(landing with step 8 of the multi-tenancy rollout)."
+                ),
+            )
+        code = await self._create_authorization_code(
+            client=client,
+            params=params,
+            group_id=self._get_local_group_id(),
+        )
         return construct_redirect_uri(
             str(params.redirect_uri),
             code=code.code,
             state=params.state,
         )
 
-    def _build_login_redirect(
-        self, client: OAuthClientInformationFull, params: AuthorizationParams
-    ) -> str:
-        """Build a URL to the login page carrying all OAuth parameters."""
-        scopes_str = " ".join(params.scopes) if params.scopes else ""
-        return construct_redirect_uri(
-            self._login_url,
-            client_id=client.client_id,
-            redirect_uri=str(params.redirect_uri),
-            redirect_uri_provided_explicitly=str(int(params.redirect_uri_provided_explicitly)),
-            code_challenge=params.code_challenge,
-            state=params.state,
-            scope=scopes_str,
-            resource=params.resource,
-        )
-
-    async def create_authorization_code_for_login(
-        self, client_id: str, params: AuthorizationParams
-    ) -> AuthorizationCode:
-        """Called by the login page after successful password verification.
-
-        Public so that the login route handler can invoke it directly.
-        """
-        client = await self._storage.get_client(client_id=client_id)
-        if client is None:
-            raise AuthorizeError(
-                error="unauthorized_client",
-                error_description="Unknown client",
-            )
-        return await self._create_authorization_code(client=client, params=params)
-
     async def _create_authorization_code(
-        self, client: OAuthClientInformationFull, params: AuthorizationParams
+        self,
+        client: OAuthClientInformationFull,
+        params: AuthorizationParams,
+        group_id: UUID,
     ) -> AuthorizationCode:
-        """Generate and persist an authorization code."""
+        """Generate and persist an authorization code bound to ``group_id``."""
         code = AuthorizationCode(
             code=OAuthStorage.generate_token(),
             client_id=client.client_id or "",
@@ -130,7 +119,7 @@ class SchmidtOAuthProvider:
             resource=params.resource,
             expires_at=time.time() + AUTHORIZATION_CODE_LIFETIME,
         )
-        await self._storage.save_authorization_code(code=code)
+        await self._storage.save_authorization_code(code=code, group_id=group_id)
         return code
 
     # ------------------------------------------------------------------
@@ -138,20 +127,43 @@ class SchmidtOAuthProvider:
     # ------------------------------------------------------------------
 
     async def load_authorization_code(
-        self, client: OAuthClientInformationFull, authorization_code: str
+        self,
+        client: OAuthClientInformationFull,
+        authorization_code: str,
     ) -> AuthorizationCode | None:
-        """Load a stored authorization code for the given client."""
-        return await self._storage.load_authorization_code(
+        """Load a stored authorization code for the given client.
+
+        The MCP library protocol expects just ``AuthorizationCode`` here; the
+        ``group_id`` is recovered alongside it during ``exchange_authorization_code``
+        via the same SELECT.
+        """
+        result = await self._storage.load_authorization_code(
             client_id=client.client_id or "",
             code=authorization_code,
         )
+        return result.code if result is not None else None
 
     async def exchange_authorization_code(
         self,
-        client: OAuthClientInformationFull,  # noqa: ARG002 — protocol-required
+        client: OAuthClientInformationFull,
         authorization_code: AuthorizationCode,
     ) -> OAuthToken:
-        """Exchange an authorization code for access + refresh tokens."""
+        """Exchange an authorization code for access + refresh tokens.
+
+        Recovers the ``group_id`` originally bound at consent time and
+        propagates it to both the access and refresh token rows.
+        """
+        with_group = await self._storage.load_authorization_code(
+            client_id=client.client_id or "",
+            code=authorization_code.code,
+        )
+        if with_group is None:
+            raise AuthorizeError(
+                error="access_denied",
+                error_description="Authorization code expired or already used",
+            )
+        group_id = with_group.group_id
+
         await self._storage.delete_authorization_code(code=authorization_code.code)
 
         now = int(time.time())
@@ -168,13 +180,14 @@ class SchmidtOAuthProvider:
             scopes=authorization_code.scopes,
             expires_at=now + REFRESH_TOKEN_LIFETIME,
         )
-        await self._storage.save_access_token(token=access)
-        await self._storage.save_refresh_token(token=refresh)
+        await self._storage.save_access_token(token=access, group_id=group_id)
+        await self._storage.save_refresh_token(token=refresh, group_id=group_id)
 
         logger.info(
-            "Issued tokens for client %s (scopes=%s)",
+            "Issued tokens for client %s (scopes=%s, group=%s)",
             authorization_code.client_id,
             authorization_code.scopes,
+            group_id,
         )
         return OAuthToken(
             access_token=access.token,
@@ -192,18 +205,30 @@ class SchmidtOAuthProvider:
         self, client: OAuthClientInformationFull, refresh_token: str
     ) -> RefreshToken | None:
         """Load a stored refresh token for the given client."""
-        return await self._storage.load_refresh_token(
+        result = await self._storage.load_refresh_token(
             client_id=client.client_id or "",
             token=refresh_token,
         )
+        return result.token if result is not None else None
 
     async def exchange_refresh_token(
         self,
-        client: OAuthClientInformationFull,  # noqa: ARG002 — protocol-required
+        client: OAuthClientInformationFull,
         refresh_token: RefreshToken,
         scopes: list[str],
     ) -> OAuthToken:
         """Rotate the refresh token and issue a new access token."""
+        with_group = await self._storage.load_refresh_token(
+            client_id=client.client_id or "",
+            token=refresh_token.token,
+        )
+        if with_group is None:
+            raise AuthorizeError(
+                error="access_denied",
+                error_description="Refresh token expired or already rotated",
+            )
+        group_id = with_group.group_id
+
         await self._storage.delete_refresh_token(token=refresh_token.token)
 
         effective_scopes = scopes if scopes else refresh_token.scopes
@@ -221,10 +246,12 @@ class SchmidtOAuthProvider:
             scopes=effective_scopes,
             expires_at=now + REFRESH_TOKEN_LIFETIME,
         )
-        await self._storage.save_access_token(token=access)
-        await self._storage.save_refresh_token(token=new_refresh)
+        await self._storage.save_access_token(token=access, group_id=group_id)
+        await self._storage.save_refresh_token(token=new_refresh, group_id=group_id)
 
-        logger.info("Rotated refresh token for client %s", refresh_token.client_id)
+        logger.info(
+            "Rotated refresh token for client %s (group=%s)", refresh_token.client_id, group_id
+        )
         return OAuthToken(
             access_token=access.token,
             token_type="Bearer",
@@ -238,8 +265,19 @@ class SchmidtOAuthProvider:
     # ------------------------------------------------------------------
 
     async def load_access_token(self, token: str) -> AccessToken | None:
-        """Verify and return an access token."""
-        return await self._storage.load_access_token(token=token)
+        """Verify and return an access token (group_id lookup is separate)."""
+        result = await self._storage.load_access_token(token=token)
+        return result.token if result is not None else None
+
+    async def load_access_token_with_group(self, token: str) -> UUID | None:
+        """Return the group_id bound to a valid access token, or None if invalid.
+
+        Used by the MCP ASGI wrapper to populate the per-request ``RunContext``
+        contextvar so tool implementations don't need to re-parse the bearer
+        header.
+        """
+        result = await self._storage.load_access_token(token=token)
+        return result.group_id if result is not None else None
 
     # ------------------------------------------------------------------
     # Revocation

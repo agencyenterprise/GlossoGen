@@ -32,6 +32,7 @@ import { api, downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { splitRunId } from "@/shared/lib/run-id";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
+import { useGroupPath } from "@/features/auth/group-context";
 import { deriveInitials, type AgentColor } from "./agent-colors";
 import type { DisplayEntry } from "./display-entry";
 import { formatTime, humanize } from "./format";
@@ -230,10 +231,11 @@ export function ChatPane({
   agentSwapDividers,
   activeInstanceRoundRange,
 }: ChatPaneProps) {
+  const groupPath = useGroupPath();
   const prodUploadStatus = useQuery({
     queryKey: ["prod-upload-status"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/prod-upload/status");
+      const { data, error } = await api.GET("/api/g/{group_slug}/prod-upload/status");
       if (error) throw new Error("Failed to load prod upload status");
       return data;
     },
@@ -241,12 +243,15 @@ export function ChatPane({
   const [prodUploadJustSucceeded, setProdUploadJustSucceeded] = useState(false);
   const prodUploadMutation = useMutation({
     mutationFn: async (variables: { force: boolean }) => {
-      const { data, error } = await api.POST("/api/runs/{scenario}/{run_dir_name}/upload-to-prod", {
-        params: {
-          path: splitRunId(runId),
-          query: { force: variables.force },
-        },
-      });
+      const { data, error } = await api.POST(
+        "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/upload-to-prod",
+        {
+          params: {
+            path: splitRunId(runId),
+            query: { force: variables.force },
+          },
+        }
+      );
       if (error) {
         const detail = (error as { detail?: string }).detail ?? "Upload failed";
         throw new Error(detail);
@@ -277,7 +282,7 @@ export function ChatPane({
   const metadataSyncMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await api.POST(
-        "/api/runs/{scenario}/{run_dir_name}/sync-metadata-to-prod",
+        "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/sync-metadata-to-prod",
         { params: { path: splitRunId(runId) } }
       );
       if (error) {
@@ -584,7 +589,7 @@ export function ChatPane({
                 params.set("channel_id", selectedChannel);
               }
               void downloadAuthenticatedFile({
-                path: `/api/runs/${runId}/export/pdf`,
+                path: `/api/g/{group_slug}/runs/${runId}/export/pdf`,
                 searchParams: params,
                 fallbackFilename: `${runId.slice(0, 8)}_transcript.pdf`,
               });
@@ -602,7 +607,7 @@ export function ChatPane({
             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             onClick={() => {
               void downloadAuthenticatedFile({
-                path: `/api/runs/${runId}/export/bundle`,
+                path: `/api/g/{group_slug}/runs/${runId}/export/bundle`,
                 searchParams: new URLSearchParams(),
                 fallbackFilename: `${runId.slice(0, 8)}_bundle.tar.gz`,
               });
@@ -830,7 +835,7 @@ export function ChatPane({
                         <>
                           {crossRunReplacedAgentId} imported from{" "}
                           <Link
-                            href={`/runs/${crossRunSourceBRunId}`}
+                            href={groupPath(`/runs/${crossRunSourceBRunId}`)}
                             className="underline-offset-2 hover:underline"
                           >
                             {crossRunSourceBRunId}
@@ -848,7 +853,7 @@ export function ChatPane({
                       <>
                         ; this timeline derives from source A{" "}
                         <Link
-                          href={`/runs/${crossRunSourceARunId}`}
+                          href={groupPath(`/runs/${crossRunSourceARunId}`)}
                           className="underline-offset-2 hover:underline"
                         >
                           {crossRunSourceARunId}

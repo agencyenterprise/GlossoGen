@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/runs": {
+    "/api/g/{group_slug}/runs": {
         parameters: {
             query?: never;
             header?: never;
@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * List Runs
-         * @description List discovered simulation runs.
+         * @description List simulation runs owned by the active group.
          *
          *     Supports optional filters used by the cross-run replace-agent
          *     picker: ``scenario`` restricts to a single scenario, and
@@ -21,7 +21,7 @@ export interface paths {
          *     that agent. ``status`` restricts to runs with a specific final
          *     status (e.g. ``completed``).
          */
-        get: operations["list_runs_api_runs_get"];
+        get: operations["list_runs_api_g__group_slug__runs_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -30,7 +30,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -41,20 +41,20 @@ export interface paths {
          * Get Run Detail
          * @description Get full detail for a specific simulation run.
          */
-        get: operations["get_run_detail_api_runs__scenario___run_dir_name__get"];
+        get: operations["get_run_detail_api_g__group_slug__runs__scenario___run_dir_name__get"];
         put?: never;
         post?: never;
         /**
          * Delete Run
          * @description Stop the simulation if still running, then delete the run directory.
          */
-        delete: operations["delete_run_api_runs__scenario___run_dir_name__delete"];
+        delete: operations["delete_run_api_g__group_slug__runs__scenario___run_dir_name__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/evaluation": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/evaluation": {
         parameters: {
             query?: never;
             header?: never;
@@ -68,7 +68,7 @@ export interface paths {
          *     Lighter than the full run-detail endpoint — used by the runs list to lazy-load
          *     measurements on hover without pulling messages, reasoning, or tool use.
          */
-        get: operations["get_run_evaluation_api_runs__scenario___run_dir_name__evaluation_get"];
+        get: operations["get_run_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluation_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -77,7 +77,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/eval-logs": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/eval-logs": {
         parameters: {
             query?: never;
             header?: never;
@@ -88,7 +88,7 @@ export interface paths {
          * Get Eval Logs
          * @description Return the contents of the evaluation stdout log file.
          */
-        get: operations["get_eval_logs_api_runs__scenario___run_dir_name__eval_logs_get"];
+        get: operations["get_eval_logs_api_g__group_slug__runs__scenario___run_dir_name__eval_logs_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -97,7 +97,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/debug-logs": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/debug-logs": {
         parameters: {
             query?: never;
             header?: never;
@@ -108,7 +108,7 @@ export interface paths {
          * Get Debug Logs
          * @description Return the debug log entries for a simulation run.
          */
-        get: operations["get_debug_logs_api_runs__scenario___run_dir_name__debug_logs_get"];
+        get: operations["get_debug_logs_api_g__group_slug__runs__scenario___run_dir_name__debug_logs_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -117,7 +117,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/stop": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/stop": {
         parameters: {
             query?: never;
             header?: never;
@@ -130,14 +130,14 @@ export interface paths {
          * Stop Run
          * @description Stop a running simulation by sending SIGTERM to its process.
          */
-        post: operations["stop_run_api_runs__scenario___run_dir_name__stop_post"];
+        post: operations["stop_run_api_g__group_slug__runs__scenario___run_dir_name__stop_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/evaluate": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/evaluate": {
         parameters: {
             query?: never;
             header?: never;
@@ -155,14 +155,14 @@ export interface paths {
          *     are valid. Launches ``python -m schmidt evaluate`` as a detached
          *     background process.
          */
-        post: operations["start_evaluation_api_runs__scenario___run_dir_name__evaluate_post"];
+        post: operations["start_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluate_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/events": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/events": {
         parameters: {
             query?: never;
             header?: never;
@@ -180,7 +180,7 @@ export interface paths {
          *     The SSE ``data`` field of each frame contains a JSON object conforming to
          *     one of the SSEEvent union members, discriminated by the ``event_type`` field.
          */
-        get: operations["stream_run_events_api_runs__scenario___run_dir_name__events_get"];
+        get: operations["stream_run_events_api_g__group_slug__runs__scenario___run_dir_name__events_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -189,7 +189,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/labels": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/labels": {
         parameters: {
             query?: never;
             header?: never;
@@ -201,7 +201,7 @@ export interface paths {
          * Update Labels
          * @description Set labels for a simulation run, replacing any existing labels.
          */
-        put: operations["update_labels_api_runs__scenario___run_dir_name__labels_put"];
+        put: operations["update_labels_api_g__group_slug__runs__scenario___run_dir_name__labels_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -209,7 +209,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/note": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/note": {
         parameters: {
             query?: never;
             header?: never;
@@ -220,12 +220,12 @@ export interface paths {
          * Get Note
          * @description Get the note content for a simulation run.
          */
-        get: operations["get_note_api_runs__scenario___run_dir_name__note_get"];
+        get: operations["get_note_api_g__group_slug__runs__scenario___run_dir_name__note_get"];
         /**
          * Update Note
          * @description Set or update the note for a simulation run.
          */
-        put: operations["update_note_api_runs__scenario___run_dir_name__note_put"];
+        put: operations["update_note_api_g__group_slug__runs__scenario___run_dir_name__note_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -233,7 +233,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/labels": {
+    "/api/g/{group_slug}/labels": {
         parameters: {
             query?: never;
             header?: never;
@@ -242,9 +242,9 @@ export interface paths {
         };
         /**
          * List All Labels
-         * @description Get all unique labels across all simulation runs.
+         * @description Get all unique labels across the active group's simulation runs.
          */
-        get: operations["list_all_labels_api_labels_get"];
+        get: operations["list_all_labels_api_g__group_slug__labels_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -253,7 +253,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/fork": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/fork": {
         parameters: {
             query?: never;
             header?: never;
@@ -270,14 +270,14 @@ export interface paths {
          *     applies text edits to the JSONL, and launches the simulation as a
          *     background subprocess with ``--resume``.
          */
-        post: operations["fork_run_api_runs__scenario___run_dir_name__fork_post"];
+        post: operations["fork_run_api_g__group_slug__runs__scenario___run_dir_name__fork_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/replace-agent": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/replace-agent": {
         parameters: {
             query?: never;
             header?: never;
@@ -294,14 +294,14 @@ export interface paths {
          *     its full reconstructed history. Optionally swaps the replaced agent's
          *     model/provider.
          */
-        post: operations["replace_agent_api_runs__scenario___run_dir_name__replace_agent_post"];
+        post: operations["replace_agent_api_g__group_slug__runs__scenario___run_dir_name__replace_agent_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/cross-run-replace-agent": {
         parameters: {
             query?: never;
             header?: never;
@@ -319,14 +319,14 @@ export interface paths {
          *     run, then re-enters the target run at ``round_start``. Same
          *     scenario and same ``agent_id`` only.
          */
-        post: operations["cross_run_replace_agent_api_runs__scenario___run_dir_name__cross_run_replace_agent_post"];
+        post: operations["cross_run_replace_agent_api_g__group_slug__runs__scenario___run_dir_name__cross_run_replace_agent_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/resume-at-round": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/resume-at-round": {
         parameters: {
             query?: never;
             header?: never;
@@ -343,14 +343,14 @@ export interface paths {
          *     ``body.knobs`` is shallow-merged onto the source's scenario config to
          *     let callers reconfigure the post-resume simulation.
          */
-        post: operations["resume_at_round_api_runs__scenario___run_dir_name__resume_at_round_post"];
+        post: operations["resume_at_round_api_g__group_slug__runs__scenario___run_dir_name__resume_at_round_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/export/pdf": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/export/pdf": {
         parameters: {
             query?: never;
             header?: never;
@@ -364,7 +364,7 @@ export interface paths {
          *     Generates a PDF containing messages, reasoning, and tool calls
          *     grouped by round and turn. Optionally filters to a single channel.
          */
-        get: operations["export_run_pdf_api_runs__scenario___run_dir_name__export_pdf_get"];
+        get: operations["export_run_pdf_api_g__group_slug__runs__scenario___run_dir_name__export_pdf_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -373,7 +373,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/export/bundle": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/export/bundle": {
         parameters: {
             query?: never;
             header?: never;
@@ -384,7 +384,7 @@ export interface paths {
          * Export Run Bundle
          * @description Export a simulation run as a tar.gz bundle.
          */
-        get: operations["export_run_bundle_api_runs__scenario___run_dir_name__export_bundle_get"];
+        get: operations["export_run_bundle_api_g__group_slug__runs__scenario___run_dir_name__export_bundle_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -393,7 +393,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/import": {
+    "/api/g/{group_slug}/runs/import": {
         parameters: {
             query?: never;
             header?: never;
@@ -409,14 +409,14 @@ export interface paths {
          *     Idempotent: if a run with the same run_id already exists, returns the
          *     existing run without re-importing.
          */
-        post: operations["import_run_bundle_api_runs_import_post"];
+        post: operations["import_run_bundle_api_g__group_slug__runs_import_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/metadata": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/metadata": {
         parameters: {
             query?: never;
             header?: never;
@@ -431,7 +431,7 @@ export interface paths {
          *     Returns 404 when the run does not exist on this server. Each field of
          *     the body is independent: ``null`` skips the field, a value replaces it.
          */
-        put: operations["sync_run_metadata_api_runs__scenario___run_dir_name__metadata_put"];
+        put: operations["sync_run_metadata_api_g__group_slug__runs__scenario___run_dir_name__metadata_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -439,7 +439,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/prod-upload/status": {
+    "/api/g/{group_slug}/prod-upload/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -450,7 +450,7 @@ export interface paths {
          * Prod Upload Status
          * @description Report whether prod upload is configured on this server.
          */
-        get: operations["prod_upload_status_api_prod_upload_status_get"];
+        get: operations["prod_upload_status_api_g__group_slug__prod_upload_status_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -459,7 +459,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/upload-to-prod": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/upload-to-prod": {
         parameters: {
             query?: never;
             header?: never;
@@ -476,14 +476,14 @@ export interface paths {
          *     bundle is neither rebuilt nor re-uploaded. Pass ``?force=true`` to
          *     delete the remote run first and re-upload, returning ``overridden``.
          */
-        post: operations["upload_run_to_prod_api_runs__scenario___run_dir_name__upload_to_prod_post"];
+        post: operations["upload_run_to_prod_api_g__group_slug__runs__scenario___run_dir_name__upload_to_prod_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/sync-metadata-to-prod": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/sync-metadata-to-prod": {
         parameters: {
             query?: never;
             header?: never;
@@ -499,14 +499,14 @@ export interface paths {
          *     Returns 404 when prod does not have this run (caller should fall back
          *     to the full ``upload-to-prod`` flow). 503 when prod is not configured.
          */
-        post: operations["sync_run_metadata_to_prod_api_runs__scenario___run_dir_name__sync_metadata_to_prod_post"];
+        post: operations["sync_run_metadata_to_prod_api_g__group_slug__runs__scenario___run_dir_name__sync_metadata_to_prod_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/scenarios": {
+    "/api/g/{group_slug}/scenarios": {
         parameters: {
             query?: never;
             header?: never;
@@ -517,7 +517,7 @@ export interface paths {
          * List Scenarios
          * @description List all available scenarios with their knobs files and supported providers.
          */
-        get: operations["list_scenarios_api_scenarios_get"];
+        get: operations["list_scenarios_api_g__group_slug__scenarios_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -526,7 +526,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/scenarios/{scenario_name}/knobs/{knobs_name}": {
+    "/api/g/{group_slug}/scenarios/{scenario_name}/knobs/{knobs_name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -537,7 +537,7 @@ export interface paths {
          * Get Knobs Content
          * @description Read and return the contents of a knobs JSON file.
          */
-        get: operations["get_knobs_content_api_scenarios__scenario_name__knobs__knobs_name__get"];
+        get: operations["get_knobs_content_api_g__group_slug__scenarios__scenario_name__knobs__knobs_name__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -546,7 +546,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/scenarios/{scenario_name}/agents": {
+    "/api/g/{group_slug}/scenarios/{scenario_name}/agents": {
         parameters: {
             query?: never;
             header?: never;
@@ -566,14 +566,14 @@ export interface paths {
          *     instantiation fails (e.g. invalid knobs) so the FE can still show
          *     role names while the user fixes the knobs.
          */
-        post: operations["get_agent_roles_api_scenarios__scenario_name__agents_post"];
+        post: operations["get_agent_roles_api_g__group_slug__scenarios__scenario_name__agents_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/runs/start": {
+    "/api/g/{group_slug}/runs/start": {
         parameters: {
             query?: never;
             header?: never;
@@ -586,7 +586,29 @@ export interface paths {
          * Start Run
          * @description Launch a new simulation as a background subprocess.
          */
-        post: operations["start_run_api_runs_start_post"];
+        post: operations["start_run_api_g__group_slug__runs_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clerk/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Receive Webhook
+         * @description Receive and act on a Clerk webhook event.
+         *
+         *     Returns 200 even for ignored event types so Clerk does not retry them.
+         */
+        post: operations["receive_webhook_api_clerk_webhook_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -607,29 +629,6 @@ export interface paths {
         get: operations["health_api_health_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Verify Auth
-         * @description Verify that the provided password is correct.
-         *
-         *     If the request reaches this endpoint, the middleware already validated
-         *     the password. Returns authenticated=True unconditionally.
-         */
-        post: operations["verify_auth_api_auth_verify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -795,16 +794,8 @@ export interface components {
             /** Labels */
             labels: string[];
         };
-        /**
-         * AuthVerifyResponse
-         * @description Response model for the password verification endpoint.
-         */
-        AuthVerifyResponse: {
-            /** Authenticated */
-            authenticated: boolean;
-        };
-        /** Body_import_run_bundle_api_runs_import_post */
-        Body_import_run_bundle_api_runs_import_post: {
+        /** Body_import_run_bundle_api_g__group_slug__runs_import_post */
+        Body_import_run_bundle_api_g__group_slug__runs_import_post: {
             /** File */
             file: string;
         };
@@ -2473,6 +2464,16 @@ export interface components {
             /** Swapped Observer Display Names */
             swapped_observer_display_names: string[];
         };
+        /**
+         * WebhookAccepted
+         * @description Response payload returned for every accepted Clerk webhook.
+         */
+        WebhookAccepted: {
+            /** Accepted */
+            accepted: boolean;
+            /** Event Type */
+            event_type: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -2482,7 +2483,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    list_runs_api_runs_get: {
+    list_runs_api_g__group_slug__runs_get: {
         parameters: {
             query?: {
                 scenario?: string | null;
@@ -2515,7 +2516,7 @@ export interface operations {
             };
         };
     };
-    get_run_detail_api_runs__scenario___run_dir_name__get: {
+    get_run_detail_api_g__group_slug__runs__scenario___run_dir_name__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2547,7 +2548,7 @@ export interface operations {
             };
         };
     };
-    delete_run_api_runs__scenario___run_dir_name__delete: {
+    delete_run_api_g__group_slug__runs__scenario___run_dir_name__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -2577,7 +2578,7 @@ export interface operations {
             };
         };
     };
-    get_run_evaluation_api_runs__scenario___run_dir_name__evaluation_get: {
+    get_run_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluation_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2609,7 +2610,7 @@ export interface operations {
             };
         };
     };
-    get_eval_logs_api_runs__scenario___run_dir_name__eval_logs_get: {
+    get_eval_logs_api_g__group_slug__runs__scenario___run_dir_name__eval_logs_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2641,7 +2642,7 @@ export interface operations {
             };
         };
     };
-    get_debug_logs_api_runs__scenario___run_dir_name__debug_logs_get: {
+    get_debug_logs_api_g__group_slug__runs__scenario___run_dir_name__debug_logs_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2673,7 +2674,7 @@ export interface operations {
             };
         };
     };
-    stop_run_api_runs__scenario___run_dir_name__stop_post: {
+    stop_run_api_g__group_slug__runs__scenario___run_dir_name__stop_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2703,7 +2704,7 @@ export interface operations {
             };
         };
     };
-    start_evaluation_api_runs__scenario___run_dir_name__evaluate_post: {
+    start_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluate_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2739,7 +2740,7 @@ export interface operations {
             };
         };
     };
-    stream_run_events_api_runs__scenario___run_dir_name__events_get: {
+    stream_run_events_api_g__group_slug__runs__scenario___run_dir_name__events_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2771,7 +2772,7 @@ export interface operations {
             };
         };
     };
-    update_labels_api_runs__scenario___run_dir_name__labels_put: {
+    update_labels_api_g__group_slug__runs__scenario___run_dir_name__labels_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -2807,7 +2808,7 @@ export interface operations {
             };
         };
     };
-    get_note_api_runs__scenario___run_dir_name__note_get: {
+    get_note_api_g__group_slug__runs__scenario___run_dir_name__note_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2839,7 +2840,7 @@ export interface operations {
             };
         };
     };
-    update_note_api_runs__scenario___run_dir_name__note_put: {
+    update_note_api_g__group_slug__runs__scenario___run_dir_name__note_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -2875,7 +2876,7 @@ export interface operations {
             };
         };
     };
-    list_all_labels_api_labels_get: {
+    list_all_labels_api_g__group_slug__labels_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2895,7 +2896,7 @@ export interface operations {
             };
         };
     };
-    fork_run_api_runs__scenario___run_dir_name__fork_post: {
+    fork_run_api_g__group_slug__runs__scenario___run_dir_name__fork_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2931,7 +2932,7 @@ export interface operations {
             };
         };
     };
-    replace_agent_api_runs__scenario___run_dir_name__replace_agent_post: {
+    replace_agent_api_g__group_slug__runs__scenario___run_dir_name__replace_agent_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2967,7 +2968,7 @@ export interface operations {
             };
         };
     };
-    cross_run_replace_agent_api_runs__scenario___run_dir_name__cross_run_replace_agent_post: {
+    cross_run_replace_agent_api_g__group_slug__runs__scenario___run_dir_name__cross_run_replace_agent_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3003,7 +3004,7 @@ export interface operations {
             };
         };
     };
-    resume_at_round_api_runs__scenario___run_dir_name__resume_at_round_post: {
+    resume_at_round_api_g__group_slug__runs__scenario___run_dir_name__resume_at_round_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3039,7 +3040,7 @@ export interface operations {
             };
         };
     };
-    export_run_pdf_api_runs__scenario___run_dir_name__export_pdf_get: {
+    export_run_pdf_api_g__group_slug__runs__scenario___run_dir_name__export_pdf_get: {
         parameters: {
             query?: {
                 channel_id?: string | null;
@@ -3074,7 +3075,7 @@ export interface operations {
             };
         };
     };
-    export_run_bundle_api_runs__scenario___run_dir_name__export_bundle_get: {
+    export_run_bundle_api_g__group_slug__runs__scenario___run_dir_name__export_bundle_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3107,7 +3108,7 @@ export interface operations {
             };
         };
     };
-    import_run_bundle_api_runs_import_post: {
+    import_run_bundle_api_g__group_slug__runs_import_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3116,7 +3117,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_import_run_bundle_api_runs_import_post"];
+                "multipart/form-data": components["schemas"]["Body_import_run_bundle_api_g__group_slug__runs_import_post"];
             };
         };
         responses: {
@@ -3138,7 +3139,7 @@ export interface operations {
             };
         };
     };
-    sync_run_metadata_api_runs__scenario___run_dir_name__metadata_put: {
+    sync_run_metadata_api_g__group_slug__runs__scenario___run_dir_name__metadata_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -3174,7 +3175,7 @@ export interface operations {
             };
         };
     };
-    prod_upload_status_api_prod_upload_status_get: {
+    prod_upload_status_api_g__group_slug__prod_upload_status_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3194,7 +3195,7 @@ export interface operations {
             };
         };
     };
-    upload_run_to_prod_api_runs__scenario___run_dir_name__upload_to_prod_post: {
+    upload_run_to_prod_api_g__group_slug__runs__scenario___run_dir_name__upload_to_prod_post: {
         parameters: {
             query?: {
                 force?: boolean;
@@ -3228,7 +3229,7 @@ export interface operations {
             };
         };
     };
-    sync_run_metadata_to_prod_api_runs__scenario___run_dir_name__sync_metadata_to_prod_post: {
+    sync_run_metadata_to_prod_api_g__group_slug__runs__scenario___run_dir_name__sync_metadata_to_prod_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3260,7 +3261,7 @@ export interface operations {
             };
         };
     };
-    list_scenarios_api_scenarios_get: {
+    list_scenarios_api_g__group_slug__scenarios_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3280,7 +3281,7 @@ export interface operations {
             };
         };
     };
-    get_knobs_content_api_scenarios__scenario_name__knobs__knobs_name__get: {
+    get_knobs_content_api_g__group_slug__scenarios__scenario_name__knobs__knobs_name__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3312,7 +3313,7 @@ export interface operations {
             };
         };
     };
-    get_agent_roles_api_scenarios__scenario_name__agents_post: {
+    get_agent_roles_api_g__group_slug__scenarios__scenario_name__agents_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3347,7 +3348,7 @@ export interface operations {
             };
         };
     };
-    start_run_api_runs_start_post: {
+    start_run_api_g__group_slug__runs_start_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3380,6 +3381,26 @@ export interface operations {
             };
         };
     };
+    receive_webhook_api_clerk_webhook_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookAccepted"];
+                };
+            };
+        };
+    };
     health_api_health_get: {
         parameters: {
             query?: never;
@@ -3396,26 +3417,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
-                };
-            };
-        };
-    };
-    verify_auth_api_auth_verify_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuthVerifyResponse"];
                 };
             };
         };

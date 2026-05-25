@@ -69,14 +69,14 @@ export function LabelPickerModal({
   const { data: allLabelsData } = useQuery({
     queryKey: ["all-labels"],
     queryFn: async () => {
-      const { data: resp } = await api.GET("/api/labels");
+      const { data: resp } = await api.GET("/api/g/{group_slug}/labels");
       return resp;
     },
   });
 
   const mutation = useMutation({
     mutationFn: async (labels: string[]) => {
-      await api.PUT("/api/runs/{scenario}/{run_dir_name}/labels", {
+      await api.PUT("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/labels", {
         params: { path: splitRunId(runId) },
         body: { labels },
       });

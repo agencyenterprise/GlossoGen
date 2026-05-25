@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
 import { splitRunId } from "@/shared/lib/run-id";
+import { useGroupPath } from "@/features/auth/group-context";
 import { formatConfigValueFull, humanize } from "./format";
 import { ModelPicker } from "./model-picker";
 import { ConfigValueModal } from "./config-value-modal";
@@ -137,6 +138,7 @@ function KnobsBadges({
 
 export function NewSimulationForm() {
   const router = useRouter();
+  const groupPath = useGroupPath();
   const queryClient = useQueryClient();
   const [scenario, setScenario] = useState("");
   const [provider, setProvider] = useState("");
@@ -158,7 +160,7 @@ export function NewSimulationForm() {
   const { data, isLoading } = useQuery({
     queryKey: ["scenarios"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/scenarios");
+      const { data, error } = await api.GET("/api/g/{group_slug}/scenarios");
       if (error) {
         throw new Error("Failed to fetch scenarios");
       }
@@ -169,7 +171,7 @@ export function NewSimulationForm() {
   const allLabelsQuery = useQuery({
     queryKey: ["all-labels"],
     queryFn: async () => {
-      const { data: resp } = await api.GET("/api/labels");
+      const { data: resp } = await api.GET("/api/g/{group_slug}/labels");
       return resp;
     },
   });
@@ -180,9 +182,12 @@ export function NewSimulationForm() {
   const knobsQuery = useQuery({
     queryKey: ["knobs", scenario, knobsFile],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/scenarios/{scenario_name}/knobs/{knobs_name}", {
-        params: { path: { scenario_name: scenario, knobs_name: knobsFile } },
-      });
+      const { data, error } = await api.GET(
+        "/api/g/{group_slug}/scenarios/{scenario_name}/knobs/{knobs_name}",
+        {
+          params: { path: { scenario_name: scenario, knobs_name: knobsFile } },
+        }
+      );
       if (error) {
         throw new Error("Failed to fetch knobs");
       }
@@ -210,10 +215,13 @@ export function NewSimulationForm() {
   const agentRolesQuery = useQuery({
     queryKey: ["agentRoles", scenario, effectiveKnobsForAgents],
     queryFn: async () => {
-      const { data, error } = await api.POST("/api/scenarios/{scenario_name}/agents", {
-        params: { path: { scenario_name: scenario } },
-        body: { knobs: effectiveKnobsForAgents },
-      });
+      const { data, error } = await api.POST(
+        "/api/g/{group_slug}/scenarios/{scenario_name}/agents",
+        {
+          params: { path: { scenario_name: scenario } },
+          body: { knobs: effectiveKnobsForAgents },
+        }
+      );
       if (error) {
         throw new Error("Failed to fetch agent roles");
       }
@@ -232,7 +240,7 @@ export function NewSimulationForm() {
   const startMutation = useMutation({
     mutationFn: async () => {
       // Snapshot existing run IDs so we can detect the new one.
-      const before = await api.GET("/api/runs");
+      const before = await api.GET("/api/g/{group_slug}/runs");
       const existingIds = new Set((before.data?.runs ?? []).map(r => r.run_id));
 
       let knobsPayload: KnobsMap | null;
@@ -266,7 +274,7 @@ export function NewSimulationForm() {
         knobsPayload.round_count = computeRoundCount(phaseBuilder);
       }
 
-      const { error } = await api.POST("/api/runs/start", {
+      const { error } = await api.POST("/api/g/{group_slug}/runs/start", {
         body: {
           scenario_name: scenario,
           model,
@@ -287,7 +295,7 @@ export function NewSimulationForm() {
       let newRunId: string | null = null;
       while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 1000));
-        const after = await api.GET("/api/runs");
+        const after = await api.GET("/api/g/{group_slug}/runs");
         const newRun = (after.data?.runs ?? []).find(r => !existingIds.has(r.run_id));
         if (newRun) {
           newRunId = newRun.run_id;
@@ -300,13 +308,13 @@ export function NewSimulationForm() {
 
       // Apply labels and note if provided.
       if (labels.length > 0) {
-        await api.PUT("/api/runs/{scenario}/{run_dir_name}/labels", {
+        await api.PUT("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/labels", {
           params: { path: splitRunId(newRunId) },
           body: { labels },
         });
       }
       if (note.trim()) {
-        await api.PUT("/api/runs/{scenario}/{run_dir_name}/note", {
+        await api.PUT("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/note", {
           params: { path: splitRunId(newRunId) },
           body: { content: note.trim() },
         });
@@ -315,7 +323,7 @@ export function NewSimulationForm() {
       return newRunId;
     },
     onSuccess: runId => {
-      router.push(`/runs/${runId}`);
+      router.push(groupPath(`/runs/${runId}`));
     },
   });
 
@@ -581,7 +589,7 @@ export function NewSimulationForm() {
 
       <div className="flex items-center justify-between pt-2">
         <Link
-          href="/runs"
+          href={groupPath("/runs")}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />

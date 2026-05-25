@@ -23,11 +23,14 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 # Phase 2: install the project itself
 COPY src/ src/
+COPY alembic.ini ./
 RUN uv sync --frozen --no-dev
 
 RUN mkdir -p /data/runs
 
 ENV SCHMIDT_RUNS_DIR=/data/runs
 
-# Railway injects $PORT at runtime
-CMD uv run --no-sync python -m schmidt serve --runs-dir /data/runs --port ${PORT:-8000}
+# Railway injects $PORT at runtime. Run alembic migrations before starting
+# the server so the schema is always at head before any request is served.
+CMD uv run --no-sync alembic upgrade head \
+    && uv run --no-sync python -m schmidt serve --runs-dir /data/runs --port ${PORT:-8000}

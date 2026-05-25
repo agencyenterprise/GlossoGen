@@ -2,6 +2,7 @@
 
 import { Users } from "lucide-react";
 import Link from "next/link";
+import { useGroupPath } from "@/features/auth/group-context";
 
 interface CrossRunReplaceAgentBadgeProps {
   sourceARunId: string;
@@ -20,6 +21,7 @@ export function CrossRunReplaceAgentBadge({
   roundStart,
   sourceBRoundEnd,
 }: CrossRunReplaceAgentBadgeProps) {
+  const groupPath = useGroupPath();
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground"
@@ -30,14 +32,14 @@ export function CrossRunReplaceAgentBadge({
       <span className="font-medium">{replacedAgentId}</span>
       <span>: A=</span>
       <Link
-        href={`/runs/${sourceARunId}`}
+        href={groupPath(`/runs/${sourceARunId}`)}
         className="font-medium underline-offset-2 hover:text-foreground hover:underline"
       >
         {sourceARunId}
       </Link>
       <span>· B=</span>
       <Link
-        href={`/runs/${sourceBRunId}`}
+        href={groupPath(`/runs/${sourceBRunId}`)}
         className="font-medium underline-offset-2 hover:text-foreground hover:underline"
       >
         {sourceBRunId}

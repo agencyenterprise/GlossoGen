@@ -266,9 +266,12 @@ export function VeyruKnobsForm({
   const presetQuery = useQuery({
     queryKey: ["veyru-preset", presetName],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/scenarios/{scenario_name}/knobs/{knobs_name}", {
-        params: { path: { scenario_name: VEYRU_SCENARIO, knobs_name: presetName } },
-      });
+      const { data, error } = await api.GET(
+        "/api/g/{group_slug}/scenarios/{scenario_name}/knobs/{knobs_name}",
+        {
+          params: { path: { scenario_name: VEYRU_SCENARIO, knobs_name: presetName } },
+        }
+      );
       if (error) {
         throw new Error("Failed to fetch preset");
       }

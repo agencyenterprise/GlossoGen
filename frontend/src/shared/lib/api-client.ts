@@ -1,12 +1,55 @@
 import createClient from "openapi-fetch";
 import type { paths } from "@/types/api.gen";
-import { AUTH_STORAGE_KEY } from "@/features/auth/auth-gate";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export const api = createClient<paths>({
   baseUrl: API_URL,
 });
+
+/**
+ * Module-level mirror of the currently active group slug.
+ *
+ * Updated by ``<GroupProvider>`` (which the ``/g/[groupSlug]`` layout
+ * renders) so the openapi-fetch onRequest middleware can substitute
+ * ``{group_slug}`` placeholders in URLs without every call site having to
+ * pass ``params.path.group_slug``. ``null`` outside any group context (the
+ * sign-in pages, etc.) — requests with unsubstituted placeholders will be
+ * rewritten to literally include the placeholder text and the backend
+ * will 404 them, which is fine because such requests shouldn't happen.
+ */
+let _activeGroupSlug: string | null = null;
+
+export function setActiveGroupSlug(slug: string | null): void {
+  _activeGroupSlug = slug;
+}
+
+/**
+ * When Clerk is loaded in the browser, fetch a fresh session token via the
+ * global `window.Clerk` accessor. Returns ``null`` in local mode (no
+ * Clerk) or before Clerk has finished initializing — the backend's
+ * identity middleware treats those requests as the synthetic local
+ * identity.
+ */
+async function getClerkSessionToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  const clerk = (
+    window as unknown as { Clerk?: { session?: { getToken: () => Promise<string | null> } } }
+  ).Clerk;
+  const session = clerk?.session;
+  if (!session) return null;
+  try {
+    return await session.getToken();
+  } catch {
+    return null;
+  }
+}
+
+function substituteGroupSlug(url: string): string {
+  if (_activeGroupSlug === null) return url;
+  const encoded = encodeURIComponent(_activeGroupSlug);
+  return url.replace("{group_slug}", encoded).replace("%7Bgroup_slug%7D", encoded);
+}
 
 export function buildApiUrlWithToken({
   path,
@@ -15,18 +58,12 @@ export function buildApiUrlWithToken({
   path: string;
   searchParams: URLSearchParams;
 }): string {
-  const params = new URLSearchParams(searchParams);
-  if (typeof window !== "undefined") {
-    const password = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (password) {
-      params.set("token", password);
-    }
-  }
-  const query = params.toString();
+  const substituted = substituteGroupSlug(path);
+  const query = searchParams.toString();
   if (query.length > 0) {
-    return `${API_URL}${path}?${query}`;
+    return `${API_URL}${substituted}?${query}`;
   }
-  return `${API_URL}${path}`;
+  return `${API_URL}${substituted}`;
 }
 
 function extractFilename(disposition: string | null, fallback: string): string {
@@ -47,14 +84,13 @@ export async function downloadAuthenticatedFile({
   searchParams: URLSearchParams;
   fallbackFilename: string;
 }): Promise<void> {
+  const substituted = substituteGroupSlug(path);
   const query = searchParams.toString();
-  const url = query.length > 0 ? `${API_URL}${path}?${query}` : `${API_URL}${path}`;
+  const url = query.length > 0 ? `${API_URL}${substituted}?${query}` : `${API_URL}${substituted}`;
   const headers: Record<string, string> = {};
-  if (typeof window !== "undefined") {
-    const password = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (password) {
-      headers["Authorization"] = `Bearer ${password}`;
-    }
+  const token = await getClerkSessionToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
   // eslint-disable-next-line no-restricted-globals -- binary download, openapi-fetch returns typed JSON only
   const resp = await fetch(url, { headers });
@@ -75,19 +111,15 @@ export async function downloadAuthenticatedFile({
 
 api.use({
   async onRequest({ request }) {
-    if (typeof window !== "undefined") {
-      const password = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (password) {
-        request.headers.set("Authorization", `Bearer ${password}`);
-      }
+    const substituted = substituteGroupSlug(request.url);
+    let outgoing = request;
+    if (substituted !== request.url) {
+      outgoing = new Request(substituted, request);
     }
-    return request;
-  },
-  async onResponse({ response }) {
-    if (response.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-      window.location.reload();
+    const token = await getClerkSessionToken();
+    if (token) {
+      outgoing.headers.set("Authorization", `Bearer ${token}`);
     }
-    return response;
+    return outgoing;
   },
 });

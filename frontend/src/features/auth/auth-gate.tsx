@@ -1,60 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { API_URL } from "@/shared/lib/api-client";
-import { LoginPage } from "./login-page";
-
-export const AUTH_STORAGE_KEY = "app_password";
-
-type AuthState = "loading" | "authenticated" | "unauthenticated";
+import type { ReactNode } from "react";
 
 /**
- * Gate that wraps the app and requires password authentication.
+ * Auth gate stub.
  *
- * Checks localStorage for a stored password. If none is found, probes the
- * backend to detect whether auth is disabled (APP_PASSWORD unset). Shows a
- * login page when authentication is required.
+ * The new identity middleware accepts every request automatically when the
+ * backend is in local mode (no CLERK_SECRET_KEY set), so the frontend no
+ * longer needs to prompt for a shared password. Step 8 of the multi-tenancy
+ * rollout replaces this with the Clerk provider + sign-in flow and deletes
+ * this file outright.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
-  const [authState, setAuthState] = useState<AuthState>("loading");
-
-  useEffect(() => {
-    // Always call the verify endpoint to check auth status. If a stored
-    // password exists, include it as a Bearer token. This also validates that
-    // previously stored passwords are still accepted by the server.
-    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-    const headers: Record<string, string> = {};
-    if (stored) {
-      headers["Authorization"] = `Bearer ${stored}`;
-    }
-
-    // eslint-disable-next-line no-restricted-globals
-    fetch(`${API_URL}/api/auth/verify`, { method: "POST", headers })
-      .then(res => {
-        if (res.ok) {
-          setAuthState("authenticated");
-        } else {
-          localStorage.removeItem(AUTH_STORAGE_KEY);
-          setAuthState("unauthenticated");
-        }
-      })
-      .catch(() => {
-        setAuthState("unauthenticated");
-      });
-  }, []);
-
-  const handleLogin = useCallback((password: string) => {
-    localStorage.setItem(AUTH_STORAGE_KEY, password);
-    setAuthState("authenticated");
-  }, []);
-
-  if (authState === "loading") {
-    return null;
-  }
-
-  if (authState === "unauthenticated") {
-    return <LoginPage onLogin={handleLogin} />;
-  }
-
   return <>{children}</>;
 }

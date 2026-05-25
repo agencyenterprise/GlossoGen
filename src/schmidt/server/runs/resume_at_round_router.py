@@ -11,14 +11,15 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Request
 
+from schmidt.models.event import RunStatus
 from schmidt.replace_agent import ReplaceAgentRequest as CoreReplaceAgentRequest
 from schmidt.replace_agent import replace_agent_in_run
-from schmidt.server.runs.discovery import resolve_run
+from schmidt.server.runs.lookup import register_new_run, resolve_run_or_404
 from schmidt.server.runs.models import ResumeAtRoundRequest, ResumeAtRoundResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api/g/{group_slug}")
 
 
 @router.post(
@@ -37,14 +38,11 @@ async def resume_at_round(
     ``body.knobs`` is shallow-merged onto the source's scenario config to
     let callers reconfigure the post-resume simulation.
     """
-    try:
-        resolved = resolve_run(
-            runs_dir=request.app.state.runs_dir,
-            scenario_name=scenario,
-            run_dir_name=run_dir_name,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Run not found") from exc
+    resolved = await resolve_run_or_404(
+        request=request,
+        scenario=scenario,
+        run_dir_name=run_dir_name,
+    )
 
     core_request = CoreReplaceAgentRequest(
         source_run_dir=resolved.run_dir,
@@ -63,6 +61,15 @@ async def resume_at_round(
         result = await replace_agent_in_run(request=core_request)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    await register_new_run(
+        request=request,
+        scenario=resolved.scenario_name,
+        run_dir_name=result.new_run_dir.name,
+        status=RunStatus.STARTING.value,
+        source_run_scenario=resolved.scenario_name,
+        source_run_dir_name=run_dir_name,
+    )
 
     return ResumeAtRoundResponse(
         new_run_id=result.new_run_id,

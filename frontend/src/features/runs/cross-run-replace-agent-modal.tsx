@@ -70,7 +70,7 @@ export function CrossRunReplaceAgentModal({
     queryKey: ["cross-run-candidates", scenarioName, replacedAgentId],
     enabled: replacedAgentId !== "",
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/runs", {
+      const { data, error } = await api.GET("/api/g/{group_slug}/runs", {
         params: {
           query: {
             scenario: scenarioName,
@@ -117,7 +117,7 @@ export function CrossRunReplaceAgentModal({
   const { data: scenariosData } = useQuery({
     queryKey: ["scenarios"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/scenarios");
+      const { data, error } = await api.GET("/api/g/{group_slug}/scenarios");
       if (error) {
         throw new Error("Failed to fetch scenarios");
       }

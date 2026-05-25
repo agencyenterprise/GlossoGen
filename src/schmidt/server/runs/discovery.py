@@ -238,7 +238,7 @@ def _write_summary_cache(run_dir: Path, cache: _SummaryCache) -> None:
 
 
 class ResolvedRun(NamedTuple):
-    """Lightweight run location returned by resolve_run."""
+    """Lightweight run location returned by ``resolve_run_or_404``."""
 
     run_dir: Path
     scenario_name: str
@@ -247,18 +247,6 @@ class ResolvedRun(NamedTuple):
 def compose_run_id(scenario_name: str, run_dir_name: str) -> str:
     """Build the canonical run identifier from its two path components."""
     return f"{scenario_name}/{run_dir_name}"
-
-
-def resolve_run(runs_dir: Path, scenario_name: str, run_dir_name: str) -> ResolvedRun:
-    """Resolve a run directory from its scenario and directory name.
-
-    Raises ValueError if the directory does not exist or contains no JSONL.
-    """
-    run_dir = runs_dir / scenario_name / run_dir_name
-    jsonl_path = run_dir / f"{scenario_name}.jsonl"
-    if not run_dir.is_dir() or not jsonl_path.exists():
-        raise ValueError(f"Run not found: {compose_run_id(scenario_name, run_dir_name)}")
-    return ResolvedRun(run_dir=run_dir, scenario_name=scenario_name)
 
 
 def _timestamp_from_dir(dir_name: str) -> datetime:
@@ -411,7 +399,7 @@ def _live_fields(
     return labels, has_note, has_evaluation, eval_in_progress
 
 
-async def _build_summary(
+async def build_summary(
     scenario_name: str,
     timestamp_dir: Path,
 ) -> RunSummary | None:
@@ -597,7 +585,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                 continue
             tasks.append(
                 asyncio.create_task(
-                    _build_summary(
+                    build_summary(
                         scenario_name=scenario_name,
                         timestamp_dir=timestamp_dir,
                     )

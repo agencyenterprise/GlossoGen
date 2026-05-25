@@ -116,7 +116,7 @@ export function useEventStream(
       if (cancelled) return;
 
       const url = buildApiUrlWithToken({
-        path: `/api/runs/${encodeURIComponent(runId)}/events`,
+        path: `/api/g/{group_slug}/runs/${runId}/events`,
         searchParams: new URLSearchParams(),
       });
       const eventSource = new EventSource(url);

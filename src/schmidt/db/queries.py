@@ -36,6 +36,22 @@ async def get_group_by_slug(
     return _group_row_from_tuple(row)
 
 
+async def get_group_by_id(
+    conn: AsyncConnection[TupleRow],
+    group_id: UUID,
+) -> GroupRow | None:
+    """Look up a group by its UUID primary key; returns ``None`` if not found."""
+    async with conn.cursor() as cur:
+        await cur.execute(
+            f"SELECT {_GROUP_COLUMNS} FROM groups WHERE id = %s",
+            (group_id,),
+        )
+        row = await cur.fetchone()
+    if row is None:
+        return None
+    return _group_row_from_tuple(row)
+
+
 async def get_group_by_clerk_org_id(
     conn: AsyncConnection[TupleRow],
     clerk_org_id: str,

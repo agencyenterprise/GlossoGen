@@ -12,6 +12,7 @@ A platform for testing agent communication through real-life simulations. LLM-ba
 - **Node.js ≥ 22** (for the frontend)
 - **[uv](https://docs.astral.sh/uv/)** — Python package manager
 - **make**, **git**
+- **Postgres ≥ 14** — the backend stores tenancy info and the runs index in Postgres. On macOS: `brew install postgresql@16 && brew services start postgresql@16`. On Debian/Ubuntu: `apt-get install postgresql`.
 - **System libraries for weasyprint** (PDF export). On macOS: `brew install pango cairo gdk-pixbuf libffi`. On Debian/Ubuntu: `apt-get install libpango-1.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0`.
 
 ### Install dependencies
@@ -22,13 +23,34 @@ make install-server     # backend only (uv sync)
 make install-frontend   # frontend only (npm ci)
 ```
 
+### Local Postgres
+
+The backend requires a Postgres database to hold the tenancy tables (groups, runs index, OAuth state). Create a local database and point the backend at it.
+
+```bash
+# 1. Create the database (one-time).
+createdb schmidt_dev
+
+# 2. Apply the migrations (creates groups, runs, user_last_active_group,
+#    schema_migrations, and the OAuth tables).
+DATABASE_URL=postgresql://localhost:5432/schmidt_dev \
+  VIRTUAL_ENV= uv run --no-sync alembic upgrade head
+
+# 3. Verify the schema.
+psql -d schmidt_dev -c "\dt"
+```
+
+The first time the backend boots it will also auto-create the synthetic `local` group used in single-tenant local mode. There's nothing else to do — leave `CLERK_SECRET_KEY` unset and every request runs as `local-user` inside the `local` group.
+
+To reset the database, drop and recreate it: `dropdb schmidt_dev && createdb schmidt_dev && alembic upgrade head`.
+
 ### Configure environment
 
 ```bash
 cp .env.example .env
 ```
 
-See `.env.example` for all available variables (API keys, authentication, CORS). At minimum, set `ANTHROPIC_API_KEY`.
+See `.env.example` for all available variables (API keys, authentication, CORS). At minimum, set `ANTHROPIC_API_KEY` and `DATABASE_URL` (point it at the database you just created — the default in `.env.example` matches the recipe above).
 
 ## Running a Simulation
 
@@ -303,9 +325,26 @@ A FastAPI backend + Next.js frontend for browsing simulation runs. The frontend 
 
 ### Authentication
 
-Set `APP_PASSWORD` in `.env` to require a shared password for the web UI. All REST API endpoints except the health check are protected. If `APP_PASSWORD` is unset, authentication is disabled (default for local development).
+The backend uses **Clerk** for multi-tenant authentication. Each Clerk organization corresponds to a study group; every run is owned by exactly one group and never shared across groups except via the export/import flow.
 
-The MCP endpoint at `/mcp` uses OAuth 2.0 with PKCE for authentication (see MCP Integration below).
+* **Local mode (default for dev clones):** leave `CLERK_SECRET_KEY` unset on the backend and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` unset on the frontend. The backend's identity middleware short-circuits every request to a synthetic `local` group / `local-user`; the frontend renders without a sign-in flow. Postgres is still required (the `local` group + `runs` index live there).
+* **Clerk mode (prod / hosted):** set Clerk env vars on both sides plus `CLERK_WEBHOOK_SECRET` so the backend can keep its local `groups` table in sync with Clerk org create/update/delete events. The frontend mounts `<ClerkProvider>` and Clerk's middleware redirects unauthenticated traffic to `/sign-in`. API requests carry the Clerk session token as the Bearer header; the backend reads the active group from the URL slug (`/api/g/{slug}/...`) and validates membership against the JWT.
+
+The active group is identified by the URL slug — `/g/team-a/runs/...` on the frontend hits `/api/g/team-a/runs/...` on the backend. The identity middleware accepts the request only if the user's Clerk session proves membership of `team-a`. This means a user who belongs to multiple orgs can open `/g/team-a/...` and `/g/team-b/...` in separate tabs concurrently — no shared "active org" session state to race on.
+
+#### Required Clerk JWT template (multi-org users)
+
+For multi-org concurrent browsing, add a custom claim to the **default JWT template** in your Clerk dashboard (Dashboard → JWT Templates → `session`, or wherever your session template lives):
+
+```json
+{
+  "org_memberships": "{{user.organization_memberships}}"
+}
+```
+
+The backend reads this claim to validate that the user is a member of the URL's group, even when their currently active org is a different one. Without this claim the backend falls back to the standard `org_slug` claim, which only carries the *active* org — fine for single-org users, but multi-org users will be forced to switch their active org before accessing each group.
+
+The MCP endpoint at `/mcp/g/{slug}` uses OAuth 2.0 with PKCE (see MCP Integration below). MCP tokens are bound to a specific group at consent time so every tool call is automatically scoped.
 
 ### Starting the Servers
 
@@ -451,7 +490,9 @@ The application deploys to Railway as two services from a single repository. Eac
 - **Backend** (`Dockerfile`, `railway.toml`): Python 3.12, FastAPI server with a persistent volume at `/data/runs` for simulation data.
 - **Frontend** (`frontend/Dockerfile`, `frontend/railway.toml`): Node 22, Next.js standalone build.
 
-Railway environment variables for the backend: `APP_PASSWORD`, `ANTHROPIC_API_KEY`, `ALLOWED_ORIGINS` (set to the frontend URL), `OAUTH_ISSUER_URL` (set to the backend URL to enable MCP). The frontend requires `NEXT_PUBLIC_API_URL` as a build arg pointing to the backend URL.
+Railway environment variables for the backend: `DATABASE_URL` (provision a Postgres database on Railway and attach its connection string here — the backend won't boot without it), `APP_PASSWORD`, `ANTHROPIC_API_KEY`, `ALLOWED_ORIGINS` (set to the frontend URL), `OAUTH_ISSUER_URL` (set to the backend URL to enable MCP). The frontend requires `NEXT_PUBLIC_API_URL` as a build arg pointing to the backend URL.
+
+The backend container runs `alembic upgrade head` on every start so the schema is always at the latest revision before the server begins accepting requests.
 
 ## Linting
 

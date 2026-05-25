@@ -3,6 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/shared/lib/api-client";
 import { splitRunId } from "@/shared/lib/run-id";
+import { useGroupPath } from "@/features/auth/group-context";
 
 interface CrossRunReplaceAgentArgs {
   sourceBRunId: string;
@@ -17,10 +18,11 @@ interface CrossRunReplaceAgentArgs {
 }
 
 export function useCrossRunReplaceAgent(runId: string) {
+  const groupPath = useGroupPath();
   return useMutation({
     mutationFn: async (args: CrossRunReplaceAgentArgs) => {
       const { data, error } = await api.POST(
-        "/api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent",
+        "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/cross-run-replace-agent",
         {
           params: { path: splitRunId(runId) },
           body: {
@@ -49,7 +51,7 @@ export function useCrossRunReplaceAgent(runId: string) {
       return data;
     },
     onSuccess: data => {
-      window.location.href = `/runs/${data.new_run_id}`;
+      window.location.href = groupPath(`/runs/${data.new_run_id}`);
     },
   });
 }

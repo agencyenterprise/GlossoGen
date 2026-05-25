@@ -23,6 +23,7 @@ import { api, downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
+import { useGroupPath } from "@/features/auth/group-context";
 import {
   elapsedSince,
   formatConfigValue,
@@ -85,12 +86,13 @@ export function RunList() {
   } | null>(null);
   const closePopoverTimerRef = useRef<number | null>(null);
   const router = useRouter();
+  const groupPath = useGroupPath();
   const queryClient = useQueryClient();
 
   const { data: labelsData } = useQuery({
     queryKey: ["all-labels"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/labels");
+      const { data, error } = await api.GET("/api/g/{group_slug}/labels");
       if (error) {
         throw new Error("Failed to fetch labels");
       }
@@ -175,7 +177,7 @@ export function RunList() {
 
   const deleteMutation = useMutation({
     mutationFn: async (runId: string) => {
-      const { error } = await api.DELETE("/api/runs/{scenario}/{run_dir_name}", {
+      const { error } = await api.DELETE("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}", {
         params: { path: splitRunId(runId) },
       });
       if (error) {
@@ -189,7 +191,7 @@ export function RunList() {
 
   const stopMutation = useMutation({
     mutationFn: async (runId: string) => {
-      const { error } = await api.POST("/api/runs/{scenario}/{run_dir_name}/stop", {
+      const { error } = await api.POST("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/stop", {
         params: { path: splitRunId(runId) },
       });
       if (error) {
@@ -205,7 +207,7 @@ export function RunList() {
     queryKey: ["runs"],
     refetchOnMount: "always",
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/runs");
+      const { data, error } = await api.GET("/api/g/{group_slug}/runs");
       if (error) {
         throw new Error("Failed to fetch runs");
       }
@@ -431,7 +433,7 @@ export function RunList() {
                       <tr
                         className={`group cursor-pointer transition-colors hover:bg-accent/50 ${bgClass} ${borderClass}`}
                         onClick={e => {
-                          const url = `/runs/${run.run_id}`;
+                          const url = groupPath(`/runs/${run.run_id}`);
                           if (e.metaKey || e.ctrlKey) {
                             window.open(url, "_blank");
                           } else {
@@ -635,7 +637,7 @@ export function RunList() {
                                 onClick={e => {
                                   e.stopPropagation();
                                   void downloadAuthenticatedFile({
-                                    path: `/api/runs/${run.run_id}/export/bundle`,
+                                    path: `/api/g/{group_slug}/runs/${run.run_id}/export/bundle`,
                                     searchParams: new URLSearchParams(),
                                     fallbackFilename: `${run.run_id.replace("/", "_")}_bundle.tar.gz`,
                                   });
@@ -669,7 +671,7 @@ export function RunList() {
                         <tr
                           className={`cursor-pointer transition-colors hover:bg-accent/50 ${bgClass}`}
                           onClick={e => {
-                            const url = `/runs/${run.run_id}`;
+                            const url = groupPath(`/runs/${run.run_id}`);
                             if (e.metaKey || e.ctrlKey) {
                               window.open(url, "_blank");
                             } else {

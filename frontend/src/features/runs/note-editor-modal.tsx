@@ -21,7 +21,7 @@ export function NoteEditorModal({
 
   const mutation = useMutation({
     mutationFn: async (text: string) => {
-      await api.PUT("/api/runs/{scenario}/{run_dir_name}/note", {
+      await api.PUT("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/note", {
         params: { path: splitRunId(runId) },
         body: { content: text },
       });

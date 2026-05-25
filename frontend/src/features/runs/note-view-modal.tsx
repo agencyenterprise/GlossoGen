@@ -12,9 +12,12 @@ export function NoteViewModal({ runId, onClose }: { runId: string; onClose: () =
   const { data, isLoading } = useQuery({
     queryKey: ["run-note", runId],
     queryFn: async () => {
-      const { data: resp } = await api.GET("/api/runs/{scenario}/{run_dir_name}/note", {
-        params: { path: splitRunId(runId) },
-      });
+      const { data: resp } = await api.GET(
+        "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/note",
+        {
+          params: { path: splitRunId(runId) },
+        }
+      );
       return resp;
     },
   });

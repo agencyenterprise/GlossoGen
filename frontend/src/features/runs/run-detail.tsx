@@ -23,6 +23,7 @@ import { useSearchParams } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import { useEventStream } from "@/shared/lib/use-event-stream";
+import { useGroupPath } from "@/features/auth/group-context";
 import { buildAgentColorMap, buildChannelColorMap } from "./agent-colors";
 import { AgentDrawer } from "./agent-drawer";
 import {
@@ -135,6 +136,7 @@ function deriveInitialForkModelOverrides(args: {
 }
 
 export function RunDetail({ scenario, runDirName }: { scenario: string; runDirName: string }) {
+  const groupPath = useGroupPath();
   const runId = `${scenario}/${runDirName}`;
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
@@ -189,7 +191,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   } = useQuery({
     queryKey: ["run", runId],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/runs/{scenario}/{run_dir_name}", {
+      const { data, error } = await api.GET("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}", {
         params: { path: { scenario, run_dir_name: runDirName } },
       });
       if (error) {
@@ -214,7 +216,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
 
   const stopMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await api.POST("/api/runs/{scenario}/{run_dir_name}/stop", {
+      const { error } = await api.POST("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/stop", {
         params: { path: { scenario, run_dir_name: runDirName } },
       });
       if (error) {
@@ -258,9 +260,12 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const { data: debugLogsData } = useQuery({
     queryKey: ["run-debug-logs", runId],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/runs/{scenario}/{run_dir_name}/debug-logs", {
-        params: { path: { scenario, run_dir_name: runDirName } },
-      });
+      const { data, error } = await api.GET(
+        "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/debug-logs",
+        {
+          params: { path: { scenario, run_dir_name: runDirName } },
+        }
+      );
       if (error) {
         throw new Error("Failed to fetch debug logs");
       }
@@ -605,7 +610,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     <div className="mx-auto flex h-dvh max-w-7xl min-h-0 flex-col px-4 py-4">
       {/* Back link */}
       <Link
-        href="/runs"
+        href={groupPath("/runs")}
         className="mb-2 inline-flex shrink-0 items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> back to runs
@@ -1219,7 +1224,7 @@ function ForkModal({
   const { data } = useQuery({
     queryKey: ["scenarios"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/scenarios");
+      const { data, error } = await api.GET("/api/g/{group_slug}/scenarios");
       if (error) {
         throw new Error("Failed to fetch scenarios");
       }
@@ -1338,7 +1343,7 @@ function ReplaceAgentModal({
   const { data } = useQuery({
     queryKey: ["scenarios"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/scenarios");
+      const { data, error } = await api.GET("/api/g/{group_slug}/scenarios");
       if (error) {
         throw new Error("Failed to fetch scenarios");
       }

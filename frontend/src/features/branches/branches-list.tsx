@@ -6,6 +6,7 @@ import { GitFork, Inbox, Loader2, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
 import type { components } from "@/types/api.gen";
+import { useGroupPath } from "@/features/auth/group-context";
 import { formatCost, formatDuration, formatTime, humanize } from "../runs/format";
 
 type RunSummary = components["schemas"]["RunSummary"];
@@ -26,11 +27,12 @@ interface SourceRunEntry {
 
 export function BranchesList() {
   const router = useRouter();
+  const groupPath = useGroupPath();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["runs"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/runs");
+      const { data, error } = await api.GET("/api/g/{group_slug}/runs");
       if (error) {
         throw new Error("Failed to fetch runs");
       }
@@ -124,7 +126,7 @@ export function BranchesList() {
                 key={run.run_id}
                 className={`group cursor-pointer transition-colors hover:bg-accent/50 ${borderClass}`}
                 onClick={() => {
-                  router.push(`/branches/${run.run_id}`);
+                  router.push(groupPath(`/branches/${run.run_id}`));
                 }}
               >
                 <td className="whitespace-nowrap py-2 pl-4 font-medium">

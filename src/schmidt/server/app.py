@@ -14,13 +14,15 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 from schmidt.db.pool import close_pool, create_pool, get_database_url
+from schmidt.server.identity.bootstrap import ensure_local_group
+from schmidt.server.identity.middleware import ClerkIdentityMiddleware
+from schmidt.server.identity.settings import load_identity_settings
+from schmidt.server.identity.webhook_router import router as clerk_webhook_router
 from schmidt.server.mcp.browser import mount_mcp_browser
-from schmidt.server.mcp.oauth_login_page import create_login_routes
 from schmidt.server.mcp.oauth_provider import SchmidtOAuthProvider
 from schmidt.server.mcp.oauth_storage import OAuthStorage
-from schmidt.server.password_auth_middleware import PasswordAuthMiddleware
 from schmidt.server.pdf.router import router as pdf_export_router
-from schmidt.server.response_models import AuthVerifyResponse, HealthResponse, HealthStatus
+from schmidt.server.response_models import HealthResponse, HealthStatus
 from schmidt.server.runs.bundle_router import router as bundle_router
 from schmidt.server.runs.cross_run_replace_agent_router import (
     router as cross_run_replace_agent_router,
@@ -37,11 +39,11 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-_app_password = os.environ.get("APP_PASSWORD")
 _oauth_issuer_url = os.environ.get("OAUTH_ISSUER_URL")
 _runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs"))
 _prod_api_url = os.environ.get("PROD_API_URL")
 _prod_password = os.environ.get("PROD_PASSWORD")
+_identity_settings = load_identity_settings()
 
 
 class _StubSessionManager:
@@ -80,25 +82,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     db_pool = await create_pool(database_url=get_database_url(), min_size=1, max_size=10)
     app.state.db_pool = db_pool
+    app.state.local_group_id = await ensure_local_group(pool=db_pool)
+    if _identity_settings.is_local_mode:
+        logger.info("Running in local mode (CLERK_SECRET_KEY unset)")
+    else:
+        logger.info("Running with Clerk authentication")
 
-    # Initialize OAuth storage.
-    if _oauth_storage is not None:
-        db_path = _runs_dir / "oauth.db"
-        await _oauth_storage.initialize(db_path=db_path)
+    if _oauth_issuer_url is not None:
         logger.info("OAuth enabled (issuer=%s)", _oauth_issuer_url)
 
     async with app.state.mcp_session_manager.run():
         yield
 
-    if _oauth_storage is not None:
-        await _oauth_storage.close()
     await close_pool(db_pool)
 
 
 app = FastAPI(title="Schmidt Simulation Server", lifespan=lifespan)
 
-if _app_password:
-    app.add_middleware(PasswordAuthMiddleware, password=_app_password)
+app.add_middleware(ClerkIdentityMiddleware, settings=_identity_settings)
 
 # CORS must be added last so it is the outermost middleware. This ensures
 # CORS headers are present on all responses, including 401s from the auth
@@ -121,22 +122,21 @@ app.include_router(bundle_router)
 app.include_router(metadata_router)
 app.include_router(prod_upload_router)
 app.include_router(scenarios_router)
+app.include_router(clerk_webhook_router)
 
-# MCP server with OAuth. Requires OAUTH_ISSUER_URL to be set.
+# MCP server with OAuth. Requires OAUTH_ISSUER_URL to be set. The OAuth
+# storage and provider read the DB pool / local group UUID via lazy getters
+# so they survive being constructed at module load before lifespan runs.
 _oauth_storage: OAuthStorage | None = None
 if _oauth_issuer_url is not None:
-    _oauth_storage = OAuthStorage()
+    _oauth_storage = OAuthStorage(get_pool=lambda: app.state.db_pool)
     _mcp_issuer_url = f"{_oauth_issuer_url}/mcp"
-    _login_url = f"{_oauth_issuer_url}/mcp/oauth/login"
     _oauth_provider = SchmidtOAuthProvider(
         storage=_oauth_storage,
-        login_url=_login_url,
-        app_password=_app_password,
+        get_local_group_id=lambda: app.state.local_group_id,
+        is_local_mode=_identity_settings.is_local_mode,
     )
     app.state.oauth_provider = _oauth_provider
-
-    for route in create_login_routes():
-        app.routes.insert(0, route)
 
     mount_mcp_browser(
         app=app,
@@ -201,13 +201,3 @@ else:
 async def health() -> HealthResponse:
     """Health check endpoint."""
     return HealthResponse(status=HealthStatus.OK)
-
-
-@app.post("/api/auth/verify", response_model=AuthVerifyResponse)
-async def verify_auth() -> AuthVerifyResponse:
-    """Verify that the provided password is correct.
-
-    If the request reaches this endpoint, the middleware already validated
-    the password. Returns authenticated=True unconditionally.
-    """
-    return AuthVerifyResponse(authenticated=True)

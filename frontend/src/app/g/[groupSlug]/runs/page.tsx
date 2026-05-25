@@ -7,9 +7,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { McpConfigModal } from "@/features/mcp-config/mcp-config-modal";
 import { RunList } from "@/features/runs/run-list";
 import { API_URL } from "@/shared/lib/api-client";
-import { AUTH_STORAGE_KEY } from "@/features/auth/auth-gate";
+import { useActiveGroupSlug, useGroupPath } from "@/features/auth/group-context";
 
 export default function RunsPage() {
+  const groupPath = useGroupPath();
+  const groupSlug = useActiveGroupSlug();
   const [showMcpConfig, setShowMcpConfig] = useState(false);
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(
     null
@@ -20,11 +22,6 @@ export default function RunsPage() {
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
     if (files.length === 0) return;
-    const headers: Record<string, string> = {};
-    const password = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (password) {
-      headers["Authorization"] = `Bearer ${password}`;
-    }
     const failures: string[] = [];
     try {
       for (const [index, file] of files.entries()) {
@@ -33,10 +30,9 @@ export default function RunsPage() {
         formData.append("file", file);
         try {
           // eslint-disable-next-line no-restricted-globals -- multipart file upload not supported by openapi-fetch
-          const resp = await fetch(`${API_URL}/api/runs/import`, {
+          const resp = await fetch(`${API_URL}/api/g/${groupSlug}/runs/import`, {
             method: "POST",
             body: formData,
-            headers,
           });
           if (!resp.ok) {
             const err = await resp.json();
@@ -67,14 +63,14 @@ export default function RunsPage() {
         <h1 className="text-3xl font-bold tracking-tight">Simulation Runs</h1>
         <div className="flex items-center gap-2">
           <Link
-            href="/runs/new"
+            href={groupPath("/runs/new")}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" />
             Start New Simulation
           </Link>
           <Link
-            href="/branches"
+            href={groupPath("/branches")}
             className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <GitFork className="h-4 w-4" />

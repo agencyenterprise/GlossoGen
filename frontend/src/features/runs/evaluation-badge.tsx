@@ -20,9 +20,12 @@ export function EvaluationBadge({ runId }: { runId: string }) {
     queryKey: ["run-evaluation", runId],
     enabled: popover !== null,
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/runs/{scenario}/{run_dir_name}/evaluation", {
-        params: { path: splitRunId(runId) },
-      });
+      const { data, error } = await api.GET(
+        "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/evaluation",
+        {
+          params: { path: splitRunId(runId) },
+        }
+      );
       if (error) {
         throw new Error("Failed to fetch evaluation");
       }

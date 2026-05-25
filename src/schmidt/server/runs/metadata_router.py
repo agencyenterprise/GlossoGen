@@ -9,18 +9,18 @@ matching the existing per-field endpoints.
 """
 
 import logging
-from pathlib import Path
 
 import orjson
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 from schmidt.evaluation.reports.evaluation_report import write_report
-from schmidt.server.runs.discovery import compose_run_id, resolve_run
+from schmidt.server.runs.discovery import compose_run_id
+from schmidt.server.runs.lookup import resolve_run_or_404
 from schmidt.server.runs.models import SyncMetadataRequest, SyncMetadataResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api/g/{group_slug}")
 
 
 @router.put(
@@ -38,15 +38,11 @@ async def sync_run_metadata(
     Returns 404 when the run does not exist on this server. Each field of
     the body is independent: ``null`` skips the field, a value replaces it.
     """
-    runs_dir: Path = request.app.state.runs_dir
-    try:
-        resolved = resolve_run(
-            runs_dir=runs_dir,
-            scenario_name=scenario,
-            run_dir_name=run_dir_name,
-        )
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Run not found")
+    resolved = await resolve_run_or_404(
+        request=request,
+        scenario=scenario,
+        run_dir_name=run_dir_name,
+    )
 
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
 

@@ -5,11 +5,11 @@
     "version": "0.1.0"
   },
   "paths": {
-    "/api/runs": {
+    "/api/g/{group_slug}/runs": {
       "get": {
         "summary": "List Runs",
-        "description": "List discovered simulation runs.\n\nSupports optional filters used by the cross-run replace-agent\npicker: ``scenario`` restricts to a single scenario, and\n``contains_agent_id`` further restricts to runs that registered\nthat agent. ``status`` restricts to runs with a specific final\nstatus (e.g. ``completed``).",
-        "operationId": "list_runs_api_runs_get",
+        "description": "List simulation runs owned by the active group.\n\nSupports optional filters used by the cross-run replace-agent\npicker: ``scenario`` restricts to a single scenario, and\n``contains_agent_id`` further restricts to runs that registered\nthat agent. ``status`` restricts to runs with a specific final\nstatus (e.g. ``completed``).",
+        "operationId": "list_runs_api_g__group_slug__runs_get",
         "parameters": [
           {
             "name": "scenario",
@@ -84,11 +84,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}": {
       "get": {
         "summary": "Get Run Detail",
         "description": "Get full detail for a specific simulation run.",
-        "operationId": "get_run_detail_api_runs__scenario___run_dir_name__get",
+        "operationId": "get_run_detail_api_g__group_slug__runs__scenario___run_dir_name__get",
         "parameters": [
           {
             "name": "scenario",
@@ -135,7 +135,7 @@
       "delete": {
         "summary": "Delete Run",
         "description": "Stop the simulation if still running, then delete the run directory.",
-        "operationId": "delete_run_api_runs__scenario___run_dir_name__delete",
+        "operationId": "delete_run_api_g__group_slug__runs__scenario___run_dir_name__delete",
         "parameters": [
           {
             "name": "scenario",
@@ -173,11 +173,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/evaluation": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/evaluation": {
       "get": {
         "summary": "Get Run Evaluation",
         "description": "Return only the evaluation report for a run, or null if it has not been evaluated.\n\nLighter than the full run-detail endpoint \u2014 used by the runs list to lazy-load\nmeasurements on hover without pulling messages, reasoning, or tool use.",
-        "operationId": "get_run_evaluation_api_runs__scenario___run_dir_name__evaluation_get",
+        "operationId": "get_run_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluation_get",
         "parameters": [
           {
             "name": "scenario",
@@ -212,7 +212,7 @@
                       "type": "null"
                     }
                   ],
-                  "title": "Response Get Run Evaluation Api Runs  Scenario   Run Dir Name  Evaluation Get"
+                  "title": "Response Get Run Evaluation Api G  Group Slug  Runs  Scenario   Run Dir Name  Evaluation Get"
                 }
               }
             }
@@ -230,11 +230,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/eval-logs": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/eval-logs": {
       "get": {
         "summary": "Get Eval Logs",
         "description": "Return the contents of the evaluation stdout log file.",
-        "operationId": "get_eval_logs_api_runs__scenario___run_dir_name__eval_logs_get",
+        "operationId": "get_eval_logs_api_g__group_slug__runs__scenario___run_dir_name__eval_logs_get",
         "parameters": [
           {
             "name": "scenario",
@@ -279,11 +279,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/debug-logs": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/debug-logs": {
       "get": {
         "summary": "Get Debug Logs",
         "description": "Return the debug log entries for a simulation run.",
-        "operationId": "get_debug_logs_api_runs__scenario___run_dir_name__debug_logs_get",
+        "operationId": "get_debug_logs_api_g__group_slug__runs__scenario___run_dir_name__debug_logs_get",
         "parameters": [
           {
             "name": "scenario",
@@ -328,11 +328,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/stop": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/stop": {
       "post": {
         "summary": "Stop Run",
         "description": "Stop a running simulation by sending SIGTERM to its process.",
-        "operationId": "stop_run_api_runs__scenario___run_dir_name__stop_post",
+        "operationId": "stop_run_api_g__group_slug__runs__scenario___run_dir_name__stop_post",
         "parameters": [
           {
             "name": "scenario",
@@ -370,11 +370,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/evaluate": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/evaluate": {
       "post": {
         "summary": "Start Evaluation",
         "description": "Launch an evaluation subprocess for a completed simulation run.\n\nValidates that the run exists and is complete, that no evaluation is\nalready in progress, and that the requested metrics and provider\nare valid. Launches ``python -m schmidt evaluate`` as a detached\nbackground process.",
-        "operationId": "start_evaluation_api_runs__scenario___run_dir_name__evaluate_post",
+        "operationId": "start_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluate_post",
         "parameters": [
           {
             "name": "scenario",
@@ -429,11 +429,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/events": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/events": {
       "get": {
         "summary": "Stream Run Events",
         "description": "Stream simulation events as Server-Sent Events.\n\nOnly available for live simulations (detected via stream.json manifest).\nProxies SSE from the simulation's embedded server. Returns 404 if the\nrun is not found, and 409 if the simulation is not currently running.\n\nThe SSE ``data`` field of each frame contains a JSON object conforming to\none of the SSEEvent union members, discriminated by the ``event_type`` field.",
-        "operationId": "stream_run_events_api_runs__scenario___run_dir_name__events_get",
+        "operationId": "stream_run_events_api_g__group_slug__runs__scenario___run_dir_name__events_get",
         "parameters": [
           {
             "name": "scenario",
@@ -523,7 +523,7 @@
                       "veyru_stabilization_judged": "#/components/schemas/SSEVeyruStabilizationJudged"
                     }
                   },
-                  "title": "Response 200 Stream Run Events Api Runs  Scenario   Run Dir Name  Events Get"
+                  "title": "Response 200 Stream Run Events Api G  Group Slug  Runs  Scenario   Run Dir Name  Events Get"
                 }
               }
             }
@@ -541,11 +541,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/labels": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/labels": {
       "put": {
         "summary": "Update Labels",
         "description": "Set labels for a simulation run, replacing any existing labels.",
-        "operationId": "update_labels_api_runs__scenario___run_dir_name__labels_put",
+        "operationId": "update_labels_api_g__group_slug__runs__scenario___run_dir_name__labels_put",
         "parameters": [
           {
             "name": "scenario",
@@ -600,11 +600,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/note": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/note": {
       "put": {
         "summary": "Update Note",
         "description": "Set or update the note for a simulation run.",
-        "operationId": "update_note_api_runs__scenario___run_dir_name__note_put",
+        "operationId": "update_note_api_g__group_slug__runs__scenario___run_dir_name__note_put",
         "parameters": [
           {
             "name": "scenario",
@@ -661,7 +661,7 @@
       "get": {
         "summary": "Get Note",
         "description": "Get the note content for a simulation run.",
-        "operationId": "get_note_api_runs__scenario___run_dir_name__note_get",
+        "operationId": "get_note_api_g__group_slug__runs__scenario___run_dir_name__note_get",
         "parameters": [
           {
             "name": "scenario",
@@ -706,11 +706,11 @@
         }
       }
     },
-    "/api/labels": {
+    "/api/g/{group_slug}/labels": {
       "get": {
         "summary": "List All Labels",
-        "description": "Get all unique labels across all simulation runs.",
-        "operationId": "list_all_labels_api_labels_get",
+        "description": "Get all unique labels across the active group's simulation runs.",
+        "operationId": "list_all_labels_api_g__group_slug__labels_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -725,11 +725,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/fork": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/fork": {
       "post": {
         "summary": "Fork Run",
         "description": "Create a forked simulation run from a specific message.\n\nClones the source run's git repository at the target message's commit,\napplies text edits to the JSONL, and launches the simulation as a\nbackground subprocess with ``--resume``.",
-        "operationId": "fork_run_api_runs__scenario___run_dir_name__fork_post",
+        "operationId": "fork_run_api_g__group_slug__runs__scenario___run_dir_name__fork_post",
         "parameters": [
           {
             "name": "scenario",
@@ -784,11 +784,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/replace-agent": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/replace-agent": {
       "post": {
         "summary": "Replace Agent",
         "description": "Replace one agent in a finished run with a fresh agent from a target message.\n\nThe new agent has no message history; every other agent resumes from\nits full reconstructed history. Optionally swaps the replaced agent's\nmodel/provider.",
-        "operationId": "replace_agent_api_runs__scenario___run_dir_name__replace_agent_post",
+        "operationId": "replace_agent_api_g__group_slug__runs__scenario___run_dir_name__replace_agent_post",
         "parameters": [
           {
             "name": "scenario",
@@ -843,11 +843,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/cross-run-replace-agent": {
       "post": {
         "summary": "Cross Run Replace Agent",
         "description": "Import an agent from one finished run into another at a chosen round boundary.\n\nThe imported agent keeps its full pydantic-ai history (text,\nthinking, tool calls) up to ``source_b_round_end`` of the source\nrun, then re-enters the target run at ``round_start``. Same\nscenario and same ``agent_id`` only.",
-        "operationId": "cross_run_replace_agent_api_runs__scenario___run_dir_name__cross_run_replace_agent_post",
+        "operationId": "cross_run_replace_agent_api_g__group_slug__runs__scenario___run_dir_name__cross_run_replace_agent_post",
         "parameters": [
           {
             "name": "scenario",
@@ -902,11 +902,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/resume-at-round": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/resume-at-round": {
       "post": {
         "summary": "Resume At Round",
         "description": "Clone a finished run at the start of ``round_start`` and resume it.\n\nNo agent is replaced; every agent keeps its full reconstructed history.\n``body.knobs`` is shallow-merged onto the source's scenario config to\nlet callers reconfigure the post-resume simulation.",
-        "operationId": "resume_at_round_api_runs__scenario___run_dir_name__resume_at_round_post",
+        "operationId": "resume_at_round_api_g__group_slug__runs__scenario___run_dir_name__resume_at_round_post",
         "parameters": [
           {
             "name": "scenario",
@@ -961,11 +961,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/export/pdf": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/export/pdf": {
       "get": {
         "summary": "Export Run Pdf",
         "description": "Export a simulation run as a formatted PDF document.\n\nGenerates a PDF containing messages, reasoning, and tool calls\ngrouped by round and turn. Optionally filters to a single channel.",
-        "operationId": "export_run_pdf_api_runs__scenario___run_dir_name__export_pdf_get",
+        "operationId": "export_run_pdf_api_g__group_slug__runs__scenario___run_dir_name__export_pdf_get",
         "parameters": [
           {
             "name": "scenario",
@@ -1025,11 +1025,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/export/bundle": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/export/bundle": {
       "get": {
         "summary": "Export Run Bundle",
         "description": "Export a simulation run as a tar.gz bundle.",
-        "operationId": "export_run_bundle_api_runs__scenario___run_dir_name__export_bundle_get",
+        "operationId": "export_run_bundle_api_g__group_slug__runs__scenario___run_dir_name__export_bundle_get",
         "parameters": [
           {
             "name": "scenario",
@@ -1073,16 +1073,16 @@
         }
       }
     },
-    "/api/runs/import": {
+    "/api/g/{group_slug}/runs/import": {
       "post": {
         "summary": "Import Run Bundle",
         "description": "Import a simulation run from an exported bundle tar.gz.\n\nIdempotent: if a run with the same run_id already exists, returns the\nexisting run without re-importing.",
-        "operationId": "import_run_bundle_api_runs_import_post",
+        "operationId": "import_run_bundle_api_g__group_slug__runs_import_post",
         "requestBody": {
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_import_run_bundle_api_runs_import_post"
+                "$ref": "#/components/schemas/Body_import_run_bundle_api_g__group_slug__runs_import_post"
               }
             }
           },
@@ -1105,11 +1105,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/metadata": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/metadata": {
       "put": {
         "summary": "Sync Run Metadata",
         "description": "Overwrite labels / note / evaluation report for an existing run.\n\nReturns 404 when the run does not exist on this server. Each field of\nthe body is independent: ``null`` skips the field, a value replaces it.",
-        "operationId": "sync_run_metadata_api_runs__scenario___run_dir_name__metadata_put",
+        "operationId": "sync_run_metadata_api_g__group_slug__runs__scenario___run_dir_name__metadata_put",
         "parameters": [
           {
             "name": "scenario",
@@ -1164,11 +1164,11 @@
         }
       }
     },
-    "/api/prod-upload/status": {
+    "/api/g/{group_slug}/prod-upload/status": {
       "get": {
         "summary": "Prod Upload Status",
         "description": "Report whether prod upload is configured on this server.",
-        "operationId": "prod_upload_status_api_prod_upload_status_get",
+        "operationId": "prod_upload_status_api_g__group_slug__prod_upload_status_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1183,11 +1183,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/upload-to-prod": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/upload-to-prod": {
       "post": {
         "summary": "Upload Run To Prod",
         "description": "Upload a single local run to the configured prod server.\n\nDefault: returns ``already_present`` when prod already has the run; the\nbundle is neither rebuilt nor re-uploaded. Pass ``?force=true`` to\ndelete the remote run first and re-upload, returning ``overridden``.",
-        "operationId": "upload_run_to_prod_api_runs__scenario___run_dir_name__upload_to_prod_post",
+        "operationId": "upload_run_to_prod_api_g__group_slug__runs__scenario___run_dir_name__upload_to_prod_post",
         "parameters": [
           {
             "name": "scenario",
@@ -1242,11 +1242,11 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/sync-metadata-to-prod": {
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/sync-metadata-to-prod": {
       "post": {
         "summary": "Sync Run Metadata To Prod",
         "description": "Read labels / note / eval report locally and PUT them onto the prod run.\n\nReturns 404 when prod does not have this run (caller should fall back\nto the full ``upload-to-prod`` flow). 503 when prod is not configured.",
-        "operationId": "sync_run_metadata_to_prod_api_runs__scenario___run_dir_name__sync_metadata_to_prod_post",
+        "operationId": "sync_run_metadata_to_prod_api_g__group_slug__runs__scenario___run_dir_name__sync_metadata_to_prod_post",
         "parameters": [
           {
             "name": "scenario",
@@ -1291,11 +1291,11 @@
         }
       }
     },
-    "/api/scenarios": {
+    "/api/g/{group_slug}/scenarios": {
       "get": {
         "summary": "List Scenarios",
         "description": "List all available scenarios with their knobs files and supported providers.",
-        "operationId": "list_scenarios_api_scenarios_get",
+        "operationId": "list_scenarios_api_g__group_slug__scenarios_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1310,11 +1310,11 @@
         }
       }
     },
-    "/api/scenarios/{scenario_name}/knobs/{knobs_name}": {
+    "/api/g/{group_slug}/scenarios/{scenario_name}/knobs/{knobs_name}": {
       "get": {
         "summary": "Get Knobs Content",
         "description": "Read and return the contents of a knobs JSON file.",
-        "operationId": "get_knobs_content_api_scenarios__scenario_name__knobs__knobs_name__get",
+        "operationId": "get_knobs_content_api_g__group_slug__scenarios__scenario_name__knobs__knobs_name__get",
         "parameters": [
           {
             "name": "scenario_name",
@@ -1359,11 +1359,11 @@
         }
       }
     },
-    "/api/scenarios/{scenario_name}/agents": {
+    "/api/g/{group_slug}/scenarios/{scenario_name}/agents": {
       "post": {
         "summary": "Get Agent Roles",
         "description": "Return the agent IDs, display names, and channels for the given knobs.\n\nThe ``channels`` field is populated by instantiating the scenario\nwith the supplied knobs and reading each ``AgentConfig.channel_ids``;\nthe FE phase-builder uses this to render per-agent visibility\ncontrols. Returns an empty channel list per agent if scenario\ninstantiation fails (e.g. invalid knobs) so the FE can still show\nrole names while the user fixes the knobs.",
-        "operationId": "get_agent_roles_api_scenarios__scenario_name__agents_post",
+        "operationId": "get_agent_roles_api_g__group_slug__scenarios__scenario_name__agents_post",
         "parameters": [
           {
             "name": "scenario_name",
@@ -1409,11 +1409,11 @@
         }
       }
     },
-    "/api/runs/start": {
+    "/api/g/{group_slug}/runs/start": {
       "post": {
         "summary": "Start Run",
         "description": "Launch a new simulation as a background subprocess.",
-        "operationId": "start_run_api_runs_start_post",
+        "operationId": "start_run_api_g__group_slug__runs_start_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1448,6 +1448,28 @@
         }
       }
     },
+    "/api/clerk/webhook": {
+      "post": {
+        "tags": [
+          "clerk"
+        ],
+        "summary": "Receive Webhook",
+        "description": "Receive and act on a Clerk webhook event.\n\nReturns 200 even for ignored event types so Clerk does not retry them.",
+        "operationId": "receive_webhook_api_clerk_webhook_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookAccepted"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -1460,25 +1482,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HealthResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/verify": {
-      "post": {
-        "summary": "Verify Auth",
-        "description": "Verify that the provided password is correct.\n\nIf the request reaches this endpoint, the middleware already validated\nthe password. Returns authenticated=True unconditionally.",
-        "operationId": "verify_auth_api_auth_verify_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthVerifyResponse"
                 }
               }
             }
@@ -1784,21 +1787,7 @@
         "title": "AllLabelsResponse",
         "description": "Response containing all unique labels across all runs."
       },
-      "AuthVerifyResponse": {
-        "properties": {
-          "authenticated": {
-            "type": "boolean",
-            "title": "Authenticated"
-          }
-        },
-        "type": "object",
-        "required": [
-          "authenticated"
-        ],
-        "title": "AuthVerifyResponse",
-        "description": "Response model for the password verification endpoint."
-      },
-      "Body_import_run_bundle_api_runs_import_post": {
+      "Body_import_run_bundle_api_g__group_slug__runs_import_post": {
         "properties": {
           "file": {
             "type": "string",
@@ -1810,7 +1799,7 @@
         "required": [
           "file"
         ],
-        "title": "Body_import_run_bundle_api_runs_import_post"
+        "title": "Body_import_run_bundle_api_g__group_slug__runs_import_post"
       },
       "ChannelMessage": {
         "properties": {
@@ -5259,6 +5248,25 @@
         ],
         "title": "VeyruSwapPoint",
         "description": "Anchor for the moment agents were swapped between teams.\n\n``target_message_id`` is the first ``MessageSent`` on a link channel\nafter the swap fired, used by the frontend to scroll the timeline\nto that exact point. ``swapped_observer_display_names`` are the\ntwo observers who exchanged teams, in stable order."
+      },
+      "WebhookAccepted": {
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "title": "Accepted"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accepted",
+          "event_type"
+        ],
+        "title": "WebhookAccepted",
+        "description": "Response payload returned for every accepted Clerk webhook."
       }
     }
   }
