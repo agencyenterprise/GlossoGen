@@ -13,6 +13,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
+from schmidt.db.pool import close_pool, create_pool, get_database_url
 from schmidt.server.mcp.browser import mount_mcp_browser
 from schmidt.server.mcp.oauth_login_page import create_login_routes
 from schmidt.server.mcp.oauth_provider import SchmidtOAuthProvider
@@ -68,7 +69,7 @@ def _parse_allowed_origins() -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    """Store the configured runs directory, init OAuth storage, and start MCP."""
+    """Store the configured runs directory, open the DB pool, and start MCP."""
     app.state.runs_dir = _runs_dir
     app.state.prod_api_url = _prod_api_url
     app.state.prod_password = _prod_password
@@ -76,6 +77,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     logger.info("Serving runs from: %s", _runs_dir)
     if _prod_api_url and _prod_password:
         logger.info("Prod upload target configured: %s", _prod_api_url)
+
+    db_pool = await create_pool(database_url=get_database_url(), min_size=1, max_size=10)
+    app.state.db_pool = db_pool
 
     # Initialize OAuth storage.
     if _oauth_storage is not None:
@@ -88,6 +92,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     if _oauth_storage is not None:
         await _oauth_storage.close()
+    await close_pool(db_pool)
 
 
 app = FastAPI(title="Schmidt Simulation Server", lifespan=lifespan)
