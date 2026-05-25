@@ -16,13 +16,14 @@ Three modes:
 * **Clerk mode** — verify token, parse the URL slug, assert the user is a
   member of that group, resolve the local Postgres group UUID, attach.
 
-Membership is read from either:
-
-1. A custom JWT claim ``org_memberships`` (recommended; configure Clerk's
-   JWT template to include ``{{user.organization_memberships}}``).
-   Required for concurrent multi-org browsing.
-2. Fallback: the standard ``org_slug`` claim (active org only). If the URL
-   slug matches the active org, the request is accepted; otherwise 403.
+Membership is proven by the standard ``org_slug`` claim — the user's
+currently active org. Multi-org users are supported via Clerk's
+``organizationSyncOptions`` on the frontend middleware (see
+``frontend/src/proxy.ts``): when a user navigates to ``/g/<slug>/...``,
+Clerk activates that org server-side before minting the session token,
+so ``claims.org_slug`` matches the URL slug for any group the user is a
+member of. If they are not a member, Clerk leaves the previously active
+org in place and this check returns 403.
 """
 
 import logging
@@ -103,19 +104,16 @@ def _not_found(scope: Scope, detail: str) -> JSONResponse:
     return JSONResponse(status_code=404, content={"detail": detail})
 
 
-def _is_member_of_slug(claims: ClerkSessionClaims, slug: str) -> bool:
-    """Check whether the user proves membership of ``slug`` via JWT claims.
+def _is_active_org(claims: ClerkSessionClaims, slug: str) -> bool:
+    """Return True when the JWT's active org slug matches ``slug``.
 
-    Accepts either a custom ``org_memberships`` claim (preferred — supports
-    multi-org concurrent browsing) or the standard ``org_slug`` claim (the
-    user's currently active org).
+    Multi-org users are handled by Clerk's ``organizationSyncOptions``
+    on the frontend middleware, which activates the URL's org before the
+    token is minted. If the user is not a member of ``slug``, Clerk
+    leaves the previously active org in place and this check returns
+    False.
     """
-    for membership in claims.org_memberships:
-        if membership.org_slug == slug:
-            return True
-    if claims.org_slug is not None and claims.org_slug == slug:
-        return True
-    return False
+    return claims.org_slug is not None and claims.org_slug == slug
 
 
 class ClerkIdentityMiddleware:
@@ -204,13 +202,15 @@ class ClerkIdentityMiddleware:
                 detail="Authenticated routes must include /g/{group_slug}/ in the path",
             )
 
-        if not _is_member_of_slug(claims=claims, slug=url_slug):
+        if not _is_active_org(claims=claims, slug=url_slug):
             return _forbidden(
                 scope=scope,
                 detail=(
-                    f"User is not a member of group {url_slug!r}. "
-                    "Configure Clerk's JWT template to include "
-                    "{{user.organization_memberships}} for multi-org users."
+                    f"URL slug {url_slug!r} does not match the JWT's "
+                    f"active org_slug {claims.org_slug!r} (user_id="
+                    f"{claims.user_id!r}). The frontend either failed to "
+                    "activate the org before minting the token, or the "
+                    "user is not a member of this group."
                 ),
             )
 

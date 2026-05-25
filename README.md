@@ -88,7 +88,7 @@ The simulation picks up from where it left off, preserving channel messages and 
 
 The web UI supports forking a completed simulation from any message. In the run detail view, hover over a message to reveal an edit button. Edit the message text, then click the play button to create a fork — a new simulation that starts with channel history up to that message (with the edit applied). Agents continue from there with full context of the prior conversation.
 
-Forked runs appear in the run list with a "Fork" badge and link back to the source run. The fork API is also available programmatically via `POST /api/runs/{run_id}/fork`.
+Forked runs appear in the run list with a "Fork" badge and link back to the source run. The fork API is also available programmatically via `POST /api/g/{group_slug}/runs/{run_id}/fork`.
 
 ### Replacing an Agent (Round-Level Rewind)
 
@@ -114,7 +114,7 @@ The CLI returns immediately after preparing the new run directory and spawning a
 
 **Per-scenario knob overrides on resume.** The `--knobs` flag accepts a JSON file whose entries are merged onto the source's `scenario_config` before validation. Veyru exposes `postmortem_disabled_at_start: bool` for this flow: setting it to `true` flips `world.disable_postmortem_globally()` at world construction, dropping the postmortem channel for the rest of the resumed simulation (no postmortem injections, no postmortem phase, sends to postmortem are rejected).
 
-Derived runs appear in the run list with a "Replaced" badge linking to the source. The same operation is available via `POST /api/runs/{run_id}/replace-agent`, which accepts `channels_with_visible_history: list[str]` and `knobs: dict | null` in the body.
+Derived runs appear in the run list with a "Replaced" badge linking to the source. The same operation is available via `POST /api/g/{group_slug}/runs/{run_id}/replace-agent`, which accepts `channels_with_visible_history: list[str]` and `knobs: dict | null` in the body.
 
 ## Cross-Run Replacing an Agent (Round-Level Rewind, Different Source for the Imported Agent)
 
@@ -140,7 +140,7 @@ Internals: clones Sim A at the round-start commit (same as replace-agent), copie
 
 For veyru cross-team experiments, set `--knobs` with `{"postmortem_disabled_at_start": true}` to drop the postmortem channel after the swap (the FE modal does this automatically; the CLI does not). Without it, the two agents have a backchannel in postmortem that quickly re-aligns their protocols, washing out the cross-team-confusion signal. Cross-run runs appear in the run list with a violet "Cross-run" badge that links back to both Source A and Source B.
 
-The cross-run API endpoint is `POST /api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent`. The path identifies Sim A; the body's `source_b_run_id` identifies Sim B.
+The cross-run API endpoint is `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/cross-run-replace-agent`. The path identifies Sim A; the body's `source_b_run_id` identifies Sim B (which must belong to the same group).
 
 The same `round_success_after_resume` metric works for both replace-agent and cross-run flows; for cross-run runs the comparison is against Sim A over the same window.
 
@@ -165,7 +165,7 @@ Internals: the flow reuses the `replace-agent` machinery with `replaced_agent_id
 
 Inherited `scheduled_events` semantics: events at `at_round < round_start` are silently skipped (the resumed clock never visits those rounds). Events at `at_round == round_start` fire on resume — by design — because the cloned JSONL is captured before the source dispatched that boundary's scheduler events. Boundaries that already fired in the source (or in a crashed-and-resumed run) are pre-seeded into the scheduler's `_fired_rounds` set so they are not re-dispatched.
 
-The resume API endpoint is `POST /api/runs/{scenario}/{run_dir_name}/resume-at-round` with body `{round_start, rounds_after_resume, knobs}`. Runs created this way appear with a green "↺ Resumed @ round N" badge linking back to the source. The chat-pane round divider exposes a circular-arrow icon at every round ≥ 2 to open a confirm modal with `rounds_after_resume` pre-filled and a JSON textarea for knob overrides. Multi-swap runs (whether direct via `scheduled_events` or inherited via resume) render one floating action button per swap so users can scroll directly to any boundary.
+The resume API endpoint is `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/resume-at-round` with body `{round_start, rounds_after_resume, knobs}`. Runs created this way appear with a green "↺ Resumed @ round N" badge linking back to the source. The chat-pane round divider exposes a circular-arrow icon at every round ≥ 2 to open a confirm modal with `rounds_after_resume` pre-filled and a JSON textarea for knob overrides. Multi-swap runs (whether direct via `scheduled_events` or inherited via resume) render one floating action button per swap so users can scroll directly to any boundary.
 
 ## In-Run Agent Swaps via `scheduled_events`
 
@@ -330,19 +330,15 @@ The backend uses **Clerk** for multi-tenant authentication. Each Clerk organizat
 * **Local mode (default for dev clones):** leave `CLERK_SECRET_KEY` unset on the backend and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` unset on the frontend. The backend's identity middleware short-circuits every request to a synthetic `local` group / `local-user`; the frontend renders without a sign-in flow. Postgres is still required (the `local` group + `runs` index live there).
 * **Clerk mode (prod / hosted):** set Clerk env vars on both sides plus `CLERK_WEBHOOK_SECRET` so the backend can keep its local `groups` table in sync with Clerk org create/update/delete events. The frontend mounts `<ClerkProvider>` and Clerk's middleware redirects unauthenticated traffic to `/sign-in`. API requests carry the Clerk session token as the Bearer header; the backend reads the active group from the URL slug (`/api/g/{slug}/...`) and validates membership against the JWT.
 
-The active group is identified by the URL slug — `/g/team-a/runs/...` on the frontend hits `/api/g/team-a/runs/...` on the backend. The identity middleware accepts the request only if the user's Clerk session proves membership of `team-a`. This means a user who belongs to multiple orgs can open `/g/team-a/...` and `/g/team-b/...` in separate tabs concurrently — no shared "active org" session state to race on.
+The active group is identified by the URL slug — `/g/team-a/runs/...` on the frontend hits `/api/g/team-a/runs/...` on the backend. The identity middleware accepts the request only if the user's Clerk session has `team-a` as the active org.
 
-#### Required Clerk JWT template (multi-org users)
+#### Multi-org users — Clerk `organizationSyncOptions`
 
-For multi-org concurrent browsing, add a custom claim to the **default JWT template** in your Clerk dashboard (Dashboard → JWT Templates → `session`, or wherever your session template lives):
+The frontend `middleware.ts` wires Clerk's `organizationSyncOptions.organizationPatterns` to `["/g/:slug", "/g/:slug/(.*)"]`. Clerk's middleware reads the slug from the URL and activates that org on the session for the current request *before* the page renders or the API client mints a token. A user who belongs to multiple orgs can therefore navigate to any of them by URL without first clicking the org switcher.
 
-```json
-{
-  "org_memberships": "{{user.organization_memberships}}"
-}
-```
+If the user is not a member of the URL's org, Clerk leaves the previously active org in place; the backend then sees `claims.org_slug != url_slug` and returns 403.
 
-The backend reads this claim to validate that the user is a member of the URL's group, even when their currently active org is a different one. Without this claim the backend falls back to the standard `org_slug` claim, which only carries the *active* org — fine for single-org users, but multi-org users will be forced to switch their active org before accessing each group.
+**Tab caveat.** Clerk's session cookie is a singleton per browser, so only one tab's active org is reflected in the cookie at a time. Each tab still activates its own org server-side on navigation (so initial page loads and Server-Component fetches are correct), and the API client uses `getToken()` per request (not the cookie), so foreground tab requests get a token aligned to that tab's URL. Background fetches (cron, service workers) that don't pass through the focused tab can race — there are none in schmidt today.
 
 The MCP endpoint at `/mcp/g/{slug}` uses OAuth 2.0 with PKCE (see MCP Integration below). MCP tokens are bound to a specific group at consent time so every tool call is automatically scoped.
 
@@ -383,7 +379,7 @@ Click the **MCP** button on the runs page for connection instructions, or config
 claude mcp add-json schmidt-runs '{"type":"http","url":"http://localhost:8000/mcp"}'
 ```
 
-No auth headers needed — the client discovers OAuth metadata and handles registration, authorization, and token refresh automatically. If `APP_PASSWORD` is set, the user is prompted with a login form during the authorization flow.
+No auth headers needed — the client discovers OAuth metadata and handles registration, authorization, and token refresh automatically. In local mode the consent step auto-approves to the synthetic `local` group; the Clerk-mode equivalent (session-gated consent + per-group MCP URL) is not yet wired, so MCP is local-only when Clerk is active.
 
 Available tools:
 - `list_scenarios`
@@ -466,18 +462,31 @@ modal/                         # Self-hosted LLM endpoint deployable to Modal (v
   README.md                    # Deploy + integration instructions
 
   server/                      # FastAPI web server (schmidt serve)
-    password_auth_middleware.py # Shared-password ASGI middleware
-    runs/fork_router.py        # POST /api/runs/{run_id}/fork endpoint
-    runs/replace_agent_router.py # POST /api/runs/{run_id}/replace-agent endpoint
+    identity/middleware.py     # Clerk-aware identity middleware: parses /g/{slug}, validates JWT
+    identity/clerk_verifier.py # Networkless Clerk JWT verification (v2 nested o claim + v1 flat)
+    identity/webhook_router.py # Svix-verified POST /api/clerk/webhook (groups sync)
+    runs/fork_router.py        # POST /api/g/{group_slug}/runs/{run_id}/fork endpoint
+    runs/replace_agent_router.py # POST /api/g/{group_slug}/runs/{run_id}/replace-agent endpoint
+    runs/listing.py            # Postgres-backed list_runs_for_group
+    runs/lookup.py             # resolve_run_or_404 + register_new_run (group-scoped)
     run_launcher.py            # Shared run-launch utilities for REST and MCP start endpoints
     mcp/                       # MCP server at /mcp with OAuth
       browser.py               # FastMCP tools for run browsing and launching
       oauth_provider.py        # OAuth 2.0 authorization server provider
-      oauth_storage.py         # SQLite-backed OAuth client/token storage
-      oauth_login_page.py      # Login form for OAuth authorization flow
+      oauth_storage.py         # Postgres-backed OAuth client/token storage (group-scoped tokens)
+      asgi_context.py          # ASGI wrapper that primes RunContext from the token's group_id
+
+  db/                          # Postgres data layer (psycopg3 async + alembic migrations)
+    queries.py                 # Typed query helpers returning Pydantic rows
+    pool.py                    # Async connection pool
+    migrations/versions/       # Raw-SQL alembic revisions (groups + runs + oauth tables)
 
 frontend/                      # Next.js web application
-  src/features/auth/           # Login page and auth gate
+  src/proxy.ts                 # clerkMiddleware with organizationSyncOptions for /g/:slug
+  src/app/g/[groupSlug]/       # All authenticated routes live under here
+  src/app/sign-in/, sign-up/   # Clerk catch-all sign-in / sign-up flows
+  src/app/select-org/          # OrganizationList for signed-in users with no active org
+  src/features/auth/           # GroupProvider, GroupTopBar (org switcher + user button)
   src/features/mcp-config/     # MCP integration modal with connection instructions
 ```
 
@@ -490,7 +499,16 @@ The application deploys to Railway as two services from a single repository. Eac
 - **Backend** (`Dockerfile`, `railway.toml`): Python 3.12, FastAPI server with a persistent volume at `/data/runs` for simulation data.
 - **Frontend** (`frontend/Dockerfile`, `frontend/railway.toml`): Node 22, Next.js standalone build.
 
-Railway environment variables for the backend: `DATABASE_URL` (provision a Postgres database on Railway and attach its connection string here — the backend won't boot without it), `APP_PASSWORD`, `ANTHROPIC_API_KEY`, `ALLOWED_ORIGINS` (set to the frontend URL), `OAUTH_ISSUER_URL` (set to the backend URL to enable MCP). The frontend requires `NEXT_PUBLIC_API_URL` as a build arg pointing to the backend URL.
+Railway environment variables for the backend:
+
+- `DATABASE_URL` — provision a Postgres database on Railway and attach its connection string. The backend won't boot without it.
+- `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_JWT_KEY`, `CLERK_WEBHOOK_SECRET` — required for Clerk-gated multi-tenant auth. Leave all unset to run in single-tenant local mode.
+- `CLERK_AUTHORIZED_PARTIES` — comma-separated frontend origins allowed to mint tokens (e.g. `https://frontend.up.railway.app`).
+- `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`, etc.) — provider keys for running simulations.
+- `ALLOWED_ORIGINS` — comma-separated frontend URLs for CORS.
+- `OAUTH_ISSUER_URL` — public backend URL to enable MCP OAuth.
+
+The frontend requires `NEXT_PUBLIC_API_URL` as a build arg pointing to the backend URL, plus `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` for Clerk-mode operation.
 
 The backend container runs `alembic upgrade head` on every start so the schema is always at the latest revision before the server begins accepting requests.
 

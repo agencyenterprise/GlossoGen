@@ -90,11 +90,24 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `round_transcript_builder.py` — builds per-round message transcripts from events (used by all generic LLM-judge metrics)
   - `prompts/` — Jinja2 templates for LLM judge prompts + the `prompt_renderer.py` loader
 - `src/schmidt/server/` — FastAPI web server exposing simulation data via REST and SSE streaming
-  - `password_auth_middleware.py` — pure ASGI middleware for shared-password authentication
-  - `runs/fork_router.py` — `POST /api/runs/{run_id}/fork` endpoint for creating forked runs
-  - `runs/replace_agent_router.py` — `POST /api/runs/{scenario}/{run_dir_name}/replace-agent` endpoint for round-level rewind with one fresh agent
-  - `runs/cross_run_replace_agent_router.py` — `POST /api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent` endpoint for round-level rewind importing an agent from a different completed run
-  - `runs/resume_at_round_router.py` — `POST /api/runs/{scenario}/{run_dir_name}/resume-at-round` endpoint for round-level rewind with no agent replacement (every agent keeps its full reconstructed history; knobs can be overridden)
+  - `identity/middleware.py` — Clerk-aware ASGI identity middleware; extracts the active group slug from the URL (`/api/g/{slug}/...` or `/mcp/g/{slug}/...`), validates membership via the Clerk session token, and attaches an `Identity` to `request.state`. Local mode (no `CLERK_SECRET_KEY`) short-circuits to a synthetic `local` group / `local-user`.
+  - `identity/clerk_verifier.py` — Networkless Clerk JWT verification. Reads both v2 (`o.id` / `o.slg` nested) and legacy v1 (`org_id` / `org_slug` flat) session token shapes.
+  - `identity/settings.py`, `identity/identity_model.py` — env config + `Identity` Pydantic model.
+  - `identity/bootstrap.py` — boots the synthetic `local` group at startup (idempotent upsert into `groups`).
+  - `identity/webhook_router.py` — Svix-verified `POST /api/clerk/webhook` that upserts/soft-deletes rows in the `groups` table from Clerk `organization.created` / `.updated` / `.deleted` events.
+  - `runs/fork_router.py` — `POST /api/g/{group_slug}/runs/{run_id}/fork` endpoint for creating forked runs
+  - `runs/replace_agent_router.py` — `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/replace-agent` endpoint for round-level rewind with one fresh agent
+  - `runs/cross_run_replace_agent_router.py` — `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/cross-run-replace-agent` endpoint for round-level rewind importing an agent from a different completed run
+  - `runs/resume_at_round_router.py` — `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/resume-at-round` endpoint for round-level rewind with no agent replacement (every agent keeps its full reconstructed history; knobs can be overridden)
+  - `runs/listing.py` — Postgres-backed `list_runs_for_group(request, scenario_filter)`; the active group's `group_id` is read from `request.state.identity`.
+  - `runs/lookup.py` — `resolve_run_or_404` (queries `runs` table on `(group_id, scenario, run_dir_name)` before touching disk) and `register_new_run` (inserts a row after `claim_run_dir`).
+- `src/schmidt/db/` — Postgres data layer (raw SQL via psycopg3 async; alembic for migrations)
+  - `pool.py` — async connection pool wrapper
+  - `queries.py` — typed query helpers returning Pydantic rows (`get_group_by_slug`, `list_runs_for_group`, `insert_run`, `upsert_group`, `soft_delete_group_by_clerk_org_id`, `set_last_active_group`, etc.)
+  - `rows.py` — `GroupRow`, `RunRow`, `UserLastActiveGroupRow` Pydantic models
+  - `local_tenant.py` — canonical constants `LOCAL_USER_ID = "local-user"`, `LOCAL_GROUP_SLUG = "local"`, `LOCAL_GROUP_NAME = "Local"`
+  - `run_registry.py` — standalone (own connection) variants used by the CLI / scripts that run outside the FastAPI lifespan
+  - `migrations/` — alembic env + raw-SQL revisions (`0001_groups_and_runs.py`, `0002_oauth_tables.py`)
   - `runs/scenario_extension.py` — `ScenarioRunDetailExtension` ABC + auto-discovery of every scenario's optional `run_detail_extension.py`; powers the discriminated-union `scenario_extras` field on `RunDetailResponse`
   - `runs/run_detail_types.py` — leaf DTOs (`AgentDetail`, `ChannelMessage`) shared by `models.py` and scenario-side extensions so extensions can import them without re-entering `models.py` during its discovery-time import
   - `mcp/browser.py` — MCP server mounted at `/mcp` for programmatic run browsing and launching (Claude Code, Cursor)
@@ -183,7 +196,12 @@ cp .env.example .env
 | `ANTHROPIC_API_KEY` | Yes (for simulations) | Anthropic API key |
 | `OPENAI_API_KEY` | Optional | OpenAI API key |
 | `HF_TOKEN` | Optional | HuggingFace token |
-| `APP_PASSWORD` | Optional | Shared password for web UI auth (disabled if unset) |
+| `DATABASE_URL` | Yes | Postgres connection string used by the tenancy + runs index (e.g. `postgresql://localhost:5432/schmidt_dev`). |
+| `CLERK_SECRET_KEY` | Yes (Clerk mode) | Clerk backend secret. If unset, the server boots in single-tenant **local mode** (every request runs as `local-user` in the `local` group). |
+| `CLERK_PUBLISHABLE_KEY` | Yes (Clerk mode) | Clerk publishable key (mirrors `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`). |
+| `CLERK_JWT_KEY` | Yes (Clerk mode) | PEM public key from the Clerk dashboard. Used for networkless JWT verification. |
+| `CLERK_WEBHOOK_SECRET` | Yes (Clerk mode) | Svix signing secret for `POST /api/clerk/webhook` that keeps the `groups` table in sync with Clerk org create/update/delete events. |
+| `CLERK_AUTHORIZED_PARTIES` | Optional (Clerk mode) | Comma-separated list of frontend origins allowed to mint tokens for this backend (e.g. `http://localhost:3000,https://app.example.com`). |
 | `ALLOWED_ORIGINS` | Optional | Comma-separated CORS origins (defaults to `http://localhost:3000`) |
 | `SCHMIDT_RUNS_DIR` | Optional | Directory for simulation run data (defaults to `./runs`) |
 | `OAUTH_ISSUER_URL` | Yes (for MCP) | Public backend URL for MCP OAuth (MCP is disabled if unset) |
@@ -199,6 +217,8 @@ Frontend environment variables go in `frontend/.env.local` (see `frontend/.env.l
 | Variable | Default | Description |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend API base URL |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | (unset) | Publishable key from the Clerk dashboard. Leave unset for local mode; the frontend then skips mounting `<ClerkProvider>` and the proxy is a pass-through. |
+| `CLERK_SECRET_KEY` | (unset) | Clerk secret key for server-side `auth()` / `clerkMiddleware()` calls inside Next.js Server Components and the proxy. |
 
 ## Development
 
@@ -209,41 +229,50 @@ make dev-frontend   # start Next.js dev server on port 3000
 
 ## Authentication
 
-The application supports two authentication modes: shared-password (for the REST API and optionally MCP) and OAuth 2.0 (for MCP clients).
+The backend is multi-tenant. Each Clerk **organization** corresponds to a study **group**; every run is owned by exactly one group, never shared across groups except via the export/import flow. The active group is identified by the URL slug — `/g/<slug>/...` on the frontend maps to `/api/g/<slug>/...` on the backend.
 
-### Shared-Password Authentication
+Two run-time modes, switched by the presence of `CLERK_SECRET_KEY`:
 
-Controlled by the `APP_PASSWORD` environment variable.
+### Local Mode (no Clerk)
 
-- **Enabled**: Set `APP_PASSWORD` to a password string. All API endpoints except `GET /api/health` require authentication.
-- **Disabled**: Leave `APP_PASSWORD` unset. All endpoints are open (default for local development).
+Default for dev clones. Leave `CLERK_SECRET_KEY` unset on the backend and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` unset on the frontend.
 
-The backend middleware (`password_auth_middleware.py`) accepts credentials via:
-- `Authorization: Bearer <password>` header (used by the typed API client)
-- `?token=<password>` query parameter (used by SSE EventSource connections, which cannot set custom headers)
+- `ClerkIdentityMiddleware` short-circuits every request to a synthetic `local` group / `local-user`. The `local` row is upserted into `groups` at server startup by `identity/bootstrap.py:ensure_local_group`.
+- The frontend renders without a sign-in flow; `<GroupProvider>` is hard-coded to `LOCAL_GROUP_SLUG = "local"`.
+- Postgres is still required (the `local` group + `runs` index live there).
+- All endpoints except `GET /api/health` still go through the identity middleware — they just receive the synthetic local identity automatically.
 
-The frontend `AuthGate` component probes `POST /api/auth/verify` on mount. If auth is required, it shows a login page. The password is stored in `localStorage` and attached to all API requests via openapi-fetch middleware.
+### Clerk Mode (prod / multi-tenant)
+
+Set `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_JWT_KEY`, and `CLERK_WEBHOOK_SECRET` on the backend; set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` on the frontend. See README "Authentication" for the full Clerk-dashboard setup.
+
+- Frontend mounts `<ClerkProvider>`. Clerk-issued session tokens carry the active org as either `o = { id, slg, ... }` (v2 — default for new apps) or flat `org_id` / `org_slug` (legacy v1). The verifier reads both.
+- `frontend/src/proxy.ts` wires `clerkMiddleware` with `organizationSyncOptions.organizationPatterns = ["/g/:slug", "/g/:slug/(.*)"]`, so navigating to `/g/<slug>/...` automatically activates that organization on the user's session *server-side, for the current request* — before any token is minted. This is how a user with multiple Clerk orgs can hit any of them by URL without first calling `setActive`.
+- The API client (`frontend/src/shared/lib/api-client.ts`) calls `session.getToken({ skipCache: true })` per request and attaches the result as `Authorization: Bearer ...`. `skipCache: true` matters: without it, a token minted before `setActive` (e.g. just after sign-in) is returned with `org_slug=null` and every `/api/g/<slug>/...` call 403s.
+- `ClerkIdentityMiddleware` (`src/schmidt/server/identity/middleware.py`) verifies the token via `clerk_backend_api.security.verify_token`, parses the URL's group slug, asserts `claims.org_slug == url_slug` (the slug-vs-active-org check), looks up the group's UUID in Postgres, and attaches `Identity(user_id, active_group_id, active_group_slug, ...)` to `request.state`.
+- Clerk webhook events (`organization.created`, `organization.updated`, `organization.deleted`) hit `POST /api/clerk/webhook` (Svix-verified). The handler upserts / soft-deletes rows in `groups`. Membership events are accepted but not mirrored — the JWT's active org claim is the source of truth.
+- SSE endpoints use the `?token=<jwt>` query parameter (EventSource cannot set custom headers); the identity middleware accepts the bearer in either the `Authorization` header or the `token` query string.
 
 ### MCP OAuth 2.0 Authentication
 
 The MCP server at `/mcp` uses OAuth 2.0 with PKCE and dynamic client registration. It is controlled by the `OAUTH_ISSUER_URL` environment variable.
 
-- **Enabled**: Set `OAUTH_ISSUER_URL` to the public base URL of the backend (e.g. `https://backend.up.railway.app`). The MCP server is mounted and protected by OAuth. The `/mcp` path is excluded from the shared-password middleware.
+- **Enabled**: Set `OAUTH_ISSUER_URL` to the public base URL of the backend (e.g. `https://backend.up.railway.app`). The MCP server is mounted and protected by OAuth.
 - **Disabled**: Leave `OAUTH_ISSUER_URL` unset. The MCP server is not mounted and the `/mcp` endpoint is unavailable.
 
 OAuth configuration:
 - Clients auto-register via `POST /mcp/register` (dynamic client registration, RFC 7591)
 - Authorization uses the code flow with PKCE (RFC 7636) via `GET /mcp/authorize`
-- When `APP_PASSWORD` is set, authorization redirects to a login form at `/mcp/oauth/login` for password verification
-- When `APP_PASSWORD` is unset, authorization auto-approves (open access)
-- Token exchange at `POST /mcp/token` issues access tokens (1 hour) and refresh tokens (30 days)
+- In **local mode** the authorize endpoint auto-approves to the synthetic `local` group.
+- In **Clerk mode** the authorize endpoint currently raises `access_denied` — Clerk-session-gated MCP consent is not yet wired up. MCP is therefore local-only when Clerk is active.
+- Token exchange at `POST /mcp/token` issues access tokens (1 hour) and refresh tokens (30 days). Each token row carries a `group_id` so every tool call is scoped to the right group via the `RunContext` contextvar primed by `mcp/asgi_context.py`.
 - OAuth metadata is discoverable at `GET /mcp/.well-known/oauth-authorization-server`
-- Token state is stored in SQLite at `$SCHMIDT_RUNS_DIR/oauth.db`
+- Token state lives in Postgres (`access_tokens`, `refresh_tokens`, `authorization_codes` tables — migration `0002_oauth_tables`).
 
 Implementation files:
 - `src/schmidt/server/mcp/oauth_provider.py` — `OAuthAuthorizationServerProvider` implementation
-- `src/schmidt/server/mcp/oauth_storage.py` — SQLite-backed storage for clients, codes, and tokens
-- `src/schmidt/server/mcp/oauth_login_page.py` — login form for the authorization flow
+- `src/schmidt/server/mcp/oauth_storage.py` — Postgres-backed storage for clients, codes, and tokens
+- `src/schmidt/server/mcp/asgi_context.py` — ASGI wrapper that reads the bearer token, resolves its `group_id`, and primes `RunContext` for every tool call
 
 ## MCP Integration
 
@@ -281,7 +310,7 @@ claude mcp add-json schmidt-runs '{"type":"http","url":"<API_URL>/mcp"}'
 }
 ```
 
-Replace `<API_URL>` with the backend URL (e.g. `http://localhost:8000` for local development). The client handles OAuth registration, authorization, and token refresh automatically. If `APP_PASSWORD` is set, the user is prompted with a login form during the authorization flow.
+Replace `<API_URL>` with the backend URL (e.g. `http://localhost:8000` for local development). The client handles OAuth registration, authorization, and token refresh automatically. In local mode the consent step auto-approves to the synthetic `local` group; in Clerk mode the consent step is not yet implemented, so MCP is local-mode-only for now.
 
 ## Deployment
 
@@ -300,10 +329,12 @@ Each service has a `railway.toml` config-as-code file:
 
 ### Railway Dashboard Setup
 
-**Backend service**: root directory `/`, volume mounted at `/data/runs`.
+**Backend service**: root directory `/`, volume mounted at `/data/runs`. Attach a Railway Postgres database — its connection string becomes `DATABASE_URL`. The Dockerfile runs `alembic upgrade head` before starting the server.
 
 Environment variables:
-- `APP_PASSWORD` — shared password for authentication
+- `DATABASE_URL` — Postgres connection string (required; backend won't boot without it)
+- `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_JWT_KEY`, `CLERK_WEBHOOK_SECRET` — required for Clerk-gated multi-tenant auth
+- `CLERK_AUTHORIZED_PARTIES` — comma-separated frontend origins allowed to mint tokens (e.g. `https://frontend.up.railway.app`)
 - `ANTHROPIC_API_KEY` — required for simulations
 - `ALLOWED_ORIGINS` — comma-separated frontend URLs for CORS (e.g. `https://frontend.up.railway.app`)
 - `OAUTH_ISSUER_URL` — public backend URL to enable MCP OAuth (e.g. `https://backend.up.railway.app`)
@@ -313,6 +344,8 @@ Environment variables:
 
 Build args:
 - `NEXT_PUBLIC_API_URL` — backend service URL (e.g. `https://backend.up.railway.app`)
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — Clerk publishable key (required to mount `<ClerkProvider>` and gate routes)
+- `CLERK_SECRET_KEY` — Clerk secret key used by Next.js Server Components and the proxy
 
 **Deploy order**: Backend first (get URL) → set as frontend `NEXT_PUBLIC_API_URL` build arg → deploy frontend → update backend `ALLOWED_ORIGINS` with frontend URL.
 
@@ -351,8 +384,8 @@ Labels are short tags attached to a run for filtering and grouping in the UI and
 
 Three ways to apply them:
 
-1. **Frontend "Create simulation" page**: enter labels at form time. Frontend POSTs the run, polls until it appears, then calls `PUT /api/runs/{scenario}/{run_dir_name}/labels` with `{"labels": [...]}` — see [new-simulation-form.tsx](frontend/src/features/runs/new-simulation-form.tsx).
-2. **Backend API**: same endpoint — `PUT /api/runs/{scenario}/{run_dir_name}/labels` with body `UpdateLabelsRequest{labels: list[str]}` — see [router.py:409](src/schmidt/server/runs/router.py#L409). The PUT replaces all labels (it does not append), so include any existing labels you want to keep.
+1. **Frontend "Create simulation" page**: enter labels at form time. Frontend POSTs the run, polls until it appears, then calls `PUT /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/labels` with `{"labels": [...]}` — see [new-simulation-form.tsx](frontend/src/features/runs/new-simulation-form.tsx).
+2. **Backend API**: same endpoint — `PUT /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/labels` with body `UpdateLabelsRequest{labels: list[str]}` — see [router.py:409](src/schmidt/server/runs/router.py#L409). The PUT replaces all labels (it does not append), so include any existing labels you want to keep.
 3. **Direct file write** (orchestrator scripts): write `labels.json` directly to the run dir as soon as the dir exists. Faster than the API and avoids needing the backend to be running. Example:
    ```bash
    echo '["baseline_oss"]' > "runs/veyru/<timestamp>/labels.json"
@@ -497,7 +530,7 @@ Forking uses the git-backed run history:
 
 Agents receive the conversation history (channel messages, scenario injections, round transitions) as context. They do not receive their prior reasoning — only externally visible state — so they re-derive their thinking naturally in response to the edited message.
 
-The fork API endpoint is `POST /api/runs/{run_id}/fork`. Forked runs appear in the run list with a "Fork" badge and show a lineage link in the run detail header.
+The fork API endpoint is `POST /api/g/{group_slug}/runs/{run_id}/fork`. Forked runs appear in the run list with a "Fork" badge and show a lineage link in the run detail header.
 
 ### Replacing an Agent (Round-Level Rewind)
 
@@ -526,7 +559,7 @@ Internals: clones the source run's git repo at the commit produced by the source
 
 **Per-scenario knob overrides.** `--knobs <file.json>` is merged onto the source's `scenario_config` before validation. Veyru exposes `postmortem_disabled_at_start: bool` for this flow: setting it to `true` flips `world.disable_postmortem_globally()` at world construction, dropping the postmortem channel for the rest of the resumed simulation (no postmortem injections, no postmortem phase, sends to postmortem are rejected).
 
-The replace-agent API endpoint is `POST /api/runs/{scenario}/{run_dir_name}/replace-agent`. Replace-agent runs appear in the run list with a "Replaced" badge.
+The replace-agent API endpoint is `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/replace-agent`. Replace-agent runs appear in the run list with a "Replaced" badge.
 
 ### Cross-Run Replacing an Agent (Round-Level Rewind, Different Source for the Imported Agent)
 
@@ -556,7 +589,7 @@ schmidt cross-run-replace-agent veyru \
 
 **Manifest + provenance.** Persisted as `cross_run_replace_manifest.json` (parallel to `replace_manifest.json`). Carries both `source_a_run_id` (target timeline) and `source_b_run_id` (where the imported agent came from), plus `imported_model`/`imported_provider`, `round_start`, `source_b_round_end`, `rounds_after_swap`, `replaced_agent_id`, `channels_with_visible_history`, `blocked_tool_call_channels`. The discovery layer surfaces this on `RunSummary` / `RunDetailResponse` as `cross_run_replace_agent_source`. Cross-run runs appear in the run list with a violet "Cross-run" badge that links back to both sources.
 
-**API endpoint** is `POST /api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent`. The path's `{scenario}/{run_dir_name}` identifies Sim A; the body's `source_b_run_id` identifies Sim B. The `GET /api/runs` listing accepts `?scenario=&contains_agent_id=&status=` filters used by the FE modal's Sim B picker.
+**API endpoint** is `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/cross-run-replace-agent`. The path's `{scenario}/{run_dir_name}` identifies Sim A; the body's `source_b_run_id` identifies Sim B (which must belong to the same group). The `GET /api/g/{group_slug}/runs` listing accepts `?scenario=&contains_agent_id=&status=` filters used by the FE modal's Sim B picker.
 
 **Verifying the imported history.** Each resumed run writes `resume_context_{agent_id}.json` to the new run dir capturing the exact reconstructed pydantic-ai messages handed to that agent on its first turn. For cross-run runs, `resume_context_<replaced_agent_id>.json`'s tail should match Sim B's last few `field_observer` (or whichever role) messages verbatim — that confirms the cross-run history is being mounted from Sim B and not contaminated by Sim A.
 
@@ -589,7 +622,7 @@ Required: `scenario_name` (positional), `--source-run-dir`, `--round-start` (≥
 
 **Knob-schema evolution caveat.** If the scenario's knobs schema gained a required field after the source was created, validation will reject the merged config until the missing key is supplied. Pass it via `--knobs` for that resume (example: veyru's `easy_round_numbers: frozenset[int]` was added later — older veyru runs need `--knobs '{"easy_round_numbers": [1, 2, 3, 6, 13]}'` to resume).
 
-**REST endpoint** is `POST /api/runs/{scenario}/{run_dir_name}/resume-at-round` with body `ResumeAtRoundRequest { round_start, rounds_after_resume, knobs }`. Response is `ResumeAtRoundResponse { new_run_id, new_run_dir }`. Discovery surfaces the manifest as `RunSummary.resume_at_round_source` / `RunDetailResponse.resume_at_round_source` (`ResumeAtRoundSource { source_run_id, round_start, rounds_after_resume, target_event_id, resumed_at }`); when `replaced_agent_id` is null, `replace_agent_source` is suppressed in favour of this field.
+**REST endpoint** is `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/resume-at-round` with body `ResumeAtRoundRequest { round_start, rounds_after_resume, knobs }`. Response is `ResumeAtRoundResponse { new_run_id, new_run_dir }`. Discovery surfaces the manifest as `RunSummary.resume_at_round_source` / `RunDetailResponse.resume_at_round_source` (`ResumeAtRoundSource { source_run_id, round_start, rounds_after_resume, target_event_id, resumed_at }`); when `replaced_agent_id` is null, `replace_agent_source` is suppressed in favour of this field.
 
 **FE surfaces.** The chat-pane round divider exposes a circular-arrow icon at every round ≥ 2 alongside the existing replace-agent and cross-run icons; clicking opens a confirm modal with `rounds_after_resume` pre-filled to `source_round_count - round_start` and a JSON textarea for knob overrides. The run-detail header shows a green `Resumed @ round N (+K)` badge linking back to the source. The runs-list row shows a green `↺R{N}` badge. Multi-swap runs render one `AgentSwapPointFab` per scheduled swap so users can scroll directly to any boundary.
 
@@ -661,9 +694,9 @@ Or embed in the `--config` JSON file under `model_overrides`:
 
 **Web UI:** The "Create simulation" page shows an "Agent Model Overrides" section after selecting a scenario. Each agent can be individually overridden to a different model/provider. The fork dialog also supports per-agent overrides.
 
-**Backend flow:** `POST /api/runs/start` and `POST /api/runs/{run_id}/fork` accept only knobs/config payloads; there is no top-level `model_overrides` field. Preflight validation reads `model_overrides` from knobs/config, validates provider names, and validates agent IDs against scenario roles before launch.
+**Backend flow:** `POST /api/g/{group_slug}/runs/start` and `POST /api/g/{group_slug}/runs/{run_id}/fork` accept only knobs/config payloads; there is no top-level `model_overrides` field. Preflight validation reads `model_overrides` from knobs/config, validates provider names, and validates agent IDs against scenario roles before launch.
 
-**Agent discovery:** `POST /api/scenarios/{scenario_name}/agents` accepts `{knobs}` and returns the agent IDs and role names for the given configuration. Used by the frontend to populate the override UI. Each scenario implements `get_agent_roles(knobs)` as a classmethod.
+**Agent discovery:** `POST /api/g/{group_slug}/scenarios/{scenario_name}/agents` accepts `{knobs}` and returns the agent IDs and role names for the given configuration. Used by the frontend to populate the override UI. Each scenario implements `get_agent_roles(knobs)` as a classmethod.
 
 ### IMPORTANT: Monitoring Long-Running Processes
 
