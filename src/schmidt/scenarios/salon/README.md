@@ -85,7 +85,7 @@ All metrics implement the platform `Metric` abstraction and return `Measurement`
 | `max_round_duration_seconds` | Wall-clock timeout per round |
 | `model_overrides` | Per-agent model/provider overrides (inherited from base) |
 | `agent_max_tokens` | Per-cycle output-token cap passed to the LLM (inherited from base) |
-| `replace_agent_default_channel_visibility` | Per-channel default visibility for the replace-agent CLI/HTTP flows (inherited from base) |
+| `replace_agent_default_channel_visibility` | Per-channel default visibility for the replace-agent CLI flow (inherited from base) |
 | `scheduled_events` | Mid-run interventions keyed off round boundaries (inherited from base) |
 | `round_time_budget_seconds` | Per-round communication budget (inherited from base). Set to `null` for Salon — adversarial pressure comes from `inquisitor_guesses_per_round` instead of a character/time budget. |
 

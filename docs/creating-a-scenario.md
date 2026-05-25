@@ -161,13 +161,13 @@ The world is also the place where:
 
 ### 7. Write `scenario.py`
 
-The `SimulationScenario` subclass — the entry point the registry hands to the CLI and frontend. Required classmethods and methods are spelled out in [scenario_protocol.py](../src/schmidt/scenario_protocol.py). The key ones:
+The `SimulationScenario` subclass — the entry point the registry hands to the CLI, MCP `start_run` tool, and run-detail UI. Required classmethods and methods are spelled out in [scenario_protocol.py](../src/schmidt/scenario_protocol.py). The key ones:
 
 - `name()` → the registry key (string).
 - `description()` → a short human-readable description.
 - `knobs_json_schema()` → returns `<YourKnobs>.model_json_schema()`.
 - `create_from_config(config, model, provider, ...)` → factory that validates the dict against `<YourKnobs>` and constructs the scenario.
-- `get_agent_roles(knobs)` → classmethod returning `(agent_id, role_name)` pairs used by the new-simulation form for agent-model overrides.
+- `get_agent_roles(knobs)` → classmethod returning `(agent_id, role_name)` pairs used for agent-model override validation in CLI run-config preflight.
 - `get_agents()`, `get_channels()`, `get_world()`, `get_mcp_tools()` — wire up the world plus the per-agent role configs (system prompt path, channels, tools, MCP).
 - `get_injection(round_number, agent_id, previous_outcome, current_case)` → renders the per-round Jinja injection for an agent.
 - `get_postmortem_injection(round_number, agent_id, previous_outcome)` → optional postmortem-phase injection.

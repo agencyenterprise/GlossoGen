@@ -67,24 +67,6 @@ def rewrite_run_jsonl(
     return len(output_lines)
 
 
-_FRESH_AGENT_EVENT_TYPES = frozenset(
-    {
-        "llm_response_received",
-        "tool_call_invoked",
-        "tool_result_received",
-    }
-)
-
-
-def drop_all_agent_history(event_dict: dict[str, Any]) -> bool:
-    """Drop predicate: every agent's LLM history events.
-
-    Used by fork — every agent starts fresh on resume because forked text
-    edits invalidate prior tool args and results.
-    """
-    return event_dict.get("event_type") in _FRESH_AGENT_EVENT_TYPES
-
-
 def patch_simulation_started_scenario_config(
     log_path: Path,
     scenario_config: dict[str, Any],

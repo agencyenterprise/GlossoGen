@@ -235,44 +235,19 @@ runs/{scenario_name}/{unix_timestamp}/
 
 The CLI `run` command computes the output path automatically from `--runs-dir`, the scenario name, and the current unix timestamp. The `evaluate` command takes `--run-dir` pointing to a specific run directory and writes the report as a sibling to the JSONL file.
 
-The web server scans this directory tree to discover runs, reading the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total messages, end reason) without loading the full log. Forked, replace-agent, cross-run replace-agent, and resume-at-round runs are identified by the presence of `fork_manifest.json`, `replace_manifest.json` (with `replaced_agent_id` set vs null), or `cross_run_replace_manifest.json` respectively.
-
-## Fork System (Message-Level Rewind)
-
-The fork system allows rewinding a completed simulation to any message, editing it, and re-running from that point. Forking creates a new run directory — the original is preserved.
-
-### Fork Flow
-
-1. **Frontend**: User hovers over a message in the run detail view, clicks the edit button, modifies the text, and clicks the play button. The frontend calls `POST /api/runs/{run_id}/fork` with target message ID, text edits, model/provider, and optional knobs/config overrides.
-2. **Fork router** (`server/runs/fork_router.py`): Resolves the target message to a git commit, clones the source run repo to a new run directory, and checks out the target commit.
-3. **Edit application**: Rewrites the forked JSONL in-place (`_apply_edits_and_new_run_id`) to apply message text edits and assign a new run ID. Writes `fork_manifest.json` for provenance and commits the fork edits.
-4. **Preflight validation**: Validates merged scenario config (source config plus optional fork knobs) with `validate_run_config`, including `model_overrides` provider checks and scenario-aware agent ID checks.
-5. **Resume**: Launches `schmidt run --resume <new_dir> --config fork_config.json` as a background subprocess.
-6. **Supervisor resume**: CLI rebuilds `RewindState` from the forked JSONL and resumes the simulation from the restored round/channel state.
-7. **Agents continue**: Fresh agent sessions start with reconstructed message history and continue naturally from the edited world state.
-
-### Key Modules
-
-- `message_rewind.py` — `RewindState` and rewind state reconstruction helpers
-- `message_history_builder.py` — builds per-agent transcript history from events
-- `run_jsonl_rewriter.py` — shared JSONL rewriter (used by both fork and replace-agent) that walks the cloned log once and applies a caller-supplied drop predicate plus run-id / message-text edits
-- `server/runs/fork_router.py` — `POST /api/runs/{run_id}/fork` API endpoint
-
-### Provenance
-
-Forked runs store a `fork_manifest.json` containing `source_run_id` and `target_message_id`. The run discovery and detail endpoints expose this as `fork_source` on the response models. The frontend shows a "Fork" badge in the run list and a lineage link in the run detail header.
+The web server scans this directory tree to discover runs, reading the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total messages, end reason) without loading the full log. Replace-agent, cross-run replace-agent, and resume-at-round runs are identified by the presence of `replace_manifest.json` (with `replaced_agent_id` set vs null) or `cross_run_replace_manifest.json`. Legacy fork runs (created when the message-level fork UI was active) are identified by the presence of `fork_manifest.json`; only their badge and lineage link are still rendered.
 
 ## Replace-Agent System (Round-Level Rewind)
 
-The replace-agent system rewinds a finished simulation to the start of a chosen round and re-runs from there with one specific agent restarted on a fresh history. Every other agent resumes from its full reconstructed history. The replacement agent's model/provider can differ from the original. Like fork, replace-agent creates a new run directory — the original is preserved.
+The replace-agent system rewinds a finished simulation to the start of a chosen round and re-runs from there with one specific agent restarted on a fresh history. Every other agent resumes from its full reconstructed history. The replacement agent's model/provider can differ from the original. Replace-agent creates a new run directory — the original is preserved.
 
-This shares the fork primitives (git clone + checkout, JSONL rewrite, `--resume` subprocess) but differs in two ways: (1) the user picks a **round number** instead of a message ID — the system resolves it to the last `MessageSent` whose `round_number < round_start`; (2) the JSONL rewriter strips `llm_response_received` / `tool_call_invoked` / `tool_result_received` events **only** when their `agent_id` matches the replaced agent, so reconstructed message history for non-replaced agents stays intact.
+The user picks a **round number**; the system resolves it to the last `MessageSent` whose `round_number < round_start`. The JSONL rewriter strips `llm_response_received` / `tool_call_invoked` / `tool_result_received` events **only** when their `agent_id` matches the replaced agent, so reconstructed message history for non-replaced agents stays intact.
 
 ### Replace-Agent Flow
 
-1. **Entry**: User invokes `python -m schmidt replace-agent <scenario> --source-run-dir <dir> --round-start <N> --replaced-agent-id <id> --model <model> --provider <provider> --runs-dir <dir>`, or `POST /api/runs/{run_id}/replace-agent` with the same payload. Both surfaces call the shared core helper `replace_agent.replace_agent_in_run`.
+1. **Entry**: User invokes `python -m schmidt replace-agent <scenario> --source-run-dir <dir> --round-start <N> --replaced-agent-id <id> --model <model> --provider <provider> --runs-dir <dir>`. The CLI calls the shared core helper `replace_agent.replace_agent_in_run`.
 2. **Round resolution**: `resolve_round_start_message(events, round_start)` finds the last `MessageSent` whose `round_number < round_start`. Round 1 is rejected (no prior message to anchor to).
-3. **Clone + checkout**: Same as fork — `find_commit_for_message` → SHA, `clone_to` + `checkout`.
+3. **Clone + checkout**: `find_commit_for_message` → SHA, `clone_to` + `checkout`.
 4. **JSONL rewrite**: `run_jsonl_rewriter.rewrite_run_jsonl` walks the cloned log once with predicate `drop_single_agent_history(event_dict, agent_id=replaced_agent_id)` — only the chosen agent's LLM history events are dropped.
 5. **Per-agent model overrides**: An explicit `model_overrides` dict is built that pins every source agent to its original `(model, provider)` pair (read from `AgentRegistered` events) and overwrites just the replaced agent's entry with the new model/provider. This guarantees non-replaced agents stay on their exact original models even if the top-level CLI defaults differ.
 6. **Manifest + commit**: `replace_manifest.json` records `source_run_id`, `round_start`, `target_message_id` (the resolved anchor, kept for traceability), `replaced_agent_id`, `replacement_model`, `replacement_provider`, `channels_with_visible_history`, `replaced_at`. Committed as `replace: agent <id> → <model>/<provider>`.
@@ -283,24 +258,23 @@ This shares the fork primitives (git clone + checkout, JSONL rewrite, `--resume`
 
 The replace-agent flow lets the caller choose, per channel, whether the replaced agent retains visibility of pre-resume messages on that channel. This is generic across scenarios.
 
-- **Request field**: `ReplaceAgentRequest.channels_with_visible_history: list[str]` (CLI flag `--visible-history-channel CHANNEL`, repeatable; HTTP body field of the same name). Empty list = wipe history visibility on every channel the agent is in.
-- **Default policy**: `BaseKnobs.replace_agent_default_channel_visibility: dict[str, bool]` (channel ID → visible). Channels absent from the map default to visible. The CLI consults this knob when no `--visible-history-channel` flag is passed; the FE consults it to pre-populate the modal checkboxes. New scenarios opt in by setting the map in their preset JSONs — no code change required.
+- **Request field**: `ReplaceAgentRequest.channels_with_visible_history: list[str]` (CLI flag `--visible-history-channel CHANNEL`, repeatable). Empty list = wipe history visibility on every channel the agent is in.
+- **Default policy**: `BaseKnobs.replace_agent_default_channel_visibility: dict[str, bool]` (channel ID → visible). Channels absent from the map default to visible. The CLI consults this knob when no `--visible-history-channel` flag is passed. New scenarios opt in by setting the map in their preset JSONs — no code change required.
 - **Persistence**: stored on `replace_manifest.json`; the CLI's `--resume` path reads it and threads it onto `RewindState.replaced_agent_channels_with_visible_history` (a `dict[str, list[str]]` keyed by `agent_id`).
 
 ### Veyru-Specific Knob: Drop Postmortem After Replacement
 
-Setting `postmortem_disabled_at_start: true` in the merged `knobs` payload makes `VeyruWorld.__init__` flip `_postmortem_globally_disabled = True` immediately. From resume onward `validate_outgoing_message`, `get_postmortem_injection`, and `get_max_postmortem_duration_seconds` all short-circuit, so the postmortem channel exists but is inert (no sends, no injections, no postmortem phase). The FE replace-agent modal exposes this as a Veyru-only "Drop #postmortem channel after replacement" checkbox; other scenarios use the generic `knobs` field directly.
+Setting `postmortem_disabled_at_start: true` in the merged `knobs` payload makes `VeyruWorld.__init__` flip `_postmortem_globally_disabled = True` immediately. From resume onward `validate_outgoing_message`, `get_postmortem_injection`, and `get_max_postmortem_duration_seconds` all short-circuit, so the postmortem channel exists but is inert (no sends, no injections, no postmortem phase). Pass `--knobs '{"postmortem_disabled_at_start": true}'` on the CLI to opt in.
 
 ### Key Modules
 
-- `replace_agent.py` — `ReplaceAgentRequest`/`ReplaceAgentResult` named tuples, `resolve_round_start_message`, and `replace_agent_in_run` (shared core called by both CLI and HTTP layers)
-- `run_jsonl_rewriter.py` — `rewrite_run_jsonl` plus the two drop predicates (`drop_all_agent_history` for fork, `drop_single_agent_history` for replace-agent)
-- `server/runs/replace_agent_router.py` — `POST /api/runs/{scenario}/{run_dir_name}/replace-agent` thin HTTP wrapper
+- `replace_agent.py` — `ReplaceAgentRequest`/`ReplaceAgentResult` named tuples, `resolve_round_start_message`, and `replace_agent_in_run` (shared core called by the CLI)
+- `run_jsonl_rewriter.py` — `rewrite_run_jsonl` plus the `drop_single_agent_history` predicate
 - `cli.py` `_run_replace_agent` — CLI subcommand implementation
 
 ### Provenance
 
-Replace-agent runs store a `replace_manifest.json`. The run discovery and detail endpoints expose this as `replace_agent_source` on the response models alongside `fork_source`. The frontend shows a "Replaced X → model @ round N" badge in the run detail header.
+Replace-agent runs store a `replace_manifest.json`. The run discovery and detail endpoints expose this as `replace_agent_source` on the response models. The frontend shows a "Replaced X → model @ round N" badge in the run detail header.
 
 ## Cross-Run Replace-Agent System (Round-Level Rewind, Different Source for the Imported Agent)
 
@@ -310,7 +284,7 @@ This shares replace-agent's primitives (git clone of Sim A + checkout, JSONL rew
 
 ### Cross-Run Flow
 
-1. **Entry**: `python -m schmidt cross-run-replace-agent <scenario> --source-a-run-dir <dir> --source-b-run-dir <dir> --round-start <N> --replaced-agent-id <id> --runs-dir <dir>` or `POST /api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent` with `source_b_run_id` in the body. Both surfaces call the shared core helper `cross_run_replace_agent.cross_run_replace_agent_in_run`.
+1. **Entry**: `python -m schmidt cross-run-replace-agent <scenario> --source-a-run-dir <dir> --source-b-run-dir <dir> --round-start <N> --replaced-agent-id <id> --runs-dir <dir>`. The CLI calls the shared core helper `cross_run_replace_agent.cross_run_replace_agent_in_run`.
 2. **Validate**: Sim A and Sim B exist, scenarios match, `replaced_agent_id` exists in both, `round_start > 1`, Sim B reached at least `source_b_round_end`. Default `source_b_round_end = min(round_start - 1, B_max_round)` so the imported agent gets the largest temporally-aligned slice of B's history without exceeding what B reached.
 3. **Resolve model**: when `--model` / `--provider` are absent, read Sim B's `AgentRegistered` for `replaced_agent_id` and use those values. Both must be passed together to override.
 4. **Clone Sim A** at the `RoundAdvanced(round_start)` commit (same as replace-agent), rewrite the JSONL run-id, copy Sim B's full JSONL to `<new_dir>/imported_history_source.jsonl`, build merged scenario_config (knobs + `model_overrides` pinning every Sim A agent to its Sim A model and the replaced agent to the imported model), write `replace_config.json`.
@@ -343,16 +317,15 @@ Same as replace-agent, the supervisor calls `write_resume_context_files` at resu
 
 ### Key Modules
 
-- `cross_run_replace_agent.py` — `CrossRunReplaceAgentRequest`/`CrossRunReplaceAgentResult` named tuples, `_resolve_source_b_cutoff_event_id`, `_compute_blocked_tool_call_channels`, and `cross_run_replace_agent_in_run` (shared core called by both CLI and HTTP layers)
+- `cross_run_replace_agent.py` — `CrossRunReplaceAgentRequest`/`CrossRunReplaceAgentResult` named tuples, `_resolve_source_b_cutoff_event_id`, `_compute_blocked_tool_call_channels`, and `cross_run_replace_agent_in_run` (shared core called by the CLI)
 - `cross_run_replace_manifest.py` — `CrossRunReplaceManifest` Pydantic model + `read_cross_run_replace_manifest` reader (kept separate from `replace_manifest.py` so metrics / discovery can dispatch on file presence)
 - `message_rewind.py` — `AgentHistoryFilter` extended with `imported: ImportedHistory | None`; `_find_imported_registration` looks up the imported agent's `AgentRegistered` in the imported event stream
-- `server/runs/cross_run_replace_agent_router.py` — `POST /api/runs/{scenario}/{run_dir_name}/cross-run-replace-agent` thin HTTP wrapper; resolves `--source-b-round-end` and `--model`/`--provider` defaults at the edge
 - `cli.py` `_run_cross_run_replace_agent` + `_resolve_source_b_max_round` + `_resolve_imported_model_from_source_b` — CLI subcommand implementation
 - `evaluation/metrics/round_success_after_resume_metric.py` — reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (so the same metric works for both flows)
 
 ### Provenance
 
-Cross-run replace-agent runs store a `cross_run_replace_manifest.json` plus a `imported_history_source.jsonl` (verbatim copy of Sim B's JSONL). The run discovery and detail endpoints expose the manifest as `cross_run_replace_agent_source` on the response models alongside `fork_source` and `replace_agent_source`. The frontend shows a violet "Cross-run X: A=… · B=… → imported_model @ round N" badge in the run detail header with both sources as links, and a violet floating action button to scroll to the swap divider in the chat pane.
+Cross-run replace-agent runs store a `cross_run_replace_manifest.json` plus a `imported_history_source.jsonl` (verbatim copy of Sim B's JSONL). The run discovery and detail endpoints expose the manifest as `cross_run_replace_agent_source` on the response models alongside `replace_agent_source`. The frontend shows a violet "Cross-run X: A=… · B=… → imported_model @ round N" badge in the run detail header with both sources as links, and a violet floating action button to scroll to the swap divider in the chat pane.
 
 ## Resume-at-Round System (Post-Hoc Resume, No Agent Replacement)
 
@@ -360,10 +333,10 @@ Resume-at-round is the simplest sibling of replace-agent: it clones a finished r
 
 ### Resume-at-Round Flow
 
-1. **Entry**: `python -m schmidt resume-at-round <scenario> --source-run-dir <dir> --round-start <N> --runs-dir <dir> [--knobs <file>] [--rounds-after-resume K]`, or `POST /api/runs/{scenario}/{run_dir_name}/resume-at-round` with `ResumeAtRoundRequest { round_start, rounds_after_resume, knobs }`. Both surfaces build a `ReplaceAgentRequest` with `replaced_agent_id=None`, `model=None`, `provider=None`, `channels_with_visible_history=None` and call `replace_agent.replace_agent_in_run`.
+1. **Entry**: `python -m schmidt resume-at-round <scenario> --source-run-dir <dir> --round-start <N> --runs-dir <dir> [--knobs <file>] [--rounds-after-resume K]`. The CLI builds a `ReplaceAgentRequest` with `replaced_agent_id=None`, `model=None`, `provider=None`, `channels_with_visible_history=None` and calls `replace_agent.replace_agent_in_run`.
 2. **Anchor resolution**: `resolve_round_start_anchor` finds the source's `RoundAdvanced(round_start)` event id; `find_round_start_timestamp` recovers the timestamp.
 3. **Source agent collection**: `_collect_source_agents` filters `AgentRegistered` events to those at or before the boundary timestamp — so resuming a multi-swap source picks up each agent's *current* model/system_prompt at `round_start`, not a later swap registration.
-4. **Clone + checkout**: Same as fork / replace-agent — `find_commit_for_event_id` → SHA, `clone_to` + `checkout`.
+4. **Clone + checkout**: Same as replace-agent — `find_commit_for_event_id` → SHA, `clone_to` + `checkout`.
 5. **JSONL rewrite**: Only the `run_id` is rewritten; no message edits, no events dropped.
 6. **Merged config**: `request.knobs` is shallow-merged onto the source's `scenario_config`. `round_count` is set to `round_start + effective_rounds_after_swap`. `model_overrides` pins every agent to its source-active registration. The merged config is written to `replace_config.json` and patched into the cloned JSONL's `SimulationStarted` event.
 7. **Manifest**: Written as `replace_manifest.json` with `replaced_agent_id`, `replacement_model`, `replacement_provider` all `null`; `channels_with_visible_history` and `blocked_tool_call_channels` empty. Commit message: `resume-at-round: r<N>`.
@@ -393,13 +366,12 @@ When the scenario's knobs schema gained a required field after the source was cr
 - `message_rewind.py` — `RewindState.rounds_with_fired_scheduler_events: frozenset[int]` populated by `_build_rewind_state_at_timestamp`
 - `autonomous_supervisor.py` — pre-seeds the scheduler from `resume_state.rounds_with_fired_scheduler_events` and calls `dispatch_resume_boundary_events` + `deliver_initial_round_injections` after agent runners launch
 - `cli.py` — `_run_resume_at_round` handler and the `resume-at-round` argparse parser; resume-side reader branches on `replace_info.replaced_agent_id is None`
-- `server/runs/resume_at_round_router.py` — `POST /api/runs/{scenario}/{run_dir_name}/resume-at-round` HTTP wrapper
-- `server/runs/models.py` — `ResumeAtRoundRequest`, `ResumeAtRoundResponse`, `ResumeAtRoundSource`
+- `server/runs/models.py` — `ResumeAtRoundSource`
 - `server/runs/discovery.py` + `detail_reader.py` — `_read_resume_at_round_source` (returns `None` when manifest's `replaced_agent_id` is non-null); `_read_replace_agent_source` returns `None` when it is null so a single manifest never surfaces under both fields
 
 ### Provenance
 
-Resume-at-round runs store a `replace_manifest.json` with `replaced_agent_id=null` (the discriminator). Discovery reads `_read_resume_at_round_source` which returns a `ResumeAtRoundSource { source_run_id, round_start, rounds_after_resume, target_event_id, resumed_at }` on `RunSummary` / `RunDetailResponse` as `resume_at_round_source`. The frontend renders a green "↺ Resumed @ round N (+K)" badge in the run-detail header (links back to `source_run_id`) and a green chip in the runs-list row. The chat-pane round divider exposes a circular-arrow icon at every round ≥ 2 to open the resume modal pre-filled with `rounds_after_resume = source_round_count - round_start` and an empty JSON knobs textarea.
+Resume-at-round runs store a `replace_manifest.json` with `replaced_agent_id=null` (the discriminator). Discovery reads `_read_resume_at_round_source` which returns a `ResumeAtRoundSource { source_run_id, round_start, rounds_after_resume, target_event_id, resumed_at }` on `RunSummary` / `RunDetailResponse` as `resume_at_round_source`. The frontend renders a green "↺ Resumed @ round N (+K)" badge in the run-detail header (links back to `source_run_id`) and a green chip in the runs-list row.
 
 ### Multi-Swap Navigation
 
@@ -608,7 +580,7 @@ The frontend includes an MCP integration modal (accessible via the **MCP** butto
 - **Data fetching**: TanStack React Query with openapi-fetch for type-safe API calls. In-progress runs auto-refresh every 5 seconds (configurable via a Stop/Resume button).
 - **Type generation**: `openapi-typescript` generates TypeScript types from the backend's OpenAPI schema. CI enforces that generated types stay in sync with the backend.
 - **Lint enforcement**: ESLint forbids raw `fetch()` — all API calls must go through the typed client at `@/shared/lib/api-client`. This ensures compile-time validation of request paths, parameters, and response types.
-- **Fork UI**: Completed runs show per-message edit buttons (on hover). Editing a message and clicking play opens a modal to select model/provider, then calls the fork API and navigates to the new run. Forked runs display a lineage badge linking to the source. Fork state is managed by the `useFork` hook (`use-fork.ts`).
+- **Lineage badges**: derived runs (replace-agent, cross-run replace-agent, resume-at-round, legacy fork) display a badge in the run-detail header linking to the source run, plus floating-action buttons in the chat pane to scroll to each lineage event. Simulations are launched from the CLI (or via the MCP `start_run` tool); the frontend is a read-only viewer.
 
 ## Results Viewer (Streamlit)
 
