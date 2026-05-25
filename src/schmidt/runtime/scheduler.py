@@ -10,7 +10,7 @@ new agent receives the round's injection just like any other.
 import logging
 from typing import Any, Protocol
 
-from schmidt.runtime.scheduled_events import InjectCase, ScheduledEvent, SetPostmortem, SwapAgent
+from schmidt.runtime.scheduled_events import ScheduledEvent, SetPostmortem, SwapAgent
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ class RoundBoundaryScheduler:
                     round_number=round_number,
                     enabled=event.enabled,
                 )
-            elif isinstance(event, InjectCase):
+            else:
                 await ops.inject_case_payload(
                     round_number=round_number,
                     payload=event.payload,

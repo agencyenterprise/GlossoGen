@@ -8,7 +8,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from pydantic import TypeAdapter
@@ -76,9 +76,10 @@ class AutonomousSupervisor:
         self._log_path = log_path
         self._runtime: SimulationRuntime | None = None
         scheduled_events_raw_obj = scenario.get_scenario_config().get("scheduled_events", [])
-        scheduled_events_raw: list[Any] = (
-            list(scheduled_events_raw_obj) if isinstance(scheduled_events_raw_obj, list) else []
-        )
+        if isinstance(scheduled_events_raw_obj, list):
+            scheduled_events_raw: list[Any] = list(cast(list[Any], scheduled_events_raw_obj))
+        else:
+            scheduled_events_raw = []
         scheduled = self._parse_scheduled_events(raw=scheduled_events_raw)
         already_fired_rounds: frozenset[int] = (
             resume_state.rounds_with_fired_scheduler_events

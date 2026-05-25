@@ -11,12 +11,7 @@ import asyncio
 import logging
 from typing import NamedTuple
 
-from schmidt.runtime.scenario_world import (
-    MessageEvent,
-    RoundAdvancedEvent,
-    ScenarioWorld,
-    WorldContext,
-)
+from schmidt.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
 from schmidt.scenarios.satellite_contact_window.cases import CommandStep, SatelliteCase
 from schmidt.scenarios.satellite_contact_window.ids import (
     COMMAND_ACCEPTED_MARKER,
@@ -285,10 +280,9 @@ class SatelliteWorld(ScenarioWorld):
                 event = await context.next_event()
                 if isinstance(event, RoundAdvancedEvent):
                     continue
-                if isinstance(event, MessageEvent):
-                    if event.channel_id != LINK_CHANNEL_ID:
-                        continue
-                    await self._send_threshold_notifications(context=context)
+                if event.channel_id != LINK_CHANNEL_ID:
+                    continue
+                await self._send_threshold_notifications(context=context)
         except asyncio.CancelledError:
             return
 

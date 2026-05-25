@@ -224,7 +224,7 @@ to `start_run`.
 
 async def _tool_list_scenarios() -> McpListScenariosResult:
     """List available scenarios, models, and providers."""
-    scenarios = []
+    scenarios: list[McpScenario] = []
     for name in sorted(SCENARIO_REGISTRY.keys()):
         scenario_cls = SCENARIO_REGISTRY[name]
         scenarios.append(

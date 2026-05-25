@@ -21,12 +21,7 @@ Heavy logic lives in dedicated sibling modules: :mod:`world_state` (the
 import asyncio
 import logging
 
-from schmidt.runtime.scenario_world import (
-    MessageEvent,
-    RoundAdvancedEvent,
-    ScenarioWorld,
-    WorldContext,
-)
+from schmidt.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
 from schmidt.scenarios.veyru.ids import (
     POSTMORTEM_A_CHANNEL_ID,
     POSTMORTEM_B_CHANNEL_ID,
@@ -411,15 +406,14 @@ class VeyruWorld(ScenarioWorld):
             while True:
                 event = await context.next_event()
                 if isinstance(event, RoundAdvancedEvent):
-                    pass
-                elif isinstance(event, MessageEvent):
-                    team_id = self._channels_by_team.get(event.channel_id)
-                    if team_id is None:
-                        continue
-                    await self._send_threshold_notifications(
-                        context=context,
-                        team_id=team_id,
-                    )
+                    continue
+                team_id = self._channels_by_team.get(event.channel_id)
+                if team_id is None:
+                    continue
+                await self._send_threshold_notifications(
+                    context=context,
+                    team_id=team_id,
+                )
         except asyncio.CancelledError:
             return
 

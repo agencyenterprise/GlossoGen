@@ -1,6 +1,6 @@
 """Shared validation helpers for scenario run configuration payloads."""
 
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 from schmidt.config_overrides import normalize_agent_overrides, validate_agent_override_ids
 from schmidt.scenario_protocol import SimulationScenario
@@ -31,7 +31,9 @@ def validate_run_config(
                 "Invalid model_overrides: expected an object mapping "
                 "agent IDs to override payloads."
             )
-        normalized_input = _normalize_agent_override_input(agent_overrides=raw_overrides)
+        normalized_input = _normalize_agent_override_input(
+            agent_overrides=cast(dict[str, Any], raw_overrides)
+        )
         normalized = normalize_agent_overrides(
             agent_overrides=normalized_input,
             default_provider=default_provider,

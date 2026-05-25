@@ -71,17 +71,17 @@ class TeamState:
     yard_operator_id: str
     current_round_characters: int = 0
     round_budget_exceeded: bool = False
-    notified_thresholds: set[str] = field(default_factory=set)
-    outcomes: list[YardOutcome] = field(default_factory=list)
-    current_stacks: dict[int, list[str]] = field(default_factory=dict)
-    truck_states: dict[str, TruckState] = field(default_factory=dict)
+    notified_thresholds: set[str] = field(default_factory=set[str])
+    outcomes: list[YardOutcome] = field(default_factory=list[YardOutcome])
+    current_stacks: dict[int, list[str]] = field(default_factory=dict[int, list[str]])
+    truck_states: dict[str, TruckState] = field(default_factory=dict[str, TruckState])
     round_failed_terminally: bool = False
     failure_reason: str = ""
     round_outcome_marked: bool = False
     current_step_index: int = 0
     step_accepted_move_count: int = 0
     step_correctly_committed_truck_count: int = 0
-    step_outcomes: list[StepOutcome] = field(default_factory=list)
+    step_outcomes: list[StepOutcome] = field(default_factory=list[StepOutcome])
 
 
 def stack_position_text(stack: int, tier: int) -> str:

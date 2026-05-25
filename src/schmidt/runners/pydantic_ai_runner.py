@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterable, Callable
+from typing import Any, cast
 
 from pydantic_ai import Agent, _agent_graph
 from pydantic_ai.agent import AgentRunResult as PydanticAIAgentRunResult
@@ -85,10 +86,10 @@ def _serialize_tool_result(content: object) -> str:
     """Serialize a tool result to a string, using JSON for dicts and lists."""
     if isinstance(content, (dict, list)):
         try:
-            return json.dumps(content)
+            return json.dumps(content)  # pyright: ignore[reportUnknownArgumentType]
         except (TypeError, ValueError):
             logger.exception("Failed to JSON-serialize tool result, falling back to str()")
-    return str(content)
+    return str(content)  # pyright: ignore[reportUnknownArgumentType]
 
 
 class _StreamingState:
@@ -560,19 +561,16 @@ class PydanticAIRunner(AgentRunner):
             )
 
             raw_args = event.part.args
+            args: dict[str, Any] = {}
             if isinstance(raw_args, dict):
                 args = raw_args
             elif isinstance(raw_args, str):
                 try:
                     parsed = json.loads(raw_args)
                     if isinstance(parsed, dict):
-                        args = parsed
-                    else:
-                        args = {}
+                        args = cast(dict[str, Any], parsed)
                 except json.JSONDecodeError:
-                    args = {}
-            else:
-                args = {}
+                    pass
             tc_req = ToolCallRequest(
                 call_id=event.part.tool_call_id,
                 tool_name=event.part.tool_name,

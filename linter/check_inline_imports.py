@@ -90,7 +90,7 @@ def check_file(file_path: Path) -> list[dict[str, Union[str, int]]]:
 
         # Filter out errors that have a '# no-inline-import' comment
         lines = content.splitlines()
-        final_errors = []
+        final_errors: list[dict[str, Union[str, int]]] = []
         for error in checker.errors:
             # AST gives 1-based line numbers, so we convert to 0-based index
             line_index = int(str(error["line"])) - 1

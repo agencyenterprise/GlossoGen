@@ -56,7 +56,10 @@ async def _create_with_retry(
     kwargs: dict[str, Any],
 ) -> anthropic.types.Message:
     """Call the Anthropic Messages API with exponential-backoff retry on transient errors."""
-    response: anthropic.types.Message = await client.messages.create(**kwargs)
+    # anthropic SDK messages.create is overloaded on `stream`; **kwargs hides
+    # the literal from pyright. We always call with stream=False.
+    client_any: Any = client
+    response: anthropic.types.Message = await client_any.messages.create(**kwargs)
     return response
 
 
@@ -137,8 +140,7 @@ class ClaudeProvider(LLMProvider):
             arguments: dict[str, Any] | None = None
             for block in response.content:
                 if block.type == "tool_use" and block.name == tool_name:
-                    if isinstance(block.input, dict):
-                        arguments = block.input
+                    arguments = dict(block.input)
                     break
 
             if arguments is None:

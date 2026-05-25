@@ -12,12 +12,7 @@ import asyncio
 import logging
 from typing import NamedTuple
 
-from schmidt.runtime.scenario_world import (
-    MessageEvent,
-    RoundAdvancedEvent,
-    ScenarioWorld,
-    WorldContext,
-)
+from schmidt.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
 from schmidt.scenarios.hospital_bed_assignment_privacy.hospital_cases import HospitalCase
 from schmidt.scenarios.hospital_bed_assignment_privacy.ids import (
     BED_MANAGER_ID,
@@ -222,10 +217,9 @@ class HospitalWorld(ScenarioWorld):
                 event = await context.next_event()
                 if isinstance(event, RoundAdvancedEvent):
                     continue
-                if isinstance(event, MessageEvent):
-                    if event.channel_id != PUBLIC_OPS_CHANNEL_ID:
-                        continue
-                    await self._send_threshold_notifications(context=context)
+                if event.channel_id != PUBLIC_OPS_CHANNEL_ID:
+                    continue
+                await self._send_threshold_notifications(context=context)
         except asyncio.CancelledError:
             return
 

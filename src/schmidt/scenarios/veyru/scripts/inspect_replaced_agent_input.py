@@ -24,7 +24,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from schmidt.cli import _read_replace_manifest
+from schmidt.cli import read_replace_manifest_info
 from schmidt.evaluation.log_reader import load_events
 from schmidt.message_rewind import AgentHistoryFilter, build_rewind_state_from_last_message
 from schmidt.models.event import AgentRegistered, InjectionDelivered
@@ -75,7 +75,7 @@ async def main() -> None:
     run_dir = args.run_dir
     log_path = run_dir / f"{args.scenario}.jsonl"
 
-    replace_info = _read_replace_manifest(run_dir=run_dir)
+    replace_info = read_replace_manifest_info(run_dir=run_dir)
     if replace_info is None:
         raise SystemExit(f"No replace_manifest.json in {run_dir}")
     if replace_info.replaced_agent_id is None:

@@ -182,10 +182,13 @@ def _score_messages(scorer_obj: Any, texts: list[str]) -> list[float]:
     tokenize to a single token (no left context), and serializing NaN to JSON
     yields ``null`` which fails Pydantic validation downstream.
     """
-    raw_scores: list[float] = scorer_obj.sequence_score(
-        texts,
-        reduction=lambda x: -x.mean(0).item(),
-    )
+
+    # minicons.IncrementalLMScorer is untyped; ``reduction`` is called with a
+    # torch.Tensor whose ``.mean(0).item()`` is a float.
+    def _negative_mean(tensor: Any) -> float:
+        return -tensor.mean(0).item()
+
+    raw_scores: list[float] = scorer_obj.sequence_score(texts, reduction=_negative_mean)
     out: list[float] = []
     for score in raw_scores:
         value = float(score)

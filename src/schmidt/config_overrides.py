@@ -7,7 +7,7 @@ top-level key is reserved for per-agent model/provider overrides.
 
 import json
 import logging
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
@@ -38,27 +38,21 @@ def normalize_agent_overrides(
     """Validate and normalize per-agent overrides to {model, provider} strings."""
     normalized: dict[str, dict[str, str]] = {}
     for agent_id, override in agent_overrides.items():
-        if not isinstance(override, dict):
-            raise SystemExit(
-                f"Invalid agents.{agent_id} override: expected an object with keys "
-                "'model' and optional 'provider'."
-            )
         try:
             payload = AgentOverridePayload.model_validate(override)
         except ValidationError as exc:
             raise SystemExit(f"Invalid agents.{agent_id} override: {exc}") from exc
 
-        model_raw = payload.model
-        if not isinstance(model_raw, str) or model_raw.strip() == "":
+        model = payload.model.strip()
+        if model == "":
             raise SystemExit(f"Invalid agents.{agent_id}.model: expected a non-empty string.")
-        model = model_raw.strip()
 
         provider_raw = payload.provider
         if provider_raw is None:
             provider_raw = default_provider
-        if not isinstance(provider_raw, str) or provider_raw.strip() == "":
-            raise SystemExit(f"Invalid agents.{agent_id}.provider: expected a non-empty string.")
         provider = provider_raw.strip()
+        if provider == "":
+            raise SystemExit(f"Invalid agents.{agent_id}.provider: expected a non-empty string.")
         if provider not in valid_providers:
             raise SystemExit(
                 f"Invalid agents.{agent_id}.provider: {provider!r}. "
@@ -116,21 +110,17 @@ def apply_overrides(config: dict[str, Any], overrides: list[tuple[str, str]]) ->
     for dotted_key, raw_value in overrides:
         parsed_value = _parse_value(raw_value=raw_value)
         parts = dotted_key.split(".")
-        target = config
+        target: dict[str, Any] = config
         for part in parts[:-1]:
             if part not in target:
                 target[part] = {}
-            elif not isinstance(target[part], dict):
+            next_target = target[part]
+            if not isinstance(next_target, dict):
                 raise SystemExit(
                     f"Cannot apply override '{dotted_key}'. "
                     f"Path segment '{part}' points to a non-object value."
                 )
-            target = target[part]
-            if not isinstance(target, dict):
-                raise SystemExit(
-                    f"Cannot apply override '{dotted_key}'. "
-                    "Nested override path does not resolve to an object."
-                )
+            target = cast(dict[str, Any], next_target)
         target[parts[-1]] = parsed_value
         logger.info("Config override: %s = %r", dotted_key, parsed_value)
     return config
@@ -142,18 +132,19 @@ def split_agent_overrides(config: dict[str, Any]) -> ConfigSplit:
     Returns a ``ConfigSplit`` with the remaining scenario config and
     a dict mapping agent IDs to ``{"model": ..., "provider": ...}``.
     """
-    agents_raw = config.pop("agents", {})
-    if not isinstance(agents_raw, dict):
+    agents_raw_obj = config.pop("agents", {})
+    if not isinstance(agents_raw_obj, dict):
         raise SystemExit(
             "Invalid config key 'agents': expected an object mapping "
             "agent IDs to override objects."
         )
+    agents_raw = cast(dict[Any, Any], agents_raw_obj)
     agent_overrides: dict[str, dict[str, str]] = {}
     for agent_id, agent_conf in agents_raw.items():
         if not isinstance(agent_id, str) or not agent_id:
             raise SystemExit("Invalid agent override key under 'agents': expected non-empty string")
         if isinstance(agent_conf, dict):
-            agent_overrides[agent_id] = agent_conf
+            agent_overrides[agent_id] = cast(dict[str, str], agent_conf)
         else:
             agent_overrides[agent_id] = {"model": str(agent_conf)}
     return ConfigSplit(

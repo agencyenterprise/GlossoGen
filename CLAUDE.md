@@ -12,7 +12,7 @@ make install-frontend  # frontend only
 
 ```bash
 make lint              # runs both server and frontend linters
-make lint-server       # server only (black, isort, ruff, mypy, pyright, vulture, custom linters)
+make lint-server       # server only (black, isort, ruff, pyright, vulture, custom linters)
 make lint-frontend     # frontend only (prettier --write, eslint, stylelint, tsc)
 make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 ```

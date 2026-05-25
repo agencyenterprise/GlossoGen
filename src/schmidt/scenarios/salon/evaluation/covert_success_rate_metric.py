@@ -8,7 +8,7 @@ single Measurement whose score is the full-success rate.
 
 import logging
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 from schmidt.evaluation.metric_core.measurement import Measurement, RoundObservation
 from schmidt.evaluation.metric_core.metric_protocol import Metric
@@ -63,7 +63,7 @@ class CovertSuccessRateMetric(Metric):
         if not isinstance(directive_sequence_attr, list):
             logger.info("%s: skipping — scenario has no directive_sequence", self.name)
             return []
-        directive_sequence: list[str] = directive_sequence_attr
+        directive_sequence = cast(list[str], directive_sequence_attr)
         rounds_reached = _max_round_advanced(events=events)
         effective_round_count = min(rounds_reached, len(directive_sequence))
 

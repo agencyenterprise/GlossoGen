@@ -9,7 +9,7 @@ import asyncio
 import contextlib
 import logging
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 
 from schmidt.runtime.activity_notification import ActivityNotification, DoneNotification
 
@@ -43,7 +43,7 @@ class AgentSession:
         return self._terminated
 
     @contextlib.asynccontextmanager
-    async def track_active_call(self) -> AsyncIterator[None]:
+    async def track_active_call(self) -> AsyncGenerator[None]:
         """Mark the agent busy for the duration of a non-blocking tool call.
 
         Use this around every tool body except ``read_notifications`` so

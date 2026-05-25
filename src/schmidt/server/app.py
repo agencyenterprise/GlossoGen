@@ -2,7 +2,7 @@
 
 import logging
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -68,7 +68,7 @@ def _parse_allowed_origins() -> list[str]:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Store the configured runs directory, init OAuth storage, and start MCP."""
     app.state.runs_dir = _runs_dir
     app.state.prod_api_url = _prod_api_url
