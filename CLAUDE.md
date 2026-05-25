@@ -95,10 +95,6 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `identity/settings.py`, `identity/identity_model.py` — env config + `Identity` Pydantic model.
   - `identity/bootstrap.py` — boots the synthetic `local` group at startup (idempotent upsert into `groups`).
   - `identity/webhook_router.py` — Svix-verified `POST /api/clerk/webhook` that upserts/soft-deletes rows in the `groups` table from Clerk `organization.created` / `.updated` / `.deleted` events.
-  - `runs/fork_router.py` — `POST /api/g/{group_slug}/runs/{run_id}/fork` endpoint for creating forked runs
-  - `runs/replace_agent_router.py` — `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/replace-agent` endpoint for round-level rewind with one fresh agent
-  - `runs/cross_run_replace_agent_router.py` — `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/cross-run-replace-agent` endpoint for round-level rewind importing an agent from a different completed run
-  - `runs/resume_at_round_router.py` — `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/resume-at-round` endpoint for round-level rewind with no agent replacement (every agent keeps its full reconstructed history; knobs can be overridden)
   - `runs/listing.py` — Postgres-backed `list_runs_for_group(request, scenario_filter)`; the active group's `group_id` is read from `request.state.identity`.
   - `runs/lookup.py` — `resolve_run_or_404` (queries `runs` table on `(group_id, scenario, run_dir_name)` before touching disk) and `register_new_run` (inserts a row after `claim_run_dir`).
 - `src/schmidt/db/` — Postgres data layer (raw SQL via psycopg3 async; alembic for migrations)
@@ -382,11 +378,10 @@ runs/{scenario_name}/{unix_timestamp}/
 
 Labels are short tags attached to a run for filtering and grouping in the UI and in evaluation queries. They live in `labels.json` inside the run dir as a JSON array of strings.
 
-Three ways to apply them:
+Two ways to apply them:
 
-1. **Frontend "Create simulation" page**: enter labels at form time. Frontend POSTs the run, polls until it appears, then calls `PUT /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/labels` with `{"labels": [...]}` — see [new-simulation-form.tsx](frontend/src/features/runs/new-simulation-form.tsx).
-2. **Backend API**: same endpoint — `PUT /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/labels` with body `UpdateLabelsRequest{labels: list[str]}` — see [router.py:409](src/schmidt/server/runs/router.py#L409). The PUT replaces all labels (it does not append), so include any existing labels you want to keep.
-3. **Direct file write** (orchestrator scripts): write `labels.json` directly to the run dir as soon as the dir exists. Faster than the API and avoids needing the backend to be running. Example:
+1. **Backend API**: `PUT /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/labels` with body `UpdateLabelsRequest{labels: list[str]}` — see [router.py:409](src/schmidt/server/runs/router.py#L409). The PUT replaces all labels (it does not append), so include any existing labels you want to keep.
+2. **Direct file write** (orchestrator scripts): write `labels.json` directly to the run dir as soon as the dir exists. Faster than the API and avoids needing the backend to be running. Example:
    ```bash
    echo '["baseline_oss"]' > "runs/veyru/<timestamp>/labels.json"
    ```
@@ -515,23 +510,6 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
 
 The `--resume` flag requires the same `--config` as the original run. The `--runs-dir` flag is still required but ignored when resuming.
 
-### Forking Runs (Message-Level Rewind)
-
-The web UI supports forking a completed simulation from any message. In the run detail view, hover over a message to reveal an edit button. Edit the message text, then click the play button to fork. A new simulation starts with the channel history up to that message (with the edit applied), and agents continue from there.
-
-Forking uses the git-backed run history:
-1. Find the git commit corresponding to the target message
-2. Clone the source run's git repository to a new run directory
-3. Check out the target commit — the JSONL and all workspace files are at the correct state
-4. Apply message text edits to the JSONL and assign a new run ID
-5. Write `fork_manifest.json` for provenance, commit the edits
-6. Launch `schmidt run --resume <new_dir>` as a background subprocess
-7. Reconstruct a conversation transcript from the event log and inject it as each agent's system prompt context
-
-Agents receive the conversation history (channel messages, scenario injections, round transitions) as context. They do not receive their prior reasoning — only externally visible state — so they re-derive their thinking naturally in response to the edited message.
-
-The fork API endpoint is `POST /api/g/{group_slug}/runs/{run_id}/fork`. Forked runs appear in the run list with a "Fork" badge and show a lineage link in the run detail header.
-
 ### Replacing an Agent (Round-Level Rewind)
 
 Replay a finished run from the start of a chosen round with one specific agent restarted on a fresh history while every other agent keeps its full reconstructed history. Useful for asking "could a fresh agent follow the engineer from here on?" — a direct, empirical alternative to a judge.
@@ -559,7 +537,7 @@ Internals: clones the source run's git repo at the commit produced by the source
 
 **Per-scenario knob overrides.** `--knobs <file.json>` is merged onto the source's `scenario_config` before validation. Veyru exposes `postmortem_disabled_at_start: bool` for this flow: setting it to `true` flips `world.disable_postmortem_globally()` at world construction, dropping the postmortem channel for the rest of the resumed simulation (no postmortem injections, no postmortem phase, sends to postmortem are rejected).
 
-The replace-agent API endpoint is `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/replace-agent`. Replace-agent runs appear in the run list with a "Replaced" badge.
+Replace-agent runs appear in the run list with a "Replaced" badge.
 
 ### Cross-Run Replacing an Agent (Round-Level Rewind, Different Source for the Imported Agent)
 
@@ -585,11 +563,9 @@ schmidt cross-run-replace-agent veyru \
 
 **Imported agent history reconstruction.** The cross-run flow extends `AgentHistoryFilter` with an `imported: ImportedHistory | None` slot (events + target_timestamp + cutoff_round). When set, that agent's history is rebuilt from Sim B's `imported_history_source.jsonl` (a verbatim copy of Sim B's JSONL placed inside the new run dir) and the agent's system prompt is taken from Sim B's `AgentRegistered`. All other agents continue to use Sim A's events. Channel-blocking on the reconstructed history covers the scenario's default blocked channels (e.g. veyru's postmortem) plus any channel the imported agent had in Sim B but is missing in Sim A.
 
-**Postmortem on cross-run runs.** The FE modal sets `postmortem_disabled_at_start: true` for veyru by default (so opus and gpt-5.4 don't have a backchannel to re-align protocols after the swap). The CLI does **not** auto-set this — pass `--knobs /tmp/cross_team_knobs.json` with `{"postmortem_disabled_at_start": true}` for the same effect. Forgetting this contaminates cross-team experiments.
+**Postmortem on cross-run runs.** The CLI does not auto-set `postmortem_disabled_at_start` — pass `--knobs /tmp/cross_team_knobs.json` with `{"postmortem_disabled_at_start": true}` for veyru cross-team experiments so opus and gpt-5.4 don't have a backchannel to re-align protocols after the swap. Forgetting this contaminates cross-team experiments.
 
 **Manifest + provenance.** Persisted as `cross_run_replace_manifest.json` (parallel to `replace_manifest.json`). Carries both `source_a_run_id` (target timeline) and `source_b_run_id` (where the imported agent came from), plus `imported_model`/`imported_provider`, `round_start`, `source_b_round_end`, `rounds_after_swap`, `replaced_agent_id`, `channels_with_visible_history`, `blocked_tool_call_channels`. The discovery layer surfaces this on `RunSummary` / `RunDetailResponse` as `cross_run_replace_agent_source`. Cross-run runs appear in the run list with a violet "Cross-run" badge that links back to both sources.
-
-**API endpoint** is `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/cross-run-replace-agent`. The path's `{scenario}/{run_dir_name}` identifies Sim A; the body's `source_b_run_id` identifies Sim B (which must belong to the same group). The `GET /api/g/{group_slug}/runs` listing accepts `?scenario=&contains_agent_id=&status=` filters used by the FE modal's Sim B picker.
 
 **Verifying the imported history.** Each resumed run writes `resume_context_{agent_id}.json` to the new run dir capturing the exact reconstructed pydantic-ai messages handed to that agent on its first turn. For cross-run runs, `resume_context_<replaced_agent_id>.json`'s tail should match Sim B's last few `field_observer` (or whichever role) messages verbatim — that confirms the cross-run history is being mounted from Sim B and not contaminated by Sim A.
 
@@ -622,9 +598,9 @@ Required: `scenario_name` (positional), `--source-run-dir`, `--round-start` (≥
 
 **Knob-schema evolution caveat.** If the scenario's knobs schema gained a required field after the source was created, validation will reject the merged config until the missing key is supplied. Pass it via `--knobs` for that resume (example: veyru's `easy_round_numbers: frozenset[int]` was added later — older veyru runs need `--knobs '{"easy_round_numbers": [1, 2, 3, 6, 13]}'` to resume).
 
-**REST endpoint** is `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/resume-at-round` with body `ResumeAtRoundRequest { round_start, rounds_after_resume, knobs }`. Response is `ResumeAtRoundResponse { new_run_id, new_run_dir }`. Discovery surfaces the manifest as `RunSummary.resume_at_round_source` / `RunDetailResponse.resume_at_round_source` (`ResumeAtRoundSource { source_run_id, round_start, rounds_after_resume, target_event_id, resumed_at }`); when `replaced_agent_id` is null, `replace_agent_source` is suppressed in favour of this field.
+**Discovery.** The manifest is surfaced as `RunSummary.resume_at_round_source` / `RunDetailResponse.resume_at_round_source` (`ResumeAtRoundSource { source_run_id, round_start, rounds_after_resume, target_event_id, resumed_at }`); when `replaced_agent_id` is null, `replace_agent_source` is suppressed in favour of this field.
 
-**FE surfaces.** The chat-pane round divider exposes a circular-arrow icon at every round ≥ 2 alongside the existing replace-agent and cross-run icons; clicking opens a confirm modal with `rounds_after_resume` pre-filled to `source_round_count - round_start` and a JSON textarea for knob overrides. The run-detail header shows a green `Resumed @ round N (+K)` badge linking back to the source. The runs-list row shows a green `↺R{N}` badge. Multi-swap runs render one `AgentSwapPointFab` per scheduled swap so users can scroll directly to any boundary.
+**FE surfaces.** The run-detail header shows a green `Resumed @ round N (+K)` badge linking back to the source. The runs-list row shows a green `↺R{N}` badge. Multi-swap runs render one `AgentSwapPointFab` per scheduled swap so users can scroll directly to any boundary.
 
 **Lineage chain.** `replace_manifest.json` carries `source_run_id` + `source_run_dir`, so chaining resume-of-resume-of-resume is traceable: walk `source_run_id` recursively to reach the root. The same field powers the badge's link target.
 
@@ -692,11 +668,7 @@ Or embed in the `--config` JSON file under `model_overrides`:
 }
 ```
 
-**Web UI:** The "Create simulation" page shows an "Agent Model Overrides" section after selecting a scenario. Each agent can be individually overridden to a different model/provider. The fork dialog also supports per-agent overrides.
-
-**Backend flow:** `POST /api/g/{group_slug}/runs/start` and `POST /api/g/{group_slug}/runs/{run_id}/fork` accept only knobs/config payloads; there is no top-level `model_overrides` field. Preflight validation reads `model_overrides` from knobs/config, validates provider names, and validates agent IDs against scenario roles before launch.
-
-**Agent discovery:** `POST /api/g/{group_slug}/scenarios/{scenario_name}/agents` accepts `{knobs}` and returns the agent IDs and role names for the given configuration. Used by the frontend to populate the override UI. Each scenario implements `get_agent_roles(knobs)` as a classmethod.
+**MCP `start_run`:** the MCP tool accepts a knobs/config payload containing `model_overrides` (no top-level override field). Preflight validation reads `model_overrides` from knobs/config, validates provider names, and validates agent IDs against scenario roles before launch.
 
 ### IMPORTANT: Monitoring Long-Running Processes
 

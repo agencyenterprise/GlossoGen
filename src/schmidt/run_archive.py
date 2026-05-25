@@ -39,18 +39,6 @@ async def find_event_offset(log_path: Path, event_id: str) -> EventLocation | No
     )
 
 
-async def find_message_offset(log_path: Path, message_id: str) -> EventLocation | None:
-    """Scan a JSONL file for the ``message_sent`` line whose nested message id matches."""
-    return await _find_offset_by_predicate(
-        log_path=log_path,
-        predicate=lambda raw: (
-            raw.get("event_type") == "message_sent"
-            and isinstance(raw.get("message"), dict)
-            and raw["message"].get("message_id") == message_id
-        ),
-    )
-
-
 async def _find_offset_by_predicate(
     log_path: Path,
     predicate: Callable[[dict[str, Any]], bool],

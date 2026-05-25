@@ -24,14 +24,8 @@ from schmidt.server.mcp.oauth_storage import OAuthStorage
 from schmidt.server.pdf.router import router as pdf_export_router
 from schmidt.server.response_models import HealthResponse, HealthStatus
 from schmidt.server.runs.bundle_router import router as bundle_router
-from schmidt.server.runs.cross_run_replace_agent_router import (
-    router as cross_run_replace_agent_router,
-)
-from schmidt.server.runs.fork_router import router as fork_router
 from schmidt.server.runs.metadata_router import router as metadata_router
 from schmidt.server.runs.prod_upload_router import router as prod_upload_router
-from schmidt.server.runs.replace_agent_router import router as replace_agent_router
-from schmidt.server.runs.resume_at_round_router import router as resume_at_round_router
 from schmidt.server.runs.router import router as runs_router
 from schmidt.server.scenarios.router import router as scenarios_router
 
@@ -113,10 +107,6 @@ app.add_middleware(
 )
 
 app.include_router(runs_router)
-app.include_router(fork_router)
-app.include_router(replace_agent_router)
-app.include_router(cross_run_replace_agent_router)
-app.include_router(resume_at_round_router)
 app.include_router(pdf_export_router)
 app.include_router(bundle_router)
 app.include_router(metadata_router)

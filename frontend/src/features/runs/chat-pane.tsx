@@ -18,12 +18,9 @@ import {
   Hash,
   Loader2,
   Package,
-  Pencil,
   RefreshCw,
-  RotateCcw,
   UserCog,
   UserPlus,
-  Users,
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -41,7 +38,6 @@ import { NotificationDisplay } from "./notification-display";
 import { ToolCallDisplay } from "./tool-call-display";
 import { RunCycleFailureDisplay } from "./run-cycle-failure-display";
 import { RoundTimelineModal } from "./round-timeline-modal";
-import type { PendingEdit } from "./use-fork";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
 type RunDetailResponse = components["schemas"]["RunDetailResponse"];
@@ -58,23 +54,6 @@ interface ChatPaneProps {
   onSelectAgent: (agentId: string) => void;
   highlightedMessageId: string | null;
   highlightNonce: number;
-  /** Whether the fork editing UI is enabled (only for completed/errored runs). */
-  forkEnabled: boolean;
-  /** The message_id currently being edited, or null. */
-  editingMessageId: string | null;
-  /** Saved edits awaiting fork. */
-  pendingEdits: Map<string, PendingEdit>;
-  /** Callbacks for fork editing. */
-  onStartEdit: (messageId: string) => void;
-  onSaveEdit: (messageId: string, newText: string) => void;
-  onCancelEdit: () => void;
-  onForkFromMessage: (targetMessageId: string) => void;
-  /** Open the replace-agent modal pre-filled with the given round_start. Null disables the trigger. */
-  onReplaceAgentFromRound: ((roundNumber: number) => void) | null;
-  /** Open the cross-run replace-agent modal pre-filled with the given round_start. Null disables the trigger. */
-  onCrossRunReplaceFromRound: ((roundNumber: number) => void) | null;
-  /** Open the resume-at-round modal pre-filled with the given round_start. Null disables the trigger. */
-  onResumeAtRoundFromRound: ((roundNumber: number) => void) | null;
   /** The message_id that was the fork point, if this is a forked run. */
   forkPointMessageId: string | null;
   /** Round number where the first post-swap messages appear (if the run had an observer swap). */
@@ -202,16 +181,6 @@ export function ChatPane({
   onSelectAgent,
   highlightedMessageId,
   highlightNonce,
-  forkEnabled,
-  editingMessageId,
-  pendingEdits,
-  onStartEdit,
-  onSaveEdit,
-  onCancelEdit,
-  onForkFromMessage,
-  onReplaceAgentFromRound,
-  onCrossRunReplaceFromRound,
-  onResumeAtRoundFromRound,
   forkPointMessageId,
   swapRoundNumber,
   swappedObserverDisplayNames,
@@ -919,43 +888,6 @@ export function ChatPane({
                 <span className="whitespace-nowrap text-[11px] text-muted-foreground">
                   Round {round.roundNumber}
                 </span>
-                {forkEnabled && onReplaceAgentFromRound !== null && round.roundNumber >= 2 ? (
-                  <Tooltip label={`Replace an agent at start of round ${round.roundNumber}`}>
-                    <button
-                      aria-label={`Replace an agent at start of round ${round.roundNumber}`}
-                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      onClick={() => onReplaceAgentFromRound(round.roundNumber)}
-                    >
-                      <UserCog className="h-3 w-3" />
-                    </button>
-                  </Tooltip>
-                ) : null}
-                {forkEnabled && onCrossRunReplaceFromRound !== null && round.roundNumber >= 2 ? (
-                  <Tooltip
-                    label={`Import an agent from another run at start of round ${round.roundNumber}`}
-                  >
-                    <button
-                      aria-label={`Cross-run replace at start of round ${round.roundNumber}`}
-                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      onClick={() => onCrossRunReplaceFromRound(round.roundNumber)}
-                    >
-                      <Users className="h-3 w-3" />
-                    </button>
-                  </Tooltip>
-                ) : null}
-                {forkEnabled && onResumeAtRoundFromRound !== null && round.roundNumber >= 2 ? (
-                  <Tooltip
-                    label={`Resume at start of round ${round.roundNumber} (no agent replaced)`}
-                  >
-                    <button
-                      aria-label={`Resume at start of round ${round.roundNumber}`}
-                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      onClick={() => onResumeAtRoundFromRound(round.roundNumber)}
-                    >
-                      <RotateCcw className="h-3 w-3" />
-                    </button>
-                  </Tooltip>
-                ) : null}
                 <div className="h-px flex-1 bg-border" />
               </div>
 
@@ -1009,15 +941,7 @@ export function ChatPane({
                       </div>
                       {turn.entries.map((entry, entryIdx) => {
                         const entryChColor = channelColorMap.get(entry.channel_id);
-                        const isEditing = editingMessageId === entry.message_id;
-                        const pendingEdit = pendingEdits.get(entry.message_id);
-                        const displayText = pendingEdit ? pendingEdit.newText : entry.text;
-                        const canEdit =
-                          forkEnabled &&
-                          !entry.is_reasoning &&
-                          !entry.is_tool_use &&
-                          !entry.is_notification_result &&
-                          !entry.is_run_cycle_failure;
+                        const displayText = entry.text;
 
                         const entryKindKey = entry.is_reasoning
                           ? "r"
@@ -1067,8 +991,6 @@ export function ChatPane({
                               hasLinkedPair && "cursor-pointer",
                               isLinkHovered &&
                                 "rounded-md ring-2 ring-blue-400/40 dark:ring-blue-500/40",
-                              pendingEdit &&
-                                "rounded-md bg-amber-50/50 ring-1 ring-amber-200/50 dark:bg-amber-950/20 dark:ring-amber-800/30",
                               forkPointMessageId === entry.message_id &&
                                 "rounded-md bg-blue-50/60 px-2 py-1.5 ring-1 ring-blue-300/50 dark:bg-blue-950/30 dark:ring-blue-700/40"
                             )}
@@ -1105,15 +1027,6 @@ export function ChatPane({
                                 message={entry.text}
                                 cycle={entry.cycle}
                               />
-                            ) : isEditing ? (
-                              <MessageEditor
-                                initialText={displayText}
-                                onFork={newText => {
-                                  onSaveEdit(entry.message_id, newText);
-                                  onForkFromMessage(entry.message_id);
-                                }}
-                                onCancel={onCancelEdit}
-                              />
                             ) : (
                               <>
                                 {displayText ? (
@@ -1133,24 +1046,6 @@ export function ChatPane({
                                 entry.character_count > 0 ? (
                                   <span className="mt-0.5 block text-[10px] text-muted-foreground/60">
                                     {entry.character_count.toLocaleString()} characters
-                                  </span>
-                                ) : null}
-                                {!entry.is_reasoning &&
-                                !entry.is_tool_use &&
-                                !entry.is_notification_result &&
-                                !entry.is_run_cycle_failure ? (
-                                  <span className="absolute right-1 top-1 z-10 flex items-center gap-0.5 rounded-md bg-background/90 p-1 shadow-sm opacity-0 transition-opacity group-hover/entry:opacity-100">
-                                    {canEdit ? (
-                                      <Tooltip label="Edit &amp; fork">
-                                        <button
-                                          aria-label="Edit and fork from this message"
-                                          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                          onClick={() => onStartEdit(entry.message_id)}
-                                        >
-                                          <Pencil className="h-3 w-3" />
-                                        </button>
-                                      </Tooltip>
-                                    ) : null}
                                   </span>
                                 ) : null}
                               </>
@@ -1180,68 +1075,6 @@ export function ChatPane({
             Scroll to bottom
           </button>
         )}
-      </div>
-    </div>
-  );
-}
-
-function MessageEditor({
-  initialText,
-  onFork,
-  onCancel,
-}: {
-  initialText: string;
-  onFork: (newText: string) => void;
-  onCancel: () => void;
-}) {
-  const [text, setText] = useState(initialText);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const autoResize = useCallback(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${ta.scrollHeight}px`;
-  }, []);
-
-  useEffect(() => {
-    autoResize();
-    textareaRef.current?.focus();
-  }, [autoResize]);
-
-  return (
-    <div className="flex flex-col gap-1.5 py-1">
-      <textarea
-        ref={textareaRef}
-        value={text}
-        onChange={e => {
-          setText(e.target.value);
-          autoResize();
-        }}
-        className="w-full resize-none rounded-md border border-border bg-background px-2 py-1.5 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-        onKeyDown={e => {
-          if (e.key === "Escape") {
-            onCancel();
-          }
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            onFork(text);
-          }
-        }}
-      />
-      <div className="flex items-center gap-1.5">
-        <button
-          className="rounded-md bg-foreground px-2.5 py-0.5 text-[11px] font-medium text-background transition-opacity hover:opacity-80"
-          onClick={() => onFork(text)}
-        >
-          Fork
-        </button>
-        <button
-          className="rounded-md border border-border px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          onClick={onCancel}
-        >
-          Cancel
-        </button>
-        <span className="text-[10px] text-muted-foreground">Ctrl+Enter to fork, Esc to cancel</span>
       </div>
     </div>
   );

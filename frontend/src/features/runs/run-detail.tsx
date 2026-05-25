@@ -61,79 +61,12 @@ import {
 import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
-import { ModelPicker } from "./model-picker";
-import { useFork } from "./use-fork";
-import { useReplaceAgent } from "./use-replace-agent";
-import { useCrossRunReplaceAgent } from "./use-cross-run-replace-agent";
-import { useResumeAtRound } from "./use-resume-at-round";
 import { ReplaceAgentBadge } from "./replace-agent-badge";
 import { CrossRunReplaceAgentBadge } from "./cross-run-replace-agent-badge";
-import { CrossRunReplaceAgentModal } from "./cross-run-replace-agent-modal";
 import { ResumeAtRoundBadge } from "./resume-at-round-badge";
-import { ResumeAtRoundModal } from "./resume-at-round-modal";
 import { ConfigValueModal } from "./config-value-modal";
-import { AgentModelOverrides, type AgentModelOverride } from "./agent-model-overrides";
 import { LabelPickerModal } from "./label-picker-modal";
 import { NoteEditorModal } from "./note-editor-modal";
-import { getScenarioPlugin } from "./scenario-registry";
-
-function extractModelOverridesFromScenarioConfig(args: {
-  scenarioConfig: Record<string, unknown>;
-}): Record<string, AgentModelOverride> {
-  const rawOverrides = args.scenarioConfig.model_overrides;
-  if (typeof rawOverrides !== "object" || rawOverrides === null || Array.isArray(rawOverrides)) {
-    return {};
-  }
-
-  const overrides: Record<string, AgentModelOverride> = {};
-  for (const [agentId, entry] of Object.entries(rawOverrides)) {
-    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
-      continue;
-    }
-    const payload = entry as Record<string, unknown>;
-    const model = payload.model;
-    const provider = payload.provider;
-    if (typeof model !== "string" || model.trim() === "") {
-      continue;
-    }
-    if (typeof provider !== "string" || provider.trim() === "") {
-      continue;
-    }
-    overrides[agentId] = {
-      model: model.trim(),
-      provider: provider.trim(),
-    };
-  }
-  return overrides;
-}
-
-function deriveInitialForkModelOverrides(args: {
-  sourceModel: string;
-  sourceProvider: string;
-  agents: { agent_id: string; model: string; provider: string }[];
-  scenarioConfig: Record<string, unknown>;
-}): Record<string, AgentModelOverride> {
-  const fromScenarioConfig = extractModelOverridesFromScenarioConfig({
-    scenarioConfig: args.scenarioConfig,
-  });
-  if (Object.keys(fromScenarioConfig).length > 0) {
-    return fromScenarioConfig;
-  }
-
-  const inferred: Record<string, AgentModelOverride> = {};
-  for (const agent of args.agents) {
-    const matchesSourceModel = agent.model === args.sourceModel;
-    const matchesSourceProvider = agent.provider === args.sourceProvider;
-    if (matchesSourceModel && matchesSourceProvider) {
-      continue;
-    }
-    inferred[agent.agent_id] = {
-      model: agent.model,
-      provider: agent.provider,
-    };
-  }
-  return inferred;
-}
 
 export function RunDetail({ scenario, runDirName }: { scenario: string; runDirName: string }) {
   const groupPath = useGroupPath();
@@ -147,10 +80,6 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const [showLogs, setShowLogs] = useState(false);
   const [showEvalLogs, setShowEvalLogs] = useState(false);
   const [showEvalPanel, setShowEvalPanel] = useState(true);
-  const [forkModalMessageId, setForkModalMessageId] = useState<string | null>(null);
-  const [replaceAgentRound, setReplaceAgentRound] = useState<number | null>(null);
-  const [crossRunReplaceRound, setCrossRunReplaceRound] = useState<number | null>(null);
-  const [resumeAtRoundRound, setResumeAtRoundRound] = useState<number | null>(null);
   const [showEvalModal, setShowEvalModal] = useState(false);
   const [evalJustLaunched, setEvalJustLaunched] = useState(false);
   const [copiedRunId, setCopiedRunId] = useState(false);
@@ -159,10 +88,6 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
 
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const fork = useFork(runId);
-  const replaceAgent = useReplaceAgent(runId);
-  const crossRunReplace = useCrossRunReplaceAgent(runId);
-  const resumeAtRound = useResumeAtRound(runId);
 
   const handleSelectChannel = useCallback((ch: string | null) => {
     setSelectedChannel(ch);
@@ -453,116 +378,6 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     return [...restLogs, ...newLogs];
   }, [debugLogsData?.entries, sse.debugLogs]);
 
-  const handleForkFromMessage = useCallback((targetMessageId: string) => {
-    setForkModalMessageId(targetMessageId);
-  }, []);
-
-  const handleReplaceAgentFromRound = useCallback((roundNumber: number) => {
-    setReplaceAgentRound(roundNumber);
-  }, []);
-
-  const handleConfirmReplaceAgent = useCallback(
-    (
-      replacedAgentId: string,
-      model: string,
-      provider: string,
-      roundsAfterSwap: number,
-      channelsWithVisibleHistory: string[],
-      knobs: Record<string, unknown> | null
-    ) => {
-      if (replaceAgentRound === null) return;
-      replaceAgent.mutate({
-        roundStart: replaceAgentRound,
-        roundsAfterSwap,
-        replacedAgentId,
-        model,
-        provider,
-        channelsWithVisibleHistory,
-        knobs,
-      });
-      // Keep the modal open so the user sees the "Launching..." state.
-      // onSuccess navigates the page; onError leaves the modal open with
-      // the inline error message until the user dismisses it.
-    },
-    [replaceAgentRound, replaceAgent]
-  );
-
-  const handleCloseReplaceAgent = useCallback(() => {
-    replaceAgent.reset();
-    setReplaceAgentRound(null);
-  }, [replaceAgent]);
-
-  const handleCrossRunReplaceFromRound = useCallback((roundNumber: number) => {
-    setCrossRunReplaceRound(roundNumber);
-  }, []);
-
-  const handleConfirmCrossRunReplace = useCallback(
-    (args: {
-      sourceBRunId: string;
-      replacedAgentId: string;
-      sourceBRoundEnd: number;
-      roundsAfterSwap: number;
-      channelsWithVisibleHistory: string[];
-      model: string | null;
-      provider: string | null;
-      knobs: Record<string, unknown> | null;
-    }) => {
-      if (crossRunReplaceRound === null) return;
-      crossRunReplace.mutate({
-        sourceBRunId: args.sourceBRunId,
-        roundStart: crossRunReplaceRound,
-        sourceBRoundEnd: args.sourceBRoundEnd,
-        roundsAfterSwap: args.roundsAfterSwap,
-        replacedAgentId: args.replacedAgentId,
-        model: args.model,
-        provider: args.provider,
-        channelsWithVisibleHistory: args.channelsWithVisibleHistory,
-        knobs: args.knobs,
-      });
-    },
-    [crossRunReplaceRound, crossRunReplace]
-  );
-
-  const handleCloseCrossRunReplace = useCallback(() => {
-    crossRunReplace.reset();
-    setCrossRunReplaceRound(null);
-  }, [crossRunReplace]);
-
-  const handleResumeAtRoundFromRound = useCallback((roundNumber: number) => {
-    setResumeAtRoundRound(roundNumber);
-  }, []);
-
-  const handleConfirmResumeAtRound = useCallback(
-    (args: { roundsAfterResume: number; knobs: Record<string, unknown> | null }) => {
-      if (resumeAtRoundRound === null) return;
-      resumeAtRound.mutate({
-        roundStart: resumeAtRoundRound,
-        roundsAfterResume: args.roundsAfterResume,
-        knobs: args.knobs,
-      });
-    },
-    [resumeAtRoundRound, resumeAtRound]
-  );
-
-  const handleCloseResumeAtRound = useCallback(() => {
-    resumeAtRound.reset();
-    setResumeAtRoundRound(null);
-  }, [resumeAtRound]);
-
-  const handleConfirmFork = useCallback(
-    (model: string, provider: string, modelOverrides: Record<string, AgentModelOverride>) => {
-      if (!forkModalMessageId) return;
-      fork.forkMutation.mutate({
-        targetMessageId: forkModalMessageId,
-        model,
-        provider,
-        knobs: { model_overrides: modelOverrides },
-      });
-      setForkModalMessageId(null);
-    },
-    [forkModalMessageId, fork.forkMutation]
-  );
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -601,7 +416,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const hasEvalLogs = evaluationInProgress || evaluation !== null || restData.has_eval_log_file;
   const activeInstance = resolveSelectedInstance(selectedAgent, agentInstances);
   const activeAgentColor = activeInstance ? agentColorMap.get(activeInstance.agent_id) : undefined;
-  const forkEnabled =
+  const runCompleted =
     effectiveStatus === "scenario_complete" ||
     effectiveStatus === "error" ||
     effectiveStatus === "killed";
@@ -703,7 +518,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
               ))}
             </span>
           </span>
-          {!isInProgress && !evaluationInProgress && forkEnabled ? (
+          {!isInProgress && !evaluationInProgress && runCompleted ? (
             <>
               {" · "}
               <span className="group/eval relative">
@@ -867,16 +682,6 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             onSelectAgent={setSelectedAgent}
             highlightedMessageId={highlightedMessageId}
             highlightNonce={highlightNonce}
-            forkEnabled={forkEnabled}
-            editingMessageId={fork.editingMessageId}
-            pendingEdits={fork.pendingEdits}
-            onStartEdit={fork.startEdit}
-            onSaveEdit={fork.saveEdit}
-            onCancelEdit={fork.cancelEdit}
-            onForkFromMessage={handleForkFromMessage}
-            onReplaceAgentFromRound={handleReplaceAgentFromRound}
-            onCrossRunReplaceFromRound={handleCrossRunReplaceFromRound}
-            onResumeAtRoundFromRound={handleResumeAtRoundFromRound}
             forkPointMessageId={restData.fork_source?.target_message_id ?? null}
             swapRoundNumber={veyruExtrasForChat?.swap_point?.round_number ?? null}
             swappedObserverDisplayNames={
@@ -968,101 +773,6 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
           runId={runId}
           initialContent={restData.note ?? null}
           onClose={() => setShowNoteEditor(false)}
-        />
-      ) : null}
-
-      {/* Replace-agent confirmation modal */}
-      {replaceAgentRound !== null ? (
-        <ReplaceAgentModal
-          isPending={replaceAgent.isPending}
-          isSuccess={replaceAgent.isSuccess}
-          errorMessage={replaceAgent.error?.message ?? null}
-          roundStart={replaceAgentRound}
-          scenarioName={restData.scenario_name}
-          sourceRoundCount={
-            typeof restData.scenario_config?.round_count === "number"
-              ? restData.scenario_config.round_count
-              : null
-          }
-          sourceAgents={restData.agents.map(agent => ({
-            agent_id: agent.agent_id,
-            role_name: agent.role_name,
-            model: agent.model,
-            provider: agent.provider,
-            channel_ids: agent.channel_ids,
-          }))}
-          onConfirm={handleConfirmReplaceAgent}
-          onCancel={handleCloseReplaceAgent}
-        />
-      ) : null}
-
-      {/* Cross-run replace-agent confirmation modal */}
-      {crossRunReplaceRound !== null ? (
-        <CrossRunReplaceAgentModal
-          isPending={crossRunReplace.isPending}
-          isSuccess={crossRunReplace.isSuccess}
-          errorMessage={crossRunReplace.error?.message ?? null}
-          roundStart={crossRunReplaceRound}
-          scenarioName={restData.scenario_name}
-          sourceRoundCount={
-            typeof restData.scenario_config?.round_count === "number"
-              ? restData.scenario_config.round_count
-              : null
-          }
-          sourceAgents={restData.agents.map(agent => ({
-            agent_id: agent.agent_id,
-            role_name: agent.role_name,
-            model: agent.model,
-            provider: agent.provider,
-            channel_ids: agent.channel_ids,
-          }))}
-          currentRunId={runId}
-          onConfirm={handleConfirmCrossRunReplace}
-          onCancel={handleCloseCrossRunReplace}
-        />
-      ) : null}
-
-      {/* Resume-at-round confirmation modal */}
-      {resumeAtRoundRound !== null ? (
-        <ResumeAtRoundModal
-          isPending={resumeAtRound.isPending}
-          isSuccess={resumeAtRound.isSuccess}
-          errorMessage={resumeAtRound.error?.message ?? null}
-          roundStart={resumeAtRoundRound}
-          sourceRoundCount={
-            typeof restData.scenario_config?.round_count === "number"
-              ? restData.scenario_config.round_count
-              : null
-          }
-          onConfirm={handleConfirmResumeAtRound}
-          onCancel={handleCloseResumeAtRound}
-        />
-      ) : null}
-
-      {/* Fork confirmation modal */}
-      {forkModalMessageId ? (
-        <ForkModal
-          isPending={fork.forkMutation.isPending}
-          sourceModel={restData.agents[0]?.model ?? ""}
-          sourceProvider={restData.agents[0]?.provider ?? restData.provider}
-          sourceAgents={restData.agents.map(agent => ({
-            agent_id: agent.agent_id,
-            role_name: agent.role_name,
-            model: agent.model,
-            provider: agent.provider,
-          }))}
-          initialModelOverrides={deriveInitialForkModelOverrides({
-            sourceModel: restData.agents[0]?.model ?? "",
-            sourceProvider: restData.agents[0]?.provider ?? restData.provider,
-            agents: restData.agents.map(agent => ({
-              agent_id: agent.agent_id,
-              model: agent.model,
-              provider: agent.provider,
-            })),
-            scenarioConfig: restData.scenario_config,
-          })}
-          onConfirm={handleConfirmFork}
-          onCancel={() => setForkModalMessageId(null)}
         />
       ) : null}
 
@@ -1191,298 +901,6 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
           </>
         );
       })()}
-    </div>
-  );
-}
-
-function ForkModal({
-  isPending,
-  sourceModel,
-  sourceProvider,
-  sourceAgents,
-  initialModelOverrides,
-  onConfirm,
-  onCancel,
-}: {
-  isPending: boolean;
-  sourceModel: string;
-  sourceProvider: string;
-  sourceAgents: { agent_id: string; role_name: string; model: string; provider: string }[];
-  initialModelOverrides: Record<string, AgentModelOverride>;
-  onConfirm: (
-    model: string,
-    provider: string,
-    modelOverrides: Record<string, AgentModelOverride>
-  ) => void;
-  onCancel: () => void;
-}) {
-  const [model, setModel] = useState(sourceModel);
-  const [provider, setProvider] = useState(sourceProvider);
-  const [modelOverrides, setModelOverrides] =
-    useState<Record<string, AgentModelOverride>>(initialModelOverrides);
-
-  const { data } = useQuery({
-    queryKey: ["scenarios"],
-    queryFn: async () => {
-      const { data, error } = await api.GET("/api/g/{group_slug}/scenarios");
-      if (error) {
-        throw new Error("Failed to fetch scenarios");
-      }
-      return data;
-    },
-  });
-
-  function handleModelSelect(selectedModel: string, selectedProvider: string) {
-    setModel(selectedModel);
-    setProvider(selectedProvider);
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-4">
-      <div className="flex min-h-full items-center justify-center">
-        <div className="flex w-full max-w-md max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-xl">
-          <div className="min-h-0 flex-1 overflow-y-auto p-5">
-            <h3 className="mb-3 text-sm font-medium">Fork simulation</h3>
-            <p className="mb-3 text-xs text-muted-foreground">
-              A new simulation will start from the edited message with the channel history up to
-              that point.
-            </p>
-
-            <div className="mb-4">
-              <ModelPicker
-                label="Model"
-                models={data?.models ?? []}
-                selectedModel={model}
-                onSelect={handleModelSelect}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Agent Model Overrides</label>
-              <p className="text-xs text-muted-foreground">
-                Overrides from this run are pre-selected. You can adjust any agent before launching.
-              </p>
-              <AgentModelOverrides
-                agents={sourceAgents}
-                models={data?.models ?? []}
-                overrides={modelOverrides}
-                onChange={setModelOverrides}
-              />
-            </div>
-          </div>
-
-          <div className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-3">
-            <button
-              className="rounded-md border border-border px-3 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              onClick={onCancel}
-              disabled={isPending}
-            >
-              Cancel
-            </button>
-            <button
-              className="rounded-md bg-foreground px-3 py-1 text-[12px] font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
-              onClick={() => onConfirm(model, provider, modelOverrides)}
-              disabled={isPending || !model}
-            >
-              {isPending ? "Launching..." : "Launch fork"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type ReplaceAgentSourceAgent = {
-  agent_id: string;
-  role_name: string;
-  model: string;
-  provider: string;
-  channel_ids: string[];
-};
-
-function ReplaceAgentModal({
-  isPending,
-  isSuccess,
-  errorMessage,
-  roundStart,
-  scenarioName,
-  sourceRoundCount,
-  sourceAgents,
-  onConfirm,
-  onCancel,
-}: {
-  isPending: boolean;
-  isSuccess: boolean;
-  errorMessage: string | null;
-  roundStart: number;
-  scenarioName: string;
-  sourceRoundCount: number | null;
-  sourceAgents: ReplaceAgentSourceAgent[];
-  onConfirm: (
-    replacedAgentId: string,
-    model: string,
-    provider: string,
-    roundsAfterSwap: number,
-    channelsWithVisibleHistory: string[],
-    knobs: Record<string, unknown> | null
-  ) => void;
-  onCancel: () => void;
-}) {
-  const defaultAgent = sourceAgents[0];
-  const [replacedAgentId, setReplacedAgentId] = useState<string>(defaultAgent?.agent_id ?? "");
-  const initialAgent = sourceAgents.find(a => a.agent_id === replacedAgentId) ?? defaultAgent;
-  const [model, setModel] = useState(initialAgent?.model ?? "");
-  const [provider, setProvider] = useState(initialAgent?.provider ?? "");
-  const defaultRoundsAfterSwap =
-    sourceRoundCount !== null ? Math.max(1, sourceRoundCount - roundStart) : 1;
-  const [roundsAfterSwap, setRoundsAfterSwap] = useState<number>(defaultRoundsAfterSwap);
-
-  const plugin = getScenarioPlugin(scenarioName);
-
-  const { data } = useQuery({
-    queryKey: ["scenarios"],
-    queryFn: async () => {
-      const { data, error } = await api.GET("/api/g/{group_slug}/scenarios");
-      if (error) {
-        throw new Error("Failed to fetch scenarios");
-      }
-      return data;
-    },
-  });
-
-  function handleAgentChange(nextAgentId: string) {
-    setReplacedAgentId(nextAgentId);
-    const next = sourceAgents.find(a => a.agent_id === nextAgentId);
-    if (next) {
-      setModel(next.model);
-      setProvider(next.provider);
-    }
-  }
-
-  function handleModelSelect(selectedModel: string, selectedProvider: string) {
-    setModel(selectedModel);
-    setProvider(selectedProvider);
-  }
-
-  const currentAgent = sourceAgents.find(a => a.agent_id === replacedAgentId);
-
-  function handleConfirmClick() {
-    const visibleChannels = currentAgent?.channel_ids ?? [];
-    const defaults = plugin.defaultReplaceAgentKnobs;
-    const knobs: Record<string, unknown> | null =
-      Object.keys(defaults).length > 0 ? { ...defaults } : null;
-    onConfirm(replacedAgentId, model, provider, roundsAfterSwap, visibleChannels, knobs);
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 px-4 py-4">
-      <div className="flex min-h-full items-center justify-center">
-        <div className="flex w-full max-w-md max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-xl">
-          <div className="min-h-0 flex-1 overflow-y-auto p-5">
-            <h3 className="mb-3 text-sm font-medium">
-              Replace agent at start of round {roundStart}
-            </h3>
-            <p className="mb-3 text-xs text-muted-foreground">
-              The chosen agent re-enters round {roundStart} with only the prior agent&apos;s tool
-              call history (text and reasoning are stripped, postmortem tool calls are dropped).
-              Every other agent keeps its full reconstructed history.
-            </p>
-
-            <div className="mb-4 space-y-1">
-              <label className="block text-sm font-medium">Agent to replace</label>
-              <select
-                className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
-                value={replacedAgentId}
-                onChange={e => handleAgentChange(e.target.value)}
-                disabled={isPending}
-              >
-                {sourceAgents.map(agent => (
-                  <option key={agent.agent_id} value={agent.agent_id}>
-                    {agent.agent_id} — {agent.role_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="mb-4">
-              <ModelPicker
-                label="Replacement model"
-                models={data?.models ?? []}
-                selectedModel={model}
-                onSelect={handleModelSelect}
-              />
-            </div>
-
-            <div className="mb-4 space-y-1">
-              <label className="block text-sm font-medium" htmlFor="rounds-after-swap">
-                Rounds after replacement
-              </label>
-              <p className="text-[11px] text-muted-foreground">
-                The resumed simulation plays this many rounds following round {roundStart}.
-              </p>
-              <input
-                id="rounds-after-swap"
-                type="number"
-                min={1}
-                className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
-                value={roundsAfterSwap}
-                onChange={e => setRoundsAfterSwap(Math.max(1, Number(e.target.value) || 1))}
-                disabled={isPending}
-              />
-            </div>
-
-            {isPending ? (
-              <div className="mt-4 flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
-                <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" />
-                <div className="space-y-0.5">
-                  <p className="font-medium text-foreground">Launching replacement…</p>
-                  <p>
-                    Cloning the source run, rewriting the JSONL, and starting the resumed
-                    simulation. Usually 10–20 seconds. Redirecting when ready.
-                  </p>
-                </div>
-              </div>
-            ) : null}
-
-            {isSuccess ? (
-              <div className="mt-4 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-700 dark:text-emerald-300">
-                Launched. Redirecting to the new run…
-              </div>
-            ) : null}
-
-            {errorMessage !== null ? (
-              <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
-                <p className="font-medium">Replace-agent failed</p>
-                <p className="mt-0.5 wrap-break-word">{errorMessage}</p>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-3">
-            <button
-              className="rounded-md border border-border px-3 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              onClick={onCancel}
-              disabled={isPending}
-            >
-              {errorMessage !== null ? "Close" : "Cancel"}
-            </button>
-            <button
-              className="rounded-md bg-foreground px-3 py-1 text-[12px] font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
-              onClick={handleConfirmClick}
-              disabled={isPending || isSuccess || !model || !replacedAgentId || !provider}
-            >
-              {isPending
-                ? "Launching..."
-                : isSuccess
-                  ? "Redirecting…"
-                  : errorMessage !== null
-                    ? "Retry"
-                    : "Launch replacement"}
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

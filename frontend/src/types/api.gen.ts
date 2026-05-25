@@ -253,103 +253,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/fork": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Fork Run
-         * @description Create a forked simulation run from a specific message.
-         *
-         *     Clones the source run's git repository at the target message's commit,
-         *     applies text edits to the JSONL, and launches the simulation as a
-         *     background subprocess with ``--resume``.
-         */
-        post: operations["fork_run_api_g__group_slug__runs__scenario___run_dir_name__fork_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/replace-agent": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Replace Agent
-         * @description Replace one agent in a finished run with a fresh agent from a target message.
-         *
-         *     The new agent has no message history; every other agent resumes from
-         *     its full reconstructed history. Optionally swaps the replaced agent's
-         *     model/provider.
-         */
-        post: operations["replace_agent_api_g__group_slug__runs__scenario___run_dir_name__replace_agent_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/cross-run-replace-agent": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Cross Run Replace Agent
-         * @description Import an agent from one finished run into another at a chosen round boundary.
-         *
-         *     The imported agent keeps its full pydantic-ai history (text,
-         *     thinking, tool calls) up to ``source_b_round_end`` of the source
-         *     run, then re-enters the target run at ``round_start``. Same
-         *     scenario and same ``agent_id`` only.
-         */
-        post: operations["cross_run_replace_agent_api_g__group_slug__runs__scenario___run_dir_name__cross_run_replace_agent_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/resume-at-round": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Resume At Round
-         * @description Clone a finished run at the start of ``round_start`` and resume it.
-         *
-         *     No agent is replaced; every agent keeps its full reconstructed history.
-         *     ``body.knobs`` is shallow-merged onto the source's scenario config to
-         *     let callers reconfigure the post-resume simulation.
-         */
-        post: operations["resume_at_round_api_g__group_slug__runs__scenario___run_dir_name__resume_at_round_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/export/pdf": {
         parameters: {
             query?: never;
@@ -546,53 +449,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/g/{group_slug}/scenarios/{scenario_name}/agents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Agent Roles
-         * @description Return the agent IDs, display names, and channels for the given knobs.
-         *
-         *     The ``channels`` field is populated by instantiating the scenario
-         *     with the supplied knobs and reading each ``AgentConfig.channel_ids``;
-         *     the FE phase-builder uses this to render per-agent visibility
-         *     controls. Returns an empty channel list per agent if scenario
-         *     instantiation fails (e.g. invalid knobs) so the FE can still show
-         *     role names while the user fixes the knobs.
-         */
-        post: operations["get_agent_roles_api_g__group_slug__scenarios__scenario_name__agents_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/g/{group_slug}/runs/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Start Run
-         * @description Launch a new simulation as a background subprocess.
-         */
-        post: operations["start_run_api_g__group_slug__runs_start_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/clerk/webhook": {
         parameters: {
             query?: never;
@@ -699,40 +555,6 @@ export interface components {
             value: number;
             /** Note */
             note: string;
-        };
-        /**
-         * AgentRoleInfo
-         * @description Lightweight agent identity for the agent discovery endpoint.
-         *
-         *     ``channels`` lists the channel IDs the agent is a member of given
-         *     the supplied knobs. Used by the FE phase-builder to render per-agent
-         *     channel-visibility controls when configuring scheduled swaps.
-         */
-        AgentRoleInfo: {
-            /** Agent Id */
-            agent_id: string;
-            /** Role Name */
-            role_name: string;
-            /** Channels */
-            channels: string[];
-        };
-        /**
-         * AgentRolesRequest
-         * @description Request body for discovering agents in a scenario.
-         */
-        AgentRolesRequest: {
-            /** Knobs */
-            knobs: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /**
-         * AgentRolesResponse
-         * @description Response listing agents that would participate in a scenario.
-         */
-        AgentRolesResponse: {
-            /** Agents */
-            agents: components["schemas"]["AgentRoleInfo"][];
         };
         /**
          * AgentRunCycleFailedEntry
@@ -1080,63 +902,6 @@ export interface components {
             expected_truck_assignments: components["schemas"]["ContainerYardTruckAssignment"][];
         };
         /**
-         * CrossRunReplaceAgentRequest
-         * @description Request body for importing an agent from another run at the start of a round.
-         *
-         *     ``source_b_run_id`` is the canonical ``<scenario>/<run_dir>`` identifier
-         *     of the run the imported agent comes from. The target run (Sim A) is
-         *     inferred from the URL path.
-         *
-         *     ``source_b_round_end`` is the last Sim B round whose events feed into
-         *     the imported agent's reconstructed history. When ``None``, defaults
-         *     to ``min(round_start - 1, B_max_round)`` so the imported agent gets
-         *     the largest possible slice of source B's history without exceeding
-         *     what B actually played.
-         *
-         *     ``model`` and ``provider`` override the imported agent's
-         *     model/provider. When both are ``None``, the imported agent runs
-         *     under Sim B's model/provider.
-         *
-         *     ``channels_with_visible_history`` lists Sim A channel IDs whose
-         *     prior history remains visible to the imported agent on resume;
-         *     every other channel they're a member of has its history wiped.
-         *
-         *     ``rounds_after_swap`` controls the post-swap round budget exactly
-         *     as in the same-run replace-agent endpoint.
-         */
-        CrossRunReplaceAgentRequest: {
-            /** Source B Run Id */
-            source_b_run_id: string;
-            /** Round Start */
-            round_start: number;
-            /** Source B Round End */
-            source_b_round_end: number | null;
-            /** Rounds After Swap */
-            rounds_after_swap: number | null;
-            /** Replaced Agent Id */
-            replaced_agent_id: string;
-            /** Model */
-            model: string | null;
-            /** Provider */
-            provider: string | null;
-            /** Knobs */
-            knobs: {
-                [key: string]: unknown;
-            } | null;
-            /** Channels With Visible History */
-            channels_with_visible_history: string[];
-        };
-        /**
-         * CrossRunReplaceAgentResponse
-         * @description Response returned after a cross-run replace-agent run is launched.
-         */
-        CrossRunReplaceAgentResponse: {
-            /** New Run Id */
-            new_run_id: string;
-            /** New Run Dir */
-            new_run_dir: string;
-        };
-        /**
          * CrossRunReplaceAgentSource
          * @description Provenance for a run created via the cross-run replace-agent endpoint.
          *
@@ -1284,34 +1049,6 @@ export interface components {
             cache_creation_input_tokens: number;
         };
         /**
-         * ForkRequest
-         * @description Request body for creating a forked simulation run.
-         */
-        ForkRequest: {
-            /** Target Message Id */
-            target_message_id: string;
-            /** Message Edits */
-            message_edits: components["schemas"]["MessageEdit"][];
-            /** Model */
-            model: string;
-            /** Provider */
-            provider: string;
-            /** Knobs */
-            knobs: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /**
-         * ForkResponse
-         * @description Response returned after a fork is created.
-         */
-        ForkResponse: {
-            /** Fork Run Id */
-            fork_run_id: string;
-            /** Fork Run Dir */
-            fork_run_dir: string;
-        };
-        /**
          * ForkSource
          * @description Provenance information for a forked simulation run.
          */
@@ -1415,16 +1152,6 @@ export interface components {
             per_agent: components["schemas"]["AgentObservationResponse"][];
         };
         /**
-         * MessageEdit
-         * @description A single message text edit for a fork request.
-         */
-        MessageEdit: {
-            /** Message Id */
-            message_id: string;
-            /** New Text */
-            new_text: string;
-        };
-        /**
          * ModelInfo
          * @description A supported model prefix and its provider.
          */
@@ -1493,48 +1220,6 @@ export interface components {
             channel_ids: string[];
         };
         /**
-         * ReplaceAgentRequest
-         * @description Request body for replacing one agent in a finished run at the start of a round.
-         *
-         *     ``channels_with_visible_history`` lists channel IDs whose prior history
-         *     remains visible to the replaced agent on resume; every other channel
-         *     they're a member of has its history wiped.
-         *
-         *     ``rounds_after_swap`` controls how many rounds the resumed simulation
-         *     plays following the replacement: ``round_count`` is set to
-         *     ``round_start + rounds_after_swap``. When ``None``, defaults to
-         *     ``source_round_count - round_start`` (the remaining rounds in the
-         *     original run after the replacement boundary).
-         */
-        ReplaceAgentRequest: {
-            /** Round Start */
-            round_start: number;
-            /** Rounds After Swap */
-            rounds_after_swap: number | null;
-            /** Replaced Agent Id */
-            replaced_agent_id: string;
-            /** Model */
-            model: string;
-            /** Provider */
-            provider: string;
-            /** Knobs */
-            knobs: {
-                [key: string]: unknown;
-            } | null;
-            /** Channels With Visible History */
-            channels_with_visible_history: string[];
-        };
-        /**
-         * ReplaceAgentResponse
-         * @description Response returned after a replace-agent run is launched.
-         */
-        ReplaceAgentResponse: {
-            /** New Run Id */
-            new_run_id: string;
-            /** New Run Dir */
-            new_run_dir: string;
-        };
-        /**
          * ReplaceAgentSource
          * @description Provenance for a run created via the replace-agent endpoint.
          *
@@ -1561,40 +1246,6 @@ export interface components {
              * Format: date-time
              */
             replaced_at: string;
-        };
-        /**
-         * ResumeAtRoundRequest
-         * @description Request body for resuming a finished run at the start of a chosen round.
-         *
-         *     No agent is replaced — every agent keeps its full reconstructed history
-         *     on resume. ``knobs`` is shallow-merged onto the source run's scenario
-         *     config (turn postmortem on/off, add post-hoc ``scheduled_events``,
-         *     extend ``round_count``, etc.).
-         *
-         *     ``rounds_after_resume`` controls how many rounds the resumed simulation
-         *     plays following the boundary: ``round_count`` is set to
-         *     ``round_start + rounds_after_resume``. When ``None``, defaults to
-         *     ``source_round_count - round_start``.
-         */
-        ResumeAtRoundRequest: {
-            /** Round Start */
-            round_start: number;
-            /** Rounds After Resume */
-            rounds_after_resume: number | null;
-            /** Knobs */
-            knobs: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /**
-         * ResumeAtRoundResponse
-         * @description Response returned after a resume-at-round run is launched.
-         */
-        ResumeAtRoundResponse: {
-            /** New Run Id */
-            new_run_id: string;
-            /** New Run Dir */
-            new_run_dir: string;
         };
         /**
          * ResumeAtRoundSource
@@ -2209,29 +1860,6 @@ export interface components {
          * @description Response after successfully launching an evaluation subprocess.
          */
         StartEvaluationResponse: {
-            status: components["schemas"]["LaunchStatus"];
-        };
-        /**
-         * StartRunRequest
-         * @description Request body for starting a new simulation run.
-         */
-        StartRunRequest: {
-            /** Scenario Name */
-            scenario_name: string;
-            /** Model */
-            model: string;
-            /** Provider */
-            provider: string;
-            /** Knobs */
-            knobs: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /**
-         * StartRunResponse
-         * @description Response after successfully launching a new simulation.
-         */
-        StartRunResponse: {
             status: components["schemas"]["LaunchStatus"];
         };
         /**
@@ -2896,150 +2524,6 @@ export interface operations {
             };
         };
     };
-    fork_run_api_g__group_slug__runs__scenario___run_dir_name__fork_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                scenario: string;
-                run_dir_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ForkRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ForkResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    replace_agent_api_g__group_slug__runs__scenario___run_dir_name__replace_agent_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                scenario: string;
-                run_dir_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReplaceAgentRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReplaceAgentResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    cross_run_replace_agent_api_g__group_slug__runs__scenario___run_dir_name__cross_run_replace_agent_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                scenario: string;
-                run_dir_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CrossRunReplaceAgentRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CrossRunReplaceAgentResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    resume_at_round_api_g__group_slug__runs__scenario___run_dir_name__resume_at_round_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                scenario: string;
-                run_dir_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ResumeAtRoundRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ResumeAtRoundResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     export_run_pdf_api_g__group_slug__runs__scenario___run_dir_name__export_pdf_get: {
         parameters: {
             query?: {
@@ -3300,74 +2784,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnobsContentResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_agent_roles_api_g__group_slug__scenarios__scenario_name__agents_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                scenario_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AgentRolesRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AgentRolesResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    start_run_api_g__group_slug__runs_start_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StartRunRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StartRunResponse"];
                 };
             };
             /** @description Validation Error */

@@ -84,12 +84,6 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
 
 The simulation picks up from where it left off, preserving channel messages and scenario state. The `--resume` flag requires the same `--config` as the original run.
 
-### Forking Runs (Message-Level Rewind)
-
-The web UI supports forking a completed simulation from any message. In the run detail view, hover over a message to reveal an edit button. Edit the message text, then click the play button to create a fork — a new simulation that starts with channel history up to that message (with the edit applied). Agents continue from there with full context of the prior conversation.
-
-Forked runs appear in the run list with a "Fork" badge and link back to the source run. The fork API is also available programmatically via `POST /api/g/{group_slug}/runs/{run_id}/fork`.
-
 ### Replacing an Agent (Round-Level Rewind)
 
 Replay a finished run from the start of a chosen round with one specific agent restarted on a fresh history while every other agent keeps its full reconstructed history. Useful for asking "could a fresh agent follow the engineer from here on?" — a direct, empirical alternative to a judge.
@@ -114,7 +108,7 @@ The CLI returns immediately after preparing the new run directory and spawning a
 
 **Per-scenario knob overrides on resume.** The `--knobs` flag accepts a JSON file whose entries are merged onto the source's `scenario_config` before validation. Veyru exposes `postmortem_disabled_at_start: bool` for this flow: setting it to `true` flips `world.disable_postmortem_globally()` at world construction, dropping the postmortem channel for the rest of the resumed simulation (no postmortem injections, no postmortem phase, sends to postmortem are rejected).
 
-Derived runs appear in the run list with a "Replaced" badge linking to the source. The same operation is available via `POST /api/g/{group_slug}/runs/{run_id}/replace-agent`, which accepts `channels_with_visible_history: list[str]` and `knobs: dict | null` in the body.
+Derived runs appear in the run list with a "Replaced" badge linking to the source.
 
 ## Cross-Run Replacing an Agent (Round-Level Rewind, Different Source for the Imported Agent)
 
@@ -138,9 +132,7 @@ Defaults: `--source-b-round-end` is `min(round_start - 1, B_max_round)` (largest
 
 Internals: clones Sim A at the round-start commit (same as replace-agent), copies Sim B's full JSONL into the new run dir as `imported_history_source.jsonl`, writes `cross_run_replace_manifest.json` with both source IDs + the imported model/provider, and launches the resumed simulation. On resume, the CLI detects `cross_run_replace_manifest.json` and feeds Sim B's events to a single agent's history reconstruction via an `ImportedHistory` redirect on `AgentHistoryFilter`; every other agent reads from Sim A's events. Channel-blocking on the imported history strips the scenario's default blocked channels (e.g. veyru's postmortem) plus any channel the imported agent had in Sim B but is missing in Sim A.
 
-For veyru cross-team experiments, set `--knobs` with `{"postmortem_disabled_at_start": true}` to drop the postmortem channel after the swap (the FE modal does this automatically; the CLI does not). Without it, the two agents have a backchannel in postmortem that quickly re-aligns their protocols, washing out the cross-team-confusion signal. Cross-run runs appear in the run list with a violet "Cross-run" badge that links back to both Source A and Source B.
-
-The cross-run API endpoint is `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/cross-run-replace-agent`. The path identifies Sim A; the body's `source_b_run_id` identifies Sim B (which must belong to the same group).
+For veyru cross-team experiments, set `--knobs` with `{"postmortem_disabled_at_start": true}` to drop the postmortem channel after the swap. Without it, the two agents have a backchannel in postmortem that quickly re-aligns their protocols, washing out the cross-team-confusion signal. Cross-run runs appear in the run list with a violet "Cross-run" badge that links back to both Source A and Source B.
 
 The same `round_success_after_resume` metric works for both replace-agent and cross-run flows; for cross-run runs the comparison is against Sim A over the same window.
 
@@ -165,7 +157,7 @@ Internals: the flow reuses the `replace-agent` machinery with `replaced_agent_id
 
 Inherited `scheduled_events` semantics: events at `at_round < round_start` are silently skipped (the resumed clock never visits those rounds). Events at `at_round == round_start` fire on resume — by design — because the cloned JSONL is captured before the source dispatched that boundary's scheduler events. Boundaries that already fired in the source (or in a crashed-and-resumed run) are pre-seeded into the scheduler's `_fired_rounds` set so they are not re-dispatched.
 
-The resume API endpoint is `POST /api/g/{group_slug}/runs/{scenario}/{run_dir_name}/resume-at-round` with body `{round_start, rounds_after_resume, knobs}`. Runs created this way appear with a green "↺ Resumed @ round N" badge linking back to the source. The chat-pane round divider exposes a circular-arrow icon at every round ≥ 2 to open a confirm modal with `rounds_after_resume` pre-filled and a JSON textarea for knob overrides. Multi-swap runs (whether direct via `scheduled_events` or inherited via resume) render one floating action button per swap so users can scroll directly to any boundary.
+Runs created this way appear with a green "↺ Resumed @ round N" badge linking back to the source. Multi-swap runs (whether direct via `scheduled_events` or inherited via resume) render one floating action button per swap so users can scroll directly to any boundary.
 
 ## In-Run Agent Swaps via `scheduled_events`
 
@@ -353,7 +345,7 @@ make dev-frontend   # terminal 2: Next.js dev server on port 3000
 
 Open <http://localhost:3000> once both are running.
 
-The frontend displays a list of all simulation runs with scenario name, timestamp, message count, status (including in-progress runs), evaluation status, and fork badges. Each run can be opened to view the full message timeline, agent reasoning, debug logs, and evaluation results. Completed runs support message-level editing and forking — hover over any message to edit it and launch a new simulation from that point.
+The frontend displays a list of all simulation runs with scenario name, timestamp, message count, status (including in-progress runs), evaluation status, and lineage badges (fork, replace-agent, cross-run, resume-at-round). Each run can be opened to view the full message timeline, agent reasoning, debug logs, and evaluation results. Simulations are launched from the CLI (see "Running a Simulation" above) or via the MCP `start_run` tool.
 
 ### Live Token Streaming
 
@@ -465,8 +457,6 @@ modal/                         # Self-hosted LLM endpoint deployable to Modal (v
     identity/middleware.py     # Clerk-aware identity middleware: parses /g/{slug}, validates JWT
     identity/clerk_verifier.py # Networkless Clerk JWT verification (v2 nested o claim + v1 flat)
     identity/webhook_router.py # Svix-verified POST /api/clerk/webhook (groups sync)
-    runs/fork_router.py        # POST /api/g/{group_slug}/runs/{run_id}/fork endpoint
-    runs/replace_agent_router.py # POST /api/g/{group_slug}/runs/{run_id}/replace-agent endpoint
     runs/listing.py            # Postgres-backed list_runs_for_group
     runs/lookup.py             # resolve_run_or_404 + register_new_run (group-scoped)
     run_launcher.py            # Shared run-launch utilities for REST and MCP start endpoints
