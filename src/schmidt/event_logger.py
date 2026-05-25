@@ -1,8 +1,7 @@
 """Async event logger that writes simulation events as newline-delimited JSON to a file.
 
 Publishes each logged event to an ``EventBus`` for real-time delivery to SSE
-subscribers when a bus is provided at construction time. Optionally commits
-meaningful state changes to a ``RunRepository`` for git-backed history.
+subscribers when a bus is provided at construction time.
 """
 
 import asyncio
@@ -13,89 +12,20 @@ import aiofiles
 import orjson
 
 from schmidt.event_bus import EventBus
-from schmidt.models.event import (
-    AgentSwappedMidRun,
-    InjectionDelivered,
-    MessageSent,
-    PostmortemDisabledMidRun,
-    RoundAdvanced,
-    SimulationEnded,
-    SimulationEvent,
-    SimulationStarted,
-    ToolResultReceived,
-)
-from schmidt.models.event_base import event_type_of
-from schmidt.run_repository import RunRepository
+from schmidt.models.event import SimulationEvent
 
 logger = logging.getLogger(__name__)
 
-# Event types that do NOT trigger a git commit. These are high-volume events
-# that don't affect forkable simulation state. They are still written to JSONL
-# but only captured in git as part of the next meaningful event's diff.
-# All other event types (including any new ones added by scenarios) are
-# committed automatically.
-_NON_COMMITTABLE_TYPES: frozenset[str] = frozenset(
-    {
-        "llm_response_received",
-        "tool_call_invoked",
-        "agent_connected",
-    }
-)
-
-
-def _build_commit_message(event: SimulationEvent) -> str:
-    """Build a structured git commit message for a simulation event."""
-    event_type = event_type_of(event=event)
-    event_id = event.event_id
-    timestamp = event.timestamp.isoformat()
-
-    if isinstance(event, SimulationStarted):
-        summary = f"{event_type}: {event.scenario_name} (run {event.run_id[:8]})"
-    elif isinstance(event, MessageSent):
-        msg = event.message
-        summary = (
-            f"{event_type}: {msg.sender_agent_id} -> {msg.channel_id} (round {event.round_number})"
-        )
-    elif isinstance(event, ToolResultReceived):
-        summary = (
-            f"{event_type}: {event.tool_name} by {event.agent_id} (round {event.round_number})"
-        )
-    elif isinstance(event, RoundAdvanced):
-        summary = f"{event_type}: round {event.round_number} ({event.trigger})"
-    elif isinstance(event, InjectionDelivered):
-        summary = f"{event_type}: {event.agent_id} (round {event.round_number})"
-    elif isinstance(event, AgentSwappedMidRun):
-        summary = (
-            f"{event_type}: {event.agent_id} -> {event.new_provider}/{event.new_model} "
-            f"(round {event.round_number})"
-        )
-    elif isinstance(event, PostmortemDisabledMidRun):
-        summary = f"{event_type}: round {event.round_number}"
-    elif isinstance(event, SimulationEnded):
-        summary = f"{event_type}: {event.reason.value}"
-    else:
-        summary = event_type
-
-    metadata = f"event_id: {event_id}\ntimestamp: {timestamp}"
-    if isinstance(event, MessageSent):
-        metadata += f"\nmessage_id: {event.message.message_id}"
-    return f"{summary}\n\n{metadata}"
-
 
 class EventLogger:
-    """Writes ``SimulationEvent`` objects as newline-delimited JSON (JSONL) to a binary file.
+    """Writes ``SimulationEvent`` objects as newline-delimited JSON (JSONL) to a binary file."""
 
-    When a ``RunRepository`` is provided, committable events also trigger a
-    git commit capturing the updated JSONL and any workspace file changes.
-    """
-
-    def __init__(self, log_path: Path, event_bus: EventBus, repo: RunRepository | None) -> None:
+    def __init__(self, log_path: Path, event_bus: EventBus) -> None:
         """Store the target log file path. The file is not opened until ``open()`` is called."""
         self._log_path = log_path
         self._file: aiofiles.threadpool.binary.AsyncBufferedIOBase | None = None
         self._event_bus = event_bus
         self._write_lock = asyncio.Lock()
-        self._repo = repo
 
     async def open(self) -> None:
         """Create parent directories if needed and open the log file for writing.
@@ -121,8 +51,6 @@ class EventLogger:
         """Serialize ``event`` to JSON, write it as a single line, and flush.
 
         Also publishes the event to the event bus for live streaming.
-        For committable event types, triggers a git commit when a
-        ``RunRepository`` is configured.
         Raises ``RuntimeError`` if the logger has not been opened.
         """
         if self._file is None:
@@ -132,18 +60,7 @@ class EventLogger:
         async with self._write_lock:
             await self._file.write(data)
             await self._file.flush()
-            if self._repo is not None and event_type_of(event=event) not in _NON_COMMITTABLE_TYPES:
-                await self._commit_event(event=event)
         self._event_bus.publish(event=event_dict)
-
-    async def _commit_event(self, event: SimulationEvent) -> None:
-        """Commit the current JSONL state and any workspace files to git."""
-        assert self._repo is not None
-        message = _build_commit_message(event=event)
-        try:
-            await self._repo.commit(message=message, paths=None)
-        except RuntimeError:
-            logger.exception("Git commit failed for event %s", event.event_id)
 
     async def close(self) -> None:
         """Close the underlying file handle if it is open and reset internal state."""

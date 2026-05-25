@@ -562,18 +562,24 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
     st.markdown("---")
     st.subheader("Probe replica self-similarity per phase")
     st.caption(
-        "Within (agent, question, cutoff), mean off-diagonal pairwise similarity "
-        "of the 3 probe replicas. Higher = more stable protocol description. "
-        "Cutoffs 11/21/31/41 map to end of phases A/B/C/D."
+        "At each phase boundary we ask each agent the same probe question 3 times "
+        "(3 replicas under temperature). We then compare **each pair of those 3 "
+        "replica answers to each other** using normalized Levenshtein similarity, "
+        "and average per (agent, question), then across (agent, question) within "
+        "the run. **Higher = the agent gives the same answer when re-asked → its "
+        "internal protocol description is stable**; lower = the agent's answer "
+        "varies between identical re-asks. Probe cutoffs 11/21/31/41 map to the "
+        "end of phases A/B/C/D respectively (an exclusive round cutoff, so "
+        "cutoff=11 means the agent has seen rounds 1–10)."
     )
     fig_sim = _build_phase_similarity_chart(cohorts=cohort_probe_data)
     st.plotly_chart(fig_sim, use_container_width=True, key="multi_swap_cohort_similarity_chart")
 
 
 def render(evaluated: list[EvaluatedRun]) -> None:
-    """Render the multi-swap tab body: Per-run + Cohort overlay subtabs."""
-    per_run_panel, cohort_panel = st.tabs(["Per-run", "Cohort overlay"])
-    with per_run_panel:
-        _render_per_run(evaluated=evaluated)
+    """Render the multi-swap tab body: Cohort overlay (default) + Per-run subtabs."""
+    cohort_panel, per_run_panel = st.tabs(["Cohort overlay", "Per-run"])
     with cohort_panel:
         _render_cohort_overlay(evaluated=evaluated)
+    with per_run_panel:
+        _render_per_run(evaluated=evaluated)

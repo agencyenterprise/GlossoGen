@@ -1,0 +1,178 @@
+"""Filesystem helpers for simulation run directories.
+
+Provides directory claiming, JSONL event-id lookup, point-in-time JSONL
+truncation, and one-shot cleanup of legacy ``.git`` directories from runs
+created before the git-backed run history was removed. The JSONL event log
+is the canonical state ledger; these helpers operate on it directly.
+"""
+
+import logging
+import shutil
+import time
+from pathlib import Path
+from typing import Any, Callable, NamedTuple
+
+import aiofiles
+import orjson
+
+logger = logging.getLogger(__name__)
+
+
+class EventLocation(NamedTuple):
+    """Position of a single event line inside a JSONL file."""
+
+    line_number: int
+    end_offset: int
+    event_dict: dict[str, Any]
+
+
+async def find_event_offset(log_path: Path, event_id: str) -> EventLocation | None:
+    """Scan a JSONL file for the line whose ``event_id`` matches.
+
+    Returns the byte offset of the first byte AFTER the matched line's
+    trailing newline, so ``log_path.read_bytes()[:end_offset]`` yields a
+    truncated copy that includes the matched event.
+    """
+    return await _find_offset_by_predicate(
+        log_path=log_path,
+        predicate=lambda raw: raw.get("event_id") == event_id,
+    )
+
+
+async def find_message_offset(log_path: Path, message_id: str) -> EventLocation | None:
+    """Scan a JSONL file for the ``message_sent`` line whose nested message id matches."""
+    return await _find_offset_by_predicate(
+        log_path=log_path,
+        predicate=lambda raw: (
+            raw.get("event_type") == "message_sent"
+            and isinstance(raw.get("message"), dict)
+            and raw["message"].get("message_id") == message_id
+        ),
+    )
+
+
+async def _find_offset_by_predicate(
+    log_path: Path,
+    predicate: Callable[[dict[str, Any]], bool],
+) -> EventLocation | None:
+    """Walk the JSONL line-by-line, returning the location of the first matching line."""
+    offset = 0
+    line_number = 0
+    async with aiofiles.open(log_path, mode="rb") as f:
+        async for line in f:
+            line_number += 1
+            line_bytes_len = len(line)
+            offset += line_bytes_len
+            stripped = line.strip()
+            if not stripped:
+                continue
+            raw: dict[str, Any] = orjson.loads(stripped)
+            if predicate(raw):
+                return EventLocation(
+                    line_number=line_number,
+                    end_offset=offset,
+                    event_dict=raw,
+                )
+    return None
+
+
+_EXCLUDED_COPY_NAMES: frozenset[str] = frozenset(
+    {
+        ".git",
+        "stream.json",
+        "__pycache__",
+    }
+)
+
+_EXCLUDED_COPY_SUFFIXES: tuple[str, ...] = (
+    "_stdout.log",
+    "_start.log",
+    "_debug.jsonl",
+    ".pyc",
+)
+
+
+def _ignore_excluded(src: str, names: list[str]) -> list[str]:
+    """Return names to skip when copying a run directory.
+
+    Signature matches the ``ignore`` callback expected by ``shutil.copytree``.
+    """
+    del src
+    ignored: list[str] = []
+    for name in names:
+        if name in _EXCLUDED_COPY_NAMES:
+            ignored.append(name)
+            continue
+        for suffix in _EXCLUDED_COPY_SUFFIXES:
+            if name.endswith(suffix):
+                ignored.append(name)
+                break
+    return ignored
+
+
+async def copy_run_at_event(
+    source_dir: Path,
+    target_dir: Path,
+    jsonl_path_within_run: Path,
+    truncate_after_offset: int,
+) -> None:
+    """Copy ``source_dir`` into ``target_dir`` and truncate the run JSONL.
+
+    The target directory must already exist (created by ``claim_run_dir``).
+    Every file from the source is copied except `.git`, stream manifests,
+    debug logs, and `*.pyc`. After copy, the JSONL at
+    ``jsonl_path_within_run`` (relative to the run dir) is truncated to
+    ``truncate_after_offset`` bytes so it ends at the target event.
+    """
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for entry in sorted(source_dir.iterdir()):
+        if entry.name in _EXCLUDED_COPY_NAMES:
+            continue
+        if any(entry.name.endswith(suffix) for suffix in _EXCLUDED_COPY_SUFFIXES):
+            continue
+        destination = target_dir / entry.name
+        if entry.is_dir():
+            shutil.copytree(src=entry, dst=destination, ignore=_ignore_excluded)
+        else:
+            shutil.copy2(src=entry, dst=destination)
+
+    target_log_path = target_dir / jsonl_path_within_run
+    raw = target_log_path.read_bytes()
+    target_log_path.write_bytes(raw[:truncate_after_offset])
+    logger.info(
+        "Copied run %s -> %s (jsonl truncated to %d bytes)",
+        source_dir,
+        target_dir,
+        truncate_after_offset,
+    )
+
+
+def strip_legacy_git_dir(run_dir: Path) -> None:
+    """Delete ``run_dir/.git`` if it exists.
+
+    Runs created before the git-backed history was removed retain a
+    ``.git`` directory. Once removed the run is functionally identical to
+    a fresh run and the deletion is idempotent.
+    """
+    git_dir = run_dir / ".git"
+    if git_dir.is_dir():
+        shutil.rmtree(git_dir, ignore_errors=True)
+        logger.info("Removed legacy .git/ at %s", git_dir)
+
+
+def claim_run_dir(runs_dir: Path, scenario_name: str) -> Path:
+    """Atomically claim a unique run directory using the current unix timestamp.
+
+    Creates ``{runs_dir}/{scenario_name}/{unix_timestamp}/``. If another
+    run already claimed the same second, sleeps 1s so the wall clock
+    advances and retries. Uses ``mkdir(exist_ok=False)`` for atomic
+    collision detection on POSIX filesystems.
+    """
+    base_dir = runs_dir / scenario_name
+    while True:
+        candidate = base_dir / str(int(time.time()))
+        try:
+            candidate.mkdir(parents=True, exist_ok=False)
+            return candidate
+        except FileExistsError:
+            time.sleep(1)

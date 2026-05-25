@@ -46,7 +46,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/schmidt/scenario_registry.py` — maps scenario name strings to `SimulationScenario` classes; lives outside `schmidt.scenarios` package init so importing event-related modules doesn't trigger eager loading of every scenario
 - `src/schmidt/autonomous_supervisor.py` — autonomous mode orchestrator (supports resume via `RewindState`)
 - `src/schmidt/message_rewind.py` — reconstructs simulation state at any message for fork/resume
-- `src/schmidt/run_repository.py` — git-backed repository for run directories (init, commit, clone, checkout)
+- `src/schmidt/run_archive.py` — run directory helpers: `claim_run_dir`, `find_event_offset`/`find_message_offset` (linear JSONL scans), `copy_run_at_event` (copy + JSONL truncate), `strip_legacy_git_dir` (one-shot cleanup of pre-rewrite runs)
 - `src/schmidt/message_history_builder.py` — reconstructs pydantic-ai ModelMessage history from JSONL events for fork/resume
 - `src/schmidt/llm/` — LLM provider abstraction + Anthropic/OpenAI/HuggingFace implementations
 - `src/schmidt/evaluation/` — generic metrics and evaluation infrastructure
@@ -318,15 +318,14 @@ Build args:
 
 ## Run Output Directory Structure
 
-All simulation outputs use a standard directory layout. Each run directory is a git repository — meaningful events (messages, tool results, round advances) trigger commits that capture the JSONL and any workspace files.
+All simulation outputs use a standard directory layout. The JSONL event log is the canonical state ledger for a run — every fork, replace-agent, cross-run, and resume-at-round operation locates the target event in the JSONL and writes a truncated copy into a new run directory.
 
 ```
 runs/{scenario_name}/{unix_timestamp}/
-├── .git/                              # Git history (one commit per meaningful event)
 ├── {scenario_name}.jsonl              # Event log (messages, reasoning, round transitions)
-├── {scenario_name}_debug.jsonl        # Debug log (JSON lines from Python logger, not in git)
+├── {scenario_name}_debug.jsonl        # Debug log (JSON lines from Python logger)
 ├── {scenario_name}_report.json        # Evaluation report (written by evaluate)
-├── {scenario_name}_stdout.log         # (pipe stdout here, not in git)
+├── {scenario_name}_stdout.log         # (pipe stdout here)
 ├── labels.json                        # JSON array of label strings (e.g. ["baseline_oss"])
 ├── note.md                            # Optional free-text note for the run
 ├── fork_manifest.json                 # (forked runs only) provenance: source_run_id, target_message_id
@@ -377,7 +376,7 @@ for d in ./runs/veyru/*/; do
 done
 ```
 
-The pattern matched runs labeled `["baseline", "budget=2000", "eval:content_filter_refusal:0", "eval:round_success:pass", ...]` and overwrote all of those eval-derived labels. They are NOT recoverable from git (labels.json is not tracked in the per-run git repos) and have to be regenerated via `schmidt evaluate`.
+The pattern matched runs labeled `["baseline", "budget=2000", "eval:content_filter_refusal:0", "eval:round_success:pass", ...]` and overwrote all of those eval-derived labels. They have to be regenerated via `schmidt evaluate`.
 
 **Rules when bulk-modifying labels.json:**
 
@@ -386,21 +385,11 @@ The pattern matched runs labeled `["baseline", "budget=2000", "eval:content_filt
 3. **Never overwrite — append.** If you must modify labels, read existing JSON, append/remove specific entries, write back. Only blow away the whole list if you're certain the run has no eval-derived labels (i.e. you just created it and `schmidt evaluate` has not run on it).
 4. **If unsure, dry-run first.** Print which runs you'd modify and their current labels; ask the user to confirm before writing.
 
-### Git-Backed Run History
+### JSONL-Backed Run History
 
-Each run directory is initialized as a git repository at simulation start. The `EventLogger` commits after writing committable events (messages, tool results, rounds, injections). Non-committable events like `LLMResponseReceived` are written to JSONL but only appear in git as part of the next meaningful commit's diff.
+The `{scenario_name}.jsonl` file is the canonical event log for a run. `EventLogger` appends one line per event and never mutates earlier lines, so every event has a stable byte offset for the lifetime of the run.
 
-All event types are committed except `llm_response_received` and `agent_connected` (high-volume, no forkable state). New event types are committed by default — no platform code changes needed.
-
-Commit messages follow a structured format for searchability:
-```
-{event_type}: {summary}
-
-event_id: {uuid}
-timestamp: {iso8601}
-```
-
-Use `git log --oneline` in a run directory to see the simulation timeline.
+Forks, replace-agent, cross-run replace-agent, and resume-at-round all locate their target event in the source JSONL (via `find_event_offset` / `find_message_offset` in `src/schmidt/run_archive.py`), copy the source run directory, and truncate the JSONL in the new directory to end at that event. Run dirs created before this change carry a legacy `.git/` subdirectory; `load_events` removes it on first read (`strip_legacy_git_dir`).
 
 ## Running Simulations
 

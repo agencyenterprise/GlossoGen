@@ -529,12 +529,12 @@ async def _tool_start_run(
 
 
 async def _tool_export_run_artifacts(run_id: str) -> McpExportArtifactsResult:
-    """Return a download URL for exporting all run artifacts as a zip archive."""
+    """Return a download URL for exporting the run as a tar.gz bundle."""
     run_summary = await _find_run_by_prefix(run_id_prefix=run_id)
     full_run_id = run_summary.run_id
     run_dir_name = full_run_id.split("/", 1)[1]
-    filename = f"{run_summary.scenario_name}_{run_dir_name}_artifacts.zip"
-    download_url = f"/api/runs/{full_run_id}/export/artifacts"
+    filename = f"{run_summary.scenario_name}_{run_dir_name}_bundle.tar.gz"
+    download_url = f"/api/runs/{full_run_id}/export/bundle"
     return McpExportArtifactsResult(
         run_id=full_run_id,
         scenario_name=run_summary.scenario_name,

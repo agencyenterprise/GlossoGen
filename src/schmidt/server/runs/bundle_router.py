@@ -1,14 +1,13 @@
 """FastAPI router for exporting and importing simulation run bundles.
 
-A bundle is a tar.gz archive of the entire run directory including git history,
-enabling full run portability between machines with fork support preserved.
+A bundle is a tar.gz archive of the entire run directory, enabling full
+run portability between machines.
 """
 
 import asyncio
 import io
 import logging
 import shutil
-import subprocess
 import tarfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,7 +18,7 @@ from fastapi.responses import StreamingResponse
 
 from schmidt.event_parsing import parse_event_bytes
 from schmidt.models.event import SimulationStarted
-from schmidt.run_repository import RunRepository, claim_run_dir
+from schmidt.run_archive import claim_run_dir, strip_legacy_git_dir
 from schmidt.server.runs.discovery import compose_run_id, discover_runs, resolve_run
 from schmidt.server.runs.models import BundleManifest, ImportBundleResponse
 
@@ -28,6 +27,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 BUNDLE_EXCLUDED_NAMES: set[str] = {
+    ".git",
     "stream.json",
     "eval_in_progress.json",
     "eval_stdout.log",
@@ -45,32 +45,14 @@ _MANIFEST_FILENAME = "bundle_manifest.json"
 def _should_include_in_bundle(path: Path, run_dir: Path) -> bool:
     """Return True if the file or directory should be included in the bundle tar.gz."""
     relative = path.relative_to(run_dir)
+    for part in relative.parts:
+        if part in BUNDLE_EXCLUDED_NAMES:
+            return False
     name = relative.name
-    if name in BUNDLE_EXCLUDED_NAMES:
-        return False
     for suffix in BUNDLE_EXCLUDED_SUFFIXES:
         if name.endswith(suffix):
             return False
     return True
-
-
-def _pack_git_objects(run_dir: Path) -> None:
-    """Run git gc to pack loose objects, dramatically reducing .git size.
-
-    Loose objects store each JSONL snapshot as a separate blob. Packing
-    enables delta compression across commits, typically shrinking .git
-    from hundreds of megabytes to a few megabytes.
-    """
-    git_dir = run_dir / ".git"
-    if not git_dir.is_dir():
-        return
-    subprocess.run(
-        ["git", "gc", "--aggressive", "--quiet"],
-        cwd=str(run_dir),
-        check=True,
-        capture_output=True,
-        timeout=360,
-    )
 
 
 def build_bundle_bytes(
@@ -79,8 +61,7 @@ def build_bundle_bytes(
     scenario_name: str,
     original_timestamp: int,
 ) -> bytes:
-    """Build a tar.gz archive of the run directory including git history."""
-    _pack_git_objects(run_dir=run_dir)
+    """Build a tar.gz archive of the run directory."""
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
         for entry_path in sorted(run_dir.rglob("*")):
@@ -107,7 +88,7 @@ def build_bundle_bytes(
     "/runs/{scenario}/{run_dir_name}/export/bundle",
     responses={
         200: {
-            "description": "Tar.gz bundle of the simulation run with git history.",
+            "description": "Tar.gz bundle of the simulation run.",
             "content": {"application/gzip": {}},
         },
     },
@@ -117,7 +98,7 @@ async def export_run_bundle(
     run_dir_name: str,
     request: Request,
 ) -> StreamingResponse:
-    """Export a simulation run as a tar.gz bundle including git history."""
+    """Export a simulation run as a tar.gz bundle."""
     runs_dir: Path = request.app.state.runs_dir
     try:
         resolved = resolve_run(
@@ -191,14 +172,6 @@ def _validate_jsonl_first_event(tar: tarfile.TarFile, scenario_name: str) -> str
     return event.run_id
 
 
-def _has_git_members(tar: tarfile.TarFile) -> bool:
-    """Check whether the tar contains .git/ directory entries."""
-    for member in tar.getmembers():
-        if member.name.startswith(".git/"):
-            return True
-    return False
-
-
 def _rename_to_original_timestamp(run_dir: Path, original_timestamp: int) -> Path:
     """Rename a run directory to use the original timestamp from the bundle.
 
@@ -255,12 +228,6 @@ def _extract_and_validate_bundle(
             raise HTTPException(
                 status_code=422,
                 detail="run_id in JSONL does not match bundle manifest",
-            )
-
-        if not _has_git_members(tar=tar):
-            raise HTTPException(
-                status_code=422,
-                detail="Bundle is missing git history (.git/ directory)",
             )
 
         existing_dir = existing_run_dirs.get(manifest.run_id)
@@ -343,16 +310,7 @@ async def import_run_bundle(
     )
 
     run_dir = Path(result.run_dir)
-    repo = RunRepository(run_dir=run_dir)
-    try:
-        await repo.get_head_sha()
-    except Exception:
-        logger.exception("Git integrity check failed for imported run at %s", run_dir)
-        shutil.rmtree(run_dir, ignore_errors=True)
-        raise HTTPException(
-            status_code=422,
-            detail="Bundle contains invalid git repository",
-        )
+    strip_legacy_git_dir(run_dir=run_dir)
 
     logger.info(
         "Imported run %s (%s) to %s",
