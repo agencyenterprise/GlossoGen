@@ -25,9 +25,9 @@ from schmidt.evaluation.log_reader import load_events
 from schmidt.message_rewind import build_rewind_state_at_event
 from schmidt.models.event import AgentRegistered, RoundAdvanced, SimulationEvent, SimulationStarted
 from schmidt.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
+from schmidt.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
 from schmidt.run_config_validation import validate_run_config
 from schmidt.run_jsonl_rewriter import patch_simulation_started_scenario_config, rewrite_run_jsonl
-from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.token_pricing import list_providers
 
@@ -310,29 +310,34 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
             f"as of round {request.round_start} (known agents: {sorted(source_agents)})"
         )
 
-    source_repo = RunRepository(run_dir=request.source_run_dir)
-    target_sha = await source_repo.find_commit_for_event_id(
+    location = await find_event_offset(
+        log_path=source_log_path,
         event_id=target_event_id,
     )
-    if target_sha is None:
+    if location is None:
         raise ValueError(
-            f"No git commit found for event {target_event_id} "
+            f"No event {target_event_id} "
             f"(round_advanced for round {request.round_start}) "
-            f"in {request.source_run_dir}"
+            f"found in {source_log_path}"
         )
 
     new_run_dir = claim_run_dir(
         runs_dir=request.runs_dir,
         scenario_name=request.scenario_name,
     )
-    new_repo = await source_repo.clone_to(target_dir=new_run_dir)
-    await new_repo.checkout(sha=target_sha)
+    new_log_filename = f"{request.scenario_name}.jsonl"
+    await copy_run_at_event(
+        source_dir=request.source_run_dir,
+        target_dir=new_run_dir,
+        jsonl_path_within_run=Path(new_log_filename),
+        truncate_after_offset=location.end_offset,
+    )
 
     new_run_id = compose_run_id(
         scenario_name=request.scenario_name,
         run_dir_name=new_run_dir.name,
     )
-    new_log_path = new_run_dir / f"{request.scenario_name}.jsonl"
+    new_log_path = new_run_dir / new_log_filename
 
     rewrite_run_jsonl(
         log_path=new_log_path,
@@ -449,14 +454,6 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
     )
     manifest_path = new_run_dir / REPLACE_MANIFEST_FILENAME
     manifest_path.write_bytes(orjson.dumps(manifest.model_dump()))
-
-    if request.replaced_agent_id is None:
-        commit_message = f"resume-at-round: r{request.round_start}"
-    else:
-        commit_message = (
-            f"replace: agent {request.replaced_agent_id} → " f"{request.model}/{request.provider}"
-        )
-    await new_repo.commit(message=commit_message, paths=None)
 
     stdout_log = new_run_dir / f"{request.scenario_name}_stdout.log"
     cmd = [

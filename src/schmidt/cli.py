@@ -54,8 +54,8 @@ from schmidt.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from schmidt.replace_agent import replace_agent_in_run
 from schmidt.replace_manifest import read_replace_manifest
 from schmidt.resume_context_writer import write_resume_context_files
+from schmidt.run_archive import claim_run_dir
 from schmidt.run_config_validation import validate_run_config
-from schmidt.run_repository import RunRepository, claim_run_dir
 from schmidt.runners.pydantic_ai_runner import PydanticAIRunner
 from schmidt.runtime.scheduled_events import (
     ChannelVisibility,
@@ -725,11 +725,7 @@ async def _run_simulation(
     log_path = run_dir / f"{scenario.name()}.jsonl"
     event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
 
-    repo = RunRepository(run_dir=run_dir)
-    if not resuming:
-        await repo.init()
-
-    event_logger = EventLogger(log_path=log_path, event_bus=event_bus, repo=repo)
+    event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
 
     resume_state: RewindState | None = None
     if resuming:

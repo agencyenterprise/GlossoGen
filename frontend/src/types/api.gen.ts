@@ -373,46 +373,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{scenario}/{run_dir_name}/export/artifacts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export Run Artifacts
-         * @description Export all artifacts from a simulation run as a zip archive.
-         */
-        get: operations["export_run_artifacts_api_runs__scenario___run_dir_name__export_artifacts_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/runs/{scenario}/{run_dir_name}/export/artifacts/{message_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export Run Artifacts At Message
-         * @description Export artifacts from a simulation run as they existed at a specific message.
-         */
-        get: operations["export_run_artifacts_at_message_api_runs__scenario___run_dir_name__export_artifacts__message_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/runs/{scenario}/{run_dir_name}/export/bundle": {
         parameters: {
             query?: never;
@@ -422,7 +382,7 @@ export interface paths {
         };
         /**
          * Export Run Bundle
-         * @description Export a simulation run as a tar.gz bundle including git history.
+         * @description Export a simulation run as a tar.gz bundle.
          */
         get: operations["export_run_bundle_api_runs__scenario___run_dir_name__export_bundle_get"];
         put?: never;
@@ -3114,73 +3074,6 @@ export interface operations {
             };
         };
     };
-    export_run_artifacts_api_runs__scenario___run_dir_name__export_artifacts_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                scenario: string;
-                run_dir_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Zip archive of the simulation run artifacts. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                    "application/zip": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    export_run_artifacts_at_message_api_runs__scenario___run_dir_name__export_artifacts__message_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                scenario: string;
-                run_dir_name: string;
-                message_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Zip archive of artifacts at a specific message commit. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                    "application/zip": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     export_run_bundle_api_runs__scenario___run_dir_name__export_bundle_get: {
         parameters: {
             query?: never;
@@ -3193,7 +3086,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Tar.gz bundle of the simulation run with git history. */
+            /** @description Tar.gz bundle of the simulation run. */
             200: {
                 headers: {
                     [name: string]: unknown;

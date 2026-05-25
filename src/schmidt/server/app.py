@@ -20,7 +20,6 @@ from schmidt.server.mcp.oauth_storage import OAuthStorage
 from schmidt.server.password_auth_middleware import PasswordAuthMiddleware
 from schmidt.server.pdf.router import router as pdf_export_router
 from schmidt.server.response_models import AuthVerifyResponse, HealthResponse, HealthStatus
-from schmidt.server.runs.artifact_router import router as artifact_export_router
 from schmidt.server.runs.bundle_router import router as bundle_router
 from schmidt.server.runs.cross_run_replace_agent_router import (
     router as cross_run_replace_agent_router,
@@ -113,7 +112,6 @@ app.include_router(replace_agent_router)
 app.include_router(cross_run_replace_agent_router)
 app.include_router(resume_at_round_router)
 app.include_router(pdf_export_router)
-app.include_router(artifact_export_router)
 app.include_router(bundle_router)
 app.include_router(metadata_router)
 app.include_router(prod_upload_router)

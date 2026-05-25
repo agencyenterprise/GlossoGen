@@ -14,6 +14,7 @@ import orjson
 from schmidt.event_parsing import parse_event
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import AgentRegistered, SimulationEvent, SimulationStarted
+from schmidt.run_archive import strip_legacy_git_dir
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ async def load_events(log_path: Path) -> list[SimulationEvent]:
     ``message_sent`` events from the parent event's ``round_number`` for
     runs that predate per-message round tagging.
     """
+    strip_legacy_git_dir(run_dir=log_path.parent)
     events: list[SimulationEvent] = []
     running_round = 0
     async with aiofiles.open(log_path, mode="rb") as f:

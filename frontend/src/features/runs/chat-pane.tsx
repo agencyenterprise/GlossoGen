@@ -15,7 +15,6 @@ import {
   ChevronDown,
   CloudUpload,
   Download,
-  FolderArchive,
   Hash,
   Loader2,
   Package,
@@ -597,24 +596,9 @@ export function ChatPane({
             Export PDF
           </span>
         </span>
-        <Tooltip label="Download all artifacts">
+        <Tooltip label="Export run bundle">
           <button
-            aria-label="Download artifacts"
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            onClick={() => {
-              void downloadAuthenticatedFile({
-                path: `/api/runs/${runId}/export/artifacts`,
-                searchParams: new URLSearchParams(),
-                fallbackFilename: `${runId.slice(0, 8)}_artifacts.tar.gz`,
-              });
-            }}
-          >
-            <FolderArchive className="h-3.5 w-3.5" />
-          </button>
-        </Tooltip>
-        <Tooltip label="Export full bundle">
-          <button
-            aria-label="Export bundle (with git history)"
+            aria-label="Export bundle"
             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             onClick={() => {
               void downloadAuthenticatedFile({
@@ -1162,21 +1146,6 @@ export function ChatPane({
                                         </button>
                                       </Tooltip>
                                     ) : null}
-                                    <Tooltip label="Download artifacts up to this point">
-                                      <button
-                                        aria-label="Download artifacts at this message"
-                                        className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                        onClick={() => {
-                                          void downloadAuthenticatedFile({
-                                            path: `/api/runs/${runId}/export/artifacts/${entry.message_id}`,
-                                            searchParams: new URLSearchParams(),
-                                            fallbackFilename: `${runId.slice(0, 8)}_${entry.message_id.slice(0, 8)}_artifacts.tar.gz`,
-                                          });
-                                        }}
-                                      >
-                                        <FolderArchive className="h-3 w-3" />
-                                      </button>
-                                    </Tooltip>
                                   </span>
                                 ) : null}
                               </>

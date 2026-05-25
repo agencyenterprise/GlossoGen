@@ -1025,115 +1025,10 @@
         }
       }
     },
-    "/api/runs/{scenario}/{run_dir_name}/export/artifacts": {
-      "get": {
-        "summary": "Export Run Artifacts",
-        "description": "Export all artifacts from a simulation run as a zip archive.",
-        "operationId": "export_run_artifacts_api_runs__scenario___run_dir_name__export_artifacts_get",
-        "parameters": [
-          {
-            "name": "scenario",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Scenario"
-            }
-          },
-          {
-            "name": "run_dir_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Run Dir Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Zip archive of the simulation run artifacts.",
-            "content": {
-              "application/json": {
-                "schema": {}
-              },
-              "application/zip": {}
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/runs/{scenario}/{run_dir_name}/export/artifacts/{message_id}": {
-      "get": {
-        "summary": "Export Run Artifacts At Message",
-        "description": "Export artifacts from a simulation run as they existed at a specific message.",
-        "operationId": "export_run_artifacts_at_message_api_runs__scenario___run_dir_name__export_artifacts__message_id__get",
-        "parameters": [
-          {
-            "name": "scenario",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Scenario"
-            }
-          },
-          {
-            "name": "run_dir_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Run Dir Name"
-            }
-          },
-          {
-            "name": "message_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Message Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Zip archive of artifacts at a specific message commit.",
-            "content": {
-              "application/json": {
-                "schema": {}
-              },
-              "application/zip": {}
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/runs/{scenario}/{run_dir_name}/export/bundle": {
       "get": {
         "summary": "Export Run Bundle",
-        "description": "Export a simulation run as a tar.gz bundle including git history.",
+        "description": "Export a simulation run as a tar.gz bundle.",
         "operationId": "export_run_bundle_api_runs__scenario___run_dir_name__export_bundle_get",
         "parameters": [
           {
@@ -1157,7 +1052,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Tar.gz bundle of the simulation run with git history.",
+            "description": "Tar.gz bundle of the simulation run.",
             "content": {
               "application/json": {
                 "schema": {}
