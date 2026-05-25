@@ -330,7 +330,7 @@ dip (-8.8 pp).
 fully by Phase D (back to baseline Phase D mean) — so the impact has a 15-30 round persistence
 window before stabilizing.
 
-## Phase 6 — budget=250 sweep (in flight 2026-05-22)
+## Phase 6 — budget=250 sweep (✓ complete 2026-05-22)
 
 **Goal.** Test whether the Phase 1+3 intervention effects hold when the source
 runs themselves were trained under a tighter time budget. The agents' protocol
@@ -369,10 +369,51 @@ nohup bash experiments/2026-05-21_veyru_pressure_interventions/launch_budget_250
 disown
 ```
 
-**Status.** _Pending launch — runs will populate this table as they land._
+**Status.** ✓ Complete — 36/36 evaluated 2026-05-22.
 
-| Run ID | Variant | Source | Status | rs | rs@16 | rs@31 | rs@46 |
-|---|---|---|---|---|---|---|---|
+### Phase 6 results (mean round_success across 3 replicas per cell)
+
+`rs` = overall round_success across 45 post-resume rounds. `rs@R` = round_success_after_resume for
+the phase starting at swap round R (15 rounds each).
+
+| Model | Variant | n | rs | rs@16 | rs@31 | rs@46 | Δ vs baseline (rs) |
+|-------|---------|---|------|-------|-------|-------|--------------------|
+| gpt-5.4 | _baseline_ | 3 | 0.622 | 0.667 | 0.644 | 0.556 | — |
+| gpt-5.4 | budget_decreased | 3 | 0.363 | 0.356 | 0.356 | 0.378 | −25.9 pp |
+| gpt-5.4 | budget_increased | 3 | 0.807 | 0.800 | 0.800 | 0.822 | **+18.5 pp** |
+| gpt-5.4 | new_motifs_injected | 3 | 0.607 | 0.600 | 0.644 | 0.578 | −1.5 pp |
+| gpt-5.4 | postmortem_kept_on | 3 | 0.748 | 0.711 | 0.822 | 0.711 | +12.6 pp |
+| gpt-5.4 | with_noise | 3 | 0.363 | 0.422 | 0.400 | 0.267 | −25.9 pp |
+| sonnet | _baseline_ | 3 | 0.630 | 0.800 | 0.578 | 0.511 | — |
+| sonnet | budget_decreased | 3 | 0.496 | 0.422 | 0.578 | 0.489 | −13.4 pp |
+| sonnet | budget_increased | 3 | 0.896 | 0.956 | 0.844 | 0.889 | **+26.6 pp** |
+| sonnet | new_motifs_injected | 3 | 0.689 | 0.778 | 0.711 | 0.578 | +5.9 pp |
+| sonnet | postmortem_kept_on | 3 | 0.867 | 0.867 | 0.844 | 0.889 | **+23.7 pp** |
+| sonnet | with_noise | 3 | 0.541 | 0.511 | 0.578 | 0.533 | −8.9 pp |
+
+### Headline observations vs Phase 1+3 (budget=450 sources)
+
+- **`budget_increased` is the largest positive intervention on the b250 source**
+  (+18.5 pp gpt, +26.6 pp sonnet). Confirms hypothesis: the protocol formed
+  under tight budget=250 has headroom that more time can exploit. Sonnet gains
+  *more* from extra budget than gpt-5.4 — opposite of what Phase 1+3 showed at
+  budget=450 sources.
+- **`postmortem_kept_on` is dramatically stronger on sonnet than gpt** (+23.7 vs
+  +12.6 pp). Sonnet uses the postmortem channel to maintain protocol coherence
+  through swaps; gpt benefits less. Consistent with Phase 1+3 trend (sonnet > gpt
+  on postmortem responsiveness).
+- **`with_noise` and `budget_decreased` collapse gpt-5.4 to the same floor
+  (~0.36)** — both push it past a working-protocol cliff. Sonnet's floor under
+  these pressures (~0.50) is meaningfully higher.
+- **`new_motifs_injected` is no longer a collapse on the b250 source** (Phase 1+3
+  showed −20 pp on gpt-5.4; here it's −1.5 pp). The compressed b250 protocol
+  appears to have *broader* generalization to novel motifs than the b450
+  protocol. Surprising — would not have predicted this.
+- **Phase carry-over differs by intervention.** `postmortem_kept_on` shows
+  *uniform* uplift across all three phases (no decay). `budget_increased` also
+  uniform. `with_noise` *worsens* in Phase D (gpt drops from 0.422→0.267).
+  `new_motifs_injected` shows the expected phase-B/C/D recovery curve on sonnet
+  (0.778 → 0.711 → 0.578) but is mostly flat on gpt.
 
 ## Open questions / observations
 

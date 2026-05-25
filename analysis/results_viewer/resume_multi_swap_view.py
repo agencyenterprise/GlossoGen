@@ -10,6 +10,7 @@ The source's own phases are read via
 come from the evaluated catalog already loaded by the caller.
 """
 
+from collections.abc import Callable
 from typing import Literal, NamedTuple
 
 import plotly.graph_objects as go
@@ -741,18 +742,20 @@ def _gather_sources_and_replicas(
 
 
 class _LineBucket(NamedTuple):
-    """All source-adjusted delta contributions for one (model, intervention, phase).
+    """All source-adjusted delta contributions for one (group, intervention, phase).
 
-    Each entry in ``deltas`` is ``replica_score − that_replica_source's_baseline_mean``
+    ``group_value`` is whatever line-grouping dimension the user picked — model
+    name (e.g. ``gpt-5.4``) or source-budget label (e.g. ``budget=250``). Each
+    entry in ``deltas`` is ``replica_score − that_replica_source's_baseline_mean``
     — i.e. the delta is computed *within* the replica's source, never across
-    sources. The chart line for ``(model, intervention)`` plots
+    sources. The chart line for ``(group_value, intervention)`` plots
     ``mean(deltas)`` at each phase point. ``intervention_run_ids`` and
     ``source_run_ids`` are parallel arrays to ``deltas``: index ``i`` records
     which intervention replica produced that delta and which source's baseline
     pool it was scored against.
     """
 
-    model: str
+    group_value: str
     intervention: str
     phase_index: int
     phase_label: str
@@ -761,17 +764,25 @@ class _LineBucket(NamedTuple):
     source_run_ids: list[str]
 
 
-def _aggregate_by_model(
+_GROUP_BY_MODEL = "Model"
+_GROUP_BY_BUDGET = "Source budget"
+_GROUP_BY_OPTIONS = (_GROUP_BY_MODEL, _GROUP_BY_BUDGET)
+
+
+def _aggregate_by_group(
     sources_data: list[tuple[str, MultiSwapRun, list[MultiSwapRun]]],
     baseline_replicas_by_source: dict[str, list[MultiSwapRun]],
     mode: ViewMode,
+    group_value_for_source: Callable[[str, MultiSwapRun], str],
 ) -> dict[tuple[str, str, int], _LineBucket]:
-    """Source-relative per-replica deltas, bucketed by ``(model, intervention, phase)``.
+    """Source-relative per-replica deltas, bucketed by ``(group, intervention, phase)``.
 
     Each delta is computed *within* a single source: an intervention replica
     from source A is scored against source A's own baseline pool, never against
     a cross-source mean. Sources accumulate into the same line bucket only
-    because they share the same ``primary_model``.
+    because ``group_value_for_source`` returns the same string for them — the
+    caller picks whether the grouping dimension is the source's model or its
+    ``round_time_budget_seconds`` tag.
 
     For ``round_success`` mode: delta = ``replica.phase.score − mean(source's
     baseline replicas' phase.scores)``. For similarity modes: delta =
@@ -784,13 +795,15 @@ def _aggregate_by_model(
     """
     buckets: dict[tuple[str, str, int], _LineBucket] = {}
 
-    def _bucket_for(model: str, intervention: str, phase_index: int, label: str) -> _LineBucket:
-        key = (model, intervention, phase_index)
+    def _bucket_for(
+        group_value: str, intervention: str, phase_index: int, label: str
+    ) -> _LineBucket:
+        key = (group_value, intervention, phase_index)
         existing = buckets.get(key)
         if existing is not None:
             return existing
         bucket = _LineBucket(
-            model=model,
+            group_value=group_value,
             intervention=intervention,
             phase_index=phase_index,
             phase_label=label,
@@ -804,14 +817,11 @@ def _aggregate_by_model(
     is_similarity = _is_similarity_mode(mode=mode)
     score_fn = _score_fn_for(mode=mode) if is_similarity else None
     for source_id, source_run, replica_runs in sources_data:
-        model = source_run.primary_model
+        group_value = group_value_for_source(source_id, source_run)
         source_baselines = baseline_replicas_by_source.get(source_id, [])
         if not source_baselines:
             continue
         if is_similarity and score_fn is not None:
-            # Per source × phase: compute the baseline reference once
-            # (pool_self_similarity of that source's baselines) and use it to
-            # adjust every intervention replica scored against that pool.
             for src_phase in source_run.phases:
                 if src_phase.swap is None:
                     continue
@@ -833,7 +843,7 @@ def _aggregate_by_model(
                         continue
                     intervention = _extract_intervention_label(labels=replica.labels)
                     bucket = _bucket_for(
-                        model=model,
+                        group_value=group_value,
                         intervention=intervention,
                         phase_index=src_phase.phase_index,
                         label=src_phase.label,
@@ -842,9 +852,6 @@ def _aggregate_by_model(
                     bucket.intervention_run_ids.append(replica.run_id)
                     bucket.source_run_ids.append(source_id)
             continue
-        # round_success mode: source baseline = mean of that source's baseline
-        # replica scores per phase. Computed once per source × phase, then used
-        # to adjust every intervention replica's score in that source.
         source_baseline_phase_scores: dict[int, list[float]] = {}
         for baseline_replica in source_baselines:
             for bphase in baseline_replica.phases:
@@ -865,7 +872,7 @@ def _aggregate_by_model(
                 if baseline_mean is None:
                     continue
                 bucket = _bucket_for(
-                    model=model,
+                    group_value=group_value,
                     intervention=intervention,
                     phase_index=rphase.phase_index,
                     label=rphase.label,
@@ -876,24 +883,27 @@ def _aggregate_by_model(
     return buckets
 
 
-_MODEL_DASH_STYLES: dict[int, str] = {0: "solid", 1: "dash", 2: "dot", 3: "dashdot"}
+_GROUP_DASH_STYLES: dict[int, str] = {0: "solid", 1: "dash", 2: "dot", 3: "dashdot"}
 
 
-def _build_model_delta_chart(
+def _build_group_delta_chart(
     buckets: dict[tuple[str, str, int], _LineBucket],
     mode: ViewMode,
+    group_label: str,
 ) -> go.Figure:
-    """One line per ``(model, intervention)`` with phases on the x-axis.
+    """One line per ``(group_value, intervention)`` with phases on the x-axis.
 
-    Y value at phase P = mean of source-relative per-replica deltas accumulated
-    in the ``(model, intervention, P)`` bucket. Each replica's delta was
+    ``group_label`` is the dimension name shown in legends and hover text
+    (e.g. ``Model`` or ``Source budget``). Y value at phase P = mean of
+    source-relative per-replica deltas accumulated in the
+    ``(group_value, intervention, P)`` bucket. Each replica's delta was
     computed against its *own* source's baseline pool — sources never mix on
     the reference side, only on the line side. Colour codes the intervention;
-    dash style codes the model so two-model comparisons stay legible inside
-    one chart.
+    dash style codes the group dimension so two-group comparisons stay
+    legible inside one chart.
     """
     is_similarity = _is_similarity_mode(mode=mode)
-    models = sorted({key[0] for key in buckets})
+    group_values = sorted({key[0] for key in buckets})
     interventions = sorted({key[1] for key in buckets})
     intervention_color: dict[str, str] = {
         iv: _OVERVIEW_PALETTE[i % len(_OVERVIEW_PALETTE)] for i, iv in enumerate(interventions)
@@ -909,20 +919,18 @@ def _build_model_delta_chart(
     # significant deltas on the rendered chart.
     all_plotted_deltas: list[float] = []
     fig = go.Figure()
-    for model_index, model in enumerate(models):
-        dash = _MODEL_DASH_STYLES.get(model_index, "solid")
+    for group_index, group_value in enumerate(group_values):
+        dash = _GROUP_DASH_STYLES.get(group_index, "solid")
         for intervention in interventions:
             xs: list[str] = []
             ys: list[float] = []
             hover: list[str] = []
             for phase_index in phase_indices:
-                bucket = buckets.get((model, intervention, phase_index))
+                bucket = buckets.get((group_value, intervention, phase_index))
                 if bucket is None or not bucket.deltas:
                     continue
                 mean_delta = sum(bucket.deltas) / len(bucket.deltas)
                 delta_pp = mean_delta * 100
-                # Snap floating-point residue (~1e-14 pp) to exact zero so chart
-                # heights agree with the labelled and hovered values.
                 if abs(delta_pp) < 1e-9:
                     delta_pp = 0.0
                 all_plotted_deltas.append(delta_pp)
@@ -932,7 +940,7 @@ def _build_model_delta_chart(
                 n_sources = len(set(bucket.source_run_ids))
                 metric_word = "similarity" if is_similarity else "round_success"
                 hover.append(
-                    f"{model} · {intervention} · {bucket.phase_label}<br>"
+                    f"{group_label}={group_value} · {intervention} · {bucket.phase_label}<br>"
                     f"Δ {metric_word} = {delta_pp:+.1f} pp<br>"
                     f"n = {n_replicas} replica(s) across {n_sources} source(s)<br>"
                     f"(each replica vs its own source's baseline pool)"
@@ -945,7 +953,7 @@ def _build_model_delta_chart(
                     x=xs,
                     y=ys,
                     mode="lines+markers",
-                    name=f"{intervention} · {model}",
+                    name=f"{intervention} · {group_value}",
                     line=dict(color=colour, width=2.5, dash=dash),
                     marker=dict(color=colour, size=10, symbol="circle"),
                     hovertext=hover,
@@ -975,7 +983,7 @@ def _build_model_delta_chart(
             zerolinewidth=2,
         ),
         legend=dict(
-            title="Model",
+            title=group_label,
             orientation="h",
             yanchor="bottom",
             y=1.02,
@@ -988,20 +996,23 @@ def _build_model_delta_chart(
     return fig
 
 
-def _render_model_delta_table(
+def _render_group_delta_table(
     buckets: dict[tuple[str, str, int], _LineBucket],
     frontend_base: str,
+    group_label: str,
 ) -> None:
-    """One row per (model, intervention, phase): mean Δ + per-replica run links.
+    """One row per (group, intervention, phase): mean Δ + per-replica run links.
 
-    Each delta in a bucket is already source-adjusted (computed against its
-    replica's own source baseline), so the row's ``Mean Δ`` is the unweighted
-    average of those per-replica deltas. ``Sources`` counts how many distinct
-    source runs contributed replicas to this row, and ``Intervention runs``
-    surfaces each replica as a clickable link back to the frontend.
+    ``group_label`` is the dimension name used as the first column header
+    (e.g. ``Model`` or ``Source budget``). Each delta in a bucket is already
+    source-adjusted (computed against its replica's own source baseline), so
+    the row's ``Mean Δ`` is the unweighted average of those per-replica
+    deltas. ``Sources`` counts how many distinct source runs contributed
+    replicas to this row, and ``Intervention runs`` surfaces each replica as
+    a clickable link back to the frontend.
     """
     headers = [
-        "Model",
+        group_label,
         "Intervention",
         "Phase",
         "Replicas (n)",
@@ -1240,34 +1251,45 @@ def render(
         )
 
     st.markdown("---")
-    st.subheader("Overview — Δ intervention vs baseline replicas, grouped by model")
+    group_by_choice = st.radio(
+        label="Group lines by",
+        options=_GROUP_BY_OPTIONS,
+        horizontal=True,
+        key=f"{key_prefix}_overview_group_by",
+    )
+    st.subheader(
+        f"Overview — Δ intervention vs baseline replicas, grouped by {group_by_choice.lower()}"
+    )
+    group_word = group_by_choice.lower()
     if mode == _MODE_MESSAGE_SIMILARITY:
         st.caption(
-            "Metric: **Levenshtein similarity** (link channel). For each (model, phase): "
-            "bar = mean( intervention replica's similarity to the baseline-replica pool ) − "
-            "mean pairwise similarity within the baseline-replica pool ('how similar are "
-            "baselines to each other?'). A **negative** bar means the intervention diverges "
-            "from baseline language more than baselines diverge from each other. Phase A is "
-            "excluded (replicas inherit it verbatim from the source clone)."
+            f"Metric: **Levenshtein similarity** (link channel). For each ({group_word}, "
+            f"phase): point = mean( intervention replica's similarity to the baseline-"
+            f"replica pool ) − mean pairwise similarity within the baseline-replica pool "
+            f"('how similar are baselines to each other?'). **Negative** means the "
+            f"intervention diverges from baseline language more than baselines diverge "
+            f"from each other. Phase A is excluded (replicas inherit it verbatim from "
+            f"the source clone)."
         )
     elif mode == _MODE_NGRAM_OVERLAP:
         st.caption(
-            "Metric: **word-bigram Jaccard overlap** (link channel). For each (model, "
-            "phase): bar = mean( intervention replica's bigram overlap with the baseline-"
-            "replica pool ) − mean pairwise bigram overlap within the baseline-replica "
-            "pool. A **negative** bar means the intervention's vocabulary/phrasing diverges "
-            "from baseline more than baselines diverge from each other. Phase A is "
-            "excluded."
+            f"Metric: **word-bigram Jaccard overlap** (link channel). For each "
+            f"({group_word}, phase): point = mean( intervention replica's bigram overlap "
+            f"with the baseline-replica pool ) − mean pairwise bigram overlap within the "
+            f"baseline-replica pool. **Negative** means the intervention's vocabulary/"
+            f"phrasing diverges from baseline more than baselines diverge from each other. "
+            f"Phase A is excluded."
         )
     else:
         st.caption(
-            "For each (model, phase): bar height = (mean of the **selected** intervention "
-            "replicas' round-success) − (mean of the **baseline** replicas' round-success), "
-            "in percentage points. Baseline replicas are the unmodified resume-at-round runs "
-            "(no knob overrides) from the same sources — they are the control and are always "
-            "used as the reference regardless of the intervention filter. Bars above zero "
-            "mean the intervention outperformed the baseline. Phase A (pre-first-swap rounds) "
-            "is excluded — replicas inherit those rounds verbatim from the source JSONL clone."
+            f"For each ({group_word}, phase): point = (mean of the **selected** "
+            f"intervention replicas' round-success) − (mean of the **baseline** replicas' "
+            f"round-success), in percentage points. Baseline replicas are the unmodified "
+            f"resume-at-round runs (no knob overrides) from the same sources — they are "
+            f"the control and are always used as the reference regardless of the "
+            f"intervention filter. Points above zero mean the intervention outperformed "
+            f"the baseline. Phase A (pre-first-swap rounds) is excluded — replicas "
+            f"inherit those rounds verbatim from the source JSONL clone."
         )
     # `baseline` is the implicit reference pool (always compared against), so it
     # is not offered as a checkbox — surfacing it would let the user compare
@@ -1379,14 +1401,25 @@ def render(
         f"source(s) vs **{baseline_total}** baseline replica(s) (the control: unmodified "
         f"resume-at-round runs with no knob overrides)."
     )
-    buckets = _aggregate_by_model(
+
+    def group_value_for_source(source_id: str, source_run: MultiSwapRun) -> str:
+        if group_by_choice == _GROUP_BY_BUDGET:
+            return _extract_source_budget_label(
+                source_id=source_id, evaluated_by_run_id=evaluated_by_run_id
+            )
+        return source_run.primary_model
+
+    buckets = _aggregate_by_group(
         sources_data=filtered_sources_data,
         baseline_replicas_by_source=baseline_replicas_by_source,
         mode=mode,
+        group_value_for_source=group_value_for_source,
     )
     if not buckets:
         st.info("No post-Phase-A data to aggregate across the selected models.")
         return
-    overview_fig = _build_model_delta_chart(buckets=buckets, mode=mode)
-    st.plotly_chart(overview_fig, width="stretch", key=f"{key_prefix}_model_delta_chart_{mode}")
-    _render_model_delta_table(buckets=buckets, frontend_base=frontend_base)
+    overview_fig = _build_group_delta_chart(buckets=buckets, mode=mode, group_label=group_by_choice)
+    st.plotly_chart(overview_fig, width="stretch", key=f"{key_prefix}_group_delta_chart_{mode}")
+    _render_group_delta_table(
+        buckets=buckets, frontend_base=frontend_base, group_label=group_by_choice
+    )
