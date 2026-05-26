@@ -10,6 +10,7 @@ from streamlit.delta_generator import DeltaGenerator
 from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.event_extractor import load_run_timeline
 from analysis.results_viewer.run_catalog import EvaluatedRun, group_runs_by_day
+from analysis.results_viewer.run_link import run_url
 from analysis.results_viewer.timeline_plot import (
     build_timeline_figure,
     build_value_metrics_figure,
@@ -217,10 +218,12 @@ def _render_selected_run_links(runs: list[EvaluatedRun]) -> None:
     The colour swatch matches the palette colour ``build_timeline_figure`` assigns to the
     same run, so rows line up visually with their lines/dots on the timeline.
     """
-    frontend_base = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    frontend_host = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    group_slug = os.environ.get("FRONTEND_GROUP_SLUG", "local").strip().strip("/")
+    frontend_base = f"{frontend_host}/g/{group_slug}"
     st.markdown("### Selected runs")
     for index, run in enumerate(runs):
-        detail_url = f"{frontend_base}/runs/{run.run_id}"
+        detail_url = run_url(frontend_base=frontend_base, run_id=run.run_id)
         colour = palette_color_for_index(index=index)
         swatch_col, label_col, id_col, link_col = st.columns([0.3, 4, 2, 1])
         swatch_col.markdown(
