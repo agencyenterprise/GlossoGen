@@ -2,6 +2,11 @@
 
 import { OrganizationList } from "@clerk/nextjs";
 
+// `<OrganizationList>` requires a live `<ClerkProvider>`, which doesn't
+// exist during the static-prerender pass at build time. Forcing dynamic
+// rendering skips prerender and renders on every request instead.
+export const dynamic = "force-dynamic";
+
 /**
  * Lands signed-in users who don't have an active organization yet.
  *
