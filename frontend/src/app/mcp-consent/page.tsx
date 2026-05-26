@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 /**
  * Clerk-gated consent page for MCP OAuth flows.
@@ -14,32 +15,43 @@ import { useSearchParams } from "next/navigation";
  * JWT and follows the returned ``redirect_url`` (the OAuth client's
  * callback) so the CLI receives its code + state.
  *
- * Loaded via ``next/dynamic`` with ``ssr: false`` so Clerk hooks never
- * execute server-side.
+ * The body is loaded via ``next/dynamic`` with ``ssr: false`` so Clerk
+ * hooks never execute server-side, and wrapped in ``<Suspense>`` because
+ * ``useSearchParams()`` forces the page out of static prerendering.
  */
 const ConsentClient = dynamic(() => import("./consent-client").then(mod => mod.ConsentClient), {
   ssr: false,
 });
 
-export default function McpConsentPage() {
+function ConsentEntry() {
   const searchParams = useSearchParams();
   const requestId = searchParams.get("request_id");
 
   if (requestId === null || requestId === "") {
     return (
-      <main className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center px-6 py-10">
+      <>
         <h1 className="mb-2 text-2xl font-bold tracking-tight">Invalid consent link</h1>
         <p className="text-sm text-muted-foreground">
           The consent URL is missing its <code>request_id</code> parameter.
         </p>
-      </main>
+      </>
     );
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center px-6 py-10">
+    <>
       <h1 className="mb-4 text-2xl font-bold tracking-tight">Authorize MCP access</h1>
       <ConsentClient requestId={requestId} />
+    </>
+  );
+}
+
+export default function McpConsentPage() {
+  return (
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center px-6 py-10">
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+        <ConsentEntry />
+      </Suspense>
     </main>
   );
 }
