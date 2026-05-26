@@ -24,7 +24,7 @@ from rapidfuzz.distance import Levenshtein
 from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.multi_swap_data import MultiSwapRun, PhaseScore, list_multi_swap_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
-from analysis.results_viewer.run_link import render_frontend_base, run_url
+from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
 
 _REPLICA_DOT_OPACITY = 0.35
 _REPLICA_DOT_SIZE = 6
@@ -91,11 +91,27 @@ class _EffectiveCohort(NamedTuple):
     color_pair_key: _ColorPairKey
 
 
+class _RunRoundEntry(NamedTuple):
+    """One run's per-round success outcomes plus its identity for clickable dots."""
+
+    success: dict[int, bool]
+    run_id: str
+    url: str
+
+
+class _RunProbeEntry(NamedTuple):
+    """One run's per-phase probe drift plus its identity for clickable dots."""
+
+    drift: dict[str, float]
+    run_id: str
+    url: str
+
+
 class _CohortRoundSeries(NamedTuple):
     """Per-round success data for one cohort, plus styling metadata."""
 
     display: str
-    runs: list[dict[int, bool]]
+    runs: list[_RunRoundEntry]
     is_baseline: bool
     color: str
 
@@ -104,7 +120,7 @@ class _CohortProbeSeries(NamedTuple):
     """Per-phase probe drift data for one cohort, plus styling metadata."""
 
     display: str
-    runs: list[dict[str, float]]
+    runs: list[_RunProbeEntry]
     is_baseline: bool
     color: str
 
@@ -317,32 +333,123 @@ def _render_per_run(evaluated: list[EvaluatedRun]) -> None:
     _render_phase_table(multi_swap=multi_swap)
 
 
-def _per_round_success(jsonl_path: Path) -> dict[int, bool]:
-    """Walk one run's JSONL and return ``round_number → success``."""
-    per_round: dict[int, bool] = {}
+_IDLE_TRIGGER = "all_agents_idle"
+
+
+class _FileStatKey(NamedTuple):
+    """Cache invalidation key derived from file size + mtime_ns. Matches the
+    pattern used by ``run_catalog._RunCacheKey``."""
+
+    size: int
+    mtime_ns: int
+
+
+class _RunRoundData(NamedTuple):
+    """Per-run round outcomes extracted from one JSONL pass."""
+
+    success: dict[int, bool]
+    triggers: dict[int, str]
+    simulation_ended: bool
+
+
+def _stat_key(path: Path) -> _FileStatKey | None:
+    """Return ``_FileStatKey`` for ``path``, or ``None`` if it doesn't exist."""
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return None
+    return _FileStatKey(size=stat.st_size, mtime_ns=stat.st_mtime_ns)
+
+
+_ROUND_DATA_CACHE: dict[Path, tuple[_FileStatKey, _RunRoundData]] = {}
+_LABELS_CACHE: dict[Path, tuple[_FileStatKey, frozenset[str]]] = {}
+
+
+def _read_run_labels(labels_path: Path) -> frozenset[str] | None:
+    """Stat-keyed cache of a run's parsed ``labels.json``. Returns ``None``
+    if the file is missing or unparseable. Both ``_gather_cohort`` and
+    ``_discover_cohort_label_sets`` would otherwise re-read every run's
+    labels file on every Streamlit interaction (~6000 reads per render at
+    the current scale)."""
+    key = _stat_key(path=labels_path)
+    if key is None:
+        return None
+    cached = _LABELS_CACHE.get(labels_path)
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    try:
+        labels = frozenset(json.loads(labels_path.read_text()))
+    except (OSError, json.JSONDecodeError):
+        return None
+    _LABELS_CACHE[labels_path] = (key, labels)
+    return labels
+
+
+def _read_run_round_data(jsonl_path: Path) -> _RunRoundData:
+    """Single JSONL pass extracting per-round success, per-round trigger, and
+    the ``simulation_ended`` flag in one read.
+
+    Cached by ``(size, mtime_ns)`` so repeat reads of a stable completed run
+    hit memory; in-flight sims invalidate naturally when the JSONL grows."""
+    key = _stat_key(path=jsonl_path)
+    if key is None:
+        return _RunRoundData(success={}, triggers={}, simulation_ended=False)
+    cached = _ROUND_DATA_CACHE.get(jsonl_path)
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    success: dict[int, bool] = {}
+    triggers: dict[int, str] = {}
+    simulation_ended = False
     with jsonl_path.open() as fh:
         for line in fh:
-            if '"round_result_recorded"' not in line:
+            if (
+                '"round_result_recorded"' not in line
+                and '"round_ended"' not in line
+                and '"simulation_ended"' not in line
+            ):
                 continue
             try:
                 event = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if event.get("event_type") != "round_result_recorded":
-                continue
-            per_round[event["round_number"]] = bool(event["success"])
-    return per_round
+            event_type = event.get("event_type")
+            if event_type == "round_result_recorded":
+                success[event["round_number"]] = bool(event["success"])
+            elif event_type == "round_ended":
+                trigger = event.get("trigger")
+                if isinstance(trigger, str):
+                    triggers[event["round_number"]] = trigger
+            elif event_type == "simulation_ended":
+                simulation_ended = True
+    result = _RunRoundData(success=success, triggers=triggers, simulation_ended=simulation_ended)
+    _ROUND_DATA_CACHE[jsonl_path] = (key, result)
+    return result
 
 
-def _has_simulation_ended(jsonl_path: Path) -> bool:
-    with jsonl_path.open() as fh:
-        for line in fh:
-            if '"simulation_ended"' in line:
-                return True
-    return False
+def _drop_idle_rounds(success: dict[int, bool], triggers: dict[int, str]) -> dict[int, bool]:
+    """Return ``success`` with idle-ended rounds removed so downstream
+    aggregation skips them entirely."""
+    return {r: w for r, w in success.items() if triggers.get(r) != _IDLE_TRIGGER}
 
 
 _PHASE_A_CUTOFF = 11
+_PROBE_DRIFT_CACHE: dict[Path, tuple[_FileStatKey, dict[str, float]]] = {}
+
+
+def _cached_run_drift_from_phase_a(probe_jsonl_path: Path) -> dict[str, float]:
+    """Stat-keyed cache around ``_run_drift_from_phase_a``. The probe JSONL is
+    only ever appended to within a run; once a run is complete, ``(size,
+    mtime_ns)`` is stable, so the Levenshtein similarity computations need to
+    happen only once per process."""
+    key = _stat_key(path=probe_jsonl_path)
+    if key is None:
+        return {}
+    cached = _PROBE_DRIFT_CACHE.get(probe_jsonl_path)
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    result = _run_drift_from_phase_a(probe_jsonl_path=probe_jsonl_path)
+    _PROBE_DRIFT_CACHE[probe_jsonl_path] = (key, result)
+    return result
 
 
 def _run_drift_from_phase_a(probe_jsonl_path: Path) -> dict[str, float]:
@@ -412,12 +519,8 @@ def _gather_cohort(
     robust against any label-shape changes elsewhere."""
     out: list[EvaluatedRun] = []
     for run in evaluated:
-        labels_path = run.run_dir / "labels.json"
-        if not labels_path.exists():
-            continue
-        try:
-            labels = set(json.loads(labels_path.read_text()))
-        except (OSError, json.JSONDecodeError):
+        labels = _read_run_labels(labels_path=run.run_dir / "labels.json")
+        if labels is None:
             continue
         if not required_labels.issubset(labels):
             continue
@@ -426,13 +529,17 @@ def _gather_cohort(
 
 
 def _per_round_rate(
-    cohort: list[dict[int, bool]], total_rounds: int
+    cohort: list[_RunRoundEntry], total_rounds: int
 ) -> tuple[list[float], list[float], list[int]]:
     means: list[float] = []
     ses: list[float] = []
     ns: list[int] = []
     for round_number in range(1, total_rounds + 1):
-        values = [1.0 if run.get(round_number) else 0.0 for run in cohort if round_number in run]
+        values = [
+            1.0 if entry.success[round_number] else 0.0
+            for entry in cohort
+            if round_number in entry.success
+        ]
         if values:
             mean_value = mean(values)
             se_value = stdev(values) / (len(values) ** 0.5) if len(values) > 1 else 0.0
@@ -472,10 +579,10 @@ def _per_phase_round_means(per_round: dict[int, bool]) -> dict[str, float]:
 
 
 def _per_phase_round_success_stats(
-    cohort: list[dict[int, bool]],
+    cohort: list[_RunRoundEntry],
 ) -> tuple[list[float], list[float], list[int]]:
     """Per phase (A/B/C/D): mean of per-run phase means, SE, and N runs."""
-    per_run_phase_means = [_per_phase_round_means(per_round=run) for run in cohort]
+    per_run_phase_means = [_per_phase_round_means(per_round=entry.success) for entry in cohort]
     means: list[float] = []
     ses: list[float] = []
     ns: list[int] = []
@@ -492,14 +599,16 @@ def _per_phase_round_success_stats(
 
 
 def _per_phase_similarity_stats(
-    cohort: list[dict[str, float]],
+    cohort: list[_RunProbeEntry],
 ) -> tuple[list[float], list[float], list[int]]:
     means: list[float] = []
     ses: list[float] = []
     ns: list[int] = []
     for phase in _PHASE_ORDER:
         values = [
-            run[phase] for run in cohort if phase in run and run[phase] == run[phase]  # filter NaN
+            entry.drift[phase]
+            for entry in cohort
+            if phase in entry.drift and entry.drift[phase] == entry.drift[phase]  # filter NaN
         ]
         if values:
             mean_value = mean(values)
@@ -525,12 +634,8 @@ def _discover_cohort_label_sets(
     """
     counts: dict[frozenset[str], int] = defaultdict(int)
     for run in evaluated:
-        labels_path = run.run_dir / "labels.json"
-        if not labels_path.exists():
-            continue
-        try:
-            labels = frozenset(json.loads(labels_path.read_text()))
-        except (OSError, json.JSONDecodeError):
+        labels = _read_run_labels(labels_path=run.run_dir / "labels.json")
+        if labels is None:
             continue
         counts[labels] += 1
     return sorted(
@@ -779,18 +884,20 @@ def _add_replica_scatter_per_round(
     xs: list[float] = []
     ys: list[float] = []
     hover: list[str] = []
+    urls: list[str] = []
     n = len(series.runs)
-    for run_index, per_round in enumerate(series.runs):
+    for run_index, entry in enumerate(series.runs):
         offset = _jittered_offset(
             index=run_index, count=n, amplitude=_REPLICA_JITTER_AMPLITUDE_ROUND
         )
         for round_number in range(1, total_rounds + 1):
-            if round_number not in per_round:
+            if round_number not in entry.success:
                 continue
             xs.append(round_number + offset)
-            ys.append(1.0 if per_round[round_number] else 0.0)
-            outcome = "stabilized" if per_round[round_number] else "lost"
-            hover.append(f"{series.display}<br>round {round_number}: {outcome}")
+            ys.append(1.0 if entry.success[round_number] else 0.0)
+            outcome = "stabilized" if entry.success[round_number] else "lost"
+            hover.append(f"{entry.run_id}<br>round {round_number}: {outcome}<br>click to open ↗")
+            urls.append(entry.url)
     fig.add_trace(
         go.Scatter(
             x=xs,
@@ -804,6 +911,7 @@ def _add_replica_scatter_per_round(
             ),
             hovertext=hover,
             hoverinfo="text",
+            customdata=urls,
             showlegend=False,
         )
     )
@@ -822,18 +930,20 @@ def _add_replica_scatter_per_phase(
     xs: list[float] = []
     ys: list[float] = []
     hover: list[str] = []
+    urls: list[str] = []
     n = len(series.runs)
-    for run_index, per_round in enumerate(series.runs):
+    for run_index, entry in enumerate(series.runs):
         offset = _jittered_offset(
             index=run_index, count=n, amplitude=_REPLICA_JITTER_AMPLITUDE_PHASE
         )
-        phase_means = _per_phase_round_means(per_round=per_round)
+        phase_means = _per_phase_round_means(per_round=entry.success)
         for phase, value in phase_means.items():
             if phase not in phase_x_by_label:
                 continue
             xs.append(phase_x_by_label[phase] + cohort_offset + offset)
             ys.append(value)
-            hover.append(f"{series.display}<br>Phase {phase}: {value:.1%}")
+            hover.append(f"{entry.run_id}<br>Phase {phase}: {value:.1%}<br>click to open ↗")
+            urls.append(entry.url)
     fig.add_trace(
         go.Scatter(
             x=xs,
@@ -847,6 +957,7 @@ def _add_replica_scatter_per_phase(
             ),
             hovertext=hover,
             hoverinfo="text",
+            customdata=urls,
             showlegend=False,
         )
     )
@@ -865,19 +976,23 @@ def _add_replica_scatter_probe_phase(
     xs: list[float] = []
     ys: list[float] = []
     hover: list[str] = []
+    urls: list[str] = []
     n = len(series.runs)
-    for run_index, per_phase in enumerate(series.runs):
+    for run_index, entry in enumerate(series.runs):
         offset = _jittered_offset(
             index=run_index, count=n, amplitude=_REPLICA_JITTER_AMPLITUDE_PHASE
         )
-        for phase, value in per_phase.items():
+        for phase, value in entry.drift.items():
             if phase not in phase_x_by_label:
                 continue
             if value != value:
                 continue
             xs.append(phase_x_by_label[phase] + cohort_offset + offset)
             ys.append(value)
-            hover.append(f"{series.display}<br>Phase {phase}: similarity {value:.3f}")
+            hover.append(
+                f"{entry.run_id}<br>Phase {phase}: similarity {value:.3f}<br>click to open ↗"
+            )
+            urls.append(entry.url)
     fig.add_trace(
         go.Scatter(
             x=xs,
@@ -891,6 +1006,7 @@ def _add_replica_scatter_probe_phase(
             ),
             hovertext=hover,
             hoverinfo="text",
+            customdata=urls,
             showlegend=False,
         )
     )
@@ -1232,6 +1348,15 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
             key="multi_swap_cohort_dots_mode",
         )
     show_dots = dots_mode == _DOTS_VISIBLE
+    exclude_idle = st.checkbox(
+        label=(
+            "Exclude `all_agents_idle` rounds from round-success "
+            "(only count rounds where the engineer committed a procedure)"
+        ),
+        value=False,
+        key="multi_swap_cohort_exclude_idle",
+    )
+    frontend_base = render_frontend_base(streamlit_key="multi_swap_cohort_frontend_base")
 
     if view_mode == _VIEW_PER_ROUND:
         total_rounds = int(
@@ -1258,11 +1383,22 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
     for cohort in effective_cohorts:
         runs = _gather_runs_for_effective_cohort(evaluated=evaluated, cohort=cohort)
         color = colors[cohort.display]
-        round_data: list[dict[int, bool]] = []
+        round_data: list[_RunRoundEntry] = []
         for run in runs:
             jsonl = run.run_dir / f"{run.scenario_name}.jsonl"
-            if jsonl.exists() and _has_simulation_ended(jsonl_path=jsonl):
-                round_data.append(_per_round_success(jsonl_path=jsonl))
+            rd = _read_run_round_data(jsonl_path=jsonl)
+            if not rd.simulation_ended:
+                continue
+            success = rd.success
+            if exclude_idle:
+                success = _drop_idle_rounds(success=success, triggers=rd.triggers)
+            round_data.append(
+                _RunRoundEntry(
+                    success=success,
+                    run_id=run.run_id,
+                    url=run_url(frontend_base=frontend_base, run_id=run.run_id),
+                )
+            )
         round_series.append(
             _CohortRoundSeries(
                 display=cohort.display,
@@ -1271,11 +1407,17 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
                 color=color,
             )
         )
-        probe_data: list[dict[str, float]] = []
+        probe_data: list[_RunProbeEntry] = []
         for run in runs:
             probe_path = run.run_dir / "protocol_probe_responses.jsonl"
             if probe_path.exists():
-                probe_data.append(_run_drift_from_phase_a(probe_jsonl_path=probe_path))
+                probe_data.append(
+                    _RunProbeEntry(
+                        drift=_cached_run_drift_from_phase_a(probe_jsonl_path=probe_path),
+                        run_id=run.run_id,
+                        url=run_url(frontend_base=frontend_base, run_id=run.run_id),
+                    )
+                )
         probe_series.append(
             _CohortProbeSeries(
                 display=cohort.display,
@@ -1301,7 +1443,16 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
         fig_rounds = _build_round_success_chart(
             series_list=round_series, total_rounds=total_rounds, show_dots=show_dots
         )
-    st.plotly_chart(fig_rounds, use_container_width=True, key="multi_swap_cohort_rounds_chart")
+    rounds_event = st.plotly_chart(
+        fig_rounds,
+        use_container_width=True,
+        key="multi_swap_cohort_rounds_chart",
+        on_select="rerun",
+        selection_mode=("points",),
+    )
+    maybe_open_clicked_run(
+        chart_event=rounds_event, session_key="multi_swap_cohort_rounds_last_opened_url"
+    )
 
     st.markdown("---")
     st.subheader("Probe-answer drift from end of Phase A")
@@ -1321,7 +1472,16 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
         "so cutoff=11 means the agent has seen rounds 1–10)."
     )
     fig_sim = _build_phase_similarity_chart(series_list=probe_series, show_dots=show_dots)
-    st.plotly_chart(fig_sim, use_container_width=True, key="multi_swap_cohort_similarity_chart")
+    sim_event = st.plotly_chart(
+        fig_sim,
+        use_container_width=True,
+        key="multi_swap_cohort_similarity_chart",
+        on_select="rerun",
+        selection_mode=("points",),
+    )
+    maybe_open_clicked_run(
+        chart_event=sim_event, session_key="multi_swap_cohort_similarity_last_opened_url"
+    )
 
 
 def render(evaluated: list[EvaluatedRun]) -> None:
