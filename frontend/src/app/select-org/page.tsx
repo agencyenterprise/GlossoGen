@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { OrganizationList } from "@clerk/nextjs";
+import dynamic from "next/dynamic";
 
 /**
  * Lands signed-in users who don't have an active organization yet.
@@ -14,31 +13,39 @@ import { OrganizationList } from "@clerk/nextjs";
  * ``afterCreateOrganizationUrl`` — landing the user on
  * ``/g/<slug>/runs``.
  *
- * The ``mounted`` flag delays rendering ``<OrganizationList>`` until
- * after hydration. Without it, the static-prerender pass (and any
- * production build that doesn't have ``NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY``
- * set as a build arg) errors because ``<OrganizationList>`` requires
- * a live ``<ClerkProvider>`` in the React tree.
+ * Loaded via ``next/dynamic`` with ``ssr: false`` so it is never
+ * rendered server-side. Required because ``<OrganizationList>`` throws
+ * when no live ``<ClerkProvider>`` is in the tree — and during a
+ * production build without ``NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`` set as
+ * a build arg, ``<ClerkProvider>`` is not mounted.
  */
-export default function SelectOrgPage() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+const OrganizationPicker = dynamic(
+  () =>
+    import("@clerk/nextjs").then(mod => {
+      const { OrganizationList } = mod;
+      return {
+        default: function OrganizationPickerInner() {
+          return (
+            <OrganizationList
+              hidePersonal
+              afterSelectOrganizationUrl={org => `/g/${org.slug}/runs`}
+              afterCreateOrganizationUrl={org => `/g/${org.slug}/runs`}
+            />
+          );
+        },
+      };
+    }),
+  { ssr: false }
+);
 
+export default function SelectOrgPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 py-10">
       <h1 className="mb-2 text-2xl font-bold tracking-tight">Choose a study group</h1>
       <p className="mb-6 text-sm text-muted-foreground">
         Pick an existing organization to continue, or create a new one.
       </p>
-      {mounted && (
-        <OrganizationList
-          hidePersonal
-          afterSelectOrganizationUrl={org => `/g/${org.slug}/runs`}
-          afterCreateOrganizationUrl={org => `/g/${org.slug}/runs`}
-        />
-      )}
+      <OrganizationPicker />
     </main>
   );
 }
