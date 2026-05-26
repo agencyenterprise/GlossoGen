@@ -20,6 +20,7 @@ import streamlit.components.v1 as components
 from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.cross_swap_data import CrossSwapRun, list_cross_swap_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
+from analysis.results_viewer.run_link import render_frontend_base, run_url
 from analysis.results_viewer.series_plot import (
     SeriesStats,
     add_mean_trace,
@@ -27,25 +28,6 @@ from analysis.results_viewer.series_plot import (
     jittered_x_linear,
     series_color_map,
 )
-
-
-def _render_frontend_base() -> str:
-    """Text input for the schmidt frontend base URL used to deep-link runs."""
-    raw = st.text_input(
-        label="Frontend base URL (for run links)",
-        value="http://localhost:3000",
-        key="cross_swap_frontend_base",
-        help=(
-            "Click a dot in the chart to open the corresponding swapped or source "
-            "run at `<base>/runs/<scenario>/<run_dir_name>`."
-        ),
-    )
-    return raw.rstrip("/")
-
-
-def _run_url(frontend_base: str, run_id: str) -> str:
-    """Build the per-run frontend URL: ``<base>/runs/<scenario>/<run_dir_name>``."""
-    return f"{frontend_base}/runs/{run_id}"
 
 
 def _scenarios_with_cross_swap_runs(runs: list[CrossSwapRun]) -> list[str]:
@@ -246,7 +228,7 @@ def _window_replica_dots(runs: list[CrossSwapRun], frontend_base: str) -> dict[s
     for run in runs:
         swapped_value = _swapped_window_accuracy(run=run)
         swapped_series = _swapped_series(run=run)
-        swapped_url = _run_url(frontend_base=frontend_base, run_id=run.run_id)
+        swapped_url = run_url(frontend_base=frontend_base, run_id=run.run_id)
         bucket = dots.setdefault(swapped_series, _ReplicaDots([], [], [], []))
         index = counter.get(swapped_series, 0)
         bucket.xs.append(jittered_x_linear(base_x=float(run.round_start), index=index))
@@ -270,7 +252,7 @@ def _window_replica_dots(runs: list[CrossSwapRun], frontend_base: str) -> dict[s
             if source_run_id in seen:
                 continue
             seen.add(source_run_id)
-            url = _run_url(frontend_base=frontend_base, run_id=source_run_id)
+            url = run_url(frontend_base=frontend_base, run_id=source_run_id)
             bucket = dots.setdefault(series, _ReplicaDots([], [], [], []))
             index = counter.get(series, 0)
             bucket.xs.append(jittered_x_linear(base_x=float(run.round_start), index=index))
@@ -605,7 +587,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     if not scenario_runs:
         st.info(f"No cross-swap runs in scenario `{scenario_name}`.")
         return
-    frontend_base = _render_frontend_base()
+    frontend_base = render_frontend_base(streamlit_key="cross_swap_frontend_base")
     pairs = _distinct_source_pairs(runs=scenario_runs)
     chosen_pair = _render_source_pair_selector(pairs=pairs)
     pair_runs = [

@@ -22,6 +22,7 @@ from matplotlib.colors import to_hex
 from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.oss_frontier_data import CellRun, list_oss_frontier_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
+from analysis.results_viewer.run_link import render_frontend_base, run_url
 
 _SUPPORTED_BUDGETS: tuple[int, ...] = (250, 800)
 _BASELINE_CONFIG_KEY = "baseline_oss"
@@ -240,7 +241,7 @@ def _render_runs_table(runs: list[CellRun], frontend_base: str) -> None:
             "rounds": r.total_rounds,
             "round_success": float(r.round_success),
             "perplexity": (float(r.perplexity) if r.perplexity is not None else float("nan")),
-            "run": f"{frontend_base}/runs/{r.run_id}",
+            "run": run_url(frontend_base=frontend_base, run_id=r.run_id),
         }
         for r in rows
     ]
@@ -264,20 +265,6 @@ def _render_runs_table(runs: list[CellRun], frontend_base: str) -> None:
         hide_index=True,
         width="stretch",
     )
-
-
-def _render_frontend_base() -> str:
-    """Text input for the schmidt frontend base URL used for per-run links."""
-    raw = st.text_input(
-        label="Frontend base URL (for run links)",
-        value="http://localhost:3000",
-        key="oss_frontier_frontend_base",
-        help=(
-            "Per-run URLs in the table below link to "
-            "`<base>/runs/<scenario>/<run_dir_name>` on this host."
-        ),
-    )
-    return raw.rstrip("/")
 
 
 def render(evaluated: list[EvaluatedRun]) -> None:
@@ -305,7 +292,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         return
     buckets = _aggregate(runs=runs)
     _render_pivot_table(buckets=buckets, selected_budgets=set(_SUPPORTED_BUDGETS))
-    frontend_base = _render_frontend_base()
+    frontend_base = render_frontend_base(streamlit_key="oss_frontier_frontend_base")
     st.subheader("Per-run scores")
     sel_configs, sel_pms, sel_budgets = _render_runs_filter(runs=runs)
     filtered = [
