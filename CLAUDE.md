@@ -201,8 +201,6 @@ cp .env.example .env
 | `ALLOWED_ORIGINS` | Optional | Comma-separated CORS origins (defaults to `http://localhost:3000`) |
 | `SCHMIDT_RUNS_DIR` | Optional | Directory for simulation run data (defaults to `./runs`) |
 | `OAUTH_ISSUER_URL` | Yes (for MCP) | Public backend URL for MCP OAuth (MCP is disabled if unset) |
-| `PROD_API_URL` | Optional | Target prod server URL for the "Upload to prod" button (button hidden when unset) |
-| `PROD_PASSWORD` | Optional | Bearer password for `PROD_API_URL` (required alongside `PROD_API_URL`) |
 | `SELF_HOSTED_BASE_URLS` | Required for `--provider self-hosted` | JSON object mapping model name → OpenAI-compatible `/v1` base URL. Example: `{"meta-llama/Llama-3.3-70B-Instruct":"https://....modal.run/v1","Qwen/Qwen3-32B":"https://....modal.run/v1"}` |
 | `SELF_HOSTED_API_KEY` | Required for `--provider self-hosted` | Bearer token shared across all entries in `SELF_HOSTED_BASE_URLS` (matches each server's `--api-key`) |
 | `LOG_LEVEL` | Optional | Stdlib logging level for `schmidt` CLI commands and analysis scripts (`DEBUG`/`INFO`/`WARNING`/`ERROR`). Set to `DEBUG` to capture verbatim LLM-judge system prompt, user prompt, and structured-output JSON in stderr. Defaults to `INFO`. |

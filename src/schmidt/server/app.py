@@ -24,8 +24,6 @@ from schmidt.server.mcp.oauth_storage import OAuthStorage
 from schmidt.server.pdf.router import router as pdf_export_router
 from schmidt.server.response_models import HealthResponse, HealthStatus
 from schmidt.server.runs.bundle_router import router as bundle_router
-from schmidt.server.runs.metadata_router import router as metadata_router
-from schmidt.server.runs.prod_upload_router import router as prod_upload_router
 from schmidt.server.runs.router import router as runs_router
 from schmidt.server.scenarios.router import router as scenarios_router
 
@@ -35,8 +33,6 @@ logger = logging.getLogger(__name__)
 
 _oauth_issuer_url = os.environ.get("OAUTH_ISSUER_URL")
 _runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs"))
-_prod_api_url = os.environ.get("PROD_API_URL")
-_prod_password = os.environ.get("PROD_PASSWORD")
 _identity_settings = load_identity_settings()
 
 
@@ -67,12 +63,8 @@ def _parse_allowed_origins() -> list[str]:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Store the configured runs directory, open the DB pool, and start MCP."""
     app.state.runs_dir = _runs_dir
-    app.state.prod_api_url = _prod_api_url
-    app.state.prod_password = _prod_password
     _runs_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Serving runs from: %s", _runs_dir)
-    if _prod_api_url and _prod_password:
-        logger.info("Prod upload target configured: %s", _prod_api_url)
 
     db_pool = await create_pool(database_url=get_database_url(), min_size=1, max_size=10)
     app.state.db_pool = db_pool
@@ -109,8 +101,6 @@ app.add_middleware(
 app.include_router(runs_router)
 app.include_router(pdf_export_router)
 app.include_router(bundle_router)
-app.include_router(metadata_router)
-app.include_router(prod_upload_router)
 app.include_router(scenarios_router)
 app.include_router(clerk_webhook_router)
 
