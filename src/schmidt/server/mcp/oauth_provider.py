@@ -24,12 +24,14 @@ from mcp.server.auth.provider import (
     construct_redirect_uri,
 )
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
+from pydantic import AnyUrl
 
 from schmidt.server.mcp.oauth_storage import (
     ACCESS_TOKEN_LIFETIME,
     AUTHORIZATION_CODE_LIFETIME,
     REFRESH_TOKEN_LIFETIME,
     OAuthStorage,
+    PendingConsentRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,8 +41,10 @@ class SchmidtOAuthProvider:
     """OAuth provider backed by Postgres storage with per-group token binding.
 
     In local mode the active-group resolver always returns the synthetic
-    ``local`` group; in Clerk mode it pulls the chosen group from the
-    Clerk-session-gated consent page (wired up in step 8).
+    ``local`` group; in Clerk mode the user is redirected to a frontend
+    consent page (``{frontend_url}/mcp-consent?request_id=...``) which
+    finalizes the code via :meth:`approve_pending_consent` once the user
+    has signed in via Clerk and chosen a group.
     """
 
     def __init__(
@@ -48,10 +52,12 @@ class SchmidtOAuthProvider:
         storage: OAuthStorage,
         get_local_group_id: Callable[[], UUID],
         is_local_mode: bool,
+        frontend_consent_url: str,
     ) -> None:
         self._storage = storage
         self._get_local_group_id = get_local_group_id
         self._is_local_mode = is_local_mode
+        self._frontend_consent_url = frontend_consent_url
 
     # ------------------------------------------------------------------
     # Client registration
@@ -79,27 +85,80 @@ class SchmidtOAuthProvider:
         """Return a URL the user-agent is redirected to for authentication.
 
         In local mode the code is issued immediately for the local group
-        and the user is redirected straight to the client callback. Clerk
-        mode would redirect to a Clerk-gated consent page; that path lands
-        with step 8.
+        and the user is redirected straight to the client callback. In
+        Clerk mode the request is parked under a ``request_id`` and the
+        user-agent is sent to the frontend consent page where Clerk
+        sign-in + group selection happens; the frontend POSTs back to
+        ``/mcp/consent/approve`` which calls :meth:`approve_pending_consent`.
         """
-        if not self._is_local_mode:
+        if self._is_local_mode:
+            code = await self._create_authorization_code(
+                client=client,
+                params=params,
+                group_id=self._get_local_group_id(),
+            )
+            return construct_redirect_uri(
+                str(params.redirect_uri),
+                code=code.code,
+                state=params.state,
+            )
+
+        request_id = OAuthStorage.generate_token()
+        pending = PendingConsentRequest(
+            request_id=request_id,
+            client_id=client.client_id or "",
+            scopes=params.scopes if params.scopes else [],
+            code_challenge=params.code_challenge,
+            redirect_uri=str(params.redirect_uri),
+            redirect_uri_provided_explicitly=params.redirect_uri_provided_explicitly,
+            resource=params.resource,
+            state=params.state,
+        )
+        await self._storage.save_pending_consent(request=pending)
+        return f"{self._frontend_consent_url}?request_id={request_id}"
+
+    async def approve_pending_consent(
+        self,
+        request_id: str,
+        group_id: UUID,
+    ) -> str:
+        """Materialize an authorization code for a previously parked request.
+
+        Called from the consent router after it has verified the user's
+        Clerk JWT and confirmed membership in the target group. Returns
+        the URL the user-agent should be redirected to (the OAuth client's
+        ``redirect_uri`` with the code + state appended).
+        """
+        pending = await self._storage.load_pending_consent(request_id=request_id)
+        if pending is None:
             raise AuthorizeError(
                 error="access_denied",
-                error_description=(
-                    "Clerk-gated MCP consent is not implemented yet "
-                    "(landing with step 8 of the multi-tenancy rollout)."
-                ),
+                error_description="Consent request expired or already used",
             )
+        client = await self._storage.get_client(client_id=pending.client_id)
+        if client is None:
+            raise AuthorizeError(
+                error="access_denied",
+                error_description=f"Unknown client {pending.client_id}",
+            )
+        params = AuthorizationParams(
+            state=pending.state,
+            scopes=pending.scopes,
+            code_challenge=pending.code_challenge,
+            redirect_uri=AnyUrl(pending.redirect_uri),
+            redirect_uri_provided_explicitly=pending.redirect_uri_provided_explicitly,
+            resource=pending.resource,
+        )
         code = await self._create_authorization_code(
             client=client,
             params=params,
-            group_id=self._get_local_group_id(),
+            group_id=group_id,
         )
+        await self._storage.delete_pending_consent(request_id=request_id)
         return construct_redirect_uri(
-            str(params.redirect_uri),
+            pending.redirect_uri,
             code=code.code,
-            state=params.state,
+            state=pending.state,
         )
 
     async def _create_authorization_code(

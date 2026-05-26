@@ -31,6 +31,7 @@ _CLIENT_SECRET_BYTES = 32
 ACCESS_TOKEN_LIFETIME = 3600  # 1 hour
 REFRESH_TOKEN_LIFETIME = 30 * 24 * 3600  # 30 days
 AUTHORIZATION_CODE_LIFETIME = 600  # 10 minutes
+PENDING_CONSENT_LIFETIME = 600  # 10 minutes
 
 
 class AuthorizationCodeWithGroup(NamedTuple):
@@ -52,6 +53,23 @@ class AccessTokenWithGroup(NamedTuple):
 
     token: AccessToken
     group_id: UUID
+
+
+class PendingConsentRequest(NamedTuple):
+    """OAuth authorization request waiting for Clerk-gated consent.
+
+    Stored by ``authorize()`` in Clerk mode and consumed by the consent
+    approval endpoint once the user has signed in and chosen a group.
+    """
+
+    request_id: str
+    client_id: str
+    scopes: list[str]
+    code_challenge: str
+    redirect_uri: str
+    redirect_uri_provided_explicitly: bool
+    resource: str | None
+    state: str | None
 
 
 class OAuthStorage:
@@ -289,14 +307,86 @@ class OAuthStorage:
             await cur.execute("DELETE FROM refresh_tokens WHERE client_id = %s", (client_id,))
 
     # ------------------------------------------------------------------
+    # Pending OAuth consent requests (Clerk-gated approval)
+    # ------------------------------------------------------------------
+
+    async def save_pending_consent(self, request: PendingConsentRequest) -> None:
+        """Persist a pending consent request waiting for Clerk-gated approval."""
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO pending_oauth_consents
+                    (request_id, client_id, scopes, code_challenge, redirect_uri,
+                     redirect_uri_provided_explicitly, resource, state, expires_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    request.request_id,
+                    request.client_id,
+                    json.dumps(request.scopes),
+                    request.code_challenge,
+                    request.redirect_uri,
+                    request.redirect_uri_provided_explicitly,
+                    request.resource,
+                    request.state,
+                    datetime.now(tz=UTC) + timedelta(seconds=PENDING_CONSENT_LIFETIME),
+                ),
+            )
+
+    async def load_pending_consent(self, request_id: str) -> PendingConsentRequest | None:
+        """Load a pending consent request by ID. Returns None if missing or expired."""
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT request_id, client_id, scopes, code_challenge, redirect_uri,
+                       redirect_uri_provided_explicitly, resource, state, expires_at
+                FROM pending_oauth_consents WHERE request_id = %s
+                """,
+                (request_id,),
+            )
+            row = await cur.fetchone()
+        if row is None:
+            return None
+        expires_at: datetime = row[8]
+        if datetime.now(tz=UTC) > expires_at:
+            await self.delete_pending_consent(request_id=request_id)
+            return None
+        return PendingConsentRequest(
+            request_id=row[0],
+            client_id=row[1],
+            scopes=json.loads(row[2]),
+            code_challenge=row[3],
+            redirect_uri=row[4],
+            redirect_uri_provided_explicitly=bool(row[5]),
+            resource=row[6],
+            state=row[7],
+        )
+
+    async def delete_pending_consent(self, request_id: str) -> None:
+        """Delete a pending consent request (consumed or expired)."""
+        async with self._pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "DELETE FROM pending_oauth_consents WHERE request_id = %s",
+                (request_id,),
+            )
+
+    # ------------------------------------------------------------------
     # Cleanup
     # ------------------------------------------------------------------
 
     async def purge_expired(self) -> int:
-        """Delete all expired tokens and codes. Returns the number of rows deleted."""
+        """Delete all expired tokens, codes, and pending consents.
+
+        Returns the number of rows deleted.
+        """
         total = 0
         async with self._pool.connection() as conn, conn.cursor() as cur:
-            for table in ("authorization_codes", "access_tokens", "refresh_tokens"):
+            for table in (
+                "authorization_codes",
+                "access_tokens",
+                "refresh_tokens",
+                "pending_oauth_consents",
+            ):
                 await cur.execute(
                     f"DELETE FROM {table} WHERE expires_at IS NOT NULL AND expires_at < NOW()"  # noqa: S608
                 )

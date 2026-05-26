@@ -28,6 +28,7 @@ org in place and this check returns 403.
 
 import logging
 import re
+from uuid import UUID
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -51,6 +52,10 @@ _UNAUTHENTICATED_PREFIXES = (
     "/api/clerk/webhook",
     "/.well-known/oauth-",
     "/.well-known/openid-configuration",
+    # MCP routes run their own OAuth auth (FastMCP's auth layer + the
+    # consent_router's inline Clerk JWT verification), so the identity
+    # middleware skips them entirely.
+    "/mcp",
 )
 
 _UNAUTHENTICATED_EXACT = frozenset(
@@ -172,9 +177,12 @@ class ClerkIdentityMiddleware:
         request: Request,
         scope: Scope,
     ) -> JSONResponse | None:
-        """Verify JWT, parse URL slug, validate membership, attach Identity.
+        """Verify JWT or OAuth Bearer, parse URL slug, attach Identity.
 
-        Returns a ``JSONResponse`` on rejection; ``None`` on success.
+        Tries Clerk JWT first; on verification failure falls back to the
+        MCP OAuth access tokens issued via the consent flow. Either path
+        ends with an Identity scoped to the URL's group. Returns a
+        ``JSONResponse`` on rejection; ``None`` on success.
         """
         if self.settings.clerk_jwt_key is None:
             return _unauthorized(
@@ -186,21 +194,35 @@ class ClerkIdentityMiddleware:
         if token is None:
             return _unauthorized(scope=scope, detail="Missing bearer token")
 
-        try:
-            claims = verify_clerk_session_token(
-                token=token,
-                clerk_jwt_key=self.settings.clerk_jwt_key,
-                authorized_parties=self.settings.clerk_authorized_parties,
-            )
-        except InvalidClerkToken as exc:
-            return _unauthorized(scope=scope, detail=str(exc))
-
         url_slug = _extract_group_slug(path=request.url.path)
         if url_slug is None:
             return _forbidden(
                 scope=scope,
                 detail="Authenticated routes must include /g/{group_slug}/ in the path",
             )
+
+        async with request.app.state.db_pool.connection() as conn:
+            group = await get_group_by_slug(conn=conn, slug=url_slug)
+        if group is None:
+            return _not_found(scope=scope, detail=f"Unknown group slug: {url_slug!r}")
+
+        try:
+            claims = verify_clerk_session_token(
+                token=token,
+                clerk_jwt_key=self.settings.clerk_jwt_key,
+                authorized_parties=self.settings.clerk_authorized_parties,
+            )
+        except InvalidClerkToken as clerk_exc:
+            oauth_identity = await self._try_oauth_bearer(
+                request=request,
+                token=token,
+                url_slug=url_slug,
+                expected_group_id=group.id,
+            )
+            if oauth_identity is None:
+                return _unauthorized(scope=scope, detail=str(clerk_exc))
+            request.state.identity = oauth_identity
+            return None
 
         if not _is_active_org(claims=claims, slug=url_slug):
             return _forbidden(
@@ -214,11 +236,6 @@ class ClerkIdentityMiddleware:
                 ),
             )
 
-        async with request.app.state.db_pool.connection() as conn:
-            group = await get_group_by_slug(conn=conn, slug=url_slug)
-        if group is None:
-            return _not_found(scope=scope, detail=f"Unknown group slug: {url_slug!r}")
-
         identity = Identity(
             user_id=claims.user_id,
             active_group_id=group.id,
@@ -228,3 +245,35 @@ class ClerkIdentityMiddleware:
         )
         request.state.identity = identity
         return None
+
+    async def _try_oauth_bearer(
+        self,
+        request: Request,
+        token: str,
+        url_slug: str,
+        expected_group_id: UUID,
+    ) -> Identity | None:
+        """Look up a Bearer as an MCP OAuth access token.
+
+        Returns an Identity scoped to the URL's group when the token is
+        valid AND its bound ``group_id`` matches ``expected_group_id``;
+        returns ``None`` on any failure so the caller can surface the
+        original Clerk error to the user.
+        """
+        oauth_provider = getattr(request.app.state, "oauth_provider", None)
+        if oauth_provider is None:
+            return None
+        try:
+            token_group_id = await oauth_provider.load_access_token_with_group(token=token)
+        except Exception:
+            logger.exception("OAuth access-token lookup failed")
+            return None
+        if token_group_id is None or token_group_id != expected_group_id:
+            return None
+        return Identity(
+            user_id=f"oauth:{token[:8]}",
+            active_group_id=expected_group_id,
+            active_group_slug=url_slug,
+            available_group_ids=frozenset({expected_group_id}),
+            is_local_mode=False,
+        )
