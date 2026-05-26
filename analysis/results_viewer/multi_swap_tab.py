@@ -26,12 +26,20 @@ from analysis.results_viewer.multi_swap_data import MultiSwapRun, PhaseScore, li
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
 
+_REPLICA_DOT_OPACITY = 0.35
+_REPLICA_DOT_SIZE = 6
+_REPLICA_JITTER_AMPLITUDE_ROUND = 0.18
+_REPLICA_JITTER_AMPLITUDE_PHASE = 0.04
 _PHASE_BAR_COLOR = "#4F46E5"
 _DELTA_POSITIVE_COLOR = "#15803D"
 _DELTA_NEGATIVE_COLOR = "#B91C1C"
 _DELTA_ZERO_COLOR = "#475569"
 _COHORT_PALETTE = ["#1E40AF", "#B91C1C", "#15803D", "#7C3AED", "#EA580C"]
+_BASELINE_DOT_PALETTE = ["#93C5FD", "#FCA5A5", "#86EFAC", "#C4B5FD", "#FED7AA"]
 _BASELINE_FALLBACK_COLOR = "#737373"
+_BASELINE_DOT_FALLBACK_COLOR = "#D1D5DB"
+_DOTS_VISIBLE = "Show"
+_DOTS_HIDDEN = "Hide"
 _PHASE_BY_CUTOFF = {11: "A", 21: "B", 31: "C", 41: "D"}
 _PHASE_ORDER = ["A", "B", "C", "D"]
 _PM_SCHEDULE_ALWAYS = "pm_always"
@@ -738,14 +746,168 @@ def _legend_name(display: str, n: int, is_baseline: bool) -> str:
     return f"{display} (n={n})"
 
 
+def _dot_color(line_color: str, is_baseline: bool) -> str:
+    """Pick the replica-dot colour for a cohort. Experiment cohorts use the
+    cohort's full line colour; baseline cohorts use the matching lighter tint
+    from the parallel ``_BASELINE_DOT_PALETTE`` so they read as the same hue
+    but visually distinct from the experiment dots."""
+    if not is_baseline:
+        return line_color
+    if line_color in _COHORT_PALETTE:
+        index = _COHORT_PALETTE.index(line_color)
+        return _BASELINE_DOT_PALETTE[index]
+    return _BASELINE_DOT_FALLBACK_COLOR
+
+
+def _jittered_offset(index: int, count: int, amplitude: float) -> float:
+    """Deterministic small horizontal offset for the ``index``-th replica out of
+    ``count`` so overlapping per-run dots resolve into a visible cloud."""
+    if count <= 1:
+        return 0.0
+    return amplitude * ((index / (count - 1)) - 0.5) * 2.0
+
+
+def _add_replica_scatter_per_round(
+    fig: go.Figure,
+    series: _CohortRoundSeries,
+    total_rounds: int,
+) -> None:
+    """Per-run, per-round dots at y=0 / y=1 with horizontal jitter so 0/1
+    outcomes spread visibly across each integer round tick."""
+    if not series.runs:
+        return
+    xs: list[float] = []
+    ys: list[float] = []
+    hover: list[str] = []
+    n = len(series.runs)
+    for run_index, per_round in enumerate(series.runs):
+        offset = _jittered_offset(
+            index=run_index, count=n, amplitude=_REPLICA_JITTER_AMPLITUDE_ROUND
+        )
+        for round_number in range(1, total_rounds + 1):
+            if round_number not in per_round:
+                continue
+            xs.append(round_number + offset)
+            ys.append(1.0 if per_round[round_number] else 0.0)
+            outcome = "stabilized" if per_round[round_number] else "lost"
+            hover.append(f"{series.display}<br>round {round_number}: {outcome}")
+    fig.add_trace(
+        go.Scatter(
+            x=xs,
+            y=ys,
+            mode="markers",
+            name=f"{series.display} · replicas",
+            marker=dict(
+                color=_dot_color(line_color=series.color, is_baseline=series.is_baseline),
+                size=_REPLICA_DOT_SIZE,
+                opacity=_REPLICA_DOT_OPACITY,
+            ),
+            hovertext=hover,
+            hoverinfo="text",
+            showlegend=False,
+        )
+    )
+
+
+def _add_replica_scatter_per_phase(
+    fig: go.Figure,
+    series: _CohortRoundSeries,
+    phase_x_by_label: dict[str, float],
+    cohort_offset: float,
+) -> None:
+    """Per-run, per-phase dots placed at the cohort's offset phase x-position
+    with small horizontal jitter."""
+    if not series.runs:
+        return
+    xs: list[float] = []
+    ys: list[float] = []
+    hover: list[str] = []
+    n = len(series.runs)
+    for run_index, per_round in enumerate(series.runs):
+        offset = _jittered_offset(
+            index=run_index, count=n, amplitude=_REPLICA_JITTER_AMPLITUDE_PHASE
+        )
+        phase_means = _per_phase_round_means(per_round=per_round)
+        for phase, value in phase_means.items():
+            if phase not in phase_x_by_label:
+                continue
+            xs.append(phase_x_by_label[phase] + cohort_offset + offset)
+            ys.append(value)
+            hover.append(f"{series.display}<br>Phase {phase}: {value:.1%}")
+    fig.add_trace(
+        go.Scatter(
+            x=xs,
+            y=ys,
+            mode="markers",
+            name=f"{series.display} · replicas",
+            marker=dict(
+                color=_dot_color(line_color=series.color, is_baseline=series.is_baseline),
+                size=_REPLICA_DOT_SIZE,
+                opacity=_REPLICA_DOT_OPACITY,
+            ),
+            hovertext=hover,
+            hoverinfo="text",
+            showlegend=False,
+        )
+    )
+
+
+def _add_replica_scatter_probe_phase(
+    fig: go.Figure,
+    series: _CohortProbeSeries,
+    phase_x_by_label: dict[str, float],
+    cohort_offset: float,
+) -> None:
+    """Per-run, per-phase probe-similarity dots at the cohort's offset phase
+    x-position with small horizontal jitter."""
+    if not series.runs:
+        return
+    xs: list[float] = []
+    ys: list[float] = []
+    hover: list[str] = []
+    n = len(series.runs)
+    for run_index, per_phase in enumerate(series.runs):
+        offset = _jittered_offset(
+            index=run_index, count=n, amplitude=_REPLICA_JITTER_AMPLITUDE_PHASE
+        )
+        for phase, value in per_phase.items():
+            if phase not in phase_x_by_label:
+                continue
+            if value != value:
+                continue
+            xs.append(phase_x_by_label[phase] + cohort_offset + offset)
+            ys.append(value)
+            hover.append(f"{series.display}<br>Phase {phase}: similarity {value:.3f}")
+    fig.add_trace(
+        go.Scatter(
+            x=xs,
+            y=ys,
+            mode="markers",
+            name=f"{series.display} · replicas",
+            marker=dict(
+                color=_dot_color(line_color=series.color, is_baseline=series.is_baseline),
+                size=_REPLICA_DOT_SIZE,
+                opacity=_REPLICA_DOT_OPACITY,
+            ),
+            hovertext=hover,
+            hoverinfo="text",
+            showlegend=False,
+        )
+    )
+
+
 def _build_round_success_chart(
     series_list: list[_CohortRoundSeries],
     total_rounds: int,
+    show_dots: bool,
 ) -> go.Figure:
     """Per-round success curve with one line per cohort, ± SE bars + phase shading.
 
     Baseline cohorts render as dashed lines in the same colour as their paired
-    experiment cohort; experiment cohorts render as solid lines.
+    experiment cohort; experiment cohorts render as solid lines. When
+    ``show_dots`` is true, per-run 0/1 outcomes are scattered at each round
+    with light jitter so the underlying distribution is visible behind the
+    means.
     """
     fig = go.Figure()
     phase_spans = [
@@ -766,6 +928,9 @@ def _build_round_success_chart(
             yref="paper",
         )
     rounds = list(range(1, total_rounds + 1))
+    if show_dots:
+        for series in series_list:
+            _add_replica_scatter_per_round(fig=fig, series=series, total_rounds=total_rounds)
     for series in series_list:
         if not series.runs:
             continue
@@ -804,15 +969,28 @@ def _build_round_success_chart(
 
 def _build_round_success_per_phase_chart(
     series_list: list[_CohortRoundSeries],
+    show_dots: bool,
 ) -> go.Figure:
     """Phase-mean round success: one point per (cohort, phase). Baselines
-    render with dashed lines + open markers sharing the experiment colour."""
+    render with dashed lines + open markers sharing the experiment colour.
+    When ``show_dots`` is true, per-run phase means are scattered around each
+    cohort's offset position."""
     fig = go.Figure()
     x_positions = list(range(len(_PHASE_ORDER)))
+    phase_x_by_label = {phase: float(x) for phase, x in zip(_PHASE_ORDER, x_positions)}
     plotted = [series for series in series_list if series.runs]
+    if show_dots:
+        for index, series in enumerate(plotted):
+            offset = (index - (len(plotted) - 1) / 2) * 0.12
+            _add_replica_scatter_per_phase(
+                fig=fig,
+                series=series,
+                phase_x_by_label=phase_x_by_label,
+                cohort_offset=offset,
+            )
     for index, series in enumerate(plotted):
         means, ses, _ = _per_phase_round_success_stats(cohort=series.runs)
-        offset = (index - (len(plotted) - 1) / 2) * 0.06
+        offset = (index - (len(plotted) - 1) / 2) * 0.12
         if series.is_baseline:
             line_style = dict(color=series.color, width=2, dash="dash")
             marker_symbol = "circle-open"
@@ -850,6 +1028,7 @@ def _build_round_success_per_phase_chart(
 
 def _build_phase_similarity_chart(
     series_list: list[_CohortProbeSeries],
+    show_dots: bool,
 ) -> go.Figure:
     """Per-phase probe-answer drift with one series per cohort.
 
@@ -858,7 +1037,17 @@ def _build_phase_similarity_chart(
     """
     fig = go.Figure()
     x_positions = list(range(len(_PHASE_ORDER)))
+    phase_x_by_label = {phase: float(x) for phase, x in zip(_PHASE_ORDER, x_positions)}
     plotted = [series for series in series_list if series.runs]
+    if show_dots:
+        for index, series in enumerate(plotted):
+            offset = (index - (len(plotted) - 1) / 2) * 0.12
+            _add_replica_scatter_probe_phase(
+                fig=fig,
+                series=series,
+                phase_x_by_label=phase_x_by_label,
+                cohort_offset=offset,
+            )
     for index, series in enumerate(plotted):
         means, ses, _ = _per_phase_similarity_stats(cohort=series.runs)
         offset = (index - (len(plotted) - 1) / 2) * 0.12
@@ -1017,7 +1206,7 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
     if auto_added:
         st.caption(f"Auto-paired baselines: {', '.join(auto_added)}")
 
-    control_left, control_right = st.columns(2)
+    control_left, control_mid, control_right = st.columns(3)
     with control_left:
         view_mode = st.radio(
             label="Round-success view",
@@ -1026,7 +1215,7 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
             horizontal=True,
             key="multi_swap_cohort_view_mode",
         )
-    with control_right:
+    with control_mid:
         budget_mode = st.radio(
             label="Budget treatment",
             options=[_BUDGET_SPLIT, _BUDGET_MERGE],
@@ -1034,6 +1223,15 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
             horizontal=True,
             key="multi_swap_cohort_budget_mode",
         )
+    with control_right:
+        dots_mode = st.radio(
+            label="Replica dots",
+            options=[_DOTS_VISIBLE, _DOTS_HIDDEN],
+            index=0,
+            horizontal=True,
+            key="multi_swap_cohort_dots_mode",
+        )
+    show_dots = dots_mode == _DOTS_VISIBLE
 
     if view_mode == _VIEW_PER_ROUND:
         total_rounds = int(
@@ -1095,10 +1293,14 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
     st.markdown("---")
     if view_mode == _VIEW_PER_PHASE:
         st.subheader("Phase-mean round success")
-        fig_rounds = _build_round_success_per_phase_chart(series_list=round_series)
+        fig_rounds = _build_round_success_per_phase_chart(
+            series_list=round_series, show_dots=show_dots
+        )
     else:
         st.subheader("Per-round success curve")
-        fig_rounds = _build_round_success_chart(series_list=round_series, total_rounds=total_rounds)
+        fig_rounds = _build_round_success_chart(
+            series_list=round_series, total_rounds=total_rounds, show_dots=show_dots
+        )
     st.plotly_chart(fig_rounds, use_container_width=True, key="multi_swap_cohort_rounds_chart")
 
     st.markdown("---")
@@ -1118,7 +1320,7 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
         "to the end of phases A/B/C/D respectively (an exclusive round cutoff, "
         "so cutoff=11 means the agent has seen rounds 1–10)."
     )
-    fig_sim = _build_phase_similarity_chart(series_list=probe_series)
+    fig_sim = _build_phase_similarity_chart(series_list=probe_series, show_dots=show_dots)
     st.plotly_chart(fig_sim, use_container_width=True, key="multi_swap_cohort_similarity_chart")
 
 
