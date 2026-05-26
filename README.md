@@ -332,7 +332,7 @@ If the user is not a member of the URL's org, Clerk leaves the previously active
 
 **Tab caveat.** Clerk's session cookie is a singleton per browser, so only one tab's active org is reflected in the cookie at a time. Each tab still activates its own org server-side on navigation (so initial page loads and Server-Component fetches are correct), and the API client uses `getToken()` per request (not the cookie), so foreground tab requests get a token aligned to that tab's URL. Background fetches (cron, service workers) that don't pass through the focused tab can race — there are none in schmidt today.
 
-The MCP endpoint at `/mcp/g/{slug}` uses OAuth 2.0 with PKCE (see MCP Integration below). MCP tokens are bound to a specific group at consent time so every tool call is automatically scoped.
+The MCP endpoint at `/mcp` uses OAuth 2.0 with PKCE (see MCP Integration below). MCP tokens are bound to a specific group at consent time — in local mode the synthetic `local` group, in Clerk mode the user's active org picked on the consent page — so every tool call is automatically scoped.
 
 ### Starting the Servers
 

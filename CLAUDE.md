@@ -255,18 +255,26 @@ The MCP server at `/mcp` uses OAuth 2.0 with PKCE and dynamic client registratio
 - **Disabled**: Leave `OAUTH_ISSUER_URL` unset. The MCP server is not mounted and the `/mcp` endpoint is unavailable.
 
 OAuth configuration:
-- Clients auto-register via `POST /mcp/register` (dynamic client registration, RFC 7591)
-- Authorization uses the code flow with PKCE (RFC 7636) via `GET /mcp/authorize`
-- In **local mode** the authorize endpoint auto-approves to the synthetic `local` group.
-- In **Clerk mode** the authorize endpoint currently raises `access_denied` — Clerk-session-gated MCP consent is not yet wired up. MCP is therefore local-only when Clerk is active.
-- Token exchange at `POST /mcp/token` issues access tokens (1 hour) and refresh tokens (30 days). Each token row carries a `group_id` so every tool call is scoped to the right group via the `RunContext` contextvar primed by `mcp/asgi_context.py`.
-- OAuth metadata is discoverable at `GET /mcp/.well-known/oauth-authorization-server`
-- Token state lives in Postgres (`access_tokens`, `refresh_tokens`, `authorization_codes` tables — migration `0002_oauth_tables`).
+- Clients auto-register via `POST /mcp/register` (dynamic client registration, RFC 7591).
+- Authorization uses the code flow with PKCE (RFC 7636) via `GET /mcp/authorize`.
+- In **local mode** the authorize endpoint auto-approves and binds the issued token to the synthetic `local` group.
+- In **Clerk mode** the authorize endpoint parks the request as a `pending_oauth_consents` row keyed by an opaque `request_id` (migration `0003_pending_oauth_consent`) and redirects the browser to `{FRONTEND_URL}/mcp-consent?request_id=<id>`. The frontend page is gated by Clerk's `proxy.ts` (signs in if needed); when the user has an active org via `organizationSyncOptions` it shows "Approve for <slug>" / "Cancel", otherwise it renders `<OrganizationList>` to pick or create one. Approve POSTs `/mcp/consent/approve` with the user's Clerk JWT — the backend asserts membership via the JWT's active `org_slug` claim, materialises the OAuth code bound to that `group_id`, and returns the OAuth-client redirect URL.
+- Token exchange at `POST /mcp/token` issues access tokens (1 hour) and refresh tokens (30 days). Each row carries a `group_id` so every tool call is scoped via the `RunContext` contextvar primed by `mcp/asgi_context.py`.
+- [`ClerkIdentityMiddleware`](src/schmidt/server/identity/middleware.py) accepts MCP OAuth access tokens as a Bearer fallback on `/api/g/<slug>/...` requests, so the CLI can address REST endpoints with the same token issued for MCP.
+- OAuth metadata is discoverable at `GET /mcp/.well-known/oauth-authorization-server`.
+- Token state lives in Postgres (`access_tokens`, `refresh_tokens`, `authorization_codes`, `pending_oauth_consents`).
+
+CLI surface (uses the same OAuth flow):
+- `schmidt login` — walks the user through the OAuth handshake, stores `{access_token, refresh_token, group_slug}` in `~/.schmidt/credentials.json`. See `src/schmidt/oauth_client.py`.
+- `schmidt whoami` — round-trips through `GET /mcp/whoami` to print the token's bound group.
+- `schmidt push` — bulk-uploads local runs to a configured remote via `/api/g/<slug>/runs/import`. See `src/schmidt/prod_push.py`.
 
 Implementation files:
-- `src/schmidt/server/mcp/oauth_provider.py` — `OAuthAuthorizationServerProvider` implementation
-- `src/schmidt/server/mcp/oauth_storage.py` — Postgres-backed storage for clients, codes, and tokens
-- `src/schmidt/server/mcp/asgi_context.py` — ASGI wrapper that reads the bearer token, resolves its `group_id`, and primes `RunContext` for every tool call
+- `src/schmidt/server/mcp/oauth_provider.py` — `OAuthAuthorizationServerProvider` implementation; `authorize` parks pending requests in Clerk mode and calls `approve_pending_consent` from the consent router.
+- `src/schmidt/server/mcp/consent_router.py` — `POST /mcp/consent/approve` (Clerk JWT auth) and `GET /mcp/whoami` (OAuth token auth).
+- `src/schmidt/server/mcp/oauth_storage.py` — Postgres-backed storage for clients, codes, tokens, and pending consents.
+- `src/schmidt/server/mcp/asgi_context.py` — ASGI wrapper that reads the bearer token, resolves its `group_id`, and primes `RunContext` for every tool call.
+- `frontend/src/app/mcp-consent/` — the consent page (Clerk-gated by `proxy.ts`); `consent-client.tsx` carries the picker + Approve button.
 
 ## MCP Integration
 
@@ -304,7 +312,7 @@ claude mcp add-json schmidt-runs '{"type":"http","url":"<API_URL>/mcp"}'
 }
 ```
 
-Replace `<API_URL>` with the backend URL (e.g. `http://localhost:8000` for local development). The client handles OAuth registration, authorization, and token refresh automatically. In local mode the consent step auto-approves to the synthetic `local` group; in Clerk mode the consent step is not yet implemented, so MCP is local-mode-only for now.
+Replace `<API_URL>` with the backend URL (e.g. `http://localhost:8000` for local development). The client handles OAuth registration, authorization, and token refresh automatically. In local mode the consent step auto-approves to the synthetic `local` group. In Clerk mode the client's browser tab opens the Clerk-gated `/mcp-consent` page — the user signs in (if not already) and clicks Approve to bind the issued token to their active org. See the **MCP OAuth 2.0 Authentication** section above for the full flow.
 
 ## Deployment
 

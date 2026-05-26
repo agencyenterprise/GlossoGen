@@ -28,8 +28,11 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 | API Client          | openapi-fetch with generated types from OpenAPI schema       |
 | Data Fetching       | TanStack React Query                                         |
 | MCP Runs API        | FastMCP mounted at `/mcp` on the FastAPI server (Streamable HTTP) |
-| MCP Authentication  | OAuth 2.0 with PKCE and dynamic client registration (MCP library built-in) |
-| MCP Token Storage   | SQLite via aiosqlite (`$SCHMIDT_RUNS_DIR/oauth.db`)              |
+| MCP Authentication  | OAuth 2.0 with PKCE and dynamic client registration (MCP library built-in); Clerk-gated consent page in Clerk mode, auto-approval in local mode |
+| MCP Token Storage   | Postgres (`access_tokens`, `refresh_tokens`, `authorization_codes`, `pending_oauth_consents`) |
+| Tenancy             | One Clerk organization = one `groups` row. Every run is owned by exactly one group; URL slug `/g/<slug>/` is the source of truth |
+| Identity Layer      | `ClerkIdentityMiddleware` (ASGI) validates a Clerk JWT *or* an MCP OAuth token and asserts the bearer's active org matches the URL slug |
+| Tenancy Storage     | Postgres via psycopg3 async + alembic migrations (raw SQL `op.execute(...)`) — no SQLAlchemy in app code |
 
 
 
@@ -521,17 +524,18 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 
 ### Architecture
 
-- The server reads from the `runs/` directory at request time (no database).
-- `SCHMIDT_RUNS_DIR` environment variable configures the runs root directory.
-- CORS origins are read from the `ALLOWED_ORIGINS` environment variable (comma-separated). Defaults to `http://localhost:3000`.
-- Optional shared-password authentication via `APP_PASSWORD` environment variable. A pure ASGI middleware (`password_auth_middleware.py`) checks `Authorization: Bearer` headers and `?token=` query parameters (for SSE EventSource connections). All REST endpoints except `GET /api/health` are protected when enabled. The `/mcp` path and OAuth well-known endpoints are excluded from password auth — the MCP server uses its own OAuth-based authentication.
+- Postgres holds tenancy + the runs index (`groups`, `runs`, `user_last_active_group`, OAuth tables). Run bodies (JSONL event log, manifests, eval reports) stay on disk under `SCHMIDT_RUNS_DIR`. A request resolves a run via the DB lookup keyed on `(group_id, scenario, run_dir_name)` and only then opens files on disk; cross-tenant access is structurally impossible because the DB query is the gate.
+- `DATABASE_URL` is required; the backend will not boot without it. Migrations run via `alembic upgrade head` at container start (Railway start command) before the server begins accepting requests.
+- `SCHMIDT_RUNS_DIR` configures the on-disk runs root.
+- CORS origins are read from `ALLOWED_ORIGINS` (comma-separated). Defaults to `http://localhost:3000`.
+- Authentication is handled by `ClerkIdentityMiddleware` (pure ASGI, so SSE streams pass through without buffering). It accepts either a Clerk JWT or — as a fallback — an MCP OAuth access token, then attaches an `Identity(user_id, active_group_id, active_group_slug, ...)` to `request.state`. See [Multi-Tenancy & Authentication](#multi-tenancy--authentication).
 - Every endpoint declares a `response_model` and returns a Pydantic model instance. No dicts or strings are returned.
 - Status-like fields use enums (`HealthStatus`, `RunStatus`) instead of bare strings. `RunStatus` includes `IN_PROGRESS` for runs that have not yet completed.
 - The run detail endpoint returns separate `messages` (ChannelMessage) and `reasoning` (ReasoningEntry) arrays, plus `debug_logs` (DebugLogEntry) parsed from the debug JSONL file.
 
 ### MCP Runs Browser
 
-An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data and run launch flows for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport, mounted via `app.mount("/mcp", mcp.streamable_http_app())`. Requires `OAUTH_ISSUER_URL` to be set; the MCP endpoint is disabled if unset.
+An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data and run launch flows for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport; the sub-app is wrapped by `McpRunContextMiddleware` ([`server/mcp/asgi_context.py`](src/schmidt/server/mcp/asgi_context.py)) which reads the bearer token, recovers the bound `group_id` from the OAuth storage, and primes a `RunContext` contextvar so every tool runs scoped to that group. Requires `OAUTH_ISSUER_URL` to be set; the MCP endpoint is disabled if unset.
 
 The MCP server exposes eight tools:
 

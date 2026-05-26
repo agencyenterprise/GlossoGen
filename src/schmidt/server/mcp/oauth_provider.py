@@ -6,8 +6,13 @@ code, access token, and refresh token is bound to a ``group_id`` at consent
 time; the binding is preserved through every exchange and refresh.
 
 Local mode (``CLERK_SECRET_KEY`` unset) auto-approves consent and binds
-issued tokens to the synthetic ``local`` group. The Clerk-session-gated
-consent UI ships with step 8 of the multi-tenancy rollout.
+issued tokens to the synthetic ``local`` group. Clerk mode parks the
+request as a ``pending_oauth_consents`` row keyed by an opaque
+``request_id`` and redirects the browser to
+``{FRONTEND_URL}/mcp-consent?request_id=<id>``; the frontend page POSTs
+back to ``/mcp/consent/approve`` once the user has signed in and picked
+the target group, and that endpoint calls back into
+:meth:`approve_pending_consent` to mint the authorization code.
 """
 
 import logging
