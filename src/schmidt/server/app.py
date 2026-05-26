@@ -19,6 +19,7 @@ from schmidt.server.identity.middleware import ClerkIdentityMiddleware
 from schmidt.server.identity.settings import load_identity_settings
 from schmidt.server.identity.webhook_router import router as clerk_webhook_router
 from schmidt.server.mcp.browser import mount_mcp_browser
+from schmidt.server.mcp.consent_router import router as mcp_consent_router
 from schmidt.server.mcp.oauth_provider import SchmidtOAuthProvider
 from schmidt.server.mcp.oauth_storage import OAuthStorage
 from schmidt.server.pdf.router import router as pdf_export_router
@@ -34,6 +35,23 @@ logger = logging.getLogger(__name__)
 _oauth_issuer_url = os.environ.get("OAUTH_ISSUER_URL")
 _runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs"))
 _identity_settings = load_identity_settings()
+
+
+def _resolve_frontend_url() -> str:
+    """Pick the frontend base URL used for OAuth consent redirects.
+
+    Reads ``FRONTEND_URL`` directly, then falls back to the first entry of
+    ``ALLOWED_ORIGINS``, then to the local-dev default ``http://localhost:3000``.
+    """
+    explicit = os.environ.get("FRONTEND_URL", "").strip()
+    if explicit:
+        return explicit.rstrip("/")
+    origins_raw = os.environ.get("ALLOWED_ORIGINS", "")
+    for candidate in origins_raw.split(","):
+        cleaned = candidate.strip()
+        if cleaned:
+            return cleaned.rstrip("/")
+    return "http://localhost:3000"
 
 
 class _StubSessionManager:
@@ -69,6 +87,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     db_pool = await create_pool(database_url=get_database_url(), min_size=1, max_size=10)
     app.state.db_pool = db_pool
     app.state.local_group_id = await ensure_local_group(pool=db_pool)
+    app.state.identity_settings = _identity_settings
     if _identity_settings.is_local_mode:
         logger.info("Running in local mode (CLERK_SECRET_KEY unset)")
     else:
@@ -111,12 +130,15 @@ _oauth_storage: OAuthStorage | None = None
 if _oauth_issuer_url is not None:
     _oauth_storage = OAuthStorage(get_pool=lambda: app.state.db_pool)
     _mcp_issuer_url = f"{_oauth_issuer_url}/mcp"
+    _frontend_consent_url = f"{_resolve_frontend_url()}/mcp-consent"
     _oauth_provider = SchmidtOAuthProvider(
         storage=_oauth_storage,
         get_local_group_id=lambda: app.state.local_group_id,
         is_local_mode=_identity_settings.is_local_mode,
+        frontend_consent_url=_frontend_consent_url,
     )
     app.state.oauth_provider = _oauth_provider
+    app.include_router(mcp_consent_router)
 
     mount_mcp_browser(
         app=app,

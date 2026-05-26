@@ -58,7 +58,9 @@ from schmidt.models.event import (
     SimulationEvent,
     SimulationStarted,
 )
+from schmidt.oauth_client import CREDENTIALS_PATH, run_login
 from schmidt.port_allocator import find_free_port
+from schmidt.prod_push import PushSpec, run_push_to_prod
 from schmidt.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from schmidt.replace_agent import replace_agent_in_run
 from schmidt.replace_manifest import read_replace_manifest
@@ -454,6 +456,97 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    login_parser = subparsers.add_parser(
+        "login",
+        help=(
+            "Authenticate the CLI against a remote schmidt server via OAuth 2.0 "
+            "PKCE. Opens a browser to the Clerk-gated consent page; the CLI's "
+            "loopback server collects the code and writes the resulting tokens "
+            "to ~/.schmidt/credentials.json."
+        ),
+    )
+    login_parser.add_argument(
+        "--url",
+        dest="url",
+        type=str,
+        required=True,
+        help=(
+            "Base URL of the schmidt backend to authenticate against "
+            "(e.g. https://schmidtsciencesapi.up.railway.app)."
+        ),
+    )
+    login_parser.add_argument(
+        "--timeout",
+        dest="timeout_seconds",
+        type=float,
+        default=300.0,
+        help="Seconds to wait for the OAuth callback before aborting (default: 300).",
+    )
+
+    push_parser = subparsers.add_parser(
+        "push-to-prod",
+        help=(
+            "Walk the local runs directory, diff against the remote schmidt "
+            "server (filtered by label + has-report), and POST each missing "
+            "run's bundle to /api/g/{slug}/runs/import using the OAuth token "
+            "from `schmidt login`."
+        ),
+    )
+    push_parser.add_argument(
+        "--runs-dir",
+        dest="runs_dir",
+        type=str,
+        default="./runs",
+        help="Root directory of local runs (default: ./runs).",
+    )
+    push_parser.add_argument(
+        "--label",
+        dest="labels",
+        action="append",
+        default=[],
+        help=(
+            "Require the run's labels.json to contain this label. Repeatable; "
+            "all listed labels must be present (AND semantics)."
+        ),
+    )
+    push_parser.add_argument(
+        "--scenario",
+        dest="scenarios",
+        action="append",
+        default=[],
+        help=(
+            "Restrict to runs of this scenario (repeatable, OR semantics). "
+            "When omitted, every scenario directory is considered."
+        ),
+    )
+    push_parser.add_argument(
+        "--include-incomplete",
+        dest="include_incomplete",
+        action="store_true",
+        help=(
+            "Sync runs even when their <scenario>_report.json is missing. "
+            "Off by default — completed runs (those with an eval report) are "
+            "the safe set to sync."
+        ),
+    )
+    push_parser.add_argument(
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        help="Print the diff (what would be uploaded) without sending bytes.",
+    )
+    push_parser.add_argument(
+        "--concurrency",
+        dest="concurrency",
+        type=int,
+        default=1,
+        help=(
+            "Max concurrent uploads (default 1, hard-capped at 4). The export "
+            "side holds the bundle bytes in memory, so high concurrency can "
+            "overwhelm the laptop on bundles that are still large."
+        ),
+    )
+
     return parser
 
 
@@ -491,6 +584,16 @@ def main() -> None:
     if known_args.command == "resume-at-round":
         args = parser.parse_args()
         asyncio.run(_run_resume_at_round(args=args))
+        return
+
+    if known_args.command == "login":
+        args = parser.parse_args()
+        asyncio.run(_run_login(args=args))
+        return
+
+    if known_args.command == "push-to-prod":
+        args = parser.parse_args()
+        asyncio.run(_run_push_to_prod(args=args))
         return
 
     scenario_cls = get_scenario_class(name=known_args.scenario_name)
@@ -1232,3 +1335,43 @@ async def _build_cross_run_resume_state(
             cross_run_info.replaced_agent_id: cross_run_info.channel_visibility,
         },
     )
+
+
+async def _run_login(args: argparse.Namespace) -> None:
+    """Drive the ``schmidt login`` subcommand."""
+    try:
+        credentials = await run_login(
+            issuer_url=args.url,
+            timeout_seconds=args.timeout_seconds,
+        )
+    except Exception as exc:
+        logger.exception("Login failed")
+        raise SystemExit(f"Login failed: {exc}") from exc
+    print(
+        f"Logged in to {credentials.issuer_url} as group "
+        f"{credentials.group_slug!r}. "
+        f"Credentials saved to {CREDENTIALS_PATH}."
+    )
+
+
+async def _run_push_to_prod(args: argparse.Namespace) -> None:
+    """Drive the ``schmidt push-to-prod`` subcommand."""
+    concurrency = max(1, min(int(args.concurrency), 4))
+    scenarios_arg: list[str] = args.scenarios
+    scenarios = frozenset(scenarios_arg) if scenarios_arg else None
+    spec = PushSpec(
+        runs_dir=Path(args.runs_dir),
+        labels=frozenset(args.labels),
+        scenarios=scenarios,
+        require_report=not args.include_incomplete,
+        dry_run=args.dry_run,
+        concurrency=concurrency,
+    )
+    tally = await run_push_to_prod(spec=spec)
+    print(
+        f"Done. uploaded={len(tally.uploaded)}  "
+        f"skipped={len(tally.skipped)}  "
+        f"failed={len(tally.failed)}"
+    )
+    if tally.failed:
+        raise SystemExit(1)

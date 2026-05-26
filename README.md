@@ -371,7 +371,7 @@ Click the **MCP** button on the runs page for connection instructions, or config
 claude mcp add-json schmidt-runs '{"type":"http","url":"http://localhost:8000/mcp"}'
 ```
 
-No auth headers needed — the client discovers OAuth metadata and handles registration, authorization, and token refresh automatically. In local mode the consent step auto-approves to the synthetic `local` group; the Clerk-mode equivalent (session-gated consent + per-group MCP URL) is not yet wired, so MCP is local-only when Clerk is active.
+No auth headers needed — the client discovers OAuth metadata and handles registration, authorization, and token refresh automatically. In local mode the consent step auto-approves to the synthetic `local` group; in Clerk mode the backend parks the authorization request and redirects the browser to the frontend at `/mcp-consent?request_id=...`, where Clerk forces sign-in and the user picks which organization to authorize. The frontend POSTs back to `/mcp/consent/approve` with a fresh Clerk JWT; the backend resolves the active org to a group, mints the authorization code bound to that `group_id`, and redirects the browser to the OAuth client's callback. Every subsequent MCP tool call is automatically scoped to the chosen group.
 
 Available tools:
 - `list_scenarios`
@@ -387,6 +387,31 @@ Typical MCP run-start workflow:
 1. `get_knobs_schema` to inspect available fields and preset names.
 2. `get_knobs_preset` to load a baseline config.
 3. `start_run` with the selected model/provider and final knobs payload.
+
+### Pushing local runs to a remote schmidt server
+
+The same OAuth flow that issues MCP tokens also gives the CLI a way to push local run bundles to a deployed (Clerk-protected) backend. The CLI calls the remote's existing `/api/g/{slug}/runs/import` REST endpoint — there's no separate prod-upload server-side feature.
+
+```bash
+# 1. One-time: sign in to the deployed backend. Opens your browser to the
+#    Clerk-gated consent page; pick your org, approve, the CLI's loopback
+#    server collects the code and writes ~/.schmidt/credentials.json (0600).
+schmidt login --url https://schmidtsciencesapi.up.railway.app
+
+# 2. Diff local runs against prod and upload anything missing. Filters by
+#    label (AND) and by report-present (so crashed runs are skipped). The
+#    remote import endpoint is idempotent on run_id, so re-running is safe.
+schmidt push-to-prod --label baseline --runs-dir ./runs
+```
+
+Useful flags:
+- `--scenario <name>` (repeatable) restricts to specific scenarios.
+- `--label <label>` (repeatable, AND) requires the run's `labels.json` to contain every listed label.
+- `--include-incomplete` allows pushing runs that don't have a `<scenario>_report.json` yet.
+- `--dry-run` prints the diff without sending bytes.
+- `--concurrency N` (default 1, capped at 4) parallelizes uploads. Keep this small — each upload holds the bundle bytes in memory, and the export side iterates the run directory.
+
+The middleware accepts the MCP OAuth Bearer for both `/mcp/*` tool calls and `/api/g/{slug}/...` REST calls, so the same token works for browsing in Claude Code and pushing from the CLI.
 
 ## Scenarios
 
