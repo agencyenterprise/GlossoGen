@@ -330,10 +330,10 @@ def _run_drift_from_phase_a(probe_jsonl_path: Path) -> dict[str, float]:
 
 
 def _gather_cohort(
-    evaluated: list[EvaluatedRun], label: str, exclude_label: str | None
+    evaluated: list[EvaluatedRun], required_labels: frozenset[str]
 ) -> list[EvaluatedRun]:
-    """Filter ``evaluated`` to runs whose labels.json contains ``label`` and
-    NOT ``exclude_label``. Reads labels.json directly so the cohort filter is
+    """Filter ``evaluated`` to runs whose labels.json is a superset of
+    ``required_labels``. Reads labels.json directly so the cohort filter is
     robust against any label-shape changes elsewhere."""
     out: list[EvaluatedRun] = []
     for run in evaluated:
@@ -341,12 +341,10 @@ def _gather_cohort(
         if not labels_path.exists():
             continue
         try:
-            labels = json.loads(labels_path.read_text())
+            labels = set(json.loads(labels_path.read_text()))
         except (OSError, json.JSONDecodeError):
             continue
-        if label not in labels:
-            continue
-        if exclude_label is not None and exclude_label in labels:
+        if not required_labels.issubset(labels):
             continue
         out.append(run)
     return out
@@ -394,20 +392,35 @@ def _per_phase_similarity_stats(
     return means, ses, ns
 
 
-def _discover_cohort_labels(evaluated: list[EvaluatedRun]) -> list[str]:
-    """Return every distinct label that appears on ≥2 evaluated runs."""
-    counts: dict[str, int] = defaultdict(int)
+def _discover_cohort_label_sets(
+    evaluated: list[EvaluatedRun],
+) -> list[tuple[frozenset[str], int]]:
+    """Return distinct frozen label-sets seen on ≥2 evaluated runs, with their counts.
+
+    Each returned `(labels, count)` tuple represents a natural cohort defined
+    by the full labels.json content. Runs with identical label-sets share a
+    cohort; runs with different label-sets belong to different cohorts.
+    Sorted by count descending then label-set string for stable display.
+    """
+    counts: dict[frozenset[str], int] = defaultdict(int)
     for run in evaluated:
         labels_path = run.run_dir / "labels.json"
         if not labels_path.exists():
             continue
         try:
-            labels = json.loads(labels_path.read_text())
+            labels = frozenset(json.loads(labels_path.read_text()))
         except (OSError, json.JSONDecodeError):
             continue
-        for lbl in labels:
-            counts[lbl] += 1
-    return sorted([lbl for lbl, n in counts.items() if n >= 2])
+        counts[labels] += 1
+    return sorted(
+        [(labels, n) for labels, n in counts.items() if n >= 2],
+        key=lambda item: (-item[1], _label_set_display(item[0])),
+    )
+
+
+def _label_set_display(labels: frozenset[str]) -> str:
+    """Stable human-readable joined label-set for a cohort."""
+    return " + ".join(sorted(labels))
 
 
 def _build_round_success_chart(
@@ -508,23 +521,28 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
         "defines one cohort; the two charts overlay all selected cohorts on "
         "shared axes for direct comparison."
     )
-    cohort_labels = _discover_cohort_labels(evaluated=evaluated)
-    if not cohort_labels:
-        st.info("No cohort labels found (need ≥2 runs sharing a label).")
+    cohort_label_sets = _discover_cohort_label_sets(evaluated=evaluated)
+    if not cohort_label_sets:
+        st.info("No cohort label-sets found (need ≥2 runs sharing the exact same labels.json).")
         return
-    default_labels = [
-        lbl
-        for lbl in ("multi_swap_baseline", "multi_swap_baseline_postmortem_on")
-        if lbl in cohort_labels
-    ] or cohort_labels[:2]
-    selected = st.multiselect(
-        label="Cohorts (one per label)",
-        options=cohort_labels,
-        default=default_labels,
+    display_to_labels: dict[str, frozenset[str]] = {
+        _label_set_display(labels): labels for labels, _ in cohort_label_sets
+    }
+    options = sorted(display_to_labels.keys())
+    default_displays = [
+        d
+        for d in options
+        if "multi_swap_baseline" in display_to_labels[d]
+        or "multi_swap_baseline_postmortem_on" in display_to_labels[d]
+    ] or options[:2]
+    selected_displays = st.multiselect(
+        label="Cohorts (each = a distinct labels.json on ≥2 runs)",
+        options=options,
+        default=default_displays,
         key="multi_swap_cohort_picker",
     )
-    if not selected:
-        st.info("Select at least one cohort label.")
+    if not selected_displays:
+        st.info("Select at least one cohort.")
         return
     total_rounds = int(
         st.number_input(
@@ -541,18 +559,10 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
     cohort_round_data: list[tuple[str, list[dict[int, bool]]]] = []
     cohort_probe_data: list[tuple[str, list[dict[str, float]]]] = []
     cohort_run_lists: dict[str, list[EvaluatedRun]] = {}
-    for label in selected:
-        # Find label-exclusivity: if `multi_swap_baseline` is selected and
-        # `multi_swap_baseline_postmortem_on` exists as a separate cohort, we
-        # need to exclude the latter from the former's filter (since
-        # `multi_swap_baseline` is a substring/superset label).
-        exclude = None
-        for other in selected:
-            if other != label and other.startswith(label):
-                exclude = other
-                break
-        runs = _gather_cohort(evaluated=evaluated, label=label, exclude_label=exclude)
-        cohort_run_lists[label] = runs
+    for display in selected_displays:
+        required_labels = display_to_labels[display]
+        runs = _gather_cohort(evaluated=evaluated, required_labels=required_labels)
+        cohort_run_lists[display] = runs
 
         # Round-success: read JSONL for each run that has simulation_ended
         round_data: list[dict[int, bool]] = []
@@ -560,7 +570,7 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
             jsonl = run.run_dir / f"{run.scenario_name}.jsonl"
             if jsonl.exists() and _has_simulation_ended(jsonl_path=jsonl):
                 round_data.append(_per_round_success(jsonl_path=jsonl))
-        cohort_round_data.append((label, round_data))
+        cohort_round_data.append((display, round_data))
 
         # Probe drift-from-Phase-A: read protocol_probe_responses.jsonl directly
         probe_data: list[dict[str, float]] = []
@@ -568,12 +578,12 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
             probe_path = run.run_dir / "protocol_probe_responses.jsonl"
             if probe_path.exists():
                 probe_data.append(_run_drift_from_phase_a(probe_jsonl_path=probe_path))
-        cohort_probe_data.append((label, probe_data))
+        cohort_probe_data.append((display, probe_data))
 
     # Summary table of cohort sizes
     summary_rows = []
-    for label in selected:
-        runs = cohort_run_lists[label]
+    for display in selected_displays:
+        runs = cohort_run_lists[display]
         round_n = len(
             [
                 r
@@ -585,7 +595,7 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
         probe_n = sum(1 for r in runs if (r.run_dir / "protocol_probe_responses.jsonl").exists())
         summary_rows.append(
             {
-                "Cohort": label,
+                "Cohort": display,
                 "Total runs": len(runs),
                 "Finished (in round-success chart)": round_n,
                 "With probes (in similarity chart)": probe_n,
