@@ -219,7 +219,7 @@ def _render_frequency_section(
         margin={"l": 40, "r": 20, "t": 20, "b": 120},
     )
     fig.update_xaxes(tickangle=-45)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.caption(f"n_cohort = {len(runs)} runs · ontology version `{ontology.version}`")
 
     _render_justifications_by_category(
@@ -383,7 +383,7 @@ def _render_outcomes_section(
             height=400,
             margin={"l": 40, "r": 20, "t": 20, "b": 40},
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         st.caption(
             f"A: {fraction_a:.2%} ({len(cohort_a)}/{len(runs)}) · "
             f"B: {fraction_b:.2%} ({len(cohort_b)}/{len(runs)}) · "
@@ -517,7 +517,7 @@ def _render_lookup_section(
         height=max(360, 28 * len(category_rows)),
         margin={"l": 220, "r": 20, "t": 20, "b": 40},
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     st.markdown("### Justifications")
     for cat in category_rows:

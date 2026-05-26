@@ -230,7 +230,7 @@ def _render_phase_table(multi_swap: MultiSwapRun) -> None:
             }
         )
         previous = phase
-    st.dataframe(rows, hide_index=True, use_container_width=True)
+    st.dataframe(rows, hide_index=True, width="stretch")
 
 
 def _render_round_strip(multi_swap: MultiSwapRun) -> None:
@@ -288,7 +288,7 @@ def _render_round_strip(multi_swap: MultiSwapRun) -> None:
         yaxis=dict(visible=False, range=[0, 1.1]),
         bargap=0.05,
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def _run_picker_label(multi_swap: MultiSwapRun) -> str:
@@ -327,7 +327,7 @@ def _render_per_run(evaluated: list[EvaluatedRun]) -> None:
     multi_swap = options[chosen_label]
     target_url = run_url(frontend_base=frontend_base, run_id=multi_swap.run_id)
     st.markdown(f"[Open run in frontend ↗]({target_url})")
-    st.plotly_chart(_build_phase_chart(multi_swap=multi_swap), use_container_width=True)
+    st.plotly_chart(_build_phase_chart(multi_swap=multi_swap), width="stretch")
     _render_round_strip(multi_swap=multi_swap)
     st.markdown("**Phase breakdown**")
     _render_phase_table(multi_swap=multi_swap)
@@ -1445,7 +1445,7 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
         )
     rounds_event = st.plotly_chart(
         fig_rounds,
-        use_container_width=True,
+        width="stretch",
         key="multi_swap_cohort_rounds_chart",
         on_select="rerun",
         selection_mode=("points",),
@@ -1474,7 +1474,7 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
     fig_sim = _build_phase_similarity_chart(series_list=probe_series, show_dots=show_dots)
     sim_event = st.plotly_chart(
         fig_sim,
-        use_container_width=True,
+        width="stretch",
         key="multi_swap_cohort_similarity_chart",
         on_select="rerun",
         selection_mode=("points",),
