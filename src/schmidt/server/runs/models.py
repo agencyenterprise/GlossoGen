@@ -1,12 +1,10 @@
 """Pydantic response models for simulation run endpoints and SSE event schemas."""
 
 from datetime import datetime
-from enum import Enum
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Discriminator
+from pydantic import BaseModel, Discriminator
 
-from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 from schmidt.models.event import RunStatus
 from schmidt.server.response_models import LaunchStatus
 from schmidt.server.runs.run_detail_types import AgentDetail, ChannelMessage
@@ -409,62 +407,6 @@ class ImportBundleResponse(BaseModel):
     run_id: str
     scenario_name: str
     run_dir: str
-
-
-# ---------------------------------------------------------------------------
-# Prod upload models
-# ---------------------------------------------------------------------------
-
-
-class ProdUploadStatusResponse(BaseModel):
-    """Whether prod upload is configured on this server."""
-
-    configured: bool
-    prod_url: str | None
-
-
-class ProdUploadOutcome(str, Enum):
-    """Outcome of a single-run prod upload."""
-
-    UPLOADED = "uploaded"
-    ALREADY_PRESENT = "already_present"
-    OVERRIDDEN = "overridden"
-
-
-class ProdUploadResponse(BaseModel):
-    """Result of uploading one run to the configured prod server."""
-
-    run_id: str
-    outcome: ProdUploadOutcome
-
-
-# ---------------------------------------------------------------------------
-# Metadata sync (labels, note, eval report) models
-# ---------------------------------------------------------------------------
-
-
-class SyncMetadataRequest(BaseModel):
-    """Body for the per-run metadata-only ingest endpoint.
-
-    Each field is optional. ``None`` means "leave the existing value on disk
-    untouched". Provide an empty list / empty string / a fresh report to
-    explicitly overwrite.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    labels: list[str] | None
-    note: str | None
-    report: EvaluationReport | None
-
-
-class SyncMetadataResponse(BaseModel):
-    """Outcome of a metadata sync, indicating which fields were written."""
-
-    run_id: str
-    labels_written: bool
-    note_written: bool
-    report_written: bool
 
 
 # ---------------------------------------------------------------------------

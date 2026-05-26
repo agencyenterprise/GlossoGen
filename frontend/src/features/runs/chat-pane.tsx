@@ -11,22 +11,16 @@ import {
 } from "react";
 import {
   ArrowLeftRight,
-  Check,
   ChevronDown,
-  CloudUpload,
   Download,
   Hash,
-  Loader2,
   Package,
-  RefreshCw,
   UserCog,
   UserPlus,
 } from "lucide-react";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Tooltip } from "@/shared/components/ui/tooltip";
-import { api, downloadAuthenticatedFile } from "@/shared/lib/api-client";
-import { splitRunId } from "@/shared/lib/run-id";
+import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { useGroupPath } from "@/features/auth/group-context";
@@ -201,74 +195,6 @@ export function ChatPane({
   activeInstanceRoundRange,
 }: ChatPaneProps) {
   const groupPath = useGroupPath();
-  const prodUploadStatus = useQuery({
-    queryKey: ["prod-upload-status"],
-    queryFn: async () => {
-      const { data, error } = await api.GET("/api/g/{group_slug}/prod-upload/status");
-      if (error) throw new Error("Failed to load prod upload status");
-      return data;
-    },
-  });
-  const [prodUploadJustSucceeded, setProdUploadJustSucceeded] = useState(false);
-  const prodUploadMutation = useMutation({
-    mutationFn: async (variables: { force: boolean }) => {
-      const { data, error } = await api.POST(
-        "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/upload-to-prod",
-        {
-          params: {
-            path: splitRunId(runId),
-            query: { force: variables.force },
-          },
-        }
-      );
-      if (error) {
-        const detail = (error as { detail?: string }).detail ?? "Upload failed";
-        throw new Error(detail);
-      }
-      return data;
-    },
-    onSuccess: data => {
-      if (data.outcome === "already_present") {
-        const prodUrl = prodUploadStatus.data?.prod_url ?? "prod";
-        if (
-          window.confirm(
-            `This run is already on ${prodUrl}. Override the existing copy with the local version?`
-          )
-        ) {
-          prodUploadMutation.mutate({ force: true });
-        }
-        return;
-      }
-      setProdUploadJustSucceeded(true);
-      window.setTimeout(() => setProdUploadJustSucceeded(false), 2000);
-    },
-    onError: err => {
-      window.alert(`Upload to prod failed: ${err instanceof Error ? err.message : String(err)}`);
-    },
-  });
-
-  const [metadataSyncJustSucceeded, setMetadataSyncJustSucceeded] = useState(false);
-  const metadataSyncMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await api.POST(
-        "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/sync-metadata-to-prod",
-        { params: { path: splitRunId(runId) } }
-      );
-      if (error) {
-        const detail = (error as { detail?: string }).detail ?? "Metadata sync failed";
-        throw new Error(detail);
-      }
-      return data;
-    },
-    onSuccess: () => {
-      setMetadataSyncJustSucceeded(true);
-      window.setTimeout(() => setMetadataSyncJustSucceeded(false), 2000);
-    },
-    onError: err => {
-      window.alert(`Metadata sync failed: ${err instanceof Error ? err.message : String(err)}`);
-    },
-  });
-
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerContentRef = useRef<HTMLDivElement>(null);
@@ -585,56 +511,6 @@ export function ChatPane({
             <Package className="h-3.5 w-3.5" />
           </button>
         </Tooltip>
-        {prodUploadStatus.data?.configured && (
-          <Tooltip label={`Upload to ${prodUploadStatus.data.prod_url}`}>
-            <button
-              aria-label="Upload to prod"
-              disabled={prodUploadMutation.isPending}
-              className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-              onClick={() => {
-                if (!window.confirm(`Upload this run to ${prodUploadStatus.data?.prod_url}?`)) {
-                  return;
-                }
-                prodUploadMutation.mutate({ force: false });
-              }}
-            >
-              {prodUploadMutation.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : prodUploadJustSucceeded ? (
-                <Check className="h-3.5 w-3.5 text-green-600" />
-              ) : (
-                <CloudUpload className="h-3.5 w-3.5" />
-              )}
-            </button>
-          </Tooltip>
-        )}
-        {prodUploadStatus.data?.configured && (
-          <Tooltip label={`Sync labels/note/evals to ${prodUploadStatus.data.prod_url}`}>
-            <button
-              aria-label="Sync metadata to prod"
-              disabled={metadataSyncMutation.isPending}
-              className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-              onClick={() => {
-                if (
-                  !window.confirm(
-                    `Sync labels, note, and eval report for this run to ${prodUploadStatus.data?.prod_url}?`
-                  )
-                ) {
-                  return;
-                }
-                metadataSyncMutation.mutate();
-              }}
-            >
-              {metadataSyncMutation.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : metadataSyncJustSucceeded ? (
-                <Check className="h-3.5 w-3.5 text-green-600" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
-              )}
-            </button>
-          </Tooltip>
-        )}
       </div>
 
       {/* Hide the chat-pane round badge while an agent drawer is open
