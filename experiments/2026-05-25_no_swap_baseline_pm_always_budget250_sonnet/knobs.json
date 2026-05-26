@@ -1,0 +1,26 @@
+{
+  "announce_swap": false,
+  "channel_noise_level": 0.0,
+  "easy_round_numbers": [1, 2, 3, 6, 13],
+  "intern_enabled": false,
+  "intern_join_round": null,
+  "intern_takeover_round": null,
+  "judge_model": "claude-haiku-4-5-20251001",
+  "judge_provider": "anthropic",
+  "max_round_duration_seconds": 1200,
+  "model_overrides": {},
+  "postmortem_after_swap": true,
+  "postmortem_disabled_at_start": false,
+  "postmortem_enabled": true,
+  "replace_agent_default_channel_visibility": {
+    "postmortem": false,
+    "postmortem_a": false,
+    "postmortem_b": false
+  },
+  "round_count": 40,
+  "round_time_budget_seconds": 250,
+  "seed": 42,
+  "swap_round": null,
+  "two_teams": false,
+  "scheduled_events": []
+}
