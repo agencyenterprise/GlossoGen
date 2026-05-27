@@ -32,7 +32,7 @@ def _get_pool(request: Request) -> DbPool:
     pool = getattr(request.app.state, "db_pool", None)
     if pool is None:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database pool not initialized",
         )
     return pool
@@ -42,7 +42,7 @@ def _get_webhook_secret() -> str:
     secret = os.environ.get("CLERK_WEBHOOK_SECRET")
     if secret is None:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="CLERK_WEBHOOK_SECRET is not configured",
         )
     return secret

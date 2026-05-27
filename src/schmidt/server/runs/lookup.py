@@ -26,7 +26,7 @@ def get_identity(request: Request) -> Identity:
     identity = getattr(request.state, "identity", None)
     if identity is None:
         raise HTTPException(
-            status_code=500,
+            status_code=503,
             detail="Identity not attached to request — middleware misconfigured",
         )
     return identity
