@@ -581,20 +581,34 @@ def _per_phase_round_means(per_round: dict[int, bool]) -> dict[str, float]:
 def _per_phase_round_success_stats(
     cohort: list[_RunRoundEntry],
 ) -> tuple[list[float], list[float], list[int]]:
-    """Per phase (A/B/C/D): mean of per-run phase means, SE, and N runs."""
-    per_run_phase_means = [_per_phase_round_means(per_round=entry.success) for entry in cohort]
+    """Per phase (A/B/C/D): pooled (micro-average) success rate, binomial SE,
+    and N pooled rounds.
+
+    Pools every round of every run in the phase into one bucket and computes
+    ``sum(stabilized) / sum(rounds)`` — each round carries equal weight,
+    regardless of which run it came from. The error bar is the binomial SE of
+    that pooled proportion, ``sqrt(p*(1-p)/n)`` over ``n`` pooled rounds.
+    """
     means: list[float] = []
     ses: list[float] = []
     ns: list[int] = []
     for phase in _PHASE_ORDER:
-        values = [run[phase] for run in per_run_phase_means if phase in run]
-        if values:
-            means.append(mean(values))
-            ses.append(stdev(values) / (len(values) ** 0.5) if len(values) > 1 else 0.0)
+        outcomes = [
+            1.0 if won else 0.0
+            for entry in cohort
+            for round_number, won in entry.success.items()
+            if _phase_for_round(round_number=round_number) == phase
+        ]
+        if outcomes:
+            rate = mean(outcomes)
+            n = len(outcomes)
+            means.append(rate)
+            ses.append((rate * (1.0 - rate) / n) ** 0.5)
+            ns.append(n)
         else:
             means.append(float("nan"))
             ses.append(0.0)
-        ns.append(len(values))
+            ns.append(0)
     return means, ses, ns
 
 
