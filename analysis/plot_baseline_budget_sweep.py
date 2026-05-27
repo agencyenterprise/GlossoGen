@@ -3,14 +3,14 @@
 Two vertically stacked panels:
 
 * **Closed models** (top) — every run carrying the ``baseline`` label
-  (sonnet-4.6, opus-4.7, gpt-5.4).
+  (opus-4.7, gpt-5.4).
 * **Open models** (bottom) — every run carrying the ``baseline_oss`` label
   (Llama-3.3-70B, Qwen3-32B).
 
 Each panel has one line per ``(model, postmortem_enabled)`` series with replica
 dots, a mean trace, and ±1 std error bars. X axis is the per-round
-``round_time_budget_seconds`` in log scale; Y axis is ``round_success`` (count
-of rounds stabilized out of ``round_count``).
+``round_time_budget_seconds`` in log scale; Y axis is the ``round_success``
+rate (fraction of rounds stabilized out of ``round_count``).
 
 Uses the doubled-font rcParams from ``plot_round_success_with_mcm.py`` so the
 chart text reads at presentation scale.
@@ -24,11 +24,13 @@ from typing import NamedTuple
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.ticker import PercentFormatter
 
 _SCENARIO_NAME = "veyru"
 _BASELINE_LABEL = "baseline"
 _BASELINE_OSS_LABEL = "baseline_oss"
 _ROUND_SUCCESS_METRIC = "round_success"
+_EXCLUDED_MODELS = frozenset({"claude-sonnet-4-6"})
 _OUTPUT_PATH = Path("analysis/baseline_budget_sweep.png")
 
 _LARGE_FONT_RCPARAMS = {
@@ -177,6 +179,8 @@ def _collect_runs(required_label: str) -> list[_RunRecord]:
         if meta is None:
             continue
         model, budget, pm, round_count = meta
+        if model in _EXCLUDED_MODELS:
+            continue
         success = _round_success_count(report_path=entry / f"{_SCENARIO_NAME}_report.json")
         if success is None:
             continue
@@ -237,7 +241,7 @@ def _aggregate_series(
     for run in runs:
         if run.model != model or run.postmortem_enabled != postmortem_enabled:
             continue
-        by_budget[run.budget].append(float(run.round_success_count))
+        by_budget[run.budget].append(run.round_success_count / run.total_rounds)
     budgets = sorted(by_budget.keys())
     means: list[float] = []
     stds: list[float] = []
@@ -277,7 +281,6 @@ def _plot_panel(
     runs: list[_RunRecord],
     title: str,
     color_by_model: dict[str, str],
-    max_rounds: int,
     x_tickvals: list[int],
 ) -> None:
     """Render one panel: replica dots + mean traces with ±1 std error bars."""
@@ -315,8 +318,9 @@ def _plot_panel(
     ax.set_xticks(x_tickvals)
     ax.set_xticklabels([str(b) for b in x_tickvals])
     ax.set_xlim(min(x_tickvals) / 1.25, max(x_tickvals) * 1.25)
-    ax.set_ylim(-0.5, max_rounds + 0.5)
-    ax.set_yticks(list(range(0, max_rounds + 1, max(1, max_rounds // 5))))
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=0))
     ax.set_ylabel("Round success")
     ax.set_title(title)
     ax.grid(axis="y", alpha=0.3)
@@ -333,35 +337,28 @@ def main() -> None:
     all_models = sorted({run.model for run in closed_runs + open_runs})
     color_by_model = _model_color_map(models=all_models)
     all_budgets = sorted({run.budget for run in closed_runs + open_runs})
-    max_rounds = max(
-        (run.total_rounds for run in closed_runs + open_runs),
-        default=15,
-    )
 
     fig, (ax_closed, ax_open) = plt.subplots(
-        2, 1, figsize=(16, 14), sharex=True, gridspec_kw={"hspace": 0.22}
+        2, 1, figsize=(16, 14), sharex=True, gridspec_kw={"hspace": 0.45}
     )
     _plot_panel(
         ax=ax_closed,
         runs=closed_runs,
         title="Closed models",
         color_by_model=color_by_model,
-        max_rounds=max_rounds,
         x_tickvals=all_budgets,
     )
     ax_closed.tick_params(axis="x", labelbottom=True)
-    ax_closed.set_xlabel("")
+    ax_closed.set_xlabel("Round budget")
     _plot_panel(
         ax=ax_open,
         runs=open_runs,
         title="Open models",
         color_by_model=color_by_model,
-        max_rounds=max_rounds,
         x_tickvals=all_budgets,
     )
-    ax_open.set_xlabel("Round time (log scale)")
+    ax_open.set_xlabel("Round budget")
     fig.align_ylabels((ax_closed, ax_open))
-    fig.tight_layout()
     fig.savefig(_OUTPUT_PATH, dpi=200, bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
     print(f"Wrote {_OUTPUT_PATH}")
