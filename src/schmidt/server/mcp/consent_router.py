@@ -82,7 +82,7 @@ async def approve_consent(
         )
     if identity_settings.clerk_jwt_key is None:
         raise HTTPException(
-            status_code=500,
+            status_code=503,
             detail="Server misconfigured: CLERK_JWT_KEY is not set",
         )
 

@@ -305,7 +305,7 @@ async def start_evaluation(
     except Exception:
         logger.exception("Failed to launch evaluation subprocess")
         raise HTTPException(
-            status_code=500,
+            status_code=503,
             detail="Failed to launch evaluation subprocess",
         )
 

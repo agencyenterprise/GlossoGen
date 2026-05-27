@@ -268,7 +268,7 @@ def _extract_and_validate_bundle(
             logger.exception("Failed to extract bundle to %s", run_dir)
             shutil.rmtree(run_dir, ignore_errors=True)
             raise HTTPException(
-                status_code=500,
+                status_code=422,
                 detail="Failed to extract bundle",
             )
 

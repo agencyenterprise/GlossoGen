@@ -14,6 +14,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 from schmidt.db.pool import close_pool, create_pool, get_database_url
+from schmidt.server.error_logging_handlers import register_error_logging_handlers
 from schmidt.server.identity.bootstrap import ensure_local_group
 from schmidt.server.identity.middleware import ClerkIdentityMiddleware
 from schmidt.server.identity.settings import load_identity_settings
@@ -103,6 +104,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 
 app = FastAPI(title="Schmidt Simulation Server", lifespan=lifespan)
+
+register_error_logging_handlers(app=app)
 
 app.add_middleware(ClerkIdentityMiddleware, settings=_identity_settings)
 
