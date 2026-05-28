@@ -69,6 +69,10 @@ _EXCLUDED_COPY_NAMES: frozenset[str] = frozenset(
         ".git",
         "stream.json",
         "__pycache__",
+        # The source's labels would otherwise be inherited; if the orchestrator's
+        # subsequent re-label step fails or races, the derived run shows up as
+        # the source's "phase=baseline" entry in label-driven worklists.
+        "labels.json",
         # Source-specific UI / eval caches. Inheriting these makes the derived
         # run look like the source: the FE shows "Completed at round N/M" from
         # the source's snapshot, the rolling evaluator thinks the run is
