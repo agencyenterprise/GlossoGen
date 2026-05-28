@@ -95,7 +95,11 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
         base_x = _column_x(model_index=i, learned=False)
         learned_x = _column_x(model_index=i, learned=True)
         tick_vals.extend([base_x, learned_x])
-        tick_text.extend([f"{model} · baseline", f"{model} · learned"])
+        budgets = sorted({r.budget for r in rs})
+        budget_tag = f"b={'/'.join(budgets)}"
+        tick_text.extend(
+            [f"{model} · {budget_tag}<br>baseline", f"{model} · {budget_tag}<br>learned"]
+        )
 
         base_xs = [base_x + _jitter(r.src_id) for r in rs]
         base_ys = [r.expected_mean for r in rs]
@@ -223,7 +227,7 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
     """
     fig = go.Figure()
     ordered = sorted(results, key=lambda r: r.learned_mean, reverse=True)
-    y_labels = [f"{r.src_id}  ({r.model_short})" for r in ordered]
+    y_labels = [f"{r.src_id}  ({r.model_short} · b={r.budget})" for r in ordered]
     for r, label in zip(ordered, y_labels, strict=True):
         color = _MODEL_COLORS.get(r.model_short, "#777777")
         url = run_url(frontend_base=frontend_base, run_id=r.src_id)
@@ -251,8 +255,9 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
                 name=f"{r.model_short} expected",
                 showlegend=False,
                 hovertemplate=(
-                    f"{r.src_id} ({r.model_short})<br>"
-                    f"expected={r.expected_mean:.3f} (n={r.n_expected})<br>"
+                    f"{r.src_id} ({r.model_short} · b={r.budget})<br>"
+                    f"expected={r.expected_mean:.3f} ± {r.expected_std:.3f} "
+                    f"(n={r.n_expected} replicas)<br>"
                     "<i>click to open source run</i><extra></extra>"
                 ),
                 customdata=[url],
@@ -267,8 +272,9 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
                 name=f"{r.model_short} learned",
                 showlegend=False,
                 hovertemplate=(
-                    f"{r.src_id} ({r.model_short})<br>"
-                    f"learned={r.learned_mean:.3f} (n={r.n_learned})<br>"
+                    f"{r.src_id} ({r.model_short} · b={r.budget})<br>"
+                    f"learned={r.learned_mean:.3f} ± {r.learned_std:.3f} "
+                    f"(n={r.n_learned} replicas)<br>"
                     f"delta={r.delta:+.3f}<br>"
                     "<i>click to open source run</i><extra></extra>"
                 ),
@@ -277,7 +283,7 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
         )
     fig.update_layout(
         height=max(360, 22 * len(y_labels) + 80),
-        xaxis_title="round_success over rounds window  (○ expected / ■ learned)",
+        xaxis_title="round_success over rounds window  (○ expected, ■ learned)",
         yaxis={"categoryorder": "array", "categoryarray": list(reversed(y_labels))},
         margin={"l": 260, "r": 20, "t": 30, "b": 40},
     )
@@ -290,6 +296,61 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
     maybe_open_clicked_run(
         chart_event=chart_event, session_key="protocol_learnability_last_opened_url"
     )
+
+
+def _render_replica_variability(results: list[BaselineLearnability]) -> None:
+    """Per-baseline stdev across the 3 replicas, expected vs learned.
+
+    One row per baseline (same ordering as the main scatter — by ``learned_mean``
+    descending), two markers per row: gray ○ for expected_std (resume replicas),
+    black ■ for learned_std (replace replicas). Wide horizontal span → high
+    replica-to-replica disagreement; near-zero → the 3 replicas agreed closely.
+    """
+    if not results:
+        return
+    ordered = sorted(results, key=lambda r: r.learned_mean, reverse=True)
+    y_labels = [f"{r.src_id}  ({r.model_short} · b={r.budget})" for r in ordered]
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=[r.expected_std for r in ordered],
+            y=y_labels,
+            mode="markers",
+            marker={
+                "symbol": "circle-open",
+                "size": 11,
+                "line": {"color": "#888888", "width": 2},
+            },
+            name="expected replica stdev",
+            hovertemplate=(
+                "%{y}<br>"
+                "expected stdev=%{x:.3f}  "
+                "(n=%{customdata[0]} replicas)<extra></extra>"
+            ),
+            customdata=[[r.n_expected] for r in ordered],
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[r.learned_std for r in ordered],
+            y=y_labels,
+            mode="markers",
+            marker={"symbol": "square", "size": 11, "color": "#222222"},
+            name="learned replica stdev",
+            hovertemplate=(
+                "%{y}<br>" "learned stdev=%{x:.3f}  " "(n=%{customdata[0]} replicas)<extra></extra>"
+            ),
+            customdata=[[r.n_learned] for r in ordered],
+        )
+    )
+    fig.update_layout(
+        height=max(360, 22 * len(y_labels) + 80),
+        xaxis_title="stdev of round_success across the 3 replicas  (○ expected, ■ learned)",
+        xaxis={"rangemode": "tozero"},
+        yaxis={"categoryorder": "array", "categoryarray": list(reversed(y_labels))},
+        margin={"l": 260, "r": 20, "t": 30, "b": 40},
+    )
+    st.plotly_chart(fig, width="stretch")
 
 
 def _render_feature_contrast_bars(rows: list, top_n: int) -> None:
@@ -432,16 +493,17 @@ def _render_feature_contrast(
 
 
 def _render_model_summary(results: list[BaselineLearnability]) -> None:
-    """Per-model means underneath the filter so the cohort split is obvious."""
-    by_model: dict[str, list[BaselineLearnability]] = {}
+    """Per-(model, budget) means underneath the filter so the cohort split is obvious."""
+    by_cell: dict[tuple[str, str], list[BaselineLearnability]] = {}
     for r in results:
-        by_model.setdefault(r.model_short, []).append(r)
+        by_cell.setdefault((r.model_short, r.budget), []).append(r)
     rows = []
-    for model in sorted(by_model):
-        rs = by_model[model]
+    for model, budget in sorted(by_cell):
+        rs = by_cell[(model, budget)]
         rows.append(
             {
                 "model": model,
+                "budget": budget,
                 "n_baselines": len(rs),
                 "expected_mean": round(statistics.mean(r.expected_mean for r in rs), 3),
                 "learned_mean": round(statistics.mean(r.learned_mean for r in rs), 3),
@@ -593,6 +655,12 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
         _render_per_model_bars(results=results)
         st.markdown("**Per-baseline** — click a marker to open the source run")
         _render_scatter(results=results, frontend_base=frontend_base)
+        st.markdown(
+            "**Per-baseline replica variability** — stdev across the 3 resume "
+            "(expected) and 3 replace (learned) replicas. Big spread → low "
+            "confidence in that baseline's mean."
+        )
+        _render_replica_variability(results=results)
     with contrast_panel:
         contrast_rows = feature_contrast(
             runs_root=str(runs_dir),
