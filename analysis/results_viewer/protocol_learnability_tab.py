@@ -353,6 +353,45 @@ def _render_feature_evidence_block(evidence: FeatureEvidence, max_samples: int) 
         st.caption("No samples in the bottom tertile for this feature.")
 
 
+def _render_feature_contrast_explanation(tertile_fraction: float) -> None:
+    """In-tab explanation of how the contrast values are calculated."""
+    pct = int(tertile_fraction * 100)
+    with st.expander("How are these values calculated?"):
+        st.markdown(f"""
+**Step 1 — split baselines into tertiles by `learned` score.**
+For each baseline we have a `learned` mean (mean `round_success` over rounds 16-25 across
+its 3 `phase=replace_learned` derived runs — fresh observer, link history only, no
+postmortem). Baselines are sorted descending by that score, then split:
+
+- **High tertile** = top **{pct}%** — protocols a fresh observer can pick up.
+- **Low tertile** = bottom **{pct}%** — protocols the newcomer can't recover from the
+  link transcript.
+- Middle baselines are dropped on purpose — the contrast is between the extremes.
+
+**Step 2 — read each baseline's feature-presence vector.**
+For each tertile baseline we load `communication_feature_presence.json`. The file has a
+`scores` list with one entry per category in the canon ontology (35 categories), each
+carrying a `confidence` (0-1) for that feature in the baseline's link rounds 1-15.
+
+**Step 3 — per-feature contrast.**
+For each of the 35 categories:
+
+- `high_mean` = mean `confidence` across the high-tertile baselines.
+- `low_mean`  = mean `confidence` across the low-tertile baselines.
+- `gap = high_mean − low_mean`.
+
+Bars are sorted by `|gap|` (largest disagreement first). **Green** (`gap > 0`) means the
+feature is more common in **transferable** protocols; **red** (`gap < 0`) means it's more
+common in **idiosyncratic** ones.
+
+**Caveats.**
+The judge only sees the baseline's rounds 1-15 (protocol-development phase). It scores against
+the fixed ontology — features the team invented but the ontology doesn't list are invisible.
+Sources: [`protocol_learnability_data.py`](analysis/results_viewer/protocol_learnability_data.py)
+(`_contrast_uncached`, `_feature_scores`).
+            """.strip())
+
+
 def _render_feature_contrast(
     runs_root: str,
     results: list[BaselineLearnability],
@@ -361,6 +400,7 @@ def _render_feature_contrast(
     top_n: int,
 ) -> None:
     """Bar chart + per-feature expanders (description + tertile justifications)."""
+    _render_feature_contrast_explanation(tertile_fraction=tertile_fraction)
     _render_feature_contrast_bars(rows=rows, top_n=top_n)
     if not rows:
         return

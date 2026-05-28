@@ -69,6 +69,24 @@ _EXCLUDED_COPY_NAMES: frozenset[str] = frozenset(
         ".git",
         "stream.json",
         "__pycache__",
+        # Source-specific UI / eval caches. Inheriting these makes the derived
+        # run look like the source: the FE shows "Completed at round N/M" from
+        # the source's snapshot, the rolling evaluator thinks the run is
+        # already evaluated (skipping it), and the streamlit Multi-swap tab
+        # serves stale numbers.
+        "run_summary_cache.json",
+        "eval_in_progress.json",
+        "multi_swap_cache.json",
+        # Source-specific evaluation artifacts. The derived run will produce
+        # its own when re-evaluated; inheriting the source's makes
+        # ``has_evaluation`` true before any post-resume metric has run.
+        "communication_open_coding.json",
+        "communication_feature_presence.json",
+        "protocol_probe_responses.jsonl",
+        "protocol_probe_usage.json",
+        "protocol_probe_replica_self_similarity.json",
+        "protocol_probe_agent_pair_similarity.json",
+        "protocol_probe_cutoff_trajectory.json",
     }
 )
 
@@ -77,6 +95,8 @@ _EXCLUDED_COPY_SUFFIXES: tuple[str, ...] = (
     "_start.log",
     "_debug.jsonl",
     ".pyc",
+    # Source-scenario eval reports (every scenario writes ``<scenario>_report.json``).
+    "_report.json",
 )
 
 
