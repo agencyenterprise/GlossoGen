@@ -22,8 +22,11 @@ class BaselineLearnability(NamedTuple):
 
     src_id: str
     model_short: str
+    budget: str
     expected_mean: float
+    expected_std: float
     learned_mean: float
+    learned_std: float
     delta: float
     n_expected: int
     n_learned: int
@@ -124,17 +127,18 @@ def _load_results_uncached(
     runs_root: str, window_lo: int, window_hi: int
 ) -> list[BaselineLearnability]:
     root = Path(runs_root)
-    baselines: dict[str, str] = {}
+    baselines: dict[str, tuple[str, str]] = {}
     accums: dict[str, _Accumulator] = {}
     for run_dir in _iter_run_dirs(root=root):
         labels = _read_labels(run_dir=run_dir)
         if "protocol_learnability" not in labels:
             continue
         model_short = _label_value(labels=labels, prefix="model=") or "unknown"
+        budget = _label_value(labels=labels, prefix="budget=") or "?"
         scenario_name = run_dir.parent.name
         if "phase=baseline" in labels:
             src_id = f"{scenario_name}/{run_dir.name}"
-            baselines[src_id] = model_short
+            baselines[src_id] = (model_short, budget)
             accums.setdefault(src_id, _Accumulator(model_short=model_short))
             continue
         src_id = _label_value(labels=labels, prefix="src=")
@@ -154,18 +158,23 @@ def _load_results_uncached(
             acc.learned.append(score)
 
     results: list[BaselineLearnability] = []
-    for src_id, model_short in baselines.items():
+    for src_id, (model_short, budget) in baselines.items():
         acc = accums[src_id]
         if not acc.expected or not acc.learned:
             continue
         expected_mean = statistics.mean(acc.expected)
         learned_mean = statistics.mean(acc.learned)
+        expected_std = statistics.stdev(acc.expected) if len(acc.expected) >= 2 else 0.0
+        learned_std = statistics.stdev(acc.learned) if len(acc.learned) >= 2 else 0.0
         results.append(
             BaselineLearnability(
                 src_id=src_id,
                 model_short=model_short,
+                budget=budget,
                 expected_mean=expected_mean,
+                expected_std=expected_std,
                 learned_mean=learned_mean,
+                learned_std=learned_std,
                 delta=learned_mean - expected_mean,
                 n_expected=len(acc.expected),
                 n_learned=len(acc.learned),
