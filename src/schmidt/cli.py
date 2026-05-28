@@ -302,6 +302,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "round_start - N. When omitted, visible channels keep full prior history."
         ),
     )
+    replace_parser.add_argument(
+        "--group-slug",
+        type=str,
+        default=LOCAL_GROUP_SLUG,
+        help=f"Tenant group slug that owns the new run (default: {LOCAL_GROUP_SLUG})",
+    )
 
     cross_run_parser = subparsers.add_parser(
         "cross-run-replace-agent",
@@ -407,6 +413,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "source_a_round_count - round_start."
         ),
     )
+    cross_run_parser.add_argument(
+        "--group-slug",
+        type=str,
+        default=LOCAL_GROUP_SLUG,
+        help=f"Tenant group slug that owns the new run (default: {LOCAL_GROUP_SLUG})",
+    )
 
     resume_parser = subparsers.add_parser(
         "resume-at-round",
@@ -468,6 +480,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "source_round_count - round_start (the remaining rounds in the "
             "original run after the resume boundary)."
         ),
+    )
+    resume_parser.add_argument(
+        "--group-slug",
+        type=str,
+        default=LOCAL_GROUP_SLUG,
+        help=f"Tenant group slug that owns the new run (default: {LOCAL_GROUP_SLUG})",
     )
 
     login_parser = subparsers.add_parser(
@@ -715,6 +733,35 @@ def _compute_run_dir(runs_dir: Path, scenario_name: str) -> Path:
     appending a numeric suffix if two runs start in the same second.
     """
     return claim_run_dir(runs_dir=runs_dir, scenario_name=scenario_name)
+
+
+async def _register_derived_run(
+    scenario: str,
+    run_dir_name: str,
+    source_run_scenario: str,
+    source_run_dir_name: str,
+    group_slug: str,
+) -> None:
+    """Insert a ``runs`` row for a derived run (replace-agent / resume-at-round / cross-run).
+
+    The detached ``schmidt run --resume`` subprocess that actually executes the
+    derived simulation skips registration (it inherits the run dir from this
+    parent CLI), so the parent has to register on its behalf or the FE never
+    sees the run.
+    """
+    try:
+        await register_run_standalone(
+            group_slug=group_slug,
+            scenario=scenario,
+            run_dir_name=run_dir_name,
+            status=RunStatus.STARTING.value,
+            created_at=datetime.now(tz=UTC),
+            created_by_user_id=None,
+            source_run_scenario=source_run_scenario,
+            source_run_dir_name=source_run_dir_name,
+        )
+    except Exception:
+        logger.exception("Failed to register derived run %s/%s in Postgres", scenario, run_dir_name)
 
 
 def _setup_logging(
@@ -1115,6 +1162,13 @@ async def _run_replace_agent(args: argparse.Namespace) -> None:
     except ValueError as exc:
         raise SystemExit(f"replace-agent failed: {exc}") from exc
 
+    await _register_derived_run(
+        scenario=args.scenario_name,
+        run_dir_name=Path(result.new_run_dir).name,
+        source_run_scenario=args.scenario_name,
+        source_run_dir_name=source_run_dir.name,
+        group_slug=args.group_slug,
+    )
     print(f"new_run_id={result.new_run_id}")
     print(f"new_run_dir={result.new_run_dir}")
 
@@ -1157,6 +1211,13 @@ async def _run_resume_at_round(args: argparse.Namespace) -> None:
     except ValueError as exc:
         raise SystemExit(f"resume-at-round failed: {exc}") from exc
 
+    await _register_derived_run(
+        scenario=args.scenario_name,
+        run_dir_name=Path(result.new_run_dir).name,
+        source_run_scenario=args.scenario_name,
+        source_run_dir_name=source_run_dir.name,
+        group_slug=args.group_slug,
+    )
     print(f"new_run_id={result.new_run_id}")
     print(f"new_run_dir={result.new_run_dir}")
 
@@ -1315,6 +1376,13 @@ async def _run_cross_run_replace_agent(args: argparse.Namespace) -> None:
     except ValueError as exc:
         raise SystemExit(f"cross-run-replace-agent failed: {exc}") from exc
 
+    await _register_derived_run(
+        scenario=args.scenario_name,
+        run_dir_name=Path(result.new_run_dir).name,
+        source_run_scenario=args.scenario_name,
+        source_run_dir_name=source_a_run_dir.name,
+        group_slug=args.group_slug,
+    )
     print(f"new_run_id={result.new_run_id}")
     print(f"new_run_dir={result.new_run_dir}")
 

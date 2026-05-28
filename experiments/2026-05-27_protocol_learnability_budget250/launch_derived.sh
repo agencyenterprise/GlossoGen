@@ -17,7 +17,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
 RUNS_DIR=runs
-REPLACE_KNOBS="$SCRIPT_DIR/replace_knobs.json"
+REPLACE_KNOBS_CANON="$SCRIPT_DIR/replace_knobs.json"
+REPLACE_KNOBS_LEGACY="$SCRIPT_DIR/replace_knobs_legacy.json"
+RESUME_KNOBS_LEGACY="$SCRIPT_DIR/resume_knobs_legacy.json"
 LOG=/tmp/protolearn_derived.log
 CAP=6
 REPLICAS=3
@@ -61,47 +63,63 @@ label_run() {
 }
 
 launch_resume() {
-  local provider="$1" short="$2" src_dir="$3" src_id="$4"
+  local provider="$1" short="$2" src_dir="$3" src_id="$4" kind="$5"
   wait_for_slot "$provider"
-  echo "$(date) [$short] resume src=$src_id" >> "$LOG"
-  local out rid
+  echo "$(date) [$short] resume src=$src_id kind=$kind" >> "$LOG"
+  local out rid extra=""
+  if [ "$kind" = "legacy" ]; then
+    extra="--knobs $RESUME_KNOBS_LEGACY"
+  fi
+  # shellcheck disable=SC2086
   out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt resume-at-round veyru \
         --source-run-dir "$src_dir" --round-start "$ROUND_START" \
-        --rounds-after-resume "$ROUNDS_AFTER" --runs-dir "./$RUNS_DIR" 2>>"$LOG")
+        --rounds-after-resume "$ROUNDS_AFTER" --runs-dir "./$RUNS_DIR" $extra 2>>"$LOG")
   rid=$(echo "$out" | grep -oE 'new_run_id=[^ ]+' | head -1 | cut -d= -f2)
   label_run "$rid" "[\"protocol_learnability\", \"phase=resume_expected\", \"budget=250\", \"model=${short}\", \"history=10\", \"src=${src_id}\"]"
   sleep 2
 }
 
 launch_replace() {
-  local provider="$1" short="$2" model="$3" src_dir="$4" src_id="$5"
+  local provider="$1" short="$2" model="$3" src_dir="$4" src_id="$5" kind="$6"
   wait_for_slot "$provider"
-  echo "$(date) [$short] replace src=$src_id" >> "$LOG"
-  local out rid
+  echo "$(date) [$short] replace src=$src_id kind=$kind" >> "$LOG"
+  local out rid knobs="$REPLACE_KNOBS_CANON"
+  if [ "$kind" = "legacy" ]; then
+    knobs="$REPLACE_KNOBS_LEGACY"
+  fi
   out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
         --source-run-dir "$src_dir" --round-start "$ROUND_START" \
         --replaced-agent-id field_observer \
         --model "$model" --provider "$provider" \
         --rounds-after-swap "$ROUNDS_AFTER" --history-from-round "$HISTORY_FROM" \
-        --knobs "$REPLACE_KNOBS" --runs-dir "./$RUNS_DIR" 2>>"$LOG")
+        --knobs "$knobs" --runs-dir "./$RUNS_DIR" 2>>"$LOG")
   rid=$(echo "$out" | grep -oE 'new_run_id=[^ ]+' | head -1 | cut -d= -f2)
   label_run "$rid" "[\"protocol_learnability\", \"phase=replace_learned\", \"budget=250\", \"model=${short}\", \"history=10\", \"src=${src_id}\"]"
   sleep 2
 }
 
-# WORKLIST: lines of "short model provider run_dir" for each baseline.
+# WORKLIST: lines of "short model provider kind run_dir" for each baseline.
 WORKLIST=$(VIRTUAL_ENV= uv run --no-sync python "$SCRIPT_DIR/list_baselines.py" "$RUNS_DIR/veyru")
 
 run_provider_queue() {
   local provider="$1"
-  echo "$WORKLIST" | while read -r short model prov src_dir; do
+  echo "$WORKLIST" | while read -r short model prov kind src_dir; do
     [ "$prov" = "$provider" ] || continue
     local src_id="veyru/$(basename "$src_dir")"
     local have_resume; have_resume=$(count_existing_derived "phase=resume_expected" "$src_id")
     local have_replace; have_replace=$(count_existing_derived "phase=replace_learned" "$src_id")
-    echo "$(date) [$short] src=$src_id existing resume=$have_resume replace=$have_replace" >> "$LOG"
-    for _ in $(seq 1 $((REPLICAS - have_resume))); do launch_resume "$provider" "$short" "$src_dir" "$src_id"; done
-    for _ in $(seq 1 $((REPLICAS - have_replace))); do launch_replace "$provider" "$short" "$model" "$src_dir" "$src_id"; done
+    local need_resume=$((REPLICAS - have_resume))
+    local need_replace=$((REPLICAS - have_replace))
+    echo "$(date) [$short] src=$src_id kind=$kind existing resume=$have_resume replace=$have_replace need resume=$need_resume replace=$need_replace" >> "$LOG"
+    # Explicit > 0 guard: macOS BSD `seq 1 0` outputs "1\n0\n" (downward),
+    # unlike GNU seq which is empty — without this guard, fully-derived sources
+    # would silently get spurious extra launches.
+    if [ "$need_resume" -gt 0 ]; then
+      for _ in $(seq 1 "$need_resume"); do launch_resume "$provider" "$short" "$src_dir" "$src_id" "$kind"; done
+    fi
+    if [ "$need_replace" -gt 0 ]; then
+      for _ in $(seq 1 "$need_replace"); do launch_replace "$provider" "$short" "$model" "$src_dir" "$src_id" "$kind"; done
+    fi
   done
   echo "$(date) [$provider] derived queue complete" >> "$LOG"
 }
