@@ -70,6 +70,7 @@ from schmidt.run_config_validation import validate_run_config
 from schmidt.runners.pydantic_ai_runner import PydanticAIRunner
 from schmidt.runtime.scheduled_events import (
     ChannelVisibility,
+    ChannelVisibilityFromRound,
     ChannelVisibilityFull,
     ChannelVisibilityNone,
 )
@@ -286,6 +287,19 @@ def _build_parser() -> argparse.ArgumentParser:
             "rounds_after_swap. When omitted, defaults to "
             "source_round_count - round_start (the remaining rounds in the "
             "original run)."
+        ),
+    )
+    replace_parser.add_argument(
+        "--history-from-round",
+        dest="history_from_round",
+        type=int,
+        default=None,
+        help=(
+            "Window the replaced agent's visible-channel history: it sees those "
+            "channels only from this round onward (read_channel returns dropped, "
+            "send_message kept from this round). Applies to every channel in the "
+            "resolved visible set. For the previous N rounds before the swap, pass "
+            "round_start - N. When omitted, visible channels keep full prior history."
         ),
     )
 
@@ -751,18 +765,25 @@ class _ReplaceManifestInfo(NamedTuple):
 def _channel_visibility_from_manifest(
     visible_channels: list[str],
     blocked_channels: list[str],
+    history_floors: dict[str, int],
 ) -> dict[str, ChannelVisibility]:
     """Translate replace-agent manifest channel lists into a visibility dict.
 
     ``visible_channels`` (channels whose prior history remains visible)
-    map to ``ChannelVisibilityFull``. ``blocked_channels`` (channels
-    whose tool calls are stripped from the predecessor's history) map
-    to ``ChannelVisibilityNone``. Channels not in either list are
-    omitted (caller decides default behaviour).
+    map to ``ChannelVisibilityFull``, except channels named in
+    ``history_floors`` which map to ``ChannelVisibilityFromRound`` (their
+    history is windowed from the floor round onward). ``blocked_channels``
+    (channels whose tool calls are stripped from the predecessor's
+    history) map to ``ChannelVisibilityNone``. Channels not in any list
+    are omitted (caller decides default behaviour).
     """
     result: dict[str, ChannelVisibility] = {}
     for channel_id in visible_channels:
-        result[channel_id] = ChannelVisibilityFull()
+        floor = history_floors.get(channel_id)
+        if floor is None:
+            result[channel_id] = ChannelVisibilityFull()
+        else:
+            result[channel_id] = ChannelVisibilityFromRound(round_floor=floor)
     for channel_id in blocked_channels:
         result[channel_id] = ChannelVisibilityNone()
     return result
@@ -778,6 +799,7 @@ def read_replace_manifest_info(run_dir: Path) -> _ReplaceManifestInfo | None:
         channel_visibility=_channel_visibility_from_manifest(
             visible_channels=list(manifest.channels_with_visible_history),
             blocked_channels=list(manifest.blocked_tool_call_channels),
+            history_floors=dict(manifest.channel_history_floors),
         ),
         target_event_id=manifest.target_event_id,
         round_start=manifest.round_start,
@@ -806,6 +828,7 @@ def _read_cross_run_manifest(run_dir: Path) -> _CrossRunManifestInfo | None:
         channel_visibility=_channel_visibility_from_manifest(
             visible_channels=list(manifest.channels_with_visible_history),
             blocked_channels=list(manifest.blocked_tool_call_channels),
+            history_floors={},
         ),
         target_event_id=manifest.target_event_id,
         round_start=manifest.round_start,
@@ -1060,10 +1083,18 @@ async def _run_replace_agent(args: argparse.Namespace) -> None:
     else:
         visible_channels = list(args.visible_history_channels)
 
+    if args.history_from_round is None:
+        channel_history_floors: dict[str, int] = {}
+    else:
+        channel_history_floors = {
+            channel_id: args.history_from_round for channel_id in visible_channels
+        }
+
     logger.info(
-        "Replace-agent: replaced=%s visible_channels=%s",
+        "Replace-agent: replaced=%s visible_channels=%s history_floors=%s",
         args.replaced_agent_id,
         visible_channels,
+        channel_history_floors,
     )
 
     request = ReplaceAgentCoreRequest(
@@ -1076,6 +1107,7 @@ async def _run_replace_agent(args: argparse.Namespace) -> None:
         provider=args.provider,
         knobs=knobs,
         channels_with_visible_history=visible_channels,
+        channel_history_floors=channel_history_floors,
         runs_dir=Path(args.runs_dir).resolve(),
     )
     try:
@@ -1117,6 +1149,7 @@ async def _run_resume_at_round(args: argparse.Namespace) -> None:
         provider=None,
         knobs=knobs,
         channels_with_visible_history=None,
+        channel_history_floors={},
         runs_dir=Path(args.runs_dir).resolve(),
     )
     try:

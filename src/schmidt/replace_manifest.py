@@ -7,7 +7,7 @@ to launch a resumed simulation).
 
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 REPLACE_MANIFEST_FILENAME = "replace_manifest.json"
 
@@ -25,6 +25,14 @@ class ReplaceManifest(BaseModel):
     is applied. ``replacement_model`` and ``replacement_provider`` are ``None``
     in the same case, and ``channels_with_visible_history`` /
     ``blocked_tool_call_channels`` are empty lists.
+
+    ``channel_history_floors`` maps a channel id to a round floor for
+    windowed history: the replaced agent sees that channel's messages
+    only from the floor round onward (``ChannelVisibilityFromRound``).
+    Channels absent from this map but present in
+    ``channels_with_visible_history`` keep their full prior history.
+    Defaults to empty so manifests written before windowing existed
+    still load.
     """
 
     source_run_id: str
@@ -37,6 +45,7 @@ class ReplaceManifest(BaseModel):
     replacement_provider: str | None
     channels_with_visible_history: list[str]
     blocked_tool_call_channels: list[str]
+    channel_history_floors: dict[str, int] = Field(default_factory=dict)
     replaced_at: float
 
 
