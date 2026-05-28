@@ -12,6 +12,7 @@ from analysis.results_viewer import (
     multi_swap_tab,
     oss_frontier_tab,
     probe_similarity_tab,
+    protocol_learnability_tab,
     resume_tab,
     timeline_tab,
     verbosity_tab,
@@ -22,7 +23,7 @@ st.set_page_config(page_title="Analysis Results Viewer", layout="wide")
 
 
 def main() -> None:
-    """Render nine tabs: Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS-vs-Frontier, Probe similarity, Language features."""  # noqa: E501
+    """Render ten tabs: Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS-vs-Frontier, Probe similarity, Language features, Protocol learnability."""  # noqa: E501
     runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs")).resolve()
     st.sidebar.markdown(f"**Runs directory**: `{runs_dir}`")
     evaluated = list_evaluated_runs(runs_dir=runs_dir)
@@ -38,6 +39,7 @@ def main() -> None:
         oss_frontier_panel,
         probe_similarity_panel,
         feature_presence_panel,
+        protocol_learnability_panel,
     ) = st.tabs(
         [
             "Timeline",
@@ -49,6 +51,7 @@ def main() -> None:
             "OSS vs Frontier",
             "Probe similarity",
             "Language features",
+            "Protocol learnability",
         ]
     )
     with timeline_panel:
@@ -69,6 +72,8 @@ def main() -> None:
         probe_similarity_tab.render(evaluated=evaluated)
     with feature_presence_panel:
         feature_presence_tab.render(evaluated=evaluated, runs_dir=runs_dir)
+    with protocol_learnability_panel:
+        protocol_learnability_tab.render(evaluated=evaluated, runs_dir=runs_dir)
 
 
 main()
