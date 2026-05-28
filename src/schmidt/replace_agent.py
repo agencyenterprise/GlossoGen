@@ -69,6 +69,7 @@ class ReplaceAgentRequest(NamedTuple):
     provider: str | None
     knobs: dict[str, Any] | None
     channels_with_visible_history: list[str] | None
+    channel_history_floors: dict[str, int]
     runs_dir: Path
 
 
@@ -217,8 +218,13 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
     When ``replaced_agent_id`` is set, ``model``, ``provider``, and
     ``channels_with_visible_history`` must all be present and ``provider``
     must be a known provider name. When ``replaced_agent_id`` is ``None``,
-    all three companion fields must also be ``None`` so the round-anchored
-    resume code path has no half-populated replacement state to interpret.
+    all three companion fields must also be ``None`` and
+    ``channel_history_floors`` must be empty so the round-anchored resume
+    code path has no half-populated replacement state to interpret.
+
+    Every channel named in ``channel_history_floors`` must also appear in
+    ``channels_with_visible_history`` (a windowed channel is still a
+    visible channel), and each floor must satisfy ``1 <= floor < round_start``.
     """
     if request.replaced_agent_id is None:
         misset = [
@@ -230,6 +236,8 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
             )
             if value is not None
         ]
+        if request.channel_history_floors:
+            misset.append("channel_history_floors")
         if misset:
             raise ValueError(
                 f"replaced_agent_id is None but {', '.join(misset)} is set; "
@@ -252,6 +260,18 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
         )
     if request.provider not in list_providers():
         raise ValueError(f"Unknown provider: {request.provider}")
+    visible = set(request.channels_with_visible_history or [])
+    for channel_id, floor in request.channel_history_floors.items():
+        if channel_id not in visible:
+            raise ValueError(
+                f"channel_history_floors names channel {channel_id!r} which is not in "
+                f"channels_with_visible_history; a windowed channel must also be visible"
+            )
+        if not 1 <= floor < request.round_start:
+            raise ValueError(
+                f"channel_history_floors[{channel_id!r}]={floor} must satisfy "
+                f"1 <= floor < round_start ({request.round_start})"
+            )
 
 
 def _pick_subprocess_default_model(
@@ -450,6 +470,7 @@ async def replace_agent_in_run(request: ReplaceAgentRequest) -> ReplaceAgentResu
         replacement_provider=request.provider,
         channels_with_visible_history=visible_channels,
         blocked_tool_call_channels=blocked_tool_call_channels,
+        channel_history_floors=dict(request.channel_history_floors),
         replaced_at=time.time(),
     )
     manifest_path = new_run_dir / REPLACE_MANIFEST_FILENAME
