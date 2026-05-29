@@ -71,9 +71,7 @@ export function EvidenceModal({
                       <span className="font-medium">Round {observation.round_number}</span>
                       <span className="text-muted-foreground">{observation.value.toFixed(2)}</span>
                     </div>
-                    {observation.note ? (
-                      <span className="text-muted-foreground">{observation.note}</span>
-                    ) : null}
+                    {observation.note ? <ProseMarkdown>{observation.note}</ProseMarkdown> : null}
                   </div>
                 ))}
               </div>
@@ -92,9 +90,7 @@ export function EvidenceModal({
                       <span className="font-medium">{humanize(observation.agent_id)}</span>
                       <span className="text-muted-foreground">{observation.value.toFixed(2)}</span>
                     </div>
-                    {observation.note ? (
-                      <span className="text-muted-foreground">{observation.note}</span>
-                    ) : null}
+                    {observation.note ? <ProseMarkdown>{observation.note}</ProseMarkdown> : null}
                   </div>
                 ))}
               </div>

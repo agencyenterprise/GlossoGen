@@ -576,6 +576,11 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
         "Then contrast `communication_feature_presence` confidences between the "
         "top-tertile and bottom-tertile learners."
     )
+    st.image(
+        str(Path(__file__).parent / "agent-swap-as-metric.png"),
+        caption="Method: replace-agent as a metric for protocol learnability",
+        width="stretch",
+    )
     with st.expander("What this experiment is, in plain English", expanded=False):
         st.markdown(
             "We selected 10 baseline runs of 15 rounds each, for three models — "
