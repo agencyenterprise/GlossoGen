@@ -19,6 +19,7 @@ from schmidt.evaluation.metrics.mcm_metric import MCMMetric
 from schmidt.evaluation.metrics.mcr_metric import MCRMetric
 from schmidt.evaluation.metrics.neologism_metric import NeologismMetric
 from schmidt.evaluation.metrics.perplexity_metric import PerplexityMetric
+from schmidt.evaluation.metrics.protocol_explanation_metric import ProtocolExplanationMetric
 from schmidt.evaluation.metrics.protocol_learned_after_swap_metric import (
     ProtocolLearnedAfterSwapMetric,
 )
@@ -48,6 +49,7 @@ _GENERIC_METRICS: list[type[Metric]] = [
     MCRMetric,
     NeologismMetric,
     PerplexityMetric,
+    ProtocolExplanationMetric,
     ProtocolLearnedAfterSwapMetric,
     ProtocolProbeMetric,
     ProtocolProbeAgentPairSimilarityMetric,

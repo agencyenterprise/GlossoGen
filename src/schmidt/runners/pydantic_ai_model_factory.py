@@ -71,8 +71,13 @@ def default_pydantic_ai_settings(provider: str) -> ModelSettings:
             anthropic_cache_tool_definitions=True,
         )
     if provider == "openai":
+        # Reasoning models consume output tokens for both the internal reasoning
+        # and the visible response; the provider default (≈4096 max_output) is
+        # easy to exhaust on long structured outputs before any visible text
+        # is emitted. 32k gives plenty of headroom without runaway costs.
         return OpenAIResponsesModelSettings(
             openai_reasoning_effort="high",
             openai_reasoning_summary="concise",
+            max_tokens=32768,
         )
     return ModelSettings()
