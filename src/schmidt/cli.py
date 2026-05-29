@@ -200,6 +200,18 @@ def _build_parser() -> argparse.ArgumentParser:
             "Required when --metrics includes communication_feature_presence."
         ),
     )
+    evaluate_parser.add_argument(
+        "--knobs",
+        type=str,
+        default=None,
+        help=(
+            "Optional path to a JSON file with scenario knob overrides merged "
+            "onto the run's recorded scenario_config before validating the "
+            "scenario. Useful for evaluating runs whose schema gained a "
+            "required knob after the run was created (e.g. veyru's "
+            "easy_round_numbers on pre-existing baselines)."
+        ),
+    )
 
     serve_parser = subparsers.add_parser("serve", help="Start the web server")
     serve_parser.add_argument(
@@ -1066,7 +1078,19 @@ async def _run_evaluation(
     report_path = run_dir / f"{args.scenario_name}_report.json"
 
     events = await load_events(log_path=log_path)
-    config = extract_scenario_config(events=events)
+    config: dict[str, Any] = dict(extract_scenario_config(events=events))
+    if args.knobs is not None:
+        knobs_raw: Any = json.loads(Path(args.knobs).read_text())
+        if not isinstance(knobs_raw, dict):
+            raise ValueError(f"--knobs file must contain a JSON object: {args.knobs}")
+        knobs_overrides: dict[str, Any] = {}
+        for key, value in cast(dict[Any, Any], knobs_raw).items():
+            knobs_overrides[str(key)] = value
+        config.update(knobs_overrides)
+        logger.info(
+            "Merged --knobs overrides into scenario_config: keys=%s",
+            sorted(knobs_overrides),
+        )
     scenario = scenario_cls.create_from_config(config=config)
 
     options = MetricRunOptions(
