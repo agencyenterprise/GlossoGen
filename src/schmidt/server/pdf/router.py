@@ -59,7 +59,7 @@ async def export_run_pdf(
 
     log_path = resolved.run_dir / f"{resolved.scenario_name}.jsonl"
 
-    run_detail = await load_run_detail(log_path=log_path)
+    run_detail = await load_run_detail(log_path=log_path, children=[])
 
     if channel_id is not None and channel_id not in run_detail.channel_ids:
         raise HTTPException(status_code=404, detail="Channel not found in this run")

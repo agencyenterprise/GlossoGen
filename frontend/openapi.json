@@ -959,6 +959,64 @@
         }
       }
     },
+    "/mcp/consent/approve": {
+      "post": {
+        "summary": "Approve Consent",
+        "description": "Verify the caller's Clerk JWT and materialize the parked OAuth code.\n\nThe group the token will be bound to is taken from the JWT's active\n``org_slug`` claim (Clerk's ``organizationSyncOptions`` keeps that\naligned with whichever org the user just selected on the FE).",
+        "operationId": "approve_consent_mcp_consent_approve_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveConsentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApproveConsentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp/whoami": {
+      "get": {
+        "summary": "Whoami",
+        "description": "Return the group bound to the calling OAuth access token.\n\nLets the CLI learn its ``group_slug`` after the OAuth exchange so it\ncan store it in ``~/.schmidt/credentials.json`` and address per-group\nREST endpoints without prompting the user.",
+        "operationId": "whoami_mcp_whoami_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhoAmIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -1185,6 +1243,40 @@
         ],
         "title": "AllLabelsResponse",
         "description": "Response containing all unique labels across all runs."
+      },
+      "ApproveConsentRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "title": "ApproveConsentRequest",
+        "description": "Body for ``POST /mcp/consent/approve`` \u2014 the parked request to materialize."
+      },
+      "ApproveConsentResponse": {
+        "properties": {
+          "redirect_url": {
+            "type": "string",
+            "title": "Redirect Url"
+          },
+          "group_slug": {
+            "type": "string",
+            "title": "Group Slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "redirect_url",
+          "group_slug"
+        ],
+        "title": "ApproveConsentResponse",
+        "description": "Response for ``POST /mcp/consent/approve`` \u2014 where the browser should go next."
       },
       "Body_import_run_bundle_api_g__group_slug__runs_import_post": {
         "properties": {
@@ -1893,6 +1985,201 @@
         "title": "DebugLogsResponse",
         "description": "Response containing debug log entries for a simulation run."
       },
+      "DerivedRunReference": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "derivation_type": {
+            "type": "string",
+            "enum": [
+              "replace_agent",
+              "resume_at_round",
+              "cross_run_replace_agent"
+            ],
+            "title": "Derivation Type"
+          },
+          "round_start": {
+            "type": "integer",
+            "title": "Round Start"
+          },
+          "rounds_after_swap": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounds After Swap"
+          },
+          "rounds_after_resume": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounds After Resume"
+          },
+          "replaced_agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaced Agent Id"
+          },
+          "replacement_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Model"
+          },
+          "replacement_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Provider"
+          },
+          "imported_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imported Model"
+          },
+          "imported_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imported Provider"
+          },
+          "source_b_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source B Run Id"
+          },
+          "source_b_round_end": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source B Round End"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "current_round": {
+            "type": "integer",
+            "title": "Current Round"
+          },
+          "target_round_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Round Count"
+          },
+          "total_messages": {
+            "type": "integer",
+            "title": "Total Messages"
+          },
+          "total_cost_usd": {
+            "type": "number",
+            "title": "Total Cost Usd"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "has_evaluation": {
+            "type": "boolean",
+            "title": "Has Evaluation"
+          },
+          "headline_measurements": {
+            "items": {
+              "$ref": "#/components/schemas/HeadlineMeasurement"
+            },
+            "type": "array",
+            "title": "Headline Measurements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "derivation_type",
+          "round_start",
+          "rounds_after_swap",
+          "rounds_after_resume",
+          "replaced_agent_id",
+          "replacement_model",
+          "replacement_provider",
+          "imported_model",
+          "imported_provider",
+          "source_b_run_id",
+          "source_b_round_end",
+          "created_at",
+          "status",
+          "current_round",
+          "target_round_count",
+          "total_messages",
+          "total_cost_usd",
+          "labels",
+          "has_evaluation",
+          "headline_measurements"
+        ],
+        "title": "DerivedRunReference",
+        "description": "One child run derived from the parent currently being viewed.\n\nA child is any run whose timeline parent is this run: created via\n``replace-agent`` (``derivation_type == \"replace_agent\"``),\n``resume-at-round`` (``\"resume_at_round\"``), or\n``cross-run-replace-agent`` with this run as source A\n(``\"cross_run_replace_agent\"``). Source-B-only usage is not represented."
+      },
       "EvalCostResponse": {
         "properties": {
           "input_tokens": {
@@ -2038,6 +2325,35 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HeadlineMeasurement": {
+        "properties": {
+          "metric_name": {
+            "type": "string",
+            "title": "Metric Name"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "score_unit": {
+            "type": "string",
+            "title": "Score Unit"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric_name",
+          "score",
+          "score_unit",
+          "summary"
+        ],
+        "title": "HeadlineMeasurement",
+        "description": "Compact eval measurement surfaced inline on a derived run reference."
       },
       "HealthResponse": {
         "properties": {
@@ -2514,6 +2830,13 @@
               }
             ]
           },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/DerivedRunReference"
+            },
+            "type": "array",
+            "title": "Children"
+          },
           "labels": {
             "items": {
               "type": "string"
@@ -2591,6 +2914,7 @@
           "replace_agent_source",
           "cross_run_replace_agent_source",
           "resume_at_round_source",
+          "children",
           "labels",
           "note",
           "round_endings",
@@ -3989,6 +4313,25 @@
         ],
         "title": "WebhookAccepted",
         "description": "Response payload returned for every accepted Clerk webhook."
+      },
+      "WhoAmIResponse": {
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "title": "Group Id"
+          },
+          "group_slug": {
+            "type": "string",
+            "title": "Group Slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "group_id",
+          "group_slug"
+        ],
+        "title": "WhoAmIResponse",
+        "description": "Response for ``GET /mcp/whoami`` \u2014 group bound to the calling OAuth token."
       }
     }
   }

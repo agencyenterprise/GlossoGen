@@ -104,7 +104,7 @@ async def _load_detail(run_summary: RunSummary) -> RunDetailResponse:
     """Load full run detail from a RunSummary."""
     run_dir = Path(run_summary.run_dir)
     jsonl_path = run_dir / f"{run_summary.scenario_name}.jsonl"
-    return await load_run_detail(log_path=jsonl_path)
+    return await load_run_detail(log_path=jsonl_path, children=[])
 
 
 def _run_summary_to_entry(run: RunSummary) -> McpRunEntry:
@@ -373,6 +373,7 @@ async def _tool_get_run(
             replace_agent_source=detail.replace_agent_source,
             cross_run_replace_agent_source=detail.cross_run_replace_agent_source,
             resume_at_round_source=detail.resume_at_round_source,
+            children=detail.children,
             labels=detail.labels,
             note=detail.note,
             round_endings=detail.round_endings,

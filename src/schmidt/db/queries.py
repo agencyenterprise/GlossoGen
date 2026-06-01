@@ -180,6 +180,34 @@ async def list_runs_for_group(
     return [_run_row_from_tuple(row) for row in rows]
 
 
+async def list_children_of_run(
+    conn: AsyncConnection[TupleRow],
+    group_id: UUID,
+    parent_scenario: str,
+    parent_run_dir_name: str,
+) -> list[RunRow]:
+    """Return runs derived from ``(parent_scenario, parent_run_dir_name)``.
+
+    A run is a child if its ``source_run_scenario`` / ``source_run_dir_name``
+    columns match the parent. Covers ``replace-agent``, ``resume-at-round``,
+    and ``cross-run-replace-agent`` (source A) derivations — all three
+    register through ``_register_derived_run`` with the timeline parent.
+    """
+    async with conn.cursor() as cur:
+        await cur.execute(
+            f"""
+            SELECT {_RUN_COLUMNS} FROM runs
+            WHERE group_id = %s
+              AND source_run_scenario = %s
+              AND source_run_dir_name = %s
+            ORDER BY created_at DESC
+            """,
+            (group_id, parent_scenario, parent_run_dir_name),
+        )
+        rows = await cur.fetchall()
+    return [_run_row_from_tuple(row) for row in rows]
+
+
 async def insert_run(
     conn: AsyncConnection[TupleRow],
     group_id: UUID,

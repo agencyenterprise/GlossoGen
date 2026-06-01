@@ -31,6 +31,7 @@ from schmidt.server.runs.models import (
     AgentSwapEventDTO,
     CrossRunReplaceAgentSource,
     DebugLogEntry,
+    DerivedRunReference,
     EvalCostResponse,
     EvalReportResponse,
     ForkSource,
@@ -181,8 +182,17 @@ def _link_reasoning_to_channels(
                 r.channel_ids = [prev_channel]
 
 
-async def load_run_detail(log_path: Path) -> RunDetailResponse:
-    """Parse all events from a JSONL log and assemble a RunDetailResponse."""
+async def load_run_detail(
+    log_path: Path,
+    children: list[DerivedRunReference],
+) -> RunDetailResponse:
+    """Parse all events from a JSONL log and assemble a RunDetailResponse.
+
+    ``children`` is the list of derived runs surfaced as the parent→child
+    link on the FE. Callers without DB access (PDF / MCP browser) pass an
+    empty list; the request-path router populates it via
+    ``build_derived_run_references``.
+    """
     events: list[SimulationEvent] = await load_events(log_path=log_path)
 
     run_dir = log_path.parent
@@ -474,6 +484,7 @@ async def load_run_detail(log_path: Path) -> RunDetailResponse:
         replace_agent_source=replace_agent_source,
         cross_run_replace_agent_source=cross_run_replace_agent_source,
         resume_at_round_source=resume_at_round_source,
+        children=children,
         labels=labels,
         note=note,
         round_endings=round_endings,
