@@ -21,6 +21,14 @@ subtabs:
   vertical dashed line at the threshold, win/loss caption from the
   success threshold, and the judge's justifications (ordered to match
   the bar chart) + deep-link to the run viewer.
+* **Knob correlation** — pick one ontology category; line plot of how
+  often that feature emerges as a function of the per-round budget
+  (X axis), split into one line for postmortem-enabled runs and one for
+  postmortem-disabled runs. Y = fraction of bucket runs whose confidence
+  is ≥ the confidence threshold. This subtab renders over the
+  metadata-filtered cohort *before* the round-success drop, so the
+  signal reads as "how often the knob setting produces this feature",
+  independent of round success.
 """
 
 import logging
@@ -530,6 +538,123 @@ def _render_lookup_section(
             st.write(justification)
 
 
+_POSTMORTEM_LINE_COLOR = "#F6BD16"
+_NO_POSTMORTEM_LINE_COLOR = _WIN_COLOR
+
+
+def _feature_presence_rate(
+    runs: list[FeaturePresenceRun],
+    category_id: str,
+    threshold: float,
+) -> tuple[int, int]:
+    """Return ``(present, total)`` runs whose confidence on ``category_id`` is ≥ ``threshold``."""
+    present = sum(1 for run in runs if run.scores.get(category_id, 0.0) >= threshold)
+    return (present, len(runs))
+
+
+def _render_knob_correlation_section(
+    runs: list[FeaturePresenceRun],
+    ontology: OntologyView,
+    threshold: float,
+) -> None:
+    """Section 4: feature emergence vs round budget, split by postmortem on/off.
+
+    The cohort here is the metadata-filtered list *before* the success
+    threshold is applied, so the plot reads as "how often this feature
+    emerges under each knob setting", independent of whether the run
+    succeeded. X = round time budget; one line per postmortem state;
+    Y = fraction of bucket runs whose confidence on the picked category
+    is ≥ the confidence threshold.
+    """
+    if not runs:
+        st.info("No runs in the current cohort.")
+        return
+    category_ids = sorted((cat.id for cat in ontology.categories), key=natural_sort_key)
+    category_id = st.selectbox(
+        label="Language feature",
+        options=category_ids,
+        key="feature_presence_knob_feature",
+    )
+    if category_id is None:  # pyright: ignore[reportUnnecessaryComparison]
+        return
+    category_meta = ontology.by_id.get(category_id)
+    if category_meta is not None:
+        st.caption(category_meta.description)
+
+    budgeted_runs: list[tuple[FeaturePresenceRun, int]] = []
+    for run in runs:
+        budget = _budget_of(run=run)
+        if budget is not None:
+            budgeted_runs.append((run, budget))
+    if not budgeted_runs:
+        st.info("No runs in the cohort carry a per-round budget (`round_time_budget_seconds`).")
+        return
+
+    budget_order = [str(budget) for budget in sorted({budget for _, budget in budgeted_runs})]
+    line_specs = [
+        (True, "with postmortem", _POSTMORTEM_LINE_COLOR),
+        (False, "no postmortem", _NO_POSTMORTEM_LINE_COLOR),
+    ]
+    fig = go.Figure()
+    per_line_counts: dict[str, int] = {}
+    for pm_state, label, color in line_specs:
+        state_runs = [
+            (run, budget)
+            for run, budget in budgeted_runs
+            if _postmortem_enabled_at_start(run=run) == pm_state
+        ]
+        per_line_counts[label] = len(state_runs)
+        if not state_runs:
+            continue
+        budgets = sorted({budget for _, budget in state_runs})
+        xs: list[str] = []
+        ys: list[float] = []
+        hovertext: list[str] = []
+        for budget in budgets:
+            bucket = [run for run, run_budget in state_runs if run_budget == budget]
+            present, total = _feature_presence_rate(
+                runs=bucket, category_id=category_id, threshold=threshold
+            )
+            fraction = present / total
+            xs.append(str(budget))
+            ys.append(fraction)
+            hovertext.append(f"{label}<br>budget {budget}<br>{fraction:.0%} ({present}/{total})")
+        fig.add_trace(
+            go.Scatter(
+                x=xs,
+                y=ys,
+                mode="lines+markers",
+                name=label,
+                marker={"color": color},
+                line={"color": color},
+                hovertext=hovertext,
+                hoverinfo="text",
+            )
+        )
+    fig.update_layout(
+        xaxis={
+            "title": "Round time budget (seconds)",
+            "type": "category",
+            "categoryorder": "array",
+            "categoryarray": budget_order,
+        },
+        yaxis={
+            "title": f"% of runs with confidence ≥ {threshold:g}",
+            "range": [0, 1],
+            "tickformat": ".0%",
+        },
+        height=420,
+        margin={"l": 40, "r": 20, "t": 20, "b": 60},
+    )
+    st.plotly_chart(fig, width="stretch")
+    st.caption(
+        f"n_cohort = {len(budgeted_runs)} runs · "
+        f"with-postmortem n={per_line_counts['with postmortem']} · "
+        f"no-postmortem n={per_line_counts['no postmortem']} · "
+        "round-success threshold intentionally not applied in this view."
+    )
+
+
 def _format_run_picker_option(run: FeaturePresenceRun) -> str:
     """Compact run-picker label: ``run_id (model) [labels]``."""
     label_suffix = f" [{', '.join(run.labels)}]" if run.labels else ""
@@ -654,8 +779,13 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
         f"(metadata-pass: {len(metadata_filtered)}; "
         f"dropped {excluded} below round_success {success_threshold:g})."
     )
-    frequency_panel, outcomes_panel, lookup_panel = st.tabs(
-        ["Per-feature frequency", "Feature-conditioned outcomes", "Per-run lookup"]
+    frequency_panel, outcomes_panel, lookup_panel, knob_panel = st.tabs(
+        [
+            "Per-feature frequency",
+            "Feature-conditioned outcomes",
+            "Per-run lookup",
+            "Knob correlation",
+        ]
     )
     with frequency_panel:
         _render_frequency_section(
@@ -677,4 +807,10 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
             frontend_base=frontend_base,
             threshold=threshold,
             success_threshold=success_threshold,
+        )
+    with knob_panel:
+        _render_knob_correlation_section(
+            runs=metadata_filtered,
+            ontology=ontology,
+            threshold=threshold,
         )

@@ -28,9 +28,17 @@ problems).
   the original engineer. This is where the *replace-agent feature becomes the metric* —
   performance here measures whether the protocol is self-explanatory from the link alone.
 
-That's 45 baselines + 135 resume + 135 resume_no_postmortem + 135 replace = 450 runs.
+- **Cross-family (3 replace runs)** — same as Learned, but the fresh observer is from
+  the **other model family**: sonnet baselines and opus-4-7 baselines get a **gpt-5.4**
+  observer; gpt-5.4 baselines get a **claude-opus-4-7** observer. Engineer stays on the
+  baseline's original model. Everything else is identical to Learned (link history
+  windowed to rounds 5–14, no postmortem). Isolates `Δ_family` — does a fresh
+  *other-family* observer read the protocol better or worse than a fresh same-family
+  observer?
 
-For each baseline we compare the three means. Decomposing `Δ_total = learned − expected`:
+That's 45 baselines + 135 resume + 135 resume_no_postmortem + 135 replace + 135 cross_family = 585 runs.
+
+For each baseline we compare the four means. Decomposing `Δ_total = learned − expected`:
 
 - `Δ_postmortem = expected_no_postmortem − expected` — loss from removing the postmortem
   back-channel alone (intact team, no fresh observer).
@@ -102,8 +110,11 @@ replaced observer sees only link rounds 5–14 and no postmortem backchannel con
 - expected: `["protocol_learnability","phase=resume_expected","budget=250","model=<m>","history=10","src=<src>"]`
 - expected_no_postmortem: `["protocol_learnability","phase=resume_expected_no_postmortem","budget=250","model=<m>","history=10","src=<src>"]`
 - learned:  `["protocol_learnability","phase=replace_learned","budget=250","model=<m>","history=10","src=<src>"]`
+- cross_family: `["protocol_learnability","phase=replace_cross_family","budget=250","model=<m>","observer=<o>","history=10","src=<src>"]`
 
-(`<m>` ∈ {sonnet, opus47, gpt54}; `<src>` = `veyru/<baseline_ts>`.)
+(`<m>` ∈ {sonnet, opus47, gpt54} = the baseline's model; `<o>` ∈ {sonnet, opus47, gpt54}
+= the cross-family observer's model — by table: sonnet→gpt54, opus47→gpt54, gpt54→opus47;
+`<src>` = `veyru/<baseline_ts>`.)
 
 ## Launch
 
@@ -121,7 +132,24 @@ nohup bash experiments/2026-05-27_protocol_learnability_budget250/launch_derived
 # Stage 3 — 135 resume_expected_no_postmortem (isolates Δ_observer from Δ_postmortem)
 nohup bash experiments/2026-05-27_protocol_learnability_budget250/launch_resume_no_postmortem.sh \
   > /tmp/protolearn_resume_no_postmortem.stdout 2>&1 & disown
+
+# Stage 4 — 135 replace_cross_family. PRECONDITION: judge prompt pinned to 364987a so
+# round_success is comparable to prior 450 runs. The script aborts if the working-tree
+# stabilization_judge.jinja hash drifts; restore via
+#   git checkout 364987a -- src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja
+nohup bash experiments/2026-05-27_protocol_learnability_budget250/launch_cross_family.sh \
+  > /tmp/protolearn_cross_family.stdout 2>&1 & disown
 ```
+
+**Judge prompt pinning (Stage 4 only).** Runs in this experiment must all be judged
+against `src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja` at commit
+`364987a` (before `e2f7cc7` "Refine ... cryptic" and `dae0724` "Refine ... clarity").
+Both subsequent commits tightened criteria; running Stage 4 against the new prompt would
+make `round_success` scores incomparable to the prior 450 runs in this experiment. The
+launcher refuses to start if the working-tree judge prompt hash does not match
+`git rev-parse 364987a:<path>`. Restore the HEAD version with the snapshot at
+`/tmp/stabilization_judge.HEAD.jinja` after every cross_family `veyru_report.json` has
+landed (the judge prompt is read at `schmidt evaluate` time, not at `schmidt run` time).
 
 `list_baselines.py` enumerates completed baselines (model/provider read from each run's
 own `AgentRegistered`) and feeds Stage 2.
@@ -159,7 +187,8 @@ newcomer can adopt.
 | baseline | sonnet / opus47 / gpt54 | 15 / 15 / 15 | ✓ complete 2026-05-28 |
 | resume_expected | per baseline ×3 | 135 | ✓ complete 2026-05-28 |
 | replace_learned | per baseline ×3 | 135 | ✓ complete 2026-05-28 |
-| resume_expected_no_postmortem | per baseline ×3 | 135 | ⏳ in progress 2026-05-29 |
+| resume_expected_no_postmortem | per baseline ×3 | 135 | ✓ complete 2026-06-01 |
+| replace_cross_family | per baseline ×3 (sonnet→gpt54, opus47→gpt54, gpt54→opus47) | 135 | ⏳ launched 2026-06-01 |
 
 ## Results
 
