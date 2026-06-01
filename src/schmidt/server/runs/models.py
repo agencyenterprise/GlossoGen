@@ -90,6 +90,48 @@ class CrossRunReplaceAgentSource(BaseModel):
     replaced_at: datetime
 
 
+class HeadlineMeasurement(BaseModel):
+    """Compact eval measurement surfaced inline on a derived run reference."""
+
+    metric_name: str
+    score: float
+    score_unit: str
+    summary: str
+
+
+class DerivedRunReference(BaseModel):
+    """One child run derived from the parent currently being viewed.
+
+    A child is any run whose timeline parent is this run: created via
+    ``replace-agent`` (``derivation_type == "replace_agent"``),
+    ``resume-at-round`` (``"resume_at_round"``), or
+    ``cross-run-replace-agent`` with this run as source A
+    (``"cross_run_replace_agent"``). Source-B-only usage is not represented.
+    """
+
+    run_id: str
+    derivation_type: Literal["replace_agent", "resume_at_round", "cross_run_replace_agent"]
+    round_start: int
+    rounds_after_swap: int | None
+    rounds_after_resume: int | None
+    replaced_agent_id: str | None
+    replacement_model: str | None
+    replacement_provider: str | None
+    imported_model: str | None
+    imported_provider: str | None
+    source_b_run_id: str | None
+    source_b_round_end: int | None
+    created_at: datetime
+    status: RunStatus
+    current_round: int
+    target_round_count: int | None
+    total_messages: int
+    total_cost_usd: float
+    labels: list[str]
+    has_evaluation: bool
+    headline_measurements: list[HeadlineMeasurement]
+
+
 class AgentModelSummary(BaseModel):
     """Per-agent model and provider info for run summary display."""
 
@@ -302,6 +344,7 @@ class RunDetailResponse(BaseModel):
     replace_agent_source: ReplaceAgentSource | None
     cross_run_replace_agent_source: CrossRunReplaceAgentSource | None
     resume_at_round_source: ResumeAtRoundSource | None
+    children: list[DerivedRunReference]
     labels: list[str]
     note: str | None
     round_endings: list[RoundEnding]

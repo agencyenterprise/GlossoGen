@@ -64,6 +64,7 @@ import { ScenarioDescriptionModal } from "./scenario-description-modal";
 import { ReplaceAgentBadge } from "./replace-agent-badge";
 import { CrossRunReplaceAgentBadge } from "./cross-run-replace-agent-badge";
 import { ResumeAtRoundBadge } from "./resume-at-round-badge";
+import { DerivedRunsSection } from "./derived-runs-section";
 import { ConfigValueModal } from "./config-value-modal";
 import { LabelPickerModal } from "./label-picker-modal";
 import { NoteEditorModal } from "./note-editor-modal";
@@ -555,6 +556,9 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
           </button>
         </span>
       </div>
+
+      {/* Derived runs (children) */}
+      <DerivedRunsSection derivedRuns={restData.children} />
 
       {/* Scenario config */}
       {restData.scenario_config && Object.keys(restData.scenario_config).length > 0 ? (

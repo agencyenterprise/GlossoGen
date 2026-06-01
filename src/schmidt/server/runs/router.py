@@ -18,6 +18,7 @@ from schmidt.eval_manifest import read_eval_manifest
 from schmidt.models.event import RunStatus, SimulationEnded
 from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.server.response_models import LaunchStatus
+from schmidt.server.runs.derived_run_references import build_derived_run_references
 from schmidt.server.runs.detail_reader import (
     debug_log_path_for,
     load_debug_logs,
@@ -26,7 +27,7 @@ from schmidt.server.runs.detail_reader import (
 )
 from schmidt.server.runs.discovery import compose_run_id, scan_jsonl
 from schmidt.server.runs.listing import list_runs_for_group
-from schmidt.server.runs.lookup import resolve_run_or_404
+from schmidt.server.runs.lookup import get_identity, resolve_run_or_404
 from schmidt.server.runs.models import (
     AllLabelsResponse,
     DebugLogsResponse,
@@ -86,7 +87,15 @@ async def get_run_detail(
     """Get full detail for a specific simulation run."""
     resolved = await resolve_run_or_404(request=request, scenario=scenario, run_dir_name=run_dir_name)
     log_path = resolved.run_dir / f"{resolved.scenario_name}.jsonl"
-    return await load_run_detail(log_path=log_path)
+    identity = get_identity(request=request)
+    children = await build_derived_run_references(
+        pool=request.app.state.db_pool,
+        runs_dir=request.app.state.runs_dir,
+        group_id=identity.active_group_id,
+        parent_scenario=resolved.scenario_name,
+        parent_run_dir_name=run_dir_name,
+    )
+    return await load_run_detail(log_path=log_path, children=children)
 
 
 @router.get("/runs/{scenario}/{run_dir_name}/evaluation", response_model=EvalReportResponse | None)

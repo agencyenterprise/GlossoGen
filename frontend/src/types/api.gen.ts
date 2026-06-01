@@ -381,6 +381,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mcp/consent/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Consent
+         * @description Verify the caller's Clerk JWT and materialize the parked OAuth code.
+         *
+         *     The group the token will be bound to is taken from the JWT's active
+         *     ``org_slug`` claim (Clerk's ``organizationSyncOptions`` keeps that
+         *     aligned with whichever org the user just selected on the FE).
+         */
+        post: operations["approve_consent_mcp_consent_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mcp/whoami": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whoami
+         * @description Return the group bound to the calling OAuth access token.
+         *
+         *     Lets the CLI learn its ``group_slug`` after the OAuth exchange so it
+         *     can store it in ``~/.schmidt/credentials.json`` and address per-group
+         *     REST endpoints without prompting the user.
+         */
+        get: operations["whoami_mcp_whoami_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -510,6 +558,24 @@ export interface components {
         AllLabelsResponse: {
             /** Labels */
             labels: string[];
+        };
+        /**
+         * ApproveConsentRequest
+         * @description Body for ``POST /mcp/consent/approve`` — the parked request to materialize.
+         */
+        ApproveConsentRequest: {
+            /** Request Id */
+            request_id: string;
+        };
+        /**
+         * ApproveConsentResponse
+         * @description Response for ``POST /mcp/consent/approve`` — where the browser should go next.
+         */
+        ApproveConsentResponse: {
+            /** Redirect Url */
+            redirect_url: string;
+            /** Group Slug */
+            group_slug: string;
         };
         /** Body_import_run_bundle_api_g__group_slug__runs_import_post */
         Body_import_run_bundle_api_g__group_slug__runs_import_post: {
@@ -851,6 +917,65 @@ export interface components {
             entries: components["schemas"]["DebugLogEntry"][];
         };
         /**
+         * DerivedRunReference
+         * @description One child run derived from the parent currently being viewed.
+         *
+         *     A child is any run whose timeline parent is this run: created via
+         *     ``replace-agent`` (``derivation_type == "replace_agent"``),
+         *     ``resume-at-round`` (``"resume_at_round"``), or
+         *     ``cross-run-replace-agent`` with this run as source A
+         *     (``"cross_run_replace_agent"``). Source-B-only usage is not represented.
+         */
+        DerivedRunReference: {
+            /** Run Id */
+            run_id: string;
+            /**
+             * Derivation Type
+             * @enum {string}
+             */
+            derivation_type: "replace_agent" | "resume_at_round" | "cross_run_replace_agent";
+            /** Round Start */
+            round_start: number;
+            /** Rounds After Swap */
+            rounds_after_swap: number | null;
+            /** Rounds After Resume */
+            rounds_after_resume: number | null;
+            /** Replaced Agent Id */
+            replaced_agent_id: string | null;
+            /** Replacement Model */
+            replacement_model: string | null;
+            /** Replacement Provider */
+            replacement_provider: string | null;
+            /** Imported Model */
+            imported_model: string | null;
+            /** Imported Provider */
+            imported_provider: string | null;
+            /** Source B Run Id */
+            source_b_run_id: string | null;
+            /** Source B Round End */
+            source_b_round_end: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            status: components["schemas"]["RunStatus"];
+            /** Current Round */
+            current_round: number;
+            /** Target Round Count */
+            target_round_count: number | null;
+            /** Total Messages */
+            total_messages: number;
+            /** Total Cost Usd */
+            total_cost_usd: number;
+            /** Labels */
+            labels: string[];
+            /** Has Evaluation */
+            has_evaluation: boolean;
+            /** Headline Measurements */
+            headline_measurements: components["schemas"]["HeadlineMeasurement"][];
+        };
+        /**
          * EvalCostResponse
          * @description Evaluation cost summary for the run detail endpoint.
          */
@@ -916,6 +1041,20 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HeadlineMeasurement
+         * @description Compact eval measurement surfaced inline on a derived run reference.
+         */
+        HeadlineMeasurement: {
+            /** Metric Name */
+            metric_name: string;
+            /** Score */
+            score: number;
+            /** Score Unit */
+            score_unit: string;
+            /** Summary */
+            summary: string;
         };
         /**
          * HealthResponse
@@ -1155,6 +1294,8 @@ export interface components {
             replace_agent_source: components["schemas"]["ReplaceAgentSource"] | null;
             cross_run_replace_agent_source: components["schemas"]["CrossRunReplaceAgentSource"] | null;
             resume_at_round_source: components["schemas"]["ResumeAtRoundSource"] | null;
+            /** Children */
+            children: components["schemas"]["DerivedRunReference"][];
             /** Labels */
             labels: string[];
             /** Note */
@@ -1856,6 +1997,16 @@ export interface components {
             /** Event Type */
             event_type: string;
         };
+        /**
+         * WhoAmIResponse
+         * @description Response for ``GET /mcp/whoami`` — group bound to the calling OAuth token.
+         */
+        WhoAmIResponse: {
+            /** Group Id */
+            group_id: string;
+            /** Group Slug */
+            group_slug: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -2445,6 +2596,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WebhookAccepted"];
+                };
+            };
+        };
+    };
+    approve_consent_mcp_consent_approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveConsentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApproveConsentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    whoami_mcp_whoami_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhoAmIResponse"];
                 };
             };
         };
