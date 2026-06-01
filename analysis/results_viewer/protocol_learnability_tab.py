@@ -62,13 +62,17 @@ def _filter_models(
 def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
     """Per-model strip plot: each baseline is one bullet, mean drawn as a bar.
 
-    Each model gets **two adjacent columns** on the x-axis — one labelled
-    ``<model> · baseline`` (the intact team continued = resume runs) and one
-    ``<model> · learned`` (a fresh same-model field observer = replace runs).
-    Within each column we plot the 10 per-baseline ``round_success`` means
-    (each itself averaged over 3 replicas), jittered horizontally for
-    visibility. The cohort mean is drawn as a thick horizontal bar across each
-    column so dispersion is read from the dots and central tendency from the bar.
+    Each model gets **three adjacent columns** on the x-axis:
+    ``<model> · baseline`` (intact team continued = resume runs, postmortem on),
+    ``<model> · no_postmortem`` (intact team but postmortem killed going forward
+    — isolates the no-postmortem effect), and ``<model> · learned`` (a fresh
+    same-model field observer = replace runs, postmortem off). Within each
+    column we plot the per-baseline ``round_success`` means (each itself
+    averaged over its 3 replicas), jittered horizontally for visibility. The
+    cohort mean is drawn as a thick horizontal bar across each column with SEM
+    error bars. Baselines without any ``resume_expected_no_postmortem`` replicas
+    are skipped in the no_postmortem column (no point plotted) but still appear
+    in the other two.
     """
     by_model: dict[str, list[BaselineLearnability]] = {}
     for r in results:
@@ -78,9 +82,9 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
     between_model_gap = 1.2
     jitter_half_width = 0.12
 
-    def _column_x(model_index: int, learned: bool) -> float:
-        base = model_index * (within_model_gap + between_model_gap)
-        return base + (within_model_gap if learned else 0.0)
+    def _column_x(model_index: int, slot: int) -> float:
+        base = model_index * (3 * within_model_gap + between_model_gap)
+        return base + slot * within_model_gap
 
     def _jitter(src_id: str) -> float:
         # Deterministic per-baseline horizontal offset inside the column width.
@@ -92,13 +96,18 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
     for i, model in enumerate(models):
         color = _MODEL_COLORS.get(model, "#777777")
         rs = by_model[model]
-        base_x = _column_x(model_index=i, learned=False)
-        learned_x = _column_x(model_index=i, learned=True)
-        tick_vals.extend([base_x, learned_x])
+        base_x = _column_x(model_index=i, slot=0)
+        no_pm_x = _column_x(model_index=i, slot=1)
+        learned_x = _column_x(model_index=i, slot=2)
+        tick_vals.extend([base_x, no_pm_x, learned_x])
         budgets = sorted({r.budget for r in rs})
         budget_tag = f"b={'/'.join(budgets)}"
         tick_text.extend(
-            [f"{model} · {budget_tag}<br>baseline", f"{model} · {budget_tag}<br>learned"]
+            [
+                f"{model} · {budget_tag}<br>baseline",
+                f"{model} · {budget_tag}<br>no_postmortem",
+                f"{model} · {budget_tag}<br>learned",
+            ]
         )
 
         base_xs = [base_x + _jitter(r.src_id) for r in rs]
@@ -107,6 +116,14 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
             f"{r.src_id} ({model}) · baseline<br>"
             f"round_success={r.expected_mean:.3f}  n={r.n_expected}"
             for r in rs
+        ]
+        no_pm_rs = [r for r in rs if r.n_expected_no_pm > 0]
+        no_pm_xs = [no_pm_x + _jitter(r.src_id) for r in no_pm_rs]
+        no_pm_ys = [r.expected_no_pm_mean for r in no_pm_rs]
+        no_pm_hover = [
+            f"{r.src_id} ({model}) · no_postmortem<br>"
+            f"round_success={r.expected_no_pm_mean:.3f}  n={r.n_expected_no_pm}"
+            for r in no_pm_rs
         ]
         learned_xs = [learned_x + _jitter(r.src_id) for r in rs]
         learned_ys = [r.learned_mean for r in rs]
@@ -134,6 +151,25 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
                 hoverinfo="text",
             )
         )
+        if no_pm_rs:
+            fig.add_trace(
+                go.Scatter(
+                    x=no_pm_xs,
+                    y=no_pm_ys,
+                    mode="markers",
+                    marker={
+                        "symbol": "triangle-up-open",
+                        "size": 11,
+                        "line": {"width": 1.6, "color": color},
+                        "color": color,
+                    },
+                    name="no_postmortem (resume — intact team, postmortem off)",
+                    legendgroup="no_postmortem",
+                    showlegend=(i == 0),
+                    hovertext=no_pm_hover,
+                    hoverinfo="text",
+                )
+            )
         fig.add_trace(
             go.Scatter(
                 x=learned_xs,
@@ -178,6 +214,39 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
                 hoverinfo="text",
             )
         )
+        if no_pm_ys:
+            no_pm_mean = statistics.mean(no_pm_ys)
+            no_pm_sem = (
+                statistics.stdev(no_pm_ys) / math.sqrt(len(no_pm_ys)) if len(no_pm_ys) >= 2 else 0.0
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=[no_pm_x],
+                    y=[no_pm_mean],
+                    mode="markers",
+                    marker={
+                        "symbol": "line-ew-open",
+                        "size": 28,
+                        "color": color,
+                        "line": {"width": 3},
+                    },
+                    error_y={
+                        "type": "data",
+                        "array": [no_pm_sem],
+                        "thickness": 2,
+                        "width": 10,
+                        "color": color,
+                    },
+                    name="cohort mean ± SEM",
+                    legendgroup="mean",
+                    showlegend=False,
+                    hovertext=(
+                        f"{model} · no_postmortem<br>"
+                        f"mean={no_pm_mean:.3f}  SEM={no_pm_sem:.3f}  n={len(no_pm_ys)}"
+                    ),
+                    hoverinfo="text",
+                )
+            )
         fig.add_trace(
             go.Scatter(
                 x=[learned_x],
@@ -231,10 +300,13 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
     for r, label in zip(ordered, y_labels, strict=True):
         color = _MODEL_COLORS.get(r.model_short, "#777777")
         url = run_url(frontend_base=frontend_base, run_id=r.src_id)
+        line_xs = [r.expected_mean, r.learned_mean]
+        if r.n_expected_no_pm > 0:
+            line_xs = [r.expected_mean, r.expected_no_pm_mean, r.learned_mean]
         fig.add_trace(
             go.Scatter(
-                x=[r.expected_mean, r.learned_mean],
-                y=[label, label],
+                x=sorted(line_xs),
+                y=[label] * len(line_xs),
                 mode="lines",
                 line={"color": color, "width": 1.5},
                 opacity=0.4,
@@ -263,6 +335,31 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
                 customdata=[url],
             )
         )
+        if r.n_expected_no_pm > 0:
+            fig.add_trace(
+                go.Scatter(
+                    x=[r.expected_no_pm_mean],
+                    y=[label],
+                    mode="markers",
+                    marker={
+                        "symbol": "triangle-up-open",
+                        "size": 12,
+                        "line": {"color": color, "width": 2},
+                    },
+                    name=f"{r.model_short} expected_no_postmortem",
+                    showlegend=False,
+                    hovertemplate=(
+                        f"{r.src_id} ({r.model_short} · b={r.budget})<br>"
+                        f"expected_no_postmortem={r.expected_no_pm_mean:.3f} "
+                        f"± {r.expected_no_pm_std:.3f} "
+                        f"(n={r.n_expected_no_pm} replicas)<br>"
+                        f"Δ_postmortem={(r.expected_no_pm_mean - r.expected_mean):+.3f}<br>"
+                        f"Δ_observer={(r.learned_mean - r.expected_no_pm_mean):+.3f}<br>"
+                        "<i>click to open source run</i><extra></extra>"
+                    ),
+                    customdata=[url],
+                )
+            )
         fig.add_trace(
             go.Scatter(
                 x=[r.learned_mean],
@@ -283,7 +380,9 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
         )
     fig.update_layout(
         height=max(360, 22 * len(y_labels) + 80),
-        xaxis_title="round_success over rounds window  (○ expected, ■ learned)",
+        xaxis_title=(
+            "round_success over rounds window  " "(○ expected, △ expected_no_postmortem, ■ learned)"
+        ),
         yaxis={"categoryorder": "array", "categoryarray": list(reversed(y_labels))},
         margin={"l": 260, "r": 20, "t": 30, "b": 40},
     )
@@ -296,61 +395,6 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
     maybe_open_clicked_run(
         chart_event=chart_event, session_key="protocol_learnability_last_opened_url"
     )
-
-
-def _render_replica_variability(results: list[BaselineLearnability]) -> None:
-    """Per-baseline stdev across the 3 replicas, expected vs learned.
-
-    One row per baseline (same ordering as the main scatter — by ``learned_mean``
-    descending), two markers per row: gray ○ for expected_std (resume replicas),
-    black ■ for learned_std (replace replicas). Wide horizontal span → high
-    replica-to-replica disagreement; near-zero → the 3 replicas agreed closely.
-    """
-    if not results:
-        return
-    ordered = sorted(results, key=lambda r: r.learned_mean, reverse=True)
-    y_labels = [f"{r.src_id}  ({r.model_short} · b={r.budget})" for r in ordered]
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=[r.expected_std for r in ordered],
-            y=y_labels,
-            mode="markers",
-            marker={
-                "symbol": "circle-open",
-                "size": 11,
-                "line": {"color": "#888888", "width": 2},
-            },
-            name="expected replica stdev",
-            hovertemplate=(
-                "%{y}<br>"
-                "expected stdev=%{x:.3f}  "
-                "(n=%{customdata[0]} replicas)<extra></extra>"
-            ),
-            customdata=[[r.n_expected] for r in ordered],
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[r.learned_std for r in ordered],
-            y=y_labels,
-            mode="markers",
-            marker={"symbol": "square", "size": 11, "color": "#222222"},
-            name="learned replica stdev",
-            hovertemplate=(
-                "%{y}<br>" "learned stdev=%{x:.3f}  " "(n=%{customdata[0]} replicas)<extra></extra>"
-            ),
-            customdata=[[r.n_learned] for r in ordered],
-        )
-    )
-    fig.update_layout(
-        height=max(360, 22 * len(y_labels) + 80),
-        xaxis_title="stdev of round_success across the 3 replicas  (○ expected, ■ learned)",
-        xaxis={"rangemode": "tozero"},
-        yaxis={"categoryorder": "array", "categoryarray": list(reversed(y_labels))},
-        margin={"l": 260, "r": 20, "t": 30, "b": 40},
-    )
-    st.plotly_chart(fig, width="stretch")
 
 
 def _render_feature_contrast_bars(rows: list, top_n: int) -> None:
@@ -655,17 +699,12 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
     scatter_panel, contrast_panel = st.tabs(["Expected vs learned", "Feature contrast"])
     with scatter_panel:
         st.markdown(
-            "**Per-model means** (○ expected, ■ learned, error bars = SEM across baselines)"
+            "**Per-model means** (○ expected, △ expected_no_postmortem, ■ learned; "
+            "error bars = SEM across baselines)"
         )
         _render_per_model_bars(results=results)
         st.markdown("**Per-baseline** — click a marker to open the source run")
         _render_scatter(results=results, frontend_base=frontend_base)
-        st.markdown(
-            "**Per-baseline replica variability** — stdev across the 3 resume "
-            "(expected) and 3 replace (learned) replicas. Big spread → low "
-            "confidence in that baseline's mean."
-        )
-        _render_replica_variability(results=results)
     with contrast_panel:
         contrast_rows = feature_contrast(
             runs_root=str(runs_dir),

@@ -10,24 +10,37 @@ every round. Over the 15 rounds they developed a private communication protocol 
 codes, compressed phrasings — to stay under budget.
 
 Then, for each baseline, we asked: **can a fresh field observer pick up that protocol just
-by reading the link transcript?** We tested this two ways, both extending the run by 10 more
-rounds (rounds 16–25, identical seed-42 cases so every condition faces the same problems).
+by reading the link transcript?** We tested this three ways, all extending the run by 10
+more rounds (rounds 16–25, identical seed-42 cases so every condition faces the same
+problems).
 
 - **Expected (3 resume runs)** — we resumed the original team verbatim (same observer, same
   engineer, postmortem still open) and let them keep playing. This gives the "ceiling": what
   the intact team naturally achieves on those 10 new rounds.
+- **Expected, no postmortem (3 resume runs)** — same intact team, but the postmortem
+  channel is killed going forward (`postmortem_disabled_at_start: true`). Isolates the
+  "no postmortem" effect from the "fresh observer" effect: comparing this against Expected
+  measures only the loss of the postmortem back-channel; comparing Learned against this
+  measures only the fresh-observer effect.
 - **Learned (3 replace runs)** — we swapped in a brand-new same-model field observer that
   had never seen this run, gave it only the **previous 10 rounds (5–14) of the link
   transcript** (no postmortem history, no postmortem going forward), and let it play with
   the original engineer. This is where the *replace-agent feature becomes the metric* —
   performance here measures whether the protocol is self-explanatory from the link alone.
 
-That's 30 baselines + 90 resume + 90 replace = 210 runs.
+That's 45 baselines + 135 resume + 135 resume_no_postmortem + 135 replace = 450 runs.
 
-For each baseline we compared the two means. A *small* gap means a fresh observer essentially
-matched the original team → the protocol is **transferable**. A *big* gap means the original
-team's performance depended on knowledge the newcomer couldn't recover from the transcript
-→ the protocol is **idiosyncratic**.
+For each baseline we compare the three means. Decomposing `Δ_total = learned − expected`:
+
+- `Δ_postmortem = expected_no_postmortem − expected` — loss from removing the postmortem
+  back-channel alone (intact team, no fresh observer).
+- `Δ_observer  = learned − expected_no_postmortem` — loss from swapping in a fresh observer
+  alone (postmortem held constant: off in both arms).
+
+A *small* `Δ_observer` means a fresh observer essentially matched the original team → the
+protocol is **transferable**. A *big* `Δ_observer` means the original team's performance
+depended on knowledge the newcomer couldn't recover from the transcript → the protocol is
+**idiosyncratic**.
 
 Finally, an LLM judge scored each baseline's link transcript against a 35-category
 communication ontology (open-coded across all 30 baselines, then re-scored as a
@@ -56,13 +69,20 @@ communication features.
 
 - **Scenario / budget**: veyru, `round_time_budget_seconds=250`, 15 rounds, postmortem ON,
   `seed=42`, judge `claude-haiku-4-5-20251001`. Knobs: [`knobs_baseline.json`](knobs_baseline.json).
-- **Models**: `claude-sonnet-4-6`, `claude-opus-4-7`, `gpt-5.4` — **10 baselines each (30 total)**.
+- **Models**: `claude-sonnet-4-6`, `claude-opus-4-7`, `gpt-5.4` — **15 baselines each (45 total)**.
+  Of those, 10 sonnet + 10 opus are reused legacy baselines (pre-`easy_round_numbers` schema);
+  the remaining 5 sonnet, 5 opus, 15 gpt-5.4 are fresh canon baselines launched for this experiment.
 - **Expected (resume)**: each baseline resumed at round 15, **+10 rounds** (→ rounds 16–25),
-  no config change (postmortem stays on, original observer continues). **3 per baseline (90)**.
+  no config change (postmortem stays on, original observer continues). **3 per baseline (135)**.
+- **Expected, no postmortem (resume)**: same resume, with
+  `postmortem_disabled_at_start: true` ([`resume_no_postmortem_knobs.json`](resume_no_postmortem_knobs.json) /
+  [`resume_no_postmortem_knobs_legacy.json`](resume_no_postmortem_knobs_legacy.json)). The
+  intact team continues, but the postmortem channel is gone from round 16 on (no injections,
+  no reads, no sends — both agents). **3 per baseline (135)**.
 - **Learned (replace)**: `field_observer` replaced at round 15 with a fresh **same-model**
   observer; link history windowed to the **previous 10 rounds (5–14)** via
   `--history-from-round 5`; historical postmortem stripped + no new postmortem
-  ([`replace_knobs.json`](replace_knobs.json)); **+10 rounds**. **3 per baseline (90)**.
+  ([`replace_knobs.json`](replace_knobs.json)); **+10 rounds**. **3 per baseline (135)**.
 - Comparison window: **rounds 16–25** (the 10 genuinely new, seed-42-identical cases).
 
 Concurrency: **6 sims per provider** (anthropic = sonnet+opus shared cap; openai = gpt).
@@ -80,6 +100,7 @@ replaced observer sees only link rounds 5–14 and no postmortem backchannel con
 
 - baseline: `["protocol_learnability","phase=baseline","budget=250","model=<m>","rc=15"]`
 - expected: `["protocol_learnability","phase=resume_expected","budget=250","model=<m>","history=10","src=<src>"]`
+- expected_no_postmortem: `["protocol_learnability","phase=resume_expected_no_postmortem","budget=250","model=<m>","history=10","src=<src>"]`
 - learned:  `["protocol_learnability","phase=replace_learned","budget=250","model=<m>","history=10","src=<src>"]`
 
 (`<m>` ∈ {sonnet, opus47, gpt54}; `<src>` = `veyru/<baseline_ts>`.)
@@ -87,13 +108,19 @@ replaced observer sees only link rounds 5–14 and no postmortem backchannel con
 ## Launch
 
 ```bash
-# Stage 1 — 30 baselines (per-provider cap 6)
+# Stage 1 — 45 baselines (per-provider cap 6). The 10 sonnet + 10 opus legacy
+# baselines are reused from earlier runs and not (re)launched by this script;
+# launch_baselines.sh + launch_baselines_gpt_topup.sh launch the canon batch.
 nohup bash experiments/2026-05-27_protocol_learnability_budget250/launch_baselines.sh \
   > /tmp/protolearn_baselines.stdout 2>&1 & disown
 
-# Stage 2 — 90 resume + 90 replace (run only after Stage 1 fully finishes)
+# Stage 2 — 135 resume + 135 replace (run only after Stage 1 fully finishes)
 nohup bash experiments/2026-05-27_protocol_learnability_budget250/launch_derived.sh \
   > /tmp/protolearn_derived.stdout 2>&1 & disown
+
+# Stage 3 — 135 resume_expected_no_postmortem (isolates Δ_observer from Δ_postmortem)
+nohup bash experiments/2026-05-27_protocol_learnability_budget250/launch_resume_no_postmortem.sh \
+  > /tmp/protolearn_resume_no_postmortem.stdout 2>&1 & disown
 ```
 
 `list_baselines.py` enumerates completed baselines (model/provider read from each run's
@@ -129,9 +156,10 @@ newcomer can adopt.
 
 | Phase | Model | Count | Status |
 |---|---|---|---|
-| baseline | sonnet / opus47 / gpt54 | 10 / 10 / 10 | ✓ complete 2026-05-27 |
-| resume_expected | per baseline ×3 | 90 | ✓ complete 2026-05-28 |
-| replace_learned | per baseline ×3 | 90 | ✓ complete 2026-05-28 |
+| baseline | sonnet / opus47 / gpt54 | 15 / 15 / 15 | ✓ complete 2026-05-28 |
+| resume_expected | per baseline ×3 | 135 | ✓ complete 2026-05-28 |
+| replace_learned | per baseline ×3 | 135 | ✓ complete 2026-05-28 |
+| resume_expected_no_postmortem | per baseline ×3 | 135 | ⏳ in progress 2026-05-29 |
 
 ## Results
 

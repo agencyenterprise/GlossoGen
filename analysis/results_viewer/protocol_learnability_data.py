@@ -2,11 +2,14 @@
 
 Walks every run in the runs directory, joins each ``phase=baseline`` source with
 its ``phase=resume_expected`` (the intact team's continued performance — the
-"expected" ceiling) and ``phase=replace_learned`` (a fresh same-model field
-observer that learned the protocol from the windowed link transcript) derived
-runs, and scores each derived run's ``round_success`` over a rounds-window. Also
-loads per-baseline ``communication_feature_presence`` vectors so the tab can
-contrast feature confidences between high- and low-learnability protocols.
+"expected" ceiling), ``phase=resume_expected_no_postmortem`` (intact team with
+the postmortem channel killed going forward — isolates the no-postmortem effect
+from the fresh-observer effect), and ``phase=replace_learned`` (a fresh
+same-model field observer that learned the protocol from the windowed link
+transcript) derived runs, and scores each derived run's ``round_success`` over a
+rounds-window. Also loads per-baseline ``communication_feature_presence``
+vectors so the tab can contrast feature confidences between high- and
+low-learnability protocols.
 """
 
 import json
@@ -18,17 +21,25 @@ import streamlit as st
 
 
 class BaselineLearnability(NamedTuple):
-    """Aggregated expected vs learned round-success for one baseline source."""
+    """Aggregated expected / expected_no_postmortem / learned round-success for one baseline source.
+
+    ``expected_no_pm_*`` carries ``mean=0.0, std=0.0, n=0`` when the third
+    condition's derived runs haven't been collected yet for this source; the
+    renderer skips the triangle marker when ``n_expected_no_pm == 0``.
+    """
 
     src_id: str
     model_short: str
     budget: str
     expected_mean: float
     expected_std: float
+    expected_no_pm_mean: float
+    expected_no_pm_std: float
     learned_mean: float
     learned_std: float
     delta: float
     n_expected: int
+    n_expected_no_pm: int
     n_learned: int
 
 
@@ -93,11 +104,12 @@ def _feature_scores(run_dir: Path) -> dict[str, float] | None:
 
 
 class _Accumulator:
-    """Mutable per-baseline collector of expected/learned window scores."""
+    """Mutable per-baseline collector of expected / expected_no_pm / learned window scores."""
 
     def __init__(self, model_short: str) -> None:
         self.model_short = model_short
         self.expected: list[float] = []
+        self.expected_no_pm: list[float] = []
         self.learned: list[float] = []
 
 
@@ -152,7 +164,9 @@ def _load_results_uncached(
         if score is None:
             continue
         acc = accums.setdefault(src_id, _Accumulator(model_short=model_short))
-        if "phase=resume_expected" in labels:
+        if "phase=resume_expected_no_postmortem" in labels:
+            acc.expected_no_pm.append(score)
+        elif "phase=resume_expected" in labels:
             acc.expected.append(score)
         elif "phase=replace_learned" in labels:
             acc.learned.append(score)
@@ -166,6 +180,14 @@ def _load_results_uncached(
         learned_mean = statistics.mean(acc.learned)
         expected_std = statistics.stdev(acc.expected) if len(acc.expected) >= 2 else 0.0
         learned_std = statistics.stdev(acc.learned) if len(acc.learned) >= 2 else 0.0
+        if acc.expected_no_pm:
+            expected_no_pm_mean = statistics.mean(acc.expected_no_pm)
+            expected_no_pm_std = (
+                statistics.stdev(acc.expected_no_pm) if len(acc.expected_no_pm) >= 2 else 0.0
+            )
+        else:
+            expected_no_pm_mean = 0.0
+            expected_no_pm_std = 0.0
         results.append(
             BaselineLearnability(
                 src_id=src_id,
@@ -173,10 +195,13 @@ def _load_results_uncached(
                 budget=budget,
                 expected_mean=expected_mean,
                 expected_std=expected_std,
+                expected_no_pm_mean=expected_no_pm_mean,
+                expected_no_pm_std=expected_no_pm_std,
                 learned_mean=learned_mean,
                 learned_std=learned_std,
                 delta=learned_mean - expected_mean,
                 n_expected=len(acc.expected),
+                n_expected_no_pm=len(acc.expected_no_pm),
                 n_learned=len(acc.learned),
             )
         )
