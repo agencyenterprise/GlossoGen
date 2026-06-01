@@ -21,11 +21,14 @@ import streamlit as st
 
 
 class BaselineLearnability(NamedTuple):
-    """Aggregated expected / expected_no_postmortem / learned round-success for one baseline source.
+    """Aggregated expected / expected_no_postmortem / learned / cross_family round-success.
 
-    ``expected_no_pm_*`` carries ``mean=0.0, std=0.0, n=0`` when the third
-    condition's derived runs haven't been collected yet for this source; the
-    renderer skips the triangle marker when ``n_expected_no_pm == 0``.
+    ``expected_no_pm_*`` and ``cross_family_*`` carry ``mean=0.0, std=0.0, n=0``
+    when the corresponding derived runs haven't been collected yet for this
+    source; the renderer skips the marker when the replica count is zero.
+    ``cross_family_observer`` is the ``observer=`` label value (``"gpt54"``,
+    ``"opus47"``, ...) of the cross-family observer family, or ``None`` when no
+    cross-family runs exist yet.
     """
 
     src_id: str
@@ -37,10 +40,14 @@ class BaselineLearnability(NamedTuple):
     expected_no_pm_std: float
     learned_mean: float
     learned_std: float
+    cross_family_mean: float
+    cross_family_std: float
+    cross_family_observer: str | None
     delta: float
     n_expected: int
     n_expected_no_pm: int
     n_learned: int
+    n_cross_family: int
 
 
 class FeatureContrast(NamedTuple):
@@ -104,13 +111,19 @@ def _feature_scores(run_dir: Path) -> dict[str, float] | None:
 
 
 class _Accumulator:
-    """Mutable per-baseline collector of expected / expected_no_pm / learned window scores."""
+    """Mutable per-baseline collector of expected / expected_no_pm / learned / cross_family scores.
+
+    ``cross_family_observer`` is set once on the first cross_family replica
+    observed for this source and re-asserted as a stable label for the swap.
+    """
 
     def __init__(self, model_short: str) -> None:
         self.model_short = model_short
         self.expected: list[float] = []
         self.expected_no_pm: list[float] = []
         self.learned: list[float] = []
+        self.cross_family: list[float] = []
+        self.cross_family_observer: str | None = None
 
 
 def _iter_run_dirs(root: Path) -> list[Path]:
@@ -168,6 +181,11 @@ def _load_results_uncached(
             acc.expected_no_pm.append(score)
         elif "phase=resume_expected" in labels:
             acc.expected.append(score)
+        elif "phase=replace_cross_family" in labels:
+            acc.cross_family.append(score)
+            observer = _label_value(labels=labels, prefix="observer=")
+            if observer is not None and acc.cross_family_observer is None:
+                acc.cross_family_observer = observer
         elif "phase=replace_learned" in labels:
             acc.learned.append(score)
 
@@ -188,6 +206,14 @@ def _load_results_uncached(
         else:
             expected_no_pm_mean = 0.0
             expected_no_pm_std = 0.0
+        if acc.cross_family:
+            cross_family_mean = statistics.mean(acc.cross_family)
+            cross_family_std = (
+                statistics.stdev(acc.cross_family) if len(acc.cross_family) >= 2 else 0.0
+            )
+        else:
+            cross_family_mean = 0.0
+            cross_family_std = 0.0
         results.append(
             BaselineLearnability(
                 src_id=src_id,
@@ -199,10 +225,14 @@ def _load_results_uncached(
                 expected_no_pm_std=expected_no_pm_std,
                 learned_mean=learned_mean,
                 learned_std=learned_std,
+                cross_family_mean=cross_family_mean,
+                cross_family_std=cross_family_std,
+                cross_family_observer=acc.cross_family_observer,
                 delta=learned_mean - expected_mean,
                 n_expected=len(acc.expected),
                 n_expected_no_pm=len(acc.expected_no_pm),
                 n_learned=len(acc.learned),
+                n_cross_family=len(acc.cross_family),
             )
         )
     results.sort(key=lambda r: r.learned_mean, reverse=True)

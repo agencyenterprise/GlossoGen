@@ -49,6 +49,15 @@ _MODEL_COLORS = {
     "unknown": "#777777",
 }
 
+# Cross-family marker uses an outline color taken from the OBSERVER family so
+# the viewer can tell at a glance which family read the protocol. Filled-shape
+# fallback for stylistic consistency with the same-family square marker.
+_CROSS_FAMILY_OUTLINE_COLOR = {
+    "sonnet": "#1f77b4",
+    "opus47": "#d62728",
+    "gpt54": "#2ca02c",
+}
+
 
 def _filter_models(
     results: list[BaselineLearnability], selected: set[str]
@@ -79,11 +88,12 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
         by_model.setdefault(r.model_short, []).append(r)
     models = sorted(by_model)
     within_model_gap = 0.8
-    between_model_gap = 1.2
+    between_model_gap = 1.4
     jitter_half_width = 0.12
+    slots_per_model = 4
 
     def _column_x(model_index: int, slot: int) -> float:
-        base = model_index * (3 * within_model_gap + between_model_gap)
+        base = model_index * (slots_per_model * within_model_gap + between_model_gap)
         return base + slot * within_model_gap
 
     def _jitter(src_id: str) -> float:
@@ -99,7 +109,8 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
         base_x = _column_x(model_index=i, slot=0)
         no_pm_x = _column_x(model_index=i, slot=1)
         learned_x = _column_x(model_index=i, slot=2)
-        tick_vals.extend([base_x, no_pm_x, learned_x])
+        cross_x = _column_x(model_index=i, slot=3)
+        tick_vals.extend([base_x, no_pm_x, learned_x, cross_x])
         budgets = sorted({r.budget for r in rs})
         budget_tag = f"b={'/'.join(budgets)}"
         tick_text.extend(
@@ -107,6 +118,7 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
                 f"{model} · {budget_tag}<br>baseline",
                 f"{model} · {budget_tag}<br>no_postmortem",
                 f"{model} · {budget_tag}<br>learned",
+                f"{model} · {budget_tag}<br>cross_family",
             ]
         )
 
@@ -131,6 +143,18 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
             f"{r.src_id} ({model}) · learned<br>"
             f"round_success={r.learned_mean:.3f}  n={r.n_learned}"
             for r in rs
+        ]
+        cross_rs = [r for r in rs if r.n_cross_family > 0]
+        cross_xs = [cross_x + _jitter(r.src_id) for r in cross_rs]
+        cross_ys = [r.cross_family_mean for r in cross_rs]
+        cross_marker_colors = [
+            _CROSS_FAMILY_OUTLINE_COLOR.get(r.cross_family_observer or "", "#777777")
+            for r in cross_rs
+        ]
+        cross_hover = [
+            f"{r.src_id} ({model} → {r.cross_family_observer}) · cross_family<br>"
+            f"round_success={r.cross_family_mean:.3f}  n={r.n_cross_family}"
+            for r in cross_rs
         ]
 
         fig.add_trace(
@@ -183,6 +207,25 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
                 hoverinfo="text",
             )
         )
+        if cross_rs:
+            fig.add_trace(
+                go.Scatter(
+                    x=cross_xs,
+                    y=cross_ys,
+                    mode="markers",
+                    marker={
+                        "symbol": "diamond-open",
+                        "size": 12,
+                        "line": {"width": 1.8, "color": cross_marker_colors},
+                        "color": cross_marker_colors,
+                    },
+                    name="cross_family (replace — fresh other-family observer)",
+                    legendgroup="cross_family",
+                    showlegend=(i == 0),
+                    hovertext=cross_hover,
+                    hoverinfo="text",
+                )
+            )
         base_mean = statistics.mean(base_ys)
         learned_mean = statistics.mean(learned_ys)
         base_sem = statistics.stdev(base_ys) / math.sqrt(len(base_ys)) if len(base_ys) >= 2 else 0.0
@@ -270,6 +313,40 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
                 hoverinfo="text",
             )
         )
+        if cross_ys:
+            cross_mean = statistics.mean(cross_ys)
+            cross_sem = (
+                statistics.stdev(cross_ys) / math.sqrt(len(cross_ys)) if len(cross_ys) >= 2 else 0.0
+            )
+            observer_tag = cross_rs[0].cross_family_observer or "?"
+            fig.add_trace(
+                go.Scatter(
+                    x=[cross_x],
+                    y=[cross_mean],
+                    mode="markers",
+                    marker={
+                        "symbol": "line-ew-open",
+                        "size": 28,
+                        "color": color,
+                        "line": {"width": 3},
+                    },
+                    error_y={
+                        "type": "data",
+                        "array": [cross_sem],
+                        "thickness": 2,
+                        "width": 10,
+                        "color": color,
+                    },
+                    name="cohort mean ± SEM",
+                    legendgroup="mean",
+                    showlegend=False,
+                    hovertext=(
+                        f"{model} → {observer_tag} · cross_family<br>"
+                        f"mean={cross_mean:.3f}  SEM={cross_sem:.3f}  n={len(cross_ys)}"
+                    ),
+                    hoverinfo="text",
+                )
+            )
     fig.update_layout(
         height=480,
         xaxis={
@@ -303,6 +380,8 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
         line_xs = [r.expected_mean, r.learned_mean]
         if r.n_expected_no_pm > 0:
             line_xs = [r.expected_mean, r.expected_no_pm_mean, r.learned_mean]
+        if r.n_cross_family > 0:
+            line_xs = line_xs + [r.cross_family_mean]
         fig.add_trace(
             go.Scatter(
                 x=sorted(line_xs),
@@ -378,10 +457,39 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
                 customdata=[url],
             )
         )
+        if r.n_cross_family > 0:
+            observer_color = _CROSS_FAMILY_OUTLINE_COLOR.get(
+                r.cross_family_observer or "", "#777777"
+            )
+            delta_family = r.cross_family_mean - r.learned_mean
+            fig.add_trace(
+                go.Scatter(
+                    x=[r.cross_family_mean],
+                    y=[label],
+                    mode="markers",
+                    marker={
+                        "symbol": "diamond-open",
+                        "size": 13,
+                        "line": {"color": observer_color, "width": 2},
+                    },
+                    name=f"{r.model_short} cross_family ({r.cross_family_observer})",
+                    showlegend=False,
+                    hovertemplate=(
+                        f"{r.src_id} ({r.model_short} · b={r.budget})<br>"
+                        f"cross_family={r.cross_family_mean:.3f} "
+                        f"± {r.cross_family_std:.3f} "
+                        f"(n={r.n_cross_family} replicas, observer={r.cross_family_observer})<br>"
+                        f"Δ_family (cross − same) = {delta_family:+.3f}<br>"
+                        "<i>click to open source run</i><extra></extra>"
+                    ),
+                    customdata=[url],
+                )
+            )
     fig.update_layout(
         height=max(360, 22 * len(y_labels) + 80),
         xaxis_title=(
-            "round_success over rounds window  " "(○ expected, △ expected_no_postmortem, ■ learned)"
+            "round_success over rounds window  "
+            "(○ expected, △ expected_no_postmortem, ■ learned, ◇ cross_family)"
         ),
         yaxis={"categoryorder": "array", "categoryarray": list(reversed(y_labels))},
         margin={"l": 260, "r": 20, "t": 30, "b": 40},
@@ -699,8 +807,8 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
     scatter_panel, contrast_panel = st.tabs(["Expected vs learned", "Feature contrast"])
     with scatter_panel:
         st.markdown(
-            "**Per-model means** (○ expected, △ expected_no_postmortem, ■ learned; "
-            "error bars = SEM across baselines)"
+            "**Per-model means** (○ expected, △ expected_no_postmortem, ■ learned, "
+            "◇ cross_family; error bars = SEM across baselines)"
         )
         _render_per_model_bars(results=results)
         st.markdown("**Per-baseline** — click a marker to open the source run")

@@ -141,6 +141,23 @@ class AgentModelSummary(BaseModel):
     provider: str
 
 
+class JudgeReplaySummary(BaseModel):
+    """Counts from re-running the stabilization judge under the updated prompt.
+
+    Sidecar lives at ``<run_dir>/judge_replay.json``. Written by
+    ``scripts/write_judge_replay_sidecars.py`` after re-judging every
+    ``stabilize_veyru`` call whose original ``judge_match`` was ``True``
+    against the current ``stabilization_judge.jinja``. Sidecar is present
+    on every run that had at least one stabilization judge event.
+    """
+
+    judge_model: str
+    generated_at: datetime
+    old_true_count: int
+    new_true_count: int
+    flipped_true_to_false: int
+
+
 class RunSummary(BaseModel):
     """Summary of a single simulation run for the runs list endpoint."""
 
@@ -166,6 +183,7 @@ class RunSummary(BaseModel):
     labels: list[str]
     has_note: bool
     current_round: int
+    judge_replay: JudgeReplaySummary | None
 
 
 class RunListResponse(BaseModel):

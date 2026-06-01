@@ -1082,6 +1082,31 @@ export interface components {
             run_dir: string;
         };
         /**
+         * JudgeReplaySummary
+         * @description Counts from re-running the stabilization judge under the updated prompt.
+         *
+         *     Sidecar lives at ``<run_dir>/judge_replay.json``. Written by
+         *     ``scripts/write_judge_replay_sidecars.py`` after re-judging every
+         *     ``stabilize_veyru`` call whose original ``judge_match`` was ``True``
+         *     against the current ``stabilization_judge.jinja``. Sidecar is present
+         *     on every run that had at least one stabilization judge event.
+         */
+        JudgeReplaySummary: {
+            /** Judge Model */
+            judge_model: string;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Old True Count */
+            old_true_count: number;
+            /** New True Count */
+            new_true_count: number;
+            /** Flipped True To False */
+            flipped_true_to_false: number;
+        };
+        /**
          * KnobsContentResponse
          * @description Response containing the parsed contents of a knobs JSON file.
          */
@@ -1368,6 +1393,7 @@ export interface components {
             has_note: boolean;
             /** Current Round */
             current_round: number;
+            judge_replay: components["schemas"]["JudgeReplaySummary"] | null;
         };
         /**
          * SSEAgentConnected

@@ -10,6 +10,7 @@ reuses the same Python process across reruns within one session, so this
 cache persists across UI interactions without needing on-disk files.
 """
 
+import logging
 from collections import OrderedDict
 from datetime import date, datetime
 from pathlib import Path
@@ -18,6 +19,8 @@ from typing import Any, NamedTuple
 import orjson
 
 from schmidt.evaluation.reports.evaluation_report import EvaluationReport
+
+logger = logging.getLogger(__name__)
 
 
 class _RunCacheKey(NamedTuple):
@@ -184,9 +187,18 @@ def _build_evaluated_run(
     entry: Path,
     jsonl_path: Path,
     report_path: Path,
-) -> EvaluatedRun:
-    """Read the report + metadata from disk and assemble one ``EvaluatedRun``."""
-    report = EvaluationReport.model_validate_json(report_path.read_bytes())
+) -> EvaluatedRun | None:
+    """Read the report + metadata from disk and assemble one ``EvaluatedRun``.
+
+    Returns ``None`` when the report JSON fails to validate (e.g. a run
+    whose evaluation never finished writing a full report), so one
+    malformed report does not abort the whole scan.
+    """
+    try:
+        report = EvaluationReport.model_validate_json(report_path.read_bytes())
+    except ValueError:
+        logger.exception("Skipping run with unparseable report at %s", report_path)
+        return None
     metadata = _scan_metadata(jsonl_path=jsonl_path)
     run_timestamp = _parse_run_timestamp(run_dir_name=entry.name)
     label = _compose_label(metadata=metadata, run_timestamp=run_timestamp, run_dir_name=entry.name)
@@ -230,6 +242,8 @@ def _load_runs_for_scenario(scenario_dir: Path, scenario_name: str) -> list[Eval
             jsonl_path=jsonl_path,
             report_path=report_path,
         )
+        if evaluated is None:
+            continue
         _RUN_CACHE[entry] = (cache_key, evaluated)
         out.append(evaluated)
     return out
