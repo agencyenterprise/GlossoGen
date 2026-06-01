@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Schmidt Simulations",
+  title: "Emergent Comms",
   description: "View and explore multi-agent simulation runs",
 };
 
