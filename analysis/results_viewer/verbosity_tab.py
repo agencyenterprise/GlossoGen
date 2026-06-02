@@ -17,7 +17,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from analysis.results_viewer import seed_mode_filter
+from analysis.results_viewer import judge_replay_filter, seed_mode_filter
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
 from analysis.results_viewer.series_plot import (
@@ -585,6 +585,7 @@ def _render_summary_table(
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Verbosity tab body."""
+    ratio_map = judge_replay_filter.flip_ratio_by_run_id(evaluated=evaluated)
     run_filter = seed_mode_filter.render_filters(key_prefix="verbosity")
     evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     scenario_name = _render_scenario_selector(evaluated=evaluated)
@@ -631,6 +632,15 @@ def render(evaluated: list[EvaluatedRun]) -> None:
             f"No selected runs have a value for `{metric.display_name}`. "
             f"Run `schmidt evaluate <scenario> --metrics {metric.display_name} ...` first."
         )
+        return
+    metric_runs = judge_replay_filter.render_and_filter(
+        items=metric_runs,
+        ratio_of=lambda run: ratio_map.get(run.run_id),
+        key="verbosity",
+        item_label="verbosity runs",
+    )
+    if not metric_runs:
+        st.info("All runs filtered out by judge-replay slider.")
         return
     colour_by_series = series_color_map(series_keys=[_COMBINED_SERIES_KEY])
     st.markdown("### Verbosity vs round-success rate")

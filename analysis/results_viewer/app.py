@@ -9,6 +9,7 @@ from analysis.results_viewer import (
     baseline_tab,
     cross_swap_tab,
     feature_presence_tab,
+    judge_replay_tab,
     multi_swap_tab,
     oss_frontier_tab,
     probe_similarity_tab,
@@ -23,7 +24,7 @@ st.set_page_config(page_title="Analysis Results Viewer", layout="wide")
 
 
 def main() -> None:
-    """Render ten tabs: Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS-vs-Frontier, Probe similarity, Language features, Protocol learnability."""  # noqa: E501
+    """Render eleven tabs: Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS-vs-Frontier, Probe similarity, Language features, Protocol learnability, Judge replay."""  # noqa: E501
     runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs")).resolve()
     st.sidebar.markdown(f"**Runs directory**: `{runs_dir}`")
     evaluated = list_evaluated_runs(runs_dir=runs_dir)
@@ -40,6 +41,7 @@ def main() -> None:
         probe_similarity_panel,
         feature_presence_panel,
         protocol_learnability_panel,
+        judge_replay_panel,
     ) = st.tabs(
         [
             "Timeline",
@@ -52,6 +54,7 @@ def main() -> None:
             "Probe similarity",
             "Language features",
             "Protocol learnability",
+            "Judge replay",
         ]
     )
     with timeline_panel:
@@ -74,6 +77,8 @@ def main() -> None:
         feature_presence_tab.render(evaluated=evaluated, runs_dir=runs_dir)
     with protocol_learnability_panel:
         protocol_learnability_tab.render(evaluated=evaluated, runs_dir=runs_dir)
+    with judge_replay_panel:
+        judge_replay_tab.render(evaluated=evaluated)
 
 
 main()
