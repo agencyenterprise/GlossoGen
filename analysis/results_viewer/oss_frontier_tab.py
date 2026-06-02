@@ -19,7 +19,7 @@ import pandas as pd
 import streamlit as st
 from matplotlib.colors import to_hex
 
-from analysis.results_viewer import seed_mode_filter
+from analysis.results_viewer import judge_replay_filter, seed_mode_filter
 from analysis.results_viewer.oss_frontier_data import CellRun, list_oss_frontier_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
@@ -269,6 +269,7 @@ def _render_runs_table(runs: list[CellRun], frontend_base: str) -> None:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the OSS-vs-Frontier comparison tab as a colored pivot table."""
+    ratio_map = judge_replay_filter.flip_ratio_by_run_id(evaluated=evaluated)
     run_filter = seed_mode_filter.render_filters(key_prefix="oss_frontier")
     evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     st.header("OSS vs Frontier — round_success comparison")
@@ -289,6 +290,15 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     ]
     if not runs:
         st.info("No runs match the supported budgets (250s, 800s).")
+        return
+    runs = judge_replay_filter.render_and_filter(
+        items=runs,
+        ratio_of=lambda r: ratio_map.get(r.run_id),
+        key="oss_frontier",
+        item_label="OSS-vs-Frontier runs",
+    )
+    if not runs:
+        st.info("All runs filtered out by judge-replay slider.")
         return
     buckets = _aggregate(runs=runs)
     _render_pivot_table(buckets=buckets, selected_budgets=set(_SUPPORTED_BUDGETS))

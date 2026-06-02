@@ -17,7 +17,7 @@ import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
 
-from analysis.results_viewer import seed_mode_filter
+from analysis.results_viewer import judge_replay_filter, seed_mode_filter
 from analysis.results_viewer.cross_swap_data import CrossSwapRun, list_cross_swap_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
@@ -570,6 +570,7 @@ def _render_included_runs(runs: list[CrossSwapRun]) -> None:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Cross-swap tab body."""
+    ratio_map = judge_replay_filter.flip_ratio_by_run_id(evaluated=evaluated)
     run_filter = seed_mode_filter.render_filters(key_prefix="cross_swap")
     evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     all_cross_swap = list_cross_swap_runs(evaluated_runs=evaluated)
@@ -606,6 +607,15 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     filtered = [r for r in pair_runs if r.swapped_series_key() in selected_buckets]
     if not filtered:
         st.info("No cross-swap runs match the selected buckets.")
+        return
+    filtered = judge_replay_filter.render_and_filter(
+        items=filtered,
+        ratio_of=lambda run: ratio_map.get(run.run_id),
+        key="cross_swap",
+        item_label="cross-swap runs",
+    )
+    if not filtered:
+        st.info("All runs filtered out by judge-replay slider.")
         return
     st.markdown(f"### {chosen_pair.label()}")
     _render_window_view(runs=filtered, frontend_base=frontend_base)
