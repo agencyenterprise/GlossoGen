@@ -228,7 +228,13 @@ export function RunList() {
   const allRuns = useMemo(() => data?.runs ?? [], [data]);
   const allLabels = useMemo(() => labelsData?.labels ?? [], [labelsData]);
   const regularFilterLabels = useMemo(
-    () => allLabels.filter(label => !label.startsWith("eval:")),
+    () =>
+      allLabels.filter(
+        label =>
+          !label.startsWith("eval:") &&
+          !label.startsWith("src=") &&
+          !label.startsWith("supersedes:")
+      ),
     [allLabels]
   );
   const allScenarios = useMemo(() => {
