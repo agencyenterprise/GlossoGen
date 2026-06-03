@@ -880,6 +880,21 @@ Scenarios opt into the platform metrics by implementing the corresponding hooks 
 
 There are no scenario-specific metrics left — every scoring concept (round-success, post-resume re-scoring, language emergence, protocol learning, protocol probing) is platform code that consumes scenario data through these hooks. Scenarios only ship their domain-specific events + the hooks that surface them.
 
+## Judge Replay and Rerun Pipeline
+
+When the stabilization judge prompt changes, the full retroactive cleanup pipeline (re-judge old verdicts → surface flips in the FE/streamlit → build affected-set plan → re-execute originals → re-execute derived runs → re-replay) is documented in [docs/judge-replay-and-rerun-pipeline.md](docs/judge-replay-and-rerun-pipeline.md).
+
+Quick reference for the scripts (all live in `scripts/`):
+
+- `replay_veyru_judge.py` — re-judge previously-accepted verdicts; writes `runs/_judge_replay/{pair_cache,flips_by_run,summary}.{jsonl,json}`.
+- `write_judge_replay_sidecars.py` — fan the replay output into per-run `judge_replay.json` sidecars (read by the FE / streamlit).
+- `build_rerun_plan.py` — compute the affected-set (seed runs above threshold + transitive descendants), topologically sort, emit `rerun_plan.json` with per-spec `cli_invocation`.
+- `run_rerun_plan.py` — orchestrator: launch → wait-for-end → eval → archive each spec; concurrency is per-provider; state in `rerun_state.json`.
+- `recover_errored_reruns.py` — finish the pipeline for `sim_wait_timeout` casualties whose sim completed naturally on disk.
+- `rerun_network_impacted.py` (dry-run preview) and `rerun_18_parallel.py` (parallel re-execution alongside a running orchestrator) — re-execute archived runs whose round-timeouts were network-induced.
+
+Artifact directories: `runs/_judge_replay/` (cache + plan + state), `runs/_superseded/<scenario>/<old>/` (archived predecessors), `runs/_failed_network_timeout/<scenario>/<bad_new>/` (audit trail for re-executed failures).
+
 ## Destructive Actions
 
 **Always ask the user before deleting or stopping anything.** This includes:
