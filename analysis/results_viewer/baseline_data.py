@@ -57,12 +57,9 @@ class BaselineRun(NamedTuple):
     mcm_score: float | None
     labels: list[str]
 
-    def series_key(self, selected_batch_labels: frozenset[str]) -> str:
-        """Plot-series identifier: one trace per (model, postmortem, kind, batch-label-subset)."""
+    def series_key(self) -> str:
+        """Plot-series identifier: one trace per (model, postmortem, kind)."""
         suffix = "postmortem" if self.postmortem_enabled else "no-postmortem"
-        carried = sorted(label for label in selected_batch_labels if label in self.labels)
-        if carried:
-            return f"{self.model} · {suffix} · {self.kind} ({', '.join(carried)})"
         return f"{self.model} · {suffix} · {self.kind}"
 
 
@@ -411,7 +408,6 @@ def _std(values: list[float], mean: float) -> float:
 def aggregate_by_budget(
     runs: list[BaselineRun],
     value_of: Callable[[BaselineRun], float],
-    selected_batch_labels: frozenset[str],
 ) -> list[BudgetStats]:
     """Group ``runs`` by ``(series_key, budget)`` and compute per-bucket statistics.
 
@@ -421,7 +417,7 @@ def aggregate_by_budget(
     """
     buckets: dict[tuple[str, int], list[float]] = {}
     for run in runs:
-        key = (run.series_key(selected_batch_labels=selected_batch_labels), run.budget)
+        key = (run.series_key(), run.budget)
         if key not in buckets:
             buckets[key] = []
         buckets[key].append(value_of(run))
