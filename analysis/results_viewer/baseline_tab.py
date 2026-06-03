@@ -30,7 +30,6 @@ from analysis.results_viewer.series_plot import (
     SeriesStats,
     add_mean_trace,
     add_replica_trace,
-    batch_label_filter,
     jittered_x,
     render_horizontal_checkboxes,
     series_color_map,
@@ -201,7 +200,6 @@ def _build_figure(
     stats: list[BudgetStats],
     colour_by_series: dict[str, str],
     metric: MetricOption,
-    selected_batch_labels: frozenset[str],
     y_axis: YAxisSpec,
     x_tickvals: list[int],
     frontend_base: str,
@@ -215,9 +213,7 @@ def _build_figure(
     fig = go.Figure()
     runs_by_series: dict[str, list[BaselineRun]] = {}
     for run in runs:
-        runs_by_series.setdefault(
-            run.series_key(selected_batch_labels=selected_batch_labels), []
-        ).append(run)
+        runs_by_series.setdefault(run.series_key(), []).append(run)
     stats_by_series: dict[str, list[BudgetStats]] = {}
     for stat in stats:
         stats_by_series.setdefault(stat.series, []).append(stat)
@@ -297,7 +293,6 @@ def _render_stats_table(stats: list[BudgetStats], metric: MetricOption) -> None:
 def _render_included_runs(
     runs: list[BaselineRun],
     metric: MetricOption,
-    selected_batch_labels: frozenset[str],
     frontend_base: str,
 ) -> None:
     """Per-replica audit listing inside an expander.
@@ -308,7 +303,7 @@ def _render_included_runs(
     """
     rows = [
         {
-            "series": r.series_key(selected_batch_labels=selected_batch_labels),
+            "series": r.series_key(),
             "budget": r.budget,
             metric.display_name: round(metric.extract(run=r), 4),
             "run_id": r.run_id,
@@ -317,7 +312,7 @@ def _render_included_runs(
         for r in sorted(
             runs,
             key=lambda r: (
-                r.series_key(selected_batch_labels=selected_batch_labels),
+                r.series_key(),
                 r.budget,
                 r.run_id,
             ),
@@ -382,17 +377,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     if not primary_filtered:
         st.info("No baseline runs for the selected filters.")
         return
-    excluded = frozenset(run.model for run in all_baseline)
-    filtered, selected_batch_labels = batch_label_filter(
-        runs=primary_filtered,
-        labels_of=lambda run: run.labels,
-        excluded_label_values=excluded,
-        streamlit_key_prefix="baseline_batch_filter",
-    )
-    if not filtered:
-        st.info("Select at least one batch label.")
-        return
-    metric_runs = [run for run in filtered if metric.available(run=run)]
+    metric_runs = [run for run in primary_filtered if metric.available(run=run)]
     if not metric_runs:
         st.info(
             f"No selected baseline runs have a value for `{metric.display_name}`. "
@@ -409,14 +394,11 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     if not metric_runs:
         st.info("All runs filtered out by judge-replay slider.")
         return
-    series_ordered = sorted(
-        {r.series_key(selected_batch_labels=selected_batch_labels) for r in metric_runs}
-    )
+    series_ordered = sorted({r.series_key() for r in metric_runs})
     colour_by_series = series_color_map(series_keys=series_ordered)
     stats = aggregate_by_budget(
         runs=metric_runs,
         value_of=metric.extract,
-        selected_batch_labels=selected_batch_labels,
     )
     # Compute axis ranges from the unfiltered baseline set so the chart's
     # X tick layout and Y range stay constant when the user toggles series.
@@ -427,7 +409,6 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         stats=stats,
         colour_by_series=colour_by_series,
         metric=metric,
-        selected_batch_labels=selected_batch_labels,
         y_axis=y_axis,
         x_tickvals=x_tickvals,
         frontend_base=frontend_base,
@@ -444,6 +425,5 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     _render_included_runs(
         runs=metric_runs,
         metric=metric,
-        selected_batch_labels=selected_batch_labels,
         frontend_base=frontend_base,
     )

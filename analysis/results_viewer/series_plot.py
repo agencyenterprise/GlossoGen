@@ -16,17 +16,6 @@ from analysis.results_viewer.timeline_plot import palette_color_for_index
 _RunT = TypeVar("_RunT")
 
 
-CORE_LABEL_PREFIXES: tuple[str, ...] = (
-    "baseline",
-    "budget=",
-    "eval:",
-    "postmortem=",
-    "single_team",
-    "two_team",
-)
-"""Label prefixes treated as standard run metadata; everything else is opt-in batch tag."""
-
-
 class SeriesStats(NamedTuple):
     """Aggregate statistics for one (series, x) bucket."""
 
@@ -188,40 +177,3 @@ def render_horizontal_checkboxes(
         ):
             selected.add(key)
     return selected
-
-
-def batch_label_filter(
-    runs: Sequence[_RunT],
-    labels_of: Callable[[_RunT], list[str]],
-    excluded_label_values: frozenset[str],
-    streamlit_key_prefix: str,
-) -> tuple[list[_RunT], frozenset[str]]:
-    """Render checkboxes for non-core batch labels and return runs matching all selected ones.
-
-    ``excluded_label_values`` lists labels that appear on the runs but are
-    metadata (e.g. the model name) rather than batch tags. They are filtered
-    out before the checkbox stack is rendered.
-    """
-    batch_labels: set[str] = set()
-    for run in runs:
-        for label in labels_of(run):
-            if any(label.startswith(prefix) for prefix in CORE_LABEL_PREFIXES):
-                continue
-            if label in excluded_label_values:
-                continue
-            batch_labels.add(label)
-    if not batch_labels:
-        return list(runs), frozenset()
-    st.markdown("**Batch labels**")
-    selected: set[str] = set()
-    for label in sorted(batch_labels):
-        count = sum(1 for r in runs if label in labels_of(r))
-        if st.checkbox(
-            label=f"{label} ({count})",
-            value=True,
-            key=f"{streamlit_key_prefix}::{label}",
-        ):
-            selected.add(label)
-    unselected = batch_labels - selected
-    filtered = [r for r in runs if not any(label in labels_of(r) for label in unselected)]
-    return filtered, frozenset(selected)

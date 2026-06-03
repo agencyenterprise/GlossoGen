@@ -58,6 +58,37 @@ _CROSS_FAMILY_OUTLINE_COLOR = {
     "gpt54": "#2ca02c",
 }
 
+# The four comparison conditions both charts can draw, in canonical column order.
+# Each carries the symbol used in the plots so chart legends/titles can be built
+# from whatever subset the user enables via the condition checkboxes.
+_CONDITION_KEYS = ("expected", "expected_no_postmortem", "learned", "cross_family")
+_CONDITION_SYMBOL_LABELS = {
+    "expected": "○ expected",
+    "expected_no_postmortem": "△ expected_no_postmortem",
+    "learned": "■ learned",
+    "cross_family": "◇ cross_family",
+}
+_DEFAULT_CONDITIONS = frozenset({"expected_no_postmortem", "learned"})
+
+
+def _render_condition_checkboxes() -> set[str]:
+    """Horizontal checkbox row selecting which conditions both charts draw.
+
+    Defaults to ``expected_no_postmortem`` and ``learned`` so the plots open on
+    the two-condition comparison rather than all four symbols at once.
+    """
+    st.markdown("**Conditions**")
+    cols = st.columns(len(_CONDITION_KEYS))
+    selected: set[str] = set()
+    for col, key in zip(cols, _CONDITION_KEYS):
+        if col.checkbox(
+            label=key,
+            value=key in _DEFAULT_CONDITIONS,
+            key=f"protocol_learnability_condition_{key}",
+        ):
+            selected.add(key)
+    return selected
+
 
 def _filter_models(
     results: list[BaselineLearnability], selected: set[str]
@@ -68,7 +99,9 @@ def _filter_models(
     return [r for r in results if r.model_short in selected]
 
 
-def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
+def _render_per_model_bars(
+    results: list[BaselineLearnability], selected_conditions: set[str]
+) -> None:
     """Per-model strip plot: each baseline is one bullet, mean drawn as a bar.
 
     Each model gets **three adjacent columns** on the x-axis:
@@ -103,6 +136,10 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
     fig = go.Figure()
     tick_vals: list[float] = []
     tick_text: list[str] = []
+    # The "cohort mean ± SEM" legend entry is shown once, on whichever mean
+    # trace renders first — the expected column may be deselected, so it cannot
+    # be pinned to the baseline trace.
+    mean_legend_shown = False
     for i, model in enumerate(models):
         color = _MODEL_COLORS.get(model, "#777777")
         rs = by_model[model]
@@ -110,17 +147,20 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
         no_pm_x = _column_x(model_index=i, slot=1)
         learned_x = _column_x(model_index=i, slot=2)
         cross_x = _column_x(model_index=i, slot=3)
-        tick_vals.extend([base_x, no_pm_x, learned_x, cross_x])
         budgets = sorted({r.budget for r in rs})
         budget_tag = f"b={'/'.join(budgets)}"
-        tick_text.extend(
-            [
-                f"{model} · {budget_tag}<br>baseline",
-                f"{model} · {budget_tag}<br>no_postmortem",
-                f"{model} · {budget_tag}<br>learned",
-                f"{model} · {budget_tag}<br>cross_family",
-            ]
-        )
+        if "expected" in selected_conditions:
+            tick_vals.append(base_x)
+            tick_text.append(f"{model} · {budget_tag}<br>baseline")
+        if "expected_no_postmortem" in selected_conditions:
+            tick_vals.append(no_pm_x)
+            tick_text.append(f"{model} · {budget_tag}<br>no_postmortem")
+        if "learned" in selected_conditions:
+            tick_vals.append(learned_x)
+            tick_text.append(f"{model} · {budget_tag}<br>learned")
+        if "cross_family" in selected_conditions:
+            tick_vals.append(cross_x)
+            tick_text.append(f"{model} · {budget_tag}<br>cross_family")
 
         base_xs = [base_x + _jitter(r.src_id) for r in rs]
         base_ys = [r.expected_mean for r in rs]
@@ -157,25 +197,26 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
             for r in cross_rs
         ]
 
-        fig.add_trace(
-            go.Scatter(
-                x=base_xs,
-                y=base_ys,
-                mode="markers",
-                marker={
-                    "symbol": "circle-open",
-                    "size": 10,
-                    "line": {"width": 1.6, "color": color},
-                    "color": color,
-                },
-                name="baseline (resume — intact team)",
-                legendgroup="baseline",
-                showlegend=(i == 0),
-                hovertext=base_hover,
-                hoverinfo="text",
+        if "expected" in selected_conditions:
+            fig.add_trace(
+                go.Scatter(
+                    x=base_xs,
+                    y=base_ys,
+                    mode="markers",
+                    marker={
+                        "symbol": "circle-open",
+                        "size": 10,
+                        "line": {"width": 1.6, "color": color},
+                        "color": color,
+                    },
+                    name="baseline (resume — intact team)",
+                    legendgroup="baseline",
+                    showlegend=(i == 0),
+                    hovertext=base_hover,
+                    hoverinfo="text",
+                )
             )
-        )
-        if no_pm_rs:
+        if no_pm_rs and "expected_no_postmortem" in selected_conditions:
             fig.add_trace(
                 go.Scatter(
                     x=no_pm_xs,
@@ -194,20 +235,21 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
                     hoverinfo="text",
                 )
             )
-        fig.add_trace(
-            go.Scatter(
-                x=learned_xs,
-                y=learned_ys,
-                mode="markers",
-                marker={"symbol": "square", "size": 10, "color": color},
-                name="learned (replace — fresh observer)",
-                legendgroup="learned",
-                showlegend=(i == 0),
-                hovertext=learned_hover,
-                hoverinfo="text",
+        if "learned" in selected_conditions:
+            fig.add_trace(
+                go.Scatter(
+                    x=learned_xs,
+                    y=learned_ys,
+                    mode="markers",
+                    marker={"symbol": "square", "size": 10, "color": color},
+                    name="learned (replace — fresh observer)",
+                    legendgroup="learned",
+                    showlegend=(i == 0),
+                    hovertext=learned_hover,
+                    hoverinfo="text",
+                )
             )
-        )
-        if cross_rs:
+        if cross_rs and "cross_family" in selected_conditions:
             fig.add_trace(
                 go.Scatter(
                     x=cross_xs,
@@ -234,30 +276,37 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
             if len(learned_ys) >= 2
             else 0.0
         )
-        fig.add_trace(
-            go.Scatter(
-                x=[base_x],
-                y=[base_mean],
-                mode="markers",
-                marker={"symbol": "line-ew-open", "size": 28, "color": color, "line": {"width": 3}},
-                error_y={
-                    "type": "data",
-                    "array": [base_sem],
-                    "thickness": 2,
-                    "width": 10,
-                    "color": color,
-                },
-                name="cohort mean ± SEM",
-                legendgroup="mean",
-                showlegend=(i == 0),
-                hovertext=(
-                    f"{model} · baseline<br>"
-                    f"mean={base_mean:.3f}  SEM={base_sem:.3f}  n={len(rs)}"
-                ),
-                hoverinfo="text",
+        if "expected" in selected_conditions:
+            fig.add_trace(
+                go.Scatter(
+                    x=[base_x],
+                    y=[base_mean],
+                    mode="markers",
+                    marker={
+                        "symbol": "line-ew-open",
+                        "size": 28,
+                        "color": color,
+                        "line": {"width": 3},
+                    },
+                    error_y={
+                        "type": "data",
+                        "array": [base_sem],
+                        "thickness": 2,
+                        "width": 10,
+                        "color": color,
+                    },
+                    name="cohort mean ± SEM",
+                    legendgroup="mean",
+                    showlegend=(not mean_legend_shown),
+                    hovertext=(
+                        f"{model} · baseline<br>"
+                        f"mean={base_mean:.3f}  SEM={base_sem:.3f}  n={len(rs)}"
+                    ),
+                    hoverinfo="text",
+                )
             )
-        )
-        if no_pm_ys:
+            mean_legend_shown = True
+        if no_pm_ys and "expected_no_postmortem" in selected_conditions:
             no_pm_mean = statistics.mean(no_pm_ys)
             no_pm_sem = (
                 statistics.stdev(no_pm_ys) / math.sqrt(len(no_pm_ys)) if len(no_pm_ys) >= 2 else 0.0
@@ -282,7 +331,7 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
                     },
                     name="cohort mean ± SEM",
                     legendgroup="mean",
-                    showlegend=False,
+                    showlegend=(not mean_legend_shown),
                     hovertext=(
                         f"{model} · no_postmortem<br>"
                         f"mean={no_pm_mean:.3f}  SEM={no_pm_sem:.3f}  n={len(no_pm_ys)}"
@@ -290,30 +339,38 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
                     hoverinfo="text",
                 )
             )
-        fig.add_trace(
-            go.Scatter(
-                x=[learned_x],
-                y=[learned_mean],
-                mode="markers",
-                marker={"symbol": "line-ew-open", "size": 28, "color": color, "line": {"width": 3}},
-                error_y={
-                    "type": "data",
-                    "array": [learned_sem],
-                    "thickness": 2,
-                    "width": 10,
-                    "color": color,
-                },
-                name="cohort mean ± SEM",
-                legendgroup="mean",
-                showlegend=False,
-                hovertext=(
-                    f"{model} · learned<br>"
-                    f"mean={learned_mean:.3f}  SEM={learned_sem:.3f}  n={len(rs)}"
-                ),
-                hoverinfo="text",
+            mean_legend_shown = True
+        if "learned" in selected_conditions:
+            fig.add_trace(
+                go.Scatter(
+                    x=[learned_x],
+                    y=[learned_mean],
+                    mode="markers",
+                    marker={
+                        "symbol": "line-ew-open",
+                        "size": 28,
+                        "color": color,
+                        "line": {"width": 3},
+                    },
+                    error_y={
+                        "type": "data",
+                        "array": [learned_sem],
+                        "thickness": 2,
+                        "width": 10,
+                        "color": color,
+                    },
+                    name="cohort mean ± SEM",
+                    legendgroup="mean",
+                    showlegend=(not mean_legend_shown),
+                    hovertext=(
+                        f"{model} · learned<br>"
+                        f"mean={learned_mean:.3f}  SEM={learned_sem:.3f}  n={len(rs)}"
+                    ),
+                    hoverinfo="text",
+                )
             )
-        )
-        if cross_ys:
+            mean_legend_shown = True
+        if cross_ys and "cross_family" in selected_conditions:
             cross_mean = statistics.mean(cross_ys)
             cross_sem = (
                 statistics.stdev(cross_ys) / math.sqrt(len(cross_ys)) if len(cross_ys) >= 2 else 0.0
@@ -339,7 +396,7 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
                     },
                     name="cohort mean ± SEM",
                     legendgroup="mean",
-                    showlegend=False,
+                    showlegend=(not mean_legend_shown),
                     hovertext=(
                         f"{model} → {observer_tag} · cross_family<br>"
                         f"mean={cross_mean:.3f}  SEM={cross_sem:.3f}  n={len(cross_ys)}"
@@ -347,6 +404,7 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
                     hoverinfo="text",
                 )
             )
+            mean_legend_shown = True
     fig.update_layout(
         height=480,
         xaxis={
@@ -364,12 +422,15 @@ def _render_per_model_bars(results: list[BaselineLearnability]) -> None:
     st.plotly_chart(fig, width="stretch")
 
 
-def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> None:
+def _render_scatter(
+    results: list[BaselineLearnability], frontend_base: str, selected_conditions: set[str]
+) -> None:
     """Paired expected→learned dots per source, sorted by learned descending.
 
     The y-axis label concatenates the model short name; clicking a marker opens
     the source run in the frontend (``customdata`` carries the URL, handled by
-    :func:`maybe_open_clicked_run`).
+    :func:`maybe_open_clicked_run`). Only the conditions in
+    ``selected_conditions`` are drawn.
     """
     fig = go.Figure()
     ordered = sorted(results, key=lambda r: r.learned_mean, reverse=True)
@@ -377,44 +438,50 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
     for r, label in zip(ordered, y_labels, strict=True):
         color = _MODEL_COLORS.get(r.model_short, "#777777")
         url = run_url(frontend_base=frontend_base, run_id=r.src_id)
-        line_xs = [r.expected_mean, r.learned_mean]
-        if r.n_expected_no_pm > 0:
-            line_xs = [r.expected_mean, r.expected_no_pm_mean, r.learned_mean]
-        if r.n_cross_family > 0:
-            line_xs = line_xs + [r.cross_family_mean]
-        fig.add_trace(
-            go.Scatter(
-                x=sorted(line_xs),
-                y=[label] * len(line_xs),
-                mode="lines",
-                line={"color": color, "width": 1.5},
-                opacity=0.4,
-                showlegend=False,
-                hoverinfo="skip",
+        line_xs: list[float] = []
+        if "expected" in selected_conditions:
+            line_xs.append(r.expected_mean)
+        if "expected_no_postmortem" in selected_conditions and r.n_expected_no_pm > 0:
+            line_xs.append(r.expected_no_pm_mean)
+        if "learned" in selected_conditions:
+            line_xs.append(r.learned_mean)
+        if "cross_family" in selected_conditions and r.n_cross_family > 0:
+            line_xs.append(r.cross_family_mean)
+        if len(line_xs) >= 2:
+            fig.add_trace(
+                go.Scatter(
+                    x=sorted(line_xs),
+                    y=[label] * len(line_xs),
+                    mode="lines",
+                    line={"color": color, "width": 1.5},
+                    opacity=0.4,
+                    showlegend=False,
+                    hoverinfo="skip",
+                )
             )
-        )
-        fig.add_trace(
-            go.Scatter(
-                x=[r.expected_mean],
-                y=[label],
-                mode="markers",
-                marker={
-                    "symbol": "circle-open",
-                    "size": 11,
-                    "line": {"color": color, "width": 2},
-                },
-                name=f"{r.model_short} expected",
-                showlegend=False,
-                hovertemplate=(
-                    f"{r.src_id} ({r.model_short} · b={r.budget})<br>"
-                    f"expected={r.expected_mean:.3f} ± {r.expected_std:.3f} "
-                    f"(n={r.n_expected} replicas)<br>"
-                    "<i>click to open source run</i><extra></extra>"
-                ),
-                customdata=[url],
+        if "expected" in selected_conditions:
+            fig.add_trace(
+                go.Scatter(
+                    x=[r.expected_mean],
+                    y=[label],
+                    mode="markers",
+                    marker={
+                        "symbol": "circle-open",
+                        "size": 11,
+                        "line": {"color": color, "width": 2},
+                    },
+                    name=f"{r.model_short} expected",
+                    showlegend=False,
+                    hovertemplate=(
+                        f"{r.src_id} ({r.model_short} · b={r.budget})<br>"
+                        f"expected={r.expected_mean:.3f} ± {r.expected_std:.3f} "
+                        f"(n={r.n_expected} replicas)<br>"
+                        "<i>click to open source run</i><extra></extra>"
+                    ),
+                    customdata=[url],
+                )
             )
-        )
-        if r.n_expected_no_pm > 0:
+        if r.n_expected_no_pm > 0 and "expected_no_postmortem" in selected_conditions:
             fig.add_trace(
                 go.Scatter(
                     x=[r.expected_no_pm_mean],
@@ -439,25 +506,26 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
                     customdata=[url],
                 )
             )
-        fig.add_trace(
-            go.Scatter(
-                x=[r.learned_mean],
-                y=[label],
-                mode="markers",
-                marker={"symbol": "square", "size": 11, "color": color},
-                name=f"{r.model_short} learned",
-                showlegend=False,
-                hovertemplate=(
-                    f"{r.src_id} ({r.model_short} · b={r.budget})<br>"
-                    f"learned={r.learned_mean:.3f} ± {r.learned_std:.3f} "
-                    f"(n={r.n_learned} replicas)<br>"
-                    f"delta={r.delta:+.3f}<br>"
-                    "<i>click to open source run</i><extra></extra>"
-                ),
-                customdata=[url],
+        if "learned" in selected_conditions:
+            fig.add_trace(
+                go.Scatter(
+                    x=[r.learned_mean],
+                    y=[label],
+                    mode="markers",
+                    marker={"symbol": "square", "size": 11, "color": color},
+                    name=f"{r.model_short} learned",
+                    showlegend=False,
+                    hovertemplate=(
+                        f"{r.src_id} ({r.model_short} · b={r.budget})<br>"
+                        f"learned={r.learned_mean:.3f} ± {r.learned_std:.3f} "
+                        f"(n={r.n_learned} replicas)<br>"
+                        f"delta={r.delta:+.3f}<br>"
+                        "<i>click to open source run</i><extra></extra>"
+                    ),
+                    customdata=[url],
+                )
             )
-        )
-        if r.n_cross_family > 0:
+        if r.n_cross_family > 0 and "cross_family" in selected_conditions:
             observer_color = _CROSS_FAMILY_OUTLINE_COLOR.get(
                 r.cross_family_observer or "", "#777777"
             )
@@ -485,12 +553,12 @@ def _render_scatter(results: list[BaselineLearnability], frontend_base: str) -> 
                     customdata=[url],
                 )
             )
+    symbol_legend = ", ".join(
+        _CONDITION_SYMBOL_LABELS[key] for key in _CONDITION_KEYS if key in selected_conditions
+    )
     fig.update_layout(
         height=max(360, 22 * len(y_labels) + 80),
-        xaxis_title=(
-            "round_success over rounds window  "
-            "(○ expected, △ expected_no_postmortem, ■ learned, ◇ cross_family)"
-        ),
+        xaxis_title=f"round_success over rounds window  ({symbol_legend})",
         yaxis={"categoryorder": "array", "categoryarray": list(reversed(y_labels))},
         margin={"l": 260, "r": 20, "t": 30, "b": 40},
     )
@@ -806,13 +874,23 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
 
     scatter_panel, contrast_panel = st.tabs(["Expected vs learned", "Feature contrast"])
     with scatter_panel:
-        st.markdown(
-            "**Per-model means** (○ expected, △ expected_no_postmortem, ■ learned, "
-            "◇ cross_family; error bars = SEM across baselines)"
-        )
-        _render_per_model_bars(results=results)
-        st.markdown("**Per-baseline** — click a marker to open the source run")
-        _render_scatter(results=results, frontend_base=frontend_base)
+        selected_conditions = _render_condition_checkboxes()
+        if not selected_conditions:
+            st.info("Select at least one condition to plot.")
+        else:
+            symbol_legend = ", ".join(
+                _CONDITION_SYMBOL_LABELS[key]
+                for key in _CONDITION_KEYS
+                if key in selected_conditions
+            )
+            st.markdown(f"**Per-model means** ({symbol_legend}; error bars = SEM across baselines)")
+            _render_per_model_bars(results=results, selected_conditions=selected_conditions)
+            st.markdown("**Per-baseline** — click a marker to open the source run")
+            _render_scatter(
+                results=results,
+                frontend_base=frontend_base,
+                selected_conditions=selected_conditions,
+            )
     with contrast_panel:
         contrast_rows = feature_contrast(
             runs_root=str(runs_dir),
