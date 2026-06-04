@@ -18,7 +18,7 @@ from tenacity import (
 )
 
 from schmidt.llm.max_tokens import resolve_max_tokens
-from schmidt.llm.provider import LLMMessage, LLMProvider, T
+from schmidt.llm.provider import LLMMessage, LLMProvider, SamplingParams, T
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +88,7 @@ class ClaudeProvider(LLMProvider):
         system_prompt: str,
         messages: list[LLMMessage],
         output_schema: type[T],
+        sampling: SamplingParams | None = None,
     ) -> T:
         """Call the Claude API with a forced tool call and return a validated Pydantic model.
 
@@ -95,7 +96,8 @@ class ClaudeProvider(LLMProvider):
         forces the model to call it via tool_choice, and validates the
         response arguments against the schema. Retries on validation
         failures (e.g. missing fields, stringified arrays) with a fresh
-        API call.
+        API call. When ``sampling`` is provided its temperature is forwarded;
+        otherwise the model's default sampling applies.
         """
         tool_name = output_schema.__name__
         tool_def = _schema_to_tool(schema_cls=output_schema, tool_name=tool_name)
@@ -117,6 +119,8 @@ class ClaudeProvider(LLMProvider):
             "tools": [tool_def],
             "tool_choice": {"type": "tool", "name": tool_name},
         }
+        if sampling is not None:
+            kwargs["temperature"] = sampling.temperature
 
         @retry(
             retry=retry_if_exception_type((ValidationError, ValueError)),
