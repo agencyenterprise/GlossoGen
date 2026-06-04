@@ -14,11 +14,6 @@ inside the solver via the project's own LLM provider, not via inspect):
         src/schmidt/scenarios/veyru/evals/judge_accuracy_eval.py \
         --model mockllm/model
 
-or simply::
-
-    VIRTUAL_ENV= uv run --no-sync python \
-        src/schmidt/scenarios/veyru/evals/judge_accuracy_eval.py
-
 The judge model/provider default to the canonical judge
 (``claude-haiku-4-5-20251001`` / ``anthropic``) and can be overridden with the
 ``VEYRU_JUDGE_MODEL`` / ``VEYRU_JUDGE_PROVIDER`` environment variables. Requires
@@ -29,8 +24,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from inspect_ai import Task
-from inspect_ai import task
+from inspect_ai import Task, task
 from inspect_ai.dataset import Sample, csv_dataset
 from inspect_ai.scorer import (
     CORRECT,
