@@ -59,6 +59,9 @@ analysis = [
     "plotly>=5.24.0",
     "pyperclip>=1.9.0",
 ]
+eval = [
+    "inspect-ai>=0.3.0",
+]
 
 [tool.uv]
 required-environments = [
