@@ -71,7 +71,7 @@ Requires `ANTHROPIC_API_KEY` (read from `.env`). Install the eval dependency gro
 VIRTUAL_ENV= uv sync --group eval
 ```
 
-Then either:
+Then run:
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync inspect eval \
@@ -79,14 +79,8 @@ VIRTUAL_ENV= uv run --no-sync inspect eval \
   --model mockllm/model
 ```
 
-or run the module directly:
-
-```bash
-VIRTUAL_ENV= uv run --no-sync python \
-  src/schmidt/scenarios/veyru/evals/judge_accuracy_eval.py
-```
-
-Useful flags: `--limit N` (first N samples), `--max-samples K` (concurrency).
+Useful flags: `--limit N` (first N samples), `--max-samples K` (concurrency),
+`--epochs N` (run each sample N times).
 View results with `inspect view`.
 
 The judge model/provider default to the canonical judge
