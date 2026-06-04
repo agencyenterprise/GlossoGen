@@ -28,7 +28,7 @@ _VEYRU_COLOR = "#1f3a93"
 _CONTAINER_COLOR = "#c1440e"
 _CONFIDENCE_THRESHOLD = 0.5
 _ONTOLOGY_PATH = Path("runs/veyru/_ontology/20260511T142136Z_full.json")
-_OUTPUT_PATH = Path("analysis/language_features.png")
+_OUTPUT_PATH = Path(__file__).resolve().parent / "output" / "language_features.png"
 _SIDECAR_FILENAME = "communication_feature_presence.json"
 _LABELS_FILENAME = "labels.json"
 # Drop categories whose max prevalence across cohorts is below this threshold

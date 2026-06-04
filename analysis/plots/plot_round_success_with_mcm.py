@@ -37,9 +37,10 @@ _SCENARIO_NAME = "veyru"
 _REQUIRED_LABELS = ("random_seed", "no_ordered_easy_rounds")
 _ROUND_SUCCESS_METRIC = "round_success"
 _MCM_METRIC = "mean_chars_per_message"
-_COMBINED_PATH = Path("analysis/round_success_with_mcm.png")
-_SUCCESS_PATH = Path("analysis/round_success.png")
-_MCM_PATH = Path("analysis/mean_chars_per_message.png")
+_OUTPUT_DIR = Path(__file__).resolve().parent / "output"
+_COMBINED_PATH = _OUTPUT_DIR / "round_success_with_mcm.png"
+_SUCCESS_PATH = _OUTPUT_DIR / "round_success.png"
+_MCM_PATH = _OUTPUT_DIR / "mean_chars_per_message.png"
 _RUN_TIMESTAMP_FLOOR = 1778877800  # first launch of the no_ordered_easy_rounds cohort
 
 _MCM_TITLE = "Message length compresses across rounds"

@@ -18,7 +18,7 @@ from matplotlib.axes import Axes
 
 _PERPLEXITY_METRIC = "perplexity"
 _MCM_METRIC = "mean_chars_per_message"
-_OUTPUT_PATH = Path("analysis/language_emergence.png")
+_OUTPUT_PATH = Path(__file__).resolve().parent / "output" / "language_emergence.png"
 
 _VEYRU_COLOR = "#1f3a93"
 _CONTAINER_COLOR = "#c1440e"

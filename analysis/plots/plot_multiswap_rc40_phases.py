@@ -23,7 +23,7 @@ import os
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
 import matplotlib.pyplot as plt  # noqa: E402
@@ -31,7 +31,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from analysis.results_viewer import multi_swap_tab as mst  # noqa: E402
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs  # noqa: E402
 
-OUT_DIR = Path(__file__).resolve().parent
+OUT_DIR = Path(__file__).resolve().parent / "output"
 PHASE_LABELS = [
     "Phase A\nrounds 1–10",
     "Phase B\nrounds 11–20",
