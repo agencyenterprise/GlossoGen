@@ -31,7 +31,7 @@ _BASELINE_LABEL = "baseline"
 _BASELINE_OSS_LABEL = "baseline_oss"
 _ROUND_SUCCESS_METRIC = "round_success"
 _EXCLUDED_MODELS = frozenset({"claude-sonnet-4-6"})
-_OUTPUT_PATH = Path("analysis/baseline_budget_sweep.png")
+_OUTPUT_PATH = Path(__file__).resolve().parent / "output" / "baseline_budget_sweep.png"
 
 _LARGE_FONT_RCPARAMS = {
     "font.size": 29,
