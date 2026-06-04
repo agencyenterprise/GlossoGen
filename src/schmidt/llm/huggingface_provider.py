@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from schmidt.llm.max_tokens import resolve_max_tokens
-from schmidt.llm.provider import LLMMessage, LLMProvider, T
+from schmidt.llm.provider import LLMMessage, LLMProvider, SamplingParams, T
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +86,14 @@ class HuggingFaceProvider(LLMProvider):
         system_prompt: str,
         messages: list[LLMMessage],
         output_schema: type[T],
+        sampling: SamplingParams | None = None,
     ) -> T:
         """Call the HuggingFace API with a forced tool call and return a validated Pydantic model.
 
         Converts the output_schema into an OpenAI function tool definition,
         forces the model to call it via tool_choice, and validates the
-        response arguments against the schema.
+        response arguments against the schema. When ``sampling`` is provided
+        its temperature is forwarded; otherwise the model's default applies.
         """
         tool_name = output_schema.__name__
         tool_def = _schema_to_openai_tool(schema_cls=output_schema, tool_name=tool_name)
@@ -111,6 +113,8 @@ class HuggingFaceProvider(LLMProvider):
             "tools": [tool_def],
             "tool_choice": tool_choice,
         }
+        if sampling is not None:
+            kwargs["temperature"] = sampling.temperature
 
         logger.debug(
             "Calling HuggingFace API (structured): model=%s, schema=%s",

@@ -1,22 +1,28 @@
 """LLM-based judge that evaluates whether a field observer's stabilization
 action matches the expected procedure for a Veyru failure case.
 
-Uses ``generate_structured`` to get a validated yes/no judgment with
-an explanation from the configured judge model.
+Uses ``generate_structured`` to get a validated yes/no judgment with an
+explanation from the configured judge model. To suppress per-call
+non-determinism, the verdict is the majority across ``JUDGE_VOTE_COUNT``
+independent calls.
 """
 
+import asyncio
 import logging
 from pathlib import Path
 
 from pydantic import BaseModel
 
-from schmidt.llm.provider import LLMMessage, LLMProvider
+from schmidt.llm.provider import LLMMessage, LLMProvider, SamplingParams
 from schmidt.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 _renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
+
+JUDGE_VOTE_COUNT = 1
+JUDGE_TEMPERATURE = 0.0
 
 
 class StabilizationJudgment(BaseModel):
@@ -36,6 +42,10 @@ async def judge_stabilization(
     ``expected_actions`` is a pre-rendered description of the correct
     procedure with stellar parameters already baked in — no conflicting
     numbers for the judge to resolve.
+
+    Runs ``JUDGE_VOTE_COUNT`` independent judge calls concurrently and returns
+    the majority verdict. The returned explanation is taken from one call that
+    agrees with the majority.
     """
     system_prompt = _renderer.render(
         template_name="stabilization_judge.jinja",
@@ -50,14 +60,28 @@ async def judge_stabilization(
         expected_actions,
         observer_action,
     )
-    judgment = await provider.generate_structured(
-        system_prompt=system_prompt,
-        messages=[LLMMessage(role="user", content=user_message)],
-        output_schema=StabilizationJudgment,
+    judgments = await asyncio.gather(
+        *[
+            provider.generate_structured(
+                system_prompt=system_prompt,
+                messages=[LLMMessage(role="user", content=user_message)],
+                output_schema=StabilizationJudgment,
+                sampling=SamplingParams(temperature=JUDGE_TEMPERATURE),
+            )
+            for _ in range(JUDGE_VOTE_COUNT)
+        ]
     )
+    match_votes = sum(1 for judgment in judgments if judgment.match)
+    majority_match = match_votes * 2 > JUDGE_VOTE_COUNT
+    representative = next(judgment for judgment in judgments if judgment.match == majority_match)
     logger.info(
-        "Stabilization judge result: match=%s — %s",
-        judgment.match,
-        judgment.explanation,
+        "Stabilization judge result (%d/%d match votes): match=%s — %s",
+        match_votes,
+        JUDGE_VOTE_COUNT,
+        majority_match,
+        representative.explanation,
     )
-    return judgment
+    return StabilizationJudgment(
+        match=majority_match,
+        explanation=representative.explanation,
+    )
