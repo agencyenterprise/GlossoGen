@@ -37,6 +37,8 @@ dependencies = [
     "alembic>=1.13.0",
     "svix>=1.40.0",
     "clerk-backend-api>=3.0.0",
+    "streamlit>=1.57.0",
+    "plotly>=6.7.0",
 ]
 
 [dependency-groups]

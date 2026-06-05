@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -4602,12 +4602,14 @@ dependencies = [
     { name = "minicons" },
     { name = "openai" },
     { name = "orjson" },
+    { name = "plotly" },
     { name = "psycopg", extra = ["binary"] },
     { name = "psycopg-pool" },
     { name = "pydantic" },
     { name = "pydantic-ai" },
     { name = "python-dotenv" },
     { name = "rapidfuzz" },
+    { name = "streamlit" },
     { name = "svix" },
     { name = "tenacity" },
     { name = "torch" },
@@ -4660,12 +4662,14 @@ requires-dist = [
     { name = "minicons", specifier = ">=0.2.55" },
     { name = "openai", specifier = ">=2.29.0" },
     { name = "orjson", specifier = ">=3.10.0" },
+    { name = "plotly", specifier = ">=6.7.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0" },
     { name = "psycopg-pool", specifier = ">=3.2.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pydantic-ai", specifier = ">=0.2.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "rapidfuzz", specifier = ">=3.10.0" },
+    { name = "streamlit", specifier = ">=1.57.0" },
     { name = "svix", specifier = ">=1.40.0" },
     { name = "tenacity", specifier = ">=9.0.0" },
     { name = "torch", specifier = ">=2.2.0" },
