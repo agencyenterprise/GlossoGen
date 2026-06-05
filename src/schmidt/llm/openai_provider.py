@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from schmidt.llm.max_tokens import resolve_max_tokens
-from schmidt.llm.provider import LLMMessage, LLMProvider, T
+from schmidt.llm.provider import LLMMessage, LLMProvider, SamplingParams, T
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +73,14 @@ class OpenAIProvider(LLMProvider):
         system_prompt: str,
         messages: list[LLMMessage],
         output_schema: type[T],
+        sampling: SamplingParams | None = None,
     ) -> T:
-        """Call the Responses API with function calling, return a validated Pydantic model."""
+        """Call the Responses API with function calling, return a validated Pydantic model.
+
+        When ``sampling`` is provided its temperature is forwarded, except for
+        reasoning models (``reasoning_effort`` set), which do not accept a
+        temperature parameter.
+        """
         tool_name = output_schema.__name__
         tool_def = _schema_to_responses_tool(schema_cls=output_schema, tool_name=tool_name)
 
@@ -94,6 +100,8 @@ class OpenAIProvider(LLMProvider):
 
         if self._reasoning_effort is not None:
             kwargs["reasoning"] = {"effort": self._reasoning_effort}
+        elif sampling is not None:
+            kwargs["temperature"] = sampling.temperature
 
         logger.debug(
             "Calling OpenAI Responses API (structured): model=%s, schema=%s",
