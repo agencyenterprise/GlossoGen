@@ -33,15 +33,14 @@ Three output tables:
   numerator/denominator (``round_success_count`` / ``total_rounds``) supports a
   binomial GLMM ``cbind(successes, failures) ~ ...`` and the fraction supports a
   beta/linear model.
-- ``round_level`` — one row per (run, round); ``success`` is the 0/1 outcome the
-  round-success metric recorded. This is the unit for a logistic mixed model
-  ``success ~ log_budget * model_class * postmortem + (1 | model) + (1 | run_id)``.
-  Each row also carries the veyru ground truth read from the event log:
-  ``veyru_symptoms_1..5`` / ``veyru_actions_1..5`` (the per-stage observable symptoms
-  and expected procedure, blank for stages the team never reached), the round-start
-  briefing each agent received (``field_observer_round_event`` /
-  ``engineer_round_event``), and ``link_messages`` (a JSON list of
-  ``{"agent", "message"}`` for the round's link-channel conversation).
+- ``substage_level`` — one row per (run, round, substage the team reached). Carries the
+  substage's veyru ground truth (``symptoms`` / ``actions``), ``substage_stabilized``
+  (0/1), and ``link_messages`` (a JSON list of ``{"agent", "message"}`` scoped to that
+  substage — the link-channel messages exchanged while the team was working on it). The
+  round-level ``success`` / ``success_raw`` / ``note`` and the round-start briefings
+  (``field_observer_round_event`` / ``engineer_round_event``) are repeated on every
+  substage row of the round. A round contributes ``stages_reached`` rows
+  (``min(stabilized_stages + 1, total_stages)``); unreached substages are omitted.
 - ``budget_aggregate`` — per (models, postmortem, random_seed, easy_rounds, budget)
   mean ± std of the success fraction; a sanity check against the plotted bands.
 
@@ -80,8 +79,6 @@ _RANDOM_SEED_LABEL = "random_seed"
 _NO_ORDERED_EASY_ROUNDS_LABEL = "no_ordered_easy_rounds"
 _KIND_TO_MODEL_CLASS = {"baseline": "closed", "baseline_oss": "open"}
 
-# Max stage columns to emit (veyru cases have at most 5 stages).
-_MAX_STAGES = 5
 _FIELD_OBSERVER_IDS = frozenset({FIELD_OBSERVER_ID, OBSERVER_A_ID, OBSERVER_B_ID})
 # "specialist" is a legacy agent_id some early runs used for the engineer role.
 _ENGINEER_IDS = frozenset(
@@ -114,14 +111,17 @@ class RoundContext(NamedTuple):
     ``stages_reached`` is the number of stages the team actually progressed to:
     ``min(stabilized_stages + 1, total_stages)`` (the team always sees stage 1, each
     stabilized stage unlocks the next, and the stage they ended on counts as reached).
-    Stages beyond ``stages_reached`` are left blank in the output.
+    Substages beyond ``stages_reached`` are not emitted. ``stabilized_stages`` is the
+    count of stages successfully stabilized this round. ``link_messages_by_substage``
+    maps a 1-indexed substage to the link-channel messages exchanged while it was active.
     """
 
     stages: list[StageGroundTruth]
     stages_reached: int
+    stabilized_stages: int
     field_observer_event: str
     engineer_event: str
-    link_messages: list[LinkMessage]
+    link_messages_by_substage: dict[int, list[LinkMessage]]
 
 
 class RunContext(NamedTuple):
@@ -163,21 +163,42 @@ def _injection_for(
     return ""
 
 
+def _bucket_link_messages(
+    raw_buckets: dict[int, list[LinkMessage]], stages_reached: int
+) -> dict[int, list[LinkMessage]]:
+    """Clamp raw per-substage message buckets into ``1..stages_reached``.
+
+    Any messages recorded past the last reached substage (e.g. sent after the final
+    stabilization of a fully-solved round) fold into ``stages_reached``, preserving
+    chronological order by walking the raw substage indices in ascending order.
+    """
+    if stages_reached < 1:
+        return {}
+    clamped: dict[int, list[LinkMessage]] = {}
+    for substage in sorted(raw_buckets):
+        index = min(max(substage, 1), stages_reached)
+        clamped.setdefault(index, []).extend(raw_buckets[substage])
+    return clamped
+
+
 def _scan_run_context(jsonl_path: Path) -> RunContext:
     """Read a run's JSONL once and extract per-agent models + per-round veyru context.
 
     Tracks the most recent ``round_advanced`` to backfill ``round_number`` on older
-    logs. ``stages`` come from ``veyru_case_started``; ``stages_reached`` from the count
-    of ``veyru_stabilization_judged`` events with ``judge_match=True`` (matching
+    logs. ``stages`` come from ``veyru_case_started``; ``stabilized_stages`` from the
+    count of ``veyru_stabilization_judged`` events with ``judge_match=True`` (matching
     ``outcome_reconstruction``); the round-start briefing is the first
-    ``injection_delivered`` per (round, agent); link messages are ``message_sent`` on a
-    link channel in chronological order.
+    ``injection_delivered`` per (round, agent). Each link-channel ``message_sent`` is
+    bucketed into the substage active when it was sent — a per-round counter that starts
+    at 1 and advances on every ``judge_match=True`` — so messages are attributed to the
+    stage the team was working on.
     """
     models: dict[str, str] = {}
     stages_by_round: dict[int, list[StageGroundTruth]] = {}
     matched_by_round: dict[int, int] = {}
     injections: dict[tuple[int, str], str] = {}
-    links_by_round: dict[int, list[LinkMessage]] = {}
+    links_by_round_substage: dict[tuple[int, int], list[LinkMessage]] = {}
+    current_substage: dict[int, int] = {}
     running_round = 0
     with jsonl_path.open("rb") as handle:
         for line in handle:
@@ -212,6 +233,7 @@ def _scan_run_context(jsonl_path: Path) -> RunContext:
             elif event_type == "veyru_stabilization_judged" and round_number >= 1:
                 if raw.get("judge_match") is True:
                     matched_by_round[round_number] = matched_by_round.get(round_number, 0) + 1
+                    current_substage[round_number] = current_substage.get(round_number, 1) + 1
             elif event_type == "injection_delivered" and round_number >= 1:
                 agent_id = raw.get("agent_id")
                 if isinstance(agent_id, str):
@@ -219,29 +241,37 @@ def _scan_run_context(jsonl_path: Path) -> RunContext:
             elif event_type == "message_sent" and round_number >= 1:
                 message = raw.get("message") or {}
                 if message.get("channel_id") in LINK_CHANNEL_IDS:
-                    links_by_round.setdefault(round_number, []).append(
+                    substage = current_substage.get(round_number, 1)
+                    links_by_round_substage.setdefault((round_number, substage), []).append(
                         LinkMessage(
                             agent=str(message.get("sender_agent_id", "")),
                             message=str(message.get("text", "")),
                         )
                     )
+    links_grouped: dict[int, dict[int, list[LinkMessage]]] = {}
+    for (round_number, substage), messages in links_by_round_substage.items():
+        links_grouped.setdefault(round_number, {})[substage] = messages
     rounds: dict[int, RoundContext] = {}
     all_rounds = (
         set(stages_by_round)
         | set(matched_by_round)
-        | set(links_by_round)
+        | set(links_grouped)
         | {round_number for round_number, _ in injections}
     )
     for round_number in all_rounds:
         stages = stages_by_round.get(round_number, [])
         total = len(stages)
-        stages_reached = min(matched_by_round.get(round_number, 0) + 1, total)
+        matched = matched_by_round.get(round_number, 0)
+        stages_reached = min(matched + 1, total) if total >= 1 else 0
         rounds[round_number] = RoundContext(
             stages=stages,
             stages_reached=stages_reached,
+            stabilized_stages=matched,
             field_observer_event=_injection_for(injections, round_number, _FIELD_OBSERVER_IDS),
             engineer_event=_injection_for(injections, round_number, _ENGINEER_IDS),
-            link_messages=links_by_round.get(round_number, []),
+            link_messages_by_substage=_bucket_link_messages(
+                raw_buckets=links_grouped.get(round_number, {}), stages_reached=stages_reached
+            ),
         )
     return RunContext(
         field_observer_model=_resolve_model(models=models, candidate_ids=_FIELD_OBSERVER_IDS),
@@ -336,25 +366,6 @@ def _round_success_per_round(evaluated: EvaluatedRun) -> list[tuple[int, float, 
     return []
 
 
-def _stage_columns(round_ctx: RoundContext | None) -> dict[str, str]:
-    """Build the veyru_symptoms_k / veyru_actions_k columns, blank past stages reached."""
-    columns: dict[str, str] = {}
-    for stage_number in range(1, _MAX_STAGES + 1):
-        symptoms = ""
-        actions = ""
-        if (
-            round_ctx is not None
-            and stage_number <= round_ctx.stages_reached
-            and stage_number <= len(round_ctx.stages)
-        ):
-            stage = round_ctx.stages[stage_number - 1]
-            symptoms = stage.symptoms
-            actions = stage.actions
-        columns[f"veyru_symptoms_{stage_number}"] = symptoms
-        columns[f"veyru_actions_{stage_number}"] = actions
-    return columns
-
-
 def _build_run_level_frame(
     joined_runs: list[JoinedRun], contexts: dict[str, RunContext]
 ) -> pd.DataFrame:
@@ -400,10 +411,16 @@ def _build_run_level_frame(
     ).reset_index(drop=True)
 
 
-def _build_round_level_frame(
+def _build_substage_level_frame(
     joined_runs: list[JoinedRun], contexts: dict[str, RunContext]
 ) -> pd.DataFrame:
-    """Long format: one row per (run, round) with the 0/1 outcome and veyru ground truth."""
+    """Long format: one row per (run, round, substage the team reached).
+
+    Each row carries that substage's ground truth (``symptoms`` / ``actions``), whether
+    it was stabilized, and the link-channel messages exchanged while it was active. The
+    round-level outcome (``success`` / ``note``) and round-start briefings are repeated
+    on every substage row of the round.
+    """
     rows: list[dict[str, object]] = []
     for joined in joined_runs:
         baseline = build_baseline_run(evaluated=joined.evaluated)
@@ -412,39 +429,42 @@ def _build_round_level_frame(
         context = contexts[baseline.run_id]
         for round_number, value, note in _round_success_per_round(evaluated=joined.evaluated):
             round_ctx = context.rounds.get(round_number)
-            link_messages = round_ctx.link_messages if round_ctx is not None else []
-            rows.append(
-                {
-                    "run_id": baseline.run_id,
-                    "scenario": joined.evaluated.scenario_name,
-                    "field_observer_model": context.field_observer_model,
-                    "engineer_model": context.engineer_model,
-                    "model_class": _KIND_TO_MODEL_CLASS[baseline.kind],
-                    "postmortem": baseline.postmortem_enabled,
-                    "round_time_budget_seconds": baseline.budget,
-                    "random_seed": _RANDOM_SEED_LABEL in baseline.labels,
-                    "easy_rounds": _NO_ORDERED_EASY_ROUNDS_LABEL not in baseline.labels,
-                    "round_number": round_number,
-                    "success": int(round(value)),
-                    "success_raw": value,
-                    "note": note,
-                    **_stage_columns(round_ctx=round_ctx),
-                    "field_observer_round_event": (
-                        round_ctx.field_observer_event if round_ctx is not None else ""
-                    ),
-                    "engineer_round_event": (
-                        round_ctx.engineer_event if round_ctx is not None else ""
-                    ),
-                    "link_messages": json.dumps(
-                        [{"agent": m.agent, "message": m.message} for m in link_messages],
-                        ensure_ascii=False,
-                    ),
-                }
-            )
+            if round_ctx is None:
+                continue
+            for substage in range(1, round_ctx.stages_reached + 1):
+                stage = round_ctx.stages[substage - 1]
+                messages = round_ctx.link_messages_by_substage.get(substage, [])
+                rows.append(
+                    {
+                        "run_id": baseline.run_id,
+                        "scenario": joined.evaluated.scenario_name,
+                        "field_observer_model": context.field_observer_model,
+                        "engineer_model": context.engineer_model,
+                        "model_class": _KIND_TO_MODEL_CLASS[baseline.kind],
+                        "postmortem": baseline.postmortem_enabled,
+                        "round_time_budget_seconds": baseline.budget,
+                        "random_seed": _RANDOM_SEED_LABEL in baseline.labels,
+                        "easy_rounds": _NO_ORDERED_EASY_ROUNDS_LABEL not in baseline.labels,
+                        "round_number": round_number,
+                        "substage": substage,
+                        "symptoms": stage.symptoms,
+                        "actions": stage.actions,
+                        "substage_stabilized": int(substage <= round_ctx.stabilized_stages),
+                        "link_messages": json.dumps(
+                            [{"agent": m.agent, "message": m.message} for m in messages],
+                            ensure_ascii=False,
+                        ),
+                        "success": int(round(value)),
+                        "success_raw": value,
+                        "note": note,
+                        "field_observer_round_event": round_ctx.field_observer_event,
+                        "engineer_round_event": round_ctx.engineer_event,
+                    }
+                )
     frame = pd.DataFrame(rows)
     if frame.empty:
         return frame
-    return frame.sort_values(by=["run_id", "round_number"]).reset_index(drop=True)
+    return frame.sort_values(by=["run_id", "round_number", "substage"]).reset_index(drop=True)
 
 
 def _build_budget_aggregate_frame(run_level: pd.DataFrame) -> pd.DataFrame:
@@ -584,11 +604,11 @@ def main() -> None:
         for joined in kept
     }
     run_level = _build_run_level_frame(joined_runs=kept, contexts=contexts)
-    round_level = _build_round_level_frame(joined_runs=kept, contexts=contexts)
+    substage_level = _build_substage_level_frame(joined_runs=kept, contexts=contexts)
     budget_aggregate = _build_budget_aggregate_frame(run_level=run_level)
     frames = {
         "run_level": run_level,
-        "round_level": round_level,
+        "substage_level": substage_level,
         "budget_aggregate": budget_aggregate,
     }
 
@@ -596,9 +616,9 @@ def main() -> None:
     xlsx_path = _write_xlsx(frames=frames, output_dir=args.output_dir, stem=args.stem)
 
     logger.info(
-        "Wrote %d runs, %d round-rows. CSVs: %s%s",
+        "Wrote %d runs, %d substage-rows. CSVs: %s%s",
         len(run_level),
-        len(round_level),
+        len(substage_level),
         ", ".join(str(p) for p in csv_paths),
         f"; workbook: {xlsx_path}" if xlsx_path is not None else "",
     )

@@ -26,6 +26,7 @@ from analysis.results_viewer.baseline_data import (
 from analysis.results_viewer.measurement_scores import read_labels
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
+from analysis.results_viewer.scenario_selector import render_scenario_radio
 from analysis.results_viewer.series_plot import (
     SeriesStats,
     add_mean_trace,
@@ -50,23 +51,10 @@ def _scenarios_with_baseline_runs(evaluated: list[EvaluatedRun]) -> list[str]:
     return sorted(out)
 
 
-_DEFAULT_SCENARIO = "veyru"
-
-
 def _render_scenario_selector(evaluated: list[EvaluatedRun]) -> str | None:
     """Radio selector listing every scenario that has baseline-labeled runs."""
     options = _scenarios_with_baseline_runs(evaluated=evaluated)
-    if not options:
-        return None
-    default_index = options.index(_DEFAULT_SCENARIO) if _DEFAULT_SCENARIO in options else 0
-    chosen = st.radio(
-        label="Scenario",
-        options=options,
-        index=default_index,
-        horizontal=True,
-        key="baseline_scenario_selector",
-    )
-    return chosen
+    return render_scenario_radio(options=options, key="baseline_scenario_selector")
 
 
 def _render_metric_selector() -> MetricOption:

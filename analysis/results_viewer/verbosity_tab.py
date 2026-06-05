@@ -20,6 +20,7 @@ from plotly.subplots import make_subplots
 from analysis.results_viewer import judge_replay_filter, seed_mode_filter
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
+from analysis.results_viewer.scenario_selector import render_scenario_radio
 from analysis.results_viewer.series_plot import (
     add_mean_trace,
     add_replica_trace,
@@ -51,16 +52,7 @@ def _scenarios_with_verbosity_runs(evaluated: list[EvaluatedRun]) -> list[str]:
 def _render_scenario_selector(evaluated: list[EvaluatedRun]) -> str | None:
     """Radio selector listing every scenario that has evaluated runs."""
     options = _scenarios_with_verbosity_runs(evaluated=evaluated)
-    if not options:
-        return None
-    chosen = st.radio(
-        label="Scenario",
-        options=options,
-        index=0,
-        horizontal=True,
-        key="verbosity_scenario_selector",
-    )
-    return chosen
+    return render_scenario_radio(options=options, key="verbosity_scenario_selector")
 
 
 def _render_metric_selector() -> VerbosityMetricOption:

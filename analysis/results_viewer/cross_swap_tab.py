@@ -21,6 +21,7 @@ from analysis.results_viewer import judge_replay_filter, seed_mode_filter
 from analysis.results_viewer.cross_swap_data import CrossSwapRun, list_cross_swap_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
+from analysis.results_viewer.scenario_selector import render_scenario_radio
 from analysis.results_viewer.series_plot import (
     SeriesStats,
     add_mean_trace,
@@ -41,16 +42,7 @@ def _scenarios_with_cross_swap_runs(runs: list[CrossSwapRun]) -> list[str]:
 def _render_scenario_selector(runs: list[CrossSwapRun]) -> str | None:
     """Radio selector listing every scenario with at least one cross-swap run."""
     options = _scenarios_with_cross_swap_runs(runs=runs)
-    if not options:
-        return None
-    chosen = st.radio(
-        label="Scenario",
-        options=options,
-        index=0,
-        horizontal=True,
-        key="cross_swap_scenario_selector",
-    )
-    return chosen
+    return render_scenario_radio(options=options, key="cross_swap_scenario_selector")
 
 
 def _swapped_series(run: CrossSwapRun) -> str:

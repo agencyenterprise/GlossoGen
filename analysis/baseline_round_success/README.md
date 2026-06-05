@@ -13,7 +13,7 @@ analysis/baseline_round_success/
 └── output/                         # generated; regenerated on each run
     ├── baseline_round_success.xlsx              # all three sheets in one workbook
     ├── baseline_round_success_run_level.csv
-    ├── baseline_round_success_round_level.csv
+    ├── baseline_round_success_substage_level.csv
     └── baseline_round_success_budget_aggregate.csv
 ```
 
@@ -61,22 +61,35 @@ or a model on `round_success_fraction`.
 (closed/open), `postmortem`, `round_time_budget_seconds`, `random_seed`, `easy_rounds`,
 `total_rounds`, `round_success_count`, `round_success_fraction`, `labels`.
 
-### `round_level` — one row per (run, round)
+### `substage_level` — one row per (run, round, substage reached)
 
-The unit for a logistic mixed model
-`success ~ log_budget * model_class * postmortem + (1 | model) + (1 | run_id)`.
-Carries the per-round metric plus the veyru ground truth read from the event log:
+A veyru round is a multi-stage case: the team stabilizes one stage, then new symptoms
+appear for the next. This sheet has one row per substage the team actually reached
+(`stages_reached = min(stabilized_stages + 1, total_stages)`; unreached substages are
+omitted). Good for modelling per-substage difficulty and reading the conversation a
+stage at a time.
 
-- `success` (0/1), `success_raw`, `note`.
-- `veyru_symptoms_1..5` / `veyru_actions_1..5` — per-stage observable symptoms and the
-  judge's expected procedure. **Blank for stages the team never reached**
-  (`stages_reached = min(stabilized_stages + 1, total_stages)`); stage 1 is always
-  present. Cases have up to 5 stages.
-- `field_observer_round_event` / `engineer_round_event` — the round-start briefing each
-  agent received (the `--- NEW VEYRU ---` injection; the postmortem/discussion injection
-  is excluded).
-- `link_messages` — JSON list `[{"agent": ..., "message": ...}]` of the round's
-  link-channel conversation, in chronological order.
+Per-substage columns:
+
+- `substage` — 1-indexed stage number within the round.
+- `symptoms` / `actions` — that stage's observable symptoms (what the observer saw) and
+  the judge's expected procedure.
+- `substage_stabilized` — `1` if the team stabilized this substage, else `0` (the last
+  reached substage of a failed round is `0`).
+- `link_messages` — JSON list `[{"agent": ..., "message": ...}]` of the link-channel
+  messages exchanged **while this substage was active**, in chronological order. A
+  message is attributed to the substage in effect when it was sent (the counter advances
+  on each successful stabilization), so the observer's "Done. New: <symptoms>" message
+  opens the next substage.
+
+Repeated round-level columns (identical across a round's substage rows): `round_number`,
+`success` (0/1, whole-round outcome), `success_raw`, `note`, `field_observer_round_event`
+/ `engineer_round_event` (the `--- NEW VEYRU ---` round-start briefings), plus all the
+run covariates (`field_observer_model`, `engineer_model`, `model_class`, `postmortem`,
+`round_time_budget_seconds`, `random_seed`, `easy_rounds`).
+
+Concatenating a round's per-substage `link_messages` in `substage` order reproduces the
+full round link transcript.
 
 ### `budget_aggregate` — one row per cell
 
