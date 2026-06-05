@@ -95,7 +95,7 @@ typeCheckingMode = "strict"
 venvPath = "."
 venv = ".venv"
 extraPaths = ["src", "."]
-ignore = ["vulture_whitelist.py", "runs", "modal"]
+ignore = ["vulture_whitelist.py", "runs", "modal", "scripts"]
 
 # analysis/ is exploratory plotting code that talks to untyped libs
 # (pandas, plotly, matplotlib, streamlit). Relax the strict-only rules
