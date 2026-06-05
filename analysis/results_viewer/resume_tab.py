@@ -16,6 +16,7 @@ from analysis.results_viewer.resume_data import ResumeRun, list_resume_runs
 from analysis.results_viewer.resume_multi_swap_view import render as render_multi_swap_subtab
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
+from analysis.results_viewer.scenario_selector import render_scenario_radio
 from analysis.results_viewer.series_plot import (
     SeriesStats,
     add_mean_trace,
@@ -49,16 +50,7 @@ def _scenarios_with_resume_runs(runs: list[ResumeRun]) -> list[str]:
 def _render_scenario_selector(runs: list[ResumeRun]) -> str | None:
     """Radio selector listing every scenario with at least one resume run."""
     options = _scenarios_with_resume_runs(runs=runs)
-    if not options:
-        return None
-    chosen = st.radio(
-        label="Scenario",
-        options=options,
-        index=0,
-        horizontal=True,
-        key="resume_scenario_selector",
-    )
-    return chosen
+    return render_scenario_radio(options=options, key="resume_scenario_selector")
 
 
 def _bucket_filter(runs: list[ResumeRun], key_prefix: str) -> set[str]:

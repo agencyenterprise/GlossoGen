@@ -11,6 +11,7 @@ from analysis.results_viewer import judge_replay_filter, seed_mode_filter
 from analysis.results_viewer.event_extractor import load_run_timeline
 from analysis.results_viewer.run_catalog import EvaluatedRun, group_runs_by_day
 from analysis.results_viewer.run_link import run_url
+from analysis.results_viewer.scenario_selector import render_scenario_radio
 from analysis.results_viewer.timeline_plot import (
     build_timeline_figure,
     build_value_metrics_figure,
@@ -55,16 +56,7 @@ def _scenarios_with_evaluated_runs(evaluated: list[EvaluatedRun]) -> list[str]:
 def _render_scenario_selector(evaluated: list[EvaluatedRun]) -> str | None:
     """Radio selector listing every scenario with evaluated runs."""
     options = _scenarios_with_evaluated_runs(evaluated=evaluated)
-    if not options:
-        return None
-    chosen = st.radio(
-        label="Scenario",
-        options=options,
-        index=0,
-        horizontal=True,
-        key="timeline_scenario_selector",
-    )
-    return chosen
+    return render_scenario_radio(options=options, key="timeline_scenario_selector")
 
 
 def _render_prefilters(runs: list[EvaluatedRun]) -> tuple[set[str], set[str]]:

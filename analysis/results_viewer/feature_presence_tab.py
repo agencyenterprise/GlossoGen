@@ -49,6 +49,7 @@ from analysis.results_viewer.feature_presence_data import (
 from analysis.results_viewer.natural_sort import natural_sort_key
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
+from analysis.results_viewer.scenario_selector import default_scenario_index
 from analysis.results_viewer.series_plot import render_horizontal_checkboxes
 from schmidt.evaluation.metrics.communication.label_models import ontology_dir_for_scenario
 
@@ -681,6 +682,7 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
     selected_scenario = st.radio(
         label="Scenario",
         options=scenario_options,
+        index=default_scenario_index(options=scenario_options),
         format_func=lambda name: f"{name} ({scenario_counts[name]} runs)",
         key="feature_presence_scenario",
         horizontal=True,
