@@ -21,6 +21,17 @@ class LLMMessage(BaseModel):
     content: str
 
 
+class SamplingParams(BaseModel):
+    """Provider-agnostic sampling controls for a structured generation call.
+
+    Concrete providers translate these fields to their own SDK parameters and
+    skip any that the target model does not support (e.g. OpenAI reasoning
+    models reject ``temperature``).
+    """
+
+    temperature: float
+
+
 class LLMProvider(ABC):
     """Abstract interface for LLM providers.
 
@@ -65,6 +76,7 @@ class LLMProvider(ABC):
         system_prompt: str,
         messages: list[LLMMessage],
         output_schema: type[T],
+        sampling: SamplingParams | None = None,
     ) -> T:
         """Send a conversation to the LLM and return a validated Pydantic model.
 
@@ -76,6 +88,8 @@ class LLMProvider(ABC):
             system_prompt: The system-level instruction for the model.
             messages: The conversation history as a list of messages.
             output_schema: The Pydantic model class defining the output shape.
+            sampling: Optional sampling controls. When ``None`` the provider
+                relies on the model's own defaults.
 
         Returns:
             A validated instance of the output_schema.
