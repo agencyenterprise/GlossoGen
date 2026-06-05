@@ -10,9 +10,9 @@ Views:
 - A headline pair: the percentage of runs affected (at least one verdict
   flipped) and the count of runs carrying a sidecar.
 - A per-run flip-rate distribution: each run's flips ÷ its previously-accepted
-  verdicts bucketed into bands (0%, >0-20%, ... >80-100%), so statements like
-  "20% of runs had more than 80% of their verdicts flip" can be read off
-  directly.
+  verdicts bucketed into non-zero bands (>0-20%, ... >80-100%; the no-flip
+  bucket is omitted), so statements like "20% of runs had more than 80% of
+  their verdicts flip" can be read off directly.
 - A horizontal bar chart of per-model flip rate (% of previously-accepted
   stabilizations that flip to rejected under the current judge prompt),
   sorted descending so the most damaged models surface first.
@@ -160,16 +160,18 @@ _FLIP_RATE_BANDS: tuple[tuple[str, float, float], ...] = (
 
 
 def _bucket_distribution(run_flips: list[_RunFlip]) -> list[_FlipBucket]:
-    """Bucket each run's flip rate into bands and report count + % of runs per band.
+    """Bucket each run's flip rate into non-zero bands and report count + % of runs per band.
 
-    The first bucket isolates runs with zero flips; the remaining bands are
-    half-open ``(low, high]`` so a run sits in exactly one band.
+    The zero-flip runs are intentionally omitted (the no-flip bucket is not
+    relevant to the damage view); the remaining bands are half-open
+    ``(low, high]`` so a run sits in exactly one band. Percentages stay
+    relative to all scoreable runs, so the bands sum to less than 100% by the
+    hidden no-flip share.
     """
     total = len(run_flips)
     if total == 0:
         return []
-    zero = sum(1 for rf in run_flips if rf.flip_rate == 0.0)
-    buckets = [_FlipBucket(label="0% (no flip)", run_count=zero, pct_of_runs=100.0 * zero / total)]
+    buckets: list[_FlipBucket] = []
     for label, low, high in _FLIP_RATE_BANDS:
         count = sum(1 for rf in run_flips if low < rf.flip_rate <= high)
         buckets.append(_FlipBucket(label=label, run_count=count, pct_of_runs=100.0 * count / total))
@@ -274,8 +276,9 @@ def _bucket_distribution_by_model(run_flips: list[_RunFlip]) -> dict[str, list[_
 def _build_distribution_by_model_chart(by_model: dict[str, list[_FlipBucket]]) -> go.Figure:
     """Grouped bar chart: one bar per model within each flip-rate band.
 
-    Each model's bars sum to 100% (band % is of that model's own run count), so
-    distributions stay comparable across models with different run counts.
+    Each band's % is of that model's own scoreable run count, so distributions
+    stay comparable across models with different run counts. The no-flip bucket
+    is omitted, so a model's bars sum to less than 100% by its no-flip share.
     """
     fig = go.Figure()
     for model in sorted(by_model):
