@@ -63,6 +63,8 @@ from typing import NamedTuple
 
 import orjson
 import pandas as pd
+import torch
+from minicons import scorer  # type: ignore[import-untyped]
 
 from analysis.results_viewer.baseline_data import build_baseline_run
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
@@ -398,9 +400,6 @@ def _score_message_perplexities(texts: list[str]) -> list[float | None]:
     ``reduction = -x.mean(0)``. Empty messages and single-token inputs (which return
     NaN — no left context) map to ``None`` so the column stays numeric elsewhere.
     """
-    import torch
-    from minicons import scorer
-
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info("perplexity: scoring %d messages with gpt2 on %s", len(texts), device)
     lm_scorer = scorer.IncrementalLMScorer("gpt2", device)
