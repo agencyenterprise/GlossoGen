@@ -60,7 +60,9 @@ or a model on `round_success_fraction`.
 
 `run_id`, `scenario`, `field_observer_model`, `engineer_model`, `model_class`
 (closed/open), `postmortem`, `round_time_budget_seconds`, `random_seed`, `easy_rounds`,
-`total_rounds`, `round_success_count`, `round_success_fraction`, `labels`.
+`total_rounds`, `round_success_count`, `round_success_fraction`, `perplexity` (run-wide
+mean per-token surprisal, nats/gpt2), `mcm` (run-wide mean chars per link message),
+`labels`.
 
 ### `message_level` — one row per link-channel message
 
@@ -75,6 +77,11 @@ Message columns:
   `specialist` — all map to `stabilization_engineer`).
 - `message_text` — the message body.
 - `message_index_in_substage` — 1-indexed order of the message within its substage.
+- `chars` — character count of the message (`len(message_text)`); the per-message value
+  that `mcm` aggregates.
+- `perplexity` — per-message mean per-token surprisal (nats) under `gpt2`, recomputed at
+  export time with the same method as the `perplexity` metric. Blank for empty or
+  single-token messages (no left context → NaN).
 
 Substage context (repeated across the substage's messages):
 
