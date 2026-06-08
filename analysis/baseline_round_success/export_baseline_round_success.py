@@ -32,11 +32,14 @@ Four output tables:
 - ``run_level`` — one row per run (the replica dots on the chart). The Bernoulli
   numerator/denominator (``round_success_count`` / ``total_rounds``) supports a
   binomial GLMM ``cbind(successes, failures) ~ ...`` and the fraction supports a
-  beta/linear model.
+  beta/linear model. Also carries the run's headline ``perplexity`` (overall mean
+  per-token surprisal) and ``mcm`` (overall mean chars per message) from the report.
 - ``message_level`` — one row per link-channel message. Each row carries its substage
   context (``substage``, ``symptoms`` / ``actions``, ``substage_stabilized``),
   ``message_index_in_substage``, ``message_agent`` (sender role, normalized to
-  ``field_observer`` or ``stabilization_engineer``), ``message_text``, and the round-level
+  ``field_observer`` or ``stabilization_engineer``), ``message_text``, ``chars``
+  (``len(message_text)``), ``perplexity`` (per-message mean per-token surprisal in nats
+  under gpt2; blank for empty/single-token messages), and the round-level
   ``success`` / ``success_raw`` / ``note``. Messages are walked over the substages the
   team reached (``min(stabilized_stages + 1, total_stages)``); substages with no link
   traffic produce no rows.
@@ -54,6 +57,7 @@ multi-sheet ``.xlsx`` workbook.
 import argparse
 import importlib.util
 import logging
+import math
 from pathlib import Path
 from typing import NamedTuple
 
@@ -367,6 +371,8 @@ def _build_run_level_frame(
                 "total_rounds": baseline.total_rounds,
                 "round_success_count": baseline.round_success,
                 "round_success_fraction": fraction,
+                "perplexity": baseline.perplexity_score,
+                "mcm": baseline.mcm_score,
                 "labels": "|".join(baseline.labels),
             }
         )
@@ -383,6 +389,37 @@ def _build_run_level_frame(
             "run_id",
         ]
     ).reset_index(drop=True)
+
+
+def _score_message_perplexities(texts: list[str]) -> list[float | None]:
+    """Per-message mean per-token surprisal (nats) under gpt2, aligned with ``texts``.
+
+    Mirrors the ``perplexity`` metric: ``minicons.IncrementalLMScorer`` with
+    ``reduction = -x.mean(0)``. Empty messages and single-token inputs (which return
+    NaN — no left context) map to ``None`` so the column stays numeric elsewhere.
+    """
+    import torch
+    from minicons import scorer
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    logger.info("perplexity: scoring %d messages with gpt2 on %s", len(texts), device)
+    lm_scorer = scorer.IncrementalLMScorer("gpt2", device)
+
+    def _negative_mean(tensor: object) -> float:
+        return -tensor.mean(0).item()  # type: ignore[attr-defined]
+
+    results: list[float | None] = [None] * len(texts)
+    scored_indices = [index for index, text in enumerate(texts) if text and text.strip()]
+    batch_size = 256
+    flat_scores: list[float] = []
+    for start in range(0, len(scored_indices), batch_size):
+        chunk = [texts[i] for i in scored_indices[start : start + batch_size]]
+        flat_scores.extend(lm_scorer.sequence_score(chunk, reduction=_negative_mean))
+    for index, score in zip(scored_indices, flat_scores):
+        value = float(score)
+        if not math.isnan(value):
+            results[index] = value
+    return results
 
 
 def _build_message_level_frame(
@@ -429,6 +466,7 @@ def _build_message_level_frame(
                             "message_index_in_substage": message_index,
                             "message_agent": _sender_role(agent_id=message.agent),
                             "message_text": message.message,
+                            "chars": len(message.message),
                             "success": int(round(value)),
                             "success_raw": value,
                             "note": note,
@@ -437,6 +475,7 @@ def _build_message_level_frame(
     frame = pd.DataFrame(rows)
     if frame.empty:
         return frame
+    frame["perplexity"] = _score_message_perplexities(texts=frame["message_text"].tolist())
     return frame.sort_values(
         by=["run_id", "round_number", "substage", "message_index_in_substage"]
     ).reset_index(drop=True)
