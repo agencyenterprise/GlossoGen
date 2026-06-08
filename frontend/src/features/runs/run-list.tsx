@@ -3,7 +3,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertTriangle,
   GitFork,
   HelpCircle,
   Inbox,
@@ -228,13 +227,7 @@ export function RunList() {
   const allRuns = useMemo(() => data?.runs ?? [], [data]);
   const allLabels = useMemo(() => labelsData?.labels ?? [], [labelsData]);
   const regularFilterLabels = useMemo(
-    () =>
-      allLabels.filter(
-        label =>
-          !label.startsWith("eval:") &&
-          !label.startsWith("src=") &&
-          !label.startsWith("supersedes:")
-      ),
+    () => allLabels.filter(label => !label.startsWith("eval:") && !label.startsWith("src=")),
     [allLabels]
   );
   const allScenarios = useMemo(() => {
@@ -544,23 +537,6 @@ export function RunList() {
                                   className="inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-400"
                                 >
                                   <RotateCcw className="h-2.5 w-2.5" />R{rr.round_start}
-                                </span>
-                              );
-                            }
-                            if (run.judge_replay && run.judge_replay.flipped_true_to_false > 0) {
-                              const jr = run.judge_replay;
-                              const pct =
-                                jr.old_true_count > 0
-                                  ? Math.round((100 * jr.flipped_true_to_false) / jr.old_true_count)
-                                  : 0;
-                              badges.push(
-                                <span
-                                  key="judge-replay"
-                                  title={`Stabilization judge replay: ${jr.flipped_true_to_false} of ${jr.old_true_count} previously-accepted stabilizations (${pct}%) are rejected under the updated prompt (${jr.judge_model}).`}
-                                  className="inline-flex items-center gap-0.5 text-rose-700 dark:text-rose-400"
-                                >
-                                  <AlertTriangle className="h-2.5 w-2.5" />
-                                  {jr.flipped_true_to_false}
                                 </span>
                               );
                             }

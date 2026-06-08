@@ -27,20 +27,23 @@ each run's design so they can be modelled or subset downstream:
 Per-agent models come from the run's ``AgentRegistered`` events: every table carries
 ``field_observer_model`` and ``engineer_model`` instead of a single ``model`` column.
 
-Three output tables:
+Four output tables:
 
 - ``run_level`` — one row per run (the replica dots on the chart). The Bernoulli
   numerator/denominator (``round_success_count`` / ``total_rounds``) supports a
   binomial GLMM ``cbind(successes, failures) ~ ...`` and the fraction supports a
   beta/linear model.
-- ``substage_level`` — one row per (run, round, substage the team reached). Carries the
-  substage's veyru ground truth (``symptoms`` / ``actions``), ``substage_stabilized``
-  (0/1), and ``link_messages`` (a JSON list of ``{"agent", "message"}`` scoped to that
-  substage — the link-channel messages exchanged while the team was working on it). The
-  round-level ``success`` / ``success_raw`` / ``note`` and the round-start briefings
-  (``field_observer_round_event`` / ``engineer_round_event``) are repeated on every
-  substage row of the round. A round contributes ``stages_reached`` rows
-  (``min(stabilized_stages + 1, total_stages)``); unreached substages are omitted.
+- ``message_level`` — one row per link-channel message. Each row carries its substage
+  context (``substage``, ``symptoms`` / ``actions``, ``substage_stabilized``),
+  ``message_index_in_substage``, ``message_agent`` (sender role, normalized to
+  ``field_observer`` or ``stabilization_engineer``), ``message_text``, and the round-level
+  ``success`` / ``success_raw`` / ``note``. Messages are walked over the substages the
+  team reached (``min(stabilized_stages + 1, total_stages)``); substages with no link
+  traffic produce no rows.
+- ``round_context`` — one row per (run, round) holding the large round-start briefings
+  (``field_observer_round_event`` / ``engineer_round_event``). Kept separate (join on
+  ``run_id`` + ``round_number``) so the briefing text is stored once per round rather
+  than duplicated on every message row.
 - ``budget_aggregate`` — per (models, postmortem, random_seed, easy_rounds, budget)
   mean ± std of the success fraction; a sanity check against the plotted bands.
 
@@ -50,9 +53,7 @@ multi-sheet ``.xlsx`` workbook.
 
 import argparse
 import importlib.util
-import json
 import logging
-from datetime import date, datetime
 from pathlib import Path
 from typing import NamedTuple
 
@@ -60,7 +61,6 @@ import orjson
 import pandas as pd
 
 from analysis.results_viewer.baseline_data import build_baseline_run
-from analysis.results_viewer.judge_replay_filter import flip_ratio_by_run_id
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
 from schmidt.scenarios.veyru.ids import (
     FIELD_OBSERVER_ID,
@@ -133,15 +133,9 @@ class RunContext(NamedTuple):
 
 
 class JoinedRun(NamedTuple):
-    """A baseline run paired with its source ``EvaluatedRun`` and judge-replay ratio.
-
-    ``flip_ratio`` is ``None`` when the run has no ``judge_replay.json`` sidecar
-    (the slider treats that as passing); otherwise it is
-    ``flipped_true_to_false / old_true_count``.
-    """
+    """A baseline run paired with its source ``EvaluatedRun``."""
 
     evaluated: EvaluatedRun
-    flip_ratio: float | None
 
 
 def _resolve_model(models: dict[str, str], candidate_ids: frozenset[str]) -> str:
@@ -150,6 +144,21 @@ def _resolve_model(models: dict[str, str], candidate_ids: frozenset[str]) -> str
         if agent_id in candidate_ids:
             return model
     return ""
+
+
+def _sender_role(agent_id: str) -> str:
+    """Normalize a sender agent_id to a role: ``field_observer`` or ``stabilization_engineer``.
+
+    The engineer role appears under several ids (``stabilization_engineer``, the two-team
+    ``_a`` / ``_b`` variants, and the legacy ``specialist``); they all map to
+    ``stabilization_engineer``. Field observers map to ``field_observer``. Any other
+    sender falls back to its raw agent_id.
+    """
+    if agent_id in _FIELD_OBSERVER_IDS:
+        return FIELD_OBSERVER_ID
+    if agent_id in _ENGINEER_IDS:
+        return STABILIZATION_ENGINEER_ID
+    return agent_id
 
 
 def _injection_for(
@@ -281,27 +290,19 @@ def _scan_run_context(jsonl_path: Path) -> RunContext:
 
 
 def _collect_joined_runs(evaluated_runs: list[EvaluatedRun], scenario_name: str) -> list[JoinedRun]:
-    """Return the baseline/baseline_oss runs for ``scenario_name`` with their flip ratios.
+    """Return the baseline/baseline_oss runs for ``scenario_name``.
 
     A run is included only when ``build_baseline_run`` accepts it — i.e. it
     carries a baseline label, a budget knob, and a ``round_success`` measurement.
     """
-    ratio_map = flip_ratio_by_run_id(evaluated=evaluated_runs)
     joined: list[JoinedRun] = []
     for run in evaluated_runs:
         if run.scenario_name != scenario_name:
             continue
         if build_baseline_run(evaluated=run) is None:
             continue
-        joined.append(JoinedRun(evaluated=run, flip_ratio=ratio_map.get(run.run_id)))
+        joined.append(JoinedRun(evaluated=run))
     return joined
-
-
-def _passes_judge_filter(flip_ratio: float | None, threshold: float) -> bool:
-    """Mirror the judge-replay slider: pass when no sidecar or flip ratio <= threshold."""
-    if flip_ratio is None:
-        return True
-    return flip_ratio <= threshold
 
 
 def _is_canonical(labels: list[str]) -> bool:
@@ -316,40 +317,13 @@ def _is_canonical(labels: list[str]) -> bool:
     return _NO_ORDERED_EASY_ROUNDS_LABEL not in labels
 
 
-def _executed_with_corrected_judge(evaluated: EvaluatedRun, cutoff: date) -> bool:
-    """True when the run was launched on/after ``cutoff`` (local date).
-
-    The stabilization judge runs live during the simulation, so a run launched
-    on/after the date the judge prompt was corrected was scored with the
-    corrected prompt and needs no judge-replay validation. The run directory
-    name is the launch unix timestamp; its local date is the execution date.
-    """
-    return datetime.fromtimestamp(evaluated.run_timestamp).date() >= cutoff
-
-
 def _apply_cohort_filters(
     joined_runs: list[JoinedRun],
-    judge_flip_threshold: float,
-    require_sidecar: bool,
     canonical_only: bool,
-    corrected_judge_cutoff: date,
 ) -> list[JoinedRun]:
-    """Filter by judge soundness and canonical design.
-
-    Runs launched on/after ``corrected_judge_cutoff`` were scored with the
-    corrected judge prompt at execution time, so they bypass the judge-replay
-    flip filter and the sidecar requirement entirely. Older runs must clear the
-    flip threshold (and, when ``require_sidecar``, carry a replay sidecar).
-    """
+    """Filter by canonical design when requested."""
     out: list[JoinedRun] = []
     for joined in joined_runs:
-        if not _executed_with_corrected_judge(
-            evaluated=joined.evaluated, cutoff=corrected_judge_cutoff
-        ):
-            if not _passes_judge_filter(joined.flip_ratio, judge_flip_threshold):
-                continue
-            if require_sidecar and joined.flip_ratio is None:
-                continue
         if canonical_only:
             baseline = build_baseline_run(evaluated=joined.evaluated)
             if baseline is None or not _is_canonical(labels=baseline.labels):
@@ -411,15 +385,16 @@ def _build_run_level_frame(
     ).reset_index(drop=True)
 
 
-def _build_substage_level_frame(
+def _build_message_level_frame(
     joined_runs: list[JoinedRun], contexts: dict[str, RunContext]
 ) -> pd.DataFrame:
-    """Long format: one row per (run, round, substage the team reached).
+    """Long format: one row per link-channel message, with its substage/round context.
 
-    Each row carries that substage's ground truth (``symptoms`` / ``actions``), whether
-    it was stabilized, and the link-channel messages exchanged while it was active. The
-    round-level outcome (``success`` / ``note``) and round-start briefings are repeated
-    on every substage row of the round.
+    Messages are walked substage by substage (substages the team reached). Substages
+    with no link messages produce no rows. The substage ground truth
+    (``symptoms`` / ``actions`` / ``substage_stabilized``), the round-level outcome
+    (``success`` / ``note``), and the round-start briefings are repeated on every message
+    row.
     """
     rows: list[dict[str, object]] = []
     for joined in joined_runs:
@@ -434,37 +409,70 @@ def _build_substage_level_frame(
             for substage in range(1, round_ctx.stages_reached + 1):
                 stage = round_ctx.stages[substage - 1]
                 messages = round_ctx.link_messages_by_substage.get(substage, [])
-                rows.append(
-                    {
-                        "run_id": baseline.run_id,
-                        "scenario": joined.evaluated.scenario_name,
-                        "field_observer_model": context.field_observer_model,
-                        "engineer_model": context.engineer_model,
-                        "model_class": _KIND_TO_MODEL_CLASS[baseline.kind],
-                        "postmortem": baseline.postmortem_enabled,
-                        "round_time_budget_seconds": baseline.budget,
-                        "random_seed": _RANDOM_SEED_LABEL in baseline.labels,
-                        "easy_rounds": _NO_ORDERED_EASY_ROUNDS_LABEL not in baseline.labels,
-                        "round_number": round_number,
-                        "substage": substage,
-                        "symptoms": stage.symptoms,
-                        "actions": stage.actions,
-                        "substage_stabilized": int(substage <= round_ctx.stabilized_stages),
-                        "link_messages": json.dumps(
-                            [{"agent": m.agent, "message": m.message} for m in messages],
-                            ensure_ascii=False,
-                        ),
-                        "success": int(round(value)),
-                        "success_raw": value,
-                        "note": note,
-                        "field_observer_round_event": round_ctx.field_observer_event,
-                        "engineer_round_event": round_ctx.engineer_event,
-                    }
-                )
+                for message_index, message in enumerate(messages, start=1):
+                    rows.append(
+                        {
+                            "run_id": baseline.run_id,
+                            "scenario": joined.evaluated.scenario_name,
+                            "field_observer_model": context.field_observer_model,
+                            "engineer_model": context.engineer_model,
+                            "model_class": _KIND_TO_MODEL_CLASS[baseline.kind],
+                            "postmortem": baseline.postmortem_enabled,
+                            "round_time_budget_seconds": baseline.budget,
+                            "random_seed": _RANDOM_SEED_LABEL in baseline.labels,
+                            "easy_rounds": _NO_ORDERED_EASY_ROUNDS_LABEL not in baseline.labels,
+                            "round_number": round_number,
+                            "substage": substage,
+                            "symptoms": stage.symptoms,
+                            "actions": stage.actions,
+                            "substage_stabilized": int(substage <= round_ctx.stabilized_stages),
+                            "message_index_in_substage": message_index,
+                            "message_agent": _sender_role(agent_id=message.agent),
+                            "message_text": message.message,
+                            "success": int(round(value)),
+                            "success_raw": value,
+                            "note": note,
+                        }
+                    )
     frame = pd.DataFrame(rows)
     if frame.empty:
         return frame
-    return frame.sort_values(by=["run_id", "round_number", "substage"]).reset_index(drop=True)
+    return frame.sort_values(
+        by=["run_id", "round_number", "substage", "message_index_in_substage"]
+    ).reset_index(drop=True)
+
+
+def _build_round_context_frame(
+    joined_runs: list[JoinedRun], contexts: dict[str, RunContext]
+) -> pd.DataFrame:
+    """One row per (run, round) carrying the round-start briefings.
+
+    Holds the large ``field_observer_round_event`` / ``engineer_round_event`` text once
+    per round (join to ``message_level`` on ``run_id`` + ``round_number``) instead of
+    repeating it on every message row.
+    """
+    rows: list[dict[str, object]] = []
+    for joined in joined_runs:
+        baseline = build_baseline_run(evaluated=joined.evaluated)
+        if baseline is None:
+            continue
+        context = contexts[baseline.run_id]
+        for round_number, _, _ in _round_success_per_round(evaluated=joined.evaluated):
+            round_ctx = context.rounds.get(round_number)
+            if round_ctx is None:
+                continue
+            rows.append(
+                {
+                    "run_id": baseline.run_id,
+                    "round_number": round_number,
+                    "field_observer_round_event": round_ctx.field_observer_event,
+                    "engineer_round_event": round_ctx.engineer_event,
+                }
+            )
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame
+    return frame.sort_values(by=["run_id", "round_number"]).reset_index(drop=True)
 
 
 def _build_budget_aggregate_frame(run_level: pd.DataFrame) -> pd.DataFrame:
@@ -528,20 +536,6 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--stem", type=str, default="baseline_round_success")
     parser.add_argument(
-        "--judge-flip-threshold",
-        type=float,
-        default=0.0,
-        help=(
-            "Maximum judge-replay flip ratio a run may have to be kept "
-            "(0.0 mirrors the slider at 0%: drop any run with >=1 flip)."
-        ),
-    )
-    parser.add_argument(
-        "--allow-missing-sidecar",
-        action="store_true",
-        help="Keep runs without a judge_replay.json sidecar (default: require one).",
-    )
-    parser.add_argument(
         "--canonical-only",
         action="store_true",
         help=(
@@ -550,51 +544,24 @@ def _parse_args() -> argparse.Namespace:
             "by the random_seed and easy_rounds columns."
         ),
     )
-    parser.add_argument(
-        "--corrected-judge-cutoff",
-        type=date.fromisoformat,
-        default=date(2026, 6, 2),
-        help=(
-            "Local date (YYYY-MM-DD) on/after which runs were executed with the "
-            "corrected judge prompt; these bypass the judge-replay flip filter and "
-            "sidecar requirement. Defaults to 2026-06-02."
-        ),
-    )
     return parser.parse_args()
 
 
 def main() -> None:
-    """Build the three frames, apply the judge-mismatch filter, and write outputs."""
+    """Build the three frames and write outputs."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = _parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     evaluated_runs = list_evaluated_runs(runs_dir=args.runs_dir)
     joined = _collect_joined_runs(evaluated_runs=evaluated_runs, scenario_name=args.scenario)
-    kept = _apply_cohort_filters(
-        joined_runs=joined,
-        judge_flip_threshold=args.judge_flip_threshold,
-        require_sidecar=not args.allow_missing_sidecar,
-        canonical_only=args.canonical_only,
-        corrected_judge_cutoff=args.corrected_judge_cutoff,
-    )
-    corrected = sum(
-        1
-        for j in kept
-        if _executed_with_corrected_judge(evaluated=j.evaluated, cutoff=args.corrected_judge_cutoff)
-    )
+    kept = _apply_cohort_filters(joined_runs=joined, canonical_only=args.canonical_only)
     logger.info(
-        "scenario=%s: %d baseline runs found, %d kept "
-        "(judge flip<=%.2f, require_sidecar=%s, canonical_only=%s, "
-        "corrected-judge cutoff>=%s: %d kept runs ran with the corrected judge).",
+        "scenario=%s: %d baseline runs found, %d kept (canonical_only=%s).",
         args.scenario,
         len(joined),
         len(kept),
-        args.judge_flip_threshold,
-        not args.allow_missing_sidecar,
         args.canonical_only,
-        args.corrected_judge_cutoff.isoformat(),
-        corrected,
     )
 
     contexts = {
@@ -604,11 +571,13 @@ def main() -> None:
         for joined in kept
     }
     run_level = _build_run_level_frame(joined_runs=kept, contexts=contexts)
-    substage_level = _build_substage_level_frame(joined_runs=kept, contexts=contexts)
+    message_level = _build_message_level_frame(joined_runs=kept, contexts=contexts)
+    round_context = _build_round_context_frame(joined_runs=kept, contexts=contexts)
     budget_aggregate = _build_budget_aggregate_frame(run_level=run_level)
     frames = {
         "run_level": run_level,
-        "substage_level": substage_level,
+        "message_level": message_level,
+        "round_context": round_context,
         "budget_aggregate": budget_aggregate,
     }
 
@@ -616,9 +585,9 @@ def main() -> None:
     xlsx_path = _write_xlsx(frames=frames, output_dir=args.output_dir, stem=args.stem)
 
     logger.info(
-        "Wrote %d runs, %d substage-rows. CSVs: %s%s",
+        "Wrote %d runs, %d message-rows. CSVs: %s%s",
         len(run_level),
-        len(substage_level),
+        len(message_level),
         ", ".join(str(p) for p in csv_paths),
         f"; workbook: {xlsx_path}" if xlsx_path is not None else "",
     )

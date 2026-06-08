@@ -13,7 +13,8 @@ analysis/baseline_round_success/
 └── output/                         # generated; regenerated on each run
     ├── baseline_round_success.xlsx              # all three sheets in one workbook
     ├── baseline_round_success_run_level.csv
-    ├── baseline_round_success_substage_level.csv
+    ├── baseline_round_success_message_level.csv
+    ├── baseline_round_success_round_context.csv
     └── baseline_round_success_budget_aggregate.csv
 ```
 
@@ -61,35 +62,52 @@ or a model on `round_success_fraction`.
 (closed/open), `postmortem`, `round_time_budget_seconds`, `random_seed`, `easy_rounds`,
 `total_rounds`, `round_success_count`, `round_success_fraction`, `labels`.
 
-### `substage_level` — one row per (run, round, substage reached)
+### `message_level` — one row per link-channel message
 
 A veyru round is a multi-stage case: the team stabilizes one stage, then new symptoms
-appear for the next. This sheet has one row per substage the team actually reached
-(`stages_reached = min(stabilized_stages + 1, total_stages)`; unreached substages are
-omitted). Good for modelling per-substage difficulty and reading the conversation a
-stage at a time.
+appear for the next. This sheet has one row per link-channel message, tagged with the
+substage it belongs to. Good for sequence/turn-level analysis of the conversation.
 
-Per-substage columns:
+Message columns:
+
+- `message_agent` — sender role, normalized to `field_observer` or
+  `stabilization_engineer` (the engineer's varying ids — including the legacy
+  `specialist` — all map to `stabilization_engineer`).
+- `message_text` — the message body.
+- `message_index_in_substage` — 1-indexed order of the message within its substage.
+
+Substage context (repeated across the substage's messages):
 
 - `substage` — 1-indexed stage number within the round.
 - `symptoms` / `actions` — that stage's observable symptoms (what the observer saw) and
   the judge's expected procedure.
 - `substage_stabilized` — `1` if the team stabilized this substage, else `0` (the last
   reached substage of a failed round is `0`).
-- `link_messages` — JSON list `[{"agent": ..., "message": ...}]` of the link-channel
-  messages exchanged **while this substage was active**, in chronological order. A
-  message is attributed to the substage in effect when it was sent (the counter advances
-  on each successful stabilization), so the observer's "Done. New: <symptoms>" message
-  opens the next substage.
 
-Repeated round-level columns (identical across a round's substage rows): `round_number`,
-`success` (0/1, whole-round outcome), `success_raw`, `note`, `field_observer_round_event`
-/ `engineer_round_event` (the `--- NEW VEYRU ---` round-start briefings), plus all the
-run covariates (`field_observer_model`, `engineer_model`, `model_class`, `postmortem`,
+Messages are attributed to the substage in effect when sent (the counter advances on each
+successful stabilization), so the observer's "Done. New: <symptoms>" message opens the
+next substage. Messages are walked over the substages the team reached
+(`stages_reached = min(stabilized_stages + 1, total_stages)`); **substages with no link
+traffic produce no rows.**
+
+Repeated round-level columns (identical across a round's message rows): `round_number`,
+`success` (0/1, whole-round outcome), `success_raw`, `note`, plus all the run covariates
+(`field_observer_model`, `engineer_model`, `model_class`, `postmortem`,
 `round_time_budget_seconds`, `random_seed`, `easy_rounds`).
 
-Concatenating a round's per-substage `link_messages` in `substage` order reproduces the
-full round link transcript.
+The round-start briefings live in the separate `round_context` sheet (below) to keep this
+sheet small — join on `run_id` + `round_number`.
+
+### `round_context` — one row per (run, round)
+
+The large round-start briefings, stored once per round instead of repeated on every
+message row (they were ~86% of the file otherwise). Join to `message_level` on
+`run_id` + `round_number`.
+
+- `run_id`, `round_number` — join keys.
+- `field_observer_round_event` / `engineer_round_event` — the `--- NEW VEYRU ---`
+  briefing each agent received at round start (the engineer's carries the full stellar
+  table; the observer's, the stage-1 symptoms).
 
 ### `budget_aggregate` — one row per cell
 

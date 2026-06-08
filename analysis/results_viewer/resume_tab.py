@@ -11,7 +11,6 @@ the rest.
 import plotly.graph_objects as go
 import streamlit as st
 
-from analysis.results_viewer import judge_replay_filter
 from analysis.results_viewer.resume_data import ResumeRun, list_resume_runs
 from analysis.results_viewer.resume_multi_swap_view import render as render_multi_swap_subtab
 from analysis.results_viewer.run_catalog import EvaluatedRun
@@ -315,7 +314,6 @@ def _render_subtab(
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Resume tab body with Multi-swap and No-swap subtabs."""
-    ratio_map = judge_replay_filter.flip_ratio_by_run_id(evaluated=evaluated)
     all_resume = list_resume_runs(evaluated_runs=evaluated)
     if not all_resume:
         st.info(
@@ -331,15 +329,6 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     scenario_runs = [r for r in all_resume if r.scenario_name == scenario_name]
     if not scenario_runs:
         st.info(f"No resume runs in scenario `{scenario_name}`.")
-        return
-    scenario_runs = judge_replay_filter.render_and_filter(
-        items=scenario_runs,
-        ratio_of=lambda r: ratio_map.get(r.run_id),
-        key="resume",
-        item_label="resume runs",
-    )
-    if not scenario_runs:
-        st.info("All runs filtered out by judge-replay slider.")
         return
     frontend_base = render_frontend_base(streamlit_key="resume_frontend_base")
 

@@ -13,7 +13,7 @@ corresponding run in the schmidt frontend (URL is attached to each point as
 import plotly.graph_objects as go
 import streamlit as st
 
-from analysis.results_viewer import judge_replay_filter, seed_mode_filter
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.baseline_data import (
     METRIC_OPTIONS,
     BaselineRun,
@@ -323,7 +323,6 @@ def _render_included_runs(
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Baseline tab body."""
-    ratio_map = judge_replay_filter.flip_ratio_by_run_id(evaluated=evaluated)
     run_filter = seed_mode_filter.render_filters(key_prefix="baseline")
     evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     scenario_name = _render_scenario_selector(evaluated=evaluated)
@@ -372,15 +371,6 @@ def render(evaluated: list[EvaluatedRun]) -> None:
             "For perplexity, run `python -m schmidt evaluate <scenario> "
             "--metrics perplexity ...` on the runs you want included."
         )
-        return
-    metric_runs = judge_replay_filter.render_and_filter(
-        items=metric_runs,
-        ratio_of=lambda run: ratio_map.get(run.run_id),
-        key="baseline",
-        item_label="baseline runs",
-    )
-    if not metric_runs:
-        st.info("All runs filtered out by judge-replay slider.")
         return
     series_ordered = sorted({r.series_key() for r in metric_runs})
     colour_by_series = series_color_map(series_keys=series_ordered)

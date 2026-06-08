@@ -2400,41 +2400,6 @@
         "title": "ImportBundleResponse",
         "description": "Response after successfully importing a run bundle."
       },
-      "JudgeReplaySummary": {
-        "properties": {
-          "judge_model": {
-            "type": "string",
-            "title": "Judge Model"
-          },
-          "generated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Generated At"
-          },
-          "old_true_count": {
-            "type": "integer",
-            "title": "Old True Count"
-          },
-          "new_true_count": {
-            "type": "integer",
-            "title": "New True Count"
-          },
-          "flipped_true_to_false": {
-            "type": "integer",
-            "title": "Flipped True To False"
-          }
-        },
-        "type": "object",
-        "required": [
-          "judge_model",
-          "generated_at",
-          "old_true_count",
-          "new_true_count",
-          "flipped_true_to_false"
-        ],
-        "title": "JudgeReplaySummary",
-        "description": "Counts from re-running the stabilization judge under the updated prompt.\n\nSidecar lives at ``<run_dir>/judge_replay.json``. Written by\n``scripts/write_judge_replay_sidecars.py`` after re-judging every\n``stabilize_veyru`` call whose original ``judge_match`` was ``True``\nagainst the current ``stabilization_judge.jinja``. Sidecar is present\non every run that had at least one stabilization judge event."
-      },
       "KnobsContentResponse": {
         "properties": {
           "knobs": {
@@ -3110,16 +3075,6 @@
           "current_round": {
             "type": "integer",
             "title": "Current Round"
-          },
-          "judge_replay": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/JudgeReplaySummary"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "type": "object",
@@ -3145,8 +3100,7 @@
           "agent_models",
           "labels",
           "has_note",
-          "current_round",
-          "judge_replay"
+          "current_round"
         ],
         "title": "RunSummary",
         "description": "Summary of a single simulation run for the runs list endpoint."
