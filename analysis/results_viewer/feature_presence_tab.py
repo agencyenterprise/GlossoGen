@@ -38,7 +38,7 @@ from pathlib import Path
 import plotly.graph_objects as go
 import streamlit as st
 
-from analysis.results_viewer import judge_replay_filter, seed_mode_filter
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.feature_presence_data import (
     FeaturePresenceRun,
     OntologyView,
@@ -664,7 +664,6 @@ def _format_run_picker_option(run: FeaturePresenceRun) -> str:
 
 def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
     """Render the "Language features" tab end to end."""
-    ratio_map = judge_replay_filter.flip_ratio_by_run_id(evaluated=evaluated)
     run_filter = seed_mode_filter.render_filters(key_prefix="feature_presence")
     evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     all_runs = list_feature_presence_runs(evaluated_runs=evaluated)
@@ -782,15 +781,6 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
         f"(metadata-pass: {len(metadata_filtered)}; "
         f"dropped {excluded} below round_success {success_threshold:g})."
     )
-    filtered_runs = judge_replay_filter.render_and_filter(
-        items=filtered_runs,
-        ratio_of=lambda r: ratio_map.get(r.run_id),
-        key="feature_presence",
-        item_label="language-feature runs",
-    )
-    if not filtered_runs:
-        st.info("All runs filtered out by judge-replay slider.")
-        return
     frequency_panel, outcomes_panel, lookup_panel, knob_panel = st.tabs(
         [
             "Per-feature frequency",

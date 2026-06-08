@@ -21,7 +21,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from rapidfuzz.distance import Levenshtein
 
-from analysis.results_viewer import judge_replay_filter, seed_mode_filter
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.multi_swap_data import MultiSwapRun, PhaseScore, list_multi_swap_runs
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import maybe_open_clicked_run, render_frontend_base, run_url
@@ -302,7 +302,6 @@ def _run_picker_label(multi_swap: MultiSwapRun) -> str:
 
 def _render_per_run(evaluated: list[EvaluatedRun]) -> None:
     """Per-run bar chart, per-round strip, and phase breakdown table."""
-    ratio_map = judge_replay_filter.flip_ratio_by_run_id(evaluated=evaluated)
     run_filter = seed_mode_filter.render_filters(key_prefix="multi_swap")
     evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     st.markdown(
@@ -316,15 +315,6 @@ def _render_per_run(evaluated: list[EvaluatedRun]) -> None:
             "No runs with `AgentSwappedMidRun` events found. Multi-swap runs "
             "are produced by the in-run scheduler (`scheduled_events` in knobs)."
         )
-        return
-    runs = judge_replay_filter.render_and_filter(
-        items=runs,
-        ratio_of=lambda r: ratio_map.get(r.run_id),
-        key="multi_swap_per_run",
-        item_label="multi-swap runs",
-    )
-    if not runs:
-        st.info("All runs filtered out by judge-replay slider.")
         return
     frontend_base = render_frontend_base(streamlit_key="multi_swap_frontend_base")
     options = {_run_picker_label(multi_swap=run): run for run in runs}
@@ -1396,16 +1386,6 @@ def _render_cohort_overlay(evaluated: list[EvaluatedRun]) -> None:
     else:
         total_rounds = 40
 
-    ratio_map = judge_replay_filter.flip_ratio_by_run_id(evaluated=evaluated)
-    evaluated = judge_replay_filter.render_and_filter(
-        items=evaluated,
-        ratio_of=lambda run: ratio_map.get(run.run_id),
-        key="multi_swap_cohort",
-        item_label="cohort runs",
-    )
-    if not evaluated:
-        st.info("All runs filtered out by judge-replay slider.")
-        return
     effective_cohorts = _resolve_effective_cohorts(
         expanded_displays=expanded_displays,
         display_to_labels=display_to_labels,

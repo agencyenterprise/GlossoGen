@@ -7,7 +7,7 @@ import pyperclip
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
-from analysis.results_viewer import judge_replay_filter, seed_mode_filter
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.event_extractor import load_run_timeline
 from analysis.results_viewer.run_catalog import EvaluatedRun, group_runs_by_day
 from analysis.results_viewer.run_link import run_url
@@ -255,7 +255,6 @@ def _render_value_metric_checkboxes(available: list[str]) -> list[str]:
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the Timeline tab body."""
-    ratio_map = judge_replay_filter.flip_ratio_by_run_id(evaluated=evaluated)
     run_filter = seed_mode_filter.render_filters(key_prefix="timeline")
     evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     if not evaluated:
@@ -274,13 +273,6 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         for run in scenario_runs
         if run.execution_mode in selected_modes and run.metadata.primary_model in selected_models
     ]
-    filtered = judge_replay_filter.render_and_filter(
-        items=filtered,
-        ratio_of=lambda run: ratio_map.get(run.run_id),
-        key="timeline",
-        item_label="runs",
-    )
-
     selected = _render_run_picker(runs=filtered)
     if not selected:
         st.info("Pick at least one run.")

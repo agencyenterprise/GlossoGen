@@ -30,7 +30,7 @@ import orjson
 import streamlit as st
 from rapidfuzz.distance import Levenshtein
 
-from analysis.results_viewer import judge_replay_filter, seed_mode_filter
+from analysis.results_viewer import seed_mode_filter
 from analysis.results_viewer.cross_swap_data import list_cross_swap_runs
 from analysis.results_viewer.multi_swap_data import MultiSwapRun, PhaseScore, list_multi_swap_runs
 from analysis.results_viewer.natural_sort import natural_sort_key
@@ -1379,7 +1379,6 @@ def _render_cross_team_summary(
 
 def render(evaluated: list[EvaluatedRun]) -> None:
     """Render the four-subtab Probe similarity view."""
-    ratio_map = judge_replay_filter.flip_ratio_by_run_id(evaluated=evaluated)
     run_filter = seed_mode_filter.render_filters(key_prefix="probe_similarity")
     evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     probe_runs = list_probe_similarity_runs(evaluated_runs=evaluated)
@@ -1387,15 +1386,6 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         st.info(
             "No runs have probe data. Run " "`schmidt evaluate ... --metrics protocol_probe` first."
         )
-        return
-    probe_runs = judge_replay_filter.render_and_filter(
-        items=probe_runs,
-        ratio_of=lambda r: ratio_map.get(r.run_id),
-        key="probe_similarity",
-        item_label="probe runs",
-    )
-    if not probe_runs:
-        st.info("All runs filtered out by judge-replay slider.")
         return
     multi_swap_runs = list_multi_swap_runs(evaluated_runs=evaluated)
     (

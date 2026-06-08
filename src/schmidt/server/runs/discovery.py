@@ -20,7 +20,6 @@ from schmidt.server.runs.models import (
     AgentModelSummary,
     CrossRunReplaceAgentSource,
     ForkSource,
-    JudgeReplaySummary,
     ReplaceAgentSource,
     ResumeAtRoundSource,
     RunSummary,
@@ -279,31 +278,6 @@ def _has_note(run_dir: Path) -> bool:
     return (run_dir / "note.md").exists()
 
 
-def _read_judge_replay(run_dir: Path) -> JudgeReplaySummary | None:
-    """Read the judge_replay.json sidecar if present.
-
-    Sidecar is written by ``scripts/write_judge_replay_sidecars.py`` after
-    re-judging every ``stabilize_veyru`` call whose original verdict was
-    ``True``. Returns counts only; per-flip details live in the sidecar's
-    ``flips`` array and are surfaced separately on run-detail.
-    """
-    path = run_dir / "judge_replay.json"
-    if not path.exists():
-        return None
-    try:
-        raw = orjson.loads(path.read_bytes())
-        return JudgeReplaySummary(
-            judge_model=raw["judge_model"],
-            generated_at=raw["generated_at"],
-            old_true_count=raw["old_true_count"],
-            new_true_count=raw["new_true_count"],
-            flipped_true_to_false=raw["flipped_true_to_false"],
-        )
-    except Exception:
-        logger.exception("Failed to read judge_replay.json from %s", path)
-        return None
-
-
 def _read_fork_source(run_dir: Path) -> ForkSource | None:
     """Read fork provenance from fork_manifest.json if it exists."""
     manifest_path = run_dir / "fork_manifest.json"
@@ -448,7 +422,6 @@ async def build_summary(
             scenario_name=scenario_name,
             timestamp_dir=timestamp_dir,
         )
-        judge_replay = _read_judge_replay(run_dir=timestamp_dir)
         return RunSummary(
             run_id=run_id,
             scenario_name=cache.scenario_name,
@@ -475,7 +448,6 @@ async def build_summary(
             labels=labels,
             has_note=has_note,
             current_round=cache.current_round,
-            judge_replay=judge_replay,
         )
 
     fork_source = _read_fork_source(run_dir=timestamp_dir)
@@ -500,7 +472,6 @@ async def build_summary(
         scenario_name=scenario_name,
         timestamp_dir=timestamp_dir,
     )
-    judge_replay = _read_judge_replay(run_dir=timestamp_dir)
 
     if scan.last_event is not None:
         derived = (
@@ -554,7 +525,6 @@ async def build_summary(
             labels=labels,
             has_note=has_note,
             current_round=scan.current_round,
-            judge_replay=judge_replay,
         )
 
     manifest = read_manifest(run_dir=timestamp_dir)
@@ -592,7 +562,6 @@ async def build_summary(
         labels=labels,
         has_note=has_note,
         current_round=scan.current_round,
-        judge_replay=judge_replay,
     )
 
 

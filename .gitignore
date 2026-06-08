@@ -171,3 +171,6 @@ cython_debug/
 /runs/*
 !/runs/.gitkeep
 /scripts/
+
+# Generated analysis exports (regenerate via the export scripts)
+/analysis/baseline_round_success/output/
