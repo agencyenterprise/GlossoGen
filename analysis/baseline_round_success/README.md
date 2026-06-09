@@ -32,24 +32,19 @@ Re-run any time new runs land — it always reads the current `./runs` on disk.
 
 ## What's in the cohort
 
-Starts from every veyru run labeled `baseline` (closed-model frontier) or
-`baseline_oss` (open-weight) that has a `round_time_budget_seconds` knob and a
-`round_success` measurement, then filters for judge soundness:
+Every veyru run labeled `baseline` (closed-model frontier), `baseline_oss` (open-weight),
+or `oss_frontier` (cross-family teams pairing an open-weight with a closed model) that has
+a `round_time_budget_seconds` knob and a `round_success` measurement.
 
-- **Judge correctness.** Runs launched **before** the cutoff (`--corrected-judge-cutoff`,
-  default `2026-06-02`) were scored by the pre-correction stabilization judge, so each is
-  validated against its `judge_replay.json` sidecar: any run with ≥1 previously-accepted
-  stabilization that flips to rejected under the corrected prompt is dropped (the
-  Streamlit judge-replay slider pinned at 0%), and sidecar-less runs are dropped. Runs
-  launched **on/after** the cutoff were scored by the corrected judge live during the
-  simulation, so they need no replay and are kept without a sidecar.
+- **`model_class`** is derived from the two agents' model families: `closed` (both
+  claude/gpt), `open` (both llama/qwen), or `mixed` (one open, one closed —
+  the `oss_frontier` runs).
 - **Design.** Every seed mode and easy-round skeleton is included by default and tagged
   with the `random_seed` / `easy_rounds` columns. Pass `--canonical-only` to keep just
   the fixed-`seed=42`, default-easy-round runs.
 
-Design target is **5 replicas per (model × postmortem × budget) cell** (see
-`src/schmidt/scenarios/veyru/scripts/run_baseline_no_specialist.py`); the judge filter can
-leave a cell below 5.
+Design target for the homogeneous baselines is **5 replicas per (model × postmortem ×
+budget) cell** (see `src/schmidt/scenarios/veyru/scripts/run_baseline_no_specialist.py`).
 
 ## Sheets
 
@@ -59,7 +54,7 @@ For binomial GLMMs (`cbind(round_success_count, total_rounds - round_success_cou
 or a model on `round_success_fraction`.
 
 `run_id`, `scenario`, `field_observer_model`, `engineer_model`, `model_class`
-(closed/open), `postmortem`, `round_time_budget_seconds`, `random_seed`, `easy_rounds`,
+(closed/open/mixed), `postmortem`, `round_time_budget_seconds`, `random_seed`, `easy_rounds`,
 `total_rounds`, `round_success_count`, `round_success_fraction`, `perplexity` (run-wide
 mean per-token surprisal, nats/gpt2), `mcm` (run-wide mean chars per link message),
 `labels`.
@@ -128,7 +123,4 @@ plotted mean ± std bands.
 | Flag | Default | Effect |
 |---|---|---|
 | `--canonical-only` | off | Keep only fixed-`seed=42` + default-easy-round runs. |
-| `--judge-flip-threshold F` | `0.0` | Max flip ratio a pre-cutoff run may have (0.0 = drop on any flip). |
-| `--allow-missing-sidecar` | off | Keep pre-cutoff runs without a `judge_replay.json`. |
-| `--corrected-judge-cutoff YYYY-MM-DD` | `2026-06-02` | Runs on/after this date bypass the judge-replay check. |
 | `--scenario`, `--runs-dir`, `--output-dir`, `--stem` | veyru / runs / output / baseline_round_success | Standard overrides. |

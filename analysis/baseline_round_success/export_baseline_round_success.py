@@ -1,19 +1,9 @@
 """Export the baseline round-success-vs-budget data behind the Streamlit baseline tab.
 
-Reproduces exactly the cohort the baseline tab plots — scenario runs labeled
-``baseline`` (closed-model frontier) or ``baseline_oss`` (open-weight), carrying
-a ``round_time_budget_seconds`` knob and a ``round_success`` measurement — and
-writes it in a shape suited to mixed-effects modelling.
-
-Judge-mismatch filter: applies only to runs launched before
-``--corrected-judge-cutoff`` (default 2026-06-02). Those older runs were scored
-by the pre-correction judge, so each is gated on its ``judge_replay.json``
-sidecar — any run with at least one previously-accepted stabilization that flips
-to rejected under the corrected prompt is dropped (mirrors the baseline tab's
-judge-replay slider at 0%), and runs without a sidecar are dropped unless
-``--allow-missing-sidecar`` is set. Runs launched on/after the cutoff were scored
-by the corrected judge live during the simulation, so they need no replay
-validation and are included without a sidecar.
+Covers scenario runs labeled ``baseline`` (closed-model frontier), ``baseline_oss``
+(open-weight), or ``oss_frontier`` (cross-family teams pairing an open-weight with a
+closed model), as long as they carry a ``round_time_budget_seconds`` knob and a
+``round_success`` measurement. Written in a shape suited to mixed-effects modelling.
 
 By default every seed mode and easy-round skeleton is included; two columns mark
 each run's design so they can be modelled or subset downstream:
@@ -26,6 +16,8 @@ each run's design so they can be modelled or subset downstream:
 
 Per-agent models come from the run's ``AgentRegistered`` events: every table carries
 ``field_observer_model`` and ``engineer_model`` instead of a single ``model`` column.
+``model_class`` is derived from the two agents' model families: ``closed`` (both
+claude/gpt), ``open`` (both llama/qwen), or ``mixed`` (one open, one closed).
 
 Four output tables:
 
@@ -66,7 +58,7 @@ import pandas as pd
 import torch
 from minicons import scorer  # type: ignore[import-untyped]
 
-from analysis.results_viewer.baseline_data import build_baseline_run
+from analysis.results_viewer.measurement_scores import mcm_score, perplexity_score, read_labels
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
 from schmidt.scenarios.veyru.ids import (
     FIELD_OBSERVER_ID,
@@ -83,7 +75,9 @@ logger = logging.getLogger(__name__)
 _ROUND_SUCCESS_METRIC = "round_success"
 _RANDOM_SEED_LABEL = "random_seed"
 _NO_ORDERED_EASY_ROUNDS_LABEL = "no_ordered_easy_rounds"
-_KIND_TO_MODEL_CLASS = {"baseline": "closed", "baseline_oss": "open"}
+# Runs in scope for the export: the homogeneous baseline cohorts plus the
+# cross-family (oss_frontier) runs that pair an open-weight with a closed model.
+_SCOPE_LABELS = frozenset({"baseline", "baseline_oss", "oss_frontier"})
 
 _FIELD_OBSERVER_IDS = frozenset({FIELD_OBSERVER_ID, OBSERVER_A_ID, OBSERVER_B_ID})
 # "specialist" is a legacy agent_id some early runs used for the engineer role.
@@ -142,6 +136,79 @@ class JoinedRun(NamedTuple):
     """A baseline run paired with its source ``EvaluatedRun``."""
 
     evaluated: EvaluatedRun
+
+
+class RunRecord(NamedTuple):
+    """The run-level facts the export needs, for any in-scope run.
+
+    Replaces ``build_baseline_run`` so the export can also admit ``oss_frontier``
+    (cross-family) runs, which carry no ``baseline`` label.
+    """
+
+    run_id: str
+    budget: int
+    postmortem_enabled: bool
+    total_rounds: int
+    round_success: int
+    perplexity_score: float | None
+    mcm_score: float | None
+    labels: list[str]
+
+
+def _model_family(model: str) -> str:
+    """Classify a model name as ``closed`` (claude/gpt), ``open`` (llama/qwen), or ``other``."""
+    lowered = model.lower()
+    if lowered.startswith(("claude", "gpt")):
+        return "closed"
+    if "llama" in lowered or "qwen" in lowered:
+        return "open"
+    return "other"
+
+
+def _model_class(field_observer_model: str, engineer_model: str) -> str:
+    """Return ``closed`` / ``open`` / ``mixed`` from the two agents' model families.
+
+    ``mixed`` when one agent is open-weight and the other closed (cross-family teams).
+    """
+    families = {_model_family(field_observer_model), _model_family(engineer_model)}
+    families.discard("other")
+    if "open" in families and "closed" in families:
+        return "mixed"
+    if families == {"closed"}:
+        return "closed"
+    if families == {"open"}:
+        return "open"
+    return "unknown"
+
+
+def _build_record(evaluated: EvaluatedRun) -> RunRecord | None:
+    """Build a ``RunRecord`` for an in-scope run, or ``None`` if it doesn't qualify.
+
+    Qualifies when the run carries a scope label (``baseline`` / ``baseline_oss`` /
+    ``oss_frontier``), a ``round_time_budget_seconds`` knob, and a ``round_success``
+    measurement. ``round_success`` counts the rounds whose per-round value is positive.
+    """
+    labels = read_labels(run_dir=evaluated.run_dir)
+    if not _SCOPE_LABELS.intersection(labels):
+        return None
+    config = evaluated.metadata.scenario_config
+    budget = config.get("round_time_budget_seconds")
+    if not isinstance(budget, (int, float)):
+        return None
+    per_round = _round_success_per_round(evaluated=evaluated)
+    if not per_round:
+        return None
+    round_success = sum(1 for _, value, _ in per_round if value > 0)
+    return RunRecord(
+        run_id=evaluated.run_id,
+        budget=int(budget),
+        postmortem_enabled=bool(config.get("postmortem_enabled", False)),
+        total_rounds=int(config.get("round_count", 0)),
+        round_success=round_success,
+        perplexity_score=perplexity_score(evaluated=evaluated),
+        mcm_score=mcm_score(evaluated=evaluated),
+        labels=labels,
+    )
 
 
 def _resolve_model(models: dict[str, str], candidate_ids: frozenset[str]) -> str:
@@ -298,14 +365,14 @@ def _scan_run_context(jsonl_path: Path) -> RunContext:
 def _collect_joined_runs(evaluated_runs: list[EvaluatedRun], scenario_name: str) -> list[JoinedRun]:
     """Return the baseline/baseline_oss runs for ``scenario_name``.
 
-    A run is included only when ``build_baseline_run`` accepts it — i.e. it
-    carries a baseline label, a budget knob, and a ``round_success`` measurement.
+    A run is included only when ``_build_record`` accepts it — i.e. it carries a
+    scope label, a budget knob, and a ``round_success`` measurement.
     """
     joined: list[JoinedRun] = []
     for run in evaluated_runs:
         if run.scenario_name != scenario_name:
             continue
-        if build_baseline_run(evaluated=run) is None:
+        if _build_record(evaluated=run) is None:
             continue
         joined.append(JoinedRun(evaluated=run))
     return joined
@@ -331,8 +398,8 @@ def _apply_cohort_filters(
     out: list[JoinedRun] = []
     for joined in joined_runs:
         if canonical_only:
-            baseline = build_baseline_run(evaluated=joined.evaluated)
-            if baseline is None or not _is_canonical(labels=baseline.labels):
+            record = _build_record(evaluated=joined.evaluated)
+            if record is None or not _is_canonical(labels=record.labels):
                 continue
         out.append(joined)
     return out
@@ -352,30 +419,33 @@ def _build_run_level_frame(
     """One row per run: covariates plus the Bernoulli numerator/denominator."""
     rows: list[dict[str, object]] = []
     for joined in joined_runs:
-        baseline = build_baseline_run(evaluated=joined.evaluated)
-        if baseline is None:
+        record = _build_record(evaluated=joined.evaluated)
+        if record is None:
             continue
-        context = contexts[baseline.run_id]
+        context = contexts[record.run_id]
         fraction = None
-        if baseline.total_rounds > 0:
-            fraction = baseline.round_success / baseline.total_rounds
+        if record.total_rounds > 0:
+            fraction = record.round_success / record.total_rounds
         rows.append(
             {
-                "run_id": baseline.run_id,
+                "run_id": record.run_id,
                 "scenario": joined.evaluated.scenario_name,
                 "field_observer_model": context.field_observer_model,
                 "engineer_model": context.engineer_model,
-                "model_class": _KIND_TO_MODEL_CLASS[baseline.kind],
-                "postmortem": baseline.postmortem_enabled,
-                "round_time_budget_seconds": baseline.budget,
-                "random_seed": _RANDOM_SEED_LABEL in baseline.labels,
-                "easy_rounds": _NO_ORDERED_EASY_ROUNDS_LABEL not in baseline.labels,
-                "total_rounds": baseline.total_rounds,
-                "round_success_count": baseline.round_success,
+                "model_class": _model_class(
+                    field_observer_model=context.field_observer_model,
+                    engineer_model=context.engineer_model,
+                ),
+                "postmortem": record.postmortem_enabled,
+                "round_time_budget_seconds": record.budget,
+                "random_seed": _RANDOM_SEED_LABEL in record.labels,
+                "easy_rounds": _NO_ORDERED_EASY_ROUNDS_LABEL not in record.labels,
+                "total_rounds": record.total_rounds,
+                "round_success_count": record.round_success,
                 "round_success_fraction": fraction,
-                "perplexity": baseline.perplexity_score,
-                "mcm": baseline.mcm_score,
-                "labels": "|".join(baseline.labels),
+                "perplexity": record.perplexity_score,
+                "mcm": record.mcm_score,
+                "labels": "|".join(record.labels),
             }
         )
     frame = pd.DataFrame(rows)
@@ -434,10 +504,14 @@ def _build_message_level_frame(
     """
     rows: list[dict[str, object]] = []
     for joined in joined_runs:
-        baseline = build_baseline_run(evaluated=joined.evaluated)
-        if baseline is None:
+        record = _build_record(evaluated=joined.evaluated)
+        if record is None:
             continue
-        context = contexts[baseline.run_id]
+        context = contexts[record.run_id]
+        model_class = _model_class(
+            field_observer_model=context.field_observer_model,
+            engineer_model=context.engineer_model,
+        )
         for round_number, value, note in _round_success_per_round(evaluated=joined.evaluated):
             round_ctx = context.rounds.get(round_number)
             if round_ctx is None:
@@ -448,15 +522,15 @@ def _build_message_level_frame(
                 for message_index, message in enumerate(messages, start=1):
                     rows.append(
                         {
-                            "run_id": baseline.run_id,
+                            "run_id": record.run_id,
                             "scenario": joined.evaluated.scenario_name,
                             "field_observer_model": context.field_observer_model,
                             "engineer_model": context.engineer_model,
-                            "model_class": _KIND_TO_MODEL_CLASS[baseline.kind],
-                            "postmortem": baseline.postmortem_enabled,
-                            "round_time_budget_seconds": baseline.budget,
-                            "random_seed": _RANDOM_SEED_LABEL in baseline.labels,
-                            "easy_rounds": _NO_ORDERED_EASY_ROUNDS_LABEL not in baseline.labels,
+                            "model_class": model_class,
+                            "postmortem": record.postmortem_enabled,
+                            "round_time_budget_seconds": record.budget,
+                            "random_seed": _RANDOM_SEED_LABEL in record.labels,
+                            "easy_rounds": _NO_ORDERED_EASY_ROUNDS_LABEL not in record.labels,
                             "round_number": round_number,
                             "substage": substage,
                             "symptoms": stage.symptoms,
@@ -491,17 +565,17 @@ def _build_round_context_frame(
     """
     rows: list[dict[str, object]] = []
     for joined in joined_runs:
-        baseline = build_baseline_run(evaluated=joined.evaluated)
-        if baseline is None:
+        record = _build_record(evaluated=joined.evaluated)
+        if record is None:
             continue
-        context = contexts[baseline.run_id]
+        context = contexts[record.run_id]
         for round_number, _, _ in _round_success_per_round(evaluated=joined.evaluated):
             round_ctx = context.rounds.get(round_number)
             if round_ctx is None:
                 continue
             rows.append(
                 {
-                    "run_id": baseline.run_id,
+                    "run_id": record.run_id,
                     "round_number": round_number,
                     "field_observer_round_event": round_ctx.field_observer_event,
                     "engineer_round_event": round_ctx.engineer_event,
