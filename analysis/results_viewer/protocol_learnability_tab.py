@@ -71,6 +71,59 @@ _CONDITION_SYMBOL_LABELS = {
 _DEFAULT_CONDITIONS = frozenset({"expected_no_postmortem", "learned"})
 
 
+def _sort_learned(r: BaselineLearnability) -> float:
+    """Newcomer absolute performance over the post-resume window."""
+    return r.learned_mean
+
+
+def _sort_transmissibility(r: BaselineLearnability) -> float:
+    """No-postmortem ceiling rewarded, transmission gap to learned weighted 2x."""
+    return r.expected_no_pm_mean + 2 * r.delta
+
+
+def _sort_expected_no_pm(r: BaselineLearnability) -> float:
+    """Intact team, postmortem disabled."""
+    return r.expected_no_pm_mean
+
+
+def _sort_expected(r: BaselineLearnability) -> float:
+    """Intact team, postmortem open."""
+    return r.expected_mean
+
+
+def _sort_delta(r: BaselineLearnability) -> float:
+    """Transmission gap: learned − expected_no_postmortem."""
+    return r.delta
+
+
+def _sort_cross_family(r: BaselineLearnability) -> float:
+    """Cross-family observer performance."""
+    return r.cross_family_mean
+
+
+# Maps the selectbox label to the per-baseline score the scatter sorts on
+# (always descending). The first entry is the default.
+_SORT_OPTIONS = {
+    "learned (desc)": _sort_learned,
+    "transmissibility: expected_no_pm + 2·delta (desc)": _sort_transmissibility,
+    "expected_no_postmortem (desc)": _sort_expected_no_pm,
+    "expected (desc)": _sort_expected,
+    "delta = learned − expected_no_pm (desc)": _sort_delta,
+    "cross_family (desc)": _sort_cross_family,
+}
+_DEFAULT_SORT = "learned (desc)"
+
+
+def _render_sort_selectbox() -> str:
+    """Selectbox choosing which score orders the per-baseline scatter (descending)."""
+    return st.selectbox(
+        label="Sort baselines by",
+        options=list(_SORT_OPTIONS),
+        index=list(_SORT_OPTIONS).index(_DEFAULT_SORT),
+        key="protocol_learnability_sort",
+    )
+
+
 def _render_condition_checkboxes() -> set[str]:
     """Horizontal checkbox row selecting which conditions both charts draw.
 
@@ -423,17 +476,21 @@ def _render_per_model_bars(
 
 
 def _render_scatter(
-    results: list[BaselineLearnability], frontend_base: str, selected_conditions: set[str]
+    results: list[BaselineLearnability],
+    frontend_base: str,
+    selected_conditions: set[str],
+    sort_label: str,
 ) -> None:
-    """Paired expected→learned dots per source, sorted by learned descending.
+    """Paired expected→learned dots per source, sorted by the chosen score descending.
 
-    The y-axis label concatenates the model short name; clicking a marker opens
-    the source run in the frontend (``customdata`` carries the URL, handled by
-    :func:`maybe_open_clicked_run`). Only the conditions in
-    ``selected_conditions`` are drawn.
+    ``sort_label`` selects a scoring rule from :data:`_SORT_OPTIONS`. The y-axis
+    label concatenates the model short name; clicking a marker opens the source
+    run in the frontend (``customdata`` carries the URL, handled by
+    :func:`maybe_open_clicked_run`). Only the conditions in ``selected_conditions``
+    are drawn.
     """
     fig = go.Figure()
-    ordered = sorted(results, key=lambda r: r.learned_mean, reverse=True)
+    ordered = sorted(results, key=_SORT_OPTIONS[sort_label], reverse=True)
     y_labels = [f"{r.src_id}  ({r.model_short} · b={r.budget})" for r in ordered]
     for r, label in zip(ordered, y_labels, strict=True):
         color = _MODEL_COLORS.get(r.model_short, "#777777")
@@ -473,6 +530,7 @@ def _render_scatter(
                     name=f"{r.model_short} expected",
                     showlegend=False,
                     hovertemplate=(
+                        f"<b>{_CONDITION_SYMBOL_LABELS['expected']}</b><br>"
                         f"{r.src_id} ({r.model_short} · b={r.budget})<br>"
                         f"expected={r.expected_mean:.3f} ± {r.expected_std:.3f} "
                         f"(n={r.n_expected} replicas)<br>"
@@ -495,6 +553,7 @@ def _render_scatter(
                     name=f"{r.model_short} expected_no_postmortem",
                     showlegend=False,
                     hovertemplate=(
+                        f"<b>{_CONDITION_SYMBOL_LABELS['expected_no_postmortem']}</b><br>"
                         f"{r.src_id} ({r.model_short} · b={r.budget})<br>"
                         f"expected_no_postmortem={r.expected_no_pm_mean:.3f} "
                         f"± {r.expected_no_pm_std:.3f} "
@@ -516,10 +575,11 @@ def _render_scatter(
                     name=f"{r.model_short} learned",
                     showlegend=False,
                     hovertemplate=(
+                        f"<b>{_CONDITION_SYMBOL_LABELS['learned']}</b><br>"
                         f"{r.src_id} ({r.model_short} · b={r.budget})<br>"
                         f"learned={r.learned_mean:.3f} ± {r.learned_std:.3f} "
                         f"(n={r.n_learned} replicas)<br>"
-                        f"delta={r.delta:+.3f}<br>"
+                        f"delta vs expected_no_postmortem={r.delta:+.3f}<br>"
                         "<i>click to open source run</i><extra></extra>"
                     ),
                     customdata=[url],
@@ -543,6 +603,7 @@ def _render_scatter(
                     name=f"{r.model_short} cross_family ({r.cross_family_observer})",
                     showlegend=False,
                     hovertemplate=(
+                        f"<b>{_CONDITION_SYMBOL_LABELS['cross_family']}</b><br>"
                         f"{r.src_id} ({r.model_short} · b={r.budget})<br>"
                         f"cross_family={r.cross_family_mean:.3f} "
                         f"± {r.cross_family_std:.3f} "
@@ -886,10 +947,12 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
             st.markdown(f"**Per-model means** ({symbol_legend}; error bars = SEM across baselines)")
             _render_per_model_bars(results=results, selected_conditions=selected_conditions)
             st.markdown("**Per-baseline** — click a marker to open the source run")
+            sort_label = _render_sort_selectbox()
             _render_scatter(
                 results=results,
                 frontend_base=frontend_base,
                 selected_conditions=selected_conditions,
+                sort_label=sort_label,
             )
     with contrast_panel:
         contrast_rows = feature_contrast(
