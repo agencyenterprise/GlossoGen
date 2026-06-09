@@ -1231,6 +1231,26 @@ export interface components {
             timestamp: string;
         };
         /**
+         * RoundInjection
+         * @description A scenario injection delivered to an agent at a round boundary.
+         *
+         *     Mirrors the ``InjectionDelivered`` event. One entry per delivery; the
+         *     same injection text is typically delivered to every agent on a channel.
+         */
+        RoundInjection: {
+            /** Round Number */
+            round_number: number;
+            /** Agent Id */
+            agent_id: string;
+            /** Text */
+            text: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+        };
+        /**
          * RoundObservationResponse
          * @description Per-round observation for an evaluation measurement.
          */
@@ -1241,6 +1261,24 @@ export interface components {
             value: number;
             /** Note */
             note: string;
+        };
+        /**
+         * RoundResult
+         * @description Structured per-round outcome emitted by the scenario.
+         *
+         *     Mirrors the ``RoundResultRecorded`` event. Single-team scenarios emit
+         *     one entry per round with ``team_id=None``; multi-team scenarios emit one
+         *     entry per team.
+         */
+        RoundResult: {
+            /** Round Number */
+            round_number: number;
+            /** Success */
+            success: boolean;
+            /** Team Id */
+            team_id: string | null;
+            /** Reason */
+            reason: string;
         };
         /**
          * RunDetailResponse
@@ -1302,6 +1340,10 @@ export interface components {
             note: string | null;
             /** Round Endings */
             round_endings: components["schemas"]["RoundEnding"][];
+            /** Round Results */
+            round_results: components["schemas"]["RoundResult"][];
+            /** Round Injections */
+            round_injections: components["schemas"]["RoundInjection"][];
             /** Scenario Extras */
             scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };

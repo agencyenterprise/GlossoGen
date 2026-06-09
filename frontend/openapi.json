@@ -2656,6 +2656,36 @@
         "title": "RoundEnding",
         "description": "Reason a round's main phase ended.\n\nOne entry per round end, across all scenarios. ``trigger`` matches the\n``RoundEnded.trigger`` field (e.g. ``veyru_stabilized``,\n``all_agents_idle``, ``veyru_collapsed``, ``round_timeout``)."
       },
+      "RoundInjection": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "agent_id",
+          "text",
+          "timestamp"
+        ],
+        "title": "RoundInjection",
+        "description": "A scenario injection delivered to an agent at a round boundary.\n\nMirrors the ``InjectionDelivered`` event. One entry per delivery; the\nsame injection text is typically delivered to every agent on a channel."
+      },
       "RoundObservationResponse": {
         "properties": {
           "round_number": {
@@ -2679,6 +2709,42 @@
         ],
         "title": "RoundObservationResponse",
         "description": "Per-round observation for an evaluation measurement."
+      },
+      "RoundResult": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "success",
+          "team_id",
+          "reason"
+        ],
+        "title": "RoundResult",
+        "description": "Structured per-round outcome emitted by the scenario.\n\nMirrors the ``RoundResultRecorded`` event. Single-team scenarios emit\none entry per round with ``team_id=None``; multi-team scenarios emit one\nentry per team."
       },
       "RunDetailResponse": {
         "properties": {
@@ -2862,6 +2928,20 @@
             "type": "array",
             "title": "Round Endings"
           },
+          "round_results": {
+            "items": {
+              "$ref": "#/components/schemas/RoundResult"
+            },
+            "type": "array",
+            "title": "Round Results"
+          },
+          "round_injections": {
+            "items": {
+              "$ref": "#/components/schemas/RoundInjection"
+            },
+            "type": "array",
+            "title": "Round Injections"
+          },
           "scenario_extras": {
             "anyOf": [
               {
@@ -2918,6 +2998,8 @@
           "labels",
           "note",
           "round_endings",
+          "round_results",
+          "round_injections",
           "scenario_extras"
         ],
         "title": "RunDetailResponse",

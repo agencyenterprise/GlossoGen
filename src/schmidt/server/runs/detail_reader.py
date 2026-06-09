@@ -15,9 +15,13 @@ from schmidt.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,
     AgentSwappedMidRun,
+    InjectionDelivered,
     LLMResponseReceived,
     MessageSent,
+    PostmortemStarted,
+    RoundAdvanced,
     RoundEnded,
+    RoundResultRecorded,
     RunStatus,
     SimulationEnded,
     SimulationEvent,
@@ -40,7 +44,9 @@ from schmidt.server.runs.models import (
     ReplaceAgentSource,
     ResumeAtRoundSource,
     RoundEnding,
+    RoundInjection,
     RoundObservationResponse,
+    RoundResult,
     RunDetailResponse,
     ToolUseEntry,
 )
@@ -215,6 +221,13 @@ async def load_run_detail(
     tool_use: list[ToolUseEntry] = []
     run_cycle_failures: list[AgentRunCycleFailedEntry] = []
     round_endings: list[RoundEnding] = []
+    round_results: list[RoundResult] = []
+    round_injections: list[RoundInjection] = []
+    # Postmortem injections share the InjectionDelivered event shape with
+    # round-start injections; they always follow a PostmortemStarted for the
+    # round and precede the next RoundAdvanced. Track the phase so the
+    # postmortem discussion-phase boilerplate is excluded from round_injections.
+    in_postmortem = False
     total_messages = 0
     total_cost_usd = 0.0
     duration_seconds = 0.0
@@ -397,6 +410,33 @@ async def load_run_detail(
                 )
             )
 
+        elif isinstance(event, RoundResultRecorded):
+            round_results.append(
+                RoundResult(
+                    round_number=event.round_number,
+                    success=event.success,
+                    team_id=event.team_id,
+                    reason=event.reason,
+                )
+            )
+
+        elif isinstance(event, PostmortemStarted):
+            in_postmortem = True
+
+        elif isinstance(event, RoundAdvanced):
+            in_postmortem = False
+
+        elif isinstance(event, InjectionDelivered):
+            if not in_postmortem:
+                round_injections.append(
+                    RoundInjection(
+                        round_number=event.round_number,
+                        agent_id=event.agent_id,
+                        text=event.text,
+                        timestamp=event.timestamp,
+                    )
+                )
+
         elif isinstance(event, SimulationEnded):
             status = event.reason
             total_cost_usd = event.total_cost_usd
@@ -488,6 +528,8 @@ async def load_run_detail(
         labels=labels,
         note=note,
         round_endings=round_endings,
+        round_results=round_results,
+        round_injections=round_injections,
         scenario_extras=scenario_extras,
     )
 

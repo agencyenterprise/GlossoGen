@@ -377,6 +377,8 @@ async def _tool_get_run(
             labels=detail.labels,
             note=detail.note,
             round_endings=detail.round_endings,
+            round_results=detail.round_results,
+            round_injections=[i for i in detail.round_injections if i.agent_id == agent_id],
             scenario_extras=detail.scenario_extras,
         )
 

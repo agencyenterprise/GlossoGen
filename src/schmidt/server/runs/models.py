@@ -204,6 +204,33 @@ class RoundEnding(BaseModel):
     timestamp: datetime
 
 
+class RoundResult(BaseModel):
+    """Structured per-round outcome emitted by the scenario.
+
+    Mirrors the ``RoundResultRecorded`` event. Single-team scenarios emit
+    one entry per round with ``team_id=None``; multi-team scenarios emit one
+    entry per team.
+    """
+
+    round_number: int
+    success: bool
+    team_id: str | None
+    reason: str
+
+
+class RoundInjection(BaseModel):
+    """A scenario injection delivered to an agent at a round boundary.
+
+    Mirrors the ``InjectionDelivered`` event. One entry per delivery; the
+    same injection text is typically delivered to every agent on a channel.
+    """
+
+    round_number: int
+    agent_id: str
+    text: str
+    timestamp: datetime
+
+
 class ToolUseEntry(BaseModel):
     """A scenario-specific tool invocation with its result.
 
@@ -348,6 +375,8 @@ class RunDetailResponse(BaseModel):
     labels: list[str]
     note: str | None
     round_endings: list[RoundEnding]
+    round_results: list[RoundResult]
+    round_injections: list[RoundInjection]
     scenario_extras: ScenarioRunExtras | None
 
 
