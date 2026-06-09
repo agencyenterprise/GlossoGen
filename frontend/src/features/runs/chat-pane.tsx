@@ -32,11 +32,14 @@ import { NotificationDisplay } from "./notification-display";
 import { ToolCallDisplay } from "./tool-call-display";
 import { RunCycleFailureDisplay } from "./run-cycle-failure-display";
 import { RoundTimelineModal } from "./round-timeline-modal";
+import { RoundInjectionRow, RoundOutcomeRow } from "./round-event-row";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
 type RunDetailResponse = components["schemas"]["RunDetailResponse"];
 type ScenarioExtras = NonNullable<RunDetailResponse["scenario_extras"]>;
 type RoundEnding = components["schemas"]["RoundEnding"];
+type RoundResult = components["schemas"]["RoundResult"];
+type RoundInjection = components["schemas"]["RoundInjection"];
 
 interface ChatPaneProps {
   runId: string;
@@ -78,6 +81,10 @@ interface ChatPaneProps {
   scenarioExtras: ScenarioExtras | null;
   /** One entry per completed round describing why its main phase ended. */
   roundEndings: RoundEnding[];
+  /** Per-round, per-team pass/fail outcomes emitted by the scenario. */
+  roundResults: RoundResult[];
+  /** Scenario injections delivered to agents at each round boundary. */
+  roundInjections: RoundInjection[];
   /** ISO timestamp at which the resume happened (replace-agent / fork). Turns and rounds with earlier timestamps are rendered faded so users see they were inherited from the source run. Null for non-resumed runs. */
   resumeCutoffTimestamp: string | null;
   /**
@@ -190,6 +197,8 @@ export function ChatPane({
   scenarioName,
   scenarioExtras,
   roundEndings,
+  roundResults,
+  roundInjections,
   resumeCutoffTimestamp,
   agentSwapDividers,
   activeInstanceRoundRange,
@@ -228,6 +237,32 @@ export function ChatPane({
     }
     return byRound;
   }, [roundEndings]);
+
+  const resultsByRound = useMemo(() => {
+    const byRound = new Map<number, RoundResult[]>();
+    for (const r of roundResults) {
+      const list = byRound.get(r.round_number);
+      if (list) {
+        list.push(r);
+      } else {
+        byRound.set(r.round_number, [r]);
+      }
+    }
+    return byRound;
+  }, [roundResults]);
+
+  const injectionsByRound = useMemo(() => {
+    const byRound = new Map<number, RoundInjection[]>();
+    for (const i of roundInjections) {
+      const list = byRound.get(i.round_number);
+      if (list) {
+        list.push(i);
+      } else {
+        byRound.set(i.round_number, [i]);
+      }
+    }
+    return byRound;
+  }, [roundInjections]);
 
   // Imperative jump — does NOT go through React state. On large runs the
   // entry list (and wire SVG) is fully mounted in the DOM, so any state
@@ -361,6 +396,11 @@ export function ChatPane({
     return map;
   }, [agents]);
 
+  const roleNameForAgent = useCallback(
+    (agentId: string) => agentMap.get(agentId)?.role_name ?? agentId,
+    [agentMap]
+  );
+
   const filtered = useMemo(() => {
     if (selectedChannel === null) {
       return messages;
@@ -389,17 +429,11 @@ export function ChatPane({
     headerName = humanize(selectedChannel);
   }
 
-  const headerMembers = useMemo(() => {
+  const channelMembers = useMemo(() => {
     if (selectedChannel === null) {
-      return null;
+      return [];
     }
-    const members = agents
-      .filter(a => a.channel_ids.includes(selectedChannel))
-      .map(a => a.role_name);
-    if (members.length === 0) {
-      return null;
-    }
-    return members.join(", ");
+    return agents.filter(a => a.channel_ids.includes(selectedChannel));
   }, [selectedChannel, agents]);
 
   const headerDesc =
@@ -408,13 +442,43 @@ export function ChatPane({
   const [showReasoning, setShowReasoning] = useState(true);
   const [showTools, setShowTools] = useState(true);
 
+  // Agent IDs the user has toggled on in the channel header to focus the view.
+  // Empty = show every member. Filtering uses the intersection with the
+  // current channel's members (``focusedAgentIds`` below), so a focus on a
+  // member of one channel never hides all traffic in another.
+  const [rawFocusedAgentIds, setRawFocusedAgentIds] = useState<Set<string>>(new Set());
+
+  const focusedAgentIds = useMemo(() => {
+    const memberIds = new Set(channelMembers.map(m => m.agent_id));
+    const out = new Set<string>();
+    for (const id of rawFocusedAgentIds) {
+      if (memberIds.has(id)) {
+        out.add(id);
+      }
+    }
+    return out;
+  }, [rawFocusedAgentIds, channelMembers]);
+
+  const toggleFocusedAgent = useCallback((agentId: string) => {
+    setRawFocusedAgentIds(prev => {
+      const next = new Set(prev);
+      if (next.has(agentId)) {
+        next.delete(agentId);
+      } else {
+        next.add(agentId);
+      }
+      return next;
+    });
+  }, []);
+
   const visibleFiltered = useMemo(() => {
     return filtered.filter(m => {
       if (m.is_reasoning && !showReasoning) return false;
       if (m.is_tool_use && !showTools) return false;
+      if (focusedAgentIds.size > 0 && !focusedAgentIds.has(m.sender_agent_id)) return false;
       return true;
     });
-  }, [filtered, showReasoning, showTools]);
+  }, [filtered, showReasoning, showTools, focusedAgentIds]);
 
   const rounds = useMemo(() => groupByRoundAndTurn(visibleFiltered), [visibleFiltered]);
 
@@ -453,8 +517,34 @@ export function ChatPane({
         <span className="text-sm text-muted-foreground">#</span>
         <span className="text-[13px] font-medium">{headerName}</span>
         <span className="text-xs text-muted-foreground">{headerDesc}</span>
-        {headerMembers ? (
-          <span className="ml-auto text-[11px] text-muted-foreground">{headerMembers}</span>
+        {channelMembers.length > 0 ? (
+          <div className="ml-auto flex flex-wrap items-center gap-1">
+            {channelMembers.map(member => {
+              const isFocused = focusedAgentIds.has(member.agent_id);
+              const color = agentColorMap.get(member.agent_id);
+              return (
+                <button
+                  key={member.agent_id}
+                  type="button"
+                  aria-pressed={isFocused}
+                  title={
+                    isFocused
+                      ? `Showing only ${member.role_name} — click to clear`
+                      : `Show only ${member.role_name}`
+                  }
+                  onClick={() => toggleFocusedAgent(member.agent_id)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors",
+                    isFocused
+                      ? cn("border-transparent font-medium", color?.bg, color?.fg)
+                      : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                  )}
+                >
+                  {member.role_name}
+                </button>
+              );
+            })}
+          </div>
         ) : null}
         <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground select-none">
           <input
@@ -767,13 +857,25 @@ export function ChatPane({
                 <div className="h-px flex-1 bg-border" />
               </div>
 
+              <RoundInjectionRow
+                injections={(injectionsByRound.get(round.roundNumber) ?? []).filter(
+                  i => focusedAgentIds.size === 0 || focusedAgentIds.has(i.agent_id)
+                )}
+                roleNameForAgent={roleNameForAgent}
+              />
+
               {round.turns.map((turn, turnIdx) => {
                 const agent = agentMap.get(turn.agentId);
                 const color = agentColorMap.get(turn.agentId);
-                const turnDisplayName =
-                  turn.entries.find(e => e.sender_display_name)?.sender_display_name ??
-                  agent?.role_name ??
-                  turn.agentId;
+                // Prefer a display name only when it differs from the agent_id:
+                // legacy runs (recorded before sender_display_name existed) backfill
+                // it with the raw agent_id, so fall through to the role name there.
+                // Scenarios that rotate identity behind one agent_id still get their
+                // distinct display name.
+                const distinctDisplayName = turn.entries.find(
+                  e => e.sender_display_name && e.sender_display_name !== turn.agentId
+                )?.sender_display_name;
+                const turnDisplayName = distinctDisplayName ?? agent?.role_name ?? turn.agentId;
 
                 const isPreResume =
                   resumeCutoffTimestamp !== null && turn.timestamp < resumeCutoffTimestamp;
@@ -933,6 +1035,11 @@ export function ChatPane({
                   </div>
                 );
               })}
+
+              <RoundOutcomeRow
+                results={resultsByRound.get(round.roundNumber) ?? []}
+                trigger={endingByRound.get(round.roundNumber)?.trigger ?? null}
+              />
             </div>
           ))}
         </div>
