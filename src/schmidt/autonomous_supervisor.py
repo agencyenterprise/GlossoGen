@@ -14,6 +14,7 @@ import httpx
 from pydantic import TypeAdapter
 
 from schmidt.channel_router import compute_per_channel_join_index
+from schmidt.db.run_registry import update_run_status_standalone
 from schmidt.event_logger import EventLogger
 from schmidt.message_rewind import RewindState
 from schmidt.models.agent_config import AgentConfig
@@ -543,3 +544,18 @@ class AutonomousSupervisor:
             total_messages,
             total_cost_usd,
         )
+
+        run_dir_name = self._log_path.parent.name
+        try:
+            await update_run_status_standalone(
+                scenario=self._scenario.name(),
+                run_dir_name=run_dir_name,
+                status=termination_status.value,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to update runs.status to %s for %s/%s",
+                termination_status.value,
+                self._scenario.name(),
+                run_dir_name,
+            )

@@ -12,7 +12,12 @@ from datetime import datetime
 import psycopg
 
 from schmidt.db.pool import get_database_url
-from schmidt.db.queries import get_group_by_slug, insert_run, insert_run_if_absent
+from schmidt.db.queries import (
+    get_group_by_slug,
+    insert_run,
+    insert_run_if_absent,
+    update_run_status,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -98,3 +103,26 @@ async def register_run_if_absent_standalone(
             source_run_dir_name=source_run_dir_name,
         )
     return inserted
+
+
+async def update_run_status_standalone(
+    *,
+    scenario: str,
+    run_dir_name: str,
+    status: str,
+) -> None:
+    """Open a one-shot connection and update the ``status`` column for a run.
+
+    Used by the autonomous supervisor to flip the row from ``starting`` to
+    the terminal status (e.g. ``scenario_complete``) when the simulation
+    finishes. Without this call, every run produced by the local CLI sits
+    indefinitely at ``starting``, hiding from the FE's completed-runs view.
+    """
+    conninfo = _resolve_async_conninfo()
+    async with await psycopg.AsyncConnection.connect(conninfo=conninfo) as conn:
+        await update_run_status(
+            conn=conn,
+            scenario=scenario,
+            run_dir_name=run_dir_name,
+            status=status,
+        )

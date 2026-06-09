@@ -228,7 +228,7 @@ def _load_results_uncached(
                 cross_family_mean=cross_family_mean,
                 cross_family_std=cross_family_std,
                 cross_family_observer=acc.cross_family_observer,
-                delta=learned_mean - expected_mean,
+                delta=learned_mean - expected_no_pm_mean,
                 n_expected=len(acc.expected),
                 n_expected_no_pm=len(acc.expected_no_pm),
                 n_learned=len(acc.learned),
