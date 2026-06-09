@@ -912,6 +912,11 @@ async def _run_simulation(
     else:
         runs_dir = Path(args.runs_dir)
         run_dir = _compute_run_dir(runs_dir=runs_dir, scenario_name=scenario.name())
+        # Print attribution markers BEFORE the simulation starts so an
+        # orchestrator that detached this process can read the freshly-claimed
+        # run id by tailing stdout, instead of racing on a directory snapshot.
+        print(f"new_run_id={scenario.name()}/{run_dir.name}", flush=True)
+        print(f"new_run_dir={run_dir}", flush=True)
         await register_run_standalone(
             group_slug=args.group_slug,
             scenario=scenario.name(),
