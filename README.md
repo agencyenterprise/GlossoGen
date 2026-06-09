@@ -25,24 +25,32 @@ make install-frontend   # frontend only (npm ci)
 
 ### Local Postgres
 
-The backend requires a Postgres database to hold the tenancy tables (groups, runs index, OAuth state). Create a local database and point the backend at it.
+The backend requires a Postgres database to hold the tenancy tables (groups, runs index, OAuth state). Create a role, a local database owned by that role, and point the backend at it.
 
 ```bash
-# 1. Create the database (one-time).
-createdb schmidt_dev
+# 1. Create a Postgres role (one-time). On macOS/Homebrew a superuser role
+#    named after your OS user already exists, so you can skip this and connect
+#    without credentials. On Debian/Ubuntu (peer auth), create a role first:
+sudo -u postgres createuser --createdb --pwprompt schmidt   # prompts for a password
 
-# 2. Apply the migrations (creates groups, runs, user_last_active_group,
+# 2. Create the database owned by that role (one-time).
+createdb -O schmidt schmidt_dev
+# Homebrew default-role shortcut (role == your OS user, no password): createdb schmidt_dev
+
+# 3. Apply the migrations (creates groups, runs, user_last_active_group,
 #    schema_migrations, and the OAuth tables).
-DATABASE_URL=postgresql://localhost:5432/schmidt_dev \
+DATABASE_URL=postgresql://schmidt:<password>@localhost:5432/schmidt_dev \
   VIRTUAL_ENV= uv run --no-sync alembic upgrade head
 
-# 3. Verify the schema.
+# 4. Verify the schema.
 psql -d schmidt_dev -c "\dt"
 ```
 
+The `DATABASE_URL` format is `postgresql://<user>:<password>@<host>:<port>/<db>`. On a Homebrew install where the role matches your OS user and local connections use `trust`/`peer` auth, you can drop the credentials entirely: `postgresql://localhost:5432/schmidt_dev`.
+
 The first time the backend boots it will also auto-create the synthetic `local` group used in single-tenant local mode. There's nothing else to do — leave `CLERK_SECRET_KEY` unset and every request runs as `local-user` inside the `local` group.
 
-To reset the database, drop and recreate it: `dropdb schmidt_dev && createdb schmidt_dev && alembic upgrade head`.
+To reset the database, drop and recreate it: `dropdb schmidt_dev && createdb -O schmidt schmidt_dev && alembic upgrade head`.
 
 ### Configure environment
 
@@ -50,7 +58,7 @@ To reset the database, drop and recreate it: `dropdb schmidt_dev && createdb sch
 cp .env.example .env
 ```
 
-See `.env.example` for all available variables (API keys, authentication, CORS). At minimum, set `ANTHROPIC_API_KEY` and `DATABASE_URL` (point it at the database you just created — the default in `.env.example` matches the recipe above).
+See `.env.example` for all available variables (API keys, authentication, CORS). At minimum, set `ANTHROPIC_API_KEY` and `DATABASE_URL` (point it at the database you just created, including the role's credentials if you set a password — the default in `.env.example` matches the no-credentials Homebrew recipe above).
 
 ## Running a Simulation
 
