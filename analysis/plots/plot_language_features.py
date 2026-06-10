@@ -59,7 +59,7 @@ _COHORTS: tuple[_ScenarioCohort, ...] = (
     _ScenarioCohort(
         name="veyru",
         display_name="Veyru",
-        required_labels=("random_seed", "no_ordered_easy_rounds"),
+        required_labels=("random_seed", ),
         color=_VEYRU_COLOR,
     ),
     _ScenarioCohort(
@@ -160,11 +160,12 @@ def _plot(
 ) -> None:
     """Render the grouped horizontal bar chart and write it to ``_OUTPUT_PATH``.
 
-    Categories are sorted by max prevalence across cohorts (most-shared
-    mechanisms on top). Veyru bars are nudged up, container bars down,
-    so each pair reads as a horizontal H. Y labels are humanized
-    (snake_case → sentence case) so the chart reads without source-code
-    fluency.
+    Only categories present in both cohorts (prevalence > 0 on each side)
+    and reaching ``_MIN_PREVALENCE_TO_SHOW`` on at least one side are shown;
+    features present in only one scenario are dropped. Categories are sorted
+    by max prevalence across cohorts (most-shared mechanisms on top). Y labels
+    are humanized (snake_case → sentence case) so the chart reads without
+    source-code fluency.
     """
     plt.rcParams.update(
         {
@@ -189,10 +190,15 @@ def _plot(
         category_id: max(prevalence_by_cohort[cohort.name][category_id] for cohort in _COHORTS)
         for category_id in category_ids
     }
+    min_per_category = {
+        category_id: min(prevalence_by_cohort[cohort.name][category_id] for cohort in _COHORTS)
+        for category_id in category_ids
+    }
     visible_categories = [
         category_id
         for category_id in category_ids
         if max_per_category[category_id] >= _MIN_PREVALENCE_TO_SHOW
+        and min_per_category[category_id] > 0.0
     ]
     ordered_categories = sorted(
         visible_categories, key=lambda category_id: -max_per_category[category_id]
