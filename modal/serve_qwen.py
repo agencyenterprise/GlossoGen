@@ -34,7 +34,7 @@ app = modal.App("qwen-3-32b")
         "/root/.cache/huggingface": hf_cache_vol,
         "/root/.cache/vllm": vllm_cache_vol,
     },
-    min_containers=1,
+    min_containers=2,
     scaledown_window=15 * MINUTES,
     timeout=30 * MINUTES,
 )
