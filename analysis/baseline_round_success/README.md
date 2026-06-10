@@ -39,9 +39,8 @@ a `round_time_budget_seconds` knob and a `round_success` measurement.
 - **`model_class`** is derived from the two agents' model families: `closed` (both
   claude/gpt), `open` (both llama/qwen), or `mixed` (one open, one closed —
   the `oss_frontier` runs).
-- **Design.** Every seed mode and easy-round skeleton is included by default and tagged
-  with the `random_seed` / `easy_rounds` columns. Pass `--canonical-only` to keep just
-  the fixed-`seed=42`, default-easy-round runs.
+- **Design.** Every seed mode is included by default and tagged with the `random_seed`
+  column. Pass `--canonical-only` to keep just the fixed-`seed=42` runs.
 
 Design target for the homogeneous baselines is **5 replicas per (model × postmortem ×
 budget) cell** (see `src/schmidt/scenarios/veyru/scripts/run_baseline_no_specialist.py`).
@@ -54,7 +53,7 @@ For binomial GLMMs (`cbind(round_success_count, total_rounds - round_success_cou
 or a model on `round_success_fraction`.
 
 `run_id`, `scenario`, `field_observer_model`, `engineer_model`, `model_class`
-(closed/open/mixed), `postmortem`, `round_time_budget_seconds`, `random_seed`, `easy_rounds`,
+(closed/open/mixed), `postmortem`, `round_time_budget_seconds`, `random_seed`,
 `total_rounds`, `round_success_count`, `round_success_fraction`, `perplexity` (run-wide
 mean per-token surprisal, nats/gpt2), `mcm` (run-wide mean chars per link message),
 `labels`.
@@ -93,9 +92,9 @@ next substage. Messages are walked over the substages the team reached
 traffic produce no rows.**
 
 Repeated round-level columns (identical across a round's message rows): `round_number`,
-`success` (0/1, whole-round outcome), `success_raw`, `note`, plus all the run covariates
+`success` (0/1, whole-round outcome), `note`, plus all the run covariates
 (`field_observer_model`, `engineer_model`, `model_class`, `postmortem`,
-`round_time_budget_seconds`, `random_seed`, `easy_rounds`).
+`round_time_budget_seconds`, `random_seed`).
 
 The round-start briefings live in the separate `round_context` sheet (below) to keep this
 sheet small — join on `run_id` + `round_number`.
@@ -114,7 +113,7 @@ message row (they were ~86% of the file otherwise). Join to `message_level` on
 ### `budget_aggregate` — one row per cell
 
 Per (model_class, field_observer_model, engineer_model, postmortem, random_seed,
-easy_rounds, budget): `n`, and mean / std (population, ddof=0) / min / max of
+budget): `n`, and mean / std (population, ddof=0) / min / max of
 `round_success_fraction`, plus `mean_success_count`. A sanity check against the
 plotted mean ± std bands.
 
@@ -122,5 +121,5 @@ plotted mean ± std bands.
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--canonical-only` | off | Keep only fixed-`seed=42` + default-easy-round runs. |
+| `--canonical-only` | off | Keep only fixed-`seed=42` runs. |
 | `--scenario`, `--runs-dir`, `--output-dir`, `--stem` | veyru / runs / output / baseline_round_success | Standard overrides. |
