@@ -1486,7 +1486,7 @@ async def _run_login(args: argparse.Namespace) -> None:
 
 async def _run_push_to_prod(args: argparse.Namespace) -> None:
     """Drive the ``schmidt push-to-prod`` subcommand."""
-    concurrency = max(1, min(int(args.concurrency), 4))
+    concurrency = max(1, min(int(args.concurrency), 16))
     scenarios_arg: list[str] = args.scenarios
     scenarios = frozenset(scenarios_arg) if scenarios_arg else None
     spec = PushSpec(
