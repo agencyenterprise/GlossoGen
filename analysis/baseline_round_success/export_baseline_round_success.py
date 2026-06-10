@@ -5,14 +5,11 @@ Covers scenario runs labeled ``baseline`` (closed-model frontier), ``baseline_os
 closed model), as long as they carry a ``round_time_budget_seconds`` knob and a
 ``round_success`` measurement. Written in a shape suited to mixed-effects modelling.
 
-By default every seed mode and easy-round skeleton is included; two columns mark
-each run's design so they can be modelled or subset downstream:
+By default every seed mode is included; the ``random_seed`` column marks each run's
+design so it can be modelled or subset downstream:
 
 - ``random_seed`` — True when the run used a per-launch random seed, False for the
-  canonical fixed ``seed=42``.
-- ``easy_rounds`` — True when the run used the default ordered easy-round warmups
-  (rounds 1/2/3/6/13 forced single-stage), False for the ``no_ordered_easy_rounds``
-  design. Pass ``--canonical-only`` to keep just fixed-seed + default-easy runs.
+  canonical fixed ``seed=42``. Pass ``--canonical-only`` to keep just the fixed-seed runs.
 
 Per-agent models come from the run's ``AgentRegistered`` events: every table carries
 ``field_observer_model`` and ``engineer_model`` instead of a single ``model`` column.
@@ -32,14 +29,14 @@ Four output tables:
   ``field_observer`` or ``stabilization_engineer``), ``message_text``, ``chars``
   (``len(message_text)``), ``perplexity`` (per-message mean per-token surprisal in nats
   under gpt2; blank for empty/single-token messages), and the round-level
-  ``success`` / ``success_raw`` / ``note``. Messages are walked over the substages the
+  ``success`` (0/1 whole-round outcome) / ``note``. Messages are walked over the substages the
   team reached (``min(stabilized_stages + 1, total_stages)``); substages with no link
   traffic produce no rows.
 - ``round_context`` — one row per (run, round) holding the large round-start briefings
   (``field_observer_round_event`` / ``engineer_round_event``). Kept separate (join on
   ``run_id`` + ``round_number``) so the briefing text is stored once per round rather
   than duplicated on every message row.
-- ``budget_aggregate`` — per (models, postmortem, random_seed, easy_rounds, budget)
+- ``budget_aggregate`` — per (models, postmortem, random_seed, budget)
   mean ± std of the success fraction; a sanity check against the plotted bands.
 
 Writes one CSV per table, and (when ``openpyxl`` is importable) a single
@@ -74,7 +71,10 @@ logger = logging.getLogger(__name__)
 
 _ROUND_SUCCESS_METRIC = "round_success"
 _RANDOM_SEED_LABEL = "random_seed"
-_NO_ORDERED_EASY_ROUNDS_LABEL = "no_ordered_easy_rounds"
+# Per-run cache of message perplexities, written beside each run's JSONL. Recomputed
+# whenever the JSONL changes or _PERPLEXITY_CACHE_VERSION is bumped (walk-order change).
+_MESSAGE_PERPLEXITY_CACHE_NAME = "message_perplexity_cache.json"
+_PERPLEXITY_CACHE_VERSION = 1
 # Runs in scope for the export: the homogeneous baseline cohorts plus the
 # cross-family (oss_frontier) runs that pair an open-weight with a closed model.
 _SCOPE_LABELS = frozenset({"baseline", "baseline_oss", "oss_frontier"})
@@ -379,15 +379,12 @@ def _collect_joined_runs(evaluated_runs: list[EvaluatedRun], scenario_name: str)
 
 
 def _is_canonical(labels: list[str]) -> bool:
-    """True for the canonical-design cohort: fixed seed and default easy-round skeleton.
+    """True for the canonical-design cohort: the fixed ``seed=42`` runs.
 
-    Canonical runs carry neither the ``random_seed`` label (so they used the
-    fixed ``seed=42``) nor the ``no_ordered_easy_rounds`` label (so rounds
-    1/2/3/6/13 are the default forced single-stage warmups).
+    Canonical runs do not carry the ``random_seed`` label, so they used the fixed
+    ``seed=42`` case set.
     """
-    if _RANDOM_SEED_LABEL in labels:
-        return False
-    return _NO_ORDERED_EASY_ROUNDS_LABEL not in labels
+    return _RANDOM_SEED_LABEL not in labels
 
 
 def _apply_cohort_filters(
@@ -439,7 +436,6 @@ def _build_run_level_frame(
                 "postmortem": record.postmortem_enabled,
                 "round_time_budget_seconds": record.budget,
                 "random_seed": _RANDOM_SEED_LABEL in record.labels,
-                "easy_rounds": _NO_ORDERED_EASY_ROUNDS_LABEL not in record.labels,
                 "total_rounds": record.total_rounds,
                 "round_success_count": record.round_success,
                 "round_success_fraction": fraction,
@@ -463,16 +459,13 @@ def _build_run_level_frame(
     ).reset_index(drop=True)
 
 
-def _score_message_perplexities(texts: list[str]) -> list[float | None]:
+def _score_texts(lm_scorer: object, texts: list[str]) -> list[float | None]:
     """Per-message mean per-token surprisal (nats) under gpt2, aligned with ``texts``.
 
     Mirrors the ``perplexity`` metric: ``minicons.IncrementalLMScorer`` with
     ``reduction = -x.mean(0)``. Empty messages and single-token inputs (which return
     NaN — no left context) map to ``None`` so the column stays numeric elsewhere.
     """
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    logger.info("perplexity: scoring %d messages with gpt2 on %s", len(texts), device)
-    lm_scorer = scorer.IncrementalLMScorer("gpt2", device)
 
     def _negative_mean(tensor: object) -> float:
         return -tensor.mean(0).item()  # type: ignore[attr-defined]
@@ -483,12 +476,108 @@ def _score_message_perplexities(texts: list[str]) -> list[float | None]:
     flat_scores: list[float] = []
     for start in range(0, len(scored_indices), batch_size):
         chunk = [texts[i] for i in scored_indices[start : start + batch_size]]
-        flat_scores.extend(lm_scorer.sequence_score(chunk, reduction=_negative_mean))
+        flat_scores.extend(lm_scorer.sequence_score(chunk, reduction=_negative_mean))  # type: ignore[attr-defined]
     for index, score in zip(scored_indices, flat_scores):
         value = float(score)
         if not math.isnan(value):
             results[index] = value
     return results
+
+
+class _PerplexityCacheKey(NamedTuple):
+    """Identity of a run's cached per-message perplexities.
+
+    A cache hit requires all fields to match, so any edit to the run's JSONL (size
+    or mtime), a change in message count, or a bump to ``_PERPLEXITY_CACHE_VERSION``
+    (used when the message-walk order changes) forces a recompute.
+    """
+
+    jsonl_size: int
+    jsonl_mtime_ns: int
+    message_count: int
+    cache_version: int
+
+
+def _perplexity_cache_key(jsonl_path: Path, message_count: int) -> _PerplexityCacheKey:
+    """Build the cache key for ``jsonl_path``'s ``message_count`` link messages."""
+    stat = jsonl_path.stat()
+    return _PerplexityCacheKey(
+        jsonl_size=stat.st_size,
+        jsonl_mtime_ns=stat.st_mtime_ns,
+        message_count=message_count,
+        cache_version=_PERPLEXITY_CACHE_VERSION,
+    )
+
+
+def _read_perplexity_cache(
+    cache_path: Path, cache_key: _PerplexityCacheKey
+) -> list[float | None] | None:
+    """Return the cached per-message perplexities if the cache matches ``cache_key``."""
+    if not cache_path.exists():
+        return None
+    try:
+        payload = orjson.loads(cache_path.read_bytes())
+    except (orjson.JSONDecodeError, OSError):
+        logger.exception("perplexity cache unreadable, recomputing: %s", cache_path)
+        return None
+    matches = (
+        payload.get("jsonl_size") == cache_key.jsonl_size
+        and payload.get("jsonl_mtime_ns") == cache_key.jsonl_mtime_ns
+        and payload.get("message_count") == cache_key.message_count
+        and payload.get("cache_version") == cache_key.cache_version
+    )
+    if not matches:
+        return None
+    return list(payload["perplexities"])
+
+
+def _write_perplexity_cache(
+    cache_path: Path, cache_key: _PerplexityCacheKey, perplexities: list[float | None]
+) -> None:
+    """Persist ``perplexities`` for a run, keyed by ``cache_key``, beside its JSONL."""
+    payload = {
+        "jsonl_size": cache_key.jsonl_size,
+        "jsonl_mtime_ns": cache_key.jsonl_mtime_ns,
+        "message_count": cache_key.message_count,
+        "cache_version": cache_key.cache_version,
+        "perplexities": perplexities,
+    }
+    cache_path.write_bytes(orjson.dumps(payload))
+
+
+class _MessagePerplexityScorer:
+    """Scores link-message perplexity, caching each run's result beside its JSONL.
+
+    The gpt2 model is loaded lazily on the first cache miss and reused for the rest of
+    the run, so an export where every run is already cached never loads gpt2 at all.
+    """
+
+    def __init__(self) -> None:
+        self._lm_scorer: object | None = None
+
+    def _ensure_scorer(self) -> object:
+        if self._lm_scorer is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            logger.info("perplexity: loading gpt2 on %s for uncached runs", device)
+            self._lm_scorer = scorer.IncrementalLMScorer("gpt2", device)
+        return self._lm_scorer
+
+    def score_run(self, jsonl_path: Path, texts: list[str]) -> list[float | None]:
+        """Return per-message perplexities for one run, reading or writing its cache."""
+        cache_path = jsonl_path.parent / _MESSAGE_PERPLEXITY_CACHE_NAME
+        cache_key = _perplexity_cache_key(jsonl_path=jsonl_path, message_count=len(texts))
+        cached = _read_perplexity_cache(cache_path=cache_path, cache_key=cache_key)
+        if cached is not None:
+            return cached
+        perplexities: list[float | None]
+        if any(text and text.strip() for text in texts):
+            perplexities = _score_texts(lm_scorer=self._ensure_scorer(), texts=texts)
+        else:
+            perplexities = [None] * len(texts)
+        _write_perplexity_cache(
+            cache_path=cache_path, cache_key=cache_key, perplexities=perplexities
+        )
+        return perplexities
 
 
 def _build_message_level_frame(
@@ -502,6 +591,7 @@ def _build_message_level_frame(
     (``success`` / ``note``), and the round-start briefings are repeated on every message
     row.
     """
+    perplexity_scorer = _MessagePerplexityScorer()
     rows: list[dict[str, object]] = []
     for joined in joined_runs:
         record = _build_record(evaluated=joined.evaluated)
@@ -512,6 +602,7 @@ def _build_message_level_frame(
             field_observer_model=context.field_observer_model,
             engineer_model=context.engineer_model,
         )
+        run_rows: list[dict[str, object]] = []
         for round_number, value, note in _round_success_per_round(evaluated=joined.evaluated):
             round_ctx = context.rounds.get(round_number)
             if round_ctx is None:
@@ -520,7 +611,7 @@ def _build_message_level_frame(
                 stage = round_ctx.stages[substage - 1]
                 messages = round_ctx.link_messages_by_substage.get(substage, [])
                 for message_index, message in enumerate(messages, start=1):
-                    rows.append(
+                    run_rows.append(
                         {
                             "run_id": record.run_id,
                             "scenario": joined.evaluated.scenario_name,
@@ -530,7 +621,6 @@ def _build_message_level_frame(
                             "postmortem": record.postmortem_enabled,
                             "round_time_budget_seconds": record.budget,
                             "random_seed": _RANDOM_SEED_LABEL in record.labels,
-                            "easy_rounds": _NO_ORDERED_EASY_ROUNDS_LABEL not in record.labels,
                             "round_number": round_number,
                             "substage": substage,
                             "symptoms": stage.symptoms,
@@ -541,14 +631,19 @@ def _build_message_level_frame(
                             "message_text": message.message,
                             "chars": len(message.message),
                             "success": int(round(value)),
-                            "success_raw": value,
                             "note": note,
                         }
                     )
+        jsonl_path = joined.evaluated.run_dir / f"{joined.evaluated.scenario_name}.jsonl"
+        perplexities = perplexity_scorer.score_run(
+            jsonl_path=jsonl_path, texts=[str(row["message_text"]) for row in run_rows]
+        )
+        for row, perplexity in zip(run_rows, perplexities):
+            row["perplexity"] = perplexity
+        rows.extend(run_rows)
     frame = pd.DataFrame(rows)
     if frame.empty:
         return frame
-    frame["perplexity"] = _score_message_perplexities(texts=frame["message_text"].tolist())
     return frame.sort_values(
         by=["run_id", "round_number", "substage", "message_index_in_substage"]
     ).reset_index(drop=True)
@@ -588,10 +683,10 @@ def _build_round_context_frame(
 
 
 def _build_budget_aggregate_frame(run_level: pd.DataFrame) -> pd.DataFrame:
-    """Per (model, postmortem, seed mode, easy-rounds, budget) mean ± std of the success fraction.
+    """Per (model, postmortem, seed mode, budget) mean ± std of the success fraction.
 
-    ``random_seed`` and ``easy_rounds`` are grouping keys so the aggregate never
-    pools runs from different experimental designs into one cell.
+    ``random_seed`` is a grouping key so the aggregate never pools runs from
+    different seed designs into one cell.
     """
     if run_level.empty:
         return run_level
@@ -601,7 +696,6 @@ def _build_budget_aggregate_frame(run_level: pd.DataFrame) -> pd.DataFrame:
         "engineer_model",
         "postmortem",
         "random_seed",
-        "easy_rounds",
         "round_time_budget_seconds",
     ]
     grouped = run_level.groupby(group_keys, as_index=False).agg(
@@ -651,9 +745,8 @@ def _parse_args() -> argparse.Namespace:
         "--canonical-only",
         action="store_true",
         help=(
-            "Restrict to the canonical design — fixed seed and default easy-round "
-            "warmups. Default keeps every seed mode / easy-round skeleton, tagged "
-            "by the random_seed and easy_rounds columns."
+            "Restrict to the canonical design — the fixed ``seed=42`` runs. Default "
+            "keeps every seed mode, tagged by the random_seed column."
         ),
     )
     return parser.parse_args()
