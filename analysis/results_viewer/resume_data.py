@@ -150,20 +150,87 @@ def _compute_round_outcomes(
 
 
 _outcomes_cache: dict[Path, dict[int, bool]] = {}
+_OUTCOMES_SIDECAR_NAME = "round_outcomes_cache.json"
+
+
+def _read_outcomes_sidecar(*, run_dir: Path, jsonl_path: Path) -> dict[int, bool] | None:
+    """Return the cached outcomes if the sidecar matches the JSONL stat; else None.
+
+    The sidecar is keyed on ``jsonl_size`` and ``jsonl_mtime_ns`` so any
+    change to the JSONL invalidates it. Returns ``None`` on any read or
+    schema error so the caller falls back to a fresh replay.
+    """
+    sidecar = run_dir / _OUTCOMES_SIDECAR_NAME
+    if not sidecar.exists():
+        return None
+    try:
+        stat = jsonl_path.stat()
+    except OSError:
+        return None
+    try:
+        raw = orjson.loads(sidecar.read_bytes())
+    except (orjson.JSONDecodeError, OSError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    if raw.get("jsonl_size") != stat.st_size:
+        return None
+    if raw.get("jsonl_mtime_ns") != stat.st_mtime_ns:
+        return None
+    outcomes_raw = raw.get("outcomes")
+    if not isinstance(outcomes_raw, dict):
+        return None
+    try:
+        return {int(k): bool(v) for k, v in outcomes_raw.items()}
+    except (TypeError, ValueError):
+        return None
+
+
+def _write_outcomes_sidecar(
+    *, run_dir: Path, jsonl_path: Path, outcomes: dict[int, bool]
+) -> None:
+    """Atomically write the outcomes sidecar; silently ignore write failures."""
+    try:
+        stat = jsonl_path.stat()
+    except OSError:
+        return
+    sidecar = run_dir / _OUTCOMES_SIDECAR_NAME
+    payload = {
+        "jsonl_size": stat.st_size,
+        "jsonl_mtime_ns": stat.st_mtime_ns,
+        "outcomes": {str(k): bool(v) for k, v in outcomes.items()},
+    }
+    try:
+        tmp = sidecar.with_suffix(".tmp")
+        tmp.write_bytes(orjson.dumps(payload))
+        tmp.replace(sidecar)
+    except OSError:
+        logger.exception("Failed to write %s", sidecar)
 
 
 def _load_round_outcomes(run_dir: Path, scenario_name: str) -> dict[int, bool]:
-    """Replay events for ``run_dir`` and return per-round success outcomes (cached)."""
+    """Return per-round success outcomes, hitting memory + disk caches before replay.
+
+    Lookup order:
+      1. ``_outcomes_cache`` (in-process memo).
+      2. ``round_outcomes_cache.json`` sidecar (mtime + size key).
+      3. Full JSONL replay + populate both caches + write the sidecar.
+    """
     cached = _outcomes_cache.get(run_dir)
     if cached is not None:
         return cached
     log_path = run_dir / f"{scenario_name}.jsonl"
     if not log_path.exists():
         return {}
+    disk_cached = _read_outcomes_sidecar(run_dir=run_dir, jsonl_path=log_path)
+    if disk_cached is not None:
+        _outcomes_cache[run_dir] = disk_cached
+        return disk_cached
     events = asyncio.run(load_events(log_path=log_path))
     agent_configs = extract_agent_configs(events=events)
     outcomes = _compute_round_outcomes(events=events, agent_configs=agent_configs)
     _outcomes_cache[run_dir] = outcomes
+    _write_outcomes_sidecar(run_dir=run_dir, jsonl_path=log_path, outcomes=outcomes)
     return outcomes
 
 
