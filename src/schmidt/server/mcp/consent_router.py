@@ -18,6 +18,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 
+from schmidt.db.local_tenant import LOCAL_GROUP_SLUG
 from schmidt.db.queries import get_group_by_id, get_group_by_slug
 from schmidt.server.identity.clerk_verifier import InvalidClerkToken, verify_clerk_session_token
 from schmidt.server.identity.settings import IdentitySettings
@@ -154,7 +155,12 @@ async def whoami(request: Request) -> WhoAmIResponse:
     if group_id is None:
         raise HTTPException(status_code=401, detail="Invalid or expired access token")
 
-    async with request.app.state.db_pool.connection() as conn:
+    pool = request.app.state.db_pool
+    if pool is None:
+        # No-database local mode: every token is bound to the local group.
+        return WhoAmIResponse(group_id=str(group_id), group_slug=LOCAL_GROUP_SLUG)
+
+    async with pool.connection() as conn:
         group = await get_group_by_id(conn=conn, group_id=group_id)
     if group is None:
         raise HTTPException(status_code=404, detail="Token bound to unknown group")

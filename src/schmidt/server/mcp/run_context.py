@@ -19,10 +19,14 @@ logger = logging.getLogger(__name__)
 
 
 class RunContext(NamedTuple):
-    """Resolved per-request state for an MCP tool call."""
+    """Resolved per-request state for an MCP tool call.
+
+    ``pool`` is ``None`` in no-database local mode, where tools fall back to
+    the filesystem-backed run helpers.
+    """
 
     runs_dir: Path
-    pool: DbPool
+    pool: DbPool | None
     group_id: UUID
     group_slug: str
 

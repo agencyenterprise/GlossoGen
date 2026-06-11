@@ -22,16 +22,6 @@ from schmidt.db.queries import (
 logger = logging.getLogger(__name__)
 
 
-def _resolve_async_conninfo() -> str:
-    """Return a psycopg3 conninfo string from ``DATABASE_URL``.
-
-    ``psycopg.AsyncConnection.connect`` is happy with the plain
-    ``postgresql://`` URL, no SQLAlchemy-style ``+psycopg`` scheme is needed
-    here.
-    """
-    return get_database_url()
-
-
 async def register_run_standalone(
     group_slug: str,
     scenario: str,
@@ -45,9 +35,13 @@ async def register_run_standalone(
     """Open a one-shot connection and insert a ``runs`` row.
 
     Raises if the group slug is unknown — that's a misconfiguration and the
-    subprocess should abort rather than silently lose ownership info.
+    subprocess should abort rather than silently lose ownership info. No-op in
+    no-database local mode (``DATABASE_URL`` unset): the run directory on disk
+    is itself the registration, surfaced by the filesystem listing.
     """
-    conninfo = _resolve_async_conninfo()
+    conninfo = get_database_url()
+    if conninfo is None:
+        return
     async with await psycopg.AsyncConnection.connect(conninfo=conninfo) as conn:
         group = await get_group_by_slug(conn=conn, slug=group_slug)
         if group is None:
@@ -84,9 +78,12 @@ async def register_run_if_absent_standalone(
     """Same as ``register_run_standalone`` but idempotent.
 
     Returns True if a row was inserted, False if one was already present.
-    Used by the backfill script to skip already-indexed runs.
+    Used by the backfill script to skip already-indexed runs. Returns False in
+    no-database local mode (``DATABASE_URL`` unset): there is no index to write.
     """
-    conninfo = _resolve_async_conninfo()
+    conninfo = get_database_url()
+    if conninfo is None:
+        return False
     async with await psycopg.AsyncConnection.connect(conninfo=conninfo) as conn:
         group = await get_group_by_slug(conn=conn, slug=group_slug)
         if group is None:
@@ -117,8 +114,13 @@ async def update_run_status_standalone(
     the terminal status (e.g. ``scenario_complete``) when the simulation
     finishes. Without this call, every run produced by the local CLI sits
     indefinitely at ``starting``, hiding from the FE's completed-runs view.
+
+    No-op in no-database local mode (``DATABASE_URL`` unset): the filesystem
+    listing infers run status directly from the JSONL and manifests.
     """
-    conninfo = _resolve_async_conninfo()
+    conninfo = get_database_url()
+    if conninfo is None:
+        return
     async with await psycopg.AsyncConnection.connect(conninfo=conninfo) as conn:
         await update_run_status(
             conn=conn,

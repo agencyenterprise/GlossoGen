@@ -186,9 +186,7 @@ def _read_outcomes_sidecar(*, run_dir: Path, jsonl_path: Path) -> dict[int, bool
         return None
 
 
-def _write_outcomes_sidecar(
-    *, run_dir: Path, jsonl_path: Path, outcomes: dict[int, bool]
-) -> None:
+def _write_outcomes_sidecar(*, run_dir: Path, jsonl_path: Path, outcomes: dict[int, bool]) -> None:
     """Atomically write the outcomes sidecar; silently ignore write failures."""
     try:
         stat = jsonl_path.stat()

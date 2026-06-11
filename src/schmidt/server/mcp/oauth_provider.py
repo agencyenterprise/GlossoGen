@@ -31,13 +31,14 @@ from mcp.server.auth.provider import (
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from pydantic import AnyUrl
 
+from schmidt.server.mcp.oauth_records import PendingConsentRequest
 from schmidt.server.mcp.oauth_storage import (
     ACCESS_TOKEN_LIFETIME,
     AUTHORIZATION_CODE_LIFETIME,
     REFRESH_TOKEN_LIFETIME,
     OAuthStorage,
-    PendingConsentRequest,
 )
+from schmidt.server.mcp.oauth_storage_port import OAuthStoragePort
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class SchmidtOAuthProvider:
 
     def __init__(
         self,
-        storage: OAuthStorage,
+        storage: OAuthStoragePort,
         get_local_group_id: Callable[[], UUID],
         is_local_mode: bool,
         frontend_consent_url: str,

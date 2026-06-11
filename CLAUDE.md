@@ -192,7 +192,7 @@ cp .env.example .env
 | `ANTHROPIC_API_KEY` | Yes (for simulations) | Anthropic API key |
 | `OPENAI_API_KEY` | Optional | OpenAI API key |
 | `HF_TOKEN` | Optional | HuggingFace token |
-| `DATABASE_URL` | Yes | Postgres connection string used by the tenancy + runs index (e.g. `postgresql://localhost:5432/schmidt_dev`). |
+| `DATABASE_URL` | No (local) / Yes (Clerk/prod) | Postgres connection string for the tenancy + runs index (e.g. `postgresql://localhost:5432/schmidt_dev`). Leave unset or blank for no-database local mode (runs index derived from the filesystem, OAuth state in memory). Required for Clerk multi-tenant auth and production. |
 | `CLERK_SECRET_KEY` | Yes (Clerk mode) | Clerk backend secret. If unset, the server boots in single-tenant **local mode** (every request runs as `local-user` in the `local` group). |
 | `CLERK_PUBLISHABLE_KEY` | Yes (Clerk mode) | Clerk publishable key (mirrors `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`). |
 | `CLERK_JWT_KEY` | Yes (Clerk mode) | PEM public key from the Clerk dashboard. Used for networkless JWT verification. |

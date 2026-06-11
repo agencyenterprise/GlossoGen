@@ -13,6 +13,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
+from schmidt.db.local_tenant import LOCAL_GROUP_ID
 from schmidt.db.pool import close_pool, create_pool, get_database_url
 from schmidt.server.error_logging_handlers import register_error_logging_handlers
 from schmidt.server.identity.bootstrap import ensure_local_group
@@ -21,8 +22,10 @@ from schmidt.server.identity.settings import load_identity_settings
 from schmidt.server.identity.webhook_router import router as clerk_webhook_router
 from schmidt.server.mcp.browser import mount_mcp_browser
 from schmidt.server.mcp.consent_router import router as mcp_consent_router
+from schmidt.server.mcp.in_memory_oauth_storage import InMemoryOAuthStorage
 from schmidt.server.mcp.oauth_provider import SchmidtOAuthProvider
 from schmidt.server.mcp.oauth_storage import OAuthStorage
+from schmidt.server.mcp.oauth_storage_port import OAuthStoragePort
 from schmidt.server.pdf.router import router as pdf_export_router
 from schmidt.server.response_models import HealthResponse, HealthStatus
 from schmidt.server.runs.bundle_router import router as bundle_router
@@ -87,7 +90,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     db_pool = await create_pool(database_url=get_database_url(), min_size=1, max_size=10)
     app.state.db_pool = db_pool
-    app.state.local_group_id = await ensure_local_group(pool=db_pool)
+    if db_pool is None:
+        if not _identity_settings.is_local_mode:
+            raise RuntimeError(
+                "DATABASE_URL is unset but CLERK_SECRET_KEY is set. Clerk "
+                "multi-tenant auth requires Postgres; set DATABASE_URL, or unset "
+                "CLERK_SECRET_KEY to run in no-database local mode."
+            )
+        app.state.local_group_id = LOCAL_GROUP_ID
+        logger.info("Running without a database (no-DB local mode)")
+    else:
+        app.state.local_group_id = await ensure_local_group(pool=db_pool)
     app.state.identity_settings = _identity_settings
     if _identity_settings.is_local_mode:
         logger.info("Running in local mode (CLERK_SECRET_KEY unset)")
@@ -129,9 +142,12 @@ app.include_router(clerk_webhook_router)
 # MCP server with OAuth. Requires OAUTH_ISSUER_URL to be set. The OAuth
 # storage and provider read the DB pool / local group UUID via lazy getters
 # so they survive being constructed at module load before lifespan runs.
-_oauth_storage: OAuthStorage | None = None
+_oauth_storage: OAuthStoragePort | None = None
 if _oauth_issuer_url is not None:
-    _oauth_storage = OAuthStorage(get_pool=lambda: app.state.db_pool)
+    if get_database_url() is None:
+        _oauth_storage = InMemoryOAuthStorage()
+    else:
+        _oauth_storage = OAuthStorage(get_pool=lambda: app.state.db_pool)
     _mcp_issuer_url = f"{_oauth_issuer_url}/mcp"
     _frontend_consent_url = f"{_resolve_frontend_url()}/mcp-consent"
     _oauth_provider = SchmidtOAuthProvider(

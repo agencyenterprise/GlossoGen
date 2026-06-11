@@ -12,7 +12,6 @@ import logging
 import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import NamedTuple
 from uuid import UUID
 
 from mcp.server.auth.provider import AccessToken, AuthorizationCode, RefreshToken
@@ -20,6 +19,12 @@ from mcp.shared.auth import OAuthClientInformationFull
 from pydantic import AnyUrl
 
 from schmidt.db.pool import DbPool
+from schmidt.server.mcp.oauth_records import (
+    AccessTokenWithGroup,
+    AuthorizationCodeWithGroup,
+    PendingConsentRequest,
+    RefreshTokenWithGroup,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,44 +37,6 @@ ACCESS_TOKEN_LIFETIME = 3600  # 1 hour
 REFRESH_TOKEN_LIFETIME = 30 * 24 * 3600  # 30 days
 AUTHORIZATION_CODE_LIFETIME = 600  # 10 minutes
 PENDING_CONSENT_LIFETIME = 600  # 10 minutes
-
-
-class AuthorizationCodeWithGroup(NamedTuple):
-    """An authorization code plus the group_id chosen at consent time."""
-
-    code: AuthorizationCode
-    group_id: UUID
-
-
-class RefreshTokenWithGroup(NamedTuple):
-    """A refresh token plus its group_id."""
-
-    token: RefreshToken
-    group_id: UUID
-
-
-class AccessTokenWithGroup(NamedTuple):
-    """An access token plus its group_id."""
-
-    token: AccessToken
-    group_id: UUID
-
-
-class PendingConsentRequest(NamedTuple):
-    """OAuth authorization request waiting for Clerk-gated consent.
-
-    Stored by ``authorize()`` in Clerk mode and consumed by the consent
-    approval endpoint once the user has signed in and chosen a group.
-    """
-
-    request_id: str
-    client_id: str
-    scopes: list[str]
-    code_challenge: str
-    redirect_uri: str
-    redirect_uri_provided_explicitly: bool
-    resource: str | None
-    state: str | None
 
 
 class OAuthStorage:

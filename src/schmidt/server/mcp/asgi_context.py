@@ -13,6 +13,7 @@ from pathlib import Path
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from schmidt.db.local_tenant import LOCAL_GROUP_SLUG
 from schmidt.db.pool import DbPool
 from schmidt.db.queries import get_group_by_id
 from schmidt.server.mcp.oauth_provider import SchmidtOAuthProvider
@@ -28,7 +29,7 @@ class McpRunContextMiddleware:
         self,
         app: ASGIApp,
         oauth_provider: SchmidtOAuthProvider,
-        get_pool: Callable[[], DbPool],
+        get_pool: Callable[[], DbPool | None],
         get_runs_dir: Callable[[], Path],
     ) -> None:
         self.app = app
@@ -45,17 +46,29 @@ class McpRunContextMiddleware:
             group_id = await self.oauth_provider.load_access_token_with_group(token=token)
             if group_id is not None:
                 pool = self.get_pool()
-                async with pool.connection() as conn:
-                    group = await get_group_by_id(conn=conn, group_id=group_id)
-                if group is not None:
+                if pool is None:
+                    # No-database local mode: the token is bound to the single
+                    # local group, so the slug is the constant — no DB lookup.
                     set_run_context(
                         RunContext(
                             runs_dir=self.get_runs_dir(),
-                            pool=pool,
+                            pool=None,
                             group_id=group_id,
-                            group_slug=group.slug,
+                            group_slug=LOCAL_GROUP_SLUG,
                         )
                     )
+                else:
+                    async with pool.connection() as conn:
+                        group = await get_group_by_id(conn=conn, group_id=group_id)
+                    if group is not None:
+                        set_run_context(
+                            RunContext(
+                                runs_dir=self.get_runs_dir(),
+                                pool=pool,
+                                group_id=group_id,
+                                group_slug=group.slug,
+                            )
+                        )
         await self.app(scope, receive, send)
 
 

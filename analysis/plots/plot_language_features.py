@@ -59,7 +59,7 @@ _COHORTS: tuple[_ScenarioCohort, ...] = (
     _ScenarioCohort(
         name="veyru",
         display_name="Veyru",
-        required_labels=("random_seed", ),
+        required_labels=("random_seed",),
         color=_VEYRU_COLOR,
     ),
     _ScenarioCohort(
