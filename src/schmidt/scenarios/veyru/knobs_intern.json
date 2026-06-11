@@ -1,6 +1,7 @@
 {
   "announce_swap": false,
   "channel_noise_level": 0.0,
+  "easy_round_numbers": [],
   "intern_enabled": true,
   "intern_join_round": 3,
   "intern_takeover_round": 8,
