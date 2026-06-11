@@ -21,10 +21,13 @@ export function NoteEditorModal({
 
   const mutation = useMutation({
     mutationFn: async (text: string) => {
-      await api.PUT("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/note", {
+      const { error } = await api.PUT("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/note", {
         params: { path: splitRunId(runId) },
         body: { content: text },
       });
+      if (error) {
+        throw new Error(`Failed to save note (${JSON.stringify(error)})`);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["runs"] });
@@ -72,6 +75,9 @@ export function NoteEditorModal({
             />
           </div>
           <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-2.5">
+            {mutation.isError ? (
+              <span className="mr-auto text-xs text-red-500">{mutation.error.message}</span>
+            ) : null}
             <button
               type="button"
               className="rounded-md px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted"

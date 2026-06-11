@@ -155,14 +155,25 @@ api.use({
   async onRequest({ request }) {
     const substituted = substituteGroupSlug(request.url);
     assertGroupSlugSubstituted(substituted);
-    let outgoing = request;
-    if (substituted !== request.url) {
-      outgoing = new Request(substituted, request);
-    }
     const token = await getClerkSessionToken();
+
+    const headers = new Headers(request.headers);
     if (token) {
-      outgoing.headers.set("Authorization", `Bearer ${token}`);
+      headers.set("Authorization", `Bearer ${token}`);
     }
-    return outgoing;
+
+    // Rebuild the request explicitly rather than via ``new Request(url,
+    // request)``: that form transfers the body stream and drops it for
+    // bodied requests in some browsers, so PUT/POST payloads arrive empty and
+    // the backend 422s. Capturing the body bytes here preserves it reliably.
+    const hasBody = request.method !== "GET" && request.method !== "HEAD";
+    const body = hasBody ? await request.arrayBuffer() : undefined;
+    return new Request(substituted, {
+      method: request.method,
+      headers,
+      body,
+      signal: request.signal,
+      credentials: request.credentials,
+    });
   },
 });
