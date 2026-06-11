@@ -1,9 +1,10 @@
-"""Postgres-backed listing of runs owned by a group.
+"""Listing of runs owned by a group.
 
-Replaces the filesystem walk in ``discover_runs`` for the request path: the
-Postgres ``runs`` table holds the authoritative set of runs per group, and
-``build_summary`` reads the per-run on-disk summary cache (or scans the JSONL
-on a miss) to produce the enriched ``RunSummary`` rows the API returns.
+With Postgres, the ``runs`` table holds the authoritative set of runs per group
+and ``build_summary`` enriches each row from the per-run on-disk summary cache.
+In no-database local mode (``pool`` is ``None``) the listing falls back to
+``discover_runs``, scanning the filesystem directly — the single ``local`` group
+owns every run, so no ownership filter is needed.
 """
 
 import asyncio
@@ -15,7 +16,7 @@ from fastapi import Request
 
 from schmidt.db.pool import DbPool
 from schmidt.db.queries import list_runs_for_group as db_list_runs_for_group
-from schmidt.server.runs.discovery import build_summary
+from schmidt.server.runs.discovery import build_summary, discover_runs
 from schmidt.server.runs.lookup import get_identity
 from schmidt.server.runs.models import RunSummary
 
@@ -26,7 +27,7 @@ _LIST_LIMIT = 10_000
 
 
 async def list_runs_owned_by_group(
-    pool: DbPool,
+    pool: DbPool | None,
     runs_dir: Path,
     group_id: UUID,
     scenario_filter: str | None,
@@ -34,8 +35,16 @@ async def list_runs_owned_by_group(
     """Core listing primitive: DB query + per-row on-disk enrichment.
 
     Used by both the REST route wrapper (``list_runs_for_group``) and the MCP
-    tool layer, which has no FastAPI ``Request`` to pull state from.
+    tool layer, which has no FastAPI ``Request`` to pull state from. When
+    ``pool`` is ``None`` (no-database local mode) the runs are discovered from
+    the filesystem instead.
     """
+    if pool is None:
+        summaries = await discover_runs(runs_dir=runs_dir)
+        if scenario_filter is None:
+            return summaries
+        return [s for s in summaries if s.scenario_name == scenario_filter]
+
     async with pool.connection() as conn:
         rows = await db_list_runs_for_group(
             conn=conn,

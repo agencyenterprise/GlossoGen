@@ -12,7 +12,7 @@ A platform for testing agent communication through real-life simulations. LLM-ba
 - **Node.js ≥ 22** (for the frontend)
 - **[uv](https://docs.astral.sh/uv/)** — Python package manager
 - **make**, **git**
-- **Postgres ≥ 14** — the backend stores tenancy info and the runs index in Postgres. On macOS: `brew install postgresql@16 && brew services start postgresql@16`. On Debian/Ubuntu: `apt-get install postgresql`.
+- **Postgres ≥ 14** — *optional for local dev.* Leave `DATABASE_URL` unset to run in zero-setup no-database local mode (the runs index is derived from the filesystem and OAuth state is held in memory). Postgres is required only for Clerk multi-tenant auth / production. On macOS: `brew install postgresql@16 && brew services start postgresql@16`. On Debian/Ubuntu: `apt-get install postgresql`.
 - **System libraries for weasyprint** (PDF export). On macOS: `brew install pango cairo gdk-pixbuf libffi`. On Debian/Ubuntu: `apt-get install libpango-1.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0`.
 
 ### Install dependencies
@@ -23,9 +23,11 @@ make install-server     # backend only (uv sync)
 make install-frontend   # frontend only (npm ci)
 ```
 
-### Local Postgres
+### Local Postgres (optional)
 
-The backend requires a Postgres database to hold the tenancy tables (groups, runs index, OAuth state). Create a role, a local database owned by that role, and point the backend at it.
+By default the backend runs in **no-database local mode** — leave `DATABASE_URL` unset and skip this entire section. The runs index is derived from the `runs/` directory on disk and MCP OAuth tokens are held in memory (they reset on restart, which just means re-authenticating the MCP client).
+
+Set up Postgres only if you want the Postgres-backed runs index locally, or to run Clerk multi-tenant auth. Create a role, a local database owned by that role, and point the backend at it via `DATABASE_URL`.
 
 ```bash
 # 1. Create a Postgres role (one-time). On macOS/Homebrew a superuser role
@@ -58,7 +60,7 @@ To reset the database, drop and recreate it: `dropdb schmidt_dev && createdb -O 
 cp .env.example .env
 ```
 
-See `.env.example` for all available variables (API keys, authentication, CORS). At minimum, set `ANTHROPIC_API_KEY` and `DATABASE_URL` (point it at the database you just created, including the role's credentials if you set a password — the default in `.env.example` matches the no-credentials Homebrew recipe above).
+See `.env.example` for all available variables (API keys, authentication, CORS). At minimum, set `ANTHROPIC_API_KEY`. Leave `DATABASE_URL` unset for no-database local mode, or set it to the Postgres database you created above (including the role's credentials if you set a password) to use the Postgres-backed runs index.
 
 ## Running a Simulation
 
@@ -327,7 +329,7 @@ A FastAPI backend + Next.js frontend for browsing simulation runs. The frontend 
 
 The backend uses **Clerk** for multi-tenant authentication. Each Clerk organization corresponds to a study group; every run is owned by exactly one group and never shared across groups except via the export/import flow.
 
-* **Local mode (default for dev clones):** leave `CLERK_SECRET_KEY` unset on the backend and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` unset on the frontend. The backend's identity middleware short-circuits every request to a synthetic `local` group / `local-user`; the frontend renders without a sign-in flow. Postgres is still required (the `local` group + `runs` index live there).
+* **Local mode (default for dev clones):** leave `CLERK_SECRET_KEY` unset on the backend and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` unset on the frontend. The backend's identity middleware short-circuits every request to a synthetic `local` group / `local-user`; the frontend renders without a sign-in flow. With `DATABASE_URL` also unset, the backend runs with no database at all — the runs index comes from the filesystem and OAuth state is in memory. (Setting `DATABASE_URL` keeps local mode but stores the `local` group + `runs` index in Postgres.)
 * **Clerk mode (prod / hosted):** set Clerk env vars on both sides plus `CLERK_WEBHOOK_SECRET` so the backend can keep its local `groups` table in sync with Clerk org create/update/delete events. The frontend mounts `<ClerkProvider>` and Clerk's middleware redirects unauthenticated traffic to `/sign-in`. API requests carry the Clerk session token as the Bearer header; the backend reads the active group from the URL slug (`/api/g/{slug}/...`) and validates membership against the JWT.
 
 The active group is identified by the URL slug — `/g/team-a/runs/...` on the frontend hits `/api/g/team-a/runs/...` on the backend. The identity middleware accepts the request only if the user's Clerk session has `team-a` as the active org.

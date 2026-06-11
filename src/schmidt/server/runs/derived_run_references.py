@@ -3,7 +3,9 @@
 Walks the Postgres ``runs`` table for every row whose ``source_run_scenario``
 / ``source_run_dir_name`` columns point at the run currently being viewed,
 then enriches each child with manifest-derived boundary info and the eval
-report's headline ``round_success*`` measurements.
+report's headline ``round_success*`` measurements. In no-database local mode
+(``pool`` is ``None``) the same children are found by scanning the filesystem
+and matching each run's manifest-derived source against the parent.
 """
 
 import asyncio
@@ -17,8 +19,15 @@ import orjson
 from schmidt.db.pool import DbPool
 from schmidt.db.queries import list_children_of_run
 from schmidt.evaluation.reports.evaluation_report import load_report
-from schmidt.server.runs.discovery import build_summary
-from schmidt.server.runs.models import DerivedRunReference, HeadlineMeasurement
+from schmidt.server.runs.discovery import build_summary, discover_runs
+from schmidt.server.runs.models import DerivedRunReference, HeadlineMeasurement, RunSummary
+
+
+class _ChildRunId(NamedTuple):
+    """A child run's ``(scenario, run_dir_name)`` identity."""
+
+    scenario: str
+    run_dir_name: str
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +56,7 @@ class _DerivationFields(NamedTuple):
 
 async def build_derived_run_references(
     *,
-    pool: DbPool,
+    pool: DbPool | None,
     runs_dir: Path,
     group_id: UUID,
     parent_scenario: str,
@@ -56,30 +65,78 @@ async def build_derived_run_references(
     """Return one reference per child run, newest first.
 
     Returns an empty list when no children exist or when the parent has
-    never been used as a derivation source.
+    never been used as a derivation source. In no-database local mode
+    (``pool`` is ``None``) children are discovered from the filesystem.
     """
-    async with pool.connection() as conn:
-        rows = await list_children_of_run(
-            conn=conn,
-            group_id=group_id,
+    if pool is None:
+        child_ids = await _find_children_on_disk(
+            runs_dir=runs_dir,
             parent_scenario=parent_scenario,
             parent_run_dir_name=parent_run_dir_name,
         )
-    if not rows:
+    else:
+        async with pool.connection() as conn:
+            rows = await list_children_of_run(
+                conn=conn,
+                group_id=group_id,
+                parent_scenario=parent_scenario,
+                parent_run_dir_name=parent_run_dir_name,
+            )
+        child_ids = [
+            _ChildRunId(scenario=row.scenario, run_dir_name=row.run_dir_name) for row in rows
+        ]
+    if not child_ids:
         return []
 
     tasks = [
         asyncio.create_task(
             _build_reference(
-                scenario=row.scenario,
-                run_dir_name=row.run_dir_name,
+                scenario=child.scenario,
+                run_dir_name=child.run_dir_name,
                 runs_dir=runs_dir,
             )
         )
-        for row in rows
+        for child in child_ids
     ]
     results = await asyncio.gather(*tasks)
     return [ref for ref in results if ref is not None]
+
+
+async def _find_children_on_disk(
+    *,
+    runs_dir: Path,
+    parent_scenario: str,
+    parent_run_dir_name: str,
+) -> list[_ChildRunId]:
+    """Scan every run dir and return those whose derivation source is the parent.
+
+    Reuses ``discover_runs`` enrichment, which already reads each run's
+    manifest into the summary's source fields, so no manifest is re-parsed here.
+    """
+    parent_run_id = f"{parent_scenario}/{parent_run_dir_name}"
+    summaries = await discover_runs(runs_dir=runs_dir)
+    children: list[_ChildRunId] = []
+    for summary in summaries:
+        if _source_run_id(summary=summary) != parent_run_id:
+            continue
+        scenario, run_dir_name = summary.run_id.split("/", 1)
+        children.append(_ChildRunId(scenario=scenario, run_dir_name=run_dir_name))
+    return children
+
+
+def _source_run_id(summary: RunSummary) -> str | None:
+    """Return the timeline parent's run id for a derived run, else ``None``.
+
+    Cross-run derivations use source A (the timeline parent), matching the
+    convention in the runs-index registration path.
+    """
+    if summary.replace_agent_source is not None:
+        return summary.replace_agent_source.source_run_id
+    if summary.resume_at_round_source is not None:
+        return summary.resume_at_round_source.source_run_id
+    if summary.cross_run_replace_agent_source is not None:
+        return summary.cross_run_replace_agent_source.source_a_run_id
+    return None
 
 
 async def _build_reference(

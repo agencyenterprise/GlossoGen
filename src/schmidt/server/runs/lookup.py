@@ -46,10 +46,21 @@ async def resolve_run_or_404(
 
     A run row without files on disk indicates a partially deleted run or a
     cross-host filesystem inconsistency; both cases surface as 404.
+
+    In no-database local mode (``pool`` is ``None``) the single ``local`` group
+    owns every run, so ownership is resolved purely by on-disk existence.
     """
     runs_dir: Path = request.app.state.runs_dir
     pool = request.app.state.db_pool
     identity = get_identity(request=request)
+
+    run_dir = runs_dir / scenario / run_dir_name
+    jsonl_path = run_dir / f"{scenario}.jsonl"
+
+    if pool is None:
+        if not run_dir.is_dir() or not jsonl_path.exists():
+            raise HTTPException(status_code=404, detail="Run not found")
+        return ResolvedRun(run_dir=run_dir, scenario_name=scenario)
 
     async with pool.connection() as conn:
         row = await get_run(
@@ -61,8 +72,6 @@ async def resolve_run_or_404(
     if row is None:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    run_dir = runs_dir / scenario / run_dir_name
-    jsonl_path = run_dir / f"{scenario}.jsonl"
     if not run_dir.is_dir() or not jsonl_path.exists():
         logger.warning(
             "Run row %s/%s present in DB but missing on disk at %s",
@@ -93,8 +102,13 @@ async def register_new_run(
     Always strict: callers must only invoke this when the run dir is
     actually new on this host. Idempotent endpoints (bundle import) check
     for an existing row beforehand and skip the call when re-importing.
+
+    No-op in no-database local mode (``pool`` is ``None``): the run directory
+    on disk is itself the registration, surfaced by the filesystem listing.
     """
     pool = request.app.state.db_pool
+    if pool is None:
+        return
     identity = get_identity(request=request)
     created_by = None if identity.is_local_mode else identity.user_id
     async with pool.connection() as conn:
