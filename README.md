@@ -1,6 +1,6 @@
-# schmidt-poc
+# Emergent Comms
 
-A platform for testing agent communication through real-life simulations. LLM-based agents run as independent Claude Code processes connected via MCP. Agents decide when to speak; a game clock manages round progression and injects scenario events. All interactions are logged for post-hoc evaluation. A web UI displays simulation runs and evaluation results.
+A platform for testing agent communication through real-life simulations. Agents decide when to speak; a game clock manages round progression and injects scenario events. All interactions are logged for post-hoc evaluation. A web UI displays simulation runs and evaluation results.
 
 ![Platform overview](images/platform_overview.webp)
 
