@@ -55,6 +55,20 @@ async function getClerkSessionToken(): Promise<string | null> {
   }
 }
 
+/**
+ * Mode-safe ``Authorization`` header for raw ``fetch`` calls that can't go
+ * through openapi-fetch (e.g. multipart uploads). Returns a bearer header in
+ * Clerk mode and an empty object in local mode (where the backend's identity
+ * middleware supplies the synthetic local identity).
+ */
+export async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getClerkSessionToken();
+  if (token) {
+    return { Authorization: `Bearer ${token}` };
+  }
+  return {};
+}
+
 function substituteGroupSlug(url: string): string {
   if (_activeGroupSlug === null) return url;
   const encoded = encodeURIComponent(_activeGroupSlug);
