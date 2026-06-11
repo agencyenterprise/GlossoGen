@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { McpConfigModal } from "@/features/mcp-config/mcp-config-modal";
 import { RunList } from "@/features/runs/run-list";
-import { API_URL } from "@/shared/lib/api-client";
+import { API_URL, authHeaders } from "@/shared/lib/api-client";
 import { useActiveGroupSlug, useGroupPath } from "@/features/auth/group-context";
 
 export default function RunsPage() {
@@ -32,6 +32,7 @@ export default function RunsPage() {
           // eslint-disable-next-line no-restricted-globals -- multipart file upload not supported by openapi-fetch
           const resp = await fetch(`${API_URL}/api/g/${groupSlug}/runs/import`, {
             method: "POST",
+            headers: await authHeaders(),
             body: formData,
           });
           if (!resp.ok) {
