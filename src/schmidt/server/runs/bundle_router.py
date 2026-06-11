@@ -87,6 +87,30 @@ def build_bundle_bytes(
     return buffer.getvalue()
 
 
+def _read_origin_run_id(run_dir: Path, scenario_name: str, fallback: str) -> str:
+    """Return the run's immutable identity from the JSONL's SimulationStarted event.
+
+    The directory name can drift from this identity after a collision-rename on
+    a prior import, so the bundle must record the JSONL run_id (not the dir
+    name) to stay importable across machines. Falls back to ``fallback`` if the
+    JSONL can't be read or its first event isn't a SimulationStarted.
+    """
+    jsonl_path = run_dir / f"{scenario_name}.jsonl"
+    try:
+        with jsonl_path.open("rb") as handle:
+            for line in handle:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                event = parse_event_bytes(raw_bytes=stripped)
+                if isinstance(event, SimulationStarted):
+                    return event.run_id
+                break
+    except Exception:
+        logger.exception("Failed to read origin run_id from %s", jsonl_path)
+    return fallback
+
+
 @router.get(
     "/runs/{scenario}/{run_dir_name}/export/bundle",
     responses={
@@ -108,7 +132,11 @@ async def export_run_bundle(
         run_dir_name=run_dir_name,
     )
 
-    run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
+    run_id = _read_origin_run_id(
+        run_dir=resolved.run_dir,
+        scenario_name=resolved.scenario_name,
+        fallback=compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name),
+    )
     original_timestamp = int(resolved.run_dir.name.split("_")[0])
 
     bundle_bytes = await asyncio.to_thread(
@@ -235,22 +263,30 @@ def _extract_and_validate_bundle(
                 detail=f"Bundle is missing {manifest.scenario_name}.jsonl",
             )
 
+        # The JSONL's run_id is the run's immutable identity. ``manifest.run_id``
+        # can legitimately differ from it when the exporting machine's run
+        # directory was renamed on a prior import (collision bumps the
+        # timestamp), so a mismatch is not a corruption signal — trust the
+        # JSONL and proceed.
         if jsonl_run_id != manifest.run_id:
-            raise HTTPException(
-                status_code=422,
-                detail="run_id in JSONL does not match bundle manifest",
+            logger.warning(
+                "Bundle manifest run_id %s differs from JSONL run_id %s "
+                "(run dir likely renamed on a prior import); using the JSONL run_id",
+                manifest.run_id,
+                jsonl_run_id,
             )
+        canonical_run_id = jsonl_run_id
 
-        existing_dir = existing_run_dirs.get(manifest.run_id)
+        existing_dir = existing_run_dirs.get(canonical_run_id)
         if existing_dir is not None:
             logger.info(
                 "Run %s already exists at %s — skipping extraction (idempotent import)",
-                manifest.run_id,
+                canonical_run_id,
                 existing_dir,
             )
             return _BundleImportOutcome(
                 response=ImportBundleResponse(
-                    run_id=manifest.run_id,
+                    run_id=canonical_run_id,
                     scenario_name=manifest.scenario_name,
                     run_dir=existing_dir,
                 ),
@@ -281,7 +317,7 @@ def _extract_and_validate_bundle(
 
     return _BundleImportOutcome(
         response=ImportBundleResponse(
-            run_id=manifest.run_id,
+            run_id=canonical_run_id,
             scenario_name=manifest.scenario_name,
             run_dir=str(target_dir),
         ),
