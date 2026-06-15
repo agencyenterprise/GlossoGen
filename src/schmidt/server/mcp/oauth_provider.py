@@ -74,10 +74,18 @@ class SchmidtOAuthProvider:
         return await self._storage.get_client(client_id=client_id)
 
     async def register_client(self, client_info: OAuthClientInformationFull) -> None:
-        """Register a new OAuth client with generated credentials."""
-        client_info.client_id = OAuthStorage.generate_client_id()
-        client_info.client_secret = OAuthStorage.generate_client_secret()
-        client_info.client_id_issued_at = int(time.time())
+        """Persist a dynamically registered OAuth client.
+
+        The MCP SDK's registration handler has already assigned the
+        ``client_id``, the issued-at timestamp, and a ``client_secret`` —
+        the latter only when ``token_endpoint_auth_method`` is not
+        ``"none"``. Public clients (PKCE-only loopback clients such as
+        Claude Code) register with ``token_endpoint_auth_method == "none"``
+        and therefore carry no secret; persisting ``client_info`` unchanged
+        keeps them secret-less so the token endpoint authenticates them via
+        PKCE alone instead of rejecting the exchange for a missing
+        ``client_secret``.
+        """
         await self._storage.save_client(client=client_info)
         logger.info("Registered OAuth client %s", client_info.client_id)
 

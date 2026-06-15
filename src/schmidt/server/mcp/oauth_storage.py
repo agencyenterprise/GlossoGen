@@ -29,8 +29,6 @@ from schmidt.server.mcp.oauth_records import (
 logger = logging.getLogger(__name__)
 
 _TOKEN_BYTES = 32
-_CLIENT_ID_BYTES = 16
-_CLIENT_SECRET_BYTES = 32
 
 # Default lifetimes in seconds.
 ACCESS_TOKEN_LIFETIME = 3600  # 1 hour
@@ -370,16 +368,6 @@ class OAuthStorage:
     def generate_token() -> str:
         """Generate a cryptographically random token string."""
         return secrets.token_urlsafe(_TOKEN_BYTES)
-
-    @staticmethod
-    def generate_client_id() -> str:
-        """Generate a random client ID."""
-        return secrets.token_urlsafe(_CLIENT_ID_BYTES)
-
-    @staticmethod
-    def generate_client_secret() -> str:
-        """Generate a random client secret."""
-        return secrets.token_urlsafe(_CLIENT_SECRET_BYTES)
 
 
 def _epoch_to_dt(epoch: float | int | None) -> datetime | None:
