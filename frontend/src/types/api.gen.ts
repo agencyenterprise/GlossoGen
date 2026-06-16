@@ -17,10 +17,11 @@ export interface paths {
          *
          *     Filters: ``scenario`` keeps runs in any of the listed scenarios (OR
          *     semantics); ``labels`` keeps runs carrying every listed label (AND
-         *     semantics); ``status`` restricts to a final status; ``contains_agent_id``
-         *     keeps runs that registered that agent (used by the cross-run replace-agent
-         *     picker). ``offset``/``limit`` page the result; ``total`` is the count
-         *     matching the filters before paging.
+         *     semantics); ``run_id_contains`` keeps runs whose ``scenario/run_dir_name``
+         *     id contains the substring (case-insensitive); ``status`` restricts to a
+         *     final status; ``contains_agent_id`` keeps runs that registered that agent
+         *     (used by the cross-run replace-agent picker). ``offset``/``limit`` page the
+         *     result; ``total`` is the count matching the filters before paging.
          */
         get: operations["list_runs_api_g__group_slug__runs_get"];
         put?: never;
@@ -2071,6 +2072,7 @@ export interface operations {
                 contains_agent_id?: string | null;
                 status?: components["schemas"]["RunStatus"] | null;
                 labels?: string[] | null;
+                run_id_contains?: string | null;
                 offset?: number;
                 limit?: number;
             };

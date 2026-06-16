@@ -60,6 +60,7 @@ async def list_runs(
     contains_agent_id: str | None = None,
     status: RunStatus | None = None,
     labels: list[str] | None = Query(default=None),
+    run_id_contains: str | None = None,
     offset: int = 0,
     limit: int = 50,
 ) -> RunListResponse:
@@ -67,15 +68,17 @@ async def list_runs(
 
     Filters: ``scenario`` keeps runs in any of the listed scenarios (OR
     semantics); ``labels`` keeps runs carrying every listed label (AND
-    semantics); ``status`` restricts to a final status; ``contains_agent_id``
-    keeps runs that registered that agent (used by the cross-run replace-agent
-    picker). ``offset``/``limit`` page the result; ``total`` is the count
-    matching the filters before paging.
+    semantics); ``run_id_contains`` keeps runs whose ``scenario/run_dir_name``
+    id contains the substring (case-insensitive); ``status`` restricts to a
+    final status; ``contains_agent_id`` keeps runs that registered that agent
+    (used by the cross-run replace-agent picker). ``offset``/``limit`` page the
+    result; ``total`` is the count matching the filters before paging.
     """
     page = await list_runs_page_for_group(
         request=request,
         scenarios=scenario or [],
         labels=labels or [],
+        run_id_contains=run_id_contains,
         status=status,
         contains_agent_id=contains_agent_id,
         offset=offset,
