@@ -258,7 +258,20 @@ export function RunList() {
       },
     });
 
-  const runs = useMemo(() => (data?.pages ?? []).flatMap(page => page.runs), [data]);
+  const runs = useMemo(() => {
+    // Offset pagination can surface a boundary run on two adjacent pages when
+    // new runs are created between fetches (active polling + in-progress runs
+    // shift every offset). Dedupe by run_id, keeping the newest occurrence.
+    const byId = new Map<string, RunSummary>();
+    for (const page of data?.pages ?? []) {
+      for (const run of page.runs) {
+        if (!byId.has(run.run_id)) {
+          byId.set(run.run_id, run);
+        }
+      }
+    }
+    return [...byId.values()];
+  }, [data]);
   const totalRuns = data?.pages[0]?.total ?? 0;
   const allLabels = useMemo(() => labelsData?.labels ?? [], [labelsData]);
   const regularFilterLabels = useMemo(
