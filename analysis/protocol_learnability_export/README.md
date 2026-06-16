@@ -89,3 +89,9 @@ performance), `cross_family_observer`, then for each derived phase
 
 Means/std use the tab's semantics: mean over the phase's replicas, sample std (`ddof=1`)
 when `n ≥ 2` else `0.0`, and `None` when the phase has no replicas.
+
+**Supersession lineage.** Baselines in this cohort are re-run over time; each replacement is
+recorded in `runs/supersedes_map.csv` (`old_run_id,new_run_id`). A derived run's `src=`
+points at whichever baseline id was current when it ran, so the aggregate resolves each
+`src` through the chain to the head-of-chain (current) baseline before joining. Without this,
+re-run baselines would look childless and their derived runs orphaned.
