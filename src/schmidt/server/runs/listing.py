@@ -25,6 +25,7 @@ from schmidt.models.event import RunStatus
 from schmidt.server.runs.discovery import (
     RunDescriptor,
     build_summary,
+    compose_run_id,
     discover_run_descriptors,
     read_run_labels,
 )
@@ -110,6 +111,7 @@ async def list_runs_page(
     group_id: UUID,
     scenarios: list[str],
     labels: list[str],
+    run_id_contains: str | None,
     status: RunStatus | None,
     contains_agent_id: str | None,
     offset: int,
@@ -117,12 +119,14 @@ async def list_runs_page(
 ) -> PaginatedRuns:
     """Return one page of run summaries plus the total matching the filters.
 
-    Scenario and label filters are applied to descriptors before enrichment, so
-    the common path (no ``status`` / ``contains_agent_id`` filter) enriches only
-    the page. ``scenarios`` keeps runs whose scenario is in the set (OR
-    semantics; empty means all). ``status`` and ``contains_agent_id`` depend on
-    enriched fields, so when either is set every scenario/label-matching
-    candidate is enriched and filtered before the page is sliced.
+    Scenario, run-id, and label filters are applied to descriptors before
+    enrichment, so the common path (no ``status`` / ``contains_agent_id``
+    filter) enriches only the page. ``scenarios`` keeps runs whose scenario is
+    in the set (OR semantics; empty means all). ``run_id_contains`` keeps runs
+    whose ``scenario/run_dir_name`` id contains the substring (case-insensitive).
+    ``status`` and ``contains_agent_id`` depend on enriched fields, so when
+    either is set every descriptor-matching candidate is enriched and filtered
+    before the page is sliced.
     """
     descriptors = await enumerate_run_descriptors(
         pool=pool,
@@ -133,6 +137,14 @@ async def list_runs_page(
     if scenarios:
         wanted = frozenset(scenarios)
         descriptors = [d for d in descriptors if d.scenario_name in wanted]
+    if run_id_contains:
+        needle = run_id_contains.lower()
+        descriptors = [
+            d
+            for d in descriptors
+            if needle
+            in compose_run_id(scenario_name=d.scenario_name, run_dir_name=d.run_dir_name).lower()
+        ]
     if labels:
         required = frozenset(labels)
         descriptors = [
@@ -201,6 +213,7 @@ async def list_runs_page_for_group(
     request: Request,
     scenarios: list[str],
     labels: list[str],
+    run_id_contains: str | None,
     status: RunStatus | None,
     contains_agent_id: str | None,
     offset: int,
@@ -214,6 +227,7 @@ async def list_runs_page_for_group(
         group_id=identity.active_group_id,
         scenarios=scenarios,
         labels=labels,
+        run_id_contains=run_id_contains,
         status=status,
         contains_agent_id=contains_agent_id,
         offset=offset,

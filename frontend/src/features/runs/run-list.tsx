@@ -10,6 +10,7 @@ import {
   Package,
   Repeat,
   RotateCcw,
+  Search,
   StickyNote,
   Sword,
   Tag,
@@ -81,6 +82,8 @@ export function RunList() {
   const [noteModalRunId, setNoteModalRunId] = useState<string | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
   const [selectedScenarios, setSelectedScenarios] = useState<Set<string>>(new Set());
+  const [idSearch, setIdSearch] = useState("");
+  const [idSearchDebounced, setIdSearchDebounced] = useState("");
   const [modelsPopover, setModelsPopover] = useState<{
     left: number;
     top: number;
@@ -136,6 +139,11 @@ export function RunList() {
       return next;
     });
   }
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => setIdSearchDebounced(idSearch.trim()), 300);
+    return () => window.clearTimeout(handle);
+  }, [idSearch]);
 
   useEffect(() => {
     return () => {
@@ -221,7 +229,10 @@ export function RunList() {
 
   const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfiniteQuery({
-      queryKey: ["runs", { scenarios: scenarioFilter, labels: labelFilter }],
+      queryKey: [
+        "runs",
+        { scenarios: scenarioFilter, labels: labelFilter, runId: idSearchDebounced },
+      ],
       refetchOnMount: "always",
       initialPageParam: 0,
       queryFn: async ({ pageParam }) => {
@@ -232,6 +243,7 @@ export function RunList() {
               limit: PAGE_SIZE,
               scenario: scenarioFilter.length > 0 ? scenarioFilter : undefined,
               labels: labelFilter.length > 0 ? labelFilter : undefined,
+              run_id_contains: idSearchDebounced.length > 0 ? idSearchDebounced : undefined,
             },
           },
         });
@@ -282,7 +294,8 @@ export function RunList() {
     () => (scenariosData?.scenarios ?? []).map(s => s.scenario_name).sort(),
     [scenariosData]
   );
-  const hasActiveFilters = selectedLabels.size > 0 || selectedScenarios.size > 0;
+  const hasActiveFilters =
+    selectedLabels.size > 0 || selectedScenarios.size > 0 || idSearchDebounced.length > 0;
 
   if (isLoading) {
     return (
@@ -314,6 +327,27 @@ export function RunList() {
 
   return (
     <div className="space-y-6">
+      <div className="relative max-w-xs">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="text"
+          value={idSearch}
+          onChange={e => setIdSearch(e.target.value)}
+          placeholder="Search by run id…"
+          className="w-full rounded-md border border-border bg-background py-1.5 pl-8 pr-7 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+        />
+        {idSearch.length > 0 ? (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => setIdSearch("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <XCircle className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+      </div>
+
       {allScenarios.length > 1 ? (
         <div className="flex flex-wrap items-center gap-1.5">
           <Package className="h-3.5 w-3.5 text-muted-foreground" />
