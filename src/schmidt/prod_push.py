@@ -130,15 +130,30 @@ async def fetch_remote_run_ids(
     client: httpx.AsyncClient,
     credentials: Credentials,
 ) -> set[str]:
-    """Pull every run_id already present on the remote for the active group."""
-    response = await client.get(
-        url=f"{credentials.issuer_url}/api/g/{credentials.group_slug}/runs",
-        headers={"Authorization": f"Bearer {credentials.access_token}"},
-        timeout=_HTTP_TIMEOUT,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    return {entry["run_id"] for entry in payload["runs"]}
+    """Pull every run_id already present on the remote for the active group.
+
+    The remote ``/runs`` endpoint paginates at 50 rows per page by default,
+    so this walks pages until ``len(seen) >= total`` to gather every id.
+    """
+    seen: set[str] = set()
+    offset = 0
+    page_size = 500
+    while True:
+        response = await client.get(
+            url=f"{credentials.issuer_url}/api/g/{credentials.group_slug}/runs",
+            params={"offset": offset, "limit": page_size},
+            headers={"Authorization": f"Bearer {credentials.access_token}"},
+            timeout=_HTTP_TIMEOUT,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        page = payload["runs"]
+        seen.update(entry["run_id"] for entry in page)
+        total = payload["total"]
+        if len(seen) >= total or not page:
+            break
+        offset += len(page)
+    return seen
 
 
 def _make_bundle(*, run: _LocalRun) -> bytes:
