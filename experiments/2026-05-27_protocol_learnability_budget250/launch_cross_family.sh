@@ -19,30 +19,19 @@
 # `model=<baseline_short>` and `observer=<observer_short>` so the streamlit tab
 # can identify both ends of the swap.
 #
-# PRECONDITION: stabilization_judge.jinja must be pinned to its pre-e2f7cc7
-# state (commit 364987a) so round_success scores are comparable to the prior
-# 450 runs in this experiment. The script aborts if the working-tree hash does
-# not match.
+# NEVER check out or modify src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja
+# to an older version. veyru judges stabilization LIVE during the simulation, so the judge
+# prompt must always be at HEAD when running sims — pinning/altering it silently changes
+# round outcomes and corrupts every run launched against it.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/../.."
-
-JUDGE_PROMPT="src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja"
-EXPECTED_SHA="$(git rev-parse 364987a:$JUDGE_PROMPT)"
-ACTUAL_SHA="$(git hash-object $JUDGE_PROMPT)"
-if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
-  echo "ABORT: $JUDGE_PROMPT is not pinned to pre-e2f7cc7 state."
-  echo "  expected (364987a): $EXPECTED_SHA"
-  echo "  actual:             $ACTUAL_SHA"
-  echo "  Run: git checkout 364987a -- $JUDGE_PROMPT"
-  exit 1
-fi
 
 RUNS_DIR=runs
 REPLACE_KNOBS_CANON="$SCRIPT_DIR/replace_knobs.json"
 REPLACE_KNOBS_LEGACY="$SCRIPT_DIR/replace_knobs_legacy.json"
 LOG=/tmp/protolearn_cross_family.log
-CAP=6
+CAP=10
 REPLICAS=3
 ROUND_START=15
 ROUNDS_AFTER=10
