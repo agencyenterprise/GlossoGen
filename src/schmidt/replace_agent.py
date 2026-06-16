@@ -267,10 +267,10 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
                 f"channel_history_floors names channel {channel_id!r} which is not in "
                 f"channels_with_visible_history; a windowed channel must also be visible"
             )
-        if not 1 <= floor < request.round_start:
+        if not 1 <= floor <= request.round_start:
             raise ValueError(
                 f"channel_history_floors[{channel_id!r}]={floor} must satisfy "
-                f"1 <= floor < round_start ({request.round_start})"
+                f"1 <= floor <= round_start ({request.round_start})"
             )
 
 

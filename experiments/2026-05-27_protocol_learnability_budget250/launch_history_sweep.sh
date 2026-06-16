@@ -82,7 +82,7 @@ launch_replace() {
         --rounds-after-swap "$ROUNDS_AFTER" --history-from-round "$from" \
         --knobs "$knobs" --runs-dir "./$RUNS_DIR" 2>>"$LOG")
   rid=$(echo "$out" | grep -oE 'new_run_id=[^ ]+' | head -1 | cut -d= -f2)
-  label_run "$rid" "[\"protocol_learnability\", \"phase=replace_learned\", \"budget=250\", \"model=${short}\", \"history=${hist}\", \"src=${src_id}\"]"
+  label_run "$rid" "[\"protocol_learnability\", \"phase=replace_learned\", \"budget=250\", \"model=${short}\", \"history=${hist}\", \"src=${src_id}\", \"ordered_easy_rounds\"]"
   sleep 2
 }
 
