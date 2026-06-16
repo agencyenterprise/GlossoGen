@@ -27,6 +27,7 @@ from schmidt.runtime.activity_notification import DoneNotification, NewMessagesN
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.scheduled_events import ChannelVisibility, ChannelVisibilityNone, SwapAgent
 from schmidt.runtime.simulation_state import SimulationRuntime
+from schmidt.token_pricing import SELF_HOSTED_PROVIDER
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +253,7 @@ async def _build_seed_history(
         cutoff_round=spec.at_round,
         tool_calls_only=True,
         channel_visibility=spec.channel_visibility,
+        split_parallel_tool_calls=spec.provider == SELF_HOSTED_PROVIDER,
     )
     return _SeedHistory(history=history, system_prompt=system_prompt)
 

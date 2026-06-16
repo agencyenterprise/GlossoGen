@@ -38,6 +38,7 @@ from schmidt.runtime.scheduled_events import (
     ChannelVisibilityNone,
 )
 from schmidt.scenario_protocol import SimulationScenario
+from schmidt.token_pricing import SELF_HOSTED_PROVIDER
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,7 @@ class ProtocolExplanationMetric(Metric):
                 cutoff_round=None,
                 tool_calls_only=False,
                 channel_visibility=channel_visibility,
+                split_parallel_tool_calls=agent.provider == SELF_HOSTED_PROVIDER,
             )
             if not history:
                 logger.info(

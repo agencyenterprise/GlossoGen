@@ -78,7 +78,7 @@ from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.simulation_server import start_simulation_server, stop_simulation_server
-from schmidt.token_pricing import list_providers
+from schmidt.token_pricing import SELF_HOSTED_PROVIDER, list_providers
 
 logger = logging.getLogger(__name__)
 
@@ -819,6 +819,7 @@ class _ReplaceManifestInfo(NamedTuple):
     channel_visibility: dict[str, ChannelVisibility]
     target_event_id: str
     round_start: int
+    replacement_provider: str | None
 
 
 def _channel_visibility_from_manifest(
@@ -862,6 +863,7 @@ def read_replace_manifest_info(run_dir: Path) -> _ReplaceManifestInfo | None:
         ),
         target_event_id=manifest.target_event_id,
         round_start=manifest.round_start,
+        replacement_provider=manifest.replacement_provider,
     )
 
 
@@ -875,6 +877,7 @@ class _CrossRunManifestInfo(NamedTuple):
     imported_history_path: Path
     source_b_round_end: int
     source_b_cutoff_event_id: str
+    imported_provider: str
 
 
 def _read_cross_run_manifest(run_dir: Path) -> _CrossRunManifestInfo | None:
@@ -894,6 +897,7 @@ def _read_cross_run_manifest(run_dir: Path) -> _CrossRunManifestInfo | None:
         imported_history_path=run_dir / manifest.imported_history_source,
         source_b_round_end=manifest.source_b_round_end,
         source_b_cutoff_event_id=manifest.source_b_cutoff_event_id,
+        imported_provider=manifest.imported_provider,
     )
 
 
@@ -981,6 +985,8 @@ async def _run_simulation(
                     tool_calls_only=True,
                     channel_visibility=replace_info.channel_visibility,
                     imported=None,
+                    split_parallel_tool_calls=replace_info.replacement_provider
+                    == SELF_HOSTED_PROVIDER,
                 )
                 base_state = build_rewind_state_at_event(
                     events=events,
@@ -1450,6 +1456,7 @@ async def _build_cross_run_resume_state(
                 target_timestamp=imported_target_timestamp,
                 cutoff_round=cross_run_info.source_b_round_end + 1,
             ),
+            split_parallel_tool_calls=cross_run_info.imported_provider == SELF_HOSTED_PROVIDER,
         )
     }
     base_state = build_rewind_state_at_event(
