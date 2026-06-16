@@ -91,7 +91,10 @@ launch_replace() {
   echo "$(date) [$short->llama] replace src=$src_id hist=$hist from=$from kind=$kind" >> "$LOG"
   local out rid knobs="$REPLACE_KNOBS_CANON"
   if [ "$kind" = "legacy" ]; then knobs="$REPLACE_KNOBS_LEGACY"; fi
-  out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
+  # Llama 3.3 70B is served at 24576 ctx; the default 16384 output cap + the
+  # observer's growing input (peaks ~18k) overflows it. veyru outputs are short
+  # tool calls, so cap output low to leave maximum room for input.
+  out=$(LLM_MAX_TOKENS=2048 VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
         --source-run-dir "$src_dir" --round-start "$ROUND_START" \
         --replaced-agent-id field_observer \
         --model "$OBS_MODEL" --provider "$OBS_PROVIDER" \
