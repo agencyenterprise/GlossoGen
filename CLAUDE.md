@@ -204,7 +204,7 @@ cp .env.example .env
 | `SELF_HOSTED_BASE_URLS` | Required for `--provider self-hosted` | JSON object mapping model name → OpenAI-compatible `/v1` base URL. Example: `{"meta-llama/Llama-3.3-70B-Instruct":"https://....modal.run/v1","Qwen/Qwen3-32B":"https://....modal.run/v1"}` |
 | `SELF_HOSTED_API_KEY` | Required for `--provider self-hosted` | Bearer token shared across all entries in `SELF_HOSTED_BASE_URLS` (matches each server's `--api-key`) |
 | `LOG_LEVEL` | Optional | Stdlib logging level for `schmidt` CLI commands and analysis scripts (`DEBUG`/`INFO`/`WARNING`/`ERROR`). Set to `DEBUG` to capture verbatim LLM-judge system prompt, user prompt, and structured-output JSON in stderr. Defaults to `INFO`. |
-| `LLM_MAX_TOKENS` | Optional | Per-call output-token cap applied uniformly to the Claude (`max_tokens`), OpenAI (`max_output_tokens`), and HuggingFace (`max_tokens`) providers. Defaults to `16384`; bump higher if structured-output JSON truncates. |
+| `LLM_MAX_TOKENS` | Optional | Per-call output-token cap applied uniformly to the Claude (`max_tokens`), OpenAI (`max_output_tokens`), and HuggingFace (`max_tokens`) providers. Defaults to `16384`; bump higher if structured-output JSON truncates. Note: this does **not** cap the simulation agents — those use the `agent_max_tokens` knob (see below). |
 
 Frontend environment variables go in `frontend/.env.local` (see `frontend/.env.local.example`):
 
@@ -459,6 +459,8 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
 ```
 
 The pricing entry in `src/schmidt/token_pricing.py` is keyed by the literal model name (case-sensitive prefix match after dots→dashes); add a new entry there if you serve a different model.
+
+**Self-hosted context budget (`agent_max_tokens` knob).** Simulation agents' per-cycle output cap is the `agent_max_tokens` knob (`BaseKnobs`, default `16384`) — not `LLM_MAX_TOKENS`. Self-hosted models are served at a small fixed context (Llama 3.3 70B is `--max-model-len 24576` in `modal/serve_llama.py`), and `input + agent_max_tokens` must stay under it or vLLM 400s with `"maximum context length is 24576 tokens"` and the run stalls. For **replace-agent / swap / cross-run** runs with a self-hosted agent, the swapped-in agent's *reconstructed history accumulates* (the veyru observer grows to ~18k tokens over a 10-round swap), so the default `16384` output cap overflows. **Set `agent_max_tokens: 2048` in the `--knobs` for self-hosted swap runs** (veyru outputs are short tool calls, so it truncates nothing). Raising `--max-model-len` instead risks KV-cache OOM on H100:2 — see `modal/README.md`. The platform also serializes parallel tool calls in reconstructed history for self-hosted agents automatically (vLLM rejects multi-tool-call turns); no action needed there.
 
 Examples:
 

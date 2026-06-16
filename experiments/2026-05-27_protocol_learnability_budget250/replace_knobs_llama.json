@@ -1,0 +1,4 @@
+{
+  "postmortem_disabled_at_start": true,
+  "agent_max_tokens": 2048
+}
