@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   GitFork,
   HelpCircle,
@@ -51,6 +51,8 @@ function dayKey(iso: string): string {
 
 type RunStatus = components["schemas"]["RunStatus"];
 
+const PAGE_SIZE = 50;
+
 const STATUS_LABELS: Record<RunStatus, string> = {
   scenario_complete: "Completed",
   in_progress: "In Progress",
@@ -95,6 +97,17 @@ export function RunList() {
       const { data, error } = await api.GET("/api/g/{group_slug}/labels");
       if (error) {
         throw new Error("Failed to fetch labels");
+      }
+      return data;
+    },
+  });
+
+  const { data: scenariosData } = useQuery({
+    queryKey: ["scenarios"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/g/{group_slug}/scenarios");
+      if (error) {
+        throw new Error("Failed to fetch scenarios");
       }
       return data;
     },
@@ -203,52 +216,60 @@ export function RunList() {
     },
   });
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["runs"],
-    refetchOnMount: "always",
-    queryFn: async () => {
-      const { data, error } = await api.GET("/api/g/{group_slug}/runs");
-      if (error) {
-        throw new Error("Failed to fetch runs");
-      }
-      return data;
-    },
-    refetchInterval: query => {
-      const hasActiveRun = query.state.data?.runs.some(
-        r => r.status === "in_progress" || r.status === "starting"
-      );
-      if (hasActiveRun) {
-        return 5000;
-      }
-      return 10000;
-    },
-  });
+  const scenarioFilter = useMemo(() => [...selectedScenarios].sort(), [selectedScenarios]);
+  const labelFilter = useMemo(() => [...selectedLabels].sort(), [selectedLabels]);
 
-  const allRuns = useMemo(() => data?.runs ?? [], [data]);
+  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: ["runs", { scenarios: scenarioFilter, labels: labelFilter }],
+      refetchOnMount: "always",
+      initialPageParam: 0,
+      queryFn: async ({ pageParam }) => {
+        const { data, error } = await api.GET("/api/g/{group_slug}/runs", {
+          params: {
+            query: {
+              offset: pageParam,
+              limit: PAGE_SIZE,
+              scenario: scenarioFilter.length > 0 ? scenarioFilter : undefined,
+              labels: labelFilter.length > 0 ? labelFilter : undefined,
+            },
+          },
+        });
+        if (error) {
+          throw new Error("Failed to fetch runs");
+        }
+        return data;
+      },
+      getNextPageParam: (lastPage, allPages) => {
+        const loaded = allPages.reduce((sum, page) => sum + page.runs.length, 0);
+        if (loaded < lastPage.total) {
+          return loaded;
+        }
+        return undefined;
+      },
+      refetchInterval: query => {
+        const hasActiveRun = query.state.data?.pages.some(page =>
+          page.runs.some(r => r.status === "in_progress" || r.status === "starting")
+        );
+        if (hasActiveRun) {
+          return 5000;
+        }
+        return 10000;
+      },
+    });
+
+  const runs = useMemo(() => (data?.pages ?? []).flatMap(page => page.runs), [data]);
+  const totalRuns = data?.pages[0]?.total ?? 0;
   const allLabels = useMemo(() => labelsData?.labels ?? [], [labelsData]);
   const regularFilterLabels = useMemo(
     () => allLabels.filter(label => !label.startsWith("eval:") && !label.startsWith("src=")),
     [allLabels]
   );
-  const allScenarios = useMemo(() => {
-    const seen = new Set<string>();
-    for (const run of allRuns) {
-      seen.add(run.scenario_name);
-    }
-    return Array.from(seen).sort();
-  }, [allRuns]);
-  const runs = useMemo(() => {
-    let filtered = allRuns;
-    if (selectedScenarios.size > 0) {
-      filtered = filtered.filter(run => selectedScenarios.has(run.scenario_name));
-    }
-    if (selectedLabels.size > 0) {
-      filtered = filtered.filter(run =>
-        [...selectedLabels].every(label => run.labels.includes(label))
-      );
-    }
-    return filtered;
-  }, [allRuns, selectedLabels, selectedScenarios]);
+  const allScenarios = useMemo(
+    () => (scenariosData?.scenarios ?? []).map(s => s.scenario_name).sort(),
+    [scenariosData]
+  );
+  const hasActiveFilters = selectedLabels.size > 0 || selectedScenarios.size > 0;
 
   if (isLoading) {
     return (
@@ -267,7 +288,7 @@ export function RunList() {
     );
   }
 
-  if (allRuns.length === 0) {
+  if (runs.length === 0 && !hasActiveFilters) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-20 text-muted-foreground">
         <Inbox className="h-10 w-10" />
@@ -404,7 +425,7 @@ export function RunList() {
         </div>
       ) : null}
 
-      {runs.length === 0 && (selectedLabels.size > 0 || selectedScenarios.size > 0) ? (
+      {runs.length === 0 && hasActiveFilters ? (
         <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
           <Inbox className="h-8 w-8" />
           <p className="text-sm">No runs match the selected filters</p>
@@ -745,6 +766,25 @@ export function RunList() {
           </div>
         </div>
       ))}
+
+      {runs.length > 0 ? (
+        <div className="flex flex-col items-center gap-2 pt-2">
+          {hasNextPage ? (
+            <button
+              type="button"
+              onClick={() => void fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-60"
+            >
+              {isFetchingNextPage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Load more
+            </button>
+          ) : null}
+          <p className="text-[11px] text-muted-foreground">
+            Showing {runs.length} of {totalRuns}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

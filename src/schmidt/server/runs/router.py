@@ -11,7 +11,7 @@ from pathlib import Path
 
 import httpx
 import orjson
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
 from schmidt.eval_manifest import read_eval_manifest
@@ -26,7 +26,7 @@ from schmidt.server.runs.detail_reader import (
     load_run_detail,
 )
 from schmidt.server.runs.discovery import compose_run_id, scan_jsonl
-from schmidt.server.runs.listing import list_runs_for_group
+from schmidt.server.runs.listing import list_all_labels_for_group, list_runs_page_for_group
 from schmidt.server.runs.lookup import get_identity, resolve_run_or_404
 from schmidt.server.runs.models import (
     AllLabelsResponse,
@@ -56,26 +56,32 @@ router = APIRouter(prefix="/api/g/{group_slug}")
 @router.get("/runs", response_model=RunListResponse)
 async def list_runs(
     request: Request,
-    scenario: str | None = None,
+    scenario: list[str] | None = Query(default=None),
     contains_agent_id: str | None = None,
     status: RunStatus | None = None,
+    labels: list[str] | None = Query(default=None),
+    offset: int = 0,
+    limit: int = 50,
 ) -> RunListResponse:
-    """List simulation runs owned by the active group.
+    """List one page of simulation runs owned by the active group, newest-first.
 
-    Supports optional filters used by the cross-run replace-agent
-    picker: ``scenario`` restricts to a single scenario, and
-    ``contains_agent_id`` further restricts to runs that registered
-    that agent. ``status`` restricts to runs with a specific final
-    status (e.g. ``completed``).
+    Filters: ``scenario`` keeps runs in any of the listed scenarios (OR
+    semantics); ``labels`` keeps runs carrying every listed label (AND
+    semantics); ``status`` restricts to a final status; ``contains_agent_id``
+    keeps runs that registered that agent (used by the cross-run replace-agent
+    picker). ``offset``/``limit`` page the result; ``total`` is the count
+    matching the filters before paging.
     """
-    summaries = await list_runs_for_group(request=request, scenario_filter=scenario)
-    if contains_agent_id is not None:
-        summaries = [
-            s for s in summaries if any(am.agent_id == contains_agent_id for am in s.agent_models)
-        ]
-    if status is not None:
-        summaries = [s for s in summaries if s.status == status]
-    return RunListResponse(runs=summaries)
+    page = await list_runs_page_for_group(
+        request=request,
+        scenarios=scenario or [],
+        labels=labels or [],
+        status=status,
+        contains_agent_id=contains_agent_id,
+        offset=offset,
+        limit=limit,
+    )
+    return RunListResponse(runs=page.runs, total=page.total)
 
 
 @router.get("/runs/{scenario}/{run_dir_name}", response_model=RunDetailResponse)
@@ -455,10 +461,5 @@ async def get_note(scenario: str, run_dir_name: str, request: Request) -> NoteRe
 @router.get("/labels", response_model=AllLabelsResponse)
 async def list_all_labels(request: Request) -> AllLabelsResponse:
     """Get all unique labels across the active group's simulation runs."""
-    summaries = await list_runs_for_group(request=request, scenario_filter=None)
-    seen: dict[str, None] = {}
-    for summary in summaries:
-        for label in summary.labels:
-            if label not in seen:
-                seen[label] = None
-    return AllLabelsResponse(labels=sorted(seen))
+    labels = await list_all_labels_for_group(request=request)
+    return AllLabelsResponse(labels=labels)

@@ -72,9 +72,11 @@ export function BranchesTimeline({ runId }: { runId: string }) {
   });
 
   const { data: allRuns } = useQuery({
-    queryKey: ["runs"],
+    queryKey: ["runs", "all"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/g/{group_slug}/runs");
+      const { data, error } = await api.GET("/api/g/{group_slug}/runs", {
+        params: { query: { limit: 10000 } },
+      });
       if (error) {
         throw new Error("Failed to fetch runs");
       }

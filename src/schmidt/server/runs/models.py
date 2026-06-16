@@ -169,9 +169,14 @@ class RunSummary(BaseModel):
 
 
 class RunListResponse(BaseModel):
-    """Response model for the list-all-runs endpoint."""
+    """Response model for the paginated runs endpoint.
+
+    ``runs`` is one page (newest-first); ``total`` is the number of runs
+    matching the request's filters before paging, for the load-more UI.
+    """
 
     runs: list[RunSummary]
+    total: int
 
 
 class AgentSwapEventDTO(BaseModel):

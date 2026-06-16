@@ -13,13 +13,14 @@ export interface paths {
         };
         /**
          * List Runs
-         * @description List simulation runs owned by the active group.
+         * @description List one page of simulation runs owned by the active group, newest-first.
          *
-         *     Supports optional filters used by the cross-run replace-agent
-         *     picker: ``scenario`` restricts to a single scenario, and
-         *     ``contains_agent_id`` further restricts to runs that registered
-         *     that agent. ``status`` restricts to runs with a specific final
-         *     status (e.g. ``completed``).
+         *     Filters: ``scenario`` keeps runs in any of the listed scenarios (OR
+         *     semantics); ``labels`` keeps runs carrying every listed label (AND
+         *     semantics); ``status`` restricts to a final status; ``contains_agent_id``
+         *     keeps runs that registered that agent (used by the cross-run replace-agent
+         *     picker). ``offset``/``limit`` page the result; ``total`` is the count
+         *     matching the filters before paging.
          */
         get: operations["list_runs_api_g__group_slug__runs_get"];
         put?: never;
@@ -1349,11 +1350,16 @@ export interface components {
         };
         /**
          * RunListResponse
-         * @description Response model for the list-all-runs endpoint.
+         * @description Response model for the paginated runs endpoint.
+         *
+         *     ``runs`` is one page (newest-first); ``total`` is the number of runs
+         *     matching the request's filters before paging, for the load-more UI.
          */
         RunListResponse: {
             /** Runs */
             runs: components["schemas"]["RunSummary"][];
+            /** Total */
+            total: number;
         };
         /**
          * RunStatus
@@ -2061,9 +2067,12 @@ export interface operations {
     list_runs_api_g__group_slug__runs_get: {
         parameters: {
             query?: {
-                scenario?: string | null;
+                scenario?: string[] | null;
                 contains_agent_id?: string | null;
                 status?: components["schemas"]["RunStatus"] | null;
+                labels?: string[] | null;
+                offset?: number;
+                limit?: number;
             };
             header?: never;
             path?: never;
