@@ -133,23 +133,18 @@ nohup bash experiments/2026-05-27_protocol_learnability_budget250/launch_derived
 nohup bash experiments/2026-05-27_protocol_learnability_budget250/launch_resume_no_postmortem.sh \
   > /tmp/protolearn_resume_no_postmortem.stdout 2>&1 & disown
 
-# Stage 4 — 135 replace_cross_family. PRECONDITION: judge prompt pinned to 364987a so
-# round_success is comparable to prior 450 runs. The script aborts if the working-tree
-# stabilization_judge.jinja hash drifts; restore via
-#   git checkout 364987a -- src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja
+# Stage 4 — 135 replace_cross_family.
 nohup bash experiments/2026-05-27_protocol_learnability_budget250/launch_cross_family.sh \
   > /tmp/protolearn_cross_family.stdout 2>&1 & disown
 ```
 
-**Judge prompt pinning (Stage 4 only).** Runs in this experiment must all be judged
-against `src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja` at commit
-`364987a` (before `e2f7cc7` "Refine ... cryptic" and `dae0724` "Refine ... clarity").
-Both subsequent commits tightened criteria; running Stage 4 against the new prompt would
-make `round_success` scores incomparable to the prior 450 runs in this experiment. The
-launcher refuses to start if the working-tree judge prompt hash does not match
-`git rev-parse 364987a:<path>`. Restore the HEAD version with the snapshot at
-`/tmp/stabilization_judge.HEAD.jinja` after every cross_family `veyru_report.json` has
-landed (the judge prompt is read at `schmidt evaluate` time, not at `schmidt run` time).
+**NEVER pin or modify the judge prompt.**
+`src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja` must always be at **HEAD**
+when running simulations. veyru judges stabilization **live during the simulation**, so
+checking the prompt out to an older commit (or editing it) silently changes round outcomes
+and corrupts every run launched against it. Do not `git checkout` or alter this file for a
+run. (An earlier version of this doc wrongly instructed pinning it to `364987a` — that
+guidance was incorrect and has been removed.)
 
 `list_baselines.py` enumerates completed baselines (model/provider read from each run's
 own `AgentRegistered`) and feeds Stage 2.
