@@ -78,12 +78,14 @@ class AgentHistoryFilter(NamedTuple):
     tool_calls_only: bool
     channel_visibility: dict[str, ChannelVisibility]
     imported: ImportedHistory | None
+    split_parallel_tool_calls: bool
 
 
 _PASS_THROUGH_FILTER = AgentHistoryFilter(
     tool_calls_only=False,
     channel_visibility={},
     imported=None,
+    split_parallel_tool_calls=False,
 )
 
 
@@ -289,6 +291,7 @@ def _build_rewind_state_at_timestamp(
             cutoff_round=history_cutoff_round,
             tool_calls_only=history_filter.tool_calls_only,
             channel_visibility=history_filter.channel_visibility,
+            split_parallel_tool_calls=history_filter.split_parallel_tool_calls,
         )
 
     logger.info(

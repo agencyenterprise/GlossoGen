@@ -28,6 +28,7 @@ from schmidt.cli import read_replace_manifest_info
 from schmidt.evaluation.log_reader import load_events
 from schmidt.message_rewind import AgentHistoryFilter, build_rewind_state_from_last_message
 from schmidt.models.event import AgentRegistered, InjectionDelivered
+from schmidt.token_pricing import SELF_HOSTED_PROVIDER
 
 
 def _print_section(title: str) -> None:
@@ -105,6 +106,7 @@ async def main() -> None:
             tool_calls_only=True,
             channel_visibility=replace_info.channel_visibility,
             imported=None,
+            split_parallel_tool_calls=replace_info.replacement_provider == SELF_HOSTED_PROVIDER,
         )
     }
     state = build_rewind_state_from_last_message(events=events, agent_filters=agent_filters)

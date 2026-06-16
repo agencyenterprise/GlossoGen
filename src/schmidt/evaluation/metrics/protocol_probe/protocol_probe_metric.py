@@ -39,6 +39,7 @@ from schmidt.models.event import SimulationEvent
 from schmidt.runners.communication_protocol import build_full_system_prompt
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.template_renderer import TemplateRenderer
+from schmidt.token_pricing import SELF_HOSTED_PROVIDER
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +141,7 @@ class ProtocolProbeMetric(Metric):
                         cutoff_round=probe_round,
                         tool_calls_only=False,
                         channel_visibility={},
+                        split_parallel_tool_calls=agent_config.provider == SELF_HOSTED_PROVIDER,
                     )
                     if not history:
                         logger.warning(

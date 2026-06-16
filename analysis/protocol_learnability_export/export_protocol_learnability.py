@@ -397,9 +397,7 @@ def _build_baseline_aggregate_frame(
         }
         means: dict[str, float | None] = {}
         for phase, prefix in _DERIVED_PHASE_PREFIX.items():
-            stats, observer = _phase_after_resume(
-                records=records, head_src_id=src_id, phase=phase
-            )
+            stats, observer = _phase_after_resume(records=records, head_src_id=src_id, phase=phase)
             row[f"n_{prefix}"] = stats.n
             row[f"{prefix}_mean"] = stats.mean
             row[f"{prefix}_std"] = stats.std

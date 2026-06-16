@@ -266,6 +266,49 @@ def _llm_response_at_or_past_cutoff(
     return llm_resp.timestamp > target_timestamp
 
 
+def _cycle_to_messages(
+    cycle: _KeptCycle,
+    split_parallel_tool_calls: bool,
+) -> list[ModelMessage]:
+    """Render one kept cycle into ``ModelResponse``/``ModelRequest`` messages.
+
+    Normally one ``ModelResponse`` (all tool calls) followed by one
+    ``ModelRequest`` (all tool returns). When ``split_parallel_tool_calls``
+    is True and the cycle holds more than one tool call, the calls are
+    serialized into one single-call ``ModelResponse`` plus its matching
+    single-return ``ModelRequest`` per call. vLLM's tool parsers (llama3_json,
+    hermes) reject any request whose history contains a turn with more than
+    one tool call, so self-hosted agents resumed onto a frontier model's
+    parallel-tool-call history need the history flattened to one call per
+    turn. Leading thinking/text parts attach to the first emitted response.
+    """
+    tool_call_parts = [part for part in cycle.response_parts if isinstance(part, ToolCallPart)]
+    if not split_parallel_tool_calls or len(tool_call_parts) <= 1:
+        messages: list[ModelMessage] = [
+            ModelResponse(parts=cycle.response_parts, timestamp=cycle.response_timestamp)
+        ]
+        if cycle.tool_return_parts:
+            messages.append(ModelRequest(parts=cycle.tool_return_parts))
+        return messages
+
+    leading_parts = [part for part in cycle.response_parts if not isinstance(part, ToolCallPart)]
+    returns_by_id = {ret.tool_call_id: ret for ret in cycle.tool_return_parts}
+    messages = []
+    for position, call_part in enumerate(tool_call_parts):
+        if position == 0:
+            response_parts: list[ThinkingPart | TextPart | ToolCallPart] = [
+                *leading_parts,
+                call_part,
+            ]
+        else:
+            response_parts = [call_part]
+        messages.append(ModelResponse(parts=response_parts, timestamp=cycle.response_timestamp))
+        matching_return = returns_by_id.get(call_part.tool_call_id)
+        if matching_return is not None:
+            messages.append(ModelRequest(parts=[matching_return]))
+    return messages
+
+
 def build_message_history(
     events: list[SimulationEvent],
     agent_id: str,
@@ -274,6 +317,7 @@ def build_message_history(
     cutoff_round: int | None,
     tool_calls_only: bool,
     channel_visibility: dict[str, ChannelVisibility],
+    split_parallel_tool_calls: bool,
 ) -> list[ModelMessage]:
     """Build a pydantic-ai message history for an agent from JSONL events.
 
@@ -303,6 +347,12 @@ def build_message_history(
     ``FromRound(R)`` drops every read and drops sends from rounds <R.
     Used by the replace-agent flow to hide e.g. postmortem traffic from
     the new agent while exposing recent protocol activity.
+
+    When ``split_parallel_tool_calls`` is True, any reconstructed turn
+    holding more than one tool call is serialized into one single-call
+    response per call (see ``_cycle_to_messages``). Set it for self-hosted
+    (vLLM) agents, whose tool parsers reject multi-tool-call turns in the
+    request history; leave it False for Anthropic/OpenAI, which accept them.
     """
     llm_responses: list[LLMResponseReceived] = []
     tool_results_by_call_id: dict[str, ToolResultReceived] = {}
@@ -445,14 +495,12 @@ def build_message_history(
     ]
 
     for index, cycle in enumerate(kept_cycles):
-        messages.append(
-            ModelResponse(
-                parts=cycle.response_parts,
-                timestamp=cycle.response_timestamp,
+        messages.extend(
+            _cycle_to_messages(
+                cycle=cycle,
+                split_parallel_tool_calls=split_parallel_tool_calls,
             )
         )
-        if cycle.tool_return_parts:
-            messages.append(ModelRequest(parts=cycle.tool_return_parts))
         is_last = index == len(kept_cycles) - 1
         if cycle.stop_reason == "end_turn" and not cycle.parent_past_cutoff and not is_last:
             messages.append(ModelRequest(parts=[UserPromptPart(content=CONTINUE_PROMPT)]))
