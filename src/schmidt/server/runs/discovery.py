@@ -260,7 +260,7 @@ def _timestamp_from_dir(dir_name: str) -> datetime:
     return datetime.fromtimestamp(int(epoch_str), tz=UTC)
 
 
-def _read_labels(run_dir: Path) -> list[str]:
+def read_run_labels(run_dir: Path) -> list[str]:
     """Read labels from labels.json if it exists, returning empty list otherwise."""
     labels_path = run_dir / "labels.json"
     if not labels_path.exists():
@@ -392,7 +392,7 @@ def _live_fields(
     Returns (labels, has_note, has_evaluation, evaluation_in_progress).
     """
     report_path = timestamp_dir / f"{scenario_name}_report.json"
-    labels = _read_labels(run_dir=timestamp_dir)
+    labels = read_run_labels(run_dir=timestamp_dir)
     has_note = _has_note(run_dir=timestamp_dir)
     has_evaluation = report_path.exists()
     eval_in_progress = read_eval_manifest(run_dir=timestamp_dir) is not None
@@ -563,6 +563,53 @@ async def build_summary(
         has_note=has_note,
         current_round=scan.current_round,
     )
+
+
+class RunDescriptor(NamedTuple):
+    """Lightweight run identity used to order and filter runs before enrichment.
+
+    Carries only what is needed to apply cheap filters (scenario, labels) and
+    sort newest-first, so a listing can defer the expensive ``build_summary``
+    call to the page actually returned.
+    """
+
+    scenario_name: str
+    run_dir_name: str
+    timestamp: datetime
+
+
+def discover_run_descriptors(runs_dir: Path) -> list[RunDescriptor]:
+    """Enumerate run directories without building summaries, newest-first.
+
+    A directory is a run when it contains ``{scenario_name}.jsonl``; this is
+    the same validity gate ``build_summary`` applies, so the descriptor list
+    and the enriched list agree on which runs exist. Reads no file contents —
+    only directory listings and the timestamp encoded in each run dir name.
+    """
+    if not runs_dir.is_dir():
+        logger.warning("Runs directory does not exist: %s", runs_dir)
+        return []
+
+    descriptors: list[RunDescriptor] = []
+    for scenario_dir in runs_dir.iterdir():
+        if not scenario_dir.is_dir():
+            continue
+        scenario_name = scenario_dir.name
+        for timestamp_dir in scenario_dir.iterdir():
+            if not timestamp_dir.is_dir():
+                continue
+            if not (timestamp_dir / f"{scenario_name}.jsonl").exists():
+                continue
+            descriptors.append(
+                RunDescriptor(
+                    scenario_name=scenario_name,
+                    run_dir_name=timestamp_dir.name,
+                    timestamp=_timestamp_from_dir(dir_name=timestamp_dir.name),
+                )
+            )
+
+    descriptors.sort(key=lambda d: (d.timestamp, d.run_dir_name), reverse=True)
+    return descriptors
 
 
 async def discover_runs(runs_dir: Path) -> list[RunSummary]:

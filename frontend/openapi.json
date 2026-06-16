@@ -8,7 +8,7 @@
     "/api/g/{group_slug}/runs": {
       "get": {
         "summary": "List Runs",
-        "description": "List simulation runs owned by the active group.\n\nSupports optional filters used by the cross-run replace-agent\npicker: ``scenario`` restricts to a single scenario, and\n``contains_agent_id`` further restricts to runs that registered\nthat agent. ``status`` restricts to runs with a specific final\nstatus (e.g. ``completed``).",
+        "description": "List one page of simulation runs owned by the active group, newest-first.\n\nFilters: ``scenario`` keeps runs in any of the listed scenarios (OR\nsemantics); ``labels`` keeps runs carrying every listed label (AND\nsemantics); ``status`` restricts to a final status; ``contains_agent_id``\nkeeps runs that registered that agent (used by the cross-run replace-agent\npicker). ``offset``/``limit`` page the result; ``total`` is the count\nmatching the filters before paging.",
         "operationId": "list_runs_api_g__group_slug__runs_get",
         "parameters": [
           {
@@ -18,7 +18,10 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 {
                   "type": "null"
@@ -57,6 +60,45 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "name": "labels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Labels"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
             }
           }
         ],
@@ -3013,14 +3055,19 @@
             },
             "type": "array",
             "title": "Runs"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
           }
         },
         "type": "object",
         "required": [
-          "runs"
+          "runs",
+          "total"
         ],
         "title": "RunListResponse",
-        "description": "Response model for the list-all-runs endpoint."
+        "description": "Response model for the paginated runs endpoint.\n\n``runs`` is one page (newest-first); ``total`` is the number of runs\nmatching the request's filters before paging, for the load-more UI."
       },
       "RunStatus": {
         "type": "string",
