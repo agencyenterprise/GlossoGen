@@ -33,8 +33,12 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/../.."
 
 RUNS_DIR=runs
-REPLACE_KNOBS_CANON="$SCRIPT_DIR/replace_knobs.json"
-REPLACE_KNOBS_LEGACY="$SCRIPT_DIR/replace_knobs_legacy.json"
+# Llama-specific knobs: postmortem disabled + agent_max_tokens=2048. Llama 3.3 70B is
+# served at 24576 ctx and the swapped-in observer's reconstructed history grows to ~18k
+# tokens; the default agent_max_tokens=16384 output cap overflows the context (vLLM 400s
+# with a context-length error). veyru outputs are short, so 2048 truncates nothing.
+REPLACE_KNOBS_CANON="$SCRIPT_DIR/replace_knobs_llama.json"
+REPLACE_KNOBS_LEGACY="$SCRIPT_DIR/replace_knobs_llama_legacy.json"
 LOG=/tmp/protolearn_llama.log
 CAP=15
 REPLICAS=3
@@ -91,10 +95,7 @@ launch_replace() {
   echo "$(date) [$short->llama] replace src=$src_id hist=$hist from=$from kind=$kind" >> "$LOG"
   local out rid knobs="$REPLACE_KNOBS_CANON"
   if [ "$kind" = "legacy" ]; then knobs="$REPLACE_KNOBS_LEGACY"; fi
-  # Llama 3.3 70B is served at 24576 ctx; the default 16384 output cap + the
-  # observer's growing input (peaks ~18k) overflows it. veyru outputs are short
-  # tool calls, so cap output low to leave maximum room for input.
-  out=$(LLM_MAX_TOKENS=2048 VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
+  out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
         --source-run-dir "$src_dir" --round-start "$ROUND_START" \
         --replaced-agent-id field_observer \
         --model "$OBS_MODEL" --provider "$OBS_PROVIDER" \
