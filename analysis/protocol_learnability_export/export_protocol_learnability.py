@@ -58,6 +58,7 @@ from analysis.veyru_run_export.run_context_scan import (
     sender_role,
 )
 from analysis.veyru_run_export.spreadsheet_writer import write_csvs, write_xlsx
+from analysis.veyru_run_export.supersession_lineage import load_supersession_one_step, resolve_head
 
 logger = logging.getLogger(__name__)
 
@@ -343,13 +344,19 @@ def _phase_stats(values: list[float]) -> _PhaseStats:
 
 
 def _phase_after_resume(
-    records: list[ProtocolRunRecord], src_id: str, phase: str
+    records: list[ProtocolRunRecord], head_src_id: str, phase: str, one_step: dict[str, str]
 ) -> tuple[_PhaseStats, str | None]:
-    """Aggregate one baseline's phase replicas of ``round_success_after_resume`` (+ observer)."""
+    """Aggregate one baseline's phase replicas of ``round_success_after_resume`` (+ observer).
+
+    A derived run's ``src_id`` is resolved through the supersession chain so derived runs
+    that reference a now-superseded baseline still join the current head baseline.
+    """
     values: list[float] = []
     observer: str | None = None
     for record in records:
-        if record.src_id != src_id or record.phase != phase:
+        if record.phase != phase:
+            continue
+        if resolve_head(run_id=record.src_id, one_step=one_step) != head_src_id:
             continue
         if record.round_success_after_resume is not None:
             values.append(record.round_success_after_resume)
@@ -366,10 +373,16 @@ def _delta(learned: float | None, baseline: float | None) -> float | None:
 
 
 def _build_baseline_aggregate_frame(
-    records: list[ProtocolRunRecord], contexts: dict[str, RunContext]
+    records: list[ProtocolRunRecord],
+    contexts: dict[str, RunContext],
+    one_step: dict[str, str],
 ) -> pd.DataFrame:
-    """One row per baseline mirroring the tab's BaselineLearnability, on after-resume score."""
-    baselines = {record.src_id: record for record in records if record.phase == _PHASE_BASELINE}
+    """One row per baseline mirroring the tab's BaselineLearnability, on after-resume score.
+
+    Derived runs are joined to the current head baseline by resolving their ``src_id``
+    through the supersession chain (``one_step``).
+    """
+    baselines = {record.run_id: record for record in records if record.phase == _PHASE_BASELINE}
     rows: list[dict[str, object]] = []
     for src_id in sorted(baselines):
         baseline = baselines[src_id]
@@ -388,7 +401,9 @@ def _build_baseline_aggregate_frame(
         }
         means: dict[str, float | None] = {}
         for phase, prefix in _DERIVED_PHASE_PREFIX.items():
-            stats, observer = _phase_after_resume(records=records, src_id=src_id, phase=phase)
+            stats, observer = _phase_after_resume(
+                records=records, head_src_id=src_id, phase=phase, one_step=one_step
+            )
             row[f"n_{prefix}"] = stats.n
             row[f"{prefix}_mean"] = stats.mean
             row[f"{prefix}_std"] = stats.std
@@ -441,7 +456,10 @@ def main() -> None:
         perplexity_by_run=_run_means(message_level=message_level, column="perplexity"),
         mcm_by_run=_run_means(message_level=message_level, column="chars"),
     )
-    baseline_aggregate = _build_baseline_aggregate_frame(records=records, contexts=contexts)
+    one_step = load_supersession_one_step(runs_dir=args.runs_dir)
+    baseline_aggregate = _build_baseline_aggregate_frame(
+        records=records, contexts=contexts, one_step=one_step
+    )
     frames = {
         "run_level": run_level,
         "message_level": message_level,
