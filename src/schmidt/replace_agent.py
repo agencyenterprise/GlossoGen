@@ -224,7 +224,8 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
 
     Every channel named in ``channel_history_floors`` must also appear in
     ``channels_with_visible_history`` (a windowed channel is still a
-    visible channel), and each floor must satisfy ``1 <= floor < round_start``.
+    visible channel), and each floor must satisfy ``1 <= floor <= round_start``
+    (``floor == round_start`` yields zero prior history — the no-history window).
     """
     if request.replaced_agent_id is None:
         misset = [
