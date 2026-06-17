@@ -96,20 +96,22 @@ def _tool_call_filtered_by_visibility(
     return False
 
 
-def _derive_notification_round_floor(
+def _derive_nonchannel_round_floor(
     channel_visibility: dict[str, ChannelVisibility],
 ) -> int | None:
-    """Return the lowest round below which ``read_notifications`` calls should be dropped.
+    """Return the lowest round below which non-channel tool calls should be dropped.
 
-    ``read_notifications`` is not channel-scoped, so its tool returns
-    cannot be filtered by ``channel_visibility``. But those returns
-    contain the round-start injection text (e.g. ``--- PREVIOUS VEYRU
-    RESULT ---``) that would otherwise leak prior-round outcomes the
-    swap meant to hide. The floor is the minimum ``round_floor`` across
-    every ``ChannelVisibilityFromRound`` entry; calls before that round
+    Channel-scoped tools (``send_message`` / ``read_channel``) are windowed
+    per channel by ``_tool_call_filtered_by_visibility``. Non-channel tools
+    are not, and would otherwise leak prior-round state the swap meant to
+    hide: ``read_notifications`` returns carry the round-start injection text
+    (e.g. ``--- PREVIOUS VEYRU RESULT ---``), and ``stabilize_veyru`` calls
+    and returns reveal the agent's own prior actions, symptoms, and outcomes.
+    The floor is the minimum ``round_floor`` across every
+    ``ChannelVisibilityFromRound`` entry; non-channel calls before that round
     are dropped. Returns ``None`` (no filtering) when no channel uses
-    ``FromRound`` — fork/resume flows pass ``Full`` visibility and keep
-    notifications intact.
+    ``FromRound`` — fork/resume flows pass ``Full`` visibility and keep the
+    full history intact.
     """
     floors = [
         visibility.round_floor
@@ -121,24 +123,27 @@ def _derive_notification_round_floor(
     return min(floors)
 
 
-def _notification_call_below_floor(
+def _nonchannel_call_below_floor(
     tool_call: ToolCallRequest,
     invoked: ToolCallInvoked | None,
-    notification_round_floor: int | None,
+    nonchannel_round_floor: int | None,
 ) -> bool:
-    """Return True when a ``read_notifications`` call falls below the round floor.
+    """Return True when a non-channel tool call falls below the round floor.
 
-    Returns False for any other tool name and when ``notification_round_floor``
-    is ``None``. A missing ``ToolCallInvoked`` is treated as past-window so
-    the call is dropped — defensive against malformed logs.
+    Applies to every tool that is not channel-scoped (e.g.
+    ``read_notifications``, ``stabilize_veyru``); channel-scoped tools are
+    windowed by ``_tool_call_filtered_by_visibility`` instead. Returns False
+    when ``nonchannel_round_floor`` is ``None`` (no windowing) or for a
+    channel-scoped tool. A missing ``ToolCallInvoked`` is treated as
+    past-window so the call is dropped — defensive against malformed logs.
     """
-    if notification_round_floor is None:
+    if nonchannel_round_floor is None:
         return False
-    if tool_call.tool_name != "read_notifications":
+    if tool_call.tool_name in CHANNEL_SCOPED_TOOLS:
         return False
     if invoked is None:
         return True
-    return invoked.round_number < notification_round_floor
+    return invoked.round_number < nonchannel_round_floor
 
 
 def _tool_call_at_or_past_cutoff(
@@ -184,7 +189,7 @@ def _build_orphan_cycle(
     orphan_invoked: list[ToolCallInvoked],
     tool_results_by_call_id: dict[str, ToolResultReceived],
     channel_visibility: dict[str, ChannelVisibility],
-    notification_round_floor: int | None,
+    nonchannel_round_floor: int | None,
 ) -> _KeptCycle | None:
     """Synthesise a ``_KeptCycle`` for ``ToolCallInvoked`` events with no parent.
 
@@ -217,10 +222,10 @@ def _build_orphan_cycle(
             channel_visibility=channel_visibility,
         ):
             continue
-        if _notification_call_below_floor(
+        if _nonchannel_call_below_floor(
             tool_call=request,
             invoked=inv,
-            notification_round_floor=notification_round_floor,
+            nonchannel_round_floor=nonchannel_round_floor,
         ):
             continue
         if _drop_call_without_result(
@@ -388,7 +393,7 @@ def build_message_history(
     if not llm_responses and not orphan_invoked:
         return []
 
-    notification_round_floor = _derive_notification_round_floor(
+    nonchannel_round_floor = _derive_nonchannel_round_floor(
         channel_visibility=channel_visibility,
     )
 
@@ -402,10 +407,10 @@ def build_message_history(
                 channel_visibility=channel_visibility,
             ):
                 continue
-            if _notification_call_below_floor(
+            if _nonchannel_call_below_floor(
                 tool_call=tc,
                 invoked=invoked_by_id.get(tc.call_id),
-                notification_round_floor=notification_round_floor,
+                nonchannel_round_floor=nonchannel_round_floor,
             ):
                 continue
             if _tool_call_at_or_past_cutoff(
@@ -477,7 +482,7 @@ def build_message_history(
         orphan_invoked=orphan_invoked,
         tool_results_by_call_id=tool_results_by_call_id,
         channel_visibility=channel_visibility,
-        notification_round_floor=notification_round_floor,
+        nonchannel_round_floor=nonchannel_round_floor,
     )
     if orphan_cycle is not None:
         kept_cycles.append(orphan_cycle)
