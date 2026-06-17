@@ -1,21 +1,22 @@
 # Protocol learnability — 5-baseline deep dive (same-model, history=10)
 
 Analysis of five `protocol_learnability` baselines and their `replace_learned`
-derived runs, where a **fresh same-model field observer** is swapped in after
-round 15 and then plays rounds 16–25 (the same seed-42 cases for every run). Only
-the field observer is replaced — the stabilization engineer is the original one
-and keeps emitting the protocol the baseline evolved. Method: see
-[ANALYSIS_METHOD.md](ANALYSIS_METHOD.md).
+derived runs, where a **fresh same-model field observer** is swapped in at the
+round-15 boundary and continues the run; the scored window is rounds 16–25 (the
+same seed-42 cases for every run). Only the field observer is replaced — the
+stabilization engineer is the original one and keeps emitting the protocol the
+baseline evolved. Method: see [ANALYSIS_METHOD.md](ANALYSIS_METHOD.md).
 
 **Visible-history window (what the swapped observer actually receives).** From
-`replace_manifest.json`: `channel_history_floors = {"link": 5}`, and verified
-verbatim against each run's `resume_context_field_observer.json`, the newcomer's
-reconstructed history contains **link rounds 5–15 only**. Rounds 1–4 are below the
-floor, and the **entire postmortem channel is excluded** (no postmortem history,
-no postmortem going forward). So in section 1, every quoted exchange is tagged
-**[Rn · seen]** if it falls in rounds 5–15 (the newcomer saw it) or **[Rn ·
-not seen]** if it does not. All section-2 exchanges are from rounds 16–25 — rounds
-the newcomer *plays*, never history.
+`replace_manifest.json`: `channel_history_floors = {"link": 5}` and `round_start =
+15`. The clone is truncated at the start-of-round-15 boundary, so the engineer's
+link messages the newcomer can read after resume (live, via `read_channel`) span
+**rounds 5–14**: rounds 1–4 are below the floor, and round 15 had not been played
+yet at the swap point. Only **postmortem message content** is excluded — the
+postmortem codebook negotiation is invisible, though per-round result announcements
+still appear. So in section 1, every quoted exchange is tagged **[Rn · seen]** if
+it falls in rounds 5–14 or **[Rn · not seen]** otherwise. All section-2 exchanges
+are from rounds 16–25, the scored post-swap window.
 
 The five baselines (4 × gpt-5.4, 1 × opus-4-7) span the full transferability
 range, from a protocol a newcomer reads almost perfectly to one where a fresh
@@ -79,10 +80,10 @@ learnability.
 
 ### 1780600361 (gpt-5.4) — two-letter motif initials + observer does the diagnosis
 
-- **Observer**: two-letter **motif initials** — `TB` (Thermal Bleed), `LI` (Low
-  Intensity), `CD` (Corner Deadlock), `DE` (Drift), `PS` (Stall), `PI` (Phase
-  Inversion), `HS` (Harmonic Split), `RC` (Resonance). These are *diagnoses*, not
-  descriptions — the observer names the failure.
+- **Observer**: two-letter **motif initials** — `TB` (Thermal Bleed), `LO` (Low
+  Intensity), `LI` (Leak Instability), `CD` (Corner Deadlock), `DE` (Drift), `PS`
+  (Stall), `PI` (Phase Inversion), `HS` (Harmonic Split), `RC` (Resonance). These
+  are *diagnoses*, not descriptions — the observer names the failure.
 - **Engineer**: space-free `P9B5m`, `P13L8g`, `P2Bo10m`.
 - **Repair**: the engineer asks for a re-tag (`Tag?` / `New tag?`), expecting the
   observer to supply a motif code — **[R5 · seen]** (here `LO` = Low Intensity):
@@ -143,7 +144,7 @@ The most convention-laden gpt protocol. Three idiosyncrasies stacked:
 
   The bare `P`-numbers are **never spelled out on the link** — the codebook was
   negotiated in the postmortem channel, which the newcomer never sees. So even
-  though the *usage* at R12–15 is inside the window, the *definitions* are not.
+  though the *usage* at R12–14 is inside the window, the *definitions* are not.
 
 ---
 
@@ -167,13 +168,14 @@ the repair convention from the window and uses it (`spell P14`, `P4?`, `P9 spell
 
 **Went wrong.** Only **budget collapses on 5-motif rounds**. R18 fails in all
 three runs *with 3/3 attempts passing* — the observer executed everything
-correctly, but `P14` is **never defined in the visible window (rounds 5–15;
-defined codes are P1,P2,P3,P5,P6,P8,P10,P11,P12,P13 — neither `P14` nor `P4`)**, so
-it must spend a ~150-char spell-out to decode it, and on the budget-starved
-5-motif round that tips it over. The 0.80 run additionally lost R16 because it
-**guessed an un-cached code wrong before asking** (`P4 fail. spell.`), wasting a
-`stabilize` attempt; the 0.90 runs asked first (`P4?`) and survived. Failure mode
-= residual budget tax, not comprehension.
+correctly, but `P14` is **never even seen in the visible window (rounds 5–14 use
+P1,P2,P3,P5,P6,P8,P10,P11,P12,P13 — never `P14` or `P4`)**, so the newcomer has
+nothing to reconstruct it from and must spend a ~150-char spell-out, and on the
+budget-starved 5-motif round that tips it over. The 0.80 run additionally lost R16
+because it **guessed the un-cached `P4` wrong before asking** (`P4 fail. spell.`),
+wasting a `stabilize` attempt; the 0.90 runs either asked first (`P4?`, run 420) or
+decoded `P4` correctly on the first try (run 383) — both survived. Failure mode =
+residual budget tax, not comprehension.
 
 ### 1780600649 → 0.90 / 0.70 / 0.90 (mean 0.833)
 
@@ -182,8 +184,9 @@ matches the no-postmortem ceiling (0.833).
 
 **Went wrong.** Failures are **execution-detail retries against a strict judge**:
 the observer decodes the right action but its phrasing drops a detail the judge
-requires — omits "slowly" (R18), omits "remove the cloth" (R25), says "the whole
-box" instead of enumerating faces (R16) — earning a ✗ and forcing a retry +
+requires — at R18 the missing "gentle volume" intensity on the tone, at R25 the
+missing "remove the cloth" step, at R16 the missing "gentle tone" on the bell and
+the "starting from the back face" ordering — earning a ✗ and forcing a retry +
 engineer clarification that bleeds the budget. The 0.70 run hit this retry-storm
 on the **very first post-swap round** (R16, 1/4✓), never recovered budget
 discipline, and also lost R18 and R25. The 0.90 runs absorbed R16 and each lost
@@ -217,10 +220,13 @@ R23) too. R16/R18/R24/R25 fail in all three replicas.
 
 ### 1780480309 (opus) → 0.80 / 0.30 / 0.20 (mean 0.433)
 
-**Went well — in one replica.** The 0.80 run volunteers full symptom descriptions
-and the engineer asks good disambiguating questions; it then behaves like a
-*transferable* run, losing only the two 5-motif budget rounds (R16, R25) — the
-exact failure set of the strong gpt baselines.
+**Went well — in one replica.** In the 0.80 run the engineer asks good
+disambiguating questions when a tag is ambiguous (R21: `HOT` → "dim or bright?"),
+which keeps diagnosis on track; it loses only R16 and R25. R25 is a clean budget
+collapse (4/4✓); R16 is mixed — an un-cached `P14` spell-out plus one mis-rendered
+action (3/4✓). (First-message tags are near-identical across all three replicas, so
+the split is driven by the engineer's clarification loop, not by this observer
+volunteering more detail.)
 
 **Went wrong — in two replicas.** The breakdown is on the **observer→engineer
 (diagnosis) direction**, the opposite of the gpt baselines. The unchanged engineer
@@ -228,14 +234,15 @@ still expects the original observer's exact code vocabulary, so when the newcome
 emits an off-vocabulary code the engineer **mis-diagnoses and prescribes the wrong
 procedure**:
 
-- R21, single-motif Thermal Bleed: observer says `BURN` (not the baseline's
-  `THERM`); the engineer prescribes cooling/tone procedures (wrong motif) three
-  times; the single-motif round collapses (0/3✓) before the right one arrives.
+- R21, single-motif Thermal Bleed: observer says `BURN` (the baseline tagged it
+  `THERM`, which never even appeared in the visible 5–14 window); the engineer
+  prescribes three wrong procedures (cooling, tone, stone-trace) — never the
+  correct one; the single-motif round collapses (0/3✓).
 - R18: observer says `STALL`; the engineer assigns it the lamp/phase-inversion
   procedure; the action fails and the 5-motif round dies after one attempt.
 
-The two weak replicas collapse even on single/2-motif rounds (R19, R20, R21, R22,
-R23). The engineer abandoned its own bare `P`-codes post-swap (0–1 uses) and
+The two weak replicas collapse even on single/2-motif rounds (R19, R21, R22, R23).
+The engineer abandoned its own bare `P`-codes post-swap (0–1 uses) and
 reverted to verbose English — so the bottleneck is *not* an undecodable
 engineer→observer channel; it is the broken diagnosis handshake plus the resulting
 budget death.
@@ -263,9 +270,13 @@ to it specifically.
 
 - **Good (helps a link-only newcomer):** the engineer's code is **positional and
   self-describing** (`P1 L 20 g` = procedure · face · duration · intensity), so even
-  an unseen procedure number parses; the **codebook is spelled out on the link**;
-  repair is **explicit and cheap** (`spell P14` / `P4?`); the observer's words are
-  **transparent** (`low`, `leak`) with one token → one stable meaning.
+  an unseen procedure number parses. The codebook *itself* was set off-link in
+  postmortem (the newcomer never sees it), but a **same-model newcomer reconstructs**
+  each procedure from that grammar plus the natural physical actions partly shown
+  verbatim in early link rounds — it correctly executes bare `P3`/`P5`/`P10` that
+  were never spelled out on the link. Repair is **explicit and cheap** (`spell P14`
+  / `P4?`), and the observer's words are **transparent** (`low`, `leak`), one token →
+  one stable meaning.
 - **Bad:** only a residual — a code is "cached" only if it was spelled out in the
   visible window, so un-cached ones (`P4`, `P14`) cost one expensive spell-out.
 - **Under observer-swap — engineer-heavy:** the hard knowledge stays with the
@@ -282,11 +293,13 @@ to it specifically.
 [SE] Cool cloth all 8; remove; fan all 6 from L 8, gentle.
 ```
 
-- **Good:** codes are terse but **decodable**, the codebook is on-link, and the
+- **Good:** codes are terse but **decodable** — positional and reconstructible by a
+  same-model newcomer (the codebook itself lives off-link in postmortem) — and the
   engineer still owns the diagnosis and the procedure table.
 - **Bad:** the noisy `N` (no-change) loop keeps dropping the engineer into **verbose
   multi-step procedures the observer must reproduce verbatim**, and the strict judge
-  punishes small omissions ("slowly", "remove the cloth").
+  punishes small omissions (a missing intensity qualifier like "gentle volume", the
+  "remove the cloth" step).
 - **Under observer-swap — engineer-heavy, so it transfers:** a clean newcomer even
   beats the original observer's accumulated habits (learned **0.833 > intact-team
   resume 0.700**). The swap deletes no essential knowledge; the residual loss is
@@ -299,8 +312,9 @@ to it specifically.
 [SE] P13L8g
 ```
 
-- **Good:** the codebook is on-link and the codes are decodable once the format is
-  known.
+- **Good:** the engineer's codes are decodable once the format is known
+  (reconstructible by a same-model newcomer; the codebook itself is off-link in
+  postmortem).
 - **Bad:** the observer reports an **opaque two-letter diagnosis** (`DE` = Drift
   Escalation — a diagnosis, not a description), and the engineer's **near-homograph
   procedures** (`P13` = fan all 6 faces vs `P6` = fan L+opposite, both "cool cloth
@@ -320,7 +334,8 @@ to it specifically.
 [SE] raw
 ```
 
-- **Good:** the codebook is on-link and the hyphenated codes are parseable.
+- **Good:** the hyphenated engineer codes are parseable and reconstructible by a
+  same-model newcomer (the codebook itself is off-link in postmortem).
 - **Bad:** an **arbitrary disambiguation** (`LI` = Low Intensity but `LC` = Leak,
   with nothing in the transcript signalling the rule) plus a **cryptic, stateful
   repair handshake** — re-sending the same tag *means* "still failing", and `raw` is
@@ -400,27 +415,34 @@ Notes:
 | Engineer procedure code | `P13 L 8 g` (positional) | `p4 T 10 g` | `P9B5m` (space-free) | `P9-Bk-m-5` | `[15s/firm] P5 Bt` (factored) |
 | Parameter factoring | per-message | per-message | per-message | per-message | **per-round prefix** |
 | Repair convention | explicit `spell out` ✓ visible | implicit `N` + Q&A | `Tag?` re-tag | **cryptic** `raw`/`2nd code` | `resend symptoms` + Q&A |
-| Codebook defined on link? | yes (spell-outs) | yes | yes | yes | **no (postmortem)** |
+| Codebook location (newcomer never sees it) | postmortem | postmortem | postmortem | postmortem | postmortem |
+| Engineer codes reconstructible by a fresh same-model observer? | **high** (positional + natural actions) | **high** (positional) | medium (dense/space-free) | medium | low — engineer reverts to verbose; break is diagnosis-side |
 | Near-homograph procedures | low | low | **yes** (`P13`/`P6`) | medium | medium |
 | Dominant failure mode | budget tax (un-cached) | judge-wording retries | procedure conflation | repair-loop under-exec + budget | **diagnosis desync** + variance |
 | Transferability | **high** | **high** | medium-low | low | **lowest** (bimodal) |
 
 ### 4c — Takeaway
 
-The five baselines trace a monotonic transferability gradient that matches the
-amount of *off-link, co-adapted shared state* each protocol relies on:
+The five baselines trace a monotonic transferability gradient. The codebook is
+off-link (postmortem) in **every** case, so codebook *location* is not the axis.
+What differs is **(a) how reconstructible the engineer's half is to a same-model
+newcomer** and **(b) how much competence the protocol offloaded onto the
+swapped-out observer** (diagnosis, repair-state, vocabulary):
 
 ```
 high transfer ........................................ low transfer
 1779909805   1780600649   1780600361   1780612051   1780480309
 (+0.13)       (0.00)        (−0.20)       (−0.33)       (−0.57)
-named codes   terse codes   obs-side dx   dx+disambig   dx + postmortem
-+ spell-out   + verbose     + homographs  + cryptic     codebook + tight
-repair        procedures                  repair        co-adaptation
+reconstructible decodable   obs-side dx   dx + arb.     dx + tight
+codes + cheap   + verbose   + near-       disambig +    co-adaptation
+repair          procedures  homographs    cryptic repair (off-vocab)
 ```
 
-Positional self-describing codes with an explicit, transcript-visible repair
-transfer cleanly; protocols whose competence is offloaded into the observer's
-diagnosis, arbitrary learned conventions, or a postmortem-negotiated codebook do
-not — and the opus case shows that the very tightness that makes the intact pair
-perfect (1.0) is what makes it most fragile to replacement.
+Reconstructible, positional engineer codes plus a cheap, explicit repair transfer
+cleanly — the newcomer can rebuild the engineer's side, and the hard knowledge
+stayed with the *preserved* engineer. Transfer fails when competence was offloaded
+onto the *swapped-out* observer (diagnosis, arbitrary conventions, stateful repair
+handshakes) or when the engineer is so tightly co-adapted to the original observer
+that a fresh one's off-vocabulary tokens make it mis-diagnose (opus). The intact
+pair's perfect 1.0 (opus) is itself the measure of that co-adaptation — exactly what
+replacement destroys.

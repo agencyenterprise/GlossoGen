@@ -83,7 +83,7 @@ collapse, because the naive reading ("it ran out of time / acted too slowly") is
 wrong:
 
 - The budget counts **only `link` `send_message` characters**. The
-  `stabilize_veyru` action texts (~150 chars each) do **not** count against it.
+  `stabilize_veyru` action texts (~150–200 chars each) do **not** count against it.
 - A round is `veyru_collapsed` the moment **cumulative link characters cross the
   budget** (250 here), on whichever message tips it over.
 - A multi-motif round needs **one passing stabilization per motif**. If the budget
