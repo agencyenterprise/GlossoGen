@@ -14,7 +14,7 @@ from pathlib import Path
 
 from fastapi import HTTPException, Request
 
-from schmidt.db.queries import get_run, insert_run
+from schmidt.db.queries import delete_run, get_run, insert_run
 from schmidt.server.identity.identity_model import Identity
 from schmidt.server.runs.discovery import ResolvedRun
 
@@ -122,4 +122,31 @@ async def register_new_run(
             created_by_user_id=created_by,
             source_run_scenario=source_run_scenario,
             source_run_dir_name=source_run_dir_name,
+        )
+
+
+async def deregister_run(
+    request: Request,
+    scenario: str,
+    run_dir_name: str,
+) -> None:
+    """Delete the ``runs`` index row for a run being removed from disk.
+
+    The mirror of ``register_new_run`` for the delete path: without it a
+    deleted run leaves an orphan row in the ``runs`` table, so the
+    Postgres-backed listing keeps surfacing a run whose directory is gone.
+
+    No-op in no-database local mode (``pool`` is ``None``): the filesystem is
+    the index there, so removing the directory already deregisters the run.
+    """
+    pool = request.app.state.db_pool
+    if pool is None:
+        return
+    identity = get_identity(request=request)
+    async with pool.connection() as conn:
+        await delete_run(
+            conn=conn,
+            group_id=identity.active_group_id,
+            scenario=scenario,
+            run_dir_name=run_dir_name,
         )

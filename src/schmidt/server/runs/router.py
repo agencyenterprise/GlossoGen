@@ -27,7 +27,7 @@ from schmidt.server.runs.detail_reader import (
 )
 from schmidt.server.runs.discovery import compose_run_id, scan_jsonl
 from schmidt.server.runs.listing import list_all_labels_for_group, list_runs_page_for_group
-from schmidt.server.runs.lookup import get_identity, resolve_run_or_404
+from schmidt.server.runs.lookup import deregister_run, get_identity, resolve_run_or_404
 from schmidt.server.runs.models import (
     AllLabelsResponse,
     DebugLogsResponse,
@@ -94,7 +94,9 @@ async def get_run_detail(
     request: Request,
 ) -> RunDetailResponse:
     """Get full detail for a specific simulation run."""
-    resolved = await resolve_run_or_404(request=request, scenario=scenario, run_dir_name=run_dir_name)
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
     log_path = resolved.run_dir / f"{resolved.scenario_name}.jsonl"
     identity = get_identity(request=request)
     children = await build_derived_run_references(
@@ -118,7 +120,9 @@ async def get_run_evaluation(
     Lighter than the full run-detail endpoint — used by the runs list to lazy-load
     measurements on hover without pulling messages, reasoning, or tool use.
     """
-    resolved = await resolve_run_or_404(request=request, scenario=scenario, run_dir_name=run_dir_name)
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
     report_path = resolved.run_dir / f"{resolved.scenario_name}_report.json"
     return await load_evaluation_report(report_path=report_path)
 
@@ -130,7 +134,9 @@ async def get_eval_logs(
     request: Request,
 ) -> EvalLogsResponse:
     """Return the contents of the evaluation stdout log file."""
-    resolved = await resolve_run_or_404(request=request, scenario=scenario, run_dir_name=run_dir_name)
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
     eval_log_path = resolved.run_dir / "eval_stdout.log"
 
     if not eval_log_path.exists():
@@ -148,7 +154,9 @@ async def get_debug_logs(
     request: Request,
 ) -> DebugLogsResponse:
     """Return the debug log entries for a simulation run."""
-    resolved = await resolve_run_or_404(request=request, scenario=scenario, run_dir_name=run_dir_name)
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
     log_path = resolved.run_dir / f"{resolved.scenario_name}.jsonl"
     debug_path = debug_log_path_for(log_path=log_path, scenario_name=resolved.scenario_name)
     entries = await load_debug_logs(debug_log_path=debug_path)
@@ -158,7 +166,9 @@ async def get_debug_logs(
 @router.delete("/runs/{scenario}/{run_dir_name}", status_code=204)
 async def delete_run(scenario: str, run_dir_name: str, request: Request) -> None:
     """Stop the simulation if still running, then delete the run directory."""
-    resolved = await resolve_run_or_404(request=request, scenario=scenario, run_dir_name=run_dir_name)
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
 
     run_dir = resolved.run_dir
@@ -175,13 +185,16 @@ async def delete_run(scenario: str, run_dir_name: str, request: Request) -> None
         delete_manifest(run_dir=run_dir)
 
     shutil.rmtree(run_dir)
-    logger.info("Deleted run directory: %s", run_dir)
+    await deregister_run(request=request, scenario=scenario, run_dir_name=run_dir_name)
+    logger.info("Deleted run directory and index row: %s", run_dir)
 
 
 @router.post("/runs/{scenario}/{run_dir_name}/stop", status_code=204)
 async def stop_run(scenario: str, run_dir_name: str, request: Request) -> None:
     """Stop a running simulation by sending SIGTERM to its process."""
-    resolved = await resolve_run_or_404(request=request, scenario=scenario, run_dir_name=run_dir_name)
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
 
     manifest = read_manifest(run_dir=resolved.run_dir)
@@ -244,7 +257,9 @@ async def start_evaluation(
     are valid. Launches ``python -m schmidt evaluate`` as a detached
     background process.
     """
-    resolved = await resolve_run_or_404(request=request, scenario=scenario, run_dir_name=run_dir_name)
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
 
     run_dir = resolved.run_dir
     jsonl_path = run_dir / f"{resolved.scenario_name}.jsonl"
@@ -388,7 +403,9 @@ async def stream_run_events(
     The SSE ``data`` field of each frame contains a JSON object conforming to
     one of the SSEEvent union members, discriminated by the ``event_type`` field.
     """
-    resolved = await resolve_run_or_404(request=request, scenario=scenario, run_dir_name=run_dir_name)
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
 
     manifest = read_manifest(run_dir=resolved.run_dir)
@@ -426,7 +443,9 @@ async def update_labels(
     request: Request,
 ) -> UpdateLabelsResponse:
     """Set labels for a simulation run, replacing any existing labels."""
-    resolved = await resolve_run_or_404(request=request, scenario=scenario, run_dir_name=run_dir_name)
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
     labels_path = resolved.run_dir / "labels.json"
     labels_path.write_bytes(orjson.dumps(body.labels))
@@ -442,7 +461,9 @@ async def update_note(
     request: Request,
 ) -> UpdateNoteResponse:
     """Set or update the note for a simulation run."""
-    resolved = await resolve_run_or_404(request=request, scenario=scenario, run_dir_name=run_dir_name)
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
     note_path = resolved.run_dir / "note.md"
     note_path.write_text(body.content, encoding="utf-8")
@@ -453,7 +474,9 @@ async def update_note(
 @router.get("/runs/{scenario}/{run_dir_name}/note", response_model=NoteResponse)
 async def get_note(scenario: str, run_dir_name: str, request: Request) -> NoteResponse:
     """Get the note content for a simulation run."""
-    resolved = await resolve_run_or_404(request=request, scenario=scenario, run_dir_name=run_dir_name)
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
     note_path = resolved.run_dir / "note.md"
     if not note_path.exists():
         return NoteResponse(content=None)
