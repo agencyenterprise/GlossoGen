@@ -303,6 +303,20 @@ async def update_run_status(
         )
 
 
+async def delete_run(
+    conn: AsyncConnection[TupleRow],
+    group_id: UUID,
+    scenario: str,
+    run_dir_name: str,
+) -> None:
+    """Delete a run's index row, scoped to its owning group."""
+    async with conn.cursor() as cur:
+        await cur.execute(
+            "DELETE FROM runs WHERE group_id = %s AND scenario = %s AND run_dir_name = %s",
+            (group_id, scenario, run_dir_name),
+        )
+
+
 async def get_last_active_group(
     conn: AsyncConnection[TupleRow],
     user_id: str,
