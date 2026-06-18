@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
 from schmidt.eval_manifest import read_eval_manifest
+from schmidt.evaluation.reports.evaluation_report import EvaluationReport, write_report
 from schmidt.models.event import RunStatus, SimulationEnded
 from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.server.response_models import LaunchStatus
@@ -40,6 +41,7 @@ from schmidt.server.runs.models import (
     SSEEvent,
     StartEvaluationRequest,
     StartEvaluationResponse,
+    UpdateEvaluationResponse,
     UpdateLabelsRequest,
     UpdateLabelsResponse,
     UpdateNoteRequest,
@@ -482,6 +484,40 @@ async def get_note(scenario: str, run_dir_name: str, request: Request) -> NoteRe
         return NoteResponse(content=None)
     content = note_path.read_text(encoding="utf-8")
     return NoteResponse(content=content)
+
+
+@router.put(
+    "/runs/{scenario}/{run_dir_name}/evaluation",
+    response_model=UpdateEvaluationResponse,
+)
+async def update_evaluation(
+    scenario: str,
+    run_dir_name: str,
+    body: EvaluationReport,
+    request: Request,
+) -> UpdateEvaluationResponse:
+    """Replace the saved evaluation report for a simulation run on disk.
+
+    Used by ``schmidt sync-metadata-to-prod`` to push freshly-evaluated
+    measurements onto runs that already exist on the remote without
+    re-uploading the full bundle. The PUT is a full replace — every
+    existing measurement is overwritten with the body.
+    """
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
+    run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
+    report_path = resolved.run_dir / f"{resolved.scenario_name}_report.json"
+    await write_report(report=body, report_path=report_path)
+    logger.info(
+        "Updated evaluation report for run %s (%d measurements)",
+        run_id,
+        len(body.measurements),
+    )
+    return UpdateEvaluationResponse(
+        run_id=run_id,
+        measurement_count=len(body.measurements),
+    )
 
 
 @router.get("/labels", response_model=AllLabelsResponse)
