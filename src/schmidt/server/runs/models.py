@@ -452,6 +452,13 @@ class UpdateNoteResponse(BaseModel):
     content: str
 
 
+class UpdateEvaluationResponse(BaseModel):
+    """Response after replacing a run's evaluation report on disk."""
+
+    run_id: str
+    measurement_count: int
+
+
 class NoteResponse(BaseModel):
     """Lightweight response for fetching a run's note content."""
 
@@ -672,9 +679,7 @@ _CORE_SSE_TYPES: tuple[type[BaseModel], ...] = (
 )
 
 _SCENARIO_SSE_TYPES: tuple[type[BaseModel], ...] = tuple(
-    cls
-    for ext in SCENARIO_RUN_EXTENSIONS.values()
-    for cls in ext.sse_event_classes
+    cls for ext in SCENARIO_RUN_EXTENSIONS.values() for cls in ext.sse_event_classes
 )
 
 _sse_event_union: Any = Union[(*_CORE_SSE_TYPES, *_SCENARIO_SSE_TYPES)]

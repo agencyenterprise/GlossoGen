@@ -1,14 +1,17 @@
-"""Bulk sync of local run metadata (labels) to a remote schmidt server.
+"""Bulk sync of local run metadata (labels + evaluation report) to a remote.
 
 Backs the ``schmidt sync-metadata-to-prod`` subcommand. Walks ``--runs-dir``,
 filters by scenario + report-present (same predicate as ``push-to-prod``),
-diffs each run's local ``labels.json`` against the labels the remote already
-holds, and PUTs the local list onto ``/api/g/{slug}/runs/{scenario}/{run_dir_name}/labels``
-for every drifted run.
+and for every local run that already exists on the remote:
 
-The PUT is a full replace — local is the source of truth. Runs that are
-missing from the remote entirely are ignored here; ``push-to-prod`` is the
-right tool for those.
+* PUTs the local labels onto ``/runs/{scenario}/{run_dir_name}/labels``
+  when the lists differ.
+* PUTs the local evaluation report onto ``/runs/{scenario}/{run_dir_name}/evaluation``
+  unconditionally — local is the source of truth, every PUT replaces the
+  saved report on disk.
+
+Runs that are missing from the remote entirely are ignored here;
+``push-to-prod`` is the right tool for those.
 """
 
 import asyncio
@@ -20,6 +23,7 @@ from typing import cast
 
 import httpx
 
+from schmidt.evaluation.reports.evaluation_report import load_report
 from schmidt.oauth_client import Credentials, load_or_refresh_credentials
 from schmidt.prod_push import HTTP_TIMEOUT, PushSpec, collect_local_runs
 
@@ -101,26 +105,22 @@ async def fetch_remote_run_labels(
     return out
 
 
-async def _put_labels(
+async def _put_with_retry(
     *,
     client: httpx.AsyncClient,
     credentials: Credentials,
-    scenario: str,
-    run_dir_name: str,
-    labels: list[str],
+    suffix: str,
+    json_body: dict[str, object],
 ) -> None:
-    """PUT a full label list, retrying transient errors up to ``_MAX_RETRIES``."""
-    url = (
-        f"{credentials.issuer_url}/api/g/{credentials.group_slug}"
-        f"/runs/{scenario}/{run_dir_name}/labels"
-    )
+    """PUT a JSON body to ``{group base}/{suffix}``, retrying transient errors."""
+    url = f"{credentials.issuer_url}/api/g/{credentials.group_slug}{suffix}"
     last_error: Exception | None = None
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
             response = await client.put(
                 url=url,
                 headers={"Authorization": f"Bearer {credentials.access_token}"},
-                json={"labels": labels},
+                json=json_body,
                 timeout=HTTP_TIMEOUT,
             )
             if response.status_code in _TRANSIENT_STATUS:
@@ -140,6 +140,49 @@ async def _put_labels(
     raise last_error
 
 
+async def _put_labels(
+    *,
+    client: httpx.AsyncClient,
+    credentials: Credentials,
+    scenario: str,
+    run_dir_name: str,
+    labels: list[str],
+) -> None:
+    """PUT a full label list, retrying transient errors up to ``_MAX_RETRIES``."""
+    await _put_with_retry(
+        client=client,
+        credentials=credentials,
+        suffix=f"/runs/{scenario}/{run_dir_name}/labels",
+        json_body={"labels": labels},
+    )
+
+
+async def _put_evaluation(
+    *,
+    client: httpx.AsyncClient,
+    credentials: Credentials,
+    scenario: str,
+    run_dir_name: str,
+    run_dir: Path,
+) -> bool:
+    """Load the local evaluation report and PUT it onto the remote run.
+
+    Returns ``False`` (silently) when no local report exists. The PUT body
+    is the full ``EvaluationReport`` JSON; the remote endpoint replaces
+    its on-disk copy.
+    """
+    report = await load_report(report_path=run_dir / f"{scenario}_report.json")
+    if report is None:
+        return False
+    await _put_with_retry(
+        client=client,
+        credentials=credentials,
+        suffix=f"/runs/{scenario}/{run_dir_name}/evaluation",
+        json_body=report.model_dump(mode="json"),
+    )
+    return True
+
+
 async def _sync_one(
     *,
     client: httpx.AsyncClient,
@@ -147,27 +190,39 @@ async def _sync_one(
     scenario: str,
     run_dir_name: str,
     run_id: str,
-    new_labels: list[str],
+    run_dir: Path,
+    new_labels: list[str] | None,
     semaphore: asyncio.Semaphore,
     position: int,
     total: int,
     tally: MetadataSyncTally,
 ) -> None:
-    """PUT a single run's labels under the concurrency semaphore."""
+    """PUT labels (when drifted) + evaluation report for one run."""
     async with semaphore:
         try:
-            await _put_labels(
+            if new_labels is not None:
+                await _put_labels(
+                    client=client,
+                    credentials=credentials,
+                    scenario=scenario,
+                    run_dir_name=run_dir_name,
+                    labels=new_labels,
+                )
+            await _put_evaluation(
                 client=client,
                 credentials=credentials,
                 scenario=scenario,
                 run_dir_name=run_dir_name,
-                labels=new_labels,
+                run_dir=run_dir,
             )
         except Exception as exc:
             logger.exception("[%d/%d] failed %s", position, total, run_id)
             tally.failed.append((run_id, str(exc)))
             return
-        logger.info("[%d/%d] synced %s -> %s", position, total, run_id, new_labels)
+        if new_labels is not None:
+            logger.info("[%d/%d] synced %s labels=%s + eval", position, total, run_id, new_labels)
+        else:
+            logger.info("[%d/%d] synced %s eval-only", position, total, run_id)
         tally.synced.append(run_id)
 
 
@@ -195,20 +250,40 @@ async def run_metadata_sync(*, spec: MetadataSyncSpec) -> MetadataSyncTally:
         remote = await fetch_remote_run_labels(client=client, credentials=credentials)
         logger.info("Remote total: %d", len(remote))
 
-        drift: list[tuple[str, str, str, list[str]]] = []
+        # For every local run that exists on prod, schedule a sync. Labels
+        # are pushed only when they differ; eval reports are always pushed
+        # (local is the source of truth, prod has no cheap way to detect
+        # measurement-level drift).
+        targets: list[tuple[str, str, str, Path, list[str] | None]] = []
+        drift_count = 0
         for run in local:
             remote_labels = remote.get(run.run_id)
             if remote_labels is None:
                 continue
             local_lbl = _local_labels(run_dir=run.run_dir)
+            new_labels: list[str] | None
             if sorted(local_lbl) != sorted(remote_labels):
-                drift.append((run.run_id, run.scenario_name, run.run_dir_name, local_lbl))
+                new_labels = local_lbl
+                drift_count += 1
+            else:
+                new_labels = None
+            targets.append(
+                (run.run_id, run.scenario_name, run.run_dir_name, run.run_dir, new_labels)
+            )
 
-        logger.info("Label drift: %d", len(drift))
+        logger.info(
+            "On-prod targets: %d (label-drift: %d, eval-only: %d)",
+            len(targets),
+            drift_count,
+            len(targets) - drift_count,
+        )
 
         if spec.dry_run:
-            for run_id, _, _, new_labels in drift:
-                logger.info("[dry-run] would PUT %s -> %s", run_id, new_labels)
+            for run_id, _, _, _, new_labels in targets:
+                if new_labels is not None:
+                    logger.info("[dry-run] %s labels=%s + eval", run_id, new_labels)
+                else:
+                    logger.info("[dry-run] %s eval-only", run_id)
             return tally
 
         semaphore = asyncio.Semaphore(spec.concurrency)
@@ -219,13 +294,16 @@ async def run_metadata_sync(*, spec: MetadataSyncSpec) -> MetadataSyncTally:
                 scenario=scenario,
                 run_dir_name=run_dir_name,
                 run_id=run_id,
+                run_dir=run_dir,
                 new_labels=new_labels,
                 semaphore=semaphore,
                 position=position,
-                total=len(drift),
+                total=len(targets),
                 tally=tally,
             )
-            for position, (run_id, scenario, run_dir_name, new_labels) in enumerate(drift, start=1)
+            for position, (run_id, scenario, run_dir_name, run_dir, new_labels) in enumerate(
+                targets, start=1
+            )
         ]
         await asyncio.gather(*tasks)
 
