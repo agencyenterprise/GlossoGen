@@ -158,6 +158,10 @@ def _load_results_uncached(
         labels = _read_labels(run_dir=run_dir)
         if "protocol_learnability" not in labels:
             continue
+        if "tool_leak" in labels:
+            # Runs produced under the since-fixed message_history_builder leak;
+            # excluded so the tab only reflects corrected (re-run) cohort members.
+            continue
         model_short = _label_value(labels=labels, prefix="model=") or "unknown"
         budget = _label_value(labels=labels, prefix="budget=") or "?"
         scenario_name = run_dir.parent.name
