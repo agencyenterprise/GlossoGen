@@ -123,7 +123,7 @@ When `postmortem_enabled` is true, a discussion phase follows each round. Both a
 
 ## Evaluation
 
-Veyru opts into platform metrics by implementing the scenario-level hooks (`judge_round_result`, `build_communication_rounds`, `detect_protocol_boundary_window`, `get_protocol_probe_config`, `restore_state_from_events`, `get_replace_agent_blocked_tool_call_channels`). Every metric described below is a platform metric living under [`src/schmidt/evaluation/metrics/`](../../evaluation/metrics/) — Veyru ships no scenario-private metric classes. All metrics return `Measurement` entries (`score`, `score_unit`, `summary`, `per_round`, `per_agent`).
+Veyru opts into platform metrics by implementing the scenario-level hooks (`judge_round_result`, `build_communication_rounds`, `detect_protocol_boundary_window`, `get_protocol_probe_config`, `get_protocol_explanation_config`, `restore_state_from_events`, `get_replace_agent_blocked_tool_call_channels`). `get_protocol_explanation_config` points the `protocol_explanation` metric at the per-role describe templates in [`prompts/describe/`](prompts/describe/), so each agent is asked to describe its emergent #link protocol in Veyru's own terms. Every metric described below is a platform metric living under [`src/schmidt/evaluation/metrics/`](../../evaluation/metrics/) — Veyru ships no scenario-private metric classes. All metrics return `Measurement` entries (`score`, `score_unit`, `summary`, `per_round`, `per_agent`).
 
 The communication-style metrics (`language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`) replace the older single `language_emergence` metric; each LLM-judge prompt scopes a single phenomenon so the metrics are non-overlapping.
 

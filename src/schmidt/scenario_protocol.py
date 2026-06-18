@@ -12,6 +12,7 @@ from typing import Any, NamedTuple, Protocol, Self
 from schmidt.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
 from schmidt.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
+from schmidt.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from schmidt.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from schmidt.evaluation.metrics.communication.round_view import CommunicationRoundView
 from schmidt.evaluation.reports.evaluation_report import EvaluationReport
@@ -474,6 +475,17 @@ class SimulationScenario(ABC):
         from question ``agent_role_filter`` strings to scenario role
         names. Returning ``None`` causes all four probe metrics to skip
         with no Measurement.
+        """
+        return None
+
+    def get_protocol_explanation_config(self) -> ProtocolExplanationConfig | None:
+        """Return this scenario's protocol-explanation configuration, or ``None``.
+
+        Used by the ``protocol_explanation`` metric. When a config is
+        returned, the metric renders the scenario's per-role prose template
+        (grounded in the scenario's communication setup) instead of its
+        generic prompt. Returning ``None`` keeps the generic prompt, so the
+        metric still runs on every scenario.
         """
         return None
 

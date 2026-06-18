@@ -14,6 +14,7 @@ GENERIC_METRIC_NAMES: list[str] = [
     "mean_chars_per_round",
     "neologism",
     "perplexity",
+    "protocol_explanation",
     "protocol_learned_after_swap",
     "protocol_probe",
     "protocol_probe_agent_pair_similarity",

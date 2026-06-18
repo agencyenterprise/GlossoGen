@@ -26,12 +26,13 @@ from pydantic_ai.messages import ModelMessage
 from schmidt.evaluation.metric_core.measurement import Measurement
 from schmidt.evaluation.metric_core.metric_protocol import Metric
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
-from schmidt.evaluation.metrics.protocol_probe.probe_agent import run_protocol_probe
-from schmidt.evaluation.metrics.protocol_probe.response_models import (
-    ProtocolProbeResponse,
-    ProtocolProbeUsageReport,
+from schmidt.evaluation.metrics.probe_usage_report import (
+    accumulate_probe_usage,
+    build_probe_usage_report,
 )
-from schmidt.evaluation.reports.evaluation_cost import EvaluationTokenUsage, compute_evaluation_cost
+from schmidt.evaluation.metrics.protocol_probe.probe_agent import run_protocol_probe
+from schmidt.evaluation.metrics.protocol_probe.response_models import ProtocolProbeResponse
+from schmidt.evaluation.reports.evaluation_cost import EvaluationTokenUsage
 from schmidt.llm.provider import LLMProvider
 from schmidt.message_history_builder import build_message_history
 from schmidt.models.agent_config import AgentConfig
@@ -162,7 +163,7 @@ class ProtocolProbeMetric(Metric):
                         usage_by_model=usage_by_model,
                     )
 
-        usage_report = _build_usage_report(usage_by_model=usage_by_model)
+        usage_report = build_probe_usage_report(usage_by_model=usage_by_model)
         usage_path = run_dir / _USAGE_FILE_NAME
         usage_path.write_text(usage_report.model_dump_json(indent=2) + "\n")
         summary = (
@@ -216,7 +217,7 @@ class ProtocolProbeMetric(Metric):
                     replica_index,
                 )
                 continue
-            _accumulate_usage(
+            accumulate_probe_usage(
                 usage_by_model=usage_by_model,
                 model=agent_config.model,
                 provider=agent_config.provider,
@@ -281,40 +282,3 @@ def _resolve_history_timestamp(events: list[SimulationEvent]) -> datetime:
     if not events:
         return datetime.now(tz=timezone.utc)
     return events[-1].timestamp
-
-
-def _accumulate_usage(
-    usage_by_model: dict[tuple[str, str], EvaluationTokenUsage],
-    model: str,
-    provider: str,
-    call_usage: EvaluationTokenUsage,
-) -> None:
-    """Increment the per-(model, provider) running totals by one probe call's usage."""
-    key = (model, provider)
-    existing = usage_by_model.get(key)
-    if existing is None:
-        usage_by_model[key] = call_usage
-        return
-    usage_by_model[key] = EvaluationTokenUsage(
-        input_tokens=existing.input_tokens + call_usage.input_tokens,
-        output_tokens=existing.output_tokens + call_usage.output_tokens,
-        cache_read_input_tokens=existing.cache_read_input_tokens
-        + call_usage.cache_read_input_tokens,
-        cache_creation_input_tokens=existing.cache_creation_input_tokens
-        + call_usage.cache_creation_input_tokens,
-    )
-
-
-def _build_usage_report(
-    usage_by_model: dict[tuple[str, str], EvaluationTokenUsage],
-) -> ProtocolProbeUsageReport:
-    """Compute per-model cost and aggregate the run total."""
-    per_model = [
-        compute_evaluation_cost(usage=usage, model=model, provider_name=provider)
-        for (model, provider), usage in usage_by_model.items()
-    ]
-    total = sum(entry.estimated_cost_usd for entry in per_model)
-    return ProtocolProbeUsageReport(
-        total_estimated_cost_usd=total,
-        per_model=per_model,
-    )
