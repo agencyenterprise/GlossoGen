@@ -64,6 +64,7 @@ from analysis.veyru_run_export.spreadsheet_writer import write_csvs, write_xlsx
 logger = logging.getLogger(__name__)
 
 _COHORT_LABEL = "protocol_learnability"
+_TOOL_LEAK_LABEL = "tool_leak"
 _ROUND_SUCCESS_METRIC = "round_success"
 _RANDOM_SEED_LABEL = "random_seed"
 
@@ -160,11 +161,14 @@ def _read_rounds_after_swap(run_dir: Path) -> int | None:
 def _build_record(evaluated: EvaluatedRun) -> ProtocolRunRecord | None:
     """Build a ``ProtocolRunRecord`` for a cohort run, or ``None`` if it doesn't qualify.
 
-    Qualifies when the run carries the ``protocol_learnability`` label, a ``phase=`` label, a
-    ``round_time_budget_seconds`` knob, and a ``round_success`` measurement.
+    Qualifies when the run carries the ``protocol_learnability`` label, is not labeled
+    ``tool_leak`` (runs produced under the since-fixed history-builder leak are excluded), a
+    ``phase=`` label, a ``round_time_budget_seconds`` knob, and a ``round_success`` measurement.
     """
     labels = read_labels(run_dir=evaluated.run_dir)
     if _COHORT_LABEL not in labels:
+        return None
+    if _TOOL_LEAK_LABEL in labels:
         return None
     phase = label_value(labels=labels, prefix="phase=")
     if phase is None:
