@@ -12,6 +12,7 @@ import io
 import logging
 import shutil
 import tarfile
+import time
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -162,6 +163,21 @@ async def export_run_bundle(
     )
 
 
+_ZIP_MIN_DATE_TIME: tuple[int, int, int, int, int, int] = (1980, 1, 1, 0, 0, 0)
+
+
+def _zip_date_time(mtime: float) -> tuple[int, int, int, int, int, int]:
+    """Return a zip-compatible ``date_time`` tuple, clamped to the 1980 epoch.
+
+    The zip format cannot represent timestamps before 1980; run directories
+    copied or extracted from older archives can carry such mtimes.
+    """
+    parts = time.localtime(mtime)
+    if parts.tm_year < 1980:
+        return _ZIP_MIN_DATE_TIME
+    return (parts.tm_year, parts.tm_mon, parts.tm_mday, parts.tm_hour, parts.tm_min, parts.tm_sec)
+
+
 def build_run_zip_bytes(run_dir: Path, run_dir_name: str) -> bytes:
     """Build a zip archive nesting the run files under a ``{run_dir_name}/`` folder.
 
@@ -177,7 +193,13 @@ def build_run_zip_bytes(run_dir: Path, run_dir_name: str) -> bytes:
             if not _should_include_in_bundle(path=entry_path, run_dir=run_dir):
                 continue
             arcname = str(Path(run_dir_name) / entry_path.relative_to(run_dir))
-            archive.write(filename=str(entry_path), arcname=arcname)
+            info = zipfile.ZipInfo(
+                filename=arcname,
+                date_time=_zip_date_time(mtime=entry_path.stat().st_mtime),
+            )
+            info.compress_type = zipfile.ZIP_DEFLATED
+            with entry_path.open("rb") as source, archive.open(info, mode="w") as target:
+                shutil.copyfileobj(source, target)
     return buffer.getvalue()
 
 
