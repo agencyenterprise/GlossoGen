@@ -3,15 +3,11 @@
 ``ProtocolProbeOutput`` is the structured output schema enforced on the LLM
 when answering a probe question. ``ProtocolProbeResponse`` is the row schema
 written to ``protocol_probe_responses.jsonl`` inside each run directory.
-``ProtocolProbeCallResult`` bundles one probe call's structured output with
-its token usage so the metric can aggregate cost per (model, provider).
 """
 
 from datetime import datetime
 
 from pydantic import BaseModel, Field
-
-from schmidt.evaluation.reports.evaluation_cost import EvaluationTokenUsage
 
 
 class ProtocolProbeOutput(BaseModel):
@@ -55,10 +51,3 @@ class ProtocolProbeResponse(BaseModel):
     cutoff_round: int | None
     reasoning_text: str
     response_text: str
-
-
-class ProtocolProbeCallResult(BaseModel):
-    """One probe LLM call's structured output bundled with its token usage."""
-
-    output: ProtocolProbeOutput
-    usage: EvaluationTokenUsage
