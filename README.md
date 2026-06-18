@@ -421,7 +421,22 @@ Useful flags:
 - `--dry-run` prints the diff without sending bytes.
 - `--concurrency N` (default 1, capped at 4) parallelizes uploads. Keep this small — each upload holds the bundle bytes in memory, and the export side iterates the run directory.
 
-The middleware accepts the MCP OAuth Bearer for both `/mcp/*` tool calls and `/api/g/{slug}/...` REST calls, so the same token works for browsing in Claude Code and pushing from the CLI.
+For runs that **already exist on prod** but whose local `labels.json` has been edited (re-evaluated, manually retagged, etc.), use the companion command:
+
+```bash
+# Diff local labels against the labels the remote returns from /runs,
+# and PUT the local list onto every drifted run. Local is the source of
+# truth — the PUT replaces the remote list. Use this when you only need
+# to push label edits without re-uploading bundles.
+schmidt sync-metadata-to-prod --runs-dir ./runs
+```
+
+Useful flags:
+- `--scenario <name>` (repeatable) restricts to specific scenarios.
+- `--dry-run` prints per-run label drift without sending PUTs.
+- `--concurrency N` (default 4, capped at 8) parallelizes the PUTs. Higher than `push-to-prod` because the request body is just the label list, not a tarball.
+
+The middleware accepts the MCP OAuth Bearer for both `/mcp/*` tool calls and `/api/g/{slug}/...` REST calls, so the same token works for browsing in Claude Code, pushing bundles, and syncing labels from the CLI.
 
 ## Scenarios
 
