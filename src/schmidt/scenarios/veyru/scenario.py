@@ -31,6 +31,7 @@ from schmidt.evaluation.metric_core.metric_protocol import Metric
 from schmidt.evaluation.metric_core.metric_registry import GENERIC_METRIC_REGISTRY
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
 from schmidt.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
+from schmidt.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from schmidt.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from schmidt.evaluation.metrics.communication.round_view import CommunicationRoundView
 from schmidt.evaluation.reports.evaluation_cost import compute_evaluation_cost
@@ -99,6 +100,22 @@ from schmidt.template_renderer import TemplateRenderer
 logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+
+def _protocol_role_groups() -> dict[str, frozenset[str]]:
+    """Map each role filter to the role names it covers (single-team + two-team)."""
+    return {
+        "field_observer": frozenset(
+            {FIELD_OBSERVER_ROLE, FIELD_OBSERVER_A_ROLE, FIELD_OBSERVER_B_ROLE}
+        ),
+        "stabilization_engineer": frozenset(
+            {
+                STABILIZATION_ENGINEER_ROLE,
+                STABILIZATION_ENGINEER_A_ROLE,
+                STABILIZATION_ENGINEER_B_ROLE,
+            }
+        ),
+    }
 
 
 class VeyruScenario(SimulationScenario):
@@ -557,21 +574,22 @@ class VeyruScenario(SimulationScenario):
         return ProtocolProbeConfig(
             questions_path=scenario_root / "protocol_probe_questions.json",
             prompts_dir=scenario_root / "prompts" / "probe",
-            role_groups={
-                "field_observer": frozenset(
-                    {FIELD_OBSERVER_ROLE, FIELD_OBSERVER_A_ROLE, FIELD_OBSERVER_B_ROLE}
-                ),
-                "stabilization_engineer": frozenset(
-                    {
-                        STABILIZATION_ENGINEER_ROLE,
-                        STABILIZATION_ENGINEER_A_ROLE,
-                        STABILIZATION_ENGINEER_B_ROLE,
-                    }
-                ),
-            },
+            role_groups=_protocol_role_groups(),
             role_templates={
                 "field_observer": "field_observer_probe.jinja",
                 "stabilization_engineer": "engineer_probe.jinja",
+            },
+        )
+
+    def get_protocol_explanation_config(self) -> ProtocolExplanationConfig | None:
+        """Point the protocol_explanation metric at Veyru's per-role describe templates."""
+        scenario_root = Path(__file__).resolve().parent
+        return ProtocolExplanationConfig(
+            prompts_dir=scenario_root / "prompts" / "describe",
+            role_groups=_protocol_role_groups(),
+            role_templates={
+                "field_observer": "field_observer_describe.jinja",
+                "stabilization_engineer": "engineer_describe.jinja",
             },
         )
 

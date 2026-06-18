@@ -23,6 +23,7 @@ replica_indices  # unused variable (src/schmidt/evaluation/metrics/protocol_prob
 schema_version  # unused variable (src/schmidt/evaluation/metrics/protocol_probe/protocol_probe_replica_self_similarity_metric.py:78)
 overall_mean_similarity  # unused variable (src/schmidt/evaluation/metrics/protocol_probe/protocol_probe_replica_self_similarity_metric.py:80)
 reasoning_text  # unused variable (src/schmidt/evaluation/metrics/protocol_probe/response_models.py:58)
+description_text  # unused variable (src/schmidt/evaluation/metrics/protocol_explanation_metric.py:85)
 transcript  # unused variable (src/schmidt/evaluation/round_transcript_builder.py:23)
 model_config  # unused variable (src/schmidt/models/agent_config.py:23)
 scenario_payload  # unused variable (src/schmidt/models/event.py:266)

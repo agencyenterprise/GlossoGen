@@ -5,15 +5,13 @@ when answering a probe question. ``ProtocolProbeResponse`` is the row schema
 written to ``protocol_probe_responses.jsonl`` inside each run directory.
 ``ProtocolProbeCallResult`` bundles one probe call's structured output with
 its token usage so the metric can aggregate cost per (model, provider).
-``ProtocolProbeUsageReport`` is the schema written to
-``protocol_probe_usage.json`` inside each run directory.
 """
 
 from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from schmidt.evaluation.reports.evaluation_cost import EvaluationCost, EvaluationTokenUsage
+from schmidt.evaluation.reports.evaluation_cost import EvaluationTokenUsage
 
 
 class ProtocolProbeOutput(BaseModel):
@@ -64,17 +62,3 @@ class ProtocolProbeCallResult(BaseModel):
 
     output: ProtocolProbeOutput
     usage: EvaluationTokenUsage
-
-
-class ProtocolProbeUsageReport(BaseModel):
-    """Aggregated probe LLM usage and cost across one evaluation run.
-
-    Written to ``protocol_probe_usage.json`` inside the run directory after
-    every probe metric invocation. ``per_model`` lists one entry per
-    distinct ``(model, provider)`` pair encountered during the run; the
-    list typically has one entry in single-team runs and may have more in
-    cross-team or replace-agent runs where agents use different models.
-    """
-
-    total_estimated_cost_usd: float
-    per_model: list[EvaluationCost]

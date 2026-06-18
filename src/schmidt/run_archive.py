@@ -86,6 +86,8 @@ _EXCLUDED_COPY_NAMES: frozenset[str] = frozenset(
         # ``has_evaluation`` true before any post-resume metric has run.
         "communication_open_coding.json",
         "communication_feature_presence.json",
+        "protocol_explanation_responses.jsonl",
+        "protocol_explanation_usage.json",
         "protocol_probe_responses.jsonl",
         "protocol_probe_usage.json",
         "protocol_probe_replica_self_similarity.json",
