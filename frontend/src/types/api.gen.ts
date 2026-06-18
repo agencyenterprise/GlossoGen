@@ -71,7 +71,16 @@ export interface paths {
          *     measurements on hover without pulling messages, reasoning, or tool use.
          */
         get: operations["get_run_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluation_get"];
-        put?: never;
+        /**
+         * Update Evaluation
+         * @description Replace the saved evaluation report for a simulation run on disk.
+         *
+         *     Used by ``schmidt sync-metadata-to-prod`` to push freshly-evaluated
+         *     measurements onto runs that already exist on the remote without
+         *     re-uploading the full bundle. The PUT is a full replace — every
+         *     existing measurement is overwritten with the body.
+         */
+        put: operations["update_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluation_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -508,6 +517,21 @@ export interface components {
             model: string;
             /** Provider */
             provider: string;
+        };
+        /**
+         * AgentObservation
+         * @description One agent's contribution to a Measurement.
+         *
+         *     Used only when an agent-level breakdown is meaningful (e.g.
+         *     content_filter_refusal per agent). Empty list otherwise.
+         */
+        AgentObservation: {
+            /** Agent Id */
+            agent_id: string;
+            /** Value */
+            value: number;
+            /** Note */
+            note: string;
         };
         /**
          * AgentObservationResponse
@@ -1045,6 +1069,52 @@ export interface components {
             evaluation_cost: components["schemas"]["EvalCostResponse"] | null;
         };
         /**
+         * EvaluationCost
+         * @description Token usage and estimated dollar cost for an evaluation run.
+         */
+        EvaluationCost: {
+            usage: components["schemas"]["EvaluationTokenUsage"];
+            /** Estimated Cost Usd */
+            estimated_cost_usd: number;
+            /** Model */
+            model: string;
+            /** Provider Name */
+            provider_name: string;
+        };
+        /**
+         * EvaluationReport
+         * @description Aggregated evaluation output for a single simulation run.
+         *
+         *     Attributes:
+         *         simulation_id: Unique identifier of the simulation that was evaluated.
+         *         scenario_name: Name of the scenario that was simulated.
+         *         measurements: Collection of measurements produced by all metrics.
+         *         evaluation_cost: Token usage and estimated dollar cost for the evaluation.
+         */
+        EvaluationReport: {
+            /** Simulation Id */
+            simulation_id: string;
+            /** Scenario Name */
+            scenario_name: string;
+            /** Measurements */
+            measurements: components["schemas"]["Measurement"][];
+            evaluation_cost: components["schemas"]["EvaluationCost"];
+        };
+        /**
+         * EvaluationTokenUsage
+         * @description Accumulated token counts across all LLM calls during an evaluation run.
+         */
+        EvaluationTokenUsage: {
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Cache Read Input Tokens */
+            cache_read_input_tokens: number;
+            /** Cache Creation Input Tokens */
+            cache_creation_input_tokens: number;
+        };
+        /**
          * ForkSource
          * @description Provenance information for a forked simulation run.
          */
@@ -1119,6 +1189,30 @@ export interface components {
          * @enum {string}
          */
         LaunchStatus: "started";
+        /**
+         * Measurement
+         * @description Numeric measurement result for a single metric applied to a run.
+         *
+         *     ``score`` is the metric's overall scalar (mean, fraction, count, ...).
+         *     ``score_unit`` is a free-form human-readable label describing what
+         *     ``score`` represents. ``summary`` is a one-line rollup.
+         *     ``per_round`` and ``per_agent`` carry structured breakdowns that
+         *     downstream tools can plot or filter without re-parsing strings.
+         */
+        Measurement: {
+            /** Metric Name */
+            metric_name: string;
+            /** Score */
+            score: number;
+            /** Score Unit */
+            score_unit: string;
+            /** Summary */
+            summary: string;
+            /** Per Round */
+            per_round: components["schemas"]["RoundObservation"][];
+            /** Per Agent */
+            per_agent: components["schemas"]["AgentObservation"][];
+        };
         /**
          * MeasurementResponse
          * @description Numeric measurement produced by a single metric for the run detail endpoint.
@@ -1271,6 +1365,23 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
+        };
+        /**
+         * RoundObservation
+         * @description One round's structured contribution to a Measurement.
+         *
+         *     A metric only emits a RoundObservation for rounds it has something to
+         *     say about. Pure metrics (perplexity, mlu) emit one per round with
+         *     messages; flag-style metrics (neologism, round_ended_idle) emit one
+         *     per round where the phenomenon fired.
+         */
+        RoundObservation: {
+            /** Round Number */
+            round_number: number;
+            /** Value */
+            value: number;
+            /** Note */
+            note: string;
         };
         /**
          * RoundObservationResponse
@@ -1897,6 +2008,16 @@ export interface components {
             result_round_number: number | null;
         };
         /**
+         * UpdateEvaluationResponse
+         * @description Response after replacing a run's evaluation report on disk.
+         */
+        UpdateEvaluationResponse: {
+            /** Run Id */
+            run_id: string;
+            /** Measurement Count */
+            measurement_count: number;
+        };
+        /**
          * UpdateLabelsRequest
          * @description Request body for setting labels on a run.
          */
@@ -2203,6 +2324,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvalReportResponse"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluation_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario: string;
+                run_dir_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvaluationReport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateEvaluationResponse"];
                 };
             };
             /** @description Validation Error */
