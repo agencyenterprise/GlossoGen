@@ -1,7 +1,10 @@
 """FastAPI router for exporting and importing simulation run bundles.
 
 A bundle is a tar.gz archive of the entire run directory, enabling full
-run portability between machines.
+run portability between machines. A separate zip export produces a
+human-extractable archive: ``{run_dir_name}.zip`` containing a single
+top-level ``{run_dir_name}/`` folder, so it drops straight into a
+scenario's runs directory.
 """
 
 import asyncio
@@ -9,6 +12,7 @@ import io
 import logging
 import shutil
 import tarfile
+import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -152,6 +156,64 @@ async def export_run_bundle(
     return StreamingResponse(
         content=io.BytesIO(bundle_bytes),
         media_type="application/gzip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+def build_run_zip_bytes(run_dir: Path, run_dir_name: str) -> bytes:
+    """Build a zip archive nesting the run files under a ``{run_dir_name}/`` folder.
+
+    Applies the same include/exclude rules as the tar.gz bundle but omits the
+    bundle manifest, so extracting the archive into a scenario's runs directory
+    reproduces the original ``{run_dir_name}/`` run directory verbatim.
+    """
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for entry_path in sorted(run_dir.rglob("*")):
+            if not entry_path.is_file():
+                continue
+            if not _should_include_in_bundle(path=entry_path, run_dir=run_dir):
+                continue
+            arcname = str(Path(run_dir_name) / entry_path.relative_to(run_dir))
+            archive.write(filename=str(entry_path), arcname=arcname)
+    return buffer.getvalue()
+
+
+@router.get(
+    "/runs/{scenario}/{run_dir_name}/export/zip",
+    responses={
+        200: {
+            "description": "Zip archive of the simulation run, nested under a run-id folder.",
+            "content": {"application/zip": {}},
+        },
+    },
+)
+async def export_run_zip(
+    scenario: str,
+    run_dir_name: str,
+    request: Request,
+) -> StreamingResponse:
+    """Export a simulation run as a ``{run_dir_name}.zip`` for manual extraction."""
+    resolved = await resolve_run_or_404(
+        request=request,
+        scenario=scenario,
+        run_dir_name=run_dir_name,
+    )
+
+    folder_name = resolved.run_dir.name
+    zip_bytes = await asyncio.to_thread(
+        build_run_zip_bytes,
+        resolved.run_dir,
+        folder_name,
+    )
+
+    filename = f"{folder_name}.zip"
+
+    return StreamingResponse(
+        content=io.BytesIO(zip_bytes),
+        media_type="application/zip",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
         },

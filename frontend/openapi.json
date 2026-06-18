@@ -895,6 +895,54 @@
         }
       }
     },
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/export/zip": {
+      "get": {
+        "summary": "Export Run Zip",
+        "description": "Export a simulation run as a ``{run_dir_name}.zip`` for manual extraction.",
+        "operationId": "export_run_zip_api_g__group_slug__runs__scenario___run_dir_name__export_zip_get",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "run_dir_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Dir Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Zip archive of the simulation run, nested under a run-id folder.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/zip": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/g/{group_slug}/runs/import": {
       "post": {
         "summary": "Import Run Bundle",

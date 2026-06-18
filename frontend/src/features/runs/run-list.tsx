@@ -705,9 +705,9 @@ export function RunList() {
                                 onClick={e => {
                                   e.stopPropagation();
                                   void downloadAuthenticatedFile({
-                                    path: `/api/g/{group_slug}/runs/${run.run_id}/export/bundle`,
+                                    path: `/api/g/{group_slug}/runs/${run.run_id}/export/zip`,
                                     searchParams: new URLSearchParams(),
-                                    fallbackFilename: `${run.run_id.replace("/", "_")}_bundle.tar.gz`,
+                                    fallbackFilename: `${splitRunId(run.run_id).run_dir_name}.zip`,
                                   });
                                 }}
                               >

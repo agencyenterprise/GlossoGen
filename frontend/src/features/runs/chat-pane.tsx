@@ -22,6 +22,7 @@ import Link from "next/link";
 import { Tooltip } from "@/shared/components/ui/tooltip";
 import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
+import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
 import { useGroupPath } from "@/features/auth/group-context";
 import { deriveInitials, type AgentColor } from "./agent-colors";
@@ -592,9 +593,9 @@ export function ChatPane({
             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             onClick={() => {
               void downloadAuthenticatedFile({
-                path: `/api/g/{group_slug}/runs/${runId}/export/bundle`,
+                path: `/api/g/{group_slug}/runs/${runId}/export/zip`,
                 searchParams: new URLSearchParams(),
-                fallbackFilename: `${runId.slice(0, 8)}_bundle.tar.gz`,
+                fallbackFilename: `${splitRunId(runId).run_dir_name}.zip`,
               });
             }}
           >
