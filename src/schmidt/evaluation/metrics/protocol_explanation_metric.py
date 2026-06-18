@@ -3,9 +3,10 @@
 For every agent in the run, reconstructs that agent's end-of-run pydantic-ai
 message history (applying the replace-agent channel-visibility filter when the
 agent was the one swapped in via ``replace-agent``) and runs one structured
-``run_protocol_probe`` call asking the agent to explain the protocol it actually
-remembers using. Each agent is probed under its own original model/provider, so
-the answer is the agent's own account of the protocol — not a third party's.
+``run_structured_probe`` call (``output_type=ProtocolExplanationOutput``) asking
+the agent to explain the protocol it actually remembers using. Each agent is
+probed under its own original model/provider, so the answer is the agent's own
+account of the protocol — not a third party's.
 
 When the scenario implements ``get_protocol_explanation_config``, the metric
 renders that scenario's per-role prose template (grounded in the scenario's
@@ -24,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import NamedTuple
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from schmidt.evaluation.metric_core.measurement import AgentObservation, Measurement
 from schmidt.evaluation.metric_core.metric_protocol import Metric
@@ -34,7 +35,7 @@ from schmidt.evaluation.metrics.probe_usage_report import (
     accumulate_probe_usage,
     build_probe_usage_report,
 )
-from schmidt.evaluation.metrics.protocol_probe.probe_agent import run_protocol_probe
+from schmidt.evaluation.metrics.protocol_probe.probe_agent import run_structured_probe
 from schmidt.evaluation.reports.evaluation_cost import EvaluationTokenUsage
 from schmidt.llm.provider import LLMProvider
 from schmidt.message_history_builder import build_message_history
@@ -66,6 +67,21 @@ _GENERIC_PROBE_PROMPT = (
     "protocol as it actually is, not as it could be. If your team did not "
     "develop any meaningful protocol, say so explicitly."
 )
+
+
+class ProtocolExplanationOutput(BaseModel):
+    """Structured output the probed agent must emit: a prose protocol description."""
+
+    description: str = Field(
+        description=(
+            "A thorough, concrete prose description of the communication protocol "
+            "your team actually developed: the abbreviations, codes, or symbols you "
+            "use and exactly what each means; how you structure a typical message; "
+            "how you signal failure or retry; and any conventions you negotiated. "
+            "Quote specific examples you remember. If your team did not develop any "
+            "meaningful protocol, say so explicitly."
+        )
+    )
 
 
 class ProtocolExplanationResponse(BaseModel):
@@ -154,14 +170,15 @@ class ProtocolExplanationMetric(Metric):
                 role_name=agent.role_name,
             )
             try:
-                probe = await run_protocol_probe(
+                probe = await run_structured_probe(
                     agent_id=agent.agent_id,
                     role_name=agent.role_name,
                     full_system_prompt=full_system_prompt,
                     model=agent.model,
                     provider=agent.provider,
                     message_history=history,
-                    probe_prompt=resolved.prompt_text,
+                    user_prompt_parts=[resolved.prompt_text],
+                    output_type=ProtocolExplanationOutput,
                 )
             except Exception:
                 logger.exception(
@@ -186,14 +203,14 @@ class ProtocolExplanationMetric(Metric):
                     model=agent.model,
                     provider=agent.provider,
                     template_name=resolved.template_name,
-                    description_text=probe.output.message,
+                    description_text=probe.output.description,
                 )
             )
             observations.append(
                 AgentObservation(
                     agent_id=agent.agent_id,
                     value=float(len(history)),
-                    note=probe.output.message,
+                    note=probe.output.description,
                 )
             )
 
