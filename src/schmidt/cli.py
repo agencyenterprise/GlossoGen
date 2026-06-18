@@ -60,6 +60,7 @@ from schmidt.models.event import (
 )
 from schmidt.oauth_client import CREDENTIALS_PATH, run_login
 from schmidt.port_allocator import find_free_port
+from schmidt.prod_metadata_sync import MetadataSyncSpec, run_metadata_sync
 from schmidt.prod_push import PushSpec, run_push_to_prod
 from schmidt.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from schmidt.replace_agent import replace_agent_in_run
@@ -591,6 +592,53 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    sync_metadata_parser = subparsers.add_parser(
+        "sync-metadata-to-prod",
+        help=(
+            "Sync local labels onto runs that already exist on prod. Walks "
+            "local runs/, diffs each run's labels.json against the labels "
+            "the remote returns from /runs, and PUTs the local list onto "
+            "/api/g/{slug}/runs/{scenario}/{run_dir_name}/labels for every "
+            "drifted run. Local is the source of truth — the PUT replaces "
+            "the remote list (use `push-to-prod` for runs that aren't yet "
+            "on prod at all)."
+        ),
+    )
+    sync_metadata_parser.add_argument(
+        "--runs-dir",
+        dest="runs_dir",
+        type=str,
+        default="./runs",
+        help="Root directory of local runs (default: ./runs).",
+    )
+    sync_metadata_parser.add_argument(
+        "--scenario",
+        dest="scenarios",
+        action="append",
+        default=[],
+        help=(
+            "Restrict to runs of this scenario (repeatable, OR semantics). "
+            "When omitted, every scenario directory is considered."
+        ),
+    )
+    sync_metadata_parser.add_argument(
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        help="Print the per-run drift without sending any PUTs.",
+    )
+    sync_metadata_parser.add_argument(
+        "--concurrency",
+        dest="concurrency",
+        type=int,
+        default=4,
+        help=(
+            "Max concurrent PUTs (default 4, hard-capped at 8). Lightweight "
+            "compared to bundle uploads because the payload is just the "
+            "label list."
+        ),
+    )
+
     return parser
 
 
@@ -638,6 +686,11 @@ def main() -> None:
     if known_args.command == "push-to-prod":
         args = parser.parse_args()
         asyncio.run(_run_push_to_prod(args=args))
+        return
+
+    if known_args.command == "sync-metadata-to-prod":
+        args = parser.parse_args()
+        asyncio.run(_run_sync_metadata_to_prod(args=args))
         return
 
     scenario_cls = get_scenario_class(name=known_args.scenario_name)
@@ -1510,5 +1563,22 @@ async def _run_push_to_prod(args: argparse.Namespace) -> None:
         f"skipped={len(tally.skipped)}  "
         f"failed={len(tally.failed)}"
     )
+    if tally.failed:
+        raise SystemExit(1)
+
+
+async def _run_sync_metadata_to_prod(args: argparse.Namespace) -> None:
+    """Drive the ``schmidt sync-metadata-to-prod`` subcommand."""
+    concurrency = max(1, min(int(args.concurrency), 8))
+    scenarios_arg: list[str] = args.scenarios
+    scenarios = frozenset(scenarios_arg) if scenarios_arg else None
+    spec = MetadataSyncSpec(
+        runs_dir=Path(args.runs_dir),
+        scenarios=scenarios,
+        dry_run=args.dry_run,
+        concurrency=concurrency,
+    )
+    tally = await run_metadata_sync(spec=spec)
+    print(f"Done. synced={len(tally.synced)}  failed={len(tally.failed)}")
     if tally.failed:
         raise SystemExit(1)

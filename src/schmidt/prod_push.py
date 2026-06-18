@@ -60,7 +60,7 @@ class PushTally:
 _TRANSIENT_STATUS = frozenset({500, 502, 503, 504})
 _RETRY_BASE_DELAY_SECONDS = 2.0
 _MAX_RETRIES = 3
-_HTTP_TIMEOUT = httpx.Timeout(connect=30.0, read=600.0, write=600.0, pool=30.0)
+HTTP_TIMEOUT = httpx.Timeout(connect=30.0, read=600.0, write=600.0, pool=30.0)
 
 
 def _load_labels(run_dir: Path) -> list[str] | None:
@@ -143,7 +143,7 @@ async def fetch_remote_run_ids(
             url=f"{credentials.issuer_url}/api/g/{credentials.group_slug}/runs",
             params={"offset": offset, "limit": page_size},
             headers={"Authorization": f"Bearer {credentials.access_token}"},
-            timeout=_HTTP_TIMEOUT,
+            timeout=HTTP_TIMEOUT,
         )
         response.raise_for_status()
         payload = response.json()
@@ -180,7 +180,7 @@ async def _post_bundle(
         url=f"{credentials.issuer_url}/api/g/{credentials.group_slug}/runs/import",
         headers={"Authorization": f"Bearer {credentials.access_token}"},
         files={"file": (filename, bundle_bytes, "application/gzip")},
-        timeout=_HTTP_TIMEOUT,
+        timeout=HTTP_TIMEOUT,
     )
     response.raise_for_status()
     return response.json()
@@ -276,7 +276,7 @@ async def run_push_to_prod(*, spec: PushSpec) -> PushTally:
     )
 
     tally = PushTally(uploaded=[], skipped=[], failed=[])
-    async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
         remote_ids = await fetch_remote_run_ids(client=client, credentials=credentials)
         logger.info("Remote already has: %d runs", len(remote_ids))
 

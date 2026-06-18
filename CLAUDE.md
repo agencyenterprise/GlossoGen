@@ -267,7 +267,8 @@ OAuth configuration:
 CLI surface (uses the same OAuth flow):
 - `schmidt login` — walks the user through the OAuth handshake, stores `{access_token, refresh_token, group_slug}` in `~/.schmidt/credentials.json`. See `src/schmidt/oauth_client.py`.
 - `schmidt whoami` — round-trips through `GET /mcp/whoami` to print the token's bound group.
-- `schmidt push` — bulk-uploads local runs to a configured remote via `/api/g/<slug>/runs/import`. See `src/schmidt/prod_push.py`.
+- `schmidt push-to-prod` — bulk-uploads local runs to a configured remote via `/api/g/<slug>/runs/import`. Filters by label / scenario / report-present; idempotent on `run_id`. See `src/schmidt/prod_push.py`.
+- `schmidt sync-metadata-to-prod` — for runs that are *already* on prod, walks local `labels.json`, diffs against what the remote's `/runs` listing returns, and PUTs the local list to `/api/g/<slug>/runs/{scenario}/{run_dir_name}/labels` for every drifted run. Local is the source of truth; the PUT replaces the full list (use `push-to-prod` for runs not yet on prod). See `src/schmidt/prod_metadata_sync.py`.
 
 Implementation files:
 - `src/schmidt/server/mcp/oauth_provider.py` — `OAuthAuthorizationServerProvider` implementation; `authorize` parks pending requests in Clerk mode and calls `approve_pending_consent` from the consent router.
