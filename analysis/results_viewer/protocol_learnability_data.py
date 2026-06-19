@@ -23,9 +23,12 @@ import streamlit as st
 class BaselineLearnability(NamedTuple):
     """Aggregated expected / expected_no_postmortem / learned / cross_family round-success.
 
-    ``expected_no_pm_*`` and ``cross_family_*`` carry ``mean=0.0, std=0.0, n=0``
-    when the corresponding derived runs haven't been collected yet for this
-    source; the renderer skips the marker when the replica count is zero.
+    ``expected_no_pm_*``, ``cross_family_*``, and ``llama_*`` carry
+    ``mean=0.0, std=0.0, n=0`` when the corresponding derived runs haven't been
+    collected yet for this source; the renderer skips the marker when the
+    replica count is zero. ``llama_*`` aggregates every ``phase=replace_llama``
+    replica (a fresh self-hosted Llama observer) across all history windows; the
+    per-window, per-run breakdown lives in :func:`load_llama_history_runs`.
     ``cross_family_observer`` is the ``observer=`` label value (``"gpt54"``,
     ``"opus47"``, ...) of the cross-family observer family, or ``None`` when no
     cross-family runs exist yet.
@@ -43,11 +46,20 @@ class BaselineLearnability(NamedTuple):
     cross_family_mean: float
     cross_family_std: float
     cross_family_observer: str | None
+    llama_mean: float
+    llama_std: float
     delta: float
     n_expected: int
     n_expected_no_pm: int
     n_learned: int
     n_cross_family: int
+    n_llama: int
+    # Per-history-window scores ("0"/"1"/"5"/"10" → replica scores) for the
+    # windowed conditions, so the tab can recompute learned/llama over a chosen
+    # subset of history windows. The flat ``learned_*``/``llama_*`` fields above
+    # pool every window.
+    learned_by_history: dict[str, list[float]]
+    llama_by_history: dict[str, list[float]]
 
 
 class FeatureContrast(NamedTuple):
@@ -124,6 +136,11 @@ class _Accumulator:
         self.learned: list[float] = []
         self.cross_family: list[float] = []
         self.cross_family_observer: str | None = None
+        self.llama: list[float] = []
+        # Per-history-window scores for the windowed conditions, so the tab can
+        # filter learned/llama by history (0/1/5/10) without re-walking disk.
+        self.learned_by_history: dict[str, list[float]] = {}
+        self.llama_by_history: dict[str, list[float]] = {}
 
 
 def _iter_run_dirs(root: Path) -> list[Path]:
@@ -190,8 +207,16 @@ def _load_results_uncached(
             observer = _label_value(labels=labels, prefix="observer=")
             if observer is not None and acc.cross_family_observer is None:
                 acc.cross_family_observer = observer
+        elif "phase=replace_llama" in labels:
+            acc.llama.append(score)
+            history = _label_value(labels=labels, prefix="history=")
+            if history is not None:
+                acc.llama_by_history.setdefault(history, []).append(score)
         elif "phase=replace_learned" in labels:
             acc.learned.append(score)
+            history = _label_value(labels=labels, prefix="history=")
+            if history is not None:
+                acc.learned_by_history.setdefault(history, []).append(score)
 
     results: list[BaselineLearnability] = []
     for src_id, (model_short, budget) in baselines.items():
@@ -218,6 +243,12 @@ def _load_results_uncached(
         else:
             cross_family_mean = 0.0
             cross_family_std = 0.0
+        if acc.llama:
+            llama_mean = statistics.mean(acc.llama)
+            llama_std = statistics.stdev(acc.llama) if len(acc.llama) >= 2 else 0.0
+        else:
+            llama_mean = 0.0
+            llama_std = 0.0
         results.append(
             BaselineLearnability(
                 src_id=src_id,
@@ -232,11 +263,16 @@ def _load_results_uncached(
                 cross_family_mean=cross_family_mean,
                 cross_family_std=cross_family_std,
                 cross_family_observer=acc.cross_family_observer,
+                llama_mean=llama_mean,
+                llama_std=llama_std,
                 delta=learned_mean - expected_no_pm_mean,
                 n_expected=len(acc.expected),
                 n_expected_no_pm=len(acc.expected_no_pm),
                 n_learned=len(acc.learned),
                 n_cross_family=len(acc.cross_family),
+                n_llama=len(acc.llama),
+                learned_by_history=dict(acc.learned_by_history),
+                llama_by_history=dict(acc.llama_by_history),
             )
         )
     results.sort(key=lambda r: r.learned_mean, reverse=True)
@@ -247,6 +283,64 @@ def _load_results_uncached(
 def load_results(runs_root: str, window_lo: int, window_hi: int) -> list[BaselineLearnability]:
     """Cached wrapper around the disk walk; key is ``(runs_root, window_lo, window_hi)``."""
     return _load_results_uncached(runs_root=runs_root, window_lo=window_lo, window_hi=window_hi)
+
+
+class LlamaRunPoint(NamedTuple):
+    """One ``phase=replace_llama`` run's post-resume ``round_success`` at its history window.
+
+    ``model_short`` is the *baseline* model family the Llama observer was swapped
+    into (``"sonnet"`` / ``"opus47"`` / ``"gpt54"``); ``history`` is the number of
+    prior link rounds the swapped-in observer saw (0 / 1 / 5 / 10); ``score`` is
+    the run's mean ``round_success`` over the post-resume window. The tab scatters
+    one dot per run and derives the per-window mean ± SEM from these.
+    """
+
+    history: int
+    model_short: str
+    score: float
+    run_id: str
+
+
+def _llama_history_runs_uncached(
+    runs_root: str, window_lo: int, window_hi: int
+) -> list[LlamaRunPoint]:
+    root = Path(runs_root)
+    points: list[LlamaRunPoint] = []
+    for run_dir in _iter_run_dirs(root=root):
+        labels = _read_labels(run_dir=run_dir)
+        if "protocol_learnability" not in labels or "phase=replace_llama" not in labels:
+            continue
+        if "tool_leak" in labels:
+            continue
+        history_str = _label_value(labels=labels, prefix="history=")
+        if history_str is None or not history_str.isdigit():
+            continue
+        model_short = _label_value(labels=labels, prefix="model=") or "unknown"
+        score = _window_round_success(
+            report_path=run_dir / "veyru_report.json",
+            window_lo=window_lo,
+            window_hi=window_hi,
+        )
+        if score is None:
+            continue
+        points.append(
+            LlamaRunPoint(
+                history=int(history_str),
+                model_short=model_short,
+                score=score,
+                run_id=f"{run_dir.parent.name}/{run_dir.name}",
+            )
+        )
+    points.sort(key=lambda p: (p.model_short, p.history))
+    return points
+
+
+@st.cache_data(show_spinner=False)
+def load_llama_history_runs(runs_root: str, window_lo: int, window_hi: int) -> list[LlamaRunPoint]:
+    """One :class:`LlamaRunPoint` per ``replace_llama`` run for the history scatter/error plot."""
+    return _llama_history_runs_uncached(
+        runs_root=runs_root, window_lo=window_lo, window_hi=window_hi
+    )
 
 
 def _contrast_uncached(
