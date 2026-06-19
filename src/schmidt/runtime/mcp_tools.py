@@ -369,6 +369,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                     new_messages=[],
                     token_count=0,
                     current_round=runtime.current_round,
+                    message_id=None,
                 ).model_dump()
 
             # Count tokens before acquiring the lock to avoid holding the lock
@@ -411,6 +412,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                         new_messages=new_messages,
                         token_count=0,
                         current_round=runtime.current_round,
+                        message_id=None,
                     ).model_dump()
 
                 transformed_text = runtime.scenario.transform_outgoing_message(
@@ -471,6 +473,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                 new_messages=[],
                 token_count=token_count,
                 current_round=runtime.current_round,
+                message_id=message.message_id,
             ).model_dump()
 
     @mcp.tool(
