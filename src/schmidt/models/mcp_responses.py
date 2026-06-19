@@ -44,6 +44,15 @@ class SendMessageResult(BaseModel):
     is the round the simulation is in at send time, mirroring the field on
     ``ReadChannelResult`` and ``read_notifications`` so the agent always has
     a consistent reference for the current round.
+
+    ``message_id`` is the id of the persisted ``SimulationMessage`` when
+    ``status == "sent"``; it is ``None`` for ``conflict`` / ``rejected``
+    results where no message was created. Because this result is captured in
+    the ``ToolResultReceived`` event (which also carries the pristine
+    ``arguments.text``), it provides an exact join from the pristine text the
+    agent sent to the persisted ``MessageSent`` (whose ``message.text`` may
+    have been transformed by ``transform_outgoing_message``, e.g. channel
+    noise).
     """
 
     status: str
@@ -51,3 +60,4 @@ class SendMessageResult(BaseModel):
     new_messages: list[ChannelMessage]
     token_count: int
     current_round: int
+    message_id: str | None

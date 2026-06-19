@@ -159,7 +159,7 @@ def _render_scatter(
     )
     fig.update_layout(
         height=440,
-        xaxis_title="problems (total case stages)",
+        xaxis_title="problems (total stages to stabilize)",
         yaxis_title=_metric_label(by_worst_round=by_worst_round),
         legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "left", "x": 0},
         margin={"l": 60, "r": 20, "t": 40, "b": 50},
