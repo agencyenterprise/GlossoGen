@@ -23,23 +23,13 @@ from schmidt.evaluation.reports.evaluation_report import EvaluationReport
 logger = logging.getLogger(__name__)
 
 
-_SIDECAR_NAME = "judge_replay.json"
-
-
 class _RunCacheKey(NamedTuple):
-    """Identity tuple for an evaluated run's on-disk inputs.
-
-    Sidecar fields are zero when ``judge_replay.json`` does not exist; once
-    it appears (or its content changes), the key changes and the cached
-    ``EvaluatedRun`` is rebuilt so the new flip ratio is picked up.
-    """
+    """Identity tuple for an evaluated run's on-disk inputs."""
 
     jsonl_size: int
     jsonl_mtime_ns: int
     report_size: int
     report_mtime_ns: int
-    sidecar_size: int
-    sidecar_mtime_ns: int
 
 
 _RUN_CACHE: dict[Path, tuple[_RunCacheKey, "EvaluatedRun"]] = {}
@@ -53,14 +43,7 @@ class RunMetadata(NamedTuple):
 
 
 class EvaluatedRun(NamedTuple):
-    """A run that has both a JSONL log and an evaluation report.
-
-    ``judge_replay_flip_ratio`` is the fraction of previously-accepted
-    stabilization-judge verdicts (``old_match=True``) that flipped to
-    ``False`` under the current judge prompt, read from
-    ``judge_replay.json``. ``None`` when the sidecar is missing
-    (non-veyru run, or never replayed).
-    """
+    """A run that has both a JSONL log and an evaluation report."""
 
     label: str
     run_dir: Path
@@ -70,7 +53,6 @@ class EvaluatedRun(NamedTuple):
     execution_mode: str
     report: EvaluationReport
     metadata: RunMetadata
-    judge_replay_flip_ratio: float | None
 
 
 class DayGroup(NamedTuple):
@@ -184,50 +166,19 @@ def _derive_run_id(scenario_name: str, run_dir: Path) -> str:
     return f"{scenario_name}/{run_dir.name}"
 
 
-def _stat_cache_key(jsonl_path: Path, report_path: Path, sidecar_path: Path) -> _RunCacheKey | None:
-    """Build the cache key from JSONL/report/sidecar stats; ``None`` if JSONL or report missing."""
+def _stat_cache_key(jsonl_path: Path, report_path: Path) -> _RunCacheKey | None:
+    """Build the cache key from JSONL/report stats; ``None`` if JSONL or report missing."""
     try:
         jsonl_stat = jsonl_path.stat()
         report_stat = report_path.stat()
     except FileNotFoundError:
         return None
-    try:
-        sidecar_stat = sidecar_path.stat()
-        sidecar_size = sidecar_stat.st_size
-        sidecar_mtime_ns = sidecar_stat.st_mtime_ns
-    except FileNotFoundError:
-        sidecar_size = 0
-        sidecar_mtime_ns = 0
     return _RunCacheKey(
         jsonl_size=jsonl_stat.st_size,
         jsonl_mtime_ns=jsonl_stat.st_mtime_ns,
         report_size=report_stat.st_size,
         report_mtime_ns=report_stat.st_mtime_ns,
-        sidecar_size=sidecar_size,
-        sidecar_mtime_ns=sidecar_mtime_ns,
     )
-
-
-def _read_judge_replay_flip_ratio(run_dir: Path) -> float | None:
-    """Return ``flipped_true_to_false / old_true_count`` from the sidecar.
-
-    Returns ``None`` when the sidecar is missing (non-veyru run or not yet
-    replayed). Returns ``0.0`` for a sidecar with ``old_true_count == 0``
-    (a replayed run that had no accepted stabilizations to flip).
-    """
-    sidecar_path = run_dir / _SIDECAR_NAME
-    if not sidecar_path.exists():
-        return None
-    try:
-        raw = orjson.loads(sidecar_path.read_bytes())
-    except Exception:
-        logger.exception("Failed to parse judge_replay sidecar at %s", sidecar_path)
-        return None
-    old_true = raw.get("old_true_count", 0)
-    flipped = raw.get("flipped_true_to_false", 0)
-    if old_true <= 0:
-        return 0.0
-    return flipped / old_true
 
 
 def _build_evaluated_run(
@@ -253,7 +204,6 @@ def _build_evaluated_run(
     label = _compose_label(metadata=metadata, run_timestamp=run_timestamp, run_dir_name=entry.name)
     execution_mode = _mode_label(scenario_config=metadata.scenario_config)
     run_id = _derive_run_id(scenario_name=scenario_name, run_dir=entry)
-    judge_replay_flip_ratio = _read_judge_replay_flip_ratio(run_dir=entry)
     return EvaluatedRun(
         label=label,
         run_dir=entry,
@@ -263,7 +213,6 @@ def _build_evaluated_run(
         execution_mode=execution_mode,
         report=report,
         metadata=metadata,
-        judge_replay_flip_ratio=judge_replay_flip_ratio,
     )
 
 
@@ -280,10 +229,7 @@ def _load_runs_for_scenario(scenario_dir: Path, scenario_name: str) -> list[Eval
             continue
         report_path = entry / f"{scenario_name}_report.json"
         jsonl_path = entry / f"{scenario_name}.jsonl"
-        sidecar_path = entry / _SIDECAR_NAME
-        cache_key = _stat_cache_key(
-            jsonl_path=jsonl_path, report_path=report_path, sidecar_path=sidecar_path
-        )
+        cache_key = _stat_cache_key(jsonl_path=jsonl_path, report_path=report_path)
         if cache_key is None:
             continue
         cached = _RUN_CACHE.get(entry)

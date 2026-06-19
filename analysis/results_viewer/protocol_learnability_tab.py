@@ -26,10 +26,12 @@ from analysis.results_viewer.protocol_learnability_data import (
     BaselineLearnability,
     FeatureEvidence,
     FeatureEvidenceSample,
+    LlamaRunPoint,
     _iter_run_dirs,
     _read_labels,
     feature_contrast,
     feature_evidence,
+    load_llama_history_runs,
     load_ontology_descriptions,
     load_results,
 )
@@ -61,14 +63,26 @@ _CROSS_FAMILY_OUTLINE_COLOR = {
 # The four comparison conditions both charts can draw, in canonical column order.
 # Each carries the symbol used in the plots so chart legends/titles can be built
 # from whatever subset the user enables via the condition checkboxes.
-_CONDITION_KEYS = ("expected", "expected_no_postmortem", "learned", "cross_family")
+_CONDITION_KEYS = ("expected", "expected_no_postmortem", "learned", "cross_family", "llama")
 _CONDITION_SYMBOL_LABELS = {
     "expected": "○ expected",
     "expected_no_postmortem": "△ expected_no_postmortem",
     "learned": "■ learned",
     "cross_family": "◇ cross_family",
+    "llama": "✦ llama",
 }
 _DEFAULT_CONDITIONS = frozenset({"expected_no_postmortem", "learned"})
+
+# Llama (self-hosted) observer markers use one fixed color across all baseline
+# families, since the observer model is the same Llama regardless of which
+# family's protocol it was swapped into.
+_LLAMA_COLOR = "#9467bd"
+
+# History windows (prior link rounds the swapped-in observer saw), in the order
+# shown to the user. Only the windowed conditions (learned, llama) carry these;
+# expected / expected_no_postmortem / cross_family are all history=10 and are
+# left unfiltered by the history checkboxes.
+_HISTORY_WINDOWS = ("10", "5", "1", "0")
 
 
 def _sort_learned(r: BaselineLearnability) -> float:
@@ -101,6 +115,11 @@ def _sort_cross_family(r: BaselineLearnability) -> float:
     return r.cross_family_mean
 
 
+def _sort_llama(r: BaselineLearnability) -> float:
+    """Llama observer performance (pooled over history windows)."""
+    return r.llama_mean
+
+
 # Maps the selectbox label to the per-baseline score the scatter sorts on
 # (always descending). The first entry is the default.
 _SORT_OPTIONS = {
@@ -110,6 +129,7 @@ _SORT_OPTIONS = {
     "expected (desc)": _sort_expected,
     "delta = learned − expected_no_pm (desc)": _sort_delta,
     "cross_family (desc)": _sort_cross_family,
+    "llama (desc)": _sort_llama,
 }
 _DEFAULT_SORT = "learned (desc)"
 
@@ -141,6 +161,63 @@ def _render_condition_checkboxes() -> set[str]:
         ):
             selected.add(key)
     return selected
+
+
+def _render_history_checkboxes(key_suffix: str) -> set[str]:
+    """Horizontal checkbox row selecting which history windows count for learned/llama.
+
+    Defaults to all windows checked. ``key_suffix`` namespaces the widget keys so
+    each subtab keeps its own independent selection.
+    """
+    st.markdown(
+        "**History window** — filters `learned` + `llama` replicas (other conditions unaffected)"
+    )
+    cols = st.columns(len(_HISTORY_WINDOWS))
+    selected: set[str] = set()
+    for col, h in zip(cols, _HISTORY_WINDOWS):
+        if col.checkbox(
+            label=f"history={h}",
+            value=True,
+            key=f"protocol_learnability_history_{key_suffix}_{h}",
+        ):
+            selected.add(h)
+    return selected
+
+
+def _apply_history_filter(
+    results: list[BaselineLearnability], history_windows: set[str]
+) -> list[BaselineLearnability]:
+    """Recompute each baseline's ``learned`` / ``llama`` aggregates over ``history_windows``.
+
+    Pools only the replicas whose ``history=`` window is selected, and rederives
+    ``learned_*`` / ``llama_*`` / ``delta`` accordingly. The non-windowed
+    conditions (expected / expected_no_postmortem / cross_family, all
+    history=10) are passed through untouched.
+    """
+    out: list[BaselineLearnability] = []
+    for r in results:
+        learned_scores = [
+            s for h, ss in r.learned_by_history.items() if h in history_windows for s in ss
+        ]
+        llama_scores = [
+            s for h, ss in r.llama_by_history.items() if h in history_windows for s in ss
+        ]
+        learned_mean = statistics.mean(learned_scores) if learned_scores else 0.0
+        learned_std = statistics.stdev(learned_scores) if len(learned_scores) >= 2 else 0.0
+        llama_mean = statistics.mean(llama_scores) if llama_scores else 0.0
+        llama_std = statistics.stdev(llama_scores) if len(llama_scores) >= 2 else 0.0
+        out.append(
+            r._replace(
+                learned_mean=learned_mean,
+                learned_std=learned_std,
+                n_learned=len(learned_scores),
+                llama_mean=llama_mean,
+                llama_std=llama_std,
+                n_llama=len(llama_scores),
+                delta=learned_mean - r.expected_no_pm_mean,
+            )
+        )
+    return out
 
 
 def _filter_models(
@@ -176,7 +253,7 @@ def _render_per_model_bars(
     within_model_gap = 0.8
     between_model_gap = 1.4
     jitter_half_width = 0.12
-    slots_per_model = 4
+    slots_per_model = 5
 
     def _column_x(model_index: int, slot: int) -> float:
         base = model_index * (slots_per_model * within_model_gap + between_model_gap)
@@ -200,6 +277,7 @@ def _render_per_model_bars(
         no_pm_x = _column_x(model_index=i, slot=1)
         learned_x = _column_x(model_index=i, slot=2)
         cross_x = _column_x(model_index=i, slot=3)
+        llama_x = _column_x(model_index=i, slot=4)
         budgets = sorted({r.budget for r in rs})
         budget_tag = f"b={'/'.join(budgets)}"
         if "expected" in selected_conditions:
@@ -214,6 +292,9 @@ def _render_per_model_bars(
         if "cross_family" in selected_conditions:
             tick_vals.append(cross_x)
             tick_text.append(f"{model} · {budget_tag}<br>cross_family")
+        if "llama" in selected_conditions:
+            tick_vals.append(llama_x)
+            tick_text.append(f"{model} · {budget_tag}<br>llama")
 
         base_xs = [base_x + _jitter(r.src_id) for r in rs]
         base_ys = [r.expected_mean for r in rs]
@@ -230,12 +311,13 @@ def _render_per_model_bars(
             f"round_success={r.expected_no_pm_mean:.3f}  n={r.n_expected_no_pm}"
             for r in no_pm_rs
         ]
-        learned_xs = [learned_x + _jitter(r.src_id) for r in rs]
-        learned_ys = [r.learned_mean for r in rs]
+        learned_rs = [r for r in rs if r.n_learned > 0]
+        learned_xs = [learned_x + _jitter(r.src_id) for r in learned_rs]
+        learned_ys = [r.learned_mean for r in learned_rs]
         learned_hover = [
             f"{r.src_id} ({model}) · learned<br>"
             f"round_success={r.learned_mean:.3f}  n={r.n_learned}"
-            for r in rs
+            for r in learned_rs
         ]
         cross_rs = [r for r in rs if r.n_cross_family > 0]
         cross_xs = [cross_x + _jitter(r.src_id) for r in cross_rs]
@@ -248,6 +330,14 @@ def _render_per_model_bars(
             f"{r.src_id} ({model} → {r.cross_family_observer}) · cross_family<br>"
             f"round_success={r.cross_family_mean:.3f}  n={r.n_cross_family}"
             for r in cross_rs
+        ]
+        llama_rs = [r for r in rs if r.n_llama > 0]
+        llama_xs = [llama_x + _jitter(r.src_id) for r in llama_rs]
+        llama_ys = [r.llama_mean for r in llama_rs]
+        llama_hover = [
+            f"{r.src_id} ({model} → llama) · llama<br>"
+            f"round_success={r.llama_mean:.3f}  n={r.n_llama} (all history windows)"
+            for r in llama_rs
         ]
 
         if "expected" in selected_conditions:
@@ -288,7 +378,7 @@ def _render_per_model_bars(
                     hoverinfo="text",
                 )
             )
-        if "learned" in selected_conditions:
+        if learned_rs and "learned" in selected_conditions:
             fig.add_trace(
                 go.Scatter(
                     x=learned_xs,
@@ -321,14 +411,27 @@ def _render_per_model_bars(
                     hoverinfo="text",
                 )
             )
+        if llama_rs and "llama" in selected_conditions:
+            fig.add_trace(
+                go.Scatter(
+                    x=llama_xs,
+                    y=llama_ys,
+                    mode="markers",
+                    marker={
+                        "symbol": "star",
+                        "size": 11,
+                        "line": {"width": 1.4, "color": _LLAMA_COLOR},
+                        "color": _LLAMA_COLOR,
+                    },
+                    name="llama (replace — fresh Llama observer)",
+                    legendgroup="llama",
+                    showlegend=(i == 0),
+                    hovertext=llama_hover,
+                    hoverinfo="text",
+                )
+            )
         base_mean = statistics.mean(base_ys)
-        learned_mean = statistics.mean(learned_ys)
         base_sem = statistics.stdev(base_ys) / math.sqrt(len(base_ys)) if len(base_ys) >= 2 else 0.0
-        learned_sem = (
-            statistics.stdev(learned_ys) / math.sqrt(len(learned_ys))
-            if len(learned_ys) >= 2
-            else 0.0
-        )
         if "expected" in selected_conditions:
             fig.add_trace(
                 go.Scatter(
@@ -393,7 +496,13 @@ def _render_per_model_bars(
                 )
             )
             mean_legend_shown = True
-        if "learned" in selected_conditions:
+        if learned_ys and "learned" in selected_conditions:
+            learned_mean = statistics.mean(learned_ys)
+            learned_sem = (
+                statistics.stdev(learned_ys) / math.sqrt(len(learned_ys))
+                if len(learned_ys) >= 2
+                else 0.0
+            )
             fig.add_trace(
                 go.Scatter(
                     x=[learned_x],
@@ -417,7 +526,7 @@ def _render_per_model_bars(
                     showlegend=(not mean_legend_shown),
                     hovertext=(
                         f"{model} · learned<br>"
-                        f"mean={learned_mean:.3f}  SEM={learned_sem:.3f}  n={len(rs)}"
+                        f"mean={learned_mean:.3f}  SEM={learned_sem:.3f}  n={len(learned_ys)}"
                     ),
                     hoverinfo="text",
                 )
@@ -453,6 +562,40 @@ def _render_per_model_bars(
                     hovertext=(
                         f"{model} → {observer_tag} · cross_family<br>"
                         f"mean={cross_mean:.3f}  SEM={cross_sem:.3f}  n={len(cross_ys)}"
+                    ),
+                    hoverinfo="text",
+                )
+            )
+            mean_legend_shown = True
+        if llama_ys and "llama" in selected_conditions:
+            llama_mean = statistics.mean(llama_ys)
+            llama_sem = (
+                statistics.stdev(llama_ys) / math.sqrt(len(llama_ys)) if len(llama_ys) >= 2 else 0.0
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=[llama_x],
+                    y=[llama_mean],
+                    mode="markers",
+                    marker={
+                        "symbol": "line-ew-open",
+                        "size": 28,
+                        "color": _LLAMA_COLOR,
+                        "line": {"width": 3},
+                    },
+                    error_y={
+                        "type": "data",
+                        "array": [llama_sem],
+                        "thickness": 2,
+                        "width": 10,
+                        "color": _LLAMA_COLOR,
+                    },
+                    name="cohort mean ± SEM",
+                    legendgroup="mean",
+                    showlegend=(not mean_legend_shown),
+                    hovertext=(
+                        f"{model} → llama<br>"
+                        f"mean={llama_mean:.3f}  SEM={llama_sem:.3f}  n={len(llama_ys)}"
                     ),
                     hoverinfo="text",
                 )
@@ -500,10 +643,12 @@ def _render_scatter(
             line_xs.append(r.expected_mean)
         if "expected_no_postmortem" in selected_conditions and r.n_expected_no_pm > 0:
             line_xs.append(r.expected_no_pm_mean)
-        if "learned" in selected_conditions:
+        if "learned" in selected_conditions and r.n_learned > 0:
             line_xs.append(r.learned_mean)
         if "cross_family" in selected_conditions and r.n_cross_family > 0:
             line_xs.append(r.cross_family_mean)
+        if "llama" in selected_conditions and r.n_llama > 0:
+            line_xs.append(r.llama_mean)
         if len(line_xs) >= 2:
             fig.add_trace(
                 go.Scatter(
@@ -565,7 +710,7 @@ def _render_scatter(
                     customdata=[url],
                 )
             )
-        if "learned" in selected_conditions:
+        if "learned" in selected_conditions and r.n_learned > 0:
             fig.add_trace(
                 go.Scatter(
                     x=[r.learned_mean],
@@ -614,6 +759,32 @@ def _render_scatter(
                     customdata=[url],
                 )
             )
+        if r.n_llama > 0 and "llama" in selected_conditions:
+            delta_llama = r.llama_mean - r.learned_mean
+            fig.add_trace(
+                go.Scatter(
+                    x=[r.llama_mean],
+                    y=[label],
+                    mode="markers",
+                    marker={
+                        "symbol": "star",
+                        "size": 13,
+                        "color": _LLAMA_COLOR,
+                        "line": {"color": _LLAMA_COLOR, "width": 1},
+                    },
+                    name=f"{r.model_short} llama",
+                    showlegend=False,
+                    hovertemplate=(
+                        f"<b>{_CONDITION_SYMBOL_LABELS['llama']}</b><br>"
+                        f"{r.src_id} ({r.model_short} → llama · b={r.budget})<br>"
+                        f"llama={r.llama_mean:.3f} ± {r.llama_std:.3f} "
+                        f"(n={r.n_llama} replicas, all history windows)<br>"
+                        f"Δ_family (llama − same-model learned) = {delta_llama:+.3f}<br>"
+                        "<i>click to open source run</i><extra></extra>"
+                    ),
+                    customdata=[url],
+                )
+            )
     symbol_legend = ", ".join(
         _CONDITION_SYMBOL_LABELS[key] for key in _CONDITION_KEYS if key in selected_conditions
     )
@@ -632,6 +803,110 @@ def _render_scatter(
     maybe_open_clicked_run(
         chart_event=chart_event, session_key="protocol_learnability_last_opened_url"
     )
+
+
+def _render_llama_history_curve(points: list[LlamaRunPoint], selected_models: set[str]) -> None:
+    """Per-run dots + mean±SEM error bars of Llama round_success vs history window.
+
+    Each dot is one ``replace_llama`` run's post-resume ``round_success``,
+    jittered at its history window (0/1/5/10, drawn equally spaced) and colored by
+    baseline family. Over the dots, a line per family connects the per-window
+    means with SEM error bars, plus a thick black pooled line. Answers: does
+    giving Llama more of the prior link transcript raise its round success?
+    """
+    pts = [p for p in points if p.model_short in selected_models]
+    if not pts:
+        st.info("No `replace_llama` runs under the current filter.")
+        return
+    history_order = [0, 1, 5, 10]
+    pos = {h: i for i, h in enumerate(history_order)}
+
+    def _jitter(run_id: str) -> float:
+        return ((hash(run_id) % 1000) / 999.0 - 0.5) * 2 * 0.16
+
+    def _mean_line(
+        label: str, series: list[LlamaRunPoint], color: str, width: float, marker_size: int
+    ) -> None:
+        by_h: dict[int, list[float]] = {}
+        for p in series:
+            by_h.setdefault(p.history, []).append(p.score)
+        hs = [h for h in history_order if h in by_h]
+        if not hs:
+            return
+        means = [statistics.mean(by_h[h]) for h in hs]
+        sems = [
+            statistics.stdev(by_h[h]) / math.sqrt(len(by_h[h])) if len(by_h[h]) >= 2 else 0.0
+            for h in hs
+        ]
+        hover = [
+            f"{label} · history={h}<br>mean={m:.3f}  SEM={s:.3f}  (n={len(by_h[h])} runs)"
+            for h, m, s in zip(hs, means, sems)
+        ]
+        fig.add_trace(
+            go.Scatter(
+                x=[pos[h] for h in hs],
+                y=means,
+                mode="lines+markers",
+                line={"color": color, "width": width},
+                marker={"color": color, "size": marker_size, "symbol": "diamond"},
+                error_y={
+                    "type": "data",
+                    "array": sems,
+                    "thickness": 1.8,
+                    "width": 9,
+                    "color": color,
+                },
+                name=label,
+                hovertext=hover,
+                hoverinfo="text",
+            )
+        )
+
+    fig = go.Figure()
+    models = sorted({p.model_short for p in pts})
+    # One faint dot per run, jittered within its history column, colored by family.
+    for model in models:
+        mpts = [p for p in pts if p.model_short == model]
+        color = _MODEL_COLORS.get(model, "#777777")
+        fig.add_trace(
+            go.Scatter(
+                x=[pos[p.history] + _jitter(p.run_id) for p in mpts],
+                y=[p.score for p in mpts],
+                mode="markers",
+                marker={"color": color, "size": 6, "opacity": 0.4},
+                name=f"{model} runs",
+                hovertext=[
+                    f"{p.run_id}<br>{model} · history={p.history}<br>round_success={p.score:.3f}"
+                    for p in mpts
+                ],
+                hoverinfo="text",
+            )
+        )
+    # Per-family mean±SEM lines, then the thick black pooled line on top.
+    for model in models:
+        _mean_line(
+            f"{model} mean",
+            [p for p in pts if p.model_short == model],
+            _MODEL_COLORS.get(model, "#777777"),
+            1.8,
+            9,
+        )
+    _mean_line("all (pooled) mean", pts, "#000000", 3.5, 12)
+
+    fig.update_layout(
+        height=480,
+        xaxis={
+            "title": "history window (prior link rounds the Llama observer saw)",
+            "tickmode": "array",
+            "tickvals": [pos[h] for h in history_order],
+            "ticktext": [str(h) for h in history_order],
+            "range": [-0.4, len(history_order) - 0.6],
+        },
+        yaxis={"title": "round_success (rounds 16–25)", "range": [-0.02, 1]},
+        margin={"l": 60, "r": 20, "t": 30, "b": 60},
+        legend={"orientation": "h", "y": 1.1, "x": 0.5, "xanchor": "center"},
+    )
+    st.plotly_chart(fig, width="stretch")
 
 
 def _render_feature_contrast_bars(rows: list, top_n: int) -> None:
@@ -933,27 +1208,45 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
     st.subheader("Per-model summary")
     _render_model_summary(results=results)
 
-    scatter_panel, contrast_panel = st.tabs(["Expected vs learned", "Feature contrast"])
+    scatter_panel, llama_panel, contrast_panel = st.tabs(
+        ["Expected vs learned", "Llama: history → round success", "Feature contrast"]
+    )
     with scatter_panel:
         selected_conditions = _render_condition_checkboxes()
+        selected_history = _render_history_checkboxes(key_suffix="scatter")
         if not selected_conditions:
             st.info("Select at least one condition to plot.")
         else:
+            filtered = _apply_history_filter(results=results, history_windows=selected_history)
             symbol_legend = ", ".join(
                 _CONDITION_SYMBOL_LABELS[key]
                 for key in _CONDITION_KEYS
                 if key in selected_conditions
             )
             st.markdown(f"**Per-model means** ({symbol_legend}; error bars = SEM across baselines)")
-            _render_per_model_bars(results=results, selected_conditions=selected_conditions)
+            _render_per_model_bars(results=filtered, selected_conditions=selected_conditions)
             st.markdown("**Per-baseline** — click a marker to open the source run")
             sort_label = _render_sort_selectbox()
             _render_scatter(
-                results=results,
+                results=filtered,
                 frontend_base=frontend_base,
                 selected_conditions=selected_conditions,
                 sort_label=sort_label,
             )
+    with llama_panel:
+        st.markdown(
+            "**Llama observer — does more link history help?** Each `phase=replace_llama` "
+            "run swaps in a fresh self-hosted Llama-3.3-70B field observer at the swap "
+            "boundary with the previous *h* rounds of link transcript (h = 0 / 1 / 5 / 10) "
+            "and no postmortem. Lines show mean `round_success` over rounds 16–25 vs *h*; "
+            "error bars are SEM across replicas. The black line pools all baseline families."
+        )
+        selected_history_llama = _render_history_checkboxes(key_suffix="llama")
+        llama_runs = load_llama_history_runs(
+            runs_root=str(runs_dir), window_lo=_WINDOW_LO, window_hi=_WINDOW_HI
+        )
+        llama_runs = [p for p in llama_runs if str(p.history) in selected_history_llama]
+        _render_llama_history_curve(points=llama_runs, selected_models=set(selected_models))
     with contrast_panel:
         contrast_rows = feature_contrast(
             runs_root=str(runs_dir),
