@@ -1241,11 +1241,9 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
             "and no postmortem. Lines show mean `round_success` over rounds 16–25 vs *h*; "
             "error bars are SEM across replicas. The black line pools all baseline families."
         )
-        selected_history_llama = _render_history_checkboxes(key_suffix="llama")
         llama_runs = load_llama_history_runs(
             runs_root=str(runs_dir), window_lo=_WINDOW_LO, window_hi=_WINDOW_HI
         )
-        llama_runs = [p for p in llama_runs if str(p.history) in selected_history_llama]
         _render_llama_history_curve(points=llama_runs, selected_models=set(selected_models))
     with contrast_panel:
         contrast_rows = feature_contrast(

@@ -232,13 +232,12 @@ def _build_overcall_run(run: EvaluatedRun, scan: _ScanResult) -> StabilizeOverca
     )
 
 
-def run_metric(run: StabilizeOvercallRun, use_redundant: bool, worst_round: bool) -> float:
-    """Selected normalized over-call ratio for a run.
+def run_metric(run: StabilizeOvercallRun, worst_round: bool) -> float:
+    """Normalized calls-per-problem ratio for a run.
 
-    ``use_redundant`` swaps the numerator from all calls to redundant
-    (``unjudged``) calls only, excluding failed retries. ``worst_round`` returns
-    the maximum per-round ratio instead of the whole-simulation total ratio.
-    Denominator is ``stages * num_teams`` (per round, or summed across the run).
+    ``worst_round`` returns the maximum per-round ratio instead of the
+    whole-simulation total ratio. Denominator is ``stages * num_teams`` (per
+    round, or summed across the run).
     """
     if worst_round:
         best = 0.0
@@ -246,34 +245,24 @@ def run_metric(run: StabilizeOvercallRun, use_redundant: bool, worst_round: bool
             denominator = observation.stages * run.num_teams
             if denominator <= 0:
                 continue
-            numerator = _round_numerator(observation=observation, use_redundant=use_redundant)
-            ratio = numerator / denominator
+            ratio = observation.calls / denominator
             if ratio > best:
                 best = ratio
         return best
     if run.expected <= 0:
         return 0.0
-    if use_redundant:
-        return run.unjudged / run.expected
     return run.calls / run.expected
 
 
-def _round_numerator(observation: RoundOvercall, use_redundant: bool) -> int:
-    """Per-round numerator: redundant (unjudged) calls, or all calls."""
-    if use_redundant:
-        return observation.unjudged
-    return observation.calls
-
-
-def worst_round(run: StabilizeOvercallRun, use_redundant: bool) -> RoundOvercall | None:
-    """Return the round with the highest numerator/stages ratio, or ``None`` if no rounds."""
+def worst_round_observation(run: StabilizeOvercallRun) -> RoundOvercall | None:
+    """Return the round with the highest calls/stages ratio, or ``None`` if no rounds."""
     best_observation: RoundOvercall | None = None
     best_ratio = -1.0
     for observation in run.per_round:
         denominator = observation.stages * run.num_teams
         if denominator <= 0:
             continue
-        ratio = _round_numerator(observation=observation, use_redundant=use_redundant) / denominator
+        ratio = observation.calls / denominator
         if ratio > best_ratio:
             best_ratio = ratio
             best_observation = observation
