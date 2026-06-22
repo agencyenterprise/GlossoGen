@@ -2,7 +2,6 @@
 
 import logging
 import os
-import shutil
 import signal
 import subprocess
 import sys
@@ -17,6 +16,7 @@ from starlette.responses import StreamingResponse
 from schmidt.eval_manifest import read_eval_manifest
 from schmidt.evaluation.reports.evaluation_report import EvaluationReport, write_report
 from schmidt.models.event import RunStatus, SimulationEnded
+from schmidt.run_archive import move_run_to_trash
 from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.server.response_models import LaunchStatus
 from schmidt.server.runs.derived_run_references import build_derived_run_references
@@ -167,28 +167,37 @@ async def get_debug_logs(
 
 @router.delete("/runs/{scenario}/{run_dir_name}", status_code=204)
 async def delete_run(scenario: str, run_dir_name: str, request: Request) -> None:
-    """Stop the simulation if still running, then delete the run directory."""
+    """Stop the simulation if still running, then move the run directory to trash.
+
+    Reversible: the run's files are moved into ``{runs_dir}/_trash/`` rather
+    than removed, so a deletion can be undone by moving the directory back and
+    re-registering it. The Postgres index row is deleted so the run no longer
+    appears in listings.
+    """
     resolved = await resolve_run_or_404(
         request=request, scenario=scenario, run_dir_name=run_dir_name
     )
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
 
     run_dir = resolved.run_dir
+    runs_dir: Path = request.app.state.runs_dir
 
     manifest = read_manifest(run_dir=run_dir)
     if manifest is not None:
         try:
             os.kill(manifest.pid, signal.SIGTERM)
             logger.info(
-                "Sent SIGTERM to simulation PID %d before deleting run %s", manifest.pid, run_id
+                "Sent SIGTERM to simulation PID %d before trashing run %s", manifest.pid, run_id
             )
         except ProcessLookupError:
             logger.info("Simulation PID %d already dead for run %s", manifest.pid, run_id)
         delete_manifest(run_dir=run_dir)
 
-    shutil.rmtree(run_dir)
+    trashed_dir = move_run_to_trash(
+        runs_dir=runs_dir, scenario_name=scenario, run_dir_name=run_dir_name
+    )
     await deregister_run(request=request, scenario=scenario, run_dir_name=run_dir_name)
-    logger.info("Deleted run directory and index row: %s", run_dir)
+    logger.info("Moved run to trash and removed index row: %s -> %s", run_dir, trashed_dir)
 
 
 @router.post("/runs/{scenario}/{run_dir_name}/stop", status_code=204)
