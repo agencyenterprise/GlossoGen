@@ -15,7 +15,7 @@ Each delivery within a round independently rolls a blocker probability:
 - **No-blocker delivery** (~60%): the target tier is the next-empty tier on top of an empty or partial stack. The yard operator sends one inbound truck; the crane plan is one move: `place_on_stack(<incoming>, <stack>, <tier>)`.
 - **Blocker delivery** (~40%): the target tier is currently occupied by one container. The yard operator sends two trucks (an inbound truck carrying the incoming container and an empty outbound truck) both to the correct station but at different pads. The crane plan is two moves: `lift_from_stack(<blocker>, <stack>, <tier>)` then `place_on_stack(<incoming>, <stack>, <tier>)`. The outbound truck leaves loaded with the blocker.
 
-Round structure is not a user knob. The per-round container count is drawn from `(1, 2, 3, 4, 5)` with weights `(20, 25, 20, 15, 15)` (mean ≈ 2.65). Rounds 1–3 are forced to a single container so agents can learn the basic deliver / lift protocol before facing multi-container coordination. Decoy manifest entries independently roll the same blocker probability against the post-round stack layout, so blocker / no-blocker entries appear in the manifest in the same mix as real deliveries — the planner cannot infer which entries are real from "which one has a blocker".
+The per-round container count is drawn from the configurable `step_count_values` weighted by `step_count_weights` — by default `(1, 2, 3, 4, 5)` with weights `(20, 25, 20, 15, 15)` (mean ≈ 2.65). Rounds named in the `easy_round_numbers` knob are forced to a single container so agents can learn the basic deliver / lift protocol before facing multi-container coordination; the default knobs leave this empty (no warmup rounds). Each round is built from an independent per-round RNG, so toggling a round in or out of `easy_round_numbers` never shifts the case stream for any other round under a fixed `seed`. Decoy manifest entries independently roll the same blocker probability against the post-round stack layout, so blocker / no-blocker entries appear in the manifest in the same mix as real deliveries — the planner cannot infer which entries are real from "which one has a blocker".
 
 ## Agents
 
@@ -93,7 +93,7 @@ The world deterministically validates each move against `expected_move_sequence[
 
 Cases are generated procedurally from `seed`. Each round picks:
 
-1. **Step count** — rounds 1–3 force `step_count=1`; from round 4 onward `step_count` is drawn from `(1, 2, 3, 4, 5)` against weights `(20, 25, 20, 15, 15)` (mean ≈ 2.65).
+1. **Step count** — every round draws `step_count` from `step_count_values` against `step_count_weights` (default `(1, 2, 3, 4, 5)` weighted `(20, 25, 20, 15, 15)`, mean ≈ 2.65); rounds named in `easy_round_numbers` discard the draw and force `step_count=1`. Each round uses an independent per-round RNG, so the easy/non-easy status of one round never shifts another round's case content under a fixed seed.
 2. **Stack pre-state** — each stack starts with `randint(0, max_filler)` random filler containers (capped to leave room for the step count); the round-start layout is shared across every delivery in the round.
 3. **Active crane stations** — two stations are sampled (fresh names and pads each round), with `STACK_COUNT // 2` disjoint reachable stacks each. Each station gets `PADS_PER_STATION` (=2) freshly named pads drawn from a shared pool. The two stations together cover all four stacks.
 4. **Per-step plan (in order, mutating a simulated stack state)** — for each step, the generator independently rolls `_BLOCKER_STEP_FRACTION` against the live stack state and picks a structurally valid target slot accordingly (an occupied tier for blocker steps, the next-empty tier for no-blocker steps). The step's `correct_crane_station` is whichever active station reaches the target stack. The step's `truck_assignments` are an inbound truck plus an optional outbound truck (blocker step only); both are constrained to the correct station. The step's `expected_move_sequence` is one move (no blocker) or two (blocker). After building the step the simulated stack state is mutated to reflect the placement (and blocker eviction), so the next step's target is picked against the post-placement layout.
@@ -151,6 +151,9 @@ Useful platform metrics for this scenario:
 | `round_time_budget_seconds`             | Per-round customs inspection window (one character on the link channel = one simulated second)                                     |
 | `seed`                            | Controls case generation (containers, stacks, stations, pads, manifest decoys, per-round step count, per-step blocker rolls)        |
 | `channel_noise_level`             | Per-character drop probability on the link channel only (postmortem stays clean). In `[0.0, 1.0]`. Dropped chars become `_`        |
+| `easy_round_numbers`              | Set of round numbers forced to a single-container delivery (warmup cases). Empty by default. Each round uses an independent per-round RNG, so this never shifts other rounds' cases under a fixed `seed`. |
+| `step_count_values`               | Candidate per-round delivery counts (e.g. `[1, 2, 3, 4, 5]`). Drawn per non-easy round against `step_count_weights`. Must be same non-empty length as `step_count_weights`; all values ≥ 1. |
+| `step_count_weights`              | Sampling weights paired positionally with `step_count_values` (e.g. `[20, 25, 20, 15, 15]`). All weights > 0. |
 | `postmortem_enabled`              | Whether a discussion phase follows each round                                                                                      |
 | `postmortem_disabled_at_start`    | When true, postmortem is dropped from round 1 onward. Used by replace-agent / cross-run flows                                      |
 | `postmortem_duration_seconds`     | Time limit for the discussion phase (inherited from `BaseKnobs`)                                                                   |
@@ -169,7 +172,7 @@ Useful platform metrics for this scenario:
 
 ## Presets
 
-- `knobs_default.json` — 15 rounds, 200 sec/round inspection window, lossless link channel, postmortem enabled.
+- `knobs_default.json` — 15 rounds, 200 sec/round inspection window, lossless link channel, postmortem enabled, no warmup rounds (`easy_round_numbers` empty).
 
 ## Running
 
