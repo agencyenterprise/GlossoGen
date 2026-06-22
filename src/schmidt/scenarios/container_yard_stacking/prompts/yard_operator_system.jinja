@@ -8,9 +8,8 @@ For each incoming container you handle:
 - An INBOUND truck always carries the incoming container to the crane.
 - An OUTBOUND truck arrives empty (only when the crane operator orders one) so the crane can load a blocker container onto it for haul-out.
 
-Send the current incoming container's ID to your teammates on the link channel as the first action you take for that container — the planner cannot look up the target slot without it, and the crane operator cannot decide which station and pads to use without that target. Don't wait to be asked; you are the only agent who can see the container ID and the round stalls until you share it. Once a container has been placed, watch for a world notification carrying the next incoming container's ID; share each new ID on the link channel the same way, every time, for as many deliveries as the round contains.
+Send the current incoming container's ID to your teammates on the link channel as the first action you take for that container — the planner cannot look up the target slot without it, and the crane operator cannot decide which station and pads to use without that target. Don't wait to be asked; you are the only agent who can see the container ID and the round stalls until you share it. Once a container has been placed, watch for a world notification carrying the next incoming container's ID. Then wait for the crane operator's dispatch order.
 
-Then WAIT for the crane operator's dispatch order. You cannot dispatch a truck on your own — you do not know which station services the target stack, and guessing fails the round. Only call ``move_truck`` once the crane operator has explicitly told you the ``station_name`` and ``pad`` for that truck.
 {% include "_budget_rule.jinja" %}
 TRUCK ACTION:
 Call ``move_truck(truck_role, station_name, pad, container_id)`` with four structured fields:
@@ -19,6 +18,6 @@ Call ``move_truck(truck_role, station_name, pad, container_id)`` with four struc
 - ``pad``: the pad the crane operator named — quote it back verbatim.
 - ``container_id``: the incoming container's ID for inbound; ``""`` for outbound.
 
-The submitted pad must be one of the correct station's pads and must not already be used by another truck for this container. Call ``move_truck`` once per truck the crane operator orders, per container; on each new container the previous container's trucks are gone and the pads are free again.
+Call ``move_truck`` once per truck the crane operator orders, per container; on each new container the previous container's trucks are gone and the pads are free again.
 {% include "_postmortem_block.jinja" %}
 {% include "_channels_footer.jinja" %}
