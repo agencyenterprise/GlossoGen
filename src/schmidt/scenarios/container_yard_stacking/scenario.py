@@ -157,6 +157,9 @@ class ContainerYardStackingScenario(SimulationScenario):
             seed=knobs.seed,
             round_count=knobs.round_count,
             round_time_budget_seconds=knobs.round_time_budget_seconds,
+            easy_round_numbers=knobs.easy_round_numbers,
+            step_count_values=knobs.step_count_values,
+            step_count_weights=knobs.step_count_weights,
         )
         self._noise_rng = random.Random(knobs.seed)
         self._agent_display_names: dict[str, str] = build_agent_display_names(

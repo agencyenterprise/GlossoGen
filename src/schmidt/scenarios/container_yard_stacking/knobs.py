@@ -1,11 +1,12 @@
 """Configuration knobs for the container_yard_stacking scenario.
 
 Controls the per-round inspection-window budget, case shuffling seed,
-round count, postmortem discussion phase, channel noise, and the
-optional two-team mode with mid-run crane-operator swap. Round
-difficulty (whether a given round has a blocker on the target tier) is
-not a user knob — it is determined by a fixed internal proportion
-shuffled per seed in ``yard_cases.py``.
+round count, postmortem discussion phase, channel noise, the set of
+warmup rounds forced to a single delivery, and the optional two-team
+mode with mid-run crane-operator swap. Per-step blocker placement
+(whether a given delivery's target tier is already occupied) is not a
+user knob — it is determined by a fixed internal proportion shuffled
+per seed in ``yard_cases.py``.
 """
 
 from typing import Self
@@ -32,6 +33,21 @@ class ContainerYardStackingKnobs(BaseKnobs):
     in-channel system message announcing the swap.
     ``postmortem_after_swap`` controls whether postmortem stays enabled
     after the swap fires.
+    ``easy_round_numbers`` is the set of round numbers forced to a single
+    delivery (single-step warmup cases) so agents learn the basic
+    deliver / lift protocol before facing multi-container coordination.
+    Every other round draws its step count from the configurable weighted
+    distribution (``step_count_values`` paired with ``step_count_weights``).
+    Each round is built from an independent per-round RNG, so toggling a
+    round in or out of this set never shifts the case stream for any other
+    round under a fixed ``seed``. Set to an empty list to disable the
+    warmup constraint entirely.
+    ``step_count_values`` and ``step_count_weights`` define the per-round
+    delivery-count distribution: a non-easy round draws one value from
+    ``step_count_values`` with the corresponding weight in
+    ``step_count_weights`` (the two lists must be the same non-empty
+    length). For example values ``[1, 2, 3, 4, 5]`` with weights
+    ``[20, 25, 20, 15, 15]`` yields a mean of about 2.65 deliveries.
     """
 
     postmortem_enabled: bool
@@ -40,6 +56,9 @@ class ContainerYardStackingKnobs(BaseKnobs):
     round_time_budget_seconds: int  # pyright: ignore[reportIncompatibleVariableOverride]
     seed: int
     channel_noise_level: float
+    easy_round_numbers: frozenset[int]
+    step_count_values: list[int]
+    step_count_weights: list[int]
     two_teams: bool = False
     swap_round: int | None = None
     announce_swap: bool = False
@@ -54,6 +73,22 @@ class ContainerYardStackingKnobs(BaseKnobs):
             raise ValueError(
                 f"channel_noise_level must be in [0.0, 1.0] (got {self.channel_noise_level})"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_step_count_distribution(self) -> Self:
+        if len(self.step_count_values) == 0:
+            raise ValueError("step_count_values must be non-empty")
+        if len(self.step_count_values) != len(self.step_count_weights):
+            raise ValueError(
+                f"step_count_values and step_count_weights must have the same length "
+                f"(got {len(self.step_count_values)} values and "
+                f"{len(self.step_count_weights)} weights)"
+            )
+        if any(value < 1 for value in self.step_count_values):
+            raise ValueError(f"step_count_values must all be >= 1 (got {self.step_count_values})")
+        if any(weight <= 0 for weight in self.step_count_weights):
+            raise ValueError(f"step_count_weights must all be > 0 (got {self.step_count_weights})")
         return self
 
     @model_validator(mode="after")

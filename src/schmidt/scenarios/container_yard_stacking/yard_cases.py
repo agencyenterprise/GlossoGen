@@ -8,10 +8,13 @@ that container, and the ordered crane plan. The active crane stations and
 the four-stack initial layout are round-scoped: the stack layout evolves
 across the round as containers are placed and blockers are evicted.
 
-Rounds 1-3 are bootstrapped to a single step so agents learn the basic
-deliver / lift protocol before facing multi-container coordination. From
-round 4 onward the per-round step count is drawn against
-``_STEP_COUNT_WEIGHTS``. Blocker steps - target tier already occupied -
+Rounds named in ``easy_round_numbers`` are bootstrapped to a single step
+so agents learn the basic deliver / lift protocol before facing
+multi-container coordination. Every other round draws its per-round step
+count from the caller-supplied ``step_count_values`` / ``step_count_weights``
+distribution. Each round is built from an independent per-round RNG, so
+toggling a round's easy status never shifts the case stream for any other
+round under a fixed seed. Blocker steps - target tier already occupied -
 are sampled independently per step against ``_BLOCKER_STEP_FRACTION``.
 """
 
@@ -126,13 +129,6 @@ _PAD_LABELS: list[str] = [
     "outer_pad",
 ]
 
-
-# Per-round step-count distribution. Rounds 1-3 are forced to a single
-# step (mirrors veyru's ``_EASY_ROUND_NUMBERS`` bootstrap); from round 4
-# the count is drawn against ``_STEP_COUNT_WEIGHTS``. Mean ~= 2.65.
-_STEP_COUNT_VALUES: tuple[int, ...] = (1, 2, 3, 4, 5)
-_STEP_COUNT_WEIGHTS: tuple[int, ...] = (20, 25, 20, 15, 15)
-_BOOTSTRAP_SINGLE_STEP_ROUNDS: frozenset[int] = frozenset({1, 2, 3})
 
 # Per-step blocker probability. Each step independently rolls whether
 # the target tier is already occupied, mirroring the previous per-round
@@ -441,31 +437,39 @@ def get_cases(
     seed: int,
     round_count: int,
     round_time_budget_seconds: int,
+    easy_round_numbers: frozenset[int],
+    step_count_values: list[int],
+    step_count_weights: list[int],
 ) -> list[YardCase]:
     """Generate per-round container yard cases deterministically.
 
-    Rounds 1-3 are forced to a single delivery; from round 4 onward the
-    per-round step count is drawn against ``_STEP_COUNT_WEIGHTS``. Each
-    step independently rolls a blocker against ``_BLOCKER_STEP_FRACTION``.
-    Container IDs are unique across the full run so a shorthand like
-    ``Orion-742`` always refers to the same container.
+    Rounds named in ``easy_round_numbers`` are forced to a single
+    delivery; every other round's step count is drawn from
+    ``step_count_values`` weighted by ``step_count_weights``. Each round is
+    built from an independent per-round RNG seeded from
+    ``(seed, round_number)``, so a round's case content depends only on
+    the seed and that round's own configuration: toggling one round in or
+    out of ``easy_round_numbers`` (or any other per-round change) never
+    perturbs any other round's case. Each step independently rolls a
+    blocker against ``_BLOCKER_STEP_FRACTION``. Container IDs are unique
+    within each round.
     """
-    rng = random.Random(seed)
     cases: list[YardCase] = []
-    taken_ids: set[str] = set()
     for case_index in range(round_count):
         case_number = case_index + 1
-        if case_number in _BOOTSTRAP_SINGLE_STEP_ROUNDS:
+        round_rng = random.Random(f"{seed}-{case_number}")
+        drawn_step_count = round_rng.choices(step_count_values, weights=step_count_weights, k=1)[0]
+        if case_number in easy_round_numbers:
             step_count = 1
         else:
-            step_count = rng.choices(_STEP_COUNT_VALUES, weights=_STEP_COUNT_WEIGHTS, k=1)[0]
+            step_count = drawn_step_count
         cases.append(
             _build_one_case(
-                rng=rng,
+                rng=round_rng,
                 case_number=case_number,
                 step_count=step_count,
                 round_time_budget_seconds=round_time_budget_seconds,
-                taken_ids=taken_ids,
+                taken_ids=set(),
             )
         )
     return cases
@@ -478,7 +482,12 @@ def _build_one_case(
     round_time_budget_seconds: int,
     taken_ids: set[str],
 ) -> YardCase:
-    """Generate one multi-step yard case end-to-end."""
+    """Generate one multi-step yard case end-to-end.
+
+    ``taken_ids`` tracks container IDs already drawn within this round so
+    the case has no duplicate containers; callers pass a fresh set per
+    round.
+    """
     initial_stacks = _build_initial_stacks(rng=rng, step_count=step_count, taken_ids=taken_ids)
     active_stations = _build_active_stations(rng=rng)
     steps, final_stacks = _build_steps(
