@@ -729,7 +729,7 @@ To run several replace-agent variants while keeping at most N simulations live, 
 
 **Parallelism policy — per-provider, never shared.** Each provider has independent rate limits and capacity, so the orchestrator must:
 
-- **Cap per model at 6 concurrent sims** (the Anthropic + OpenAI accounts comfortably sustain this).
+- **Cap per model at 15 concurrent sims** (the Anthropic + OpenAI accounts comfortably sustain this).
 - **Run a separate queue per model in parallel** so a paused `gpt-5.4` queue (waiting for an OpenAI slot) never holds back the `claude-sonnet-4-6` queue. Strict-sequential single-queue orchestrators are a bug: with mixed-model specs, the queue blocks on the current spec's model and idles every slot on the other provider until the current spec launches. Always use per-provider parallel queues — typically two background subshells joined by `wait`.
 
 Reference shape — per-provider parallel orchestrator (save as `/tmp/replace_orchestrator.sh` or anywhere outside the repo):

@@ -7,6 +7,7 @@ import streamlit as st
 
 from analysis.results_viewer import (
     baseline_tab,
+    container_yard_budget_tab,
     cross_swap_tab,
     feature_presence_tab,
     multi_swap_tab,
@@ -24,7 +25,7 @@ st.set_page_config(page_title="Analysis Results Viewer", layout="wide")
 
 
 def main() -> None:
-    """Render eleven tabs: Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS-vs-Frontier, Probe similarity, Language features, Protocol learnability, Stabilize over-calling."""  # noqa: E501
+    """Render twelve tabs: Timeline, Baseline, Verbosity, Container-yard budget, Resume, Cross-swap, Multi-swap, OSS-vs-Frontier, Probe similarity, Language features, Protocol learnability, Stabilize over-calling."""  # noqa: E501
     runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs")).resolve()
     st.sidebar.markdown(f"**Runs directory**: `{runs_dir}`")
     evaluated = list_evaluated_runs(runs_dir=runs_dir)
@@ -34,6 +35,7 @@ def main() -> None:
         timeline_panel,
         baseline_panel,
         verbosity_panel,
+        container_yard_budget_panel,
         resume_panel,
         cross_swap_panel,
         multi_swap_panel,
@@ -47,6 +49,7 @@ def main() -> None:
             "Timeline",
             "Baseline",
             "Verbosity",
+            "Container-yard budget",
             "Resume",
             "Cross-swap",
             "Multi-swap",
@@ -63,6 +66,8 @@ def main() -> None:
         baseline_tab.render(evaluated=evaluated)
     with verbosity_panel:
         verbosity_tab.render(evaluated=evaluated)
+    with container_yard_budget_panel:
+        container_yard_budget_tab.render(evaluated=evaluated)
     with resume_panel:
         resume_tab.render(evaluated=evaluated)
     with cross_swap_panel:

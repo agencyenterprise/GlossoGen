@@ -174,6 +174,33 @@ def strip_legacy_git_dir(run_dir: Path) -> None:
         logger.info("Removed legacy .git/ at %s", git_dir)
 
 
+TRASH_DIR_NAME: str = "_trash"
+
+
+def move_run_to_trash(runs_dir: Path, scenario_name: str, run_dir_name: str) -> Path:
+    """Move a run directory into ``{runs_dir}/_trash/{scenario}/{run_dir_name}/``.
+
+    A reversible alternative to ``shutil.rmtree``: the run's files are
+    preserved under the trash directory so a deletion can be undone by moving
+    the directory back. Returns the destination path. If a trashed run with
+    the same name already exists, a numeric suffix is appended so no prior
+    trashed run is overwritten.
+    """
+    source = runs_dir / scenario_name / run_dir_name
+    trash_scenario_dir = runs_dir / TRASH_DIR_NAME / scenario_name
+    trash_scenario_dir.mkdir(parents=True, exist_ok=True)
+
+    destination = trash_scenario_dir / run_dir_name
+    collision_index = 1
+    while destination.exists():
+        destination = trash_scenario_dir / f"{run_dir_name}.{collision_index}"
+        collision_index += 1
+
+    shutil.move(src=str(source), dst=str(destination))
+    logger.info("Moved run %s to trash at %s", source, destination)
+    return destination
+
+
 def claim_run_dir(runs_dir: Path, scenario_name: str) -> Path:
     """Atomically claim a unique run directory using the current unix timestamp.
 
