@@ -120,18 +120,54 @@ def _render_postmortem_filter(runs: list[VerbosityRun]) -> set[bool]:
     return selected
 
 
+_KIND_ORDER = ("baseline", "channel_noise", "resume")
+
+
 def _render_kind_filter(runs: list[VerbosityRun]) -> set[str]:
-    """Two checkboxes: baseline / resume run kinds."""
-    counts = {"baseline": 0, "resume": 0}
+    """One checkbox per run kind present (``baseline`` / ``channel_noise`` / ``resume``)."""
+    counts: dict[str, int] = {}
     for run in runs:
-        counts["resume" if run.is_resume else "baseline"] += 1
-    options = [(k, k, counts[k]) for k in ("baseline", "resume") if counts[k] > 0]
+        counts[run.kind] = counts.get(run.kind, 0) + 1
+    ordered = [k for k in _KIND_ORDER if k in counts]
+    ordered += sorted(k for k in counts if k not in _KIND_ORDER)
+    options = [(k, k, counts[k]) for k in ordered]
     return render_horizontal_checkboxes(
         title="Run kind",
         options=options,
         key_prefix="verbosity_kind_filter",
         initial_state=True,
     )
+
+
+def _render_noise_filter(runs: list[VerbosityRun]) -> set[float]:
+    """Checkboxes for each distinct applied channel-noise level; ``0.0`` is ``no_noise``."""
+    counts: dict[float, int] = {}
+    for run in runs:
+        counts[run.noise_level] = counts.get(run.noise_level, 0) + 1
+    if not counts:
+        return set()
+    sorted_levels = sorted(counts.keys())
+    options = [
+        (
+            "no_noise" if level == 0.0 else str(level),
+            "no_noise" if level == 0.0 else str(level),
+            counts[level],
+        )
+        for level in sorted_levels
+    ]
+    selected_keys = render_horizontal_checkboxes(
+        title="Channel noise",
+        options=options,
+        key_prefix="verbosity_noise_filter",
+        initial_state=True,
+    )
+    selected: set[float] = set()
+    for key in selected_keys:
+        if key == "no_noise":
+            selected.add(0.0)
+        else:
+            selected.add(float(key))
+    return selected
 
 
 def _render_budget_filter(runs: list[VerbosityRun]) -> set[int | None]:
@@ -586,9 +622,9 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     all_runs = list_verbosity_runs(evaluated_runs=evaluated, scenario_name=scenario_name)
     if not all_runs:
         st.info(
-            f"No baseline or resume runs in scenario `{scenario_name}` evaluated yet. "
-            "Add the 'baseline' or 'resume' label and run `schmidt evaluate` with "
-            "the language metrics."
+            f"No baseline, channel_noise, or resume runs in scenario `{scenario_name}` "
+            "evaluated yet. Add the 'baseline', 'channel_noise', or 'resume' label and run "
+            "`schmidt evaluate` with the language metrics."
         )
         return
     metric = _render_metric_selector()
@@ -597,6 +633,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     selected_postmortem = _render_postmortem_filter(runs=all_runs)
     selected_kinds = _render_kind_filter(runs=all_runs)
     selected_budgets = _render_budget_filter(runs=all_runs)
+    selected_noise = _render_noise_filter(runs=all_runs)
     if not selected_models:
         st.info("Select at least one model.")
         return
@@ -609,13 +646,17 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     if not selected_budgets:
         st.info("Select at least one budget bucket.")
         return
+    if not selected_noise:
+        st.info("Select at least one channel-noise level.")
+        return
     filtered = [
         run
         for run in all_runs
         if run.model in selected_models
         and run.postmortem_enabled in selected_postmortem
-        and ("resume" if run.is_resume else "baseline") in selected_kinds
+        and run.kind in selected_kinds
         and run.budget in selected_budgets
+        and run.noise_level in selected_noise
     ]
     metric_runs = [run for run in filtered if getattr(run, metric.attr) is not None]
     if not metric_runs:

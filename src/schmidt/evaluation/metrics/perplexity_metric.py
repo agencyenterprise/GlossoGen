@@ -4,6 +4,13 @@ Uses ``minicons.scorer.IncrementalLMScorer`` with ``gpt2`` to compute the mean
 per-token surprisal (in nats) of every message sent on the scenario's primary
 channel. Produces an overall scalar score plus a per-round breakdown.
 Deterministic — does not consult the LLM provider.
+
+Scores the **pristine** text the sender composed, not what the channel
+delivered: when a scenario transforms outgoing messages (e.g. veyru channel
+noise replaces dropped characters with ``_``), each primary-channel
+``MessageSent`` is resolved back to its pre-transform text via the
+``message_id`` link. Runs with no transform (or predating that link) score the
+transmitted text unchanged.
 """
 
 import asyncio
@@ -18,6 +25,10 @@ from minicons import scorer  # type: ignore[import-untyped]
 from schmidt.evaluation.metric_core.measurement import Measurement, RoundObservation
 from schmidt.evaluation.metric_core.metric_protocol import Metric
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
+from schmidt.evaluation.metric_core.pristine_text_index import (
+    build_pristine_text_index,
+    pristine_text_for,
+)
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import MessageSent, SimulationEvent
@@ -69,9 +80,11 @@ class PerplexityMetric(Metric):
             logger.info("%s: skipping — scenario has no primary channel", self.name)
             return []
 
+        pristine_index = build_pristine_text_index(events=events)
         rounds = _collect_primary_messages_by_round(
             events=events,
             primary_channel_id=primary_channel_id,
+            pristine_index=pristine_index,
         )
         if not rounds:
             logger.info(
@@ -128,15 +141,21 @@ class PerplexityMetric(Metric):
 def _collect_primary_messages_by_round(
     events: list[SimulationEvent],
     primary_channel_id: str,
+    pristine_index: dict[str, str],
 ) -> list[RoundMessages]:
-    """Extract message texts from MessageSent events on the primary channel, by round."""
+    """Extract pristine message texts from MessageSent events on the primary channel, by round.
+
+    Each primary-channel message is resolved to its pre-transform text via
+    ``pristine_index`` so the score reflects what the sender composed, not the
+    channel-transformed delivery.
+    """
     by_round: dict[int, list[str]] = {}
     for event in events:
         if not isinstance(event, MessageSent):
             continue
         if event.message.channel_id != primary_channel_id:
             continue
-        text = event.message.text
+        text = pristine_text_for(index=pristine_index, message=event)
         if not text:
             continue
         if event.round_number not in by_round:

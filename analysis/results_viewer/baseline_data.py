@@ -23,7 +23,9 @@ from analysis.results_viewer.run_catalog import EvaluatedRun
 
 _BASELINE_LABEL = "baseline"
 _BASELINE_OSS_LABEL = "baseline_oss"
-_BASELINE_LABELS = frozenset({_BASELINE_LABEL, _BASELINE_OSS_LABEL})
+_CHANNEL_NOISE_LABEL = "channel_noise"
+_NOISE_LABEL_PREFIX = "noise="
+_BASELINE_LABELS = frozenset({_BASELINE_LABEL, _BASELINE_OSS_LABEL, _CHANNEL_NOISE_LABEL})
 _ROUND_SUCCESS_METRIC = "round_success"
 _ROUND_ENDED_IDLE_METRIC = "round_ended_idle"
 _ROUND_ENDED_TIMEOUT_METRIC = "round_ended_timeout"
@@ -312,20 +314,44 @@ def _refusal_total(evaluated: EvaluatedRun) -> int:
     return 0
 
 
+def _resolve_kind(matching: frozenset[str], labels: list[str]) -> str:
+    """Pick the run kind from the matched baseline-family labels.
+
+    A ``channel_noise`` run is split into one kind per noise level
+    (``channel_noise(noise=0.2)`` etc.) parsed from its ``noise=`` label, so
+    each noise level renders as its own series across budgets. Falls back to
+    ``baseline_oss`` then ``baseline`` for the original baseline kinds.
+    """
+    if _CHANNEL_NOISE_LABEL in matching:
+        level = _noise_level_from_labels(labels=labels)
+        return f"{_CHANNEL_NOISE_LABEL}(noise={level})"
+    if _BASELINE_OSS_LABEL in matching:
+        return _BASELINE_OSS_LABEL
+    return _BASELINE_LABEL
+
+
+def _noise_level_from_labels(labels: list[str]) -> str:
+    """Return the ``noise=`` label's value, or ``"?"`` when absent."""
+    for label in labels:
+        if label.startswith(_NOISE_LABEL_PREFIX):
+            return label[len(_NOISE_LABEL_PREFIX) :]
+    return "?"
+
+
 def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
     """Convert an ``EvaluatedRun`` into a ``BaselineRun`` if it qualifies.
 
-    A run qualifies when it has the ``baseline`` or ``baseline_oss`` label,
-    a budget knob in its scenario_config, and a ``round_success`` metric in
-    its evaluation report. The two round-end metrics default to 0.0 when
-    missing so older runs evaluated before they existed still render on
-    the chart (just as a flat zero line).
+    A run qualifies when it has the ``baseline``, ``baseline_oss``, or
+    ``channel_noise`` label, a budget knob in its scenario_config, and a
+    ``round_success`` metric in its evaluation report. The two round-end
+    metrics default to 0.0 when missing so older runs evaluated before they
+    existed still render on the chart (just as a flat zero line).
     """
     labels = read_labels(run_dir=evaluated.run_dir)
     matching = _BASELINE_LABELS.intersection(labels)
     if not matching:
         return None
-    kind = _BASELINE_OSS_LABEL if _BASELINE_OSS_LABEL in matching else _BASELINE_LABEL
+    kind = _resolve_kind(matching=matching, labels=labels)
     budget = _budget_from_config(evaluated=evaluated)
     if budget is None:
         return None
