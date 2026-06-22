@@ -16,7 +16,7 @@ have exactly the expected replica count.
 import json
 from collections import defaultdict
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple, cast
 
 RUNS_ROOT = Path("runs/veyru")
 EXPECTED_REPLICAS = 5
@@ -72,11 +72,16 @@ def _audit_run(run_dir: Path) -> RunAudit | None:
     budget_label = _label_value(labels=labels, prefix="budget=")
     model_label = _label_value(labels=labels, prefix="model=")
 
-    events = [json.loads(line) for line in jsonl_path.read_text().splitlines() if line.strip()]
-    config = next(
-        (e["scenario_config"] for e in events if e.get("event_type") == "simulation_started"),
-        {},
-    )
+    events: list[dict[str, Any]] = [
+        json.loads(line) for line in jsonl_path.read_text().splitlines() if line.strip()
+    ]
+    config: dict[str, Any] = {}
+    for event in events:
+        if event.get("event_type") == "simulation_started":
+            raw_config = event.get("scenario_config")
+            if isinstance(raw_config, dict):
+                config = cast(dict[str, Any], raw_config)
+            break
     knob_noise = config.get("channel_noise_level")
     knob_budget = config.get("round_time_budget_seconds")
     knob_match = (
