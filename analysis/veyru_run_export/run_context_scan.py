@@ -42,10 +42,17 @@ class StageGroundTruth(NamedTuple):
 
 
 class LinkMessage(NamedTuple):
-    """One link-channel message: which agent sent it and the text."""
+    """One link-channel message: which agent sent it, the persisted text, and its id.
+
+    ``message`` is the text persisted on the channel — already
+    channel-transformed (e.g. veyru noise drops characters to ``_``).
+    ``message_id`` is the persisted message id, used to join back to the
+    pristine pre-transform text via the ``send_message`` tool result.
+    """
 
     agent: str
     message: str
+    message_id: str
 
 
 class RoundContext(NamedTuple):
@@ -226,6 +233,7 @@ def scan_run_context(jsonl_path: Path) -> RunContext:
                         LinkMessage(
                             agent=str(message.get("sender_agent_id", "")),
                             message=str(message.get("text", "")),
+                            message_id=str(message.get("message_id", "")),
                         )
                     )
     links_grouped: dict[int, dict[int, list[LinkMessage]]] = {}
