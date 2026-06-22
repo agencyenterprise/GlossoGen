@@ -1,4 +1,4 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -6,9 +6,12 @@ import type { NextRequest } from "next/server";
  * Next.js proxy (the file convention formerly known as middleware).
  *
  * When `CLERK_SECRET_KEY` is set, delegate to Clerk's middleware so every
- * route gets a session attached (and Clerk handles redirects to /sign-in).
- * In local mode (no Clerk env vars) this is a no-op pass-through so the
- * dev server runs without any Clerk config.
+ * route gets a session attached. The callback calls `auth.protect()` on
+ * every non-public route, so an unauthenticated request to a deep link
+ * (e.g. `/g/<slug>/runs/<scenario>/<run>`) is redirected to `/sign-in`
+ * before the page renders — instead of rendering and failing the API call
+ * with a 401/403. In local mode (no Clerk env vars) this is a no-op
+ * pass-through so the dev server runs without any Clerk config.
  *
  * `organizationSyncOptions.organizationPatterns` tells Clerk to read the
  * group slug from the URL (`/g/<slug>`) and activate that organization on
@@ -22,12 +25,21 @@ function isClerkConfigured(): boolean {
   return Boolean(process.env.CLERK_SECRET_KEY && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 }
 
+const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+
 const _clerkMiddleware = isClerkConfigured()
-  ? clerkMiddleware(() => {}, {
-      organizationSyncOptions: {
-        organizationPatterns: ["/g/:slug", "/g/:slug/(.*)"],
+  ? clerkMiddleware(
+      async (auth, request) => {
+        if (!isPublicRoute(request)) {
+          await auth.protect();
+        }
       },
-    })
+      {
+        organizationSyncOptions: {
+          organizationPatterns: ["/g/:slug", "/g/:slug/(.*)"],
+        },
+      }
+    )
   : null;
 
 export default function middleware(
