@@ -36,17 +36,19 @@ from analysis.results_viewer.series_plot import (
     series_color_map,
 )
 
+_BASELINE_FAMILY_LABELS = frozenset({"baseline", "baseline_oss", "channel_noise"})
+
 
 def _scenarios_with_baseline_runs(evaluated: list[EvaluatedRun]) -> list[str]:
-    """Return every scenario that has at least one run labeled ``baseline``.
+    """Return every scenario that has at least one baseline-family run.
 
-    Auto-discovered from the loaded runs so any scenario whose runs ship
-    a ``baseline`` label appears in the radio selector without code
-    changes.
+    Auto-discovered from the loaded runs so any scenario whose runs ship a
+    ``baseline``, ``baseline_oss``, or ``channel_noise`` label appears in the
+    radio selector without code changes.
     """
     out: set[str] = set()
     for run in evaluated:
-        if "baseline" in read_labels(run_dir=run.run_dir):
+        if _BASELINE_FAMILY_LABELS.intersection(read_labels(run_dir=run.run_dir)):
             out.add(run.scenario_name)
     return sorted(out)
 
@@ -124,7 +126,8 @@ def _render_postmortem_filter(runs: list[BaselineRun]) -> set[bool]:
 
 
 def _render_kind_filter(runs: list[BaselineRun]) -> set[str]:
-    """Two checkboxes: ``baseline`` vs ``baseline_oss`` runs."""
+    """One checkbox per run kind present (``baseline``, ``baseline_oss``, and
+    per-noise-level ``channel_noise(noise=...)`` variants)."""
     counts: dict[str, int] = {}
     for run in runs:
         counts[run.kind] = counts.get(run.kind, 0) + 1

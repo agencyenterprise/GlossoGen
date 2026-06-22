@@ -28,6 +28,7 @@ from analysis.results_viewer.run_catalog import EvaluatedRun
 
 _BASELINE_LABEL = "baseline"
 _RESUME_LABEL = "resume"
+_CHANNEL_NOISE_LABEL = "channel_noise"
 _TWO_TEAM_METRIC_NAMES = frozenset({"round_success_team_a", "round_success_team_b"})
 
 
@@ -46,6 +47,8 @@ class VerbosityRun(NamedTuple):
     model: str
     postmortem_enabled: bool
     is_resume: bool
+    kind: str
+    noise_level: float
     budget: int | None
     success_fraction: float
     mcr_score: float | None
@@ -57,8 +60,7 @@ class VerbosityRun(NamedTuple):
     def series_key(self) -> str:
         """Stable identifier for plot grouping; one trace per (model, postmortem, kind)."""
         suffix = "postmortem" if self.postmortem_enabled else "no-postmortem"
-        kind = "resume" if self.is_resume else "baseline"
-        return f"{self.model} · {suffix} · {kind}"
+        return f"{self.model} · {suffix} · {self.kind}"
 
 
 class VerbosityMetricOption(NamedTuple):
@@ -125,15 +127,16 @@ VERBOSITY_METRIC_OPTIONS: list[VerbosityMetricOption] = [
 def build_verbosity_run(evaluated: EvaluatedRun) -> VerbosityRun | None:
     """Convert an ``EvaluatedRun`` into a ``VerbosityRun`` if it qualifies.
 
-    A run qualifies when it has the ``baseline`` or ``resume`` label, is not
-    a two-team run, and carries the matching success measurement. Resume
-    runs use ``round_success_after_resume``; baseline runs use
-    ``round_success``.
+    A run qualifies when it has the ``baseline``, ``resume``, or
+    ``channel_noise`` label, is not a two-team run, and carries the matching
+    success measurement. Resume runs use ``round_success_after_resume``;
+    baseline and channel_noise runs use ``round_success``.
     """
     labels = read_labels(run_dir=evaluated.run_dir)
     is_baseline = _BASELINE_LABEL in labels
     is_resume = _RESUME_LABEL in labels
-    if not is_baseline and not is_resume:
+    is_channel_noise = _CHANNEL_NOISE_LABEL in labels
+    if not is_baseline and not is_resume and not is_channel_noise:
         return None
     if _is_two_team(evaluated=evaluated):
         return None
@@ -151,6 +154,8 @@ def build_verbosity_run(evaluated: EvaluatedRun) -> VerbosityRun | None:
         model=evaluated.metadata.primary_model,
         postmortem_enabled=postmortem_enabled,
         is_resume=is_resume,
+        kind=_resolve_kind(is_resume=is_resume, is_channel_noise=is_channel_noise),
+        noise_level=_resolve_noise_level(evaluated=evaluated),
         budget=budget,
         success_fraction=success_fraction,
         mcr_score=mcr_score(evaluated=evaluated),
@@ -159,6 +164,33 @@ def build_verbosity_run(evaluated: EvaluatedRun) -> VerbosityRun | None:
         per_round_by_metric=_collect_per_round(evaluated=evaluated),
         labels=labels,
     )
+
+
+def _resolve_kind(is_resume: bool, is_channel_noise: bool) -> str:
+    """Pick the display/grouping kind for a run.
+
+    ``resume`` takes precedence (it changes the success-metric scope);
+    ``channel_noise`` runs are otherwise tagged as their own kind so they
+    can be toggled separately from clean baselines.
+    """
+    if is_resume:
+        return "resume"
+    if is_channel_noise:
+        return "channel_noise"
+    return "baseline"
+
+
+def _resolve_noise_level(evaluated: EvaluatedRun) -> float:
+    """Return the run's applied link-channel noise level from scenario_config.
+
+    Defaults to ``0.0`` (no noise) when the knob is absent, so every run —
+    including clean baselines — carries a comparable value for the
+    channel-noise filter.
+    """
+    value = evaluated.metadata.scenario_config.get("channel_noise_level")
+    if isinstance(value, (int, float)):
+        return float(value)
+    return 0.0
 
 
 def _collect_per_round(evaluated: EvaluatedRun) -> dict[str, list[RoundValue]]:
