@@ -15,6 +15,7 @@ from analysis.results_viewer.run_catalog import EvaluatedRun
 PERPLEXITY_METRIC = "perplexity"
 MCR_METRIC = "mean_chars_per_round"
 MCM_METRIC = "mean_chars_per_message"
+LANGUAGE_REPETITION_METRIC = "language_repetition"
 ROUND_SUCCESS_METRIC = "round_success"
 ROUND_SUCCESS_AFTER_RESUME_METRIC = "round_success_after_resume"
 
@@ -51,6 +52,14 @@ def mcr_score(evaluated: EvaluatedRun) -> float | None:
 def mcm_score(evaluated: EvaluatedRun) -> float | None:
     """Mean chars per primary-channel message; ``None`` if unscored."""
     return measurement_score(evaluated=evaluated, metric_name=MCM_METRIC)
+
+
+def language_repetition_score(evaluated: EvaluatedRun) -> float | None:
+    """Mean redundancy factor (encodings per information unit) on the primary channel.
+
+    ``None`` if unscored.
+    """
+    return measurement_score(evaluated=evaluated, metric_name=LANGUAGE_REPETITION_METRIC)
 
 
 def round_success_score(evaluated: EvaluatedRun) -> float | None:

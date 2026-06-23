@@ -85,7 +85,9 @@ class ProtocolStabilityMetric(Metric):
     ) -> list[Measurement]:
         """Ask an LLM judge to look for a recurring, primer-anchored covert scheme."""
         _ = agent_configs, run_dir, options
-        round_transcripts = build_round_transcripts(events=events, scenario=scenario)
+        round_transcripts = build_round_transcripts(
+            events=events, scenario=scenario, pristine_index={}
+        )
         pair_primer_attr = getattr(scenario, "pair_primer_text", None)
         if not isinstance(pair_primer_attr, str):
             logger.info("%s: skipping — scenario has no pair_primer_text", self.name)
