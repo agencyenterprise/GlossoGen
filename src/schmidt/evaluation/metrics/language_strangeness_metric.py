@@ -63,6 +63,7 @@ class LanguageStrangenessMetric(Metric):
         round_transcripts = build_round_transcripts(
             events=events,
             scenario=scenario,
+            pristine_index={},
         )
 
         if not round_transcripts:

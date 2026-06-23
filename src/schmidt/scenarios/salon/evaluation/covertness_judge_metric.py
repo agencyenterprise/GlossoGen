@@ -80,7 +80,9 @@ class CovertnessJudgeMetric(Metric):
     ) -> list[Measurement]:
         """Ask an LLM judge to assess the public transcript's covertness."""
         _ = agent_configs, run_dir, options
-        round_transcripts = build_round_transcripts(events=events, scenario=scenario)
+        round_transcripts = build_round_transcripts(
+            events=events, scenario=scenario, pristine_index={}
+        )
 
         if not round_transcripts:
             logger.info("%s: skipping — no messages found", self.name)

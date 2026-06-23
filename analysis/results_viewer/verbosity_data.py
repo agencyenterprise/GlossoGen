@@ -13,10 +13,12 @@ from pathlib import Path
 from typing import NamedTuple
 
 from analysis.results_viewer.measurement_scores import (
+    LANGUAGE_REPETITION_METRIC,
     MCM_METRIC,
     MCR_METRIC,
     PERPLEXITY_METRIC,
     ROUND_SUCCESS_METRIC,
+    language_repetition_score,
     mcm_score,
     mcr_score,
     perplexity_score,
@@ -54,6 +56,7 @@ class VerbosityRun(NamedTuple):
     mcr_score: float | None
     mcm_score: float | None
     perplexity_score: float | None
+    repetition_score: float | None
     per_round_by_metric: dict[str, list[RoundValue]]
     labels: list[str]
 
@@ -76,6 +79,7 @@ _DISPLAY_NAME_TO_METRIC = {
     "mcr": MCR_METRIC,
     "mcm": MCM_METRIC,
     "perplexity": PERPLEXITY_METRIC,
+    "repetition": LANGUAGE_REPETITION_METRIC,
 }
 
 
@@ -121,6 +125,22 @@ VERBOSITY_METRIC_OPTIONS: list[VerbosityMetricOption] = [
             "protocols drive the score up."
         ),
     ),
+    VerbosityMetricOption(
+        display_name="repetition",
+        attr="repetition_score",
+        x_axis_label="repetition (mean encodings per information unit, x)",
+        description=(
+            "**language_repetition** — an LLM judge counts, per round, the "
+            "distinct pieces of information conveyed on the primary channel and "
+            "the total number of encodings of them; the redundancy factor is "
+            "`total_encodings / distinct_units` (1.0 = each thing said once, "
+            "2.0 = twice, 3.0 = three times). Scored on the pristine text the "
+            "agent composed, before channel noise.\n\n"
+            "Higher = agents re-encode the same information more times to "
+            "survive character loss (repeated tokens, digit+word dual-encoding, "
+            "abbreviation+expansion)."
+        ),
+    ),
 ]
 
 
@@ -161,6 +181,7 @@ def build_verbosity_run(evaluated: EvaluatedRun) -> VerbosityRun | None:
         mcr_score=mcr_score(evaluated=evaluated),
         mcm_score=mcm_score(evaluated=evaluated),
         perplexity_score=perplexity_score(evaluated=evaluated),
+        repetition_score=language_repetition_score(evaluated=evaluated),
         per_round_by_metric=_collect_per_round(evaluated=evaluated),
         labels=labels,
     )

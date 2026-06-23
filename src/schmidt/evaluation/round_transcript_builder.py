@@ -10,6 +10,7 @@ communication.
 import logging
 from typing import NamedTuple
 
+from schmidt.evaluation.metric_core.pristine_text_index import pristine_text_for
 from schmidt.models.event import MessageSent, SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
 
@@ -27,12 +28,19 @@ class RoundTranscript(NamedTuple):
 def build_round_transcripts(
     events: list[SimulationEvent],
     scenario: SimulationScenario,
+    pristine_index: dict[str, str],
 ) -> list[RoundTranscript]:
     """Group all MessageSent events by round and format as labeled transcripts.
 
     When the scenario declares a primary channel via ``get_primary_channel_id``,
     messages are split into a PRIMARY CHANNEL section and an OTHER CHANNELS
     section per round. Otherwise, all messages are listed together.
+
+    Each message line uses ``pristine_text_for(index=pristine_index, ...)`` to
+    resolve its text: callers that pass a populated ``pristine_index`` (from
+    ``build_pristine_text_index``) render the text the sender composed before any
+    ``transform_outgoing_message`` rewrite (e.g. veyru's channel noise); callers
+    that pass an empty dict render the transmitted text as persisted.
 
     Returns one RoundTranscript per round that had at least one message,
     sorted by round number.
@@ -54,7 +62,8 @@ def build_round_transcripts(
             channel_id=event.message.channel_id,
             agent_id=event.message.sender_agent_id,
         )
-        line = f"[{channel_name}] {sender}: {event.message.text}"
+        text = pristine_text_for(index=pristine_index, message=event)
+        line = f"[{channel_name}] {sender}: {text}"
 
         if primary_channel_id is not None and event.message.channel_id == primary_channel_id:
             if rn not in primary_by_round:
