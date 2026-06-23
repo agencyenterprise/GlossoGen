@@ -1,4 +1,4 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -6,12 +6,17 @@ import type { NextRequest } from "next/server";
  * Next.js proxy (the file convention formerly known as middleware).
  *
  * When `CLERK_SECRET_KEY` is set, delegate to Clerk's middleware so every
- * route gets a session attached. The callback calls `auth.protect()` on
- * every non-public route, so an unauthenticated request to a deep link
- * (e.g. `/g/<slug>/runs/<scenario>/<run>`) is redirected to `/sign-in`
- * before the page renders — instead of rendering and failing the API call
- * with a 401/403. In local mode (no Clerk env vars) this is a no-op
- * pass-through so the dev server runs without any Clerk config.
+ * route gets a session attached. In local mode (no Clerk env vars) this is
+ * a no-op pass-through so the dev server runs without any Clerk config.
+ *
+ * The middleware deliberately does NOT call `auth.protect()`: the
+ * healthcheck path `/` is probed without cookies or a browser `Accept`
+ * header, and `auth.protect()` answers such non-document requests with a
+ * 404 rather than a redirect, which fails the Railway healthcheck and
+ * blocks every deploy. Route gating is done server-side instead — the root
+ * `page.tsx` and the `/g/[groupSlug]` layout each call `auth()` and
+ * `redirect("/sign-in")` for signed-out users, returning a clean 307 that
+ * the healthcheck accepts.
  *
  * `organizationSyncOptions.organizationPatterns` tells Clerk to read the
  * group slug from the URL (`/g/<slug>`) and activate that organization on
@@ -25,21 +30,12 @@ function isClerkConfigured(): boolean {
   return Boolean(process.env.CLERK_SECRET_KEY && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 }
 
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
-
 const _clerkMiddleware = isClerkConfigured()
-  ? clerkMiddleware(
-      async (auth, request) => {
-        if (!isPublicRoute(request)) {
-          await auth.protect();
-        }
+  ? clerkMiddleware(() => {}, {
+      organizationSyncOptions: {
+        organizationPatterns: ["/g/:slug", "/g/:slug/(.*)"],
       },
-      {
-        organizationSyncOptions: {
-          organizationPatterns: ["/g/:slug", "/g/:slug/(.*)"],
-        },
-      }
-    )
+    })
   : null;
 
 export default function middleware(
