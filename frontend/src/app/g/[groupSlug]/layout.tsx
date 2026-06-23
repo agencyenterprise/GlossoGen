@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { GroupProvider } from "@/features/auth/group-context";
 import { GroupTopBar } from "@/features/auth/group-top-bar";
@@ -32,9 +33,9 @@ export default async function GroupLayout({
   children: ReactNode;
 }) {
   if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-    const { userId, redirectToSignIn } = await auth();
+    const { userId } = await auth();
     if (userId === null || userId === undefined) {
-      return redirectToSignIn();
+      redirect("/sign-in");
     }
   }
   const resolved = await params;
