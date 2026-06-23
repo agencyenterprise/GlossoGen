@@ -57,8 +57,37 @@ from analysis.veyru_run_export.run_context_scan import (
 from analysis.veyru_run_export.spreadsheet_writer import write_csvs, write_xlsx
 from schmidt.evaluation.log_reader import load_events
 from schmidt.evaluation.metric_core.pristine_text_index import build_pristine_text_index
+from schmidt.models.event import RoundResultRecorded, SimulationEvent
 
 logger = logging.getLogger(__name__)
+
+
+class _RoundOutcome(NamedTuple):
+    """A round's joint success flag and its recorded reason."""
+
+    success: bool
+    reason: str
+
+
+def _round_outcomes_from_events(events: list[SimulationEvent]) -> dict[int, _RoundOutcome]:
+    """Build ``round_number -> (joint success, reason)`` straight from the JSONL events.
+
+    Reads ``RoundResultRecorded`` directly rather than the report's
+    ``round_success`` measurement, so a stale or partially-flushed
+    measurement can never cause a round (and its link messages) to be
+    dropped from the export. Multi-team rounds collapse to joint success.
+    """
+    successes: dict[int, list[bool]] = {}
+    reasons: dict[int, str] = {}
+    for event in events:
+        if isinstance(event, RoundResultRecorded):
+            successes.setdefault(event.round_number, []).append(event.success)
+            reasons.setdefault(event.round_number, event.reason)
+    return {
+        round_number: _RoundOutcome(success=all(flags), reason=reasons.get(round_number, ""))
+        for round_number, flags in successes.items()
+    }
+
 
 _ROUND_SUCCESS_METRIC = "round_success"
 _RANDOM_SEED_LABEL = "random_seed"
@@ -130,12 +159,6 @@ def _round_success_per_round(evaluated: EvaluatedRun) -> list[tuple[int, float, 
     return []
 
 
-def _pristine_index(jsonl_path: Path) -> dict[str, str]:
-    """Build the ``message_id -> pristine text`` index for one run via the shared helper."""
-    events = asyncio.run(load_events(log_path=jsonl_path))
-    return build_pristine_text_index(events=events)
-
-
 def _build_run_level_frame(
     runs: list[EvaluatedRun], contexts: dict[str, RunContext]
 ) -> pd.DataFrame:
@@ -205,16 +228,22 @@ def _build_message_level_frame(
             continue
         context = contexts[record.run_id]
         jsonl_path = evaluated.run_dir / f"{evaluated.scenario_name}.jsonl"
-        pristine_by_id = _pristine_index(jsonl_path=jsonl_path)
+        events = asyncio.run(load_events(log_path=jsonl_path))
+        pristine_by_id = build_pristine_text_index(events=events)
+        outcomes = _round_outcomes_from_events(events=events)
         run_model_class = model_class(
             field_observer_model=context.field_observer_model,
             engineer_model=context.engineer_model,
         )
         run_rows: list[dict[str, object]] = []
-        for round_number, value, note in _round_success_per_round(evaluated=evaluated):
-            round_ctx = context.rounds.get(round_number)
-            if round_ctx is None:
-                continue
+        # Iterate the rounds the scanner found (not the round_success measurement)
+        # so a stale/partial measurement can't drop a round's messages. Success
+        # and reason come straight from the JSONL round-result events.
+        for round_number in sorted(context.rounds):
+            round_ctx = context.rounds[round_number]
+            outcome = outcomes.get(round_number, _RoundOutcome(success=False, reason=""))
+            value = 1.0 if outcome.success else 0.0
+            note = outcome.reason
             for substage in range(1, round_ctx.stages_reached + 1):
                 stage = round_ctx.stages[substage - 1]
                 messages = round_ctx.link_messages_by_substage.get(substage, [])
@@ -275,10 +304,8 @@ def _build_round_context_frame(
         if record is None:
             continue
         context = contexts[record.run_id]
-        for round_number, _, _ in _round_success_per_round(evaluated=evaluated):
-            round_ctx = context.rounds.get(round_number)
-            if round_ctx is None:
-                continue
+        for round_number in sorted(context.rounds):
+            round_ctx = context.rounds[round_number]
             rows.append(
                 {
                     "run_id": record.run_id,
