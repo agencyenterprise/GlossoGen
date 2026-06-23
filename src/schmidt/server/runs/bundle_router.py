@@ -25,6 +25,7 @@ from fastapi.responses import StreamingResponse
 from schmidt.event_parsing import parse_event_bytes
 from schmidt.models.event import RunStatus, SimulationStarted
 from schmidt.run_archive import claim_run_dir, strip_legacy_git_dir
+from schmidt.run_lineage import read_timeline_parent
 from schmidt.server.runs.discovery import compose_run_id
 from schmidt.server.runs.listing import list_runs_for_group
 from schmidt.server.runs.lookup import register_new_run, resolve_run_or_404
@@ -449,13 +450,19 @@ async def import_run_bundle(
     if outcome.freshly_extracted:
         run_dir = Path(outcome.response.run_dir)
         strip_legacy_git_dir(run_dir=run_dir)
+        timeline_parent = read_timeline_parent(run_dir=run_dir)
+        source_run_scenario: str | None = None
+        source_run_dir_name: str | None = None
+        if timeline_parent is not None:
+            source_run_scenario = timeline_parent.scenario
+            source_run_dir_name = timeline_parent.run_dir_name
         await register_new_run(
             request=request,
             scenario=outcome.response.scenario_name,
             run_dir_name=run_dir.name,
             status=RunStatus.SCENARIO_COMPLETE.value,
-            source_run_scenario=None,
-            source_run_dir_name=None,
+            source_run_scenario=source_run_scenario,
+            source_run_dir_name=source_run_dir_name,
         )
         logger.info(
             "Imported run %s (%s) to %s",

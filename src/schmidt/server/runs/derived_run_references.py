@@ -117,19 +117,23 @@ async def _find_children_on_disk(
     summaries = await discover_runs(runs_dir=runs_dir)
     children: list[_ChildRunId] = []
     for summary in summaries:
-        if _source_run_id(summary=summary) != parent_run_id:
+        if timeline_parent_run_id(summary=summary) != parent_run_id:
             continue
         scenario, run_dir_name = summary.run_id.split("/", 1)
         children.append(_ChildRunId(scenario=scenario, run_dir_name=run_dir_name))
     return children
 
 
-def _source_run_id(summary: RunSummary) -> str | None:
+def timeline_parent_run_id(summary: RunSummary) -> str | None:
     """Return the timeline parent's run id for a derived run, else ``None``.
 
-    Cross-run derivations use source A (the timeline parent), matching the
+    Normalizes the multiply-defined provenance: fork, replace-agent, and
+    resume-at-round each store the parent under ``source_run_id``; cross-run
+    derivations use ``source_a_run_id`` (the timeline parent), matching the
     convention in the runs-index registration path.
     """
+    if summary.fork_source is not None:
+        return summary.fork_source.source_run_id
     if summary.replace_agent_source is not None:
         return summary.replace_agent_source.source_run_id
     if summary.resume_at_round_source is not None:

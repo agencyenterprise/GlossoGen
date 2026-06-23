@@ -288,8 +288,8 @@ The backend exposes an MCP (Model Context Protocol) server at `/mcp` for program
 
 - `list_scenarios` — lists available scenarios with knobs files, metrics, and supported models/providers
 - `list_runs` — paginated run listing with filtering by scenario, model, fork status, run status, and labels (AND-matched)
-- `get_run_metadata` — lightweight metadata for a single run: agents, channels, configuration, evaluation summary
-- `list_derived_runs` — lists every run derived from a parent run (replace-agent, resume-at-round, cross-run-replace-agent), with derivation type, round boundaries, swapped/imported models, labels, and headline `round_success` scores
+- `get_run_metadata` — lightweight metadata for a single run: agents, channels, configuration, evaluation summary, labels, and full lineage provenance (`parent_run_id` plus the structured `fork_source` / `replace_agent_source` / `resume_at_round_source` / `cross_run_replace_agent_source`)
+- `list_derived_runs` — lists every run derived from a parent run (replace-agent, resume-at-round, cross-run-replace-agent), with derivation type, round boundaries, swapped/imported models, labels, and headline `round_success` scores. Uses the runs-index timeline-parent linkage; this can return fewer runs than an orchestrator `src=<run_id>` grouping label, which may span an entire experiment family
 - `get_run` — full run content with messages; opt-in sections for reasoning, tool use, debug logs, and system prompts; filtering by agent or channel
 - `get_knobs_schema` — returns a scenario's knobs JSON Schema and available knobs preset files
 - `get_knobs_preset` — loads a knobs preset JSON payload by scenario and preset name
