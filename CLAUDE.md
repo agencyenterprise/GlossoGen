@@ -825,6 +825,17 @@ The orchestrator has no automatic recovery: if it dies, simulations keep running
 
 ## Running Evaluations
 
+### NEVER evaluate a run before it has emitted `simulation_ended`
+
+**The only safe "this run is finished" signal is the `simulation_ended` event in the JSONL.** Do not gate evaluation (or any "completed" check) on a round count such as `grep -c '"round_advanced"' >= round_count` or `round_advanced.round_number == <last>`. `round_advanced` to round N fires when round N **starts**; round N's `RoundResultRecorded` is not written until round N **ends** (after its game phase + postmortem). So a count-based gate fires while the final round is still running and evaluates a run that is missing its last round — `round_success` then reads `N-1` rounds (e.g. `6/14` instead of `7/15`), and any per-round export keyed off `round_success` silently drops the final round's data.
+
+This exact bug clipped the last round from 13 veyru `channel_noise` runs (their `rolling_eval.sh` used a `round_advanced >= 15` gate); re-evaluating the untouched JSONL produced the correct `/15`. The data was always complete — only the premature eval was wrong.
+
+Rules for any launch-then-evaluate or scan-for-complete orchestration:
+
+- Wait for / filter on `simulation_ended`, e.g. `grep -q '"simulation_ended"' <run>/<scenario>.jsonl`. The shared `wait_for_simulation_end` helper in `scripts/run_rerun_plan.py` (reused by `rerun_18_parallel.py` and `run_self_hosted_reruns.py`) does this correctly — prefer it.
+- `round_advanced` counts are fine only for *progress monitoring* (watching rounds climb), never for *completion*.
+
 After a simulation completes, score the log with one or more **metrics** — both deterministic ones and LLM-as-judge ones live behind the same `Metric` abstraction, returning a `Measurement` (`score`, `score_unit`, `summary`, `per_round`, `per_agent`). Evaluation uses `--provider` to select the LLM judge for the LLM-driven metrics; deterministic metrics ignore it. The evaluate command reads the scenario configuration from the JSONL event log, so no scenario-specific flags (like `--knobs`) are needed.
 
 ```bash

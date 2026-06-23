@@ -2,8 +2,9 @@
 protocol-learnability baseline run, read from each run's own event log.
 
 A run qualifies when its labels.json carries both ``protocol_learnability`` and
-``phase=baseline`` and its JSONL reached the final round (a ``round_advanced``
-event for round 15 exists). The field observer's registered model/provider are
+``phase=baseline`` and its JSONL emitted ``simulation_ended`` (the only safe
+"finished" signal — ``round_advanced`` to the final round fires when that round
+STARTS, before its result is recorded). The field observer's registered model/provider are
 read from the ``agent_registered`` events so the derived runs pin the same
 model. ``kind`` is ``"canon"`` or ``"legacy"`` based on whether the source's
 scenario_config carries ``easy_round_numbers`` (legacy = ``None``).
@@ -39,7 +40,7 @@ def baseline_info(run_dir: Path) -> tuple[str, str, str, str] | None:
         return None
     model = None
     provider = None
-    reached_final = False
+    completed = False
     kind = "canon"
     with jsonl.open() as handle:
         for line in handle:
@@ -56,9 +57,9 @@ def baseline_info(run_dir: Path) -> tuple[str, str, str, str] | None:
             if event_type == "agent_registered" and event.get("agent_id") == "field_observer":
                 model = event.get("model")
                 provider = event.get("provider")
-            if event_type == "round_advanced" and event.get("round_number") == 15:
-                reached_final = True
-    if model is None or provider is None or not reached_final:
+            if event_type == "simulation_ended":
+                completed = True
+    if model is None or provider is None or not completed:
         return None
     model_str = str(model)
     provider_str = str(provider)

@@ -17,8 +17,12 @@ ONTOLOGY_PATH="$RUNS_DIR/veyru/_ontology/${ONTOLOGY_VERSION}.json"
 RUN_IDS_FILE=/tmp/veyru_noise_run_ids.txt
 
 channel_noise_dirs() {
+  # Only emit runs that have emitted simulation_ended. Never gate on a
+  # round_advanced count: round_advanced to N fires when round N STARTS, so a
+  # count-based gate evaluates mid-final-round and drops the last round.
   for d in "$RUNS_DIR"/veyru/*/; do
-    [ -f "$d/labels.json" ] && grep -q '"channel_noise"' "$d/labels.json" && echo "$d"
+    [ -f "$d/labels.json" ] && grep -q '"channel_noise"' "$d/labels.json" || continue
+    grep -q '"simulation_ended"' "$d/veyru.jsonl" 2>/dev/null && echo "$d"
   done
 }
 

@@ -30,9 +30,13 @@ is_channel_noise_run() {
 }
 
 is_complete() {
+  # A run is only safe to evaluate once it has emitted simulation_ended.
+  # Do NOT use a round_advanced count: round_advanced to N fires when round N
+  # STARTS, but round N's RoundResultRecorded isn't written until round N ENDS,
+  # so a count>=round_count gate evaluates mid-final-round and drops the last
+  # round's results (round_success then reads N-1 rounds).
   local d="$1"
-  local ra; ra=$(grep -c '"round_advanced"' "$d/veyru.jsonl" 2>/dev/null || echo 0)
-  [ "$ra" -ge 15 ]
+  grep -q '"simulation_ended"' "$d/veyru.jsonl" 2>/dev/null
 }
 
 has_report() {
