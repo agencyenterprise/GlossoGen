@@ -1,6 +1,7 @@
 #!/bin/bash
 # Rolling evaluator for the channel-noise sweep. Repeatedly scans for completed
-# channel_noise runs (>=15 round_advanced) that lack an evaluation report, and
+# channel_noise runs (those that have emitted simulation_ended) that lack an
+# evaluation report, and
 # evaluates each with the deterministic + language-emergence metric set under
 # the canonical haiku judge. Caps concurrency to avoid contending with the live
 # opus sims on the anthropic rate limit. Exits once the orchestrator has drained
