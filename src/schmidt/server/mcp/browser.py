@@ -28,6 +28,7 @@ from schmidt.server.mcp.models import (
     McpAgent,
     McpAgentModel,
     McpAgentObservation,
+    McpCrossRunReplaceAgentSource,
     McpDebugLog,
     McpDerivedRun,
     McpExportArtifactsResult,
@@ -43,6 +44,8 @@ from schmidt.server.mcp.models import (
     McpMessage,
     McpModel,
     McpReasoning,
+    McpReplaceAgentSource,
+    McpResumeAtRoundSource,
     McpRoundObservation,
     McpRunEntry,
     McpRunMetadata,
@@ -53,7 +56,10 @@ from schmidt.server.mcp.models import (
 from schmidt.server.mcp.oauth_provider import SchmidtOAuthProvider
 from schmidt.server.mcp.run_context import get_run_context
 from schmidt.server.run_launcher import launch_simulation
-from schmidt.server.runs.derived_run_references import build_derived_run_references
+from schmidt.server.runs.derived_run_references import (
+    build_derived_run_references,
+    timeline_parent_run_id,
+)
 from schmidt.server.runs.detail_reader import debug_log_path_for, load_debug_logs, load_run_detail
 from schmidt.server.runs.listing import list_runs_owned_by_group
 from schmidt.server.runs.models import DerivedRunReference, RunDetailResponse, RunSummary
@@ -142,6 +148,53 @@ def _run_summary_to_entry(run: RunSummary) -> McpRunEntry:
             for a in run.agent_models
         ],
         fork_source=fork_source,
+        parent_run_id=timeline_parent_run_id(summary=run),
+        labels=run.labels,
+    )
+
+
+def _replace_agent_source_of(run: RunSummary) -> McpReplaceAgentSource | None:
+    """Convert a run's replace-agent provenance, or None if not a replace-agent run."""
+    source = run.replace_agent_source
+    if source is None:
+        return None
+    return McpReplaceAgentSource(
+        source_run_id=source.source_run_id,
+        round_start=source.round_start,
+        replaced_agent_id=source.replaced_agent_id,
+        replacement_model=source.replacement_model,
+        replacement_provider=source.replacement_provider,
+        replaced_at=source.replaced_at,
+    )
+
+
+def _resume_at_round_source_of(run: RunSummary) -> McpResumeAtRoundSource | None:
+    """Convert a run's resume-at-round provenance, or None if not a resume-at-round run."""
+    source = run.resume_at_round_source
+    if source is None:
+        return None
+    return McpResumeAtRoundSource(
+        source_run_id=source.source_run_id,
+        round_start=source.round_start,
+        rounds_after_resume=source.rounds_after_resume,
+        resumed_at=source.resumed_at,
+    )
+
+
+def _cross_run_source_of(run: RunSummary) -> McpCrossRunReplaceAgentSource | None:
+    """Convert a run's cross-run replace-agent provenance, or None if not a cross-run run."""
+    source = run.cross_run_replace_agent_source
+    if source is None:
+        return None
+    return McpCrossRunReplaceAgentSource(
+        source_a_run_id=source.source_a_run_id,
+        source_b_run_id=source.source_b_run_id,
+        round_start=source.round_start,
+        source_b_round_end=source.source_b_round_end,
+        replaced_agent_id=source.replaced_agent_id,
+        imported_model=source.imported_model,
+        imported_provider=source.imported_provider,
+        replaced_at=source.replaced_at,
     )
 
 
@@ -265,7 +318,15 @@ labels, and headline round_success scores. Pass a full run_id or prefix.
 ## Tips
 
 - Run IDs accept unique prefixes (e.g. "veyru/17" instead of the full id).
-- `list_runs` returns newest runs first.
+- `list_runs` returns newest runs first. Each entry carries `labels` and \
+`parent_run_id` (the timeline parent for derived runs, else null).
+- `get_run_metadata` carries full lineage provenance: `parent_run_id` plus \
+the structured `fork_source` / `replace_agent_source` / \
+`resume_at_round_source` / `cross_run_replace_agent_source` (at most one set).
+- `parent_run_id` reflects the run's registered timeline parent. Lineage \
+grouping labels like `src=<run_id>` are separate orchestrator tags that may \
+span an entire experiment family, so they can match more runs than \
+`list_derived_runs` returns for the same parent.
 - `get_run` messages are paginated: use `message_offset` and \
 `message_limit` to page through.
 - Evaluation measurements include numeric scores plus per-round and \
@@ -378,6 +439,11 @@ async def _tool_get_run_metadata(run_id: str) -> McpRunMetadata:
             for a in run.agent_models
         ],
         fork_source=fork_source,
+        replace_agent_source=_replace_agent_source_of(run=run),
+        resume_at_round_source=_resume_at_round_source_of(run=run),
+        cross_run_replace_agent_source=_cross_run_source_of(run=run),
+        parent_run_id=timeline_parent_run_id(summary=run),
+        labels=run.labels,
         evaluation=_load_evaluation_measurements(run_summary=run),
     )
 

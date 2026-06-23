@@ -46,8 +46,50 @@ class McpForkSource(BaseModel):
     forked_at: datetime
 
 
+class McpReplaceAgentSource(BaseModel):
+    """Provenance for a run created via the replace-agent flow."""
+
+    source_run_id: str
+    round_start: int
+    replaced_agent_id: str
+    replacement_model: str
+    replacement_provider: str
+    replaced_at: datetime
+
+
+class McpResumeAtRoundSource(BaseModel):
+    """Provenance for a run created via the resume-at-round flow (no agent replaced)."""
+
+    source_run_id: str
+    round_start: int
+    rounds_after_resume: int
+    resumed_at: datetime
+
+
+class McpCrossRunReplaceAgentSource(BaseModel):
+    """Provenance for a run created via the cross-run replace-agent flow.
+
+    ``source_a_run_id`` is the timeline parent; ``source_b_run_id`` is the run
+    the imported agent came from.
+    """
+
+    source_a_run_id: str
+    source_b_run_id: str
+    round_start: int
+    source_b_round_end: int
+    replaced_agent_id: str
+    imported_model: str
+    imported_provider: str
+    replaced_at: datetime
+
+
 class McpRunEntry(BaseModel):
-    """A single run entry for the list_runs response."""
+    """A single run entry for the list_runs response.
+
+    ``parent_run_id`` is the timeline parent for any derived run (fork,
+    replace-agent, resume-at-round, or cross-run source A), or ``None`` for a
+    natively-launched run.
+    """
 
     run_id: str
     scenario_name: str
@@ -62,6 +104,8 @@ class McpRunEntry(BaseModel):
     has_evaluation: bool
     agent_models: list[McpAgentModel]
     fork_source: McpForkSource | None
+    parent_run_id: str | None
+    labels: list[str]
 
 
 class McpListRunsResult(BaseModel):
@@ -150,7 +194,14 @@ class McpMeasurement(BaseModel):
 
 
 class McpRunMetadata(BaseModel):
-    """Response for get_run_metadata."""
+    """Response for get_run_metadata.
+
+    ``parent_run_id`` is the timeline parent for any derived run, normalized
+    across the fork / replace-agent / resume-at-round / cross-run (source A)
+    provenance variants. The structured ``*_source`` fields carry the full
+    boundary detail for whichever derivation produced this run; at most one is
+    non-null.
+    """
 
     run_id: str
     scenario_name: str
@@ -165,6 +216,11 @@ class McpRunMetadata(BaseModel):
     scenario_config: dict[str, Any]
     agent_models: list[McpAgentModel]
     fork_source: McpForkSource | None
+    replace_agent_source: McpReplaceAgentSource | None
+    resume_at_round_source: McpResumeAtRoundSource | None
+    cross_run_replace_agent_source: McpCrossRunReplaceAgentSource | None
+    parent_run_id: str | None
+    labels: list[str]
     evaluation: list[McpMeasurement] | None
 
 
