@@ -45,6 +45,19 @@ while staying well under the LLM's sequential round-trip time (hundreds of ms
 to seconds), so legitimate sequential ``read_notifications`` calls are not
 falsely rejected."""
 
+NON_BLOCKING_TOOL_TIMEOUT_SECONDS = 120.0
+"""Hard cap on any single non-blocking tool body (scenario tools, send_message,
+read_channel). Sits well under the MCP client's ~300s request timeout so a
+stalled call (e.g. a judge HTTP request that hangs) is cancelled server-side,
+releasing the agent's in-flight slot and returning a clean error to the agent
+instead of wedging it for the rest of the round."""
+
+STALE_ACTIVE_CALL_SECONDS = 150.0
+"""Age past which an in-flight non-blocking call is treated as a zombie by
+``read_notifications``. Above ``NON_BLOCKING_TOOL_TIMEOUT_SECONDS`` so it only
+trips when a call somehow survives the hard cap; lets ``read_notifications``
+proceed so the agent can always drain its queue and recover."""
+
 BASE_TOOL_NAMES: frozenset[str] = frozenset(
     {
         "read_notifications",
@@ -152,7 +165,23 @@ def _build_guarded_executor(
         session = runtime.resolve_session(agent_id=agent_id)
         _reject_if_terminated(session=session, tool_name=tool_name)
         async with session.track_active_call():
-            return await original_executor(*args, **kwargs)
+            try:
+                return await asyncio.wait_for(
+                    original_executor(*args, **kwargs),
+                    timeout=NON_BLOCKING_TOOL_TIMEOUT_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                logger.exception(
+                    "Tool %s for agent %s exceeded %.0fs and was cancelled to free the agent",
+                    tool_name,
+                    agent_id,
+                    NON_BLOCKING_TOOL_TIMEOUT_SECONDS,
+                )
+                return (
+                    f"The '{tool_name}' action timed out after "
+                    f"{NON_BLOCKING_TOOL_TIMEOUT_SECONDS:.0f} seconds and was cancelled. "
+                    "Try again."
+                )
 
     # Preserve the original signature so FastMCP generates the correct
     # JSON schema for the tool's parameters.
@@ -211,8 +240,17 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         sibling_dispatched_recently = (
             last_dispatch is not None and (now - last_dispatch) < PARALLEL_DETECTION_WINDOW_SECONDS
         )
+        # A non-blocking call that has been in flight far longer than any
+        # legitimate tool body is a zombie (e.g. a stalled judge HTTP call
+        # whose cancellation did not unwind). Treat it as not-blocking so the
+        # agent is never starved of its notification queue and can recover.
+        oldest_active_age = session.oldest_active_call_age(now=now)
+        active_calls_are_stale = (
+            oldest_active_age is not None and oldest_active_age >= STALE_ACTIVE_CALL_SECONDS
+        )
+        genuine_parallel_call = session.active_non_blocking_calls > 0 and not active_calls_are_stale
         if (
-            session.active_non_blocking_calls > 0
+            genuine_parallel_call
             or session.read_notifications_in_flight
             or sibling_dispatched_recently
         ):
