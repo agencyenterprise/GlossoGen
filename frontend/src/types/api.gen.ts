@@ -48,7 +48,12 @@ export interface paths {
         post?: never;
         /**
          * Delete Run
-         * @description Stop the simulation if still running, then delete the run directory.
+         * @description Stop the simulation if still running, then move the run directory to trash.
+         *
+         *     Reversible: the run's files are moved into ``{runs_dir}/_trash/`` rather
+         *     than removed, so a deletion can be undone by moving the directory back and
+         *     re-registering it. The Postgres index row is deleted so the run no longer
+         *     appears in listings.
          */
         delete: operations["delete_run_api_g__group_slug__runs__scenario___run_dir_name__delete"];
         options?: never;
