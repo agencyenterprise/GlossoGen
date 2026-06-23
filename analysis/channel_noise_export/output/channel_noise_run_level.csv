@@ -22,12 +22,12 @@ veyru/1781895643,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,800,0.4,False
 veyru/1781897123,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,450,0.6,False,15,7,0.4666666666666667,5.338848923747502,51.662921348314605,channel_noise|phase=baseline|noise=0.6|budget=450|model=opus47|rc=15
 veyru/1781897250,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,450,0.6,False,15,1,0.06666666666666667,5.043718773126602,85.86486486486487,channel_noise|phase=baseline|noise=0.6|budget=450|model=opus47|rc=15
 veyru/1781897348,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,450,0.6,False,15,4,0.26666666666666666,7.170281713122413,41.24528301886792,channel_noise|phase=baseline|noise=0.6|budget=450|model=opus47|rc=15
-veyru/1781897625,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,450,0.6,False,15,9,0.6,3.9714408140205872,36.99122807017544,channel_noise|phase=baseline|noise=0.6|budget=450|model=opus47|rc=15
+veyru/1781897625,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,450,0.6,False,15,10,0.6666666666666666,3.9714408140205872,36.99122807017544,channel_noise|phase=baseline|noise=0.6|budget=450|model=opus47|rc=15
 veyru/1781897663,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,450,0.6,False,15,0,0.0,6.681673041828095,58.1505376344086,channel_noise|phase=baseline|noise=0.6|budget=450|model=opus47|rc=15
-veyru/1781897821,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,800,0.6,False,15,1,0.06666666666666667,7.383290134390112,47.142857142857146,channel_noise|phase=baseline|noise=0.6|budget=800|model=opus47|rc=15
+veyru/1781897821,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,800,0.6,False,15,2,0.13333333333333333,7.383290134390112,47.142857142857146,channel_noise|phase=baseline|noise=0.6|budget=800|model=opus47|rc=15
 veyru/1781897949,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,800,0.6,False,15,10,0.6666666666666666,4.737509230696966,26.5,channel_noise|phase=baseline|noise=0.6|budget=800|model=opus47|rc=15
-veyru/1781898228,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,800,0.6,False,15,1,0.06666666666666667,5.2875859506924945,71.78571428571429,channel_noise|phase=baseline|noise=0.6|budget=800|model=opus47|rc=15
-veyru/1781899108,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,800,0.6,False,15,6,0.4,4.770475711382484,63.327586206896555,channel_noise|phase=baseline|noise=0.6|budget=800|model=opus47|rc=15
+veyru/1781898228,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,800,0.6,False,15,2,0.13333333333333333,5.2875859506924945,71.78571428571429,channel_noise|phase=baseline|noise=0.6|budget=800|model=opus47|rc=15
+veyru/1781899108,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,800,0.6,False,15,7,0.4666666666666667,4.770475711382484,63.327586206896555,channel_noise|phase=baseline|noise=0.6|budget=800|model=opus47|rc=15
 veyru/1781899565,veyru,claude-opus-4-7,claude-opus-4-7,closed,True,800,0.6,False,15,4,0.26666666666666666,5.496128853712326,31.0625,channel_noise|phase=baseline|noise=0.6|budget=800|model=opus47|rc=15
 veyru/1781892315,veyru,gpt-5.4,gpt-5.4,closed,True,450,0.2,False,15,9,0.6,6.341702522590857,46.80582524271845,channel_noise|phase=baseline|noise=0.2|budget=450|model=gpt54|rc=15
 veyru/1781892322,veyru,gpt-5.4,gpt-5.4,closed,True,450,0.2,False,15,7,0.4666666666666667,6.436690346021501,62.11224489795919,channel_noise|phase=baseline|noise=0.2|budget=450|model=gpt54|rc=15
