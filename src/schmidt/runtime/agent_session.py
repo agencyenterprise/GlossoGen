@@ -7,6 +7,7 @@ termination state.
 
 import asyncio
 import contextlib
+import itertools
 import logging
 import time
 from collections.abc import AsyncGenerator
@@ -27,11 +28,29 @@ class AgentSession:
         self._queue: asyncio.Queue[ActivityNotification] = asyncio.Queue()
         self._last_seen_counts: dict[str, int] = {}
         self.is_idle = False
-        self.active_non_blocking_calls = 0
+        self._active_calls: dict[int, float] = {}
+        self._active_call_seq = itertools.count()
         self.read_notifications_in_flight = False
         self.last_non_blocking_dispatch_ts: float | None = None
         self._terminated = False
         self._done_reason = ""
+
+    @property
+    def active_non_blocking_calls(self) -> int:
+        """Number of non-blocking tool calls currently in flight for this agent."""
+        return len(self._active_calls)
+
+    def oldest_active_call_age(self, now: float) -> float | None:
+        """Seconds the longest-running in-flight non-blocking call has been active.
+
+        Returns ``None`` when no non-blocking call is in flight. Used by
+        ``read_notifications`` to detect a zombie call (one stalled far longer
+        than any legitimate tool body) so the agent is never starved of its
+        notification queue by a tool that never returns.
+        """
+        if not self._active_calls:
+            return None
+        return now - min(self._active_calls.values())
 
     @property
     def terminated(self) -> bool:
@@ -54,12 +73,14 @@ class AgentSession:
         detect sibling dispatches that already finished by the time the
         parallelism check runs.
         """
-        self.active_non_blocking_calls += 1
-        self.last_non_blocking_dispatch_ts = time.monotonic()
+        call_id = next(self._active_call_seq)
+        now = time.monotonic()
+        self.last_non_blocking_dispatch_ts = now
+        self._active_calls[call_id] = now
         try:
             yield
         finally:
-            self.active_non_blocking_calls -= 1
+            self._active_calls.pop(call_id, None)
 
     def record_channel_read(self, channel_id: str, message_count: int) -> None:
         """Record that this agent has seen all messages up to the given count."""
