@@ -29,11 +29,14 @@ from schmidt.server.mcp.models import (
     McpAgentModel,
     McpAgentObservation,
     McpDebugLog,
+    McpDerivedRun,
     McpExportArtifactsResult,
     McpForkSource,
     McpGetKnobsPresetResult,
     McpGetKnobsSchemaResult,
     McpGetRunResult,
+    McpHeadlineMeasurement,
+    McpListDerivedRunsResult,
     McpListRunsResult,
     McpListScenariosResult,
     McpMeasurement,
@@ -50,9 +53,10 @@ from schmidt.server.mcp.models import (
 from schmidt.server.mcp.oauth_provider import SchmidtOAuthProvider
 from schmidt.server.mcp.run_context import get_run_context
 from schmidt.server.run_launcher import launch_simulation
+from schmidt.server.runs.derived_run_references import build_derived_run_references
 from schmidt.server.runs.detail_reader import debug_log_path_for, load_debug_logs, load_run_detail
 from schmidt.server.runs.listing import list_runs_owned_by_group
-from schmidt.server.runs.models import RunDetailResponse, RunSummary
+from schmidt.server.runs.models import DerivedRunReference, RunDetailResponse, RunSummary
 from schmidt.token_pricing import list_models, list_providers
 
 logger = logging.getLogger(__name__)
@@ -141,6 +145,41 @@ def _run_summary_to_entry(run: RunSummary) -> McpRunEntry:
     )
 
 
+def _derived_run_to_entry(reference: DerivedRunReference) -> McpDerivedRun:
+    """Convert a DerivedRunReference to an McpDerivedRun."""
+    return McpDerivedRun(
+        run_id=reference.run_id,
+        derivation_type=reference.derivation_type,
+        round_start=reference.round_start,
+        rounds_after_swap=reference.rounds_after_swap,
+        rounds_after_resume=reference.rounds_after_resume,
+        replaced_agent_id=reference.replaced_agent_id,
+        replacement_model=reference.replacement_model,
+        replacement_provider=reference.replacement_provider,
+        imported_model=reference.imported_model,
+        imported_provider=reference.imported_provider,
+        source_b_run_id=reference.source_b_run_id,
+        source_b_round_end=reference.source_b_round_end,
+        created_at=reference.created_at,
+        status=reference.status.value,
+        current_round=reference.current_round,
+        target_round_count=reference.target_round_count,
+        total_messages=reference.total_messages,
+        total_cost_usd=reference.total_cost_usd,
+        labels=reference.labels,
+        has_evaluation=reference.has_evaluation,
+        headline_measurements=[
+            McpHeadlineMeasurement(
+                metric_name=measurement.metric_name,
+                score=measurement.score,
+                score_unit=measurement.score_unit,
+                summary=measurement.summary,
+            )
+            for measurement in reference.headline_measurements
+        ],
+    )
+
+
 def _load_evaluation_measurements(run_summary: RunSummary) -> list[McpMeasurement] | None:
     """Load evaluation measurements from the report JSON, or return None."""
     run_dir = Path(run_summary.run_dir)
@@ -199,11 +238,16 @@ Schmidt simulation platform. Browse and launch multi-agent simulations.
 1. `list_scenarios` — see available scenarios, knobs files, metrics, \
 and supported models.
 2. `list_runs` — browse runs with optional filters (scenario, model, \
-status, is_forked). Paginate with offset/limit.
+status, is_forked, labels). `labels` is AND-matched. Paginate with \
+offset/limit.
 3. `get_run_metadata` — inspect a single run's config, agents, and \
 evaluation results without loading messages. Pass a full run_id \
 (e.g. `veyru/1776801080`) or a unique prefix of it.
-4. `get_run` — load messages (paginated). Add flags for extra sections:
+4. `list_derived_runs` — list every run derived from a parent run \
+(replace-agent, resume-at-round, cross-run-replace-agent). Each entry \
+carries derivation type, round boundaries, swapped/imported models, \
+labels, and headline round_success scores. Pass a full run_id or prefix.
+5. `get_run` — load messages (paginated). Add flags for extra sections:
    - `with_reasoning=true` — LLM thinking/reasoning text
    - `with_tool_use=true` — tool invocations and results
    - `with_system_prompts=true` — full agent system prompts
@@ -262,8 +306,13 @@ async def _tool_list_runs(
     model: str | None = None,
     is_forked: bool | None = None,
     status: str | None = None,
+    labels: list[str] | None = None,
 ) -> McpListRunsResult:
-    """List simulation runs with filtering and pagination."""
+    """List simulation runs with filtering and pagination.
+
+    ``labels`` filters with AND semantics: a run is kept only if every
+    requested label is present in its label set.
+    """
     all_runs = await _list_runs_for_active_group(scenario_filter=None)
 
     filtered = all_runs
@@ -281,6 +330,8 @@ async def _tool_list_runs(
     if status is not None:
         status_lower = status.lower()
         filtered = [r for r in filtered if r.status.value.lower() == status_lower]
+    if labels is not None:
+        filtered = [r for r in filtered if all(label in r.labels for label in labels)]
 
     total = len(filtered)
     page = filtered[offset : offset + limit]
@@ -328,6 +379,28 @@ async def _tool_get_run_metadata(run_id: str) -> McpRunMetadata:
         ],
         fork_source=fork_source,
         evaluation=_load_evaluation_measurements(run_summary=run),
+    )
+
+
+async def _tool_list_derived_runs(run_id: str) -> McpListDerivedRunsResult:
+    """List every run derived from a parent run, newest first."""
+    parent = await _find_run_by_prefix(run_id_prefix=run_id)
+    parent_scenario, parent_run_dir_name = parent.run_id.split("/", 1)
+
+    ctx = get_run_context()
+    references = await build_derived_run_references(
+        pool=ctx.pool,
+        runs_dir=ctx.runs_dir,
+        group_id=ctx.group_id,
+        parent_scenario=parent_scenario,
+        parent_run_dir_name=parent_run_dir_name,
+    )
+
+    derived_runs = [_derived_run_to_entry(reference=reference) for reference in references]
+    return McpListDerivedRunsResult(
+        parent_run_id=parent.run_id,
+        derived_runs=derived_runs,
+        total=len(derived_runs),
     )
 
 
@@ -580,6 +653,15 @@ _TOOL_DEFS: list[tuple[str, str, Any]] = [
         "configuration, and evaluation results. Does not load messages or "
         "reasoning. Accepts a full run_id or a unique prefix.",
         _tool_get_run_metadata,
+    ),
+    (
+        "list_derived_runs",
+        "List every run derived from a parent run: replace-agent, "
+        "resume-at-round, and cross-run-replace-agent (with the parent as "
+        "source A). Each entry carries the derivation type, round boundaries, "
+        "swapped/imported models, labels, and headline round_success scores. "
+        "Accepts a full run_id or a unique prefix.",
+        _tool_list_derived_runs,
     ),
     (
         "get_run",

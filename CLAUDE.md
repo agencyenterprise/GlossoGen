@@ -287,8 +287,9 @@ The backend exposes an MCP (Model Context Protocol) server at `/mcp` for program
 ### Available Tools
 
 - `list_scenarios` — lists available scenarios with knobs files, metrics, and supported models/providers
-- `list_runs` — paginated run listing with filtering by scenario, model, fork status, and run status
+- `list_runs` — paginated run listing with filtering by scenario, model, fork status, run status, and labels (AND-matched)
 - `get_run_metadata` — lightweight metadata for a single run: agents, channels, configuration, evaluation summary
+- `list_derived_runs` — lists every run derived from a parent run (replace-agent, resume-at-round, cross-run-replace-agent), with derivation type, round boundaries, swapped/imported models, labels, and headline `round_success` scores
 - `get_run` — full run content with messages; opt-in sections for reasoning, tool use, debug logs, and system prompts; filtering by agent or channel
 - `get_knobs_schema` — returns a scenario's knobs JSON Schema and available knobs preset files
 - `get_knobs_preset` — loads a knobs preset JSON payload by scenario and preset name
