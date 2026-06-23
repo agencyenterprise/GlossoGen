@@ -229,7 +229,7 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
 Generic metrics (available to every scenario, opt-in via the per-scenario hooks listed below). Both deterministic and LLM-driven metrics return `Measurement` entries with `score`, `score_unit`, `summary`, structured `per_round`, and optional `per_agent` breakdowns:
 
 Communication-style LLM judges (each scoped to one phenomenon so they don't overlap):
-- `language_repetition` — redundant re-encoding of information on the primary channel (repeated tokens, digit+word dual-encoding, abbreviation+expansion); per-round redundancy factor = encodings per distinct information unit (≥1.0), scored on the pristine pre-noise text
+- `language_repetition` — redundant re-encoding of information on the primary channel (repeated tokens, digit+word dual-encoding, abbreviation+expansion); per-round redundancy factor = encodings per distinct information unit (≥1.0), scored on the pristine pre-noise text and averaged over 3 judge replicas (per-round spread recorded in the note)
 - `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style
 - `slang_emergence` — informal register shifts, colloquial expressions, casual nicknames
 - `neologism` — genuinely invented words with new meanings
