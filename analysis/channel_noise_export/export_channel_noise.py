@@ -25,13 +25,17 @@ Four output tables:
   ``postmortem``, ``round_time_budget_seconds``, ``channel_noise_level``,
   ``random_seed``, the Bernoulli numerator/denominator
   (``round_success_count`` / ``total_rounds``) and fraction, plus the run's
-  headline ``perplexity`` (pristine) and ``mcm``.
+  headline ``perplexity`` (pristine), ``mcm``, and ``repetition`` (the
+  ``language_repetition`` mean redundancy factor — encodings per information unit).
 - ``message_level`` — one row per link-channel message with its substage / round
   context, the pristine and transmitted text, character-loss stats, and
   per-message pristine ``perplexity``.
-- ``round_context`` — one row per (run, round) holding the round-start briefings.
+- ``round_context`` — one row per (run, round): the round-start briefings plus the
+  per-round ``round_success`` flag and ``repetition_factor`` (so per-round
+  redundancy can be correlated with per-round success directly).
 - ``budget_aggregate`` — per (models, postmortem, random_seed,
-  channel_noise_level, budget) mean ± std of the success fraction.
+  channel_noise_level, budget) mean ± std of the success fraction and of the
+  ``repetition`` factor.
 
 Writes one CSV per table, and (when ``openpyxl`` is importable) a single
 multi-sheet ``.xlsx`` workbook.
@@ -45,7 +49,13 @@ from typing import NamedTuple
 
 import pandas as pd
 
-from analysis.results_viewer.measurement_scores import mcm_score, perplexity_score, read_labels
+from analysis.results_viewer.measurement_scores import (
+    LANGUAGE_REPETITION_METRIC,
+    language_repetition_score,
+    mcm_score,
+    perplexity_score,
+    read_labels,
+)
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
 from analysis.veyru_run_export.message_perplexity_scorer import MessagePerplexityScorer
 from analysis.veyru_run_export.run_context_scan import (
@@ -105,6 +115,7 @@ class RunRecord(NamedTuple):
     round_success: int
     perplexity_score: float | None
     mcm_score: float | None
+    repetition_score: float | None
     labels: list[str]
 
 
@@ -135,6 +146,7 @@ def _build_record(evaluated: EvaluatedRun) -> RunRecord | None:
         round_success=round_success,
         perplexity_score=perplexity_score(evaluated=evaluated),
         mcm_score=mcm_score(evaluated=evaluated),
+        repetition_score=language_repetition_score(evaluated=evaluated),
         labels=labels,
     )
 
@@ -157,6 +169,18 @@ def _round_success_per_round(evaluated: EvaluatedRun) -> list[tuple[int, float, 
         if measurement.metric_name == _ROUND_SUCCESS_METRIC:
             return [(obs.round_number, obs.value, obs.note) for obs in measurement.per_round]
     return []
+
+
+def _repetition_per_round(evaluated: EvaluatedRun) -> dict[int, float]:
+    """Map ``round_number -> redundancy factor`` from the ``language_repetition`` measurement.
+
+    Empty when the run wasn't scored for ``language_repetition``. Rounds the
+    metric skipped (no primary-channel content) are absent from the map.
+    """
+    for measurement in evaluated.report.measurements:
+        if measurement.metric_name == LANGUAGE_REPETITION_METRIC:
+            return {obs.round_number: obs.value for obs in measurement.per_round}
+    return {}
 
 
 def _build_run_level_frame(
@@ -191,6 +215,7 @@ def _build_run_level_frame(
                 "round_success_fraction": fraction,
                 "perplexity": record.perplexity_score,
                 "mcm": record.mcm_score,
+                "repetition": record.repetition_score,
                 "labels": "|".join(record.labels),
             }
         )
@@ -297,19 +322,35 @@ def _build_message_level_frame(
 def _build_round_context_frame(
     runs: list[EvaluatedRun], contexts: dict[str, RunContext]
 ) -> pd.DataFrame:
-    """One row per (run, round) carrying the round-start briefings."""
+    """One row per (run, round): the round-start briefings plus per-round outcomes.
+
+    Carries ``round_success`` (1/0 from the run's ``round_success`` measurement)
+    and ``repetition_factor`` (the round's ``language_repetition`` redundancy
+    factor, ``None`` when the round had no primary-channel content or the run
+    wasn't scored), so per-round redundancy can be correlated with per-round
+    success directly from this table.
+    """
     rows: list[dict[str, object]] = []
     for evaluated in runs:
         record = _build_record(evaluated=evaluated)
         if record is None:
             continue
         context = contexts[record.run_id]
+        success_by_round = {
+            rn: value for rn, value, _ in _round_success_per_round(evaluated=evaluated)
+        }
+        repetition_by_round = _repetition_per_round(evaluated=evaluated)
         for round_number in sorted(context.rounds):
             round_ctx = context.rounds[round_number]
+            success = success_by_round.get(round_number)
             rows.append(
                 {
                     "run_id": record.run_id,
                     "round_number": round_number,
+                    "channel_noise_level": record.channel_noise_level,
+                    "round_time_budget_seconds": record.budget,
+                    "round_success": None if success is None else int(round(success)),
+                    "repetition_factor": repetition_by_round.get(round_number),
                     "field_observer_round_event": round_ctx.field_observer_event,
                     "engineer_round_event": round_ctx.engineer_event,
                 }
@@ -340,6 +381,8 @@ def _build_budget_aggregate_frame(run_level: pd.DataFrame) -> pd.DataFrame:
         min_success_fraction=("round_success_fraction", "min"),
         max_success_fraction=("round_success_fraction", "max"),
         mean_success_count=("round_success_count", "mean"),
+        mean_repetition=("repetition", "mean"),
+        std_repetition=("repetition", lambda s: s.std(ddof=0)),
     )
     return grouped.sort_values(by=group_keys).reset_index(drop=True)
 

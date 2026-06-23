@@ -60,7 +60,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
     - `evaluation_report.py` — `EvaluationReport` schema, plus `load_report` / `write_report` / `merge_evaluation_costs` helpers
     - `evaluation_cost.py` — `EvaluationTokenUsage`, `EvaluationCost`, and `compute_evaluation_cost`
   - `metrics/` — concrete Metric implementations
-    - `language_repetition_metric.py` — LLM judge; per-round redundancy factor (mean encodings per distinct information unit, ≥1.0) on pristine primary-channel text — captures repeated tokens, digit+word dual-encoding, and abbreviation+expansion
+    - `language_repetition_metric.py` — LLM judge (3 replicas, averaged); per-round redundancy factor (mean encodings per distinct information unit, ≥1.0) on pristine primary-channel text — captures repeated tokens, digit+word dual-encoding, and abbreviation+expansion; per-round note records the per-replica spread
     - `language_strangeness_metric.py` — detects unusual grammar, structure, formatting (not codes/slang/neologisms)
     - `slang_emergence_metric.py` — detects informal register shifts and colloquial expressions
     - `neologism_metric.py` — detects genuinely invented words (not abbreviations or codes)
@@ -868,7 +868,7 @@ Available metrics per scenario:
 
 Generic metrics (available to all scenarios):
 
-- `language_repetition` — how much agents redundantly re-encode information on the primary channel under noise (repeated tokens like `Lf Lf 12 12`, digit+word dual-encoding like `12 twelve`, abbreviation+expansion like `gnt gentle`). LLM judge scored on the **pristine** pre-noise text; per round it counts distinct information units + total encodings, and the metric reports a redundancy factor `total_encodings / distinct_units` (≥1.0, unbounded — `T1 T1 T1` ×3 outscores `12 12` ×2). `score` = mean factor across rounds; `per_round[].value` is the per-round factor with raw counts in the note. Not bit-reproducible (judge-derived counts).
+- `language_repetition` — how much agents redundantly re-encode information on the primary channel under noise (repeated tokens like `Lf Lf 12 12`, digit+word dual-encoding like `12 twelve`, abbreviation+expansion like `gnt gentle`). LLM judge scored on the **pristine** pre-noise text; per round it counts distinct information units + total encodings, and the metric reports a redundancy factor `total_encodings / distinct_units` (≥1.0, unbounded — `T1 T1 T1` ×3 outscores `12 12` ×2). The judge is called 3 times per run; each round's factor is the **mean across replicas** and the per-round note records the per-replica factors + spread (so judge disagreement, e.g. on counting character runs, is visible). `score` = mean averaged factor across rounds; `per_round[].value` is the per-round mean factor. Not bit-reproducible (judge-derived counts), but the 3-replica mean damps single-call variance.
 - `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style (NOT codes, slang, or new words). LLM judge; `score` = number of rounds with detected anomalies.
 - `slang_emergence` — informal register shifts, existing-word repurposing (NOT codes or new words). LLM judge; `score` = number of rounds with detected slang.
 - `neologism` — genuinely invented words with new meanings (NOT abbreviations or code mappings). LLM judge; `score` = number of rounds with detected neologisms.
