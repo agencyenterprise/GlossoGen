@@ -49,8 +49,7 @@ from analysis.results_viewer.feature_presence_data import (
 from analysis.results_viewer.natural_sort import natural_sort_key
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
-from analysis.results_viewer.scenario_selector import default_scenario_index
-from analysis.results_viewer.series_plot import render_horizontal_checkboxes
+from analysis.results_viewer.series_plot import render_horizontal_checkboxes, series_color_map
 from schmidt.evaluation.metrics.communication.label_models import ontology_dir_for_scenario
 
 logger = logging.getLogger(__name__)
@@ -198,57 +197,75 @@ def _render_frequency_section(
     if not runs:
         st.info("No runs in the current cohort.")
         return
-    rows: list[tuple[str, float, float, float]] = []
-    for category in ontology.categories:
-        values = [run.scores.get(category.id, 0.0) for run in runs]
-        present = sum(1 for v in values if v >= threshold)
-        fraction = present / len(values)
-        mean = statistics.mean(values)
-        std = statistics.stdev(values) if len(values) > 1 else 0.0
-        rows.append((category.id, fraction, mean, std))
-    rows.sort(key=lambda r: -r[1])
-    fig = go.Figure()
-    fig.add_trace(
-        go.Bar(
-            x=[r[0] for r in rows],
-            y=[r[1] for r in rows],
-            hovertext=[
-                f"{r[0]}<br>fraction ≥ {threshold:g}: {r[1]:.2%}<br>"
-                f"mean: {r[2]:.2f} (std {r[3]:.2f})"
-                for r in rows
-            ],
-            hoverinfo="text",
-            marker={"color": _WIN_COLOR},
-        )
+    scenarios = sorted({run.scenario_name for run in runs})
+    runs_by_scenario: dict[str, list[FeaturePresenceRun]] = {s: [] for s in scenarios}
+    for run in runs:
+        runs_by_scenario[run.scenario_name].append(run)
+    # Per (scenario, category) presence fraction; categories sorted by the max
+    # prevalence across scenarios so the most-shared mechanisms cluster left.
+    fraction_by_scenario: dict[str, dict[str, float]] = {}
+    for scenario_name, scenario_runs in runs_by_scenario.items():
+        per_cat: dict[str, float] = {}
+        for category in ontology.categories:
+            values = [r.scores.get(category.id, 0.0) for r in scenario_runs]
+            per_cat[category.id] = sum(1 for v in values if v >= threshold) / len(values)
+        fraction_by_scenario[scenario_name] = per_cat
+    ordered_categories = sorted(
+        (c.id for c in ontology.categories),
+        key=lambda cid: -max(fraction_by_scenario[s][cid] for s in scenarios),
     )
+    colour_by_scenario = series_color_map(series_keys=scenarios)
+    fig = go.Figure()
+    for scenario_name in scenarios:
+        per_cat = fraction_by_scenario[scenario_name]
+        scenario_runs = runs_by_scenario[scenario_name]
+        means = {
+            c.id: statistics.mean([r.scores.get(c.id, 0.0) for r in scenario_runs])
+            for c in ontology.categories
+        }
+        single = len(scenarios) == 1
+        fig.add_trace(
+            go.Bar(
+                name=f"{scenario_name} (n={len(scenario_runs)})",
+                x=ordered_categories,
+                y=[per_cat[cid] for cid in ordered_categories],
+                hovertext=[
+                    f"{cid}<br>{scenario_name}<br>fraction ≥ {threshold:g}: {per_cat[cid]:.2%}"
+                    f"<br>mean: {means[cid]:.2f}"
+                    for cid in ordered_categories
+                ],
+                hoverinfo="text",
+                marker={"color": _WIN_COLOR if single else colour_by_scenario[scenario_name]},
+            )
+        )
     fig.update_layout(
+        barmode="group",
         yaxis={"title": f"Fraction of runs with confidence ≥ {threshold:g}", "range": [0, 1]},
         xaxis={"title": "Ontology category"},
-        height=420,
+        height=440,
         margin={"l": 40, "r": 20, "t": 20, "b": 120},
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "left", "x": 0},
     )
     fig.update_xaxes(tickangle=-45)
     st.plotly_chart(fig, width="stretch")
-    st.caption(f"n_cohort = {len(runs)} runs · ontology version `{ontology.version}`")
+    per_scenario_n = " · ".join(f"{s}: {len(runs_by_scenario[s])}" for s in scenarios)
+    st.caption(
+        f"n_cohort = {len(runs)} runs ({per_scenario_n}) · ontology version `{ontology.version}`"
+    )
 
+    summary_rows = [
+        (
+            cid,
+            f"{cid} — "
+            + ", ".join(f"{s} {fraction_by_scenario[s][cid]:.0%}" for s in scenarios)
+            + f" (≥ {threshold:g})",
+        )
+        for cid in ordered_categories
+    ]
     _render_justifications_by_category(
         runs=runs,
         ontology=ontology,
-        category_summaries=[
-            (row[0], _frequency_expander_header(row=row, threshold=threshold)) for row in rows
-        ],
-    )
-
-
-def _frequency_expander_header(
-    row: tuple[str, float, float, float],
-    threshold: float,
-) -> str:
-    """Header line for one category's justifications expander in the frequency view."""
-    category_id, fraction, mean, std = row
-    return (
-        f"{category_id} — {fraction:.0%} of runs ≥ {threshold:g} "
-        f"(mean {mean:.2f}, std {std:.2f})"
+        category_summaries=summary_rows,
     )
 
 
@@ -678,35 +695,37 @@ def render(evaluated: list[EvaluatedRun], runs_dir: Path) -> None:
     for run in all_runs:
         scenario_counts[run.scenario_name] = scenario_counts.get(run.scenario_name, 0) + 1
     scenario_options = sorted(scenario_counts.keys())
-    selected_scenario = st.radio(
-        label="Scenario",
-        options=scenario_options,
-        index=default_scenario_index(options=scenario_options),
-        format_func=lambda name: f"{name} ({scenario_counts[name]} runs)",
-        key="feature_presence_scenario",
-        horizontal=True,
+    selected_scenarios = render_horizontal_checkboxes(
+        title="Scenarios",
+        options=[(name, name, scenario_counts[name]) for name in scenario_options],
+        key_prefix="feature_presence_scenario",
+        initial_state=True,
     )
-    if selected_scenario is None:  # pyright: ignore[reportUnnecessaryComparison]
-        st.info("Select a scenario.")
+    if not selected_scenarios:
+        st.info("Select at least one scenario.")
         return
-    runs = [run for run in all_runs if run.scenario_name == selected_scenario]
+    runs = [run for run in all_runs if run.scenario_name in selected_scenarios]
     if not runs:
-        st.info(f"No feature-presence sidecars found for scenario `{selected_scenario}`.")
+        st.info("No feature-presence sidecars found for the selected scenarios.")
         return
-    ontology = resolve_ontology(
-        runs=runs,
-        scenario_name=selected_scenario,
-        runs_dir=runs_dir,
-    )
+    # Resolve one shared ontology across the selected scenarios. Both veyru and
+    # container_yard score against the same consolidated ontology version, so
+    # whichever selected scenario's `_ontology` dir carries that version wins;
+    # the categories then line up across every selected cohort.
+    ontology = None
+    for scenario_name in sorted(selected_scenarios):
+        ontology = resolve_ontology(runs=runs, scenario_name=scenario_name, runs_dir=runs_dir)
+        if ontology is not None:
+            break
     if ontology is None:
-        scenario_ontology_dir = ontology_dir_for_scenario(
-            runs_dir=runs_dir, scenario_name=selected_scenario
+        searched = ", ".join(
+            str(ontology_dir_for_scenario(runs_dir=runs_dir, scenario_name=name))
+            for name in sorted(selected_scenarios)
         )
         st.error(
-            f"No ontology JSON found under `{scenario_ontology_dir}`. "
-            f"Run the consolidation phase "
-            f"(`scripts/run_communication_pipeline.sh --scenario {selected_scenario} --phase 2`) "
-            "first."
+            f"No ontology JSON found under any selected scenario's dir ({searched}). "
+            "Run the consolidation phase "
+            "(`scripts/run_communication_pipeline.sh --scenario <name> --phase 2`) first."
         )
         return
     versions = {run.ontology_version for run in runs}
