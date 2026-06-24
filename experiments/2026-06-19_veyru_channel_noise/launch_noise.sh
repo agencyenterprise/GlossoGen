@@ -23,7 +23,9 @@ CAP=10
 REPLICAS=5
 
 NOISE_LEVELS=(0.2 0.4 0.6)
-BUDGETS=(450 800)
+# Budgets default to the original 450/800 tiers; override with the NOISE_BUDGETS
+# env var (space-separated) to launch a different tier, e.g. NOISE_BUDGETS="150".
+read -r -a BUDGETS <<< "${NOISE_BUDGETS:-450 800}"
 
 # Per-provider cell lists: "short|model|provider"
 declare -a OPENAI_MODELS=(
