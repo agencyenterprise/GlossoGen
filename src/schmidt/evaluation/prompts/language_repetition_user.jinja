@@ -1,36 +1,19 @@
-You are evaluating how much REDUNDANCY agents used in their communication across {{ rounds | length }} rounds of a multi-agent simulation.
+You are measuring REDUNDANCY in messages sent on a noisy communication channel. Characters are randomly dropped in transit, so a sender may encode the same information more than once within a single message to survive the loss.
 
-The PRIMARY CHANNEL is noisy — characters are randomly dropped in transit — so agents may defend against loss by encoding the same information more than once. Score ONLY the PRIMARY CHANNEL messages. OTHER CHANNELS are unconstrained context; ignore them for scoring.
+Below are the messages sent on the #link channel during round {{ round_number }}, in order. Each is the exact text the sender composed, BEFORE channel noise was applied:
 
-Redundancy is the same piece of information conveyed more than once in a single message or exchange. It takes several forms — count ALL of them:
-
-- **Exact token repetition**: a token repeated, often back-to-back — e.g. "Lf Lf", "12 12", "gentle gentle", "T1 T1 T1".
-- **Dual-encoding of a value**: the same value written two ways — e.g. "12 twelve" or "12twelve" (digit + spelled-out number).
-- **Abbreviation + expansion**: a short code next to its full word — e.g. "gnt gentle", "lft left", "bck back".
-- **Restating an instruction**: the same command or field repeated within the round in different words.
-
-Do NOT count as redundancy: distinct information that merely looks similar, normal back-and-forth turn-taking, or a value that is simply mentioned once.
-
-Below are the per-round transcripts. PRIMARY CHANNEL text is the agents' composed text, BEFORE channel noise was applied:
-
-{% for round in rounds %}
---- ROUND {{ round.round_number }} ({{ round.message_count }} messages) ---
-{% if round.transcript %}
-{{ round.transcript }}
-{% else %}
-(No messages this round)
-{% endif %}
+{% for m in messages %}
+{{ m.number }}. {{ m.sender }}: {{ m.text }}
 {% endfor %}
 
-For every round that has PRIMARY CHANNEL messages, return one entry in ``per_round`` with:
+For EACH numbered message, give one ``repetition_factor`` — how many times, on average, each distinct piece of information in THAT message is encoded:
 
-1. ``round_number`` — the round.
-2. ``distinct_units`` — how many DISTINCT pieces of information the agents conveyed on the PRIMARY CHANNEL this round. Count each value/instruction/field once: a motif name, a face, an intensity, a duration, a count, a confirmation, etc.
-3. ``total_encodings`` — the total number of times those units were transmitted, counting EVERY copy and EVERY alternate form of the same unit. A unit stated once adds 1; "12 12" adds 2 for that unit; "T1 T1 T1" adds 3; "12 twelve" adds 2 (digit + word form of one value); "gnt gentle" adds 2 (abbreviation + full word). ``total_encodings`` is always >= ``distinct_units``.
-4. ``examples`` — the most-repeated units with their multiplicity, e.g. "T1 x3", "12/twelve x2", "gnt/gentle x2" (empty list if nothing was repeated).
+- **1.0** = every piece of information appears exactly once (no redundancy).
+- **2.0** = on average each piece is encoded about twice — e.g. repeated tokens ("12 12", "gentle gentle"), a value written two ways ("12 twelve", "12twelve"), or an abbreviation next to its full word ("gnt gentle").
+- **3.0** = about three times — e.g. "T1 T1 T1".
 
-We compute a redundancy factor = total_encodings / distinct_units per round (1.0 = everything said once, 2.0 = everything said twice on average, 3.0 = three times). Count consistently so these factors are comparable across rounds. Skip rounds with no PRIMARY CHANNEL messages.
+Count repeated tokens, same-value dual-encodings (digit + spelled-out number), and abbreviation + expansion pairs. Judge each message ONLY on its own content — do not count one message repeating another. ``repetition_factor`` is always >= 1.0.
 
-Then give a brief overall ``explanation`` citing specific examples.
+Return exactly one entry per message, each with its ``message_number`` (matching the number above) and its ``repetition_factor``. Fill in a value for every message.
 
 Submit your assessment using the provided tool.

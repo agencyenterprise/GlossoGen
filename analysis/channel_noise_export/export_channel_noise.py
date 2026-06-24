@@ -29,8 +29,9 @@ Four output tables:
   ``language_repetition`` mean redundancy factor — encodings per information unit).
 - ``message_level`` — one row per link-channel message with its substage / round
   context, the pristine and transmitted text, character-loss stats, per-message
-  pristine ``perplexity``, and the round's ``round_repetition_factor`` denormalized
-  onto every message (``language_repetition`` is per-round, not per-message).
+  pristine ``perplexity``, and ``message_repetition_factor`` (the per-message
+  ``language_repetition`` LLM-judge factor, read from the run's
+  ``language_repetition_messages.jsonl`` sidecar by ``message_id``).
 - ``round_context`` — one row per (run, round): the round-start briefings plus the
   per-round ``round_success`` flag and ``repetition_factor`` (so per-round
   redundancy can be correlated with per-round success directly).
@@ -44,6 +45,7 @@ multi-sheet ``.xlsx`` workbook.
 
 import argparse
 import asyncio
+import json
 import logging
 from pathlib import Path
 from typing import NamedTuple
@@ -184,6 +186,32 @@ def _repetition_per_round(evaluated: EvaluatedRun) -> dict[int, float]:
     return {}
 
 
+_REPETITION_SIDECAR = "language_repetition_messages.jsonl"
+
+
+def _message_repetition_factors(run_dir: Path) -> dict[str, float]:
+    """Map ``message_id -> per-message repetition factor`` from the metric's sidecar.
+
+    The ``language_repetition`` metric writes one JSONL row per primary-channel
+    message to ``language_repetition_messages.jsonl`` (an LLM judge factor, >= 1.0,
+    averaged over replicas). Empty when the sidecar is absent (the run was not
+    scored for ``language_repetition``).
+    """
+    sidecar = run_dir / _REPETITION_SIDECAR
+    if not sidecar.exists():
+        return {}
+    factors: dict[str, float] = {}
+    for line in sidecar.read_text().splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        message_id = row.get("message_id")
+        factor = row.get("repetition_factor")
+        if isinstance(message_id, str) and isinstance(factor, (int, float)):
+            factors[message_id] = float(factor)
+    return factors
+
+
 def _build_run_level_frame(
     runs: list[EvaluatedRun], contexts: dict[str, RunContext]
 ) -> pd.DataFrame:
@@ -244,10 +272,11 @@ def _build_message_level_frame(
     channel-delivered text. ``chars`` is the message length (preserved under
     character-drop noise); ``chars_dropped`` counts ``_`` substitutions and
     ``drop_fraction`` normalizes it. Per-message ``perplexity`` scores the pristine
-    text. ``round_repetition_factor`` is the round-level ``language_repetition``
-    factor (a per-round judge measure) denormalized onto every message in the
-    round — same shape as ``success`` — so it is identical for all messages of a
-    round; per-message repetition is not defined because redundancy spans messages.
+    text. ``message_repetition_factor`` is the per-message ``language_repetition``
+    LLM-judge factor (>= 1.0, averaged over replicas), read from the run's
+    ``language_repetition_messages.jsonl`` sidecar and joined by ``message_id``.
+    The run-level / per-round means of these factors live in ``run_level`` /
+    ``round_context``.
     """
     perplexity_scorer = MessagePerplexityScorer()
     rows: list[dict[str, object]] = []
@@ -260,7 +289,7 @@ def _build_message_level_frame(
         events = asyncio.run(load_events(log_path=jsonl_path))
         pristine_by_id = build_pristine_text_index(events=events)
         outcomes = _round_outcomes_from_events(events=events)
-        repetition_by_round = _repetition_per_round(evaluated=evaluated)
+        message_repetition = _message_repetition_factors(run_dir=evaluated.run_dir)
         run_model_class = model_class(
             field_observer_model=context.field_observer_model,
             engineer_model=context.engineer_model,
@@ -307,7 +336,7 @@ def _build_message_level_frame(
                             "chars_dropped": chars_dropped,
                             "drop_fraction": drop_fraction,
                             "success": int(round(value)),
-                            "round_repetition_factor": repetition_by_round.get(round_number),
+                            "message_repetition_factor": message_repetition.get(message.message_id),
                             "note": note,
                         }
                     )
