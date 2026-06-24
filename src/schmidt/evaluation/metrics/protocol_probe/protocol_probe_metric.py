@@ -34,7 +34,7 @@ from schmidt.evaluation.metrics.protocol_probe.probe_agent import run_protocol_p
 from schmidt.evaluation.metrics.protocol_probe.response_models import ProtocolProbeResponse
 from schmidt.evaluation.reports.evaluation_cost import EvaluationTokenUsage
 from schmidt.llm.provider import LLMProvider
-from schmidt.message_history_builder import build_message_history
+from schmidt.message_history_builder import build_message_history, resolve_history_timestamp
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent
 from schmidt.runners.communication_protocol import build_full_system_prompt
@@ -99,7 +99,7 @@ class ProtocolProbeMetric(Metric):
         renderer = TemplateRenderer(prompts_dirs=[probe_config.prompts_dir])
         questions = _load_test_bank(path=probe_config.questions_path)
         responses_path = run_dir / _RESPONSES_FILE_NAME
-        target_timestamp = _resolve_history_timestamp(events=events)
+        target_timestamp = resolve_history_timestamp(events=events)
 
         rows_written = 0
         usage_by_model: dict[tuple[str, str], EvaluationTokenUsage] = {}
@@ -272,13 +272,3 @@ def _match_agents(
     return list(by_agent_id.values())
 
 
-def _resolve_history_timestamp(events: list[SimulationEvent]) -> datetime:
-    """Pick a ``target_timestamp`` for ``build_message_history`` that keeps every event.
-
-    When ``cutoff_round`` is set, ``target_timestamp`` is ignored. When it is
-    ``None`` (end-of-run probe), ``target_timestamp`` is the latest event's
-    timestamp so no calls are dropped by timestamp filtering.
-    """
-    if not events:
-        return datetime.now(tz=timezone.utc)
-    return events[-1].timestamp

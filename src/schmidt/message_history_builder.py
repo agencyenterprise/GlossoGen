@@ -16,7 +16,7 @@ their parent batch finished post-cutoff.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import NamedTuple
 
 from pydantic_ai.messages import (
@@ -312,6 +312,18 @@ def _cycle_to_messages(
         if matching_return is not None:
             messages.append(ModelRequest(parts=[matching_return]))
     return messages
+
+
+def resolve_history_timestamp(events: list[SimulationEvent]) -> datetime:
+    """Pick a ``target_timestamp`` for ``build_message_history`` that keeps every event.
+
+    When ``cutoff_round`` is set, ``target_timestamp`` is ignored. When it is
+    ``None`` (end-of-run reconstruction), ``target_timestamp`` is the latest
+    event's timestamp so no calls are dropped by timestamp filtering.
+    """
+    if not events:
+        return datetime.now(tz=timezone.utc)
+    return events[-1].timestamp
 
 
 def build_message_history(
