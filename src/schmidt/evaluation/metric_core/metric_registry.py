@@ -14,6 +14,9 @@ from schmidt.evaluation.metrics.communication.communication_open_coding_metric i
     CommunicationOpenCodingMetric,
 )
 from schmidt.evaluation.metrics.content_filter_refusal_metric import ContentFilterRefusalMetric
+from schmidt.evaluation.metrics.english_ngram.english_ngram_metric import (
+    EnglishNgramSurprisalMetric,
+)
 from schmidt.evaluation.metrics.language_repetition_metric import LanguageRepetitionMetric
 from schmidt.evaluation.metrics.language_strangeness_metric import LanguageStrangenessMetric
 from schmidt.evaluation.metrics.mcm_metric import MCMMetric
@@ -45,6 +48,7 @@ _GENERIC_METRICS: list[type[Metric]] = [
     CommunicationFeaturePresenceMetric,
     CommunicationOpenCodingMetric,
     ContentFilterRefusalMetric,
+    EnglishNgramSurprisalMetric,
     LanguageRepetitionMetric,
     LanguageStrangenessMetric,
     MCMMetric,

@@ -25,13 +25,15 @@ from minicons import scorer  # type: ignore[import-untyped]
 from schmidt.evaluation.metric_core.measurement import Measurement, RoundObservation
 from schmidt.evaluation.metric_core.metric_protocol import Metric
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
-from schmidt.evaluation.metric_core.pristine_text_index import (
-    build_pristine_text_index,
-    pristine_text_for,
+from schmidt.evaluation.metric_core.primary_channel_messages import (
+    RoundMessages,
+    collect_primary_messages_by_round,
 )
+from schmidt.evaluation.metric_core.pristine_text_index import build_pristine_text_index
+from schmidt.evaluation.metric_core.surprisal_stats import mean, population_std
 from schmidt.llm.provider import LLMProvider
 from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import MessageSent, SimulationEvent
+from schmidt.models.event import SimulationEvent
 from schmidt.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -44,13 +46,6 @@ class RoundPerplexity(NamedTuple):
     mean_surprisal: float
     std_surprisal: float
     message_count: int
-
-
-class RoundMessages(NamedTuple):
-    """All primary-channel message texts for a single round."""
-
-    round_number: int
-    texts: list[str]
 
 
 class PerplexityMetric(Metric):
@@ -81,7 +76,7 @@ class PerplexityMetric(Metric):
             return []
 
         pristine_index = build_pristine_text_index(events=events)
-        rounds = _collect_primary_messages_by_round(
+        rounds = collect_primary_messages_by_round(
             events=events,
             primary_channel_id=primary_channel_id,
             pristine_index=pristine_index,
@@ -102,8 +97,8 @@ class PerplexityMetric(Metric):
 
         all_means = [rp.mean_surprisal for rp in round_perplexities]
         total_messages = sum(rp.message_count for rp in round_perplexities)
-        overall_mean = _mean(values=all_means)
-        overall_std = _std(values=all_means, mean=overall_mean)
+        overall_mean = mean(values=all_means)
+        overall_std = population_std(values=all_means, value_mean=overall_mean)
 
         per_round = [
             RoundObservation(
@@ -138,32 +133,6 @@ class PerplexityMetric(Metric):
         ]
 
 
-def _collect_primary_messages_by_round(
-    events: list[SimulationEvent],
-    primary_channel_id: str,
-    pristine_index: dict[str, str],
-) -> list[RoundMessages]:
-    """Extract pristine message texts from MessageSent events on the primary channel, by round.
-
-    Each primary-channel message is resolved to its pre-transform text via
-    ``pristine_index`` so the score reflects what the sender composed, not the
-    channel-transformed delivery.
-    """
-    by_round: dict[int, list[str]] = {}
-    for event in events:
-        if not isinstance(event, MessageSent):
-            continue
-        if event.message.channel_id != primary_channel_id:
-            continue
-        text = pristine_text_for(index=pristine_index, message=event)
-        if not text:
-            continue
-        if event.round_number not in by_round:
-            by_round[event.round_number] = []
-        by_round[event.round_number].append(text)
-    return [RoundMessages(round_number=rn, texts=by_round[rn]) for rn in sorted(by_round.keys())]
-
-
 def _score_all_rounds(
     model_name: str,
     rounds: list[RoundMessages],
@@ -181,8 +150,8 @@ def _score_all_rounds(
         per_message_surprisals = _score_messages(scorer_obj=lm_scorer, texts=round_messages.texts)
         if not per_message_surprisals:
             continue
-        mean_surprisal = _mean(values=per_message_surprisals)
-        std_surprisal = _std(values=per_message_surprisals, mean=mean_surprisal)
+        mean_surprisal = mean(values=per_message_surprisals)
+        std_surprisal = population_std(values=per_message_surprisals, value_mean=mean_surprisal)
         results.append(
             RoundPerplexity(
                 round_number=round_messages.round_number,
@@ -215,18 +184,3 @@ def _score_messages(scorer_obj: Any, texts: list[str]) -> list[float]:
             continue
         out.append(value)
     return out
-
-
-def _mean(values: list[float]) -> float:
-    """Arithmetic mean; returns 0.0 for an empty list."""
-    if not values:
-        return 0.0
-    return sum(values) / len(values)
-
-
-def _std(values: list[float], mean: float) -> float:
-    """Population standard deviation; returns 0.0 for fewer than two values."""
-    if len(values) < 2:
-        return 0.0
-    variance = sum((v - mean) ** 2 for v in values) / len(values)
-    return math.sqrt(variance)
