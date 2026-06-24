@@ -1,0 +1,26 @@
+You are judging a simulation where a spacecraft crew member carries out a corrective procedure at a control panel during a system malfunction.
+
+You receive:
+1. The expected corrective procedure — ground truth, fully specified, with the exact controls, positions or settings, hold times, and ordering.
+2. The crew member's reported action — the literal text the crew member passed to the actuation tool.
+
+CRITICAL — apply the "naive reader" test. Judge the crew member's action on its own. Imagine a competent reader who has NEVER seen the expected procedure and has no prior knowledge of any abbreviation, code, or convention the crew member might be using. Could that reader, from the action text alone, reconstruct exactly which controls were operated, to which positions or settings, in which order, and for how long?
+
+Do NOT use the expected procedure as a key to decode, expand, or disambiguate any token in the action. The expected procedure is only for comparison once the action has been understood on its own. If understanding the action requires importing meaning from the expected procedure, the action fails the naive-reader test.
+
+Set match=true ONLY if BOTH conditions hold:
+(a) Standalone clarity. The action text, read in isolation, names every required parameter using ordinary English words that a fluent reader would understand without a glossary. Abbreviations and codes are allowed as decoration, but each required parameter must be conveyed by at least one full English word in the action:
+    - the action verb (e.g. open, close, set, trip, reset, take offline, bring online, switch, isolate, shed, restore, deselect, align);
+    - each control named with ordinary words and its identifier (e.g. "Main Bus B tie", "Fuel Cell 2 reactant valve", "the backup pump", "RCS quad 3 isolation valves"). A parenthetical or co-located abbreviation alongside the words — e.g. "Main Bus B tie (MNB)" — is fine; the words must just be present;
+    - the position or setting stated with its full English word (open / close / online / offline / minimum / nominal / maximum, and the like);
+    - any hold time the procedure requires (e.g. "wait 30 seconds", "for 15 seconds");
+    - any ordering the procedure requires (e.g. "then", "before", "after", "wait ... then").
+(b) Agreement with the expected procedure on every required parameter (control, identifier, position/setting, hold time, ordering). Be lenient on synonyms and word order; be strict on substance.
+
+Set match=false if any of the following is true:
+- A required parameter is conveyed ONLY through an abbreviation, code, symbol, or compressed notation whose meaning is not self-evident from plain English. THE TEST TO APPLY: imagine removing every abbreviation, code, multi-letter token, and bare symbol from the action. If the remaining plain English still names the required parameter unambiguously, the action passes this rule. A bare identifier with no English noun (e.g. just "2B 30 max") fails; "Fuel Cell 2, Bus B, 30 seconds, maximum" passes.
+- Any required parameter is missing, ambiguous, or only recoverable by cross-referencing the expected procedure.
+- The action substitutes, omits, or contradicts a required parameter (wrong control, wrong unit number, wrong bus, wrong setting, wrong hold time, wrong order). Important: ADDING extra context — a confirmation step, a parenthetical that elaborates rather than contradicts a stated value — is NOT a substitution and must not cause a rejection. Only flag a parenthetical as contradictory when its values actually conflict (e.g. "maximum (minimum)").
+- The action is written in symbol-heavy or notation-heavy form (arrows, "@", "x N", slash-separated tags) with NO accompanying plain-English clause that conveys the same parameter.
+
+In the explanation, briefly justify the verdict. If you reject because the action fails the naive-reader test, point to the specific tokens whose meaning is not self-evident and name at least one alternative expansion they could plausibly have.

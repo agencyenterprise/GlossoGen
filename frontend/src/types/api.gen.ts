@@ -1255,6 +1255,75 @@ export interface components {
             content: string | null;
         };
         /**
+         * OrbitalAnomalyActuationMetadata
+         * @description Judge context captured for a single ``actuate_panel`` call.
+         *
+         *     Attached to the corresponding tool-use entry so the frontend can show
+         *     the expected procedure and the LLM judge's verdict alongside the call.
+         */
+        OrbitalAnomalyActuationMetadata: {
+            /** Expected Actions */
+            expected_actions: string;
+            /** Judge Match */
+            judge_match: boolean;
+            /** Judge Explanation */
+            judge_explanation: string;
+        };
+        /**
+         * OrbitalAnomalyCaseStageDTO
+         * @description One stage of an anomaly: the three agent views plus the expected fix.
+         */
+        OrbitalAnomalyCaseStageDTO: {
+            /** Fault Name */
+            fault_name: string;
+            /** Subsystem */
+            subsystem: string;
+            /** Cockpit Alarm */
+            cockpit_alarm: string;
+            /** Panel Observation */
+            panel_observation: string;
+            /** Telemetry Readout */
+            telemetry_readout: string;
+            /** Judge Expected Actions */
+            judge_expected_actions: string;
+        };
+        /**
+         * OrbitalAnomalyCaseSummary
+         * @description Per-round anomaly metadata for the round-timeline modal.
+         *
+         *     One entry per round, mirroring the ``OrbitalAnomalyCaseStarted`` event.
+         *     ``variant_index`` is the per-round secret variant selection.
+         */
+        OrbitalAnomalyCaseSummary: {
+            /** Round Number */
+            round_number: number;
+            /** Case Number */
+            case_number: number;
+            /** Variant Index */
+            variant_index: number;
+            /** Time Budget Seconds */
+            time_budget_seconds: number;
+            /** Stages */
+            stages: components["schemas"]["OrbitalAnomalyCaseStageDTO"][];
+        };
+        /**
+         * OrbitalAnomalyRunExtras
+         * @description Scenario-specific run-detail payload surfaced for orbital_anomaly runs.
+         */
+        OrbitalAnomalyRunExtras: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            scenario_name: "orbital_anomaly";
+            /** Cases */
+            cases: components["schemas"]["OrbitalAnomalyCaseSummary"][];
+            /** Actuation Metadata By Call Id */
+            actuation_metadata_by_call_id: {
+                [key: string]: components["schemas"]["OrbitalAnomalyActuationMetadata"];
+            };
+        };
+        /**
          * ReasoningEntry
          * @description An LLM reasoning/thinking entry from an agent's turn.
          *
@@ -1483,7 +1552,7 @@ export interface components {
             /** Round Injections */
             round_injections: components["schemas"]["RoundInjection"][];
             /** Scenario Extras */
-            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
+            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };
         /**
          * RunListResponse
@@ -1741,6 +1810,34 @@ export interface components {
             round_number: number;
             /** Token Count */
             token_count: number;
+        };
+        /**
+         * SSEOrbitalAnomalyActuationJudged
+         * @description SSE event carrying the actuation judge's verdict for an actuate_panel call.
+         */
+        SSEOrbitalAnomalyActuationJudged: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "orbital_anomaly_actuation_judged";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Round Number */
+            round_number: number;
+            /** Expected Actions */
+            expected_actions: string;
+            /** Judge Match */
+            judge_match: boolean;
+            /** Judge Explanation */
+            judge_explanation: string;
         };
         /**
          * SSERoundAdvanced
@@ -2526,7 +2623,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolCallInvoked"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSEAgentCostUpdated"] | components["schemas"]["SSEDebugLog"] | components["schemas"]["SSEAgentRunCycleFailed"] | components["schemas"]["SSEVeyruStabilizationJudged"];
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolCallInvoked"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSEAgentCostUpdated"] | components["schemas"]["SSEDebugLog"] | components["schemas"]["SSEAgentRunCycleFailed"] | components["schemas"]["SSEOrbitalAnomalyActuationJudged"] | components["schemas"]["SSEVeyruStabilizationJudged"];
                 };
             };
             /** @description Validation Error */

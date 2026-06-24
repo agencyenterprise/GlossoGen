@@ -616,6 +616,9 @@
                       "$ref": "#/components/schemas/SSEAgentRunCycleFailed"
                     },
                     {
+                      "$ref": "#/components/schemas/SSEOrbitalAnomalyActuationJudged"
+                    },
+                    {
                       "$ref": "#/components/schemas/SSEVeyruStabilizationJudged"
                     }
                   ],
@@ -635,6 +638,7 @@
                       "agent_cost_updated": "#/components/schemas/SSEAgentCostUpdated",
                       "debug_log": "#/components/schemas/SSEDebugLog",
                       "agent_run_cycle_failed": "#/components/schemas/SSEAgentRunCycleFailed",
+                      "orbital_anomaly_actuation_judged": "#/components/schemas/SSEOrbitalAnomalyActuationJudged",
                       "veyru_stabilization_judged": "#/components/schemas/SSEVeyruStabilizationJudged"
                     }
                   },
@@ -2828,6 +2832,137 @@
         "title": "NoteResponse",
         "description": "Lightweight response for fetching a run's note content."
       },
+      "OrbitalAnomalyActuationMetadata": {
+        "properties": {
+          "expected_actions": {
+            "type": "string",
+            "title": "Expected Actions"
+          },
+          "judge_match": {
+            "type": "boolean",
+            "title": "Judge Match"
+          },
+          "judge_explanation": {
+            "type": "string",
+            "title": "Judge Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_actions",
+          "judge_match",
+          "judge_explanation"
+        ],
+        "title": "OrbitalAnomalyActuationMetadata",
+        "description": "Judge context captured for a single ``actuate_panel`` call.\n\nAttached to the corresponding tool-use entry so the frontend can show\nthe expected procedure and the LLM judge's verdict alongside the call."
+      },
+      "OrbitalAnomalyCaseStageDTO": {
+        "properties": {
+          "fault_name": {
+            "type": "string",
+            "title": "Fault Name"
+          },
+          "subsystem": {
+            "type": "string",
+            "title": "Subsystem"
+          },
+          "cockpit_alarm": {
+            "type": "string",
+            "title": "Cockpit Alarm"
+          },
+          "panel_observation": {
+            "type": "string",
+            "title": "Panel Observation"
+          },
+          "telemetry_readout": {
+            "type": "string",
+            "title": "Telemetry Readout"
+          },
+          "judge_expected_actions": {
+            "type": "string",
+            "title": "Judge Expected Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fault_name",
+          "subsystem",
+          "cockpit_alarm",
+          "panel_observation",
+          "telemetry_readout",
+          "judge_expected_actions"
+        ],
+        "title": "OrbitalAnomalyCaseStageDTO",
+        "description": "One stage of an anomaly: the three agent views plus the expected fix."
+      },
+      "OrbitalAnomalyCaseSummary": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "case_number": {
+            "type": "integer",
+            "title": "Case Number"
+          },
+          "variant_index": {
+            "type": "integer",
+            "title": "Variant Index"
+          },
+          "time_budget_seconds": {
+            "type": "integer",
+            "title": "Time Budget Seconds"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/OrbitalAnomalyCaseStageDTO"
+            },
+            "type": "array",
+            "title": "Stages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "case_number",
+          "variant_index",
+          "time_budget_seconds",
+          "stages"
+        ],
+        "title": "OrbitalAnomalyCaseSummary",
+        "description": "Per-round anomaly metadata for the round-timeline modal.\n\nOne entry per round, mirroring the ``OrbitalAnomalyCaseStarted`` event.\n``variant_index`` is the per-round secret variant selection."
+      },
+      "OrbitalAnomalyRunExtras": {
+        "properties": {
+          "scenario_name": {
+            "type": "string",
+            "const": "orbital_anomaly",
+            "title": "Scenario Name",
+            "default": "orbital_anomaly"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/OrbitalAnomalyCaseSummary"
+            },
+            "type": "array",
+            "title": "Cases"
+          },
+          "actuation_metadata_by_call_id": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/OrbitalAnomalyActuationMetadata"
+            },
+            "type": "object",
+            "title": "Actuation Metadata By Call Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cases",
+          "actuation_metadata_by_call_id"
+        ],
+        "title": "OrbitalAnomalyRunExtras",
+        "description": "Scenario-specific run-detail payload surfaced for orbital_anomaly runs."
+      },
       "ReasoningEntry": {
         "properties": {
           "message_id": {
@@ -3294,6 +3429,9 @@
                     "$ref": "#/components/schemas/ContainerYardRunExtras"
                   },
                   {
+                    "$ref": "#/components/schemas/OrbitalAnomalyRunExtras"
+                  },
+                  {
                     "$ref": "#/components/schemas/VeyruRunExtras"
                   }
                 ],
@@ -3301,6 +3439,7 @@
                   "propertyName": "scenario_name",
                   "mapping": {
                     "container_yard_stacking": "#/components/schemas/ContainerYardRunExtras",
+                    "orbital_anomaly": "#/components/schemas/OrbitalAnomalyRunExtras",
                     "veyru": "#/components/schemas/VeyruRunExtras"
                   }
                 }
@@ -3873,6 +4012,57 @@
         ],
         "title": "SSEMessageSent",
         "description": "SSE event emitted when an agent sends a message to a channel."
+      },
+      "SSEOrbitalAnomalyActuationJudged": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "orbital_anomaly_actuation_judged",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "expected_actions": {
+            "type": "string",
+            "title": "Expected Actions"
+          },
+          "judge_match": {
+            "type": "boolean",
+            "title": "Judge Match"
+          },
+          "judge_explanation": {
+            "type": "string",
+            "title": "Judge Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "agent_id",
+          "round_number",
+          "expected_actions",
+          "judge_match",
+          "judge_explanation"
+        ],
+        "title": "SSEOrbitalAnomalyActuationJudged",
+        "description": "SSE event carrying the actuation judge's verdict for an actuate_panel call."
       },
       "SSERoundAdvanced": {
         "properties": {
