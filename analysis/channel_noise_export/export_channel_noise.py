@@ -28,8 +28,9 @@ Four output tables:
   headline ``perplexity`` (pristine), ``mcm``, and ``repetition`` (the
   ``language_repetition`` mean redundancy factor — encodings per information unit).
 - ``message_level`` — one row per link-channel message with its substage / round
-  context, the pristine and transmitted text, character-loss stats, and
-  per-message pristine ``perplexity``.
+  context, the pristine and transmitted text, character-loss stats, per-message
+  pristine ``perplexity``, and the round's ``round_repetition_factor`` denormalized
+  onto every message (``language_repetition`` is per-round, not per-message).
 - ``round_context`` — one row per (run, round): the round-start briefings plus the
   per-round ``round_success`` flag and ``repetition_factor`` (so per-round
   redundancy can be correlated with per-round success directly).
@@ -243,7 +244,10 @@ def _build_message_level_frame(
     channel-delivered text. ``chars`` is the message length (preserved under
     character-drop noise); ``chars_dropped`` counts ``_`` substitutions and
     ``drop_fraction`` normalizes it. Per-message ``perplexity`` scores the pristine
-    text.
+    text. ``round_repetition_factor`` is the round-level ``language_repetition``
+    factor (a per-round judge measure) denormalized onto every message in the
+    round — same shape as ``success`` — so it is identical for all messages of a
+    round; per-message repetition is not defined because redundancy spans messages.
     """
     perplexity_scorer = MessagePerplexityScorer()
     rows: list[dict[str, object]] = []
@@ -256,6 +260,7 @@ def _build_message_level_frame(
         events = asyncio.run(load_events(log_path=jsonl_path))
         pristine_by_id = build_pristine_text_index(events=events)
         outcomes = _round_outcomes_from_events(events=events)
+        repetition_by_round = _repetition_per_round(evaluated=evaluated)
         run_model_class = model_class(
             field_observer_model=context.field_observer_model,
             engineer_model=context.engineer_model,
@@ -302,6 +307,7 @@ def _build_message_level_frame(
                             "chars_dropped": chars_dropped,
                             "drop_fraction": drop_fraction,
                             "success": int(round(value)),
+                            "round_repetition_factor": repetition_by_round.get(round_number),
                             "note": note,
                         }
                     )
