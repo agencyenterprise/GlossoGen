@@ -270,5 +270,3 @@ def _match_agents(
         if config.role_name in role_names:
             by_agent_id[config.agent_id] = config
     return list(by_agent_id.values())
-
-
