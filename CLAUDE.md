@@ -60,7 +60,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
     - `evaluation_report.py` — `EvaluationReport` schema, plus `load_report` / `write_report` / `merge_evaluation_costs` helpers
     - `evaluation_cost.py` — `EvaluationTokenUsage`, `EvaluationCost`, and `compute_evaluation_cost`
   - `metrics/` — concrete Metric implementations
-    - `language_repetition_metric.py` — LLM judge (3 replicas, averaged); per-round redundancy factor (mean encodings per distinct information unit, ≥1.0) on pristine primary-channel text — captures repeated tokens, digit+word dual-encoding, and abbreviation+expansion; per-round note records the per-replica spread
+    - `language_repetition_metric.py` — LLM judge, **per message**: for each round it feeds that round's `#link` messages (pristine) as an enumerated list and the judge returns one redundancy factor per message (≥1.0; captures repeated tokens, digit+word dual-encoding, abbreviation+expansion). Judged `rounds × 3` calls (3 replicas/round, averaged per message). Per-message factors → `language_repetition_messages.jsonl` sidecar (keyed by `message_id`); the `Measurement` carries the per-round mean factor and run-level mean
     - `language_strangeness_metric.py` — detects unusual grammar, structure, formatting (not codes/slang/neologisms)
     - `slang_emergence_metric.py` — detects informal register shifts and colloquial expressions
     - `neologism_metric.py` — detects genuinely invented words (not abbreviations or codes)
@@ -376,6 +376,7 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── replace_config.json                # (replace-agent / cross-run / resume-at-round runs) merged scenario_config + model_overrides written by the orchestrator
 ├── resume_context_{agent_id}.json     # (resume / fork / replace-agent / cross-run runs) per-agent reconstructed pydantic-ai message history dumped at resume time for inspection
 ├── resume_context_{agent_id}_round_{R}.json  # (in-run scheduled swap) one file per AgentSwappedMidRun event capturing the swapped-in agent's seed history
+├── language_repetition_messages.jsonl # (language_repetition metric) one row per primary-channel message: its per-message redundancy factor (judge, replica-averaged), keyed by message_id
 ├── protocol_explanation_responses.jsonl  # (protocol_explanation metric) one row per agent: its own free-text description of the protocol
 ├── protocol_explanation_usage.json    # (same) per-model token usage + cost for the explanation probe batch
 ├── protocol_probe_responses.jsonl     # (scenarios that implement get_protocol_probe_config) one row per (agent, question, replica)
@@ -868,7 +869,7 @@ Available metrics per scenario:
 
 Generic metrics (available to all scenarios):
 
-- `language_repetition` — how much agents redundantly re-encode information on the primary channel under noise (repeated tokens like `Lf Lf 12 12`, digit+word dual-encoding like `12 twelve`, abbreviation+expansion like `gnt gentle`). LLM judge scored on the **pristine** pre-noise text; per round it counts distinct information units + total encodings, and the metric reports a redundancy factor `total_encodings / distinct_units` (≥1.0, unbounded — `T1 T1 T1` ×3 outscores `12 12` ×2). The judge is called 3 times per run; each round's factor is the **mean across replicas** and the per-round note records the per-replica factors + spread (so judge disagreement, e.g. on counting character runs, is visible). `score` = mean averaged factor across rounds; `per_round[].value` is the per-round mean factor. Not bit-reproducible (judge-derived counts), but the 3-replica mean damps single-call variance.
+- `language_repetition` — how much each message redundantly re-encodes information on the primary channel under noise (repeated tokens like `Lf Lf 12 12`, digit+word dual-encoding like `12 twelve`, abbreviation+expansion like `gnt gentle`). **Per-message LLM judge**: for each round, that round's `#link` messages (pristine pre-noise text) are fed as an enumerated list and the judge returns one `repetition_factor` per message (≥1.0; 1.0 = each piece of info once, 2.0 ≈ twice, 3.0 ≈ thrice). Each round is judged **3 times** (`rounds × 3` calls/run) and per-message factors are averaged across replicas. Per-message factors are written to a `language_repetition_messages.jsonl` sidecar keyed by `message_id`. `score` = mean per-message factor across rounds (run mean); `per_round[].value` = that round's mean per-message factor. Within-message only (cross-message repetition is not counted). Not bit-reproducible (judge-derived), but per-message framing + 3-replica mean make it far more stable than round-level lumping.
 - `language_strangeness` — unusual grammar, sentence structure, formatting, telegraph-style (NOT codes, slang, or new words). LLM judge; `score` = number of rounds with detected anomalies.
 - `slang_emergence` — informal register shifts, existing-word repurposing (NOT codes or new words). LLM judge; `score` = number of rounds with detected slang.
 - `neologism` — genuinely invented words with new meanings (NOT abbreviations or code mappings). LLM judge; `score` = number of rounds with detected neologisms.
