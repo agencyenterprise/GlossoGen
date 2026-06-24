@@ -110,11 +110,15 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
                 </li>
                 <li>
                   <code className="font-mono">list_runs</code> — paginated run listing with
-                  filtering by scenario, model, status, fork
+                  filtering by scenario, model, status, fork, and labels
                 </li>
                 <li>
                   <code className="font-mono">get_run_metadata</code> — lightweight run metadata,
-                  agents, and evaluation summary
+                  agents, evaluation summary, and lineage provenance
+                </li>
+                <li>
+                  <code className="font-mono">list_derived_runs</code> — runs derived from a parent
+                  (replace-agent, resume-at-round, cross-run) with round boundaries and scores
                 </li>
                 <li>
                   <code className="font-mono">get_run</code> — full run content with messages,
@@ -131,6 +135,14 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
                 <li>
                   <code className="font-mono">start_run</code> — launch a simulation with scenario,
                   model, provider, and knobs
+                </li>
+                <li>
+                  <code className="font-mono">export_run_artifacts</code> — download URL for a zip
+                  archive of all run artifacts
+                </li>
+                <li>
+                  <code className="font-mono">export_agent_thread</code> — one agent thread as a
+                  drop-in Anthropic/OpenAI request body (optional round cutoff)
                 </li>
               </ul>
             </div>
