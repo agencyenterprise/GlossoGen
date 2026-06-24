@@ -25,13 +25,15 @@ Four output tables:
   ``postmortem``, ``round_time_budget_seconds``, ``channel_noise_level``,
   ``random_seed``, the Bernoulli numerator/denominator
   (``round_success_count`` / ``total_rounds``) and fraction, plus the run's
-  headline ``perplexity`` (pristine), ``mcm``, and ``repetition`` (the
+  headline ``perplexity`` (pristine), ``english_ngram_surprisal`` (pristine; English
+  char trigram, higher = less English-like), ``mcm``, and ``repetition`` (the
   ``language_repetition`` mean redundancy factor — encodings per information unit).
 - ``message_level`` — one row per link-channel message with its substage / round
   context, the pristine and transmitted text, character-loss stats, per-message
-  pristine ``perplexity``, and ``message_repetition_factor`` (the per-message
-  ``language_repetition`` LLM-judge factor, read from the run's
-  ``language_repetition_messages.jsonl`` sidecar by ``message_id``).
+  pristine ``perplexity`` and ``english_ngram_surprisal``, and
+  ``message_repetition_factor`` (the per-message ``language_repetition`` LLM-judge
+  factor, read from the run's ``language_repetition_messages.jsonl`` sidecar by
+  ``message_id``).
 - ``round_context`` — one row per (run, round): the round-start briefings plus the
   per-round ``round_success`` flag and ``repetition_factor`` (so per-round
   redundancy can be correlated with per-round success directly).
@@ -54,12 +56,14 @@ import pandas as pd
 
 from analysis.results_viewer.measurement_scores import (
     LANGUAGE_REPETITION_METRIC,
+    english_ngram_surprisal_score,
     language_repetition_score,
     mcm_score,
     perplexity_score,
     read_labels,
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
+from analysis.veyru_run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
 from analysis.veyru_run_export.message_perplexity_scorer import MessagePerplexityScorer
 from analysis.veyru_run_export.run_context_scan import (
     RunContext,
@@ -117,6 +121,7 @@ class RunRecord(NamedTuple):
     total_rounds: int
     round_success: int
     perplexity_score: float | None
+    english_ngram_score: float | None
     mcm_score: float | None
     repetition_score: float | None
     labels: list[str]
@@ -148,6 +153,7 @@ def _build_record(evaluated: EvaluatedRun) -> RunRecord | None:
         total_rounds=int(config.get("round_count", 0)),
         round_success=round_success,
         perplexity_score=perplexity_score(evaluated=evaluated),
+        english_ngram_score=english_ngram_surprisal_score(evaluated=evaluated),
         mcm_score=mcm_score(evaluated=evaluated),
         repetition_score=language_repetition_score(evaluated=evaluated),
         labels=labels,
@@ -243,6 +249,7 @@ def _build_run_level_frame(
                 "round_success_count": record.round_success,
                 "round_success_fraction": fraction,
                 "perplexity": record.perplexity_score,
+                "english_ngram_surprisal": record.english_ngram_score,
                 "mcm": record.mcm_score,
                 "repetition": record.repetition_score,
                 "labels": "|".join(record.labels),
@@ -271,14 +278,17 @@ def _build_message_level_frame(
     from the ``send_message`` ``message_id``); ``message_text_transmitted`` is the
     channel-delivered text. ``chars`` is the message length (preserved under
     character-drop noise); ``chars_dropped`` counts ``_`` substitutions and
-    ``drop_fraction`` normalizes it. Per-message ``perplexity`` scores the pristine
-    text. ``message_repetition_factor`` is the per-message ``language_repetition``
+    ``drop_fraction`` normalizes it. Per-message ``perplexity`` (gpt2, per token) and
+    ``english_ngram_surprisal`` (English char trigram, per char; higher = less
+    English-like) both score the pristine text. ``message_repetition_factor`` is the
+    per-message ``language_repetition``
     LLM-judge factor (>= 1.0, averaged over replicas), read from the run's
     ``language_repetition_messages.jsonl`` sidecar and joined by ``message_id``.
     The run-level / per-round means of these factors live in ``run_level`` /
     ``round_context``.
     """
     perplexity_scorer = MessagePerplexityScorer()
+    english_ngram_scorer = MessageEnglishNgramScorer()
     rows: list[dict[str, object]] = []
     for evaluated in runs:
         record = _build_record(evaluated=evaluated)
@@ -340,11 +350,14 @@ def _build_message_level_frame(
                             "note": note,
                         }
                     )
-        perplexities = perplexity_scorer.score_run(
-            jsonl_path=jsonl_path, texts=[str(row["message_text"]) for row in run_rows]
+        pristine_texts = [str(row["message_text"]) for row in run_rows]
+        perplexities = perplexity_scorer.score_run(jsonl_path=jsonl_path, texts=pristine_texts)
+        english_ngram_surprisals = english_ngram_scorer.score_run(
+            jsonl_path=jsonl_path, texts=pristine_texts
         )
-        for row, perplexity in zip(run_rows, perplexities):
+        for row, perplexity, english_ngram in zip(run_rows, perplexities, english_ngram_surprisals):
             row["perplexity"] = perplexity
+            row["english_ngram_surprisal"] = english_ngram
         rows.extend(run_rows)
     frame = pd.DataFrame(rows)
     if frame.empty:

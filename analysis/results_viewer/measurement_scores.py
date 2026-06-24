@@ -13,6 +13,7 @@ import orjson
 from analysis.results_viewer.run_catalog import EvaluatedRun
 
 PERPLEXITY_METRIC = "perplexity"
+ENGLISH_NGRAM_SURPRISAL_METRIC = "english_ngram_surprisal"
 MCR_METRIC = "mean_chars_per_round"
 MCM_METRIC = "mean_chars_per_message"
 LANGUAGE_REPETITION_METRIC = "language_repetition"
@@ -42,6 +43,14 @@ def measurement_score(evaluated: EvaluatedRun, metric_name: str) -> float | None
 def perplexity_score(evaluated: EvaluatedRun) -> float | None:
     """Mean per-token surprisal in nats under gpt2; ``None`` if unscored."""
     return measurement_score(evaluated=evaluated, metric_name=PERPLEXITY_METRIC)
+
+
+def english_ngram_surprisal_score(evaluated: EvaluatedRun) -> float | None:
+    """Mean per-char surprisal in nats under the English char trigram; ``None`` if unscored.
+
+    Higher means less English-like (the inverse intuition of ``perplexity``).
+    """
+    return measurement_score(evaluated=evaluated, metric_name=ENGLISH_NGRAM_SURPRISAL_METRIC)
 
 
 def mcr_score(evaluated: EvaluatedRun) -> float | None:
