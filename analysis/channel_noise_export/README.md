@@ -70,8 +70,10 @@ or a model on `round_success_fraction`.
 `run_id`, `scenario`, `field_observer_model`, `engineer_model`, `model_class`,
 `postmortem`, `round_time_budget_seconds`, **`channel_noise_level`**, `random_seed`,
 `total_rounds`, `round_success_count`, `round_success_fraction`, `perplexity` (run-wide
-mean per-token surprisal, nats/gpt2, **pristine text**), `mcm` (run-wide mean chars per
-link message — length is preserved under character-drop noise), `labels`.
+mean per-token surprisal, nats/gpt2, **pristine text**), `english_ngram_surprisal`
+(run-wide mean per-char surprisal under an English character trigram, nats, **pristine
+text** — higher = less English-like), `mcm` (run-wide mean chars per link message —
+length is preserved under character-drop noise), `labels`.
 
 ### `message_level` — one row per link-channel message
 
@@ -93,6 +95,10 @@ Message columns:
   realized noise, which averages to `channel_noise_level` within a cell.
 - `perplexity` — per-message mean per-token surprisal (nats) under `gpt2`, on the pristine
   text, same method as the `perplexity` metric. Blank for empty or single-token messages.
+- `english_ngram_surprisal` — per-message mean per-char surprisal (nats) under an English
+  character trigram, on the pristine text, same method as the `english_ngram_surprisal`
+  metric. Higher = less English-like (degenerate repetition, codes, digit runs score high).
+  Blank for empty messages.
 
 Substage context (repeated across the substage's messages):
 
