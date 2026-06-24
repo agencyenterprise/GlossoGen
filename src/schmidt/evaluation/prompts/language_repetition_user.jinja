@@ -12,7 +12,9 @@ For EACH numbered message, give one ``repetition_factor`` — how many times, on
 - **2.0** = on average each piece is encoded about twice — e.g. repeated tokens ("12 12", "gentle gentle"), a value written two ways ("12 twelve", "12twelve"), or an abbreviation next to its full word ("gnt gentle").
 - **3.0** = about three times — e.g. "T1 T1 T1".
 
-Count repeated tokens, same-value dual-encodings (digit + spelled-out number), and abbreviation + expansion pairs. Judge each message ONLY on its own content — do not count one message repeating another. ``repetition_factor`` is always >= 1.0.
+A RUN OF THE SAME UPPERCASE LETTER repeated counts as that letter encoded once per occurrence — treat the run as ONE piece of information repeated that many times. So "LLLLLLL" is the symbol "L" encoded 7 times (repetition_factor 7.0) and "FFFFFFFFFFFF" is "F" encoded 12 times (repetition_factor 12.0). When such a run sits alongside other tokens, fold its count into the message average — e.g. "WWWWWWWWWW T12 T12 T12" has "W" encoded 10 times plus "T12" encoded 3 times.
+
+Count repeated tokens, same-value dual-encodings (digit + spelled-out number), abbreviation + expansion pairs, AND repeated-uppercase-letter runs. Judge each message ONLY on its own content — do not count one message repeating another. ``repetition_factor`` is always >= 1.0 and may exceed 3.0 for long character runs.
 
 Return exactly one entry per message, each with its ``message_number`` (matching the number above) and its ``repetition_factor``. Fill in a value for every message.
 
