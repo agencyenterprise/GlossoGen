@@ -231,6 +231,120 @@
         }
       }
     },
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/agents/{agent_id}/thread": {
+      "get": {
+        "summary": "Get Agent Thread Export",
+        "description": "Export one agent's reconstructed thread as a drop-in provider-native request body.\n\n``round`` is the exclusive cutoff (rounds ``1..round-1``; omit for the full\nend-of-run thread); ``format`` defaults to the format matching the agent's\nown provider. The returned ``request`` is a ready-to-POST Anthropic/OpenAI\nbody \u2014 the caller appends their own trailing user message (and ``max_tokens``\nfor Anthropic) and sends it to the provider.",
+        "operationId": "get_agent_thread_export_api_g__group_slug__runs__scenario___run_dir_name__agents__agent_id__thread_get",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "run_dir_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Dir Name"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "round",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Round"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "anthropic",
+                    "openai"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "name": "include_thinking",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Thinking"
+            }
+          },
+          {
+            "name": "flatten_tools",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Flatten Tools"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadExport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/evaluation": {
       "get": {
         "summary": "Get Run Evaluation",
@@ -1434,6 +1548,153 @@
         ],
         "title": "AllLabelsResponse",
         "description": "Response containing all unique labels across all runs."
+      },
+      "AnthropicMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AnthropicTextBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/AnthropicToolUseBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/AnthropicToolResultBlock"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "type",
+                "mapping": {
+                  "text": "#/components/schemas/AnthropicTextBlock",
+                  "tool_result": "#/components/schemas/AnthropicToolResultBlock",
+                  "tool_use": "#/components/schemas/AnthropicToolUseBlock"
+                }
+              }
+            },
+            "type": "array",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "AnthropicMessage",
+        "description": "One Anthropic message turn with role-tagged content blocks."
+      },
+      "AnthropicRequest": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "system": {
+            "type": "string",
+            "title": "System"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/AnthropicMessage"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "system",
+          "messages"
+        ],
+        "title": "AnthropicRequest",
+        "description": "Drop-in Anthropic Messages API body (minus ``max_tokens`` and the trailing question)."
+      },
+      "AnthropicTextBlock": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "text",
+            "title": "Type",
+            "default": "text"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "AnthropicTextBlock",
+        "description": "Anthropic ``text`` content block."
+      },
+      "AnthropicToolResultBlock": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "tool_result",
+            "title": "Type",
+            "default": "tool_result"
+          },
+          "tool_use_id": {
+            "type": "string",
+            "title": "Tool Use Id"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool_use_id",
+          "content"
+        ],
+        "title": "AnthropicToolResultBlock",
+        "description": "Anthropic ``tool_result`` content block referencing the originating call."
+      },
+      "AnthropicToolUseBlock": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "tool_use",
+            "title": "Type",
+            "default": "tool_use"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "input": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "input"
+        ],
+        "title": "AnthropicToolUseBlock",
+        "description": "Anthropic ``tool_use`` content block carrying the call's arguments object."
       },
       "ApproveConsentRequest": {
         "properties": {
@@ -2831,6 +3092,162 @@
         ],
         "title": "NoteResponse",
         "description": "Lightweight response for fetching a run's note content."
+      },
+      "OpenAIAssistantMessage": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "OpenAIFunctionCall": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "arguments": {
+            "type": "string",
+            "title": "Arguments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "title": "OpenAIFunctionCall",
+        "description": "The ``function`` payload of an OpenAI tool call (arguments as a JSON string)."
+      },
+      "OpenAIRequest": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "messages": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/OpenAISystemMessage"
+                },
+                {
+                  "$ref": "#/components/schemas/OpenAIUserMessage"
+                },
+                {
+                  "$ref": "#/components/schemas/OpenAIAssistantMessage"
+                },
+                {
+                  "$ref": "#/components/schemas/OpenAIToolMessage"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "role",
+                "mapping": {
+                  "assistant": "#/components/schemas/OpenAIAssistantMessage",
+                  "system": "#/components/schemas/OpenAISystemMessage",
+                  "tool": "#/components/schemas/OpenAIToolMessage",
+                  "user": "#/components/schemas/OpenAIUserMessage"
+                }
+              }
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "messages"
+        ],
+        "title": "OpenAIRequest",
+        "description": "Drop-in OpenAI Chat Completions body (minus the trailing question)."
+      },
+      "OpenAISystemMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "const": "system",
+            "title": "Role",
+            "default": "system"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "OpenAISystemMessage",
+        "description": "OpenAI ``system`` message."
+      },
+      "OpenAIToolCall": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "const": "function",
+            "title": "Type",
+            "default": "function"
+          },
+          "function": {
+            "$ref": "#/components/schemas/OpenAIFunctionCall"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "function"
+        ],
+        "title": "OpenAIToolCall",
+        "description": "One OpenAI assistant tool call."
+      },
+      "OpenAIToolMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "const": "tool",
+            "title": "Role",
+            "default": "tool"
+          },
+          "tool_call_id": {
+            "type": "string",
+            "title": "Tool Call Id"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool_call_id",
+          "content"
+        ],
+        "title": "OpenAIToolMessage",
+        "description": "OpenAI ``tool`` message returning one tool call's result."
+      },
+      "OpenAIUserMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "const": "user",
+            "title": "Role",
+            "default": "user"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "OpenAIUserMessage",
+        "description": "OpenAI ``user`` message."
       },
       "OrbitalAnomalyActuationMetadata": {
         "properties": {
@@ -4497,6 +4914,112 @@
         ],
         "title": "StartEvaluationResponse",
         "description": "Response after successfully launching an evaluation subprocess."
+      },
+      "ThreadExport": {
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/ThreadExportMeta"
+          },
+          "request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnthropicRequest"
+              },
+              {
+                "$ref": "#/components/schemas/OpenAIRequest"
+              }
+            ],
+            "title": "Request"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meta",
+          "request"
+        ],
+        "title": "ThreadExport",
+        "description": "Full export: provenance ``meta`` plus a drop-in provider ``request`` body."
+      },
+      "ThreadExportMeta": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "role_name": {
+            "type": "string",
+            "title": "Role Name"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "cutoff_round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cutoff Round"
+          },
+          "rounds_covered": {
+            "type": "string",
+            "title": "Rounds Covered"
+          },
+          "num_messages": {
+            "type": "integer",
+            "title": "Num Messages"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "anthropic_messages",
+              "openai_chat"
+            ],
+            "title": "Format"
+          },
+          "thinking_included": {
+            "type": "boolean",
+            "title": "Thinking Included"
+          },
+          "tools_flattened": {
+            "type": "boolean",
+            "title": "Tools Flattened"
+          },
+          "exported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Exported At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "agent_id",
+          "role_name",
+          "model",
+          "provider",
+          "cutoff_round",
+          "rounds_covered",
+          "num_messages",
+          "format",
+          "thinking_included",
+          "tools_flattened",
+          "exported_at"
+        ],
+        "title": "ThreadExportMeta",
+        "description": "Provenance describing which agent/run/round the exported thread came from."
       },
       "ToolUseEntry": {
         "properties": {

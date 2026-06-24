@@ -61,6 +61,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/agents/{agent_id}/thread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agent Thread Export
+         * @description Export one agent's reconstructed thread as a drop-in provider-native request body.
+         *
+         *     ``round`` is the exclusive cutoff (rounds ``1..round-1``; omit for the full
+         *     end-of-run thread); ``format`` defaults to the format matching the agent's
+         *     own provider. The returned ``request`` is a ready-to-POST Anthropic/OpenAI
+         *     body — the caller appends their own trailing user message (and ``max_tokens``
+         *     for Anthropic) and sends it to the provider.
+         */
+        get: operations["get_agent_thread_export_api_g__group_slug__runs__scenario___run_dir_name__agents__agent_id__thread_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/evaluation": {
         parameters: {
             query?: never;
@@ -609,6 +635,78 @@ export interface components {
         AllLabelsResponse: {
             /** Labels */
             labels: string[];
+        };
+        /**
+         * AnthropicMessage
+         * @description One Anthropic message turn with role-tagged content blocks.
+         */
+        AnthropicMessage: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Content */
+            content: (components["schemas"]["AnthropicTextBlock"] | components["schemas"]["AnthropicToolUseBlock"] | components["schemas"]["AnthropicToolResultBlock"])[];
+        };
+        /**
+         * AnthropicRequest
+         * @description Drop-in Anthropic Messages API body (minus ``max_tokens`` and the trailing question).
+         */
+        AnthropicRequest: {
+            /** Model */
+            model: string;
+            /** System */
+            system: string;
+            /** Messages */
+            messages: components["schemas"]["AnthropicMessage"][];
+        };
+        /**
+         * AnthropicTextBlock
+         * @description Anthropic ``text`` content block.
+         */
+        AnthropicTextBlock: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "text";
+            /** Text */
+            text: string;
+        };
+        /**
+         * AnthropicToolResultBlock
+         * @description Anthropic ``tool_result`` content block referencing the originating call.
+         */
+        AnthropicToolResultBlock: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool_result";
+            /** Tool Use Id */
+            tool_use_id: string;
+            /** Content */
+            content: string;
+        };
+        /**
+         * AnthropicToolUseBlock
+         * @description Anthropic ``tool_use`` content block carrying the call's arguments object.
+         */
+        AnthropicToolUseBlock: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool_use";
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Input */
+            input: {
+                [key: string]: unknown;
+            };
         };
         /**
          * ApproveConsentRequest
@@ -1253,6 +1351,91 @@ export interface components {
         NoteResponse: {
             /** Content */
             content: string | null;
+        };
+        OpenAIAssistantMessage: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            role: "assistant";
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * OpenAIFunctionCall
+         * @description The ``function`` payload of an OpenAI tool call (arguments as a JSON string).
+         */
+        OpenAIFunctionCall: {
+            /** Name */
+            name: string;
+            /** Arguments */
+            arguments: string;
+        };
+        /**
+         * OpenAIRequest
+         * @description Drop-in OpenAI Chat Completions body (minus the trailing question).
+         */
+        OpenAIRequest: {
+            /** Model */
+            model: string;
+            /** Messages */
+            messages: (components["schemas"]["OpenAISystemMessage"] | components["schemas"]["OpenAIUserMessage"] | components["schemas"]["OpenAIAssistantMessage"] | components["schemas"]["OpenAIToolMessage"])[];
+        };
+        /**
+         * OpenAISystemMessage
+         * @description OpenAI ``system`` message.
+         */
+        OpenAISystemMessage: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            role: "system";
+            /** Content */
+            content: string;
+        };
+        /**
+         * OpenAIToolCall
+         * @description One OpenAI assistant tool call.
+         */
+        OpenAIToolCall: {
+            /** Id */
+            id: string;
+            /**
+             * Type
+             * @default function
+             * @constant
+             */
+            type: "function";
+            function: components["schemas"]["OpenAIFunctionCall"];
+        };
+        /**
+         * OpenAIToolMessage
+         * @description OpenAI ``tool`` message returning one tool call's result.
+         */
+        OpenAIToolMessage: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            role: "tool";
+            /** Tool Call Id */
+            tool_call_id: string;
+            /** Content */
+            content: string;
+        };
+        /**
+         * OpenAIUserMessage
+         * @description OpenAI ``user`` message.
+         */
+        OpenAIUserMessage: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            role: "user";
+            /** Content */
+            content: string;
         };
         /**
          * OrbitalAnomalyActuationMetadata
@@ -2069,6 +2252,51 @@ export interface components {
             status: components["schemas"]["LaunchStatus"];
         };
         /**
+         * ThreadExport
+         * @description Full export: provenance ``meta`` plus a drop-in provider ``request`` body.
+         */
+        ThreadExport: {
+            meta: components["schemas"]["ThreadExportMeta"];
+            /** Request */
+            request: components["schemas"]["AnthropicRequest"] | components["schemas"]["OpenAIRequest"];
+        };
+        /**
+         * ThreadExportMeta
+         * @description Provenance describing which agent/run/round the exported thread came from.
+         */
+        ThreadExportMeta: {
+            /** Run Id */
+            run_id: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Role Name */
+            role_name: string;
+            /** Model */
+            model: string;
+            /** Provider */
+            provider: string;
+            /** Cutoff Round */
+            cutoff_round: number | null;
+            /** Rounds Covered */
+            rounds_covered: string;
+            /** Num Messages */
+            num_messages: number;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "anthropic_messages" | "openai_chat";
+            /** Thinking Included */
+            thinking_included: boolean;
+            /** Tools Flattened */
+            tools_flattened: boolean;
+            /**
+             * Exported At
+             * Format: date-time
+             */
+            exported_at: string;
+        };
+        /**
          * ToolUseEntry
          * @description A scenario-specific tool invocation with its result.
          *
@@ -2395,6 +2623,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_thread_export_api_g__group_slug__runs__scenario___run_dir_name__agents__agent_id__thread_get: {
+        parameters: {
+            query?: {
+                round?: number | null;
+                format?: ("anthropic" | "openai") | null;
+                include_thinking?: boolean;
+                flatten_tools?: boolean;
+            };
+            header?: never;
+            path: {
+                scenario: string;
+                run_dir_name: string;
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadExport"];
+                };
             };
             /** @description Validation Error */
             422: {

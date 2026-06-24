@@ -7,6 +7,7 @@ import subprocess
 import sys
 from collections.abc import AsyncGenerator
 from pathlib import Path
+from typing import Literal
 
 import httpx
 import orjson
@@ -48,6 +49,11 @@ from schmidt.server.runs.models import (
     UpdateNoteResponse,
 )
 from schmidt.stream_manifest import delete_manifest, read_manifest
+from schmidt.thread_export.export_agent_thread import (
+    ThreadExportFormat,
+    export_agent_thread_from_run_dir,
+)
+from schmidt.thread_export.thread_export_models import ThreadExport
 from schmidt.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)
@@ -109,6 +115,52 @@ async def get_run_detail(
         parent_run_dir_name=run_dir_name,
     )
     return await load_run_detail(log_path=log_path, children=children)
+
+
+@router.get(
+    "/runs/{scenario}/{run_dir_name}/agents/{agent_id}/thread",
+    response_model=ThreadExport,
+)
+async def get_agent_thread_export(
+    scenario: str,
+    run_dir_name: str,
+    agent_id: str,
+    request: Request,
+    cutoff_round: int | None = Query(default=None, alias="round"),
+    output_format: Literal["anthropic", "openai"] | None = Query(default=None, alias="format"),
+    include_thinking: bool = Query(default=False),
+    flatten_tools: bool = Query(default=False),
+) -> ThreadExport:
+    """Export one agent's reconstructed thread as a drop-in provider-native request body.
+
+    ``round`` is the exclusive cutoff (rounds ``1..round-1``; omit for the full
+    end-of-run thread); ``format`` defaults to the format matching the agent's
+    own provider. The returned ``request`` is a ready-to-POST Anthropic/OpenAI
+    body — the caller appends their own trailing user message (and ``max_tokens``
+    for Anthropic) and sends it to the provider.
+    """
+    resolved = await resolve_run_or_404(
+        request=request, scenario=scenario, run_dir_name=run_dir_name
+    )
+    resolved_format: ThreadExportFormat | None
+    if output_format == "anthropic":
+        resolved_format = "anthropic_messages"
+    elif output_format == "openai":
+        resolved_format = "openai_chat"
+    else:
+        resolved_format = None
+    try:
+        return await export_agent_thread_from_run_dir(
+            run_dir=resolved.run_dir,
+            scenario_name=resolved.scenario_name,
+            agent_id=agent_id,
+            cutoff_round=cutoff_round,
+            output_format=resolved_format,
+            include_thinking=include_thinking,
+            flatten_tools=flatten_tools,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/runs/{scenario}/{run_dir_name}/evaluation", response_model=EvalReportResponse | None)
