@@ -21,7 +21,7 @@ from typing import Any, NamedTuple, cast
 RUNS_ROOT = Path("runs/veyru")
 EXPECTED_REPLICAS = 5
 EXPECTED_NOISE = {"0.2", "0.4", "0.6"}
-EXPECTED_BUDGET = {"450", "800"}
+EXPECTED_BUDGET = {"150", "450", "800"}
 EXPECTED_MODELS = {"gpt54", "opus47"}
 
 
