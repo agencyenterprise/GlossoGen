@@ -295,6 +295,8 @@ The backend exposes an MCP (Model Context Protocol) server at `/mcp` for program
 - `get_knobs_schema` — returns a scenario's knobs JSON Schema and available knobs preset files
 - `get_knobs_preset` — loads a knobs preset JSON payload by scenario and preset name
 - `start_run` — launches a simulation subprocess with scenario, model, provider, and optional knobs
+- `export_run_artifacts` — returns a relative download URL for a zip archive of the run's artifacts
+- `export_agent_thread` — reconstructs one agent's thread (optional exclusive `cutoff_round`) and returns a drop-in provider-native request body (Anthropic Messages / OpenAI Chat); `output_format` defaults to the agent's own provider. Thin MCP wrapper over `thread_export.export_agent_thread_from_run_dir` (same orchestrator as the `schmidt export-thread` CLI and the `/runs/.../agents/{agent_id}/thread` REST endpoint)
 
 ### Connecting
 

@@ -387,12 +387,14 @@ No auth headers needed — the client discovers OAuth metadata and handles regis
 Available tools:
 - `list_scenarios`
 - `list_runs` (paginated, filterable)
-- `get_run_metadata`
+- `get_run_metadata` (agents, configuration, evaluation summary, lineage provenance)
+- `list_derived_runs` (replace-agent / resume-at-round / cross-run children with round boundaries and scores)
 - `get_run` (messages, reasoning, tool use)
 - `get_knobs_schema` (JSON Schema for scenario knobs + available preset files)
 - `get_knobs_preset` (load a preset knobs file)
 - `start_run` (launch a simulation with model/provider/knobs)
 - `export_run_artifacts` (download URL for a zip of the run's artifacts)
+- `export_agent_thread` (one agent's reconstructed thread as a drop-in Anthropic/OpenAI request body, with an optional round cutoff)
 
 Typical MCP run-start workflow:
 1. `get_knobs_schema` to inspect available fields and preset names.

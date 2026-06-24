@@ -591,18 +591,20 @@ A Svix-verified webhook receiver at `POST /api/clerk/webhook` ([`identity/webhoo
 
 An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data and run launch flows for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport; the sub-app is wrapped by `McpRunContextMiddleware` ([`server/mcp/asgi_context.py`](src/schmidt/server/mcp/asgi_context.py)) which reads the bearer token, recovers the bound `group_id` from the OAuth storage, and primes a `RunContext` contextvar so every tool runs scoped to that group. Requires `OAUTH_ISSUER_URL` to be set; the MCP endpoint is disabled if unset.
 
-The MCP server exposes eight tools:
+The MCP server exposes ten tools:
 
 | Tool                   | Description                                                                                      |
 | ---------------------- | ------------------------------------------------------------------------------------------------ |
 | `list_scenarios`       | Lists available scenarios with knobs files, metrics, and supported models/providers              |
 | `list_runs`            | Paginated run listing with filtering by scenario, model, fork status, and run status             |
 | `get_run_metadata`     | Lightweight metadata for a single run: agents, channels, configuration, evaluation summary       |
+| `list_derived_runs`    | Lists runs derived from a parent (replace-agent, resume-at-round, cross-run) with derivation type, round boundaries, swapped/imported models, and headline `round_success` scores |
 | `get_run`              | Full run content with messages; opt-in sections for reasoning, tool use, debug logs, system prompts; filtering by agent or channel |
 | `get_knobs_schema`     | Returns a scenario knobs JSON Schema (field types, enums, descriptions) and available presets    |
 | `get_knobs_preset`     | Loads a knobs preset JSON payload for a scenario                                                  |
 | `start_run`            | Launches a simulation subprocess with scenario, model, provider, and optional knobs               |
 | `export_run_artifacts` | Returns a download URL for a zip archive of the run's artifacts                                   |
+| `export_agent_thread`  | Reconstructs one agent's thread (optional exclusive `cutoff_round`) and returns a drop-in provider-native request body (Anthropic Messages / OpenAI Chat); `output_format` defaults to the agent's own provider |
 
 All tools return structured JSON via Pydantic response models. `list_runs` and `get_run` support pagination. `get_run` uses flags (`with_reasoning`, `with_tool_use`, `with_debug_logs`, `with_system_prompts`) to control which sections are included.
 

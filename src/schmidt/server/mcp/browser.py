@@ -1,9 +1,10 @@
 """MCP server for browsing simulation runs, mounted inside the FastAPI app.
 
-Exposes tools over Streamable HTTP: list_scenarios, list_runs,
-get_run_metadata, get_run, get_knobs_schema, get_knobs_preset, and
-start_run. Designed for LLM clients (Claude Code, Cursor) to query run
-data programmatically. All tools return structured JSON.
+Exposes tools over Streamable HTTP for listing scenarios and runs, inspecting
+run metadata and content, exporting run artifacts and per-agent threads, and
+launching runs (full set in ``_TOOL_DEFS``). Designed for LLM clients (Claude
+Code, Cursor) to query run data programmatically. All tools return structured
+JSON.
 
 FastMCP construction is deferred to :func:`mount_mcp_browser` so that
 OAuth configuration (which depends on environment variables) can be
@@ -63,6 +64,11 @@ from schmidt.server.runs.derived_run_references import (
 from schmidt.server.runs.detail_reader import debug_log_path_for, load_debug_logs, load_run_detail
 from schmidt.server.runs.listing import list_runs_owned_by_group
 from schmidt.server.runs.models import DerivedRunReference, RunDetailResponse, RunSummary
+from schmidt.thread_export.export_agent_thread import (
+    ThreadExportFormat,
+    export_agent_thread_from_run_dir,
+)
+from schmidt.thread_export.thread_export_models import ThreadExport
 from schmidt.token_pricing import list_models, list_providers
 
 logger = logging.getLogger(__name__)
@@ -696,6 +702,41 @@ async def _tool_export_run_artifacts(run_id: str) -> McpExportArtifactsResult:
     )
 
 
+def _resolve_thread_export_format(output_format: str | None) -> ThreadExportFormat | None:
+    """Map the tool's ``anthropic``/``openai`` choice to the internal export format.
+
+    ``None`` defers to the agent's own provider inside the orchestrator.
+    """
+    if output_format is None:
+        return None
+    if output_format == "anthropic":
+        return "anthropic_messages"
+    if output_format == "openai":
+        return "openai_chat"
+    raise ValueError(f"output_format must be 'anthropic' or 'openai', got {output_format!r}")
+
+
+async def _tool_export_agent_thread(
+    run_id: str,
+    agent_id: str,
+    cutoff_round: int | None = None,
+    output_format: str | None = None,
+    include_thinking: bool = False,
+    flatten_tools: bool = False,
+) -> ThreadExport:
+    """Export one agent's reconstructed thread as a drop-in provider request body."""
+    run_summary = await _find_run_by_prefix(run_id_prefix=run_id)
+    return await export_agent_thread_from_run_dir(
+        run_dir=Path(run_summary.run_dir),
+        scenario_name=run_summary.scenario_name,
+        agent_id=agent_id,
+        cutoff_round=cutoff_round,
+        output_format=_resolve_thread_export_format(output_format=output_format),
+        include_thinking=include_thinking,
+        flatten_tools=flatten_tools,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tool registration table
 # ---------------------------------------------------------------------------
@@ -765,6 +806,17 @@ _TOOL_DEFS: list[tuple[str, str, Any]] = [
         "Returns a relative URL path that can be fetched from the backend server. "
         "Accepts a full run_id or a unique prefix.",
         _tool_export_run_artifacts,
+    ),
+    (
+        "export_agent_thread",
+        "Export one agent's reconstructed conversation thread from a finished run as a "
+        "drop-in provider-native API request body (Anthropic Messages or OpenAI Chat). "
+        "Set cutoff_round=R to cut the history before round R (keeps rounds 1..R-1); omit "
+        "for the full end-of-run thread. output_format defaults to the agent's own provider; "
+        "pass 'anthropic' or 'openai' to override. The returned 'request' is ready to POST — "
+        "append your own trailing user message (and max_tokens for Anthropic) and send it to "
+        "the provider. Accepts a full run_id or a unique prefix.",
+        _tool_export_agent_thread,
     ),
 ]
 
