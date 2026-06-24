@@ -1,0 +1,10 @@
+{% if previous_outcome is not none %}--- PREVIOUS ANOMALY ---
+Anomaly {{ round_number - 1 }}: {% if previous_outcome.stabilized %}RESOLVED{% elif previous_outcome.characters_used > previous_outcome.time_budget_seconds %}LOST — over the time available ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds|round(0)|int }}s, had {{ previous_outcome.time_budget_seconds }}s).{% else %}NOT RESOLVED — the anomaly was not resolved before time ran out ({{ previous_outcome.characters_used }} chars = {{ previous_outcome.time_elapsed_seconds|round(0)|int }}s of {{ previous_outcome.time_budget_seconds }}s).{% endif %}
+{% endif %}
+{% if current_case is not none %}--- NEW ANOMALY ---
+Anomaly {{ round_number }}
+Time available: {{ current_case.time_budget_seconds }}s (one character = one second; total for all three of you)
+
+Downlinked telemetry this anomaly:
+{{ first_stage_telemetry_readout }}
+{% endif %}

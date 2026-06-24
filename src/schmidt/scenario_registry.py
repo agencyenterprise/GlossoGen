@@ -17,6 +17,7 @@ from schmidt.scenarios.container_yard_stacking.scenario import ContainerYardStac
 from schmidt.scenarios.hospital_bed_assignment_privacy.scenario import (
     HospitalBedAssignmentPrivacyScenario,
 )
+from schmidt.scenarios.orbital_anomaly.scenario import OrbitalAnomalyScenario
 from schmidt.scenarios.salon.scenario import SalonScenario
 from schmidt.scenarios.satellite_contact_window.scenario import SatelliteContactWindowScenario
 from schmidt.scenarios.surprise_party.scenario import SurprisePartyScenario
@@ -27,6 +28,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "codebreakers": CodebreakersScenario,
     "container_yard_stacking": ContainerYardStackingScenario,
     "hospital_bed_assignment_privacy": HospitalBedAssignmentPrivacyScenario,
+    "orbital_anomaly": OrbitalAnomalyScenario,
     "salon": SalonScenario,
     "satellite_contact_window": SatelliteContactWindowScenario,
     "surprise_party": SurprisePartyScenario,
