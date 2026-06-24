@@ -17,10 +17,7 @@ from schmidt.message_history_builder import build_message_history, resolve_histo
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import SimulationEvent
 from schmidt.runners.communication_protocol import build_full_system_prompt
-from schmidt.thread_export.provider_thread_serializer import (
-    to_anthropic_request,
-    to_openai_request,
-)
+from schmidt.thread_export.provider_thread_serializer import to_anthropic_request, to_openai_request
 from schmidt.thread_export.thread_export_models import ThreadExport, ThreadExportMeta
 from schmidt.token_pricing import SELF_HOSTED_PROVIDER
 

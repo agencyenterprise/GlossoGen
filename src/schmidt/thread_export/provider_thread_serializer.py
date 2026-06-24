@@ -195,9 +195,7 @@ def _openai_messages_from_request(
             messages.append(OpenAIUserMessage(content=_coerce_to_text(content=part.content)))
         elif isinstance(part, ToolReturnPart):
             if flatten_tools:
-                messages.append(
-                    OpenAIUserMessage(content=_flattened_tool_result_text(part=part))
-                )
+                messages.append(OpenAIUserMessage(content=_flattened_tool_result_text(part=part)))
             else:
                 messages.append(
                     OpenAIToolMessage(
