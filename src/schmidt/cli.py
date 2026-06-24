@@ -79,6 +79,10 @@ from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.simulation_server import start_simulation_server, stop_simulation_server
+from schmidt.thread_export.export_agent_thread import (
+    ThreadExportFormat,
+    export_agent_thread_from_run_dir,
+)
 from schmidt.token_pricing import SELF_HOSTED_PROVIDER, list_providers
 
 logger = logging.getLogger(__name__)
@@ -212,6 +216,76 @@ def _build_parser() -> argparse.ArgumentParser:
             "required knob after the run was created (e.g. veyru's "
             "easy_round_numbers on pre-existing baselines)."
         ),
+    )
+
+    export_thread_parser = subparsers.add_parser(
+        "export-thread",
+        help="Export one agent's reconstructed thread as a provider-native API request body",
+    )
+    export_thread_parser.add_argument(
+        "scenario_name",
+        type=str,
+        choices=scenario_names,
+        help="Name of the scenario the run belongs to",
+    )
+    export_thread_parser.add_argument(
+        "--run-dir",
+        type=str,
+        required=True,
+        help="Path to the run directory (e.g. runs/veyru/1742234567)",
+    )
+    export_thread_parser.add_argument(
+        "--agent-id",
+        type=str,
+        required=True,
+        help="Agent whose thread to export (e.g. field_observer)",
+    )
+    export_thread_parser.add_argument(
+        "--round",
+        dest="round",
+        type=int,
+        default=None,
+        help=(
+            "Exclusive round cutoff: drops every tool call whose round_number >= R, "
+            "so the exported history covers rounds 1..R-1. Pass --round=R+1 to capture "
+            "the agent's state at the END of round R. Omit for the full end-of-run thread."
+        ),
+    )
+    export_thread_parser.add_argument(
+        "--format",
+        dest="format",
+        type=str,
+        choices=["anthropic", "openai"],
+        default=None,
+        help=(
+            "Target provider format for the request body. Defaults to the format "
+            "matching the agent's own provider (anthropic->anthropic, "
+            "openai/self-hosted->openai)."
+        ),
+    )
+    export_thread_parser.add_argument(
+        "--include-thinking",
+        dest="include_thinking",
+        action="store_true",
+        help=(
+            "Keep reasoning/thinking parts as text blocks. Dropped by default because "
+            "replaying provider reasoning blocks in a raw request requires signatures."
+        ),
+    )
+    export_thread_parser.add_argument(
+        "--flatten-tools",
+        dest="flatten_tools",
+        action="store_true",
+        help=(
+            "Render tool calls and results as plain text instead of native tool_use/"
+            "tool_result blocks, producing a body that needs no tool configuration."
+        ),
+    )
+    export_thread_parser.add_argument(
+        "--out",
+        type=str,
+        default=None,
+        help="Write the export JSON to this path. Omit to print it to stdout.",
     )
 
     serve_parser = subparsers.add_parser("serve", help="Start the web server")
@@ -691,6 +765,11 @@ def main() -> None:
     if known_args.command == "sync-metadata-to-prod":
         args = parser.parse_args()
         asyncio.run(_run_sync_metadata_to_prod(args=args))
+        return
+
+    if known_args.command == "export-thread":
+        args = parser.parse_args()
+        asyncio.run(_run_export_thread(args=args))
         return
 
     scenario_cls = get_scenario_class(name=known_args.scenario_name)
@@ -1179,6 +1258,44 @@ async def _run_evaluation(
         logger.info("Evaluation complete. Report written to %s", report_path)
     finally:
         delete_eval_manifest(run_dir=run_dir)
+
+
+async def _run_export_thread(args: argparse.Namespace) -> None:
+    """Export one agent's reconstructed thread as a provider-native request body.
+
+    Writes the ``ThreadExport`` JSON to ``--out`` (or stdout). The consumer
+    appends their own trailing user message (and ``max_tokens`` for Anthropic)
+    to ``request`` and POSTs it straight to the provider.
+    """
+    if args.format == "anthropic":
+        output_format: ThreadExportFormat | None = "anthropic_messages"
+    elif args.format == "openai":
+        output_format = "openai_chat"
+    else:
+        output_format = None
+
+    export = await export_agent_thread_from_run_dir(
+        run_dir=Path(args.run_dir).resolve(),
+        scenario_name=args.scenario_name,
+        agent_id=args.agent_id,
+        cutoff_round=args.round,
+        output_format=output_format,
+        include_thinking=args.include_thinking,
+        flatten_tools=args.flatten_tools,
+    )
+    payload = export.model_dump_json(indent=2)
+    if args.out is None:
+        print(payload)
+        return
+    out_path = Path(args.out)
+    out_path.write_text(payload + "\n")
+    logger.info(
+        "Wrote thread export for agent %s (%s, %d messages) -> %s",
+        export.meta.agent_id,
+        export.meta.format,
+        export.meta.num_messages,
+        out_path,
+    )
 
 
 def _run_serve(args: argparse.Namespace) -> None:
