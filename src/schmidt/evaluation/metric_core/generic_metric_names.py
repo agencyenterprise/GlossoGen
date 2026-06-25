@@ -14,6 +14,7 @@ GENERIC_METRIC_NAMES: list[str] = [
     "language_strangeness",
     "mean_chars_per_message",
     "mean_chars_per_round",
+    "message_entropy",
     "neologism",
     "perplexity",
     "protocol_explanation",

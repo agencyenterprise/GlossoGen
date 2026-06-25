@@ -14,6 +14,7 @@ from analysis.results_viewer.run_catalog import EvaluatedRun
 
 PERPLEXITY_METRIC = "perplexity"
 ENGLISH_NGRAM_SURPRISAL_METRIC = "english_ngram_surprisal"
+MESSAGE_ENTROPY_METRIC = "message_entropy"
 MCR_METRIC = "mean_chars_per_round"
 MCM_METRIC = "mean_chars_per_message"
 LANGUAGE_REPETITION_METRIC = "language_repetition"
@@ -51,6 +52,14 @@ def english_ngram_surprisal_score(evaluated: EvaluatedRun) -> float | None:
     Higher means less English-like (the inverse intuition of ``perplexity``).
     """
     return measurement_score(evaluated=evaluated, metric_name=ENGLISH_NGRAM_SURPRISAL_METRIC)
+
+
+def message_entropy_score(evaluated: EvaluatedRun) -> float | None:
+    """Mean within-message character Shannon entropy in bits/char; ``None`` if unscored.
+
+    Lower means more repetitive/compressible (a model-free intrinsic measure).
+    """
+    return measurement_score(evaluated=evaluated, metric_name=MESSAGE_ENTROPY_METRIC)
 
 
 def mcr_score(evaluated: EvaluatedRun) -> float | None:

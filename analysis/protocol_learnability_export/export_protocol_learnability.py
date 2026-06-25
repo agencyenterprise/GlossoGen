@@ -28,7 +28,9 @@ Three output tables:
 
 - ``run_level`` — one row per cohort run.
 - ``message_level`` — one row per link-channel message across every round the run played, with
-  substage ground truth + per-message gpt2 ``perplexity``.
+  substage ground truth + per-message gpt2 ``perplexity``, English-char-trigram
+  ``english_ngram_surprisal`` (higher = less English-like), and ``message_entropy``
+  (within-message character Shannon entropy, bits/char; lower = more repetitive).
 - ``baseline_aggregate`` — one row per baseline (``src_id``), with per-phase means/std/n for the
   cohort's derived phases and a ``delta`` column, computed on ``round_success_after_resume``.
   Frontier columns: ``expected`` / ``expected_no_pm`` / ``learned`` / ``cross_family`` with
@@ -51,6 +53,7 @@ import pandas as pd
 
 from analysis.results_viewer.measurement_scores import read_labels, round_success_after_resume_score
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
+from analysis.veyru_run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
 from analysis.veyru_run_export.message_perplexity_scorer import MessagePerplexityScorer
 from analysis.veyru_run_export.run_context_scan import (
     RunContext,
@@ -60,6 +63,7 @@ from analysis.veyru_run_export.run_context_scan import (
     sender_role,
 )
 from analysis.veyru_run_export.spreadsheet_writer import write_csvs, write_xlsx
+from schmidt.evaluation.metric_core.character_entropy import character_entropy_bits
 
 logger = logging.getLogger(__name__)
 
@@ -244,13 +248,19 @@ def _build_run_level_frame(
     records: list[ProtocolRunRecord],
     contexts: dict[str, RunContext],
     perplexity_by_run: dict[str, float | None],
+    english_ngram_by_run: dict[str, float | None],
+    message_entropy_by_run: dict[str, float | None],
     mcm_by_run: dict[str, float | None],
 ) -> pd.DataFrame:
     """One row per cohort run.
 
-    ``perplexity`` (run-wide mean per-message surprisal, nats/gpt2) and ``mcm`` (run-wide
-    mean chars per link message) are rolled up from the per-message ``message_level``
-    scoring, since these runs carry no ``perplexity`` / ``mcm`` metric in their reports.
+    ``perplexity`` (run-wide mean per-message surprisal, nats/gpt2),
+    ``english_ngram_surprisal`` (run-wide mean per-message per-char surprisal under an
+    English char trigram; higher = less English-like), ``message_entropy`` (run-wide mean
+    within-message character Shannon entropy, bits/char; lower = more
+    repetitive/compressible), and ``mcm`` (run-wide mean chars per link message) are rolled
+    up from the per-message ``message_level`` scoring, since these runs carry no
+    ``perplexity`` / ``mcm`` metric in their reports.
     """
     rows: list[dict[str, object]] = []
     for record in records:
@@ -277,6 +287,8 @@ def _build_run_level_frame(
                 "round_success_count": record.round_success_count,
                 "round_success_after_resume": record.round_success_after_resume,
                 "perplexity": perplexity_by_run.get(record.run_id),
+                "english_ngram_surprisal": english_ngram_by_run.get(record.run_id),
+                "message_entropy": message_entropy_by_run.get(record.run_id),
                 "mcm": mcm_by_run.get(record.run_id),
                 "labels": "|".join(record.labels),
             }
@@ -297,6 +309,7 @@ def _build_message_level_frame(
     ``phase`` / ``src_id`` / ``observer``.
     """
     perplexity_scorer = MessagePerplexityScorer()
+    english_ngram_scorer = MessageEnglishNgramScorer()
     rows: list[dict[str, object]] = []
     for record in records:
         context = contexts[record.run_id]
@@ -340,11 +353,20 @@ def _build_message_level_frame(
                         }
                     )
         jsonl_path = record.run_dir / f"{record.scenario}.jsonl"
-        perplexities = perplexity_scorer.score_run(
-            jsonl_path=jsonl_path, texts=[str(row["message_text"]) for row in run_rows]
+        message_texts = [str(row["message_text"]) for row in run_rows]
+        perplexities = perplexity_scorer.score_run(jsonl_path=jsonl_path, texts=message_texts)
+        english_ngram_surprisals = english_ngram_scorer.score_run(
+            jsonl_path=jsonl_path, texts=message_texts
         )
-        for row, perplexity in zip(run_rows, perplexities):
+        message_entropies = [
+            character_entropy_bits(text=text) if text.strip() else None for text in message_texts
+        ]
+        for row, perplexity, english_ngram, entropy in zip(
+            run_rows, perplexities, english_ngram_surprisals, message_entropies
+        ):
             row["perplexity"] = perplexity
+            row["english_ngram_surprisal"] = english_ngram
+            row["message_entropy"] = entropy
         rows.extend(run_rows)
     frame = pd.DataFrame(rows)
     if frame.empty:
@@ -516,6 +538,10 @@ def main() -> None:
         records=records,
         contexts=contexts,
         perplexity_by_run=_run_means(message_level=message_level, column="perplexity"),
+        english_ngram_by_run=_run_means(
+            message_level=message_level, column="english_ngram_surprisal"
+        ),
+        message_entropy_by_run=_run_means(message_level=message_level, column="message_entropy"),
         mcm_by_run=_run_means(message_level=message_level, column="chars"),
     )
     baseline_aggregate = _build_baseline_aggregate_frame(

@@ -26,11 +26,13 @@ Four output tables:
   ``random_seed``, the Bernoulli numerator/denominator
   (``round_success_count`` / ``total_rounds``) and fraction, plus the run's
   headline ``perplexity`` (pristine), ``english_ngram_surprisal`` (pristine; English
-  char trigram, higher = less English-like), ``mcm``, and ``repetition`` (the
-  ``language_repetition`` mean redundancy factor — encodings per information unit).
+  char trigram, higher = less English-like), ``message_entropy`` (pristine; within-message
+  character Shannon entropy in bits/char, lower = more repetitive/compressible), ``mcm``,
+  and ``repetition`` (the ``language_repetition`` mean redundancy factor — encodings per
+  information unit).
 - ``message_level`` — one row per link-channel message with its substage / round
   context, the pristine and transmitted text, character-loss stats, per-message
-  pristine ``perplexity`` and ``english_ngram_surprisal``, and
+  pristine ``perplexity``, ``english_ngram_surprisal``, ``message_entropy``, and
   ``message_repetition_factor`` (the per-message ``language_repetition`` LLM-judge
   factor, read from the run's ``language_repetition_messages.jsonl`` sidecar by
   ``message_id``).
@@ -59,6 +61,7 @@ from analysis.results_viewer.measurement_scores import (
     english_ngram_surprisal_score,
     language_repetition_score,
     mcm_score,
+    message_entropy_score,
     perplexity_score,
     read_labels,
 )
@@ -73,6 +76,7 @@ from analysis.veyru_run_export.run_context_scan import (
 )
 from analysis.veyru_run_export.spreadsheet_writer import write_csvs, write_xlsx
 from schmidt.evaluation.log_reader import load_events
+from schmidt.evaluation.metric_core.character_entropy import character_entropy_bits
 from schmidt.evaluation.metric_core.pristine_text_index import build_pristine_text_index
 from schmidt.models.event import RoundResultRecorded, SimulationEvent
 
@@ -122,6 +126,7 @@ class RunRecord(NamedTuple):
     round_success: int
     perplexity_score: float | None
     english_ngram_score: float | None
+    message_entropy_score: float | None
     mcm_score: float | None
     repetition_score: float | None
     labels: list[str]
@@ -154,6 +159,7 @@ def _build_record(evaluated: EvaluatedRun) -> RunRecord | None:
         round_success=round_success,
         perplexity_score=perplexity_score(evaluated=evaluated),
         english_ngram_score=english_ngram_surprisal_score(evaluated=evaluated),
+        message_entropy_score=message_entropy_score(evaluated=evaluated),
         mcm_score=mcm_score(evaluated=evaluated),
         repetition_score=language_repetition_score(evaluated=evaluated),
         labels=labels,
@@ -250,6 +256,7 @@ def _build_run_level_frame(
                 "round_success_fraction": fraction,
                 "perplexity": record.perplexity_score,
                 "english_ngram_surprisal": record.english_ngram_score,
+                "message_entropy": record.message_entropy_score,
                 "mcm": record.mcm_score,
                 "repetition": record.repetition_score,
                 "labels": "|".join(record.labels),
@@ -355,9 +362,15 @@ def _build_message_level_frame(
         english_ngram_surprisals = english_ngram_scorer.score_run(
             jsonl_path=jsonl_path, texts=pristine_texts
         )
-        for row, perplexity, english_ngram in zip(run_rows, perplexities, english_ngram_surprisals):
+        message_entropies = [
+            character_entropy_bits(text=text) if text.strip() else None for text in pristine_texts
+        ]
+        for row, perplexity, english_ngram, entropy in zip(
+            run_rows, perplexities, english_ngram_surprisals, message_entropies
+        ):
             row["perplexity"] = perplexity
             row["english_ngram_surprisal"] = english_ngram
+            row["message_entropy"] = entropy
         rows.extend(run_rows)
     frame = pd.DataFrame(rows)
     if frame.empty:

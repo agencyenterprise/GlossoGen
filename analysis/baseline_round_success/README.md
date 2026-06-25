@@ -55,7 +55,10 @@ or a model on `round_success_fraction`.
 `run_id`, `scenario`, `field_observer_model`, `engineer_model`, `model_class`
 (closed/open/mixed), `postmortem`, `round_time_budget_seconds`, `random_seed`,
 `total_rounds`, `round_success_count`, `round_success_fraction`, `perplexity` (run-wide
-mean per-token surprisal, nats/gpt2), `mcm` (run-wide mean chars per link message),
+mean per-token surprisal, nats/gpt2), `english_ngram_surprisal` (run-wide mean per-char
+surprisal under an English char trigram, nats — higher = less English-like),
+`message_entropy` (run-wide mean within-message character Shannon entropy, bits/char —
+lower = more repetitive/compressible), `mcm` (run-wide mean chars per link message),
 `labels`.
 
 ### `message_level` — one row per link-channel message
@@ -76,6 +79,13 @@ Message columns:
 - `perplexity` — per-message mean per-token surprisal (nats) under `gpt2`, recomputed at
   export time with the same method as the `perplexity` metric. Blank for empty or
   single-token messages (no left context → NaN).
+- `english_ngram_surprisal` — per-message mean per-char surprisal (nats) under an English
+  character trigram, recomputed at export time with the same method as the
+  `english_ngram_surprisal` metric. Higher = less English-like (degenerate repetition,
+  codes, digit runs score high). Blank for empty messages.
+- `message_entropy` — per-message within-message character Shannon entropy (bits/char),
+  recomputed at export time with the same method as the `message_entropy` metric. Lower =
+  more repetitive/compressible (`LLLLLLL` → 0). Blank for empty messages.
 
 Substage context (repeated across the substage's messages):
 
