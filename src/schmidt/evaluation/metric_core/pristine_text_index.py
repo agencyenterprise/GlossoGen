@@ -16,6 +16,7 @@ predating the ``message_id`` link, or scenarios with no transform.
 
 import json
 import logging
+from typing import Any, cast
 
 from schmidt.models.event import MessageSent, SimulationEvent, ToolResultReceived
 
@@ -39,9 +40,12 @@ def build_pristine_text_index(events: list[SimulationEvent]) -> dict[str, str]:
         if event.tool_name != _SEND_MESSAGE_TOOL:
             continue
         try:
-            result = json.loads(event.result)
+            parsed = json.loads(event.result)
         except (json.JSONDecodeError, TypeError):
             continue
+        if not isinstance(parsed, dict):
+            continue
+        result = cast(dict[str, Any], parsed)
         if result.get("status") != _SENT_STATUS:
             continue
         message_id = result.get("message_id")

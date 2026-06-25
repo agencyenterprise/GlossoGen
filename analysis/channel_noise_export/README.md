@@ -72,8 +72,10 @@ or a model on `round_success_fraction`.
 `total_rounds`, `round_success_count`, `round_success_fraction`, `perplexity` (run-wide
 mean per-token surprisal, nats/gpt2, **pristine text**), `english_ngram_surprisal`
 (run-wide mean per-char surprisal under an English character trigram, nats, **pristine
-text** — higher = less English-like), `mcm` (run-wide mean chars per link message —
-length is preserved under character-drop noise), `labels`.
+text** — higher = less English-like), `message_entropy` (run-wide mean within-message
+character Shannon entropy, bits/char, **pristine text** — lower = more
+repetitive/compressible), `mcm` (run-wide mean chars per link message — length is
+preserved under character-drop noise), `labels`.
 
 ### `message_level` — one row per link-channel message
 
@@ -99,6 +101,9 @@ Message columns:
   character trigram, on the pristine text, same method as the `english_ngram_surprisal`
   metric. Higher = less English-like (degenerate repetition, codes, digit runs score high).
   Blank for empty messages.
+- `message_entropy` — per-message within-message character Shannon entropy (bits/char), on
+  the pristine text, same method as the `message_entropy` metric. Lower = more
+  repetitive/compressible (`LLLLLLL` → 0). Blank for empty messages.
 
 Substage context (repeated across the substage's messages):
 

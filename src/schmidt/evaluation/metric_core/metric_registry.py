@@ -21,6 +21,7 @@ from schmidt.evaluation.metrics.language_repetition_metric import LanguageRepeti
 from schmidt.evaluation.metrics.language_strangeness_metric import LanguageStrangenessMetric
 from schmidt.evaluation.metrics.mcm_metric import MCMMetric
 from schmidt.evaluation.metrics.mcr_metric import MCRMetric
+from schmidt.evaluation.metrics.message_entropy_metric import MessageEntropyMetric
 from schmidt.evaluation.metrics.neologism_metric import NeologismMetric
 from schmidt.evaluation.metrics.perplexity_metric import PerplexityMetric
 from schmidt.evaluation.metrics.protocol_explanation_metric import ProtocolExplanationMetric
@@ -53,6 +54,7 @@ _GENERIC_METRICS: list[type[Metric]] = [
     LanguageStrangenessMetric,
     MCMMetric,
     MCRMetric,
+    MessageEntropyMetric,
     NeologismMetric,
     PerplexityMetric,
     ProtocolExplanationMetric,

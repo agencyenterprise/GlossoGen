@@ -22,13 +22,20 @@ Four output tables:
   numerator/denominator (``round_success_count`` / ``total_rounds``) supports a
   binomial GLMM ``cbind(successes, failures) ~ ...`` and the fraction supports a
   beta/linear model. Also carries the run's headline ``perplexity`` (overall mean
-  per-token surprisal) and ``mcm`` (overall mean chars per message) from the report.
+  per-token surprisal), ``english_ngram_surprisal`` (overall mean per-char surprisal
+  under an English char trigram; higher = less English-like), ``message_entropy`` (overall
+  mean within-message character Shannon entropy in bits/char; lower = more
+  repetitive/compressible), and ``mcm`` (overall mean chars per message) from the report.
 - ``message_level`` — one row per link-channel message. Each row carries its substage
   context (``substage``, ``symptoms`` / ``actions``, ``substage_stabilized``),
   ``message_index_in_substage``, ``message_agent`` (sender role, normalized to
   ``field_observer`` or ``stabilization_engineer``), ``message_text``, ``chars``
   (``len(message_text)``), ``perplexity`` (per-message mean per-token surprisal in nats
-  under gpt2; blank for empty/single-token messages), and the round-level
+  under gpt2; blank for empty/single-token messages), ``english_ngram_surprisal``
+  (per-message mean per-char surprisal under an English char trigram; higher = less
+  English-like; blank for empty messages), ``message_entropy`` (per-message within-message
+  character Shannon entropy in bits/char; lower = more repetitive; blank for empty
+  messages), and the round-level
   ``success`` (0/1 whole-round outcome) / ``note``. Messages are walked over the substages the
   team reached (``min(stabilized_stages + 1, total_stages)``); substages with no link
   traffic produce no rows.
@@ -50,8 +57,15 @@ from typing import NamedTuple
 
 import pandas as pd
 
-from analysis.results_viewer.measurement_scores import mcm_score, perplexity_score, read_labels
+from analysis.results_viewer.measurement_scores import (
+    english_ngram_surprisal_score,
+    mcm_score,
+    message_entropy_score,
+    perplexity_score,
+    read_labels,
+)
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
+from analysis.veyru_run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
 from analysis.veyru_run_export.message_perplexity_scorer import MessagePerplexityScorer
 from analysis.veyru_run_export.run_context_scan import (
     RunContext,
@@ -60,6 +74,7 @@ from analysis.veyru_run_export.run_context_scan import (
     sender_role,
 )
 from analysis.veyru_run_export.spreadsheet_writer import write_csvs, write_xlsx
+from schmidt.evaluation.metric_core.character_entropy import character_entropy_bits
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +104,8 @@ class RunRecord(NamedTuple):
     total_rounds: int
     round_success: int
     perplexity_score: float | None
+    english_ngram_score: float | None
+    message_entropy_score: float | None
     mcm_score: float | None
     labels: list[str]
 
@@ -118,6 +135,8 @@ def _build_record(evaluated: EvaluatedRun) -> RunRecord | None:
         total_rounds=int(config.get("round_count", 0)),
         round_success=round_success,
         perplexity_score=perplexity_score(evaluated=evaluated),
+        english_ngram_score=english_ngram_surprisal_score(evaluated=evaluated),
+        message_entropy_score=message_entropy_score(evaluated=evaluated),
         mcm_score=mcm_score(evaluated=evaluated),
         labels=labels,
     )
@@ -201,6 +220,8 @@ def _build_run_level_frame(
                 "round_success_count": record.round_success,
                 "round_success_fraction": fraction,
                 "perplexity": record.perplexity_score,
+                "english_ngram_surprisal": record.english_ngram_score,
+                "message_entropy": record.message_entropy_score,
                 "mcm": record.mcm_score,
                 "labels": "|".join(record.labels),
             }
@@ -232,6 +253,7 @@ def _build_message_level_frame(
     row.
     """
     perplexity_scorer = MessagePerplexityScorer()
+    english_ngram_scorer = MessageEnglishNgramScorer()
     rows: list[dict[str, object]] = []
     for joined in joined_runs:
         record = _build_record(evaluated=joined.evaluated)
@@ -275,11 +297,20 @@ def _build_message_level_frame(
                         }
                     )
         jsonl_path = joined.evaluated.run_dir / f"{joined.evaluated.scenario_name}.jsonl"
-        perplexities = perplexity_scorer.score_run(
-            jsonl_path=jsonl_path, texts=[str(row["message_text"]) for row in run_rows]
+        message_texts = [str(row["message_text"]) for row in run_rows]
+        perplexities = perplexity_scorer.score_run(jsonl_path=jsonl_path, texts=message_texts)
+        english_ngram_surprisals = english_ngram_scorer.score_run(
+            jsonl_path=jsonl_path, texts=message_texts
         )
-        for row, perplexity in zip(run_rows, perplexities):
+        message_entropies = [
+            character_entropy_bits(text=text) if text.strip() else None for text in message_texts
+        ]
+        for row, perplexity, english_ngram, entropy in zip(
+            run_rows, perplexities, english_ngram_surprisals, message_entropies
+        ):
             row["perplexity"] = perplexity
+            row["english_ngram_surprisal"] = english_ngram
+            row["message_entropy"] = entropy
         rows.extend(run_rows)
     frame = pd.DataFrame(rows)
     if frame.empty:
