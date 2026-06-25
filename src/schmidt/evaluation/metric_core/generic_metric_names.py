@@ -10,6 +10,7 @@ GENERIC_METRIC_NAMES: list[str] = [
     "communication_open_coding",
     "content_filter_refusal",
     "english_ngram_surprisal",
+    "gzip_compression_ratio",
     "language_repetition",
     "language_strangeness",
     "mean_chars_per_message",

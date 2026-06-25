@@ -25,7 +25,9 @@ Four output tables:
   per-token surprisal), ``english_ngram_surprisal`` (overall mean per-char surprisal
   under an English char trigram; higher = less English-like), ``message_entropy`` (overall
   mean within-message character Shannon entropy in bits/char; lower = more
-  repetitive/compressible), and ``mcm`` (overall mean chars per message) from the report.
+  repetitive/compressible), ``gzip_compression_ratio`` (overall mean per-message gzip
+  compressed/original; lower = more compressible; short messages overhead-dominated so the
+  mean exceeds 1), and ``mcm`` (overall mean chars per message) from the report.
 - ``message_level`` — one row per link-channel message. Each row carries its substage
   context (``substage``, ``symptoms`` / ``actions``, ``substage_stabilized``),
   ``message_index_in_substage``, ``message_agent`` (sender role, normalized to
@@ -35,7 +37,8 @@ Four output tables:
   (per-message mean per-char surprisal under an English char trigram; higher = less
   English-like; blank for empty messages), ``message_entropy`` (per-message within-message
   character Shannon entropy in bits/char; lower = more repetitive; blank for empty
-  messages), and the round-level
+  messages), ``gzip_compression_ratio`` (per-message gzip compressed/original; lower = more
+  compressible; >1 for short messages; blank for empty messages), and the round-level
   ``success`` (0/1 whole-round outcome) / ``note``. Messages are walked over the substages the
   team reached (``min(stabilized_stages + 1, total_stages)``); substages with no link
   traffic produce no rows.
@@ -59,6 +62,7 @@ import pandas as pd
 
 from analysis.results_viewer.measurement_scores import (
     english_ngram_surprisal_score,
+    gzip_compression_ratio_score,
     mcm_score,
     message_entropy_score,
     perplexity_score,
@@ -75,6 +79,7 @@ from analysis.veyru_run_export.run_context_scan import (
 )
 from analysis.veyru_run_export.spreadsheet_writer import write_csvs, write_xlsx
 from schmidt.evaluation.metric_core.character_entropy import character_entropy_bits
+from schmidt.evaluation.metric_core.gzip_compression import gzip_compression_ratio
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +111,7 @@ class RunRecord(NamedTuple):
     perplexity_score: float | None
     english_ngram_score: float | None
     message_entropy_score: float | None
+    gzip_compression_ratio_score: float | None
     mcm_score: float | None
     labels: list[str]
 
@@ -137,6 +143,7 @@ def _build_record(evaluated: EvaluatedRun) -> RunRecord | None:
         perplexity_score=perplexity_score(evaluated=evaluated),
         english_ngram_score=english_ngram_surprisal_score(evaluated=evaluated),
         message_entropy_score=message_entropy_score(evaluated=evaluated),
+        gzip_compression_ratio_score=gzip_compression_ratio_score(evaluated=evaluated),
         mcm_score=mcm_score(evaluated=evaluated),
         labels=labels,
     )
@@ -222,6 +229,7 @@ def _build_run_level_frame(
                 "perplexity": record.perplexity_score,
                 "english_ngram_surprisal": record.english_ngram_score,
                 "message_entropy": record.message_entropy_score,
+                "gzip_compression_ratio": record.gzip_compression_ratio_score,
                 "mcm": record.mcm_score,
                 "labels": "|".join(record.labels),
             }
@@ -305,12 +313,16 @@ def _build_message_level_frame(
         message_entropies = [
             character_entropy_bits(text=text) if text.strip() else None for text in message_texts
         ]
-        for row, perplexity, english_ngram, entropy in zip(
-            run_rows, perplexities, english_ngram_surprisals, message_entropies
+        gzip_ratios = [
+            gzip_compression_ratio(text=text) if text.strip() else None for text in message_texts
+        ]
+        for row, perplexity, english_ngram, entropy, gzip_ratio in zip(
+            run_rows, perplexities, english_ngram_surprisals, message_entropies, gzip_ratios
         ):
             row["perplexity"] = perplexity
             row["english_ngram_surprisal"] = english_ngram
             row["message_entropy"] = entropy
+            row["gzip_compression_ratio"] = gzip_ratio
         rows.extend(run_rows)
     frame = pd.DataFrame(rows)
     if frame.empty:

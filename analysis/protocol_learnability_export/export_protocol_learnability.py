@@ -29,8 +29,10 @@ Three output tables:
 - ``run_level`` — one row per cohort run.
 - ``message_level`` — one row per link-channel message across every round the run played, with
   substage ground truth + per-message gpt2 ``perplexity``, English-char-trigram
-  ``english_ngram_surprisal`` (higher = less English-like), and ``message_entropy``
-  (within-message character Shannon entropy, bits/char; lower = more repetitive).
+  ``english_ngram_surprisal`` (higher = less English-like), ``message_entropy``
+  (within-message character Shannon entropy, bits/char; lower = more repetitive), and
+  ``gzip_compression_ratio`` (per-message gzip compressed/original; lower = more
+  compressible; >1 for short messages).
 - ``baseline_aggregate`` — one row per baseline (``src_id``), with per-phase means/std/n for the
   cohort's derived phases and a ``delta`` column, computed on ``round_success_after_resume``.
   Frontier columns: ``expected`` / ``expected_no_pm`` / ``learned`` / ``cross_family`` with
@@ -64,6 +66,7 @@ from analysis.veyru_run_export.run_context_scan import (
 )
 from analysis.veyru_run_export.spreadsheet_writer import write_csvs, write_xlsx
 from schmidt.evaluation.metric_core.character_entropy import character_entropy_bits
+from schmidt.evaluation.metric_core.gzip_compression import gzip_compression_ratio
 
 logger = logging.getLogger(__name__)
 
@@ -250,6 +253,7 @@ def _build_run_level_frame(
     perplexity_by_run: dict[str, float | None],
     english_ngram_by_run: dict[str, float | None],
     message_entropy_by_run: dict[str, float | None],
+    gzip_compression_ratio_by_run: dict[str, float | None],
     mcm_by_run: dict[str, float | None],
 ) -> pd.DataFrame:
     """One row per cohort run.
@@ -258,9 +262,11 @@ def _build_run_level_frame(
     ``english_ngram_surprisal`` (run-wide mean per-message per-char surprisal under an
     English char trigram; higher = less English-like), ``message_entropy`` (run-wide mean
     within-message character Shannon entropy, bits/char; lower = more
-    repetitive/compressible), and ``mcm`` (run-wide mean chars per link message) are rolled
-    up from the per-message ``message_level`` scoring, since these runs carry no
-    ``perplexity`` / ``mcm`` metric in their reports.
+    repetitive/compressible), ``gzip_compression_ratio`` (run-wide mean per-message gzip
+    compressed/original; lower = more compressible; short messages overhead-dominated so the
+    mean exceeds 1), and ``mcm`` (run-wide mean chars per link message) are rolled up from
+    the per-message ``message_level`` scoring, since these runs carry no ``perplexity`` /
+    ``mcm`` metric in their reports.
     """
     rows: list[dict[str, object]] = []
     for record in records:
@@ -289,6 +295,7 @@ def _build_run_level_frame(
                 "perplexity": perplexity_by_run.get(record.run_id),
                 "english_ngram_surprisal": english_ngram_by_run.get(record.run_id),
                 "message_entropy": message_entropy_by_run.get(record.run_id),
+                "gzip_compression_ratio": gzip_compression_ratio_by_run.get(record.run_id),
                 "mcm": mcm_by_run.get(record.run_id),
                 "labels": "|".join(record.labels),
             }
@@ -361,12 +368,16 @@ def _build_message_level_frame(
         message_entropies = [
             character_entropy_bits(text=text) if text.strip() else None for text in message_texts
         ]
-        for row, perplexity, english_ngram, entropy in zip(
-            run_rows, perplexities, english_ngram_surprisals, message_entropies
+        gzip_ratios = [
+            gzip_compression_ratio(text=text) if text.strip() else None for text in message_texts
+        ]
+        for row, perplexity, english_ngram, entropy, gzip_ratio in zip(
+            run_rows, perplexities, english_ngram_surprisals, message_entropies, gzip_ratios
         ):
             row["perplexity"] = perplexity
             row["english_ngram_surprisal"] = english_ngram
             row["message_entropy"] = entropy
+            row["gzip_compression_ratio"] = gzip_ratio
         rows.extend(run_rows)
     frame = pd.DataFrame(rows)
     if frame.empty:
@@ -542,6 +553,9 @@ def main() -> None:
             message_level=message_level, column="english_ngram_surprisal"
         ),
         message_entropy_by_run=_run_means(message_level=message_level, column="message_entropy"),
+        gzip_compression_ratio_by_run=_run_means(
+            message_level=message_level, column="gzip_compression_ratio"
+        ),
         mcm_by_run=_run_means(message_level=message_level, column="chars"),
     )
     baseline_aggregate = _build_baseline_aggregate_frame(

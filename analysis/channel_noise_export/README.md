@@ -74,8 +74,10 @@ mean per-token surprisal, nats/gpt2, **pristine text**), `english_ngram_surprisa
 (run-wide mean per-char surprisal under an English character trigram, nats, **pristine
 text** — higher = less English-like), `message_entropy` (run-wide mean within-message
 character Shannon entropy, bits/char, **pristine text** — lower = more
-repetitive/compressible), `mcm` (run-wide mean chars per link message — length is
-preserved under character-drop noise), `labels`.
+repetitive/compressible), `gzip_compression_ratio` (run-wide mean per-message gzip
+compressed/original, **pristine text** — lower = more compressible; short messages are
+overhead-dominated so the mean exceeds 1), `mcm` (run-wide mean chars per link message —
+length is preserved under character-drop noise), `labels`.
 
 ### `message_level` — one row per link-channel message
 
@@ -104,6 +106,10 @@ Message columns:
 - `message_entropy` — per-message within-message character Shannon entropy (bits/char), on
   the pristine text, same method as the `message_entropy` metric. Lower = more
   repetitive/compressible (`LLLLLLL` → 0). Blank for empty messages.
+- `gzip_compression_ratio` — per-message gzip compressed/original size ratio, on the pristine
+  text, same method as the `gzip_compression_ratio` metric. Lower = more compressible. Note
+  gzip's ~18-byte header overhead makes short messages exceed 1.0 (`LLLLLLL` → 3.29); the
+  signal is meaningful in aggregate. Blank for empty messages.
 
 Substage context (repeated across the substage's messages):
 
