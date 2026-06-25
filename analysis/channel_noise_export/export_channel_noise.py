@@ -5,15 +5,20 @@ sweep) that carry a ``round_time_budget_seconds`` knob and a ``round_success``
 measurement. Mirrors the ``baseline_round_success`` export's shape so the two
 workbooks share a schema, with the additions the noise sweep needs.
 
-The noise sweep's defining covariate is ``channel_noise_level`` — the
-per-character drop probability applied to the link channel (postmortem stays
-clean). Every table carries it. Because the link text the agent *composed*
-differs from what the channel *delivered*, the ``message_level`` table reports
-both: ``message_text`` is the pristine pre-transform text (joined back via the
-``send_message`` ``message_id``), ``message_text_transmitted`` is what the
-channel delivered (``_`` for dropped characters), and ``chars_dropped`` /
-``drop_fraction`` quantify the loss. Per-message ``perplexity`` is scored on the
-**pristine** text, matching the run-level ``perplexity`` metric.
+The noise sweep's defining covariates are ``channel_noise_level`` — the
+per-character corruption probability applied to the link channel (postmortem
+stays clean) — and ``noise_replacement_mode``: ``mask`` replaces each corrupted
+character with ``_`` (erasure channel), ``random_letter`` with a different random
+letter (substitution channel). Older runs without the knob default to ``mask``;
+both modes carry the ``channel_noise`` label, so both are covered. Because the
+link text the agent *composed* differs from what the channel *delivered*, the
+``message_level`` table reports both: ``message_text`` is the pristine
+pre-transform text (joined back via the ``send_message`` ``message_id``),
+``message_text_transmitted`` is what the channel delivered, and ``chars_dropped``
+/ ``drop_fraction`` count the characters that differ between the two (correct for
+either mode — ``_`` masks and substituted letters alike). Per-message
+``perplexity`` is scored on the **pristine** text, matching the run-level
+``perplexity`` metric.
 
 Columns inherited from the baseline export that are constant across this cohort
 (``model_class`` = closed, ``postmortem`` = True, ``random_seed`` = False) are
@@ -23,6 +28,7 @@ Four output tables:
 
 - ``run_level`` — one row per run: per-agent models, ``model_class``,
   ``postmortem``, ``round_time_budget_seconds``, ``channel_noise_level``,
+  ``noise_replacement_mode``,
   ``random_seed``, the Bernoulli numerator/denominator
   (``round_success_count`` / ``total_rounds``) and fraction, plus the run's
   headline ``perplexity`` (pristine), ``english_ngram_surprisal`` (pristine; English
@@ -47,8 +53,9 @@ Four output tables:
   ``None`` if unscored, ``0`` for a judged round with no occurrences), so per-round
   dialog/retransmission can be correlated with per-round success directly.
 - ``budget_aggregate`` — per (models, postmortem, random_seed,
-  channel_noise_level, budget) mean ± std of the success fraction and of the
-  ``repetition`` factor.
+  channel_noise_level, ``noise_replacement_mode``, budget) mean ± std of the
+  success fraction and of the ``repetition`` factor (mask and random_letter cells
+  are kept separate so the two channel types are never averaged together).
 
 Writes one CSV per table, and (when ``openpyxl`` is importable) a single
 multi-sheet ``.xlsx`` workbook.
@@ -134,6 +141,7 @@ class RunRecord(NamedTuple):
     run_id: str
     budget: int
     channel_noise_level: float
+    noise_replacement_mode: str
     postmortem_enabled: bool
     total_rounds: int
     round_success: int
@@ -170,6 +178,7 @@ def _build_record(evaluated: EvaluatedRun) -> RunRecord | None:
         run_id=evaluated.run_id,
         budget=int(budget),
         channel_noise_level=float(noise) if isinstance(noise, (int, float)) else 0.0,
+        noise_replacement_mode=str(config.get("noise_replacement_mode", "mask")),
         postmortem_enabled=bool(config.get("postmortem_enabled", False)),
         total_rounds=int(config.get("round_count", 0)),
         round_success=round_success,
@@ -290,6 +299,7 @@ def _build_run_level_frame(
                 "postmortem": record.postmortem_enabled,
                 "round_time_budget_seconds": record.budget,
                 "channel_noise_level": record.channel_noise_level,
+                "noise_replacement_mode": record.noise_replacement_mode,
                 "random_seed": _RANDOM_SEED_LABEL in record.labels,
                 "total_rounds": record.total_rounds,
                 "round_success_count": record.round_success,
@@ -369,9 +379,16 @@ def _build_message_level_frame(
                 for message_index, message in enumerate(messages, start=1):
                     transmitted = message.message
                     pristine = pristine_by_id.get(message.message_id, transmitted)
-                    chars_dropped = transmitted.count("_")
                     chars = len(pristine)
-                    drop_fraction = chars_dropped / chars if chars > 0 else None
+                    # Count corrupted characters as positions where the delivered text differs
+                    # from the pristine text. This is correct for both noise modes: mask
+                    # replaces a dropped char with "_", random_letter with a different letter,
+                    # so a positional diff captures either (and avoids miscounting literal "_"
+                    # the agents may use in their own shorthand).
+                    chars_dropped = sum(1 for p, t in zip(pristine, transmitted) if p != t)
+                    drop_fraction = None
+                    if chars > 0:
+                        drop_fraction = chars_dropped / chars
                     run_rows.append(
                         {
                             "run_id": record.run_id,
@@ -382,6 +399,7 @@ def _build_message_level_frame(
                             "postmortem": record.postmortem_enabled,
                             "round_time_budget_seconds": record.budget,
                             "channel_noise_level": record.channel_noise_level,
+                            "noise_replacement_mode": record.noise_replacement_mode,
                             "random_seed": _RANDOM_SEED_LABEL in record.labels,
                             "round_number": round_number,
                             "substage": substage,
@@ -461,6 +479,7 @@ def _build_round_context_frame(
                     "run_id": record.run_id,
                     "round_number": round_number,
                     "channel_noise_level": record.channel_noise_level,
+                    "noise_replacement_mode": record.noise_replacement_mode,
                     "round_time_budget_seconds": record.budget,
                     "round_success": None if success is None else int(round(success)),
                     "repetition_factor": repetition_by_round.get(round_number),
@@ -491,6 +510,7 @@ def _build_budget_aggregate_frame(run_level: pd.DataFrame) -> pd.DataFrame:
         "postmortem",
         "random_seed",
         "channel_noise_level",
+        "noise_replacement_mode",
         "round_time_budget_seconds",
     ]
     grouped = run_level.groupby(group_keys, as_index=False).agg(
