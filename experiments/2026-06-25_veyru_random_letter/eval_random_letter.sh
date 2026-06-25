@@ -33,7 +33,11 @@ echo "=== random_letter eval started $(date) ===" >> "$LOG"
 for d in "$RUNS_DIR"/veyru/*/; do
   [ -f "$d/labels.json" ] && grep -q '"random_letter"' "$d/labels.json" || continue
   grep -q '"simulation_ended"' "$d/veyru.jsonl" 2>/dev/null || { echo "$(date) SKIP (no simulation_ended) $d" >> "$LOG"; continue; }
-  [ -f "$d/veyru_report.json" ] && { echo "$(date) SKIP (already evaluated) $d" >> "$LOG"; continue; }
+  # Skip only runs already carrying the FULL metric set. Use round_success as the
+  # completeness marker — a partial report (e.g. a gzip-only report written by a
+  # concurrent deterministic eval) lacks it, so it gets (re-)evaluated and the
+  # missing metrics merge in.
+  [ -f "$d/veyru_report.json" ] && grep -q '"round_success"' "$d/veyru_report.json" && { echo "$(date) SKIP (already fully evaluated) $d" >> "$LOG"; continue; }
   while [ "$(count_running_evals)" -ge "$CAP" ]; do sleep 10; done
   echo "$(date) eval $d" >> "$LOG"
   VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
