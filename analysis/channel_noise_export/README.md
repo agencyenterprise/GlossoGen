@@ -35,13 +35,15 @@ Re-run any time new runs land — it always reads the current `./runs` on disk.
 ## What's in the cohort
 
 Every veyru run labeled `channel_noise` that has a `round_time_budget_seconds` knob and a
-`round_success` measurement. The sweep design is **5 replicas per (model ×
-`channel_noise_level` × budget) cell** (see
-`experiments/2026-06-19_veyru_channel_noise/`).
+`round_success` measurement. This includes the `random_letter` substitution-channel cohort —
+those runs also carry the `channel_noise` label, and the `noise_replacement_mode` column tells
+them apart. The mask sweep design is **5 replicas per (model × `channel_noise_level` × budget)
+cell** (see `experiments/2026-06-19_veyru_channel_noise/`).
 
-`channel_noise_level` is the per-character drop probability applied to the **link
-channel only** — the postmortem channel stays lossless. A dropped character is replaced
-with `_` in the persisted (transmitted) message.
+`channel_noise_level` is the per-character corruption probability applied to the **link
+channel only** — the postmortem channel stays lossless. `noise_replacement_mode` selects what
+each corrupted character becomes: `mask` replaces it with `_` (erasure channel), `random_letter`
+with a different random letter (substitution channel). Runs without the knob default to `mask`.
 
 Columns inherited from the baseline export that are **constant across this cohort** are
 kept so the two workbooks concatenate for cross-cohort comparison:
@@ -68,7 +70,8 @@ For binomial GLMMs (`cbind(round_success_count, total_rounds - round_success_cou
 or a model on `round_success_fraction`.
 
 `run_id`, `scenario`, `field_observer_model`, `engineer_model`, `model_class`,
-`postmortem`, `round_time_budget_seconds`, **`channel_noise_level`**, `random_seed`,
+`postmortem`, `round_time_budget_seconds`, **`channel_noise_level`**,
+**`noise_replacement_mode`** (`mask` / `random_letter`), `random_seed`,
 `total_rounds`, `round_success_count`, `round_success_fraction`, `perplexity` (run-wide
 mean per-token surprisal, nats/gpt2, **pristine text**), `english_ngram_surprisal`
 (run-wide mean per-char surprisal under an English character trigram, nats, **pristine
@@ -92,11 +95,13 @@ Message columns:
 - `message_agent` — sender role, normalized to `field_observer` or
   `stabilization_engineer`.
 - `message_text` — the **pristine** text the agent composed (joined via `message_id`).
-- `message_text_transmitted` — what the channel delivered (`_` for dropped characters).
+- `message_text_transmitted` — what the channel delivered (`_` masks under `mask` mode, a
+  substituted random letter under `random_letter` mode).
 - `message_index_in_substage` — 1-indexed order of the message within its substage.
 - `chars` — character count (`len(message_text)`); preserved under noise, so equal for
   pristine and transmitted.
-- `chars_dropped` — number of `_` substitutions in the transmitted text.
+- `chars_dropped` — number of characters that differ between pristine and transmitted (the `_`
+  masks or substituted letters); a positional diff, correct for both noise modes.
 - `drop_fraction` — `chars_dropped / chars` (blank for empty messages); per-message
   realized noise, which averages to `channel_noise_level` within a cell.
 - `perplexity` — per-message mean per-token surprisal (nats) under `gpt2`, on the pristine
@@ -154,8 +159,10 @@ message row. Join to `message_level` on `run_id` + `round_number`. (Briefings ar
 ### `budget_aggregate` — one row per cell
 
 Per (model_class, field_observer_model, engineer_model, postmortem, random_seed,
-**channel_noise_level**, budget): `n`, and mean / std (population, ddof=0) / min / max of
-`round_success_fraction`, plus `mean_success_count`. A sanity check against the success
+**channel_noise_level**, **noise_replacement_mode**, budget): `n`, and mean / std (population,
+ddof=0) / min / max of `round_success_fraction`, plus `mean_success_count`. Grouping on
+`noise_replacement_mode` keeps the `mask` and `random_letter` cells separate so the two channel
+types are never averaged together. A sanity check against the success
 grid.
 
 ## Useful flags
