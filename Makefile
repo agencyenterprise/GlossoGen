@@ -27,6 +27,23 @@ lint-server:
 results-viewer:
 	VIRTUAL_ENV= PYTHONPATH=. uv run --group analysis --no-sync streamlit run analysis/results_viewer/app.py
 
+# Google Sheets sync — regenerate each workbook, then overwrite only its data tabs
+# (chart tabs untouched; a pre-write CSV backup lands under analysis/sheets_sync/backups/).
+sync-sheets-baseline:
+	VIRTUAL_ENV= uv run --no-sync --with openpyxl python -m analysis.baseline_round_success.export_baseline_round_success
+	VIRTUAL_ENV= PYTHONPATH=. uv run --no-sync --group sheets python analysis/sheets_sync/sync_to_sheets.py --target baseline
+
+sync-sheets-noise:
+	VIRTUAL_ENV= uv run --no-sync --with openpyxl python -m analysis.channel_noise_export.export_channel_noise
+	VIRTUAL_ENV= PYTHONPATH=. uv run --no-sync --group sheets python analysis/sheets_sync/sync_to_sheets.py --target channel_noise
+
+sync-sheets-protocol:
+	VIRTUAL_ENV= uv run --no-sync --with openpyxl python -m analysis.protocol_learnability_export.export_protocol_learnability
+	VIRTUAL_ENV= PYTHONPATH=. uv run --no-sync --group sheets python analysis/sheets_sync/sync_to_sheets.py --target protocol_learnability
+
+sync-sheets: sync-sheets-baseline sync-sheets-noise sync-sheets-protocol
+	@echo "All spreadsheets synced"
+
 lint-frontend:
 	@echo "Linting frontend..."
 	cd frontend && npx prettier --write "src/**/*.{ts,tsx,js,jsx,json,css,scss,md}"
@@ -58,4 +75,4 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend results-viewer export-openapi gen-api-types
+.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend results-viewer sync-sheets sync-sheets-baseline sync-sheets-noise sync-sheets-protocol export-openapi gen-api-types

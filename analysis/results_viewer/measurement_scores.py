@@ -16,6 +16,8 @@ PERPLEXITY_METRIC = "perplexity"
 ENGLISH_NGRAM_SURPRISAL_METRIC = "english_ngram_surprisal"
 MESSAGE_ENTROPY_METRIC = "message_entropy"
 GZIP_COMPRESSION_RATIO_METRIC = "gzip_compression_ratio"
+DIALOG_COUNT_METRIC = "dialog_count"
+RETRANSMISSION_REQUEST_COUNT_METRIC = "retransmission_request_count"
 MCR_METRIC = "mean_chars_per_round"
 MCM_METRIC = "mean_chars_per_message"
 LANGUAGE_REPETITION_METRIC = "language_repetition"
@@ -69,6 +71,16 @@ def gzip_compression_ratio_score(evaluated: EvaluatedRun) -> float | None:
     Lower means more compressible/repetitive (short messages are overhead-dominated).
     """
     return measurement_score(evaluated=evaluated, metric_name=GZIP_COMPRESSION_RATIO_METRIC)
+
+
+def dialog_count_score(evaluated: EvaluatedRun) -> float | None:
+    """Mean dialog messages per round (LLM judge); ``None`` if unscored."""
+    return measurement_score(evaluated=evaluated, metric_name=DIALOG_COUNT_METRIC)
+
+
+def retransmission_request_count_score(evaluated: EvaluatedRun) -> float | None:
+    """Mean retransmission-request messages per round (LLM judge); ``None`` if unscored."""
+    return measurement_score(evaluated=evaluated, metric_name=RETRANSMISSION_REQUEST_COUNT_METRIC)
 
 
 def mcr_score(evaluated: EvaluatedRun) -> float | None:

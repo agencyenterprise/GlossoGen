@@ -1417,6 +1417,19 @@ requests = [
 ]
 
 [[package]]
+name = "google-auth-oauthlib"
+version = "1.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-auth" },
+    { name = "requests-oauthlib" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/70/18/90c7fac516e63cf2058166fce0c88c353647c677b51cc036c09c49bb5cbb/google_auth_oauthlib-1.4.0.tar.gz", hash = "sha256:18b5e28880eb8eba9065c436becdc0ee8e4b59117a73a510679c82f70cd363d2", size = 21675, upload-time = "2026-05-07T08:03:47.816Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/37/d3/d7dff0d58a9e9244b48044bfb6a898bfcc8ecc42e0031d1bebc695344725/google_auth_oauthlib-1.4.0-py3-none-any.whl", hash = "sha256:251314f213a9ee46a5ae73988e84fd7cca8bb68e7ecf4bfd45940f9e7f51d070", size = 19261, upload-time = "2026-05-07T08:02:13.798Z" },
+]
+
+[[package]]
 name = "google-genai"
 version = "1.74.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1594,6 +1607,33 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5b/28/5a2c299ec82a876a252c5919aa895a6f1d1d35c96417c5ce4a4660dc3a80/grpclib-0.4.9.tar.gz", hash = "sha256:cc589c330fa81004c6400a52a566407574498cb5b055fa927013361e21466c46", size = 84798, upload-time = "2025-12-14T22:23:14.349Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5c/90/b0cbbd9efcc82816c58f31a34963071aa19fb792a212a5d9caf8e0fc3097/grpclib-0.4.9-py3-none-any.whl", hash = "sha256:7762ec1c8ed94dfad597475152dd35cbd11aecaaca2f243e29702435ca24cf0e", size = 77063, upload-time = "2025-12-14T22:23:13.224Z" },
+]
+
+[[package]]
+name = "gspread"
+version = "6.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-auth" },
+    { name = "google-auth-oauthlib" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/91/83/42d1d813822ed016d77aabadc99b09de3b5bd68532fd6bae23fd62347c41/gspread-6.2.1.tar.gz", hash = "sha256:2c7c99f7c32ebea6ec0d36f2d5cbe8a2be5e8f2a48bde87ad1ea203eff32bd03", size = 82590, upload-time = "2025-05-14T15:56:25.254Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/27/76/563fb20dedd0e12794d9a12cfe0198458cc0501fdc7b034eee2166d035d5/gspread-6.2.1-py3-none-any.whl", hash = "sha256:6d4ec9f1c23ae3c704a9219026dac01f2b328ac70b96f1495055d453c4c184db", size = 59977, upload-time = "2025-05-14T15:56:24.014Z" },
+]
+
+[[package]]
+name = "gspread-dataframe"
+version = "4.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "gspread" },
+    { name = "pandas" },
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b4/bc/82a1a8a850468b5db7f894f2f73f690a927a5bf59a67581317c00c0a86d8/gspread-dataframe-4.0.0.tar.gz", hash = "sha256:5ca5493478ecae49b833664a06bac8e17b5b4ed0bdf77f551c948f30545860e6", size = 27400, upload-time = "2024-06-12T21:17:53.184Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c9/2f/ffb71b19208cf3d3e1e1323716de07bdb46e24c850f2c5627cb8157d9687/gspread_dataframe-4.0.0-py2.py3-none-any.whl", hash = "sha256:19a3c6cd95bf85f8d6c3657227bb921ef36110174d365cc576defe4ed45b6f7d", size = 9046, upload-time = "2024-06-12T21:17:51.766Z" },
 ]
 
 [[package]]
@@ -3042,6 +3082,15 @@ wheels = [
 ]
 
 [[package]]
+name = "oauthlib"
+version = "3.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/5f/19930f824ffeb0ad4372da4812c50edbd1434f678c90c2733e1188edfc63/oauthlib-3.3.1.tar.gz", hash = "sha256:0f0f8aa759826a193cf66c12ea1af1637f87b9b4622d46e866952bb022e538c9", size = 185918, upload-time = "2025-06-19T22:48:08.269Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/be/9c/92789c596b8df838baa98fa71844d84283302f7604ed565dafe5a6b5041a/oauthlib-3.3.1-py3-none-any.whl", hash = "sha256:88119c938d2b8fb88561af5f6ee0eec8cc8d552b7bb1f712743136eb7523b7a1", size = 160065, upload-time = "2025-06-19T22:48:06.508Z" },
+]
+
+[[package]]
 name = "openai"
 version = "2.33.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4422,6 +4471,19 @@ wheels = [
 ]
 
 [[package]]
+name = "requests-oauthlib"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "oauthlib" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/42/f2/05f29bc3913aea15eb670be136045bf5c5bbf4b99ecb839da9b422bb2c85/requests-oauthlib-2.0.0.tar.gz", hash = "sha256:b3dffaebd884d8cd778494369603a9e7b58d29111bf6b41bdc2dcd87203af4e9", size = 55650, upload-time = "2024-03-22T20:32:29.939Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3b/5d/63d4ae3b9daea098d5d6f5da83984853c1bbacd5dc826764b249fe119d24/requests_oauthlib-2.0.0-py2.py3-none-any.whl", hash = "sha256:7dd8a5c40426b779b0868c404bdef9768deccf22749cde15852df527e6269b36", size = 24179, upload-time = "2024-03-22T20:32:28.055Z" },
+]
+
+[[package]]
 name = "rich"
 version = "15.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4665,6 +4727,10 @@ dev = [
 eval = [
     { name = "inspect-ai" },
 ]
+sheets = [
+    { name = "gspread" },
+    { name = "gspread-dataframe" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -4725,6 +4791,10 @@ dev = [
     { name = "vulture", specifier = ">=2.14" },
 ]
 eval = [{ name = "inspect-ai", specifier = ">=0.3.0" }]
+sheets = [
+    { name = "gspread", specifier = ">=6.0.0" },
+    { name = "gspread-dataframe", specifier = ">=4.0.0" },
+]
 
 [[package]]
 name = "seaborn"

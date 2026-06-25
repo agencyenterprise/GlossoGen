@@ -5,16 +5,13 @@ Exports the data behind the Streamlit **Protocol learnability** tab
 the baseline round-success export's column schema, adding only a few cohort columns plus
 the one signal the tab doesn't surface directly: **`round_success_after_resume`**.
 
-One script produces **two spreadsheets**, selected by `--cohort`, because frontier
-(Anthropic/OpenAI) and self-hosted **Llama** observers are analysed separately. Both cohorts
-share the same `phase=baseline` runs (the source teams that developed the protocol).
+One invocation produces **one workbook** covering every phase, so it maps 1:1 onto the online
+spreadsheet's data tabs. Frontier (Anthropic/OpenAI) and self-hosted **Llama** observers share
+the same `phase=baseline` runs (the source teams that developed the protocol) and the same
+`run_level` / `message_level` schema; they split only at the aggregate, whose column set is
+cohort-specific (`baseline_aggregate` for frontier, `baseline_aggregate_llama` for Llama).
 
-## Cohorts
-
-| `--cohort` | stem | derived phases included |
-|---|---|---|
-| `frontier` (default) | `protocol_learnability` | `resume_expected`, `resume_expected_no_postmortem`, `replace_learned`, `replace_cross_family` — **excludes Llama** |
-| `llama` | `protocol_learnability_llama` | `replace_llama` only — a fresh self-hosted Llama-3.3-70B observer swapped onto a frontier team's protocol |
+## Phases
 
 | phase label | what it is |
 |---|---|
@@ -37,35 +34,30 @@ analysis/protocol_learnability_export/
 ├── README.md                       # this file
 ├── export_protocol_learnability.py
 └── output/                         # generated; regenerated on each run
-    ├── protocol_learnability.xlsx                       # frontier: all three sheets
+    ├── protocol_learnability.xlsx                       # all four sheets in one workbook
     ├── protocol_learnability_run_level.csv
     ├── protocol_learnability_message_level.csv
     ├── protocol_learnability_baseline_aggregate.csv
-    ├── protocol_learnability_llama.xlsx                 # llama: all three sheets
-    ├── protocol_learnability_llama_run_level.csv
-    ├── protocol_learnability_llama_message_level.csv
-    └── protocol_learnability_llama_baseline_aggregate.csv
+    └── protocol_learnability_baseline_aggregate_llama.csv
 ```
 
 ## Regenerate
 
-Run from the repo root. Each cohort is a separate invocation:
+Run from the repo root — a single invocation writes the whole workbook:
 
 ```bash
-# frontier (default) — excludes Llama
 VIRTUAL_ENV= uv run --no-sync --with openpyxl \
-  python -m analysis.protocol_learnability_export.export_protocol_learnability --cohort frontier
-
-# llama — Llama observer runs + their baselines only
-VIRTUAL_ENV= uv run --no-sync --with openpyxl \
-  python -m analysis.protocol_learnability_export.export_protocol_learnability --cohort llama
+  python -m analysis.protocol_learnability_export.export_protocol_learnability
 ```
 
 `--with openpyxl` is only needed for the `.xlsx`; the CSVs are written regardless. The first
 run scores every link message's gpt2 perplexity and caches it beside each run's JSONL
 (`message_perplexity_cache.json`); later runs reuse the cache and only re-score runs whose
 JSONL changed. Other flags: `--runs-dir` (default `runs`), `--scenario` (default `veyru`),
-`--output-dir`, `--stem` (overrides the cohort default).
+`--output-dir`, `--stem` (default `protocol_learnability`).
+
+To push the regenerated workbook to the online spreadsheet, see
+[`analysis/sheets_sync`](../sheets_sync/README.md) (`--target protocol_learnability`).
 
 ## `round_success_after_resume`
 
@@ -107,19 +99,21 @@ One row per link message across **every round each run played** (rounds 1–25 f
 runs, since their cloned JSONL carries the source's pre-swap history). Substages with no link
 traffic produce no rows.
 
-### `baseline_aggregate` — one row per baseline
+### `baseline_aggregate` — one row per baseline (frontier)
 
 Mirrors the tab's `BaselineLearnability`, computed on `round_success_after_resume`. Fixed
 columns: `src_id`, `field_observer_model`, `engineer_model`, `model_class`,
 `round_time_budget_seconds`, `baseline_round_success_fraction` (the baseline's own 1–15
-performance), `cross_family_observer`. Then, per derived phase in the cohort, `n_<prefix>`,
-`<prefix>_mean`, `<prefix>_std`, and a cohort-specific `delta`:
+performance), `cross_family_observer`. Then, per frontier phase `expected` / `expected_no_pm` /
+`learned` / `cross_family`: `n_<prefix>`, `<prefix>_mean`, `<prefix>_std`, and
+`delta = learned − expected_no_pm` (the fresh same-model observer's transmission gap vs the
+no-postmortem ceiling).
 
-- **frontier** — phases `expected` / `expected_no_pm` / `learned` / `cross_family`;
-  `delta = learned − expected_no_pm` (the fresh same-model observer's transmission gap vs the
-  no-postmortem ceiling).
-- **llama** — phase `llama`; `delta = llama − baseline` (the fresh Llama observer's post-swap
-  success vs the source team's own baseline success). `cross_family_observer` is blank.
+### `baseline_aggregate_llama` — one row per baseline (Llama)
 
-Means/std use the tab's semantics: mean over the phase's replicas, sample std (`ddof=1`) when
-`n ≥ 2` else `0.0`, and `None` when the phase has no replicas.
+Same fixed columns, then the single phase `llama`: `n_llama`, `llama_mean`, `llama_std`, and
+`delta = llama − baseline` (the fresh Llama observer's post-swap success vs the source team's
+own baseline success). `cross_family_observer` is blank.
+
+Both aggregates use the tab's semantics: mean over the phase's replicas, sample std (`ddof=1`)
+when `n ≥ 2` else `0.0`, and `None` when the phase has no replicas.

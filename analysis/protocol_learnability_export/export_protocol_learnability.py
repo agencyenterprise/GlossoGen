@@ -1,16 +1,16 @@
 """Export the protocol-learnability cohort behind the Streamlit "Protocol learnability" tab.
 
-``--cohort`` selects which derived phases the spreadsheet covers; both cohorts share the
-``phase=baseline`` runs (the 15-round source teams that developed the private protocol):
+One merged workbook covers every phase, so it maps 1:1 onto the online spreadsheet's data
+tabs. All derived phases share the ``phase=baseline`` runs (the 15-round source teams that
+developed the private protocol):
 
-- ``--cohort frontier`` (default, stem ``protocol_learnability``) — the four Anthropic/OpenAI
-  conditions: ``resume_expected`` (intact team resumed, postmortem on — the *expected*
-  ceiling), ``resume_expected_no_postmortem`` (intact team resumed, postmortem killed —
-  isolates the no-postmortem effect), ``replace_learned`` (fresh same-model observer that
-  learned the protocol from the windowed link transcript), and ``replace_cross_family``
-  (fresh *other-family* observer; the ``observer=`` label records its family). Excludes Llama.
-- ``--cohort llama`` (stem ``protocol_learnability_llama``) — only ``phase=replace_llama``: a
-  fresh self-hosted Llama observer swapped onto a frontier team's protocol, plus the baselines.
+- frontier conditions — ``resume_expected`` (intact team resumed, postmortem on — the
+  *expected* ceiling), ``resume_expected_no_postmortem`` (intact team resumed, postmortem
+  killed — isolates the no-postmortem effect), ``replace_learned`` (fresh same-model observer
+  that learned the protocol from the windowed link transcript), and ``replace_cross_family``
+  (fresh *other-family* observer; the ``observer=`` label records its family).
+- llama condition — ``replace_llama``: a fresh self-hosted Llama observer swapped onto a
+  frontier team's protocol.
 
 Each derived run links to its baseline through the ``src=<scenario>/<ts>`` label and carries
 a ``replace_manifest.json`` (``rounds_after_swap``).
@@ -24,7 +24,9 @@ link-window label), ``rounds_after_swap``, and the one new metric the tab couldn
 ``round_start``–(``round_start`` + ``rounds_after_swap``); blank on baselines, which carry no
 swap manifest).
 
-Three output tables:
+Four output tables (``run_level`` / ``message_level`` carry every phase, distinguished by the
+``phase`` column; the two aggregates differ only in which derived phases they roll up because
+their column sets differ):
 
 - ``run_level`` — one row per cohort run.
 - ``message_level`` — one row per link-channel message across every round the run played, with
@@ -33,10 +35,10 @@ Three output tables:
   (within-message character Shannon entropy, bits/char; lower = more repetitive), and
   ``gzip_compression_ratio`` (per-message gzip compressed/original; lower = more
   compressible; >1 for short messages).
-- ``baseline_aggregate`` — one row per baseline (``src_id``), with per-phase means/std/n for the
-  cohort's derived phases and a ``delta`` column, computed on ``round_success_after_resume``.
-  Frontier columns: ``expected`` / ``expected_no_pm`` / ``learned`` / ``cross_family`` with
-  ``delta = learned − expected_no_pm``. Llama columns: ``llama`` with
+- ``baseline_aggregate`` — one row per baseline (``src_id``), frontier columns
+  ``expected`` / ``expected_no_pm`` / ``learned`` / ``cross_family`` (means/std/n) with
+  ``delta = learned − expected_no_pm``, computed on ``round_success_after_resume``.
+- ``baseline_aggregate_llama`` — one row per baseline, llama column ``llama`` with
   ``delta = llama − baseline`` (the fresh Llama observer's post-swap success vs the source
   team's own baseline success).
 
@@ -76,9 +78,12 @@ _ROUND_SUCCESS_METRIC = "round_success"
 _RANDOM_SEED_LABEL = "random_seed"
 
 _PHASE_BASELINE = "baseline"
+_STEM = "protocol_learnability"
 # Maps each derived phase to the column prefix used in baseline_aggregate, matching the
-# tab's BaselineLearnability field names. The frontier cohort holds the four
-# Anthropic/OpenAI conditions; the llama cohort holds only the self-hosted Llama observer.
+# tab's BaselineLearnability field names. The frontier aggregate holds the four
+# Anthropic/OpenAI conditions; the llama aggregate holds only the self-hosted Llama observer.
+# They carry different column sets, so each gets its own sheet, while run_level /
+# message_level carry every phase in one sheet (distinguished by the ``phase`` column).
 _FRONTIER_DERIVED_PREFIX = {
     "resume_expected": "expected",
     "resume_expected_no_postmortem": "expected_no_pm",
@@ -91,25 +96,16 @@ _LLAMA_DERIVED_PREFIX = {
 
 
 class _CohortSpec(NamedTuple):
-    """Which derived phases a spreadsheet covers, and the output file stem to use."""
+    """One ``baseline_aggregate`` definition: its name and the derived phases it rolls up."""
 
     name: str
     derived_prefix: dict[str, str]
-    stem: str
 
 
-_COHORTS = {
-    "frontier": _CohortSpec(
-        name="frontier",
-        derived_prefix=_FRONTIER_DERIVED_PREFIX,
-        stem="protocol_learnability",
-    ),
-    "llama": _CohortSpec(
-        name="llama",
-        derived_prefix=_LLAMA_DERIVED_PREFIX,
-        stem="protocol_learnability_llama",
-    ),
-}
+_FRONTIER_AGGREGATE = _CohortSpec(name="frontier", derived_prefix=_FRONTIER_DERIVED_PREFIX)
+_LLAMA_AGGREGATE = _CohortSpec(name="llama", derived_prefix=_LLAMA_DERIVED_PREFIX)
+# run_level / message_level cover every phase; each aggregate then filters to its own.
+_ALLOWED_PHASES = frozenset({_PHASE_BASELINE, *_FRONTIER_DERIVED_PREFIX, *_LLAMA_DERIVED_PREFIX})
 
 
 class ProtocolRunRecord(NamedTuple):
@@ -500,45 +496,26 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir", type=Path, default=Path("analysis/protocol_learnability_export/output")
     )
-    parser.add_argument(
-        "--cohort",
-        type=str,
-        choices=sorted(_COHORTS),
-        default="frontier",
-        help=(
-            "frontier = baseline + the 4 Anthropic/OpenAI conditions (excludes Llama); "
-            "llama = baseline + the self-hosted Llama observer only."
-        ),
-    )
-    parser.add_argument(
-        "--stem",
-        type=str,
-        default=None,
-        help="Output file stem (defaults to the cohort's stem).",
-    )
+    parser.add_argument("--stem", type=str, default=_STEM)
     return parser.parse_args()
 
 
 def main() -> None:
-    """Build the three frames and write outputs."""
+    """Build the four frames and write the merged workbook + CSVs."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = _parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    cohort = _COHORTS[args.cohort]
-    stem: str = args.stem if args.stem is not None else cohort.stem
-    allowed_phases = frozenset({_PHASE_BASELINE, *cohort.derived_prefix})
 
     evaluated_runs = list_evaluated_runs(runs_dir=args.runs_dir)
     records, contexts = _collect_records(
         evaluated_runs=evaluated_runs,
         scenario_name=args.scenario,
-        allowed_phases=allowed_phases,
+        allowed_phases=_ALLOWED_PHASES,
     )
     baseline_count = sum(1 for record in records if record.phase == _PHASE_BASELINE)
     logger.info(
-        "scenario=%s cohort=%s: %d protocol_learnability runs (%d baselines, %d derived).",
+        "scenario=%s: %d protocol_learnability runs (%d baselines, %d derived).",
         args.scenario,
-        cohort.name,
         len(records),
         baseline_count,
         len(records) - baseline_count,
@@ -559,22 +536,27 @@ def main() -> None:
         mcm_by_run=_run_means(message_level=message_level, column="chars"),
     )
     baseline_aggregate = _build_baseline_aggregate_frame(
-        records=records, contexts=contexts, cohort=cohort
+        records=records, contexts=contexts, cohort=_FRONTIER_AGGREGATE
+    )
+    baseline_aggregate_llama = _build_baseline_aggregate_frame(
+        records=records, contexts=contexts, cohort=_LLAMA_AGGREGATE
     )
     frames = {
         "run_level": run_level,
         "message_level": message_level,
         "baseline_aggregate": baseline_aggregate,
+        "baseline_aggregate_llama": baseline_aggregate_llama,
     }
 
-    csv_paths = write_csvs(frames=frames, output_dir=args.output_dir, stem=stem)
-    xlsx_path = write_xlsx(frames=frames, output_dir=args.output_dir, stem=stem)
+    csv_paths = write_csvs(frames=frames, output_dir=args.output_dir, stem=args.stem)
+    xlsx_path = write_xlsx(frames=frames, output_dir=args.output_dir, stem=args.stem)
 
     logger.info(
-        "Wrote %d runs, %d message-rows, %d baselines. CSVs: %s%s",
+        "Wrote %d runs, %d message-rows, %d frontier-baselines, %d llama-baselines. CSVs: %s%s",
         len(run_level),
         len(message_level),
         len(baseline_aggregate),
+        len(baseline_aggregate_llama),
         ", ".join(str(p) for p in csv_paths),
         f"; workbook: {xlsx_path}" if xlsx_path is not None else "",
     )

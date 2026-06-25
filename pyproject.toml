@@ -66,6 +66,10 @@ analysis = [
 eval = [
     "inspect-ai>=0.3.0",
 ]
+sheets = [
+    "gspread>=6.0.0",
+    "gspread-dataframe>=4.0.0",
+]
 
 [tool.uv]
 required-environments = [

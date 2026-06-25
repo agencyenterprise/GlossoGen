@@ -29,9 +29,11 @@ Four output tables:
   char trigram, higher = less English-like), ``message_entropy`` (pristine; within-message
   character Shannon entropy in bits/char, lower = more repetitive/compressible),
   ``gzip_compression_ratio`` (pristine; per-message gzip compressed/original, lower = more
-  compressible; short messages are overhead-dominated so the mean exceeds 1), ``mcm``, and
-  ``repetition`` (the ``language_repetition`` mean redundancy factor — encodings per
-  information unit).
+  compressible; short messages are overhead-dominated so the mean exceeds 1),
+  ``dialog_count`` and ``retransmission_request_count`` (LLM-judge ``dialog_retransmission``
+  mean messages per round — clarification/coordination turns and requests to repeat/resend),
+  ``mcm``, and ``repetition`` (the ``language_repetition`` mean redundancy factor — encodings
+  per information unit).
 - ``message_level`` — one row per link-channel message with its substage / round
   context, the pristine and transmitted text, character-loss stats, per-message
   pristine ``perplexity``, ``english_ngram_surprisal``, ``message_entropy``,
@@ -40,8 +42,10 @@ Four output tables:
   factor, read from the run's ``language_repetition_messages.jsonl`` sidecar by
   ``message_id``).
 - ``round_context`` — one row per (run, round): the round-start briefings plus the
-  per-round ``round_success`` flag and ``repetition_factor`` (so per-round
-  redundancy can be correlated with per-round success directly).
+  per-round ``round_success`` flag, ``repetition_factor``, and the per-round
+  ``dialog_count`` / ``retransmission_request_count`` (LLM-judge ``dialog_retransmission``;
+  ``None`` if unscored, ``0`` for a judged round with no occurrences), so per-round
+  dialog/retransmission can be correlated with per-round success directly.
 - ``budget_aggregate`` — per (models, postmortem, random_seed,
   channel_noise_level, budget) mean ± std of the success fraction and of the
   ``repetition`` factor.
@@ -60,7 +64,10 @@ from typing import NamedTuple
 import pandas as pd
 
 from analysis.results_viewer.measurement_scores import (
+    DIALOG_COUNT_METRIC,
     LANGUAGE_REPETITION_METRIC,
+    RETRANSMISSION_REQUEST_COUNT_METRIC,
+    dialog_count_score,
     english_ngram_surprisal_score,
     gzip_compression_ratio_score,
     language_repetition_score,
@@ -68,6 +75,7 @@ from analysis.results_viewer.measurement_scores import (
     message_entropy_score,
     perplexity_score,
     read_labels,
+    retransmission_request_count_score,
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
 from analysis.veyru_run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
@@ -133,6 +141,8 @@ class RunRecord(NamedTuple):
     english_ngram_score: float | None
     message_entropy_score: float | None
     gzip_compression_ratio_score: float | None
+    dialog_count_score: float | None
+    retransmission_request_count_score: float | None
     mcm_score: float | None
     repetition_score: float | None
     labels: list[str]
@@ -167,6 +177,8 @@ def _build_record(evaluated: EvaluatedRun) -> RunRecord | None:
         english_ngram_score=english_ngram_surprisal_score(evaluated=evaluated),
         message_entropy_score=message_entropy_score(evaluated=evaluated),
         gzip_compression_ratio_score=gzip_compression_ratio_score(evaluated=evaluated),
+        dialog_count_score=dialog_count_score(evaluated=evaluated),
+        retransmission_request_count_score=retransmission_request_count_score(evaluated=evaluated),
         mcm_score=mcm_score(evaluated=evaluated),
         repetition_score=language_repetition_score(evaluated=evaluated),
         labels=labels,
@@ -203,6 +215,27 @@ def _repetition_per_round(evaluated: EvaluatedRun) -> dict[int, float]:
         if measurement.metric_name == LANGUAGE_REPETITION_METRIC:
             return {obs.round_number: obs.value for obs in measurement.per_round}
     return {}
+
+
+def _round_count(by_round: dict[int, float] | None, round_number: int) -> float | None:
+    """Per-round count for one round: ``None`` if unscored, else the count (0 if absent)."""
+    if by_round is None:
+        return None
+    return by_round.get(round_number, 0.0)
+
+
+def _counts_per_round(evaluated: EvaluatedRun, metric_name: str) -> dict[int, float] | None:
+    """Map ``round_number -> count`` from a per-round count measurement, or ``None`` if absent.
+
+    The ``dialog_count`` / ``retransmission_request_count`` measurements only emit a
+    per-round entry for rounds with a non-zero count. ``None`` distinguishes "this run was
+    never judged for the metric" from "judged, and this round had zero"; callers default
+    missing rounds to ``0.0`` only when the map is not ``None``.
+    """
+    for measurement in evaluated.report.measurements:
+        if measurement.metric_name == metric_name:
+            return {obs.round_number: obs.value for obs in measurement.per_round}
+    return None
 
 
 _REPETITION_SIDECAR = "language_repetition_messages.jsonl"
@@ -265,6 +298,8 @@ def _build_run_level_frame(
                 "english_ngram_surprisal": record.english_ngram_score,
                 "message_entropy": record.message_entropy_score,
                 "gzip_compression_ratio": record.gzip_compression_ratio_score,
+                "dialog_count": record.dialog_count_score,
+                "retransmission_request_count": record.retransmission_request_count_score,
                 "mcm": record.mcm_score,
                 "repetition": record.repetition_score,
                 "labels": "|".join(record.labels),
@@ -397,11 +432,12 @@ def _build_round_context_frame(
 ) -> pd.DataFrame:
     """One row per (run, round): the round-start briefings plus per-round outcomes.
 
-    Carries ``round_success`` (1/0 from the run's ``round_success`` measurement)
-    and ``repetition_factor`` (the round's ``language_repetition`` redundancy
-    factor, ``None`` when the round had no primary-channel content or the run
-    wasn't scored), so per-round redundancy can be correlated with per-round
-    success directly from this table.
+    Carries ``round_success`` (1/0 from the run's ``round_success`` measurement),
+    ``repetition_factor`` (the round's ``language_repetition`` redundancy factor), and the
+    per-round ``dialog_count`` / ``retransmission_request_count`` from the LLM-judge
+    ``dialog_retransmission`` metric (``None`` when the run wasn't scored; ``0`` for a judged
+    round with no occurrences), so per-round dialog/retransmission can be correlated with
+    per-round success directly from this table.
     """
     rows: list[dict[str, object]] = []
     for evaluated in runs:
@@ -413,6 +449,10 @@ def _build_round_context_frame(
             rn: value for rn, value, _ in _round_success_per_round(evaluated=evaluated)
         }
         repetition_by_round = _repetition_per_round(evaluated=evaluated)
+        dialog_by_round = _counts_per_round(evaluated=evaluated, metric_name=DIALOG_COUNT_METRIC)
+        retransmission_by_round = _counts_per_round(
+            evaluated=evaluated, metric_name=RETRANSMISSION_REQUEST_COUNT_METRIC
+        )
         for round_number in sorted(context.rounds):
             round_ctx = context.rounds[round_number]
             success = success_by_round.get(round_number)
@@ -424,6 +464,12 @@ def _build_round_context_frame(
                     "round_time_budget_seconds": record.budget,
                     "round_success": None if success is None else int(round(success)),
                     "repetition_factor": repetition_by_round.get(round_number),
+                    "dialog_count": _round_count(
+                        by_round=dialog_by_round, round_number=round_number
+                    ),
+                    "retransmission_request_count": _round_count(
+                        by_round=retransmission_by_round, round_number=round_number
+                    ),
                     "field_observer_round_event": round_ctx.field_observer_event,
                     "engineer_round_event": round_ctx.engineer_event,
                 }
