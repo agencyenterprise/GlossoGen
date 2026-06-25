@@ -150,7 +150,8 @@ Useful platform metrics for this scenario:
 | `round_count`                     | Number of rounds                                                                                                                   |
 | `round_time_budget_seconds`             | Per-round customs inspection window (one character on the link channel = one simulated second)                                     |
 | `seed`                            | Controls case generation (containers, stacks, stations, pads, manifest decoys, per-round step count, per-step blocker rolls)        |
-| `channel_noise_level`             | Per-character drop probability on the link channel only (postmortem stays clean). In `[0.0, 1.0]`. Dropped chars become `_`        |
+| `channel_noise_level`             | Per-character drop probability on the link channel only (postmortem stays clean). In `[0.0, 1.0]`        |
+| `noise_replacement_mode`          | What each dropped char becomes: `mask` (default) → `_` (visible erasure); `random_letter` → a different random letter (unmarked substitution) |
 | `easy_round_numbers`              | Set of round numbers forced to a single-container delivery (warmup cases). Empty by default. Each round uses an independent per-round RNG, so this never shifts other rounds' cases under a fixed `seed`. |
 | `step_count_values`               | Candidate per-round delivery counts (e.g. `[1, 2, 3, 4, 5]`). Drawn per non-easy round against `step_count_weights`. Must be same non-empty length as `step_count_weights`; all values ≥ 1. |
 | `step_count_weights`              | Sampling weights paired positionally with `step_count_values` (e.g. `[20, 25, 20, 15, 15]`). All weights > 0. |

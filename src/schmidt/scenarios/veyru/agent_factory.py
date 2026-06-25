@@ -274,6 +274,7 @@ def build_agents(
                         "intern_takeover_round": knobs.intern_takeover_round,
                         "failure_motifs": FAILURE_MOTIFS,
                         "channel_noise_level": knobs.channel_noise_level,
+                        "noise_replacement_mode": knobs.noise_replacement_mode.value,
                     },
                 ),
                 channel_ids=d.channel_ids,

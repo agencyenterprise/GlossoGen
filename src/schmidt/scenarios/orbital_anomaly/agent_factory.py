@@ -125,6 +125,7 @@ def build_agents(
                         "channels": channel_entries,
                         "postmortem_enabled": postmortem_active,
                         "channel_noise_level": knobs.channel_noise_level,
+                        "noise_replacement_mode": knobs.noise_replacement_mode.value,
                         "fault_signatures": FAULT_SIGNATURES,
                     },
                 ),

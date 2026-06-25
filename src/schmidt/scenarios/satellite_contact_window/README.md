@@ -121,6 +121,7 @@ Configured via `knobs_default.json` (and any custom `--config` JSON file):
 | `postmortem_enabled` | true | Whether the postmortem channel opens between rounds. |
 | `postmortem_disabled_at_start` | false | Disable postmortem from round 1. |
 | `channel_noise_level` | 0.0 | Per-character drop probability on link. |
+| `noise_replacement_mode` | `mask` | What each dropped char becomes: `mask` → `_` (visible erasure); `random_letter` → a different random letter (unmarked substitution). |
 | `judge_model` / `judge_provider` | `claude-haiku-4-5-20251001` / `anthropic` | Command-sequence judge LLM (canonical). |
 | `max_round_duration_seconds` | 300 | Wall-clock cap per round. |
 | `model_overrides` | `{}` | Per-agent model/provider overrides. |

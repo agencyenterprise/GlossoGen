@@ -8,6 +8,7 @@ the LLM judge.
 from pydantic import model_validator
 
 from schmidt.scenarios.base_knobs import BaseKnobs
+from schmidt.scenarios.channel_noise import NoiseReplacementMode
 
 
 class WarehouseRobotRecoveryKnobs(BaseKnobs):
@@ -26,8 +27,11 @@ class WarehouseRobotRecoveryKnobs(BaseKnobs):
     count drawn from the catalog. ``channel_noise_level`` is the
     per-character drop probability applied to messages on the radio
     channel only (postmortem stays clean); at ``0.0`` the channel is
-    lossless, at ``1.0`` every character is dropped. Dropped characters
-    are replaced with ``_`` so agents can see where loss occurred.
+    lossless, at ``1.0`` every character is dropped.
+    ``noise_replacement_mode`` selects what each dropped character becomes:
+    ``mask`` replaces it with ``_`` (erasure channel), ``random_letter``
+    replaces it with a different random letter leaving no marker
+    (substitution channel).
     ``judge_model`` and ``judge_provider`` specify the LLM used to
     evaluate whether the floor associate's recovery action satisfies the
     eight round-success criteria.
@@ -43,6 +47,7 @@ class WarehouseRobotRecoveryKnobs(BaseKnobs):
     fault_count_min: int
     fault_count_max: int
     channel_noise_level: float
+    noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
 
     @model_validator(mode="after")
     def _validate_channel_noise_level(self) -> "WarehouseRobotRecoveryKnobs":

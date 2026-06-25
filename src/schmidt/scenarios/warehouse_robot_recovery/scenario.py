@@ -35,6 +35,7 @@ from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld
 from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
+from schmidt.scenarios.channel_noise import apply_character_noise
 from schmidt.scenarios.warehouse_robot_recovery.events import (
     WarehouseCaseStarted,
     WarehouseFaultRecovery,
@@ -236,6 +237,7 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
                             "postmortem_enabled": self._postmortem_active,
                             "robot_faults": ROBOT_FAULTS,
                             "channel_noise_level": self._knobs.channel_noise_level,
+                            "noise_replacement_mode": self._knobs.noise_replacement_mode.value,
                         },
                     ),
                     channel_ids=d.channel_ids,
@@ -467,10 +469,12 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
         _ = agent_id
         if channel_id != RADIO_CHANNEL_ID:
             return text
-        noise_level = self._knobs.channel_noise_level
-        if noise_level == 0.0:
-            return text
-        return "".join("_" if self._noise_rng.random() < noise_level else ch for ch in text)
+        return apply_character_noise(
+            text=text,
+            noise_level=self._knobs.channel_noise_level,
+            mode=self._knobs.noise_replacement_mode,
+            rng=self._noise_rng,
+        )
 
     def get_primary_channel_id(self) -> str | None:
         """Return the radio channel where the communication budget applies."""

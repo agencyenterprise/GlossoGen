@@ -49,6 +49,7 @@ from schmidt.models.event import SimulationEvent
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.runtime.scenario_world import ScenarioWorld
 from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
+from schmidt.scenarios.channel_noise import apply_character_noise
 from schmidt.scenarios.veyru.agent_factory import (
     build_agent_display_names,
     build_agents,
@@ -507,18 +508,20 @@ class VeyruScenario(SimulationScenario):
     def transform_outgoing_message(self, agent_id: str, channel_id: str, text: str) -> str:
         """Apply per-character drop noise to messages on link channels.
 
-        Postmortem and any other channels are returned unchanged. Dropped
-        characters are replaced with ``_`` so agents can see where loss
-        occurred. Sampling uses the scenario-owned seeded RNG for run
+        Postmortem and any other channels are returned unchanged. The
+        ``noise_replacement_mode`` knob selects what each dropped character
+        becomes; sampling uses the scenario-owned seeded RNG for run
         reproducibility.
         """
         _ = agent_id
         if channel_id not in LINK_CHANNEL_IDS:
             return text
-        noise_level = self._knobs.channel_noise_level
-        if noise_level == 0.0:
-            return text
-        return "".join("_" if self._noise_rng.random() < noise_level else ch for ch in text)
+        return apply_character_noise(
+            text=text,
+            noise_level=self._knobs.channel_noise_level,
+            mode=self._knobs.noise_replacement_mode,
+            rng=self._noise_rng,
+        )
 
     def get_primary_channel_id(self) -> str | None:
         """Return the comm link channel where budget constraints apply.
