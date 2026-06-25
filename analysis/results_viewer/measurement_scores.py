@@ -15,6 +15,7 @@ from analysis.results_viewer.run_catalog import EvaluatedRun
 PERPLEXITY_METRIC = "perplexity"
 ENGLISH_NGRAM_SURPRISAL_METRIC = "english_ngram_surprisal"
 MESSAGE_ENTROPY_METRIC = "message_entropy"
+GZIP_COMPRESSION_RATIO_METRIC = "gzip_compression_ratio"
 MCR_METRIC = "mean_chars_per_round"
 MCM_METRIC = "mean_chars_per_message"
 LANGUAGE_REPETITION_METRIC = "language_repetition"
@@ -60,6 +61,14 @@ def message_entropy_score(evaluated: EvaluatedRun) -> float | None:
     Lower means more repetitive/compressible (a model-free intrinsic measure).
     """
     return measurement_score(evaluated=evaluated, metric_name=MESSAGE_ENTROPY_METRIC)
+
+
+def gzip_compression_ratio_score(evaluated: EvaluatedRun) -> float | None:
+    """Mean per-message gzip compression ratio (compressed/original); ``None`` if unscored.
+
+    Lower means more compressible/repetitive (short messages are overhead-dominated).
+    """
+    return measurement_score(evaluated=evaluated, metric_name=GZIP_COMPRESSION_RATIO_METRIC)
 
 
 def mcr_score(evaluated: EvaluatedRun) -> float | None:

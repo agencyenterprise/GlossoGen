@@ -58,8 +58,9 @@ or a model on `round_success_fraction`.
 mean per-token surprisal, nats/gpt2), `english_ngram_surprisal` (run-wide mean per-char
 surprisal under an English char trigram, nats — higher = less English-like),
 `message_entropy` (run-wide mean within-message character Shannon entropy, bits/char —
-lower = more repetitive/compressible), `mcm` (run-wide mean chars per link message),
-`labels`.
+lower = more repetitive/compressible), `gzip_compression_ratio` (run-wide mean per-message
+gzip compressed/original — lower = more compressible; short messages overhead-dominated so
+the mean exceeds 1), `mcm` (run-wide mean chars per link message), `labels`.
 
 ### `message_level` — one row per link-channel message
 
@@ -86,6 +87,10 @@ Message columns:
 - `message_entropy` — per-message within-message character Shannon entropy (bits/char),
   recomputed at export time with the same method as the `message_entropy` metric. Lower =
   more repetitive/compressible (`LLLLLLL` → 0). Blank for empty messages.
+- `gzip_compression_ratio` — per-message gzip compressed/original size ratio, recomputed at
+  export time with the same method as the `gzip_compression_ratio` metric. Lower = more
+  compressible; gzip's ~18-byte overhead makes short messages exceed 1.0 (`LLLLLLL` → 3.29).
+  Blank for empty messages.
 
 Substage context (repeated across the substage's messages):
 

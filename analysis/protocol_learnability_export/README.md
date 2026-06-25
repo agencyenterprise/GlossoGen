@@ -80,23 +80,27 @@ Blank on baseline runs (they carry no swap manifest, so the metric is not emitte
 The baseline export's `run_level` columns — `run_id`, `scenario`, `field_observer_model`,
 `engineer_model`, `model_class`, `postmortem`, `round_time_budget_seconds`, `random_seed`,
 `total_rounds`, `round_success_count`, `perplexity`, `english_ngram_surprisal`,
-`message_entropy`, `mcm`, `labels` — plus the cohort columns `phase`, `src_id`,
-`observer_model`, `history`, `rounds_after_swap`, and `round_success_after_resume`.
-(`round_success_fraction` is dropped — it's just `round_success_count / total_rounds`.)
+`message_entropy`, `gzip_compression_ratio`, `mcm`, `labels` — plus the cohort columns
+`phase`, `src_id`, `observer_model`, `history`, `rounds_after_swap`, and
+`round_success_after_resume`. (`round_success_fraction` is dropped — it's just
+`round_success_count / total_rounds`.)
 
 `perplexity` (run-wide mean per-message surprisal, nats/gpt2), `english_ngram_surprisal`
 (run-wide mean per-message per-char surprisal under an English char trigram — higher = less
 English-like), `message_entropy` (run-wide mean within-message character Shannon entropy,
-bits/char — lower = more repetitive/compressible), and `mcm` (run-wide mean chars per link
-message) are rolled up from the per-message `message_level` scoring, since these runs carry
-no `perplexity` / `mcm` metric in their reports.
+bits/char — lower = more repetitive/compressible), `gzip_compression_ratio` (run-wide mean
+per-message gzip compressed/original — lower = more compressible; short messages
+overhead-dominated so the mean exceeds 1), and `mcm` (run-wide mean chars per link message)
+are rolled up from the per-message `message_level` scoring, since these runs carry no
+`perplexity` / `mcm` metric in their reports.
 
 ### `message_level` — one row per link-channel message
 
 The baseline export's `message_level` columns — sender role, `message_text`, `chars`,
 per-message gpt2 `perplexity`, per-message English-char-trigram `english_ngram_surprisal`
 (higher = less English-like), per-message `message_entropy` (within-message character Shannon
-entropy, bits/char; lower = more repetitive), substage ground truth (`substage`, `symptoms` / `actions`,
+entropy, bits/char; lower = more repetitive), per-message `gzip_compression_ratio` (gzip
+compressed/original; lower = more compressible; >1 for short messages), substage ground truth (`substage`, `symptoms` / `actions`,
 `substage_stabilized`), `message_index_in_substage`, and the round-level `success` (0/1
 whole-round outcome) / `note` — plus the cohort columns `phase`, `src_id`, `observer_model`.
 One row per link message across **every round each run played** (rounds 1–25 for derived
