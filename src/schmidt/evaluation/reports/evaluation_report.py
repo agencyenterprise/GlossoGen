@@ -71,12 +71,16 @@ def merge_measurements(
       different data.
     * Existing measurements whose metric_name was NOT attempted are
       preserved, so partial re-runs do not wipe unrelated results.
-    * Note that the new list may contain metric_names not in
-      ``attempted_metric_names`` (a base metric like ``round_success``
-      that emits ``round_success_team_a`` / ``round_success_team_b``);
-      those are appended like any other new entry.
+    * The new list may contain metric_names not in
+      ``attempted_metric_names`` — a base metric like ``round_success``
+      emits ``round_success_team_a`` / ``round_success_team_b``, and
+      ``dialog_retransmission`` emits ``dialog_count`` /
+      ``retransmission_request_count``. Existing measurements sharing any
+      of those emitted names are also dropped, so re-running such a metric
+      replaces its prior output instead of stacking duplicate copies.
     """
-    preserved = [m for m in existing if m.metric_name not in attempted_metric_names]
+    stale_names = attempted_metric_names | {m.metric_name for m in new}
+    preserved = [m for m in existing if m.metric_name not in stale_names]
     return preserved + new
 
 

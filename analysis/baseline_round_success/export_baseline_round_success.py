@@ -25,9 +25,9 @@ Four output tables:
   per-token surprisal), ``english_ngram_surprisal`` (overall mean per-char surprisal
   under an English char trigram; higher = less English-like), ``message_entropy`` (overall
   mean within-message character Shannon entropy in bits/char; lower = more
-  repetitive/compressible), ``gzip_compression_ratio`` (overall mean per-message gzip
-  compressed/original; lower = more compressible; short messages overhead-dominated so the
-  mean exceeds 1), and ``mcm`` (overall mean chars per message) from the report.
+  repetitive/compressible), ``gzip_compression_ratio`` (overall mean per-message raw-DEFLATE
+  compressed/original with the constant gzip framing excluded; lower = more
+  compressible/repetitive), and ``mcm`` (overall mean chars per message) from the report.
 - ``message_level`` — one row per link-channel message. Each row carries its substage
   context (``substage``, ``symptoms`` / ``actions``, ``substage_stabilized``),
   ``message_index_in_substage``, ``message_agent`` (sender role, normalized to
@@ -37,8 +37,8 @@ Four output tables:
   (per-message mean per-char surprisal under an English char trigram; higher = less
   English-like; blank for empty messages), ``message_entropy`` (per-message within-message
   character Shannon entropy in bits/char; lower = more repetitive; blank for empty
-  messages), ``gzip_compression_ratio`` (per-message gzip compressed/original; lower = more
-  compressible; >1 for short messages; blank for empty messages), and the round-level
+  messages), ``gzip_compression_ratio`` (per-message raw-DEFLATE compressed/original, gzip
+  framing excluded; lower = more compressible; blank for empty messages), and the round-level
   ``success`` (0/1 whole-round outcome) / ``note``. Messages are walked over the substages the
   team reached (``min(stabilized_stages + 1, total_stages)``); substages with no link
   traffic produce no rows.

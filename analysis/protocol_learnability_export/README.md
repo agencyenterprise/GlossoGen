@@ -81,8 +81,8 @@ The baseline export's `run_level` columns — `run_id`, `scenario`, `field_obser
 (run-wide mean per-message per-char surprisal under an English char trigram — higher = less
 English-like), `message_entropy` (run-wide mean within-message character Shannon entropy,
 bits/char — lower = more repetitive/compressible), `gzip_compression_ratio` (run-wide mean
-per-message gzip compressed/original — lower = more compressible; short messages
-overhead-dominated so the mean exceeds 1), and `mcm` (run-wide mean chars per link message)
+per-message raw-DEFLATE compressed/original with the constant gzip framing excluded — lower =
+more compressible/repetitive), and `mcm` (run-wide mean chars per link message)
 are rolled up from the per-message `message_level` scoring, since these runs carry no
 `perplexity` / `mcm` metric in their reports.
 
@@ -91,8 +91,8 @@ are rolled up from the per-message `message_level` scoring, since these runs car
 The baseline export's `message_level` columns — sender role, `message_text`, `chars`,
 per-message gpt2 `perplexity`, per-message English-char-trigram `english_ngram_surprisal`
 (higher = less English-like), per-message `message_entropy` (within-message character Shannon
-entropy, bits/char; lower = more repetitive), per-message `gzip_compression_ratio` (gzip
-compressed/original; lower = more compressible; >1 for short messages), substage ground truth (`substage`, `symptoms` / `actions`,
+entropy, bits/char; lower = more repetitive), per-message `gzip_compression_ratio` (raw-DEFLATE
+compressed/original, gzip framing excluded; lower = more compressible/repetitive), substage ground truth (`substage`, `symptoms` / `actions`,
 `substage_stabilized`), `message_index_in_substage`, and the round-level `success` (0/1
 whole-round outcome) / `note` — plus the cohort columns `phase`, `src_id`, `observer_model`.
 One row per link message across **every round each run played** (rounds 1–25 for derived

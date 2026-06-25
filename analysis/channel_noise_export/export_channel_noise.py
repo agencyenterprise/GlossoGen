@@ -28,8 +28,8 @@ Four output tables:
   headline ``perplexity`` (pristine), ``english_ngram_surprisal`` (pristine; English
   char trigram, higher = less English-like), ``message_entropy`` (pristine; within-message
   character Shannon entropy in bits/char, lower = more repetitive/compressible),
-  ``gzip_compression_ratio`` (pristine; per-message gzip compressed/original, lower = more
-  compressible; short messages are overhead-dominated so the mean exceeds 1),
+  ``gzip_compression_ratio`` (pristine; per-message raw-DEFLATE compressed/original with the
+  constant gzip framing excluded, lower = more compressible/repetitive),
   ``dialog_count`` and ``retransmission_request_count`` (LLM-judge ``dialog_retransmission``
   mean messages per round — clarification/coordination turns and requests to repeat/resend),
   ``mcm``, and ``repetition`` (the ``language_repetition`` mean redundancy factor — encodings

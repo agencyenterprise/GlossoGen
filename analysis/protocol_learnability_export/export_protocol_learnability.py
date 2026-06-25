@@ -33,8 +33,8 @@ their column sets differ):
   substage ground truth + per-message gpt2 ``perplexity``, English-char-trigram
   ``english_ngram_surprisal`` (higher = less English-like), ``message_entropy``
   (within-message character Shannon entropy, bits/char; lower = more repetitive), and
-  ``gzip_compression_ratio`` (per-message gzip compressed/original; lower = more
-  compressible; >1 for short messages).
+  ``gzip_compression_ratio`` (per-message raw-DEFLATE compressed/original, gzip framing
+  excluded; lower = more compressible/repetitive).
 - ``baseline_aggregate`` — one row per baseline (``src_id``), frontier columns
   ``expected`` / ``expected_no_pm`` / ``learned`` / ``cross_family`` (means/std/n) with
   ``delta = learned − expected_no_pm``, computed on ``round_success_after_resume``.
@@ -258,9 +258,9 @@ def _build_run_level_frame(
     ``english_ngram_surprisal`` (run-wide mean per-message per-char surprisal under an
     English char trigram; higher = less English-like), ``message_entropy`` (run-wide mean
     within-message character Shannon entropy, bits/char; lower = more
-    repetitive/compressible), ``gzip_compression_ratio`` (run-wide mean per-message gzip
-    compressed/original; lower = more compressible; short messages overhead-dominated so the
-    mean exceeds 1), and ``mcm`` (run-wide mean chars per link message) are rolled up from
+    repetitive/compressible), ``gzip_compression_ratio`` (run-wide mean per-message raw-DEFLATE
+    compressed/original with the constant gzip framing excluded; lower = more
+    compressible/repetitive), and ``mcm`` (run-wide mean chars per link message) are rolled up from
     the per-message ``message_level`` scoring, since these runs carry no ``perplexity`` /
     ``mcm`` metric in their reports.
     """

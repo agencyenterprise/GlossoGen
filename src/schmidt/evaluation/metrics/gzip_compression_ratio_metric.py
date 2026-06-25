@@ -1,18 +1,21 @@
-"""Gzip compression ratio metric: per-message gzip compressibility.
+"""Gzip compression ratio metric: per-message DEFLATE compressibility.
 
-Scores every primary-channel message by its gzip compression ratio
-(``len(gzip(text)) / len(text)`` in bytes, compressed/original) and reports the
-mean per round and overall. Model-free and deterministic — needs no language
-model or corpus, and does not consult the LLM provider.
+Scores every primary-channel message by its raw-DEFLATE compression ratio
+(``len(raw_deflate(text)) / len(text)`` in bytes, compressed/original) and reports
+the mean per round and overall. DEFLATE is gzip's codec; running it without the
+gzip wrapper removes the constant 18-byte header/footer that would otherwise
+inflate short-message ratios (see ``gzip_compression``). Model-free and
+deterministic — needs no language model or corpus, and does not consult the LLM
+provider.
 
-Lower means more compressible/repetitive: gzip exploits repeated substrings and
+Lower means more compressible/repetitive: DEFLATE exploits repeated substrings and
 codes, so a protocol that re-uses the same tokens compresses well. Complements
 ``message_entropy`` (per-character Shannon entropy) by capturing multi-character
 repetition. **Lower = more compressible/repetitive.**
 
-Caveat: gzip's ~18-byte fixed overhead makes the per-message ratio exceed 1.0 for
-short messages (compressed larger than original); the signal is meaningful in
-aggregate, not in individual short-message values.
+DEFLATE keeps a small per-stream overhead (block header + Huffman framing), so the
+very shortest or incompressible messages can read slightly above 1.0; the signal is
+most meaningful in aggregate.
 
 Scores the **pristine** text the sender composed (resolved via the ``message_id``
 link), not the channel-delivered text, so noise transforms do not contaminate it.
@@ -109,8 +112,8 @@ class GzipCompressionRatioMetric(Metric):
         summary = (
             f"{total_messages} messages on {primary_channel_id} across "
             f"{len(round_compressions)} rounds; mean per-message gzip compression ratio "
-            f"{overall_mean:.3f} compressed/original (lower = more compressible; short "
-            f"messages are overhead-dominated, ratio may exceed 1; "
+            f"{overall_mean:.3f} compressed/original (raw DEFLATE, gzip framing excluded; "
+            f"lower = more compressible/repetitive; "
             f"round-to-round std {overall_std:.3f})"
         )
 
