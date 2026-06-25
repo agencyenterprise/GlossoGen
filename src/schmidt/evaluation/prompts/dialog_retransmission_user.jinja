@@ -1,0 +1,38 @@
+You are analyzing the communication between agents in a multi-agent simulation across {{ rounds | length }} rounds. The agents talk over a budget-constrained PRIMARY CHANNEL, and over the run their protocol often evolves into terse, abbreviated, or coded shorthand. A single primary-channel message can therefore look cryptic on its own.
+
+Your job: for each round, count two kinds of PRIMARY-CHANNEL message — **dialog** and **retransmission requests** (defined below).
+
+DECODE BEFORE YOU CLASSIFY. A message's meaning is frequently NOT obvious from its surface text. Before classifying any round, use ALL of the context available to you to work out what the terse primary-channel messages actually mean:
+
+- **Other channels, especially the postmortem debriefs** (shown in each round's OTHER CHANNELS section): this is where agents explain, agree on, and refine their codes and shorthand. Treat it as the codebook.
+- **The full history of earlier rounds**: the protocol evolves, so the meaning of a token in a later round is often established in earlier rounds and postmortems.
+
+Only after decoding the intended meaning should you decide what each message is doing.
+
+DO NOT rely on surface cues like question marks. A coded protocol may express a question, a request to repeat, or an acknowledgement with no punctuation at all (e.g. a bare token, a repeated symbol, or a status marker). Classify by the *communicative intent* you decoded, not by how it is spelled.
+
+Definitions (count the NUMBER OF PRIMARY-CHANNEL MESSAGES per round that match):
+
+- **retransmission_request**: a message asking the partner to repeat or resend information that was lost, missing, or garbled — "say again", "resend the pressure value", "didn't catch last", or the protocol's coded equivalent (e.g. a marker that means "repeat last"). Count these in the retransmission bucket only.
+- **dialog**: clarification or coordination back-and-forth that is NOT transmitting new task data — asking for clarification, confirming or acknowledging receipt ("got it", "confirmed", or a coded ack), checking understanding, or coordinating whose turn it is. Do NOT count pure retransmission requests as dialog (they have their own bucket). Do NOT count messages that simply report new task information.
+
+Below are the per-round transcripts. Each round shows its PRIMARY CHANNEL messages and, separately, its OTHER CHANNELS messages (postmortem etc.) for context:
+
+{% for round in rounds %}
+--- ROUND {{ round.round_number }} ({{ round.message_count }} messages) ---
+{% if round.transcript %}
+{{ round.transcript }}
+{% else %}
+(No messages this round)
+{% endif %}
+{% endfor %}
+
+For EVERY round that has at least one dialog message or at least one retransmission request on the PRIMARY CHANNEL, return one entry in ``per_round_counts`` with:
+- ``round_number``
+- ``dialog_count`` — number of dialog messages that round (0 if none)
+- ``retransmission_request_count`` — number of retransmission-request messages that round (0 if none)
+- ``evidence`` — brief quoted fragments and, where the message was coded, what you decoded it to mean
+
+Omit rounds where both counts are 0. Then give a brief overall ``explanation`` of how you decoded the protocol and what you counted.
+
+Submit your assessment using the provided tool.

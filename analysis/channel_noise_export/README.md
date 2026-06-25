@@ -76,8 +76,10 @@ text** — higher = less English-like), `message_entropy` (run-wide mean within-
 character Shannon entropy, bits/char, **pristine text** — lower = more
 repetitive/compressible), `gzip_compression_ratio` (run-wide mean per-message gzip
 compressed/original, **pristine text** — lower = more compressible; short messages are
-overhead-dominated so the mean exceeds 1), `mcm` (run-wide mean chars per link message —
-length is preserved under character-drop noise), `labels`.
+overhead-dominated so the mean exceeds 1), `dialog_count` / `retransmission_request_count`
+(run-wide mean per round from the LLM-judge `dialog_retransmission` metric — clarification/
+coordination turns, and requests to repeat/resend lost or garbled info), `mcm` (run-wide mean
+chars per link message — length is preserved under character-drop noise), `labels`.
 
 ### `message_level` — one row per link-channel message
 
@@ -138,6 +140,12 @@ message row. Join to `message_level` on `run_id` + `round_number`. (Briefings ar
 `injection_delivered` events, not link traffic, so they are never noise-corrupted.)
 
 - `run_id`, `round_number` — join keys.
+- `round_success` — 1/0 whole-round outcome; `repetition_factor` — the round's
+  `language_repetition` redundancy factor.
+- `dialog_count` / `retransmission_request_count` — per-round counts from the LLM-judge
+  `dialog_retransmission` metric (clarification/coordination turns, and requests to
+  repeat/resend). Blank when the run wasn't scored; `0` for a judged round with no
+  occurrences.
 - `field_observer_round_event` / `engineer_round_event` — the `--- NEW VEYRU ---`
   briefing each agent received at round start.
 

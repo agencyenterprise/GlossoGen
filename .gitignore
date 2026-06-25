@@ -174,3 +174,11 @@ cython_debug/
 
 # Generated analysis exports (regenerate via the export scripts)
 /analysis/baseline_round_success/output/
+/analysis/protocol_learnability_export/output/
+/analysis/channel_noise_export/output/
+
+# Google Sheets sync: pre-write tab snapshots + service-account credentials
+/analysis/sheets_sync/backups/
+secrets/
+*gcp_service_account*.json
+*service-account*.json
