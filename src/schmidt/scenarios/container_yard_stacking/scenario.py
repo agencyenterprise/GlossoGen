@@ -50,6 +50,7 @@ from schmidt.models.event import SimulationEvent
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.runtime.scenario_world import ScenarioWorld
 from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
+from schmidt.scenarios.channel_noise import apply_character_noise
 from schmidt.scenarios.container_yard_stacking.agent_factory import (
     build_agent_display_names,
     build_agents,
@@ -447,16 +448,12 @@ class ContainerYardStackingScenario(SimulationScenario):
         _ = agent_id
         if channel_id != LINK_CHANNEL_ID:
             return text
-        noise_level = self._knobs.channel_noise_level
-        if noise_level == 0.0:
-            return text
-        chars: list[str] = []
-        for ch in text:
-            if self._noise_rng.random() < noise_level:
-                chars.append("_")
-            else:
-                chars.append(ch)
-        return "".join(chars)
+        return apply_character_noise(
+            text=text,
+            noise_level=self._knobs.channel_noise_level,
+            mode=self._knobs.noise_replacement_mode,
+            rng=self._noise_rng,
+        )
 
     def get_primary_channel_id(self) -> str | None:
         """Return the link channel where the communication budget applies."""

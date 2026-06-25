@@ -269,7 +269,8 @@ Failure auditing: every non-zero exit row in `STATUS_LOG` corresponds to a `/tmp
 | `intern_enabled` | Opt-in toggle for the single-team intern observer mode (see below). When false, `intern_join_round` and `intern_takeover_round` must be null |
 | `intern_join_round` | Round at which the intern silently joins the comm link (must be less than `intern_takeover_round`) |
 | `intern_takeover_round` | Round at which the intern replaces the field observer (must be ≤ `round_count`) |
-| `channel_noise_level` | Per-character drop probability on the link channel(s) only (postmortem stays clean). Must be in `[0.0, 1.0]`. At `0.0` the channel is lossless; dropped characters are replaced with `_`. When > 0, agents receive a system-prompt note that the link is lossy |
+| `channel_noise_level` | Per-character drop probability on the link channel(s) only (postmortem stays clean). Must be in `[0.0, 1.0]`. At `0.0` the channel is lossless. When > 0, agents receive a system-prompt note that the link is lossy |
+| `noise_replacement_mode` | What each dropped character becomes: `mask` (default) replaces it with `_` so loss is visible (erasure channel); `random_letter` replaces it with a different random letter, leaving no marker (substitution channel). The agent system-prompt note describes whichever mode is active |
 | `scheduled_events` | Platform knob (on `BaseKnobs`) for in-run agent swaps and runtime toggles fired at round boundaries. Each entry is a `swap_agent` (replaces one agent's seat with a fresh instance + reconstructed history) or `set_postmortem` (toggles postmortem mid-run via `disable_postmortem_globally`). See "Multi-Phase Protocol Transmission" below |
 
 ## Two-Team Mode (opt-in)

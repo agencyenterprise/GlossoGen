@@ -10,6 +10,7 @@ from typing import Self
 from pydantic import model_validator
 
 from schmidt.scenarios.base_knobs import BaseKnobs
+from schmidt.scenarios.channel_noise import NoiseReplacementMode
 
 
 class OrbitalAnomalyKnobs(BaseKnobs):
@@ -19,7 +20,10 @@ class OrbitalAnomalyKnobs(BaseKnobs):
     comm loop: every character sent costs one simulated second, and the
     anomaly is lost when the running total exceeds the budget.
     ``channel_noise_level`` is the per-character drop probability on the
-    comm loop. ``cipher_enabled`` toggles the per-round secret rotation that
+    comm loop. ``noise_replacement_mode`` selects what each dropped character
+    becomes: ``mask`` replaces it with ``_`` (erasure channel),
+    ``random_letter`` replaces it with a different random letter leaving no
+    marker (substitution channel). ``cipher_enabled`` toggles the per-round secret rotation that
     maps each fault to a different fault's procedure template; when false the
     offset is forced to zero so every fault maps to its own (coherent)
     procedure. ``easy_round_numbers`` lists round numbers forced to a single
@@ -37,6 +41,7 @@ class OrbitalAnomalyKnobs(BaseKnobs):
     round_time_budget_seconds: int  # pyright: ignore[reportIncompatibleVariableOverride]
     seed: int
     channel_noise_level: float
+    noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     cipher_enabled: bool
     easy_round_numbers: frozenset[int]
     fault_count_values: list[int]

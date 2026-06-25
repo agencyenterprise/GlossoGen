@@ -215,6 +215,7 @@ def build_agents(
                         ),
                         "postmortem_enabled": postmortem_initially_active,
                         "channel_noise_level": knobs.channel_noise_level,
+                        "noise_replacement_mode": knobs.noise_replacement_mode.value,
                         "intern_join_round": knobs.intern_join_round,
                         "intern_takeover_round": knobs.intern_takeover_round,
                     },

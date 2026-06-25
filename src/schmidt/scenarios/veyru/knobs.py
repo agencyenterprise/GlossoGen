@@ -9,6 +9,7 @@ the LLM judge.
 from pydantic import model_validator
 
 from schmidt.scenarios.base_knobs import BaseKnobs
+from schmidt.scenarios.channel_noise import NoiseReplacementMode
 
 
 class VeyruKnobs(BaseKnobs):
@@ -43,8 +44,10 @@ class VeyruKnobs(BaseKnobs):
     ``channel_noise_level`` is the per-character drop probability applied
     to messages on the link channel(s) only (postmortem stays clean). At
     ``0.0`` the channel is lossless (current behavior); at ``1.0`` every
-    character is dropped. Dropped characters are replaced with ``_`` so
-    agents can see where loss occurred.
+    character is dropped. ``noise_replacement_mode`` selects what each
+    dropped character becomes: ``mask`` replaces it with ``_`` so agents can
+    see where loss occurred (erasure channel), ``random_letter`` replaces it
+    with a different random letter leaving no marker (substitution channel).
     ``easy_round_numbers`` is the set of round numbers forced to a single
     priority-<=2 failure motif (single-stage warmup cases). Every other
     round draws 1-5 motifs from the full pool. Set to an empty list to
@@ -66,6 +69,7 @@ class VeyruKnobs(BaseKnobs):
     intern_join_round: int | None
     intern_takeover_round: int | None
     channel_noise_level: float
+    noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     easy_round_numbers: frozenset[int]
 
     @model_validator(mode="after")

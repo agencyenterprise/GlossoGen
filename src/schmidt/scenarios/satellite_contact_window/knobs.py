@@ -8,6 +8,7 @@ and the LLM judge.
 from pydantic import model_validator
 
 from schmidt.scenarios.base_knobs import BaseKnobs
+from schmidt.scenarios.channel_noise import NoiseReplacementMode
 
 
 class SatelliteContactWindowKnobs(BaseKnobs):
@@ -27,8 +28,10 @@ class SatelliteContactWindowKnobs(BaseKnobs):
     from the catalog. ``channel_noise_level`` is the per-character drop
     probability applied to messages on the ``link`` channel only (postmortem
     stays clean); at ``0.0`` the channel is lossless, at ``1.0`` every
-    character is dropped. Dropped characters are replaced with ``_`` so
-    agents can see where loss occurred. ``judge_model`` and ``judge_provider``
+    character is dropped. ``noise_replacement_mode`` selects what each dropped
+    character becomes: ``mask`` replaces it with ``_`` (erasure channel),
+    ``random_letter`` replaces it with a different random letter leaving no
+    marker (substitution channel). ``judge_model`` and ``judge_provider``
     specify the LLM used to evaluate whether the operator's submitted command
     sequence satisfies the round-success criteria.
     """
@@ -43,6 +46,7 @@ class SatelliteContactWindowKnobs(BaseKnobs):
     pattern_count_min: int
     pattern_count_max: int
     channel_noise_level: float
+    noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
 
     @model_validator(mode="after")
     def _validate_channel_noise_level(self) -> "SatelliteContactWindowKnobs":

@@ -14,6 +14,7 @@ from typing import Self
 from pydantic import model_validator
 
 from schmidt.scenarios.base_knobs import BaseKnobs
+from schmidt.scenarios.channel_noise import NoiseReplacementMode
 
 
 class ContainerYardStackingKnobs(BaseKnobs):
@@ -23,7 +24,10 @@ class ContainerYardStackingKnobs(BaseKnobs):
     link channel: every character sent costs one simulated second, and the
     round fails when the running total reaches the budget.
     ``channel_noise_level`` is the per-character drop probability on the
-    link channel.
+    link channel. ``noise_replacement_mode`` selects what each dropped
+    character becomes: ``mask`` replaces it with ``_`` (erasure channel),
+    ``random_letter`` replaces it with a different random letter leaving no
+    marker (substitution channel).
 
     Two-team mode runs two isolated teams (yard / planner / crane on
     ``link_a`` / ``link_b``) on identical cases each round.
@@ -56,6 +60,7 @@ class ContainerYardStackingKnobs(BaseKnobs):
     round_time_budget_seconds: int  # pyright: ignore[reportIncompatibleVariableOverride]
     seed: int
     channel_noise_level: float
+    noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     easy_round_numbers: frozenset[int]
     step_count_values: list[int]
     step_count_weights: list[int]
