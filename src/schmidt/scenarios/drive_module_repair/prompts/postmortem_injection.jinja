@@ -1,0 +1,5 @@
+--- ROUND {{ round_number }} DISCUSSION PHASE ---
+{% if previous_outcome is not none %}
+Result: {% if previous_outcome.round_succeeded %}REPAIRED — {{ previous_outcome.replacements_done }}/{{ previous_outcome.replacement_count }} components replaced ({{ previous_outcome.characters_used }} chars / {{ previous_outcome.round_time_budget_seconds }}s window){% else %}FAILED — {{ previous_outcome.failure_reason }} ({{ previous_outcome.replacements_done }}/{{ previous_outcome.replacement_count }} done; {{ previous_outcome.characters_used }} chars / {{ previous_outcome.round_time_budget_seconds }}s window){% endif %}
+{% endif %}
+The "team discussion" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds.

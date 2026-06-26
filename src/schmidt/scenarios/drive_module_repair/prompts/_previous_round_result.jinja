@@ -1,0 +1,4 @@
+{% if previous_outcome is not none %}
+--- PREVIOUS ROUND RESULT ---
+Round {{ round_number - 1 }}: {% if previous_outcome.round_succeeded %}REPAIRED — {{ previous_outcome.replacements_done }}/{{ previous_outcome.replacement_count }} components replaced ({{ previous_outcome.characters_used }} chars / {{ previous_outcome.round_time_budget_seconds }}s window){% elif previous_outcome.budget_exceeded %}FAILED — service window exhausted ({{ previous_outcome.characters_used }} chars, window was {{ previous_outcome.round_time_budget_seconds }}s); {{ previous_outcome.replacements_done }}/{{ previous_outcome.replacement_count }} done{% else %}FAILED — {{ previous_outcome.failure_reason }} ({{ previous_outcome.replacements_done }}/{{ previous_outcome.replacement_count }} done){% endif %}
+{% endif %}
