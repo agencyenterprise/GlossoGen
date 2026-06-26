@@ -20,6 +20,7 @@ from schmidt.scenarios.hospital_bed_assignment_privacy.scenario import (
 from schmidt.scenarios.orbital_anomaly.scenario import OrbitalAnomalyScenario
 from schmidt.scenarios.salon.scenario import SalonScenario
 from schmidt.scenarios.satellite_contact_window.scenario import SatelliteContactWindowScenario
+from schmidt.scenarios.spillway_release.scenario import SpillwayReleaseScenario
 from schmidt.scenarios.surprise_party.scenario import SurprisePartyScenario
 from schmidt.scenarios.veyru.scenario import VeyruScenario
 from schmidt.scenarios.warehouse_robot_recovery.scenario import WarehouseRobotRecoveryScenario
@@ -31,6 +32,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "orbital_anomaly": OrbitalAnomalyScenario,
     "salon": SalonScenario,
     "satellite_contact_window": SatelliteContactWindowScenario,
+    "spillway_release": SpillwayReleaseScenario,
     "surprise_party": SurprisePartyScenario,
     "veyru": VeyruScenario,
     "warehouse_robot_recovery": WarehouseRobotRecoveryScenario,

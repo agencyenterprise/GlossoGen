@@ -1,0 +1,6 @@
+--- ROUND {{ round_number }} DISCUSSION PHASE ---
+{% if previous_outcome is not none %}
+Result: {% if previous_outcome.round_succeeded %}SUCCESS — reservoir ended at {{ previous_outcome.end_level | round | int }}% with no one harmed ({{ previous_outcome.characters_used }} chars / {{ previous_outcome.round_time_budget_seconds }}s window){% else %}FAILED — {{ previous_outcome.failure_reason }} ({{ previous_outcome.characters_used }} chars / {{ previous_outcome.round_time_budget_seconds }}s window){% endif %}
+Round detail: started at {{ previous_outcome.start_level }}%, inflow +{{ previous_outcome.inflow }}%, released {{ previous_outcome.release_total | round | int }}% over {{ previous_outcome.release_duration_hours }}h with {{ previous_outcome.gates_opened }} gate(s); park {% if previous_outcome.park_secured %}secured{% elif previous_outcome.evacuated %}evacuated{% else %}left as-is{% endif %}.
+{% endif %}
+The "team discussion" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds.

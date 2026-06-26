@@ -1,0 +1,10 @@
+{% include "_previous_round_result.jinja" %}
+{% if current_case is not none %}
+--- WEATHER FORECAST ---
+Round {{ round_number }} — current time {{ current_time_label }} (operating day ends {{ day_end_label }})
+Coordination window: {{ current_case.round_time_budget_seconds }}s (one character on the ops channel = one second; shared across all three of you)
+
+Forecast: {{ current_case.forecast_conditions }}
+Inflow this round: +{{ current_case.inflow }}% of reservoir capacity.
+You do not know the reservoir level or the park schedule — the dam operator and park ranger do.
+{% endif %}

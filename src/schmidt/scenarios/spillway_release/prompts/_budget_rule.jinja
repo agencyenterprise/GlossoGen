@@ -1,0 +1,3 @@
+CRITICAL RULE — COORDINATION TIME COSTS SECONDS:
+You coordinate over the ops channel, but the inflow is rising and decisions cannot wait: every character sent on the ops channel costs one second of a fixed per-round coordination window. If the total characters sent by all three of you exceed that window, the round fails before anything is decided. Keep messages short.
+{% include "_unreliable_channel.jinja" %}
