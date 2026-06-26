@@ -1242,8 +1242,7 @@ function ToolOrNotification({ entry }: { entry: DisplayEntry }) {
       arguments={entry.tool_arguments}
       result={entry.tool_result}
       stabilizeMetadata={entry.stabilize_metadata}
-      truckMetadata={entry.truck_metadata}
-      craneMetadata={entry.crane_metadata}
+      moveMetadata={entry.move_metadata}
     />
   );
 }

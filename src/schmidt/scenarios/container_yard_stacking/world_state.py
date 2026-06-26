@@ -1,45 +1,33 @@
 """Mutable per-team state and immutable outcome types for the yard world.
 
 The world holds one ``TeamState`` per team (solo mode keeps one; two-team
-mode keeps two). Each ``TeamState`` carries the live truck positions,
-current step bookkeeping, and the rolling list of finished ``YardOutcome``
-entries. Truck commit and crane move judging modules mutate these fields;
+mode keeps two). Each ``TeamState`` carries the live yard row, how many
+batch containers have been placed, and the rolling list of finished
+``YardOutcome`` entries. The move-judging module mutates these fields;
 ``ContainerYardWorld`` owns the lifecycle (reset, finalize, mark outcome).
 """
 
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-
-class TruckState(NamedTuple):
-    """Live per-step position and contents of one truck."""
-
-    truck_role: str
-    arrived: bool
-    station_name: str
-    pad: str
-    container_id: str
+from schmidt.scenarios.container_yard_stacking.container_attributes import Container
 
 
-class TruckCommitResult(NamedTuple):
-    """Outcome of a single ``record_truck_commit`` call."""
+class MoveResult(NamedTuple):
+    """Outcome of a single ``record_move`` call."""
 
-    truck_role: str
     accepted: bool
-    duplicate: bool
+    soft_rejected: bool
 
 
 class StepOutcome(NamedTuple):
-    """One step's recorded outcome within a completed round."""
+    """One batch container's recorded outcome within a completed round."""
 
     step_index: int
-    incoming_container_id: str
-    target_position_text: str
+    container_summary: str
+    intake_slot: int
+    target_slot: int
     succeeded: bool
-    expected_move_count: int
-    accepted_move_count: int
-    expected_truck_count: int
-    correctly_committed_truck_count: int
 
 
 class YardOutcome(NamedTuple):
@@ -50,10 +38,6 @@ class YardOutcome(NamedTuple):
     step_count: int
     steps_succeeded: int
     step_outcomes: tuple[StepOutcome, ...]
-    total_expected_move_count: int
-    total_accepted_move_count: int
-    total_expected_truck_count: int
-    total_correctly_committed_truck_count: int
     budget_exceeded: bool
     characters_used: int
     round_time_budget_seconds: int
@@ -68,22 +52,13 @@ class TeamState:
 
     team_id: str
     link_channel_id: str
-    yard_operator_id: str
     current_round_characters: int = 0
     round_budget_exceeded: bool = False
     notified_thresholds: set[str] = field(default_factory=set[str])
     outcomes: list[YardOutcome] = field(default_factory=list[YardOutcome])
-    current_stacks: dict[int, list[str]] = field(default_factory=dict[int, list[str]])
-    truck_states: dict[str, TruckState] = field(default_factory=dict[str, TruckState])
+    current_row: dict[int, Container | None] = field(default_factory=dict[int, "Container | None"])
     round_failed_terminally: bool = False
     failure_reason: str = ""
     round_outcome_marked: bool = False
-    current_step_index: int = 0
-    step_accepted_move_count: int = 0
-    step_correctly_committed_truck_count: int = 0
+    placed_count: int = 0
     step_outcomes: list[StepOutcome] = field(default_factory=list[StepOutcome])
-
-
-def stack_position_text(stack: int, tier: int) -> str:
-    """Return the canonical ``Stack S, Tier T`` position string."""
-    return f"Stack {stack}, Tier {tier}"

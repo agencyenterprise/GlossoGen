@@ -5,11 +5,13 @@ export type ContainerYardMode = "single" | "swap" | "intern";
 export type ContainerYardKnobsState = {
   mode: ContainerYardMode;
   round_count: number;
-  time_budget_seconds: number;
+  round_time_budget_seconds: number;
   seed: number;
   postmortem_enabled: boolean;
   postmortem_disabled_at_start: boolean;
   max_round_duration_seconds: number;
+  yard_slot_count: number;
+  batch_size: number;
   swap_round: number | null;
   announce_swap: boolean;
   postmortem_after_swap: boolean;
@@ -44,6 +46,15 @@ function coerceBool(value: unknown, fallback: boolean): boolean {
   return fallback;
 }
 
+// The form exposes a single fixed batch size; the backend takes a
+// distribution, so a one-element distribution round-trips as that fixed size.
+function coerceBatchSize(value: unknown): number {
+  if (Array.isArray(value) && value.length > 0 && typeof value[0] === "number") {
+    return value[0];
+  }
+  return 8;
+}
+
 export function detectMode(knobs: Record<string, unknown>): ContainerYardMode {
   if (coerceBool(knobs.intern_enabled, false)) {
     return "intern";
@@ -58,11 +69,13 @@ export function knobsToState(knobs: Record<string, unknown>): ContainerYardKnobs
   return {
     mode: detectMode(knobs),
     round_count: coerceNumber(knobs.round_count, 15),
-    time_budget_seconds: coerceNumber(knobs.time_budget_seconds, 200),
+    round_time_budget_seconds: coerceNumber(knobs.round_time_budget_seconds, 200),
     seed: coerceNumber(knobs.seed, 42),
     postmortem_enabled: coerceBool(knobs.postmortem_enabled, true),
     postmortem_disabled_at_start: coerceBool(knobs.postmortem_disabled_at_start, false),
     max_round_duration_seconds: coerceNumber(knobs.max_round_duration_seconds, 300),
+    yard_slot_count: coerceNumber(knobs.yard_slot_count, 24),
+    batch_size: coerceBatchSize(knobs.batch_size_values),
     swap_round: coerceNullableNumber(knobs.swap_round),
     announce_swap: coerceBool(knobs.announce_swap, false),
     postmortem_after_swap: coerceBool(knobs.postmortem_after_swap, true),
@@ -83,10 +96,19 @@ export function validateState(state: ContainerYardKnobsState): ContainerYardFiel
       message: "Round duration must be at least 1 second.",
     });
   }
-  if (state.time_budget_seconds < 1) {
+  if (state.round_time_budget_seconds < 1) {
     errors.push({
-      field: "time_budget_seconds",
+      field: "round_time_budget_seconds",
       message: "Round time budget must be at least 1 second.",
+    });
+  }
+  if (state.batch_size < 1) {
+    errors.push({ field: "batch_size", message: "Batch size must be at least 1." });
+  }
+  if (state.yard_slot_count < 2 * state.batch_size + 2) {
+    errors.push({
+      field: "yard_slot_count",
+      message: `Yard slot count must be at least ${2 * state.batch_size + 2} (2 × batch size + 2).`,
     });
   }
   if (state.channel_noise_level < 0 || state.channel_noise_level > 1) {
@@ -176,6 +198,8 @@ export function buildPayload({
 
   return {
     announce_swap: state.announce_swap,
+    batch_size_values: [state.batch_size],
+    batch_size_weights: [1],
     channel_noise_level: state.channel_noise_level,
     intern_enabled: internEnabled,
     intern_join_round: internJoinRound,
@@ -186,9 +210,10 @@ export function buildPayload({
     postmortem_disabled_at_start: state.postmortem_disabled_at_start,
     postmortem_enabled: state.postmortem_enabled,
     round_count: state.round_count,
+    round_time_budget_seconds: state.round_time_budget_seconds,
     seed: state.seed,
     swap_round: swapRound,
-    time_budget_seconds: state.time_budget_seconds,
     two_teams: twoTeams,
+    yard_slot_count: state.yard_slot_count,
   };
 }

@@ -151,18 +151,48 @@ function SharedSection({
       <NumberInput
         label="Round time budget"
         description="Per-round character budget on the link channel. One character = one simulated second."
-        value={state.time_budget_seconds}
+        value={state.round_time_budget_seconds}
         onChange={next =>
           onChange({
             ...state,
-            time_budget_seconds: next === null ? state.time_budget_seconds : next,
+            round_time_budget_seconds: next === null ? state.round_time_budget_seconds : next,
           })
         }
         min={1}
         max={null}
         step={1}
         unit="seconds"
-        error={getFieldError({ errors, field: "time_budget_seconds" })}
+        error={getFieldError({ errors, field: "round_time_budget_seconds" })}
+        nullable={false}
+        disabled={false}
+      />
+      <NumberInput
+        label="Batch size"
+        description="Number of inbound containers to sort each round. More containers raise the per-round message entropy, so the budget binds harder."
+        value={state.batch_size}
+        onChange={next =>
+          onChange({ ...state, batch_size: next === null ? state.batch_size : next })
+        }
+        min={1}
+        max={null}
+        step={1}
+        unit="containers"
+        error={getFieldError({ errors, field: "batch_size" })}
+        nullable={false}
+        disabled={false}
+      />
+      <NumberInput
+        label="Yard slot count"
+        description="Number of slots in the yard. Must hold the batch plus its target bays (≥ 2 × batch size + 2)."
+        value={state.yard_slot_count}
+        onChange={next =>
+          onChange({ ...state, yard_slot_count: next === null ? state.yard_slot_count : next })
+        }
+        min={4}
+        max={null}
+        step={1}
+        unit="slots"
+        error={getFieldError({ errors, field: "yard_slot_count" })}
         nullable={false}
         disabled={false}
       />

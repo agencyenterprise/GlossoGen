@@ -1,13 +1,10 @@
 {% include "_previous_round_result.jinja" %}
 {% if current_case is not none %}
---- NEW MANIFEST + LAYOUT ---
+--- STOWAGE ASSIGNMENT ---
 Round {{ round_number }}
 Inspection window: {{ current_case.round_time_budget_seconds }}s before the customs slot is missed (one character = one second; total across all three of you)
 
-CURRENT STACK LAYOUT (each stack listed bottom-to-top):
-{% for stack_index, contents in current_case.initial_stacks.items() %}- Stack {{ stack_index }}: {% if contents | length == 0 %}empty{% else %}{% for cid in contents %}Tier {{ loop.index }} = {{ cid }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}
-{% endfor %}
-SHIFT MANIFEST (scheduled inbound containers and their target slots):
-{% for entry in current_case.manifest %}- {{ entry.container_id }} → Stack {{ entry.target_position.stack }}, Tier {{ entry.target_position.tier }}
+ASSIGNMENT (container attributes → target bay):
+{% for attrs, slot in planner_lines %}- {{ attrs }} → bay {{ slot }}
 {% endfor %}
 {% endif %}

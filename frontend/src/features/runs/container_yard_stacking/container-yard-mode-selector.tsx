@@ -15,7 +15,7 @@ const MODE_CARDS: ModeCard[] = [
   {
     mode: "single",
     title: "Single team",
-    description: "One yard operator, logistics planner, and crane operator work all rounds.",
+    description: "One yard spotter, logistics planner, and crane operator work all rounds.",
     icon: Users,
   },
   {

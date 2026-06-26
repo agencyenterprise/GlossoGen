@@ -7,6 +7,7 @@ role, gate the intern's lifecycle (silent observation → takeover), and
 hand variables to the renderer.
 """
 
+from schmidt.scenarios.container_yard_stacking.case_rendering import render_container
 from schmidt.scenarios.container_yard_stacking.ids import (
     CRANE_OPERATOR_INJECTION_TEMPLATE,
     INTERN_ID,
@@ -42,11 +43,26 @@ def render_round_injection(
         return None
     template_name = _injection_template_for_role(role_kind=role_kind)
     team_id = team_id_for_agent(agent_id=agent_id)
+    spotter_lines = [
+        (render_container(container=step.container), step.intake_slot)
+        for step in sorted(case.steps, key=lambda s: s.intake_slot)
+    ]
+    planner_lines = [
+        (render_container(container=step.container), step.target_slot)
+        for step in sorted(case.steps, key=lambda s: s.target_slot)
+    ]
+    crane_occupancy = [
+        (slot, "FULL" if case.initial_row[slot] is not None else "EMPTY")
+        for slot in range(1, case.yard_slot_count + 1)
+    ]
     rendered = renderer.render(
         template_name=template_name,
         template_variables={
             "round_number": round_number,
             "current_case": case,
+            "spotter_lines": spotter_lines,
+            "planner_lines": planner_lines,
+            "crane_occupancy": crane_occupancy,
             "previous_outcome": previous_outcome,
             "knobs": knobs,
             "team_id": team_id,

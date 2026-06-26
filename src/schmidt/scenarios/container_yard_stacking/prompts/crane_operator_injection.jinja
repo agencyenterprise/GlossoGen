@@ -1,10 +1,10 @@
 {% include "_previous_round_result.jinja" %}
 {% if current_case is not none %}
---- CRANE READY ---
+--- YARD OCCUPANCY ---
 Round {{ round_number }}
 Inspection window: {{ current_case.round_time_budget_seconds }}s before the customs slot is missed (one character = one second; total across all three of you)
 
-ACTIVE CRANE STATIONS:
-{% for station in current_case.active_crane_stations %}- {{ station.station_name }} (pads: {{ station.pads | join(', ') }}) — can reach stacks: {{ station.reachable_stacks | join(', ') }}
+SLOTS (you cannot read container attributes from the cab):
+{% for slot, status in crane_occupancy %}- Slot {{ slot }}: {{ status }}
 {% endfor %}
 {% endif %}
