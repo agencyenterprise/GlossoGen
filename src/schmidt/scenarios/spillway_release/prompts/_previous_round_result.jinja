@@ -1,0 +1,4 @@
+{% if previous_outcome is not none %}
+--- PREVIOUS ROUND RESULT ---
+Round {{ round_number - 1 }}: {% if previous_outcome.round_succeeded %}SUCCESS — reservoir ended at {{ previous_outcome.end_level | round | int }}%, no one harmed{% else %}FAILED — {{ previous_outcome.failure_reason }}{% endif %}
+{% endif %}

@@ -1,0 +1,9 @@
+{% include "_previous_round_result.jinja" %}
+{% if current_case is not none %}
+--- PARK SCHEDULE ---
+Round {{ round_number }} — current time {{ current_time_label }} (operating day ends {{ day_end_label }})
+Coordination window: {{ current_case.round_time_budget_seconds }}s (one character on the ops channel = one second; shared across all three of you)
+
+{{ park_status_label }}
+You do not know the reservoir level or the inflow — the dam operator and civil defense do.
+{% endif %}

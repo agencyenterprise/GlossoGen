@@ -1,0 +1,15 @@
+HOW THE RESERVOIR WORKS (the same for all three of you):
+- The reservoir level is a percentage of capacity. The dam COLLAPSES if the level exceeds {{ max_level }}%. The water supply FAILS if the level drops below {{ min_level }}%. At the end of the round the level must be within [{{ min_level }}%, {{ max_level }}%].
+- Rain adds inflow (raises the level); opening spillway gates sheds water (lowers it). There are {{ gate_count }} identical gates; each open gate sheds {{ release_per_gate_per_hour }}% of capacity per hour. Total shed this round = (gates opened) x {{ release_per_gate_per_hour }} x (hours open).
+- Opening gates sends water down the river past a hiking park. While that park is OPEN to visitors, ANY gate release endangers them. A release is safe for visitors only if ONE of these holds: it finishes BEFORE the park opens; the park ranger keeps the park closed; or civil defense evacuates the downstream area.
+
+WHO KNOWS WHAT (you each hold one piece and must share it):
+- Dam operator: the current reservoir level; controls the gates.
+- Civil defense: the weather forecast and the exact inflow; can evacuate.
+- Park ranger: the park's opening time, visitor count, and whether it can be closed today; can close the park.
+
+A ROUND SUCCEEDS ONLY IF ALL OF THESE HOLD:
+1. The reservoir ends within [{{ min_level }}%, {{ max_level }}%] (too little release collapses the dam; too much drains the supply).
+2. No gate release reached an occupied park that was not cleared.
+3. The park was NOT closed needlessly — close it only when a release would otherwise endanger visitors.
+4. An evacuation was NOT ordered needlessly — evacuate only when a release must overlap an occupied park that CANNOT be closed (a committed-event day). If the park can be closed, closing it is the right tool; evacuating instead fails the round.

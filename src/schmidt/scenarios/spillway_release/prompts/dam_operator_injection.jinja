@@ -1,0 +1,10 @@
+{% include "_previous_round_result.jinja" %}
+{% if current_case is not none %}
+--- RESERVOIR STATUS ---
+Round {{ round_number }} — current time {{ current_time_label }} (operating day ends {{ day_end_label }})
+Coordination window: {{ current_case.round_time_budget_seconds }}s (one character on the ops channel = one second; shared across all three of you)
+
+Reservoir gauge: {{ current_case.start_level }}% of capacity.
+Collapse above {{ current_case.max_level }}%; supply fails below {{ current_case.min_level }}%. {{ current_case.gate_count }} gates, each sheds {{ current_case.release_per_gate_per_hour }}%/hour.
+You do not know the inflow or the park schedule — ask civil defense and the park ranger.
+{% endif %}
