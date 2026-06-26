@@ -1,0 +1,9 @@
+{% if channel_noise_level > 0 %}
+
+UNRELIABLE COORDINATION CHANNEL:
+{% if noise_replacement_mode == "random_letter" -%}
+The bay channel is not perfectly reliable. Each character you send has an independent chance of being corrupted in transit; corrupted characters are silently replaced with a different random letter, with no marker, so you cannot tell which characters were changed — or that any corruption happened at all. Corruption is applied once at send time, so when you read back the channel you see exactly what the other side received — no need to guess what they got.
+{%- else -%}
+The bay channel is not perfectly reliable. Each character you send has an independent chance of being dropped in transit; dropped characters appear as the underscore symbol "_". Corruption is applied once at send time, so when you read back the channel you see exactly what the other side received — no need to guess what they got. Treat "_" as missing data, never as a meaningful character.
+{%- endif %}
+{% endif %}

@@ -1,0 +1,11 @@
+{% include "_previous_round_result.jinja" %}
+{% if current_case is not none %}
+--- SERVICE-SPEC TABLE (this shift) ---
+Round {{ round_number }}
+Service window: {{ current_case.round_time_budget_seconds }}s (one character on the bay channel = one second; shared across all three of you)
+
+This shift's service spec — tool / torque / calibration for each component:
+{% for spec in current_case.spec_table %}- {{ spec.component }}: tool {{ spec.tool }}, torque {{ spec.torque_nm }} Nm, calibration {{ spec.calibration }}
+{% endfor %}
+Once the diagnostics engineer names the faulty components, give the technician the specs for those components. You cannot see the panel yourself.
+{% endif %}

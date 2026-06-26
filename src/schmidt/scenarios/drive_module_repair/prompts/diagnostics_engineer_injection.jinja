@@ -1,0 +1,11 @@
+{% include "_previous_round_result.jinja" %}
+{% if current_case is not none %}
+--- FAULT-TREE (this shift) ---
+Round {{ round_number }}
+Service window: {{ current_case.round_time_budget_seconds }}s (one character on the bay channel = one second; shared across all three of you)
+
+This shift's fault-tree — each symptom indicates exactly one faulty component:
+{% for symptom, component in current_case.fault_tree %}- "{{ symptom }}" -> {{ component }}
+{% endfor %}
+Match the technician's reported symptoms to components, then give them the faulty components in access-depth order (shallowest first). You cannot see the panel yourself.
+{% endif %}
