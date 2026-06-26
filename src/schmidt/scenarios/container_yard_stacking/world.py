@@ -1,24 +1,22 @@
 """World simulation for the container_yard_stacking scenario.
 
-Tracks per-team yard state, truck commits, crane moves, and the running
-character count on each team's link channel. The world is mutated
-synchronously by the two scenario tools: structured ``move_truck`` args
-feed ``record_truck_commit`` and structured ``crane_move`` args feed
-``record_crane_move``. Every mutating method takes a ``team_id`` so
-two-team mode can fork the per-team state without changing call sites.
+Tracks per-team yard-row state, the single ``move_container`` action, and
+the running character count on each team's link channel. The world is
+mutated synchronously by the one scenario tool: the crane operator submits
+a source slot and a destination slot, ``record_move`` judges them against
+the round's ``YardCase`` ground truth and the live row, and mutates the row
+on accept. Every mutating method takes a ``team_id`` so two-team mode can
+fork per-team state without changing call sites.
 
-A round delivers one or more incoming containers per team. Each
-delivery is one "step": the team's yard operator commits trucks for
-the step, the team's crane operator executes the step's planned moves,
-and once the incoming container reaches its target the world advances
-to the next step on that team. Round success requires every step to
-complete with its expected trucks and moves and the round budget not
-to have been exceeded.
+A round relocates one or more target containers per team. Each relocation
+is one "step": the team's crane operator moves the announced target to its
+relative goal. Round success requires every step to be placed correctly and
+the round budget not to have been exceeded.
 
-Heavy logic lives in dedicated sibling modules:
-:mod:`judging` (truck + crane scoring), :mod:`outcome_reconstruction`
-(rebuilding outcomes from a JSONL event log on resume), and
-:mod:`world_state` (the ``TeamState`` / ``YardOutcome`` types).
+Heavy logic lives in dedicated sibling modules: :mod:`judging` (move
+scoring), :mod:`outcome_reconstruction` (rebuilding outcomes from a JSONL
+event log on resume), and :mod:`world_state` (the ``TeamState`` /
+``YardOutcome`` types).
 """
 
 import asyncio
@@ -26,7 +24,7 @@ import logging
 from typing import Any
 
 from schmidt.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
-from schmidt.scenarios.container_yard_stacking.events import ContainerYardCraneMoveStep
+from schmidt.scenarios.container_yard_stacking.case_rendering import render_container
 from schmidt.scenarios.container_yard_stacking.ids import (
     BUDGET_EXCEEDED_MARKER,
     LINK_A_CHANNEL_ID,
@@ -40,18 +38,11 @@ from schmidt.scenarios.container_yard_stacking.ids import (
     TEAM_A_ID,
     TEAM_B_ID,
     TEAM_SOLO_ID,
-    YARD_OPERATOR_A_ID,
-    YARD_OPERATOR_B_ID,
-    YARD_OPERATOR_ID,
 )
 from schmidt.scenarios.container_yard_stacking.judging import (
-    destination_is_free,
-    find_assignment,
+    MoveJudgement,
     last_failure_reason,
-    pads_already_committed,
-    record_crane_move,
-    record_truck_commit,
-    source_holds_container,
+    record_move,
 )
 from schmidt.scenarios.container_yard_stacking.outcome_reconstruction import (
     restore_outcomes_from_events,
@@ -60,11 +51,9 @@ from schmidt.scenarios.container_yard_stacking.team_routing import team_id_for_c
 from schmidt.scenarios.container_yard_stacking.world_state import (
     StepOutcome,
     TeamState,
-    TruckCommitResult,
     YardOutcome,
-    stack_position_text,
 )
-from schmidt.scenarios.container_yard_stacking.yard_cases import CaseStep, TruckAssignment, YardCase
+from schmidt.scenarios.container_yard_stacking.yard_cases import YardCase
 
 logger = logging.getLogger(__name__)
 
@@ -76,18 +65,16 @@ __all__ = [
     "ContainerYardWorld",
     "StepOutcome",
     "TeamState",
-    "TruckCommitResult",
     "YardOutcome",
 ]
 
 
 class ContainerYardWorld(ScenarioWorld):
-    """Per-team yard world that judges truck commits and crane moves deterministically.
+    """Per-team yard world that judges ``move_container`` calls deterministically.
 
     Single-team mode holds one ``TeamState`` keyed by ``TEAM_SOLO_ID``.
-    Two-team mode holds two, keyed by ``TEAM_A_ID`` / ``TEAM_B_ID``.
-    Every mutation method takes a ``team_id`` to select which team's
-    state to update.
+    Two-team mode holds two, keyed by ``TEAM_A_ID`` / ``TEAM_B_ID``. Every
+    mutation method takes a ``team_id`` to select which team to update.
     """
 
     _context: WorldContext
@@ -110,23 +97,11 @@ class ContainerYardWorld(ScenarioWorld):
         """Initialize the team-state map for single or two-team mode."""
         if two_teams:
             return {
-                TEAM_A_ID: TeamState(
-                    team_id=TEAM_A_ID,
-                    link_channel_id=LINK_A_CHANNEL_ID,
-                    yard_operator_id=YARD_OPERATOR_A_ID,
-                ),
-                TEAM_B_ID: TeamState(
-                    team_id=TEAM_B_ID,
-                    link_channel_id=LINK_B_CHANNEL_ID,
-                    yard_operator_id=YARD_OPERATOR_B_ID,
-                ),
+                TEAM_A_ID: TeamState(team_id=TEAM_A_ID, link_channel_id=LINK_A_CHANNEL_ID),
+                TEAM_B_ID: TeamState(team_id=TEAM_B_ID, link_channel_id=LINK_B_CHANNEL_ID),
             }
         return {
-            TEAM_SOLO_ID: TeamState(
-                team_id=TEAM_SOLO_ID,
-                link_channel_id=LINK_CHANNEL_ID,
-                yard_operator_id=YARD_OPERATOR_ID,
-            ),
+            TEAM_SOLO_ID: TeamState(team_id=TEAM_SOLO_ID, link_channel_id=LINK_CHANNEL_ID),
         }
 
     @property
@@ -149,26 +124,13 @@ class ContainerYardWorld(ScenarioWorld):
         """The yard case for the current round (shared across teams)."""
         return self._current_case
 
-    def current_step(self, team_id: str) -> CaseStep | None:
-        """The step ``team_id`` is currently expecting trucks / moves for, if any."""
+    def all_placed(self, team_id: str) -> bool:
+        """Whether ``team_id`` has relocated every container in this round's batch."""
         case = self._current_case
         team = self._teams[team_id]
         if case is None:
-            return None
-        if team.current_step_index >= len(case.steps):
-            return None
-        return case.steps[team.current_step_index]
-
-    def _next_step(self, team_id: str) -> CaseStep | None:
-        """The step that becomes active for ``team_id`` after the current step completes."""
-        case = self._current_case
-        team = self._teams[team_id]
-        if case is None:
-            return None
-        next_index = team.current_step_index + 1
-        if next_index >= len(case.steps):
-            return None
-        return case.steps[next_index]
+            return False
+        return team.placed_count >= len(case.steps)
 
     @property
     def in_postmortem(self) -> bool:
@@ -188,10 +150,6 @@ class ContainerYardWorld(ScenarioWorld):
         """Whether ``team_id`` has exceeded its communication budget this round."""
         return self._teams[team_id].round_budget_exceeded
 
-    def step_accepted_move_count(self, team_id: str) -> int:
-        """Crane moves accepted for ``team_id``'s current step so far."""
-        return self._teams[team_id].step_accepted_move_count
-
     def round_failed_terminally(self, team_id: str) -> bool:
         """Whether ``team_id``'s current round has been marked unrecoverable."""
         return self._teams[team_id].round_failed_terminally
@@ -199,13 +157,6 @@ class ContainerYardWorld(ScenarioWorld):
     def outcomes(self, team_id: str) -> list[YardOutcome]:
         """Historical per-round outcomes for one team."""
         return self._teams[team_id].outcomes
-
-    def truck_arrived(self, team_id: str, truck_role: str) -> bool:
-        """Whether ``team_id``'s named truck role has arrived at its correct spot."""
-        state = self._teams[team_id].truck_states.get(truck_role)
-        if state is None:
-            return False
-        return state.arrived
 
     def enter_postmortem(self) -> None:
         """Mark the start of a postmortem discussion phase."""
@@ -233,12 +184,7 @@ class ContainerYardWorld(ScenarioWorld):
         return outcomes[-1]
 
     def restore_outcomes_from_events(self, events: list[Any]) -> None:
-        """Seed each team's ``outcomes`` from a JSONL event list on resume.
-
-        Delegates to :func:`outcome_reconstruction.restore_outcomes_from_events`
-        which walks the truck/crane verdicts and link-channel messages to
-        recover one ``YardOutcome`` per completed round per team.
-        """
+        """Seed each team's ``outcomes`` from a JSONL event list on resume."""
         restore_outcomes_from_events(
             teams=self._teams,
             cases=self._cases,
@@ -246,90 +192,24 @@ class ContainerYardWorld(ScenarioWorld):
             events=events,
         )
 
-    def find_assignment(self, team_id: str, truck_role: str) -> TruckAssignment | None:
-        """Return ``team_id``'s current step's ground-truth assignment for ``truck_role``."""
-        return find_assignment(
-            current_step=self.current_step(team_id=team_id),
-            truck_role=truck_role,
-        )
-
-    async def record_truck_commit(
-        self,
-        team_id: str,
-        parsed_truck_role: str,
-        parsed_pad: str,
-        role_matches_active_assignment: bool,
-        targets_correct_station: bool,
-        targets_correct_pad: bool,
-        carries_correct_container: bool,
-    ) -> TruckCommitResult:
-        """Update ``team_id``'s state with the verdict for one ``move_truck`` call."""
-        if self._current_case is None:
-            return TruckCommitResult(
-                truck_role=parsed_truck_role,
-                accepted=False,
-                duplicate=False,
-            )
-        return await record_truck_commit(
-            team=self._teams[team_id],
-            current_step=self.current_step(team_id=team_id),
-            context=self._context,
-            parsed_truck_role=parsed_truck_role,
-            parsed_pad=parsed_pad,
-            role_matches_active_assignment=role_matches_active_assignment,
-            targets_correct_station=targets_correct_station,
-            targets_correct_pad=targets_correct_pad,
-            carries_correct_container=carries_correct_container,
-        )
-
-    def pads_already_committed(self, team_id: str) -> list[str]:
-        """Return non-empty pads currently bound to a truck for ``team_id``'s current step."""
-        return pads_already_committed(team=self._teams[team_id])
-
-    def source_holds_container(
-        self, team_id: str, kind: str, stack: int | None, container_id: str
-    ) -> bool:
-        """Return True when ``team_id``'s named source currently carries ``container_id``."""
-        return source_holds_container(
-            team=self._teams[team_id], kind=kind, stack=stack, container_id=container_id
-        )
-
-    def destination_is_free(
-        self, team_id: str, kind: str, stack: int | None, tier: int | None
-    ) -> bool:
-        """Return True when ``team_id``'s named destination is free for a crane drop."""
-        return destination_is_free(team=self._teams[team_id], kind=kind, stack=stack, tier=tier)
-
     def last_failure_reason(self, team_id: str) -> str:
         """Return ``team_id``'s most recently recorded failure reason for this round."""
         return last_failure_reason(team=self._teams[team_id])
 
-    async def record_crane_move(
+    async def record_move(
         self,
         team_id: str,
-        parsed_move: ContainerYardCraneMoveStep,
-        parsed_source_kind: str,
-        parsed_source_stack: int | None,
-        parsed_destination_kind: str,
-        parsed_destination_stack: int | None,
-        matches_expected_next_move: bool,
-        source_currently_holds_container: bool,
-        destination_currently_empty: bool,
-    ) -> bool:
-        """Apply or reject a crane move for ``team_id`` and emit a notification."""
-        return await record_crane_move(
+        submitted_from_slot: int,
+        submitted_to_slot: int,
+    ) -> MoveJudgement:
+        """Judge and apply one ``move_container`` call for ``team_id``."""
+        assert self._current_case is not None, "record_move requires an active case"
+        return await record_move(
             team=self._teams[team_id],
-            current_step=self.current_step(team_id=team_id),
-            next_step=self._next_step(team_id=team_id),
+            case=self._current_case,
             context=self._context,
-            parsed_move=parsed_move,
-            parsed_source_kind=parsed_source_kind,
-            parsed_source_stack=parsed_source_stack,
-            parsed_destination_kind=parsed_destination_kind,
-            parsed_destination_stack=parsed_destination_stack,
-            matches_expected_next_move=matches_expected_next_move,
-            source_currently_holds_container=source_currently_holds_container,
-            destination_currently_empty=destination_currently_empty,
+            submitted_from_slot=submitted_from_slot,
+            submitted_to_slot=submitted_to_slot,
         )
 
     def mark_round_outcome(self, round_number: int) -> None:
@@ -353,31 +233,25 @@ class ContainerYardWorld(ScenarioWorld):
             team.current_round_characters = 0
             team.round_budget_exceeded = False
             team.notified_thresholds = set()
-            team.truck_states = {}
             team.round_failed_terminally = False
             team.failure_reason = ""
             team.round_outcome_marked = False
-            team.current_step_index = 0
-            team.step_accepted_move_count = 0
-            team.step_correctly_committed_truck_count = 0
+            team.placed_count = 0
             team.step_outcomes = []
-            team.current_stacks = {
-                stack_index: list(containers)
-                for stack_index, containers in next_case.initial_stacks.items()
-            }
+            team.current_row = dict(next_case.initial_row)
 
     def round_succeeded(self, team_id: str) -> bool:
-        """Return True when ``team_id`` completed every step within budget."""
+        """Return True when ``team_id`` placed every container within budget."""
         return self._round_succeeded(team_id=team_id)
 
     def _round_succeeded(self, team_id: str) -> bool:
-        """Return True when ``team_id`` completed every step within budget."""
+        """Return True when ``team_id`` placed every container within budget."""
         case = self._current_case
         team = self._teams[team_id]
         if case is None:
             return False
         return (
-            team.current_step_index == len(case.steps)
+            team.placed_count == len(case.steps)
             and not team.round_budget_exceeded
             and not team.round_failed_terminally
         )
@@ -388,47 +262,22 @@ class ContainerYardWorld(ScenarioWorld):
         if case is None:
             return
         all_step_outcomes: list[StepOutcome] = list(team.step_outcomes)
-        if team.current_step_index < len(case.steps):
-            in_progress_step = case.steps[team.current_step_index]
+        placed_step_indices = {outcome.step_index for outcome in team.step_outcomes}
+        for step in case.steps:
+            if step.step_index in placed_step_indices:
+                continue
             all_step_outcomes.append(
                 StepOutcome(
-                    step_index=in_progress_step.step_index,
-                    incoming_container_id=in_progress_step.incoming_container_id,
-                    target_position_text=stack_position_text(
-                        stack=in_progress_step.target_position.stack,
-                        tier=in_progress_step.target_position.tier,
-                    ),
+                    step_index=step.step_index,
+                    container_summary=render_container(container=step.container),
+                    intake_slot=step.intake_slot,
+                    target_slot=step.target_slot,
                     succeeded=False,
-                    expected_move_count=len(in_progress_step.expected_move_sequence),
-                    accepted_move_count=team.step_accepted_move_count,
-                    expected_truck_count=len(in_progress_step.truck_assignments),
-                    correctly_committed_truck_count=team.step_correctly_committed_truck_count,
                 )
             )
-        for remaining in case.steps[team.current_step_index + 1 :]:
-            all_step_outcomes.append(
-                StepOutcome(
-                    step_index=remaining.step_index,
-                    incoming_container_id=remaining.incoming_container_id,
-                    target_position_text=stack_position_text(
-                        stack=remaining.target_position.stack,
-                        tier=remaining.target_position.tier,
-                    ),
-                    succeeded=False,
-                    expected_move_count=len(remaining.expected_move_sequence),
-                    accepted_move_count=0,
-                    expected_truck_count=len(remaining.truck_assignments),
-                    correctly_committed_truck_count=0,
-                )
-            )
+        all_step_outcomes.sort(key=lambda outcome: outcome.step_index)
         steps_succeeded = sum(1 for step in all_step_outcomes if step.succeeded)
         round_succeeded = self._round_succeeded(team_id=team.team_id)
-        total_expected_moves = sum(s.expected_move_count for s in all_step_outcomes)
-        total_accepted_moves = sum(s.accepted_move_count for s in all_step_outcomes)
-        total_expected_trucks = sum(s.expected_truck_count for s in all_step_outcomes)
-        total_correctly_committed_trucks = sum(
-            s.correctly_committed_truck_count for s in all_step_outcomes
-        )
         failure_step_index: int | None = None
         if not round_succeeded:
             for step in all_step_outcomes:
@@ -442,10 +291,6 @@ class ContainerYardWorld(ScenarioWorld):
                 step_count=len(case.steps),
                 steps_succeeded=steps_succeeded,
                 step_outcomes=tuple(all_step_outcomes),
-                total_expected_move_count=total_expected_moves,
-                total_accepted_move_count=total_accepted_moves,
-                total_expected_truck_count=total_expected_trucks,
-                total_correctly_committed_truck_count=total_correctly_committed_trucks,
                 budget_exceeded=team.round_budget_exceeded,
                 characters_used=team.current_round_characters,
                 round_time_budget_seconds=case.round_time_budget_seconds,
@@ -460,8 +305,7 @@ class ContainerYardWorld(ScenarioWorld):
         """No-op marker; the swap is implemented at the scenario level.
 
         The world tracks teams by ``team_id``, not by agent_id. Swapping
-        agents is a scenario-side concern (handled by reassigning
-        ``AgentConfig``), so this hook is intentionally a no-op.
+        agents is a scenario-side concern, so this hook is a no-op.
         """
         return None
 
@@ -544,7 +388,7 @@ class ContainerYardWorld(ScenarioWorld):
                 if team.failure_reason != "":
                     reason = team.failure_reason
                 else:
-                    reason = "Round did not complete every delivery."
+                    reason = "Round did not complete every placement."
                 text = f"{ROUND_FAILED_MARKER}. {reason}"
             await self._context.send_update_to_channel(
                 channel_id=team.link_channel_id,

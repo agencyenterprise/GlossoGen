@@ -1794,49 +1794,47 @@
         "title": "ChannelMessage",
         "description": "A message sent by an agent to a channel."
       },
-      "ContainerYardCaseStepDTO": {
+      "ContainerYardAttribute": {
         "properties": {
-          "step_index": {
-            "type": "integer",
-            "title": "Step Index"
-          },
-          "incoming_container_id": {
+          "name": {
             "type": "string",
-            "title": "Incoming Container Id"
+            "title": "Name"
           },
-          "target_position": {
-            "$ref": "#/components/schemas/ContainerYardStackPosition"
-          },
-          "correct_crane_station": {
+          "value": {
             "type": "string",
-            "title": "Correct Crane Station"
-          },
-          "truck_assignments": {
-            "items": {
-              "$ref": "#/components/schemas/ContainerYardTruckAssignment"
-            },
-            "type": "array",
-            "title": "Truck Assignments"
-          },
-          "expected_move_sequence": {
-            "items": {
-              "$ref": "#/components/schemas/ContainerYardCraneMoveStep"
-            },
-            "type": "array",
-            "title": "Expected Move Sequence"
+            "title": "Value"
           }
         },
         "type": "object",
         "required": [
-          "step_index",
-          "incoming_container_id",
-          "target_position",
-          "correct_crane_station",
-          "truck_assignments",
-          "expected_move_sequence"
+          "name",
+          "value"
         ],
-        "title": "ContainerYardCaseStepDTO",
-        "description": "Ground-truth plan for one delivery within a round."
+        "title": "ContainerYardAttribute",
+        "description": "One (dimension, value) pair of a container's attribute bundle."
+      },
+      "ContainerYardBatchItem": {
+        "properties": {
+          "container": {
+            "$ref": "#/components/schemas/ContainerYardContainer"
+          },
+          "intake_slot": {
+            "type": "integer",
+            "title": "Intake Slot"
+          },
+          "target_slot": {
+            "type": "integer",
+            "title": "Target Slot"
+          }
+        },
+        "type": "object",
+        "required": [
+          "container",
+          "intake_slot",
+          "target_slot"
+        ],
+        "title": "ContainerYardBatchItem",
+        "description": "One container in the round's batch: its attributes, intake slot, and target bay."
       },
       "ContainerYardCaseSummary": {
         "properties": {
@@ -1852,33 +1850,23 @@
             "type": "integer",
             "title": "Round Time Budget Seconds"
           },
-          "active_crane_stations": {
-            "items": {
-              "$ref": "#/components/schemas/ContainerYardCraneStation"
-            },
-            "type": "array",
-            "title": "Active Crane Stations"
+          "yard_slot_count": {
+            "type": "integer",
+            "title": "Yard Slot Count"
           },
-          "initial_stacks": {
+          "initial_row": {
             "items": {
-              "$ref": "#/components/schemas/ContainerYardStackSnapshot"
+              "$ref": "#/components/schemas/ContainerYardSlot"
             },
             "type": "array",
-            "title": "Initial Stacks"
+            "title": "Initial Row"
           },
-          "manifest": {
+          "batch": {
             "items": {
-              "$ref": "#/components/schemas/ContainerYardManifestEntry"
+              "$ref": "#/components/schemas/ContainerYardBatchItem"
             },
             "type": "array",
-            "title": "Manifest"
-          },
-          "steps": {
-            "items": {
-              "$ref": "#/components/schemas/ContainerYardCaseStepDTO"
-            },
-            "type": "array",
-            "title": "Steps"
+            "title": "Batch"
           }
         },
         "type": "object",
@@ -1886,262 +1874,125 @@
           "round_number",
           "case_number",
           "round_time_budget_seconds",
-          "active_crane_stations",
-          "initial_stacks",
-          "manifest",
-          "steps"
+          "yard_slot_count",
+          "initial_row",
+          "batch"
         ],
         "title": "ContainerYardCaseSummary",
-        "description": "Per-round case metadata used by the round-detail panel.\n\nMirrors the ``ContainerYardCaseStarted`` event one-for-one, repackaged\nas a stable DTO so the frontend never has to touch raw event JSON."
+        "description": "Per-round case metadata used by the round-detail panel.\n\nMirrors the ``ContainerYardCaseStarted`` event, repackaged as a stable\nDTO so the frontend never has to touch raw event JSON."
       },
-      "ContainerYardCraneMetadata": {
+      "ContainerYardContainer": {
+        "properties": {
+          "attributes": {
+            "items": {
+              "$ref": "#/components/schemas/ContainerYardAttribute"
+            },
+            "type": "array",
+            "title": "Attributes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "attributes"
+        ],
+        "title": "ContainerYardContainer",
+        "description": "A yard container described entirely by its ordered attribute bundle."
+      },
+      "ContainerYardMoveMetadata": {
         "properties": {
           "step_index": {
             "type": "integer",
             "title": "Step Index"
           },
-          "move_index": {
+          "submitted_from_slot": {
             "type": "integer",
-            "title": "Move Index"
+            "title": "Submitted From Slot"
           },
-          "submitted_move": {
-            "$ref": "#/components/schemas/ContainerYardCraneMoveStep"
+          "submitted_to_slot": {
+            "type": "integer",
+            "title": "Submitted To Slot"
           },
           "verdict": {
-            "$ref": "#/components/schemas/ContainerYardCraneMoveVerdict"
+            "$ref": "#/components/schemas/ContainerYardMoveVerdict"
           },
           "accepted": {
             "type": "boolean",
             "title": "Accepted"
           },
+          "soft_rejected": {
+            "type": "boolean",
+            "title": "Soft Rejected"
+          },
           "explanation": {
             "type": "string",
             "title": "Explanation"
           },
-          "expected_move": {
+          "expected_from_slot": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ContainerYardCraneMoveStep"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Expected From Slot"
+          },
+          "expected_to_slot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected To Slot"
           }
         },
         "type": "object",
         "required": [
           "step_index",
-          "move_index",
-          "submitted_move",
+          "submitted_from_slot",
+          "submitted_to_slot",
           "verdict",
           "accepted",
+          "soft_rejected",
           "explanation",
-          "expected_move"
+          "expected_from_slot",
+          "expected_to_slot"
         ],
-        "title": "ContainerYardCraneMetadata",
-        "description": "Verdict for a single ``place_on_stack``/``lift_from_stack`` call.\n\n``expected_move`` is the planner's expected next move at the time the\ncall was made \u2014 useful for showing \"expected vs submitted\" inline."
+        "title": "ContainerYardMoveMetadata",
+        "description": "Verdict for a single ``move_container`` call attached by ``call_id``.\n\n``expected_from_slot`` / ``expected_to_slot`` are the batch container's\nground-truth intake slot and target bay for the step the move targeted,\nuseful for showing \"expected vs submitted\" inline."
       },
-      "ContainerYardCraneMoveStep": {
+      "ContainerYardMoveVerdict": {
         "properties": {
-          "move_index": {
-            "type": "integer",
-            "title": "Move Index"
-          },
-          "container_id": {
-            "type": "string",
-            "title": "Container Id"
-          },
-          "source_kind": {
-            "type": "string",
-            "enum": [
-              "inbound_truck",
-              "stack_tier"
-            ],
-            "title": "Source Kind"
-          },
-          "source_stack": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Stack"
-          },
-          "source_tier": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Tier"
-          },
-          "destination_kind": {
-            "type": "string",
-            "enum": [
-              "outbound_truck",
-              "stack_tier"
-            ],
-            "title": "Destination Kind"
-          },
-          "destination_stack": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Destination Stack"
-          },
-          "destination_tier": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Destination Tier"
-          }
-        },
-        "type": "object",
-        "required": [
-          "move_index",
-          "container_id",
-          "source_kind",
-          "source_stack",
-          "source_tier",
-          "destination_kind",
-          "destination_stack",
-          "destination_tier"
-        ],
-        "title": "ContainerYardCraneMoveStep",
-        "description": "One step in the expected crane plan or in the agent's submitted history.\n\nThe endpoints are structured (no string rendering): ``source_kind`` is\n``\"inbound_truck\"`` or ``\"stack_tier\"``; ``destination_kind`` is\n``\"outbound_truck\"`` or ``\"stack_tier\"``. The ``*_stack`` / ``*_tier``\nfields are populated only when the corresponding kind is\n``\"stack_tier\"`` and ``None`` otherwise."
-      },
-      "ContainerYardCraneMoveVerdict": {
-        "properties": {
-          "matches_expected_next_move": {
+          "from_slot_occupied": {
             "type": "boolean",
-            "title": "Matches Expected Next Move"
+            "title": "From Slot Occupied"
           },
-          "source_currently_holds_container": {
+          "to_slot_empty": {
             "type": "boolean",
-            "title": "Source Currently Holds Container"
+            "title": "To Slot Empty"
           },
-          "destination_currently_empty": {
+          "from_slot_correct": {
             "type": "boolean",
-            "title": "Destination Currently Empty"
+            "title": "From Slot Correct"
           },
-          "parsed_source_kind": {
-            "type": "string",
-            "enum": [
-              "inbound_truck",
-              "outbound_truck",
-              "stack_tier"
-            ],
-            "title": "Parsed Source Kind"
-          },
-          "parsed_source_stack": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Parsed Source Stack"
-          },
-          "parsed_destination_kind": {
-            "type": "string",
-            "enum": [
-              "inbound_truck",
-              "outbound_truck",
-              "stack_tier"
-            ],
-            "title": "Parsed Destination Kind"
-          },
-          "parsed_destination_stack": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Parsed Destination Stack"
+          "to_slot_correct": {
+            "type": "boolean",
+            "title": "To Slot Correct"
           }
         },
         "type": "object",
         "required": [
-          "matches_expected_next_move",
-          "source_currently_holds_container",
-          "destination_currently_empty",
-          "parsed_source_kind",
-          "parsed_source_stack",
-          "parsed_destination_kind",
-          "parsed_destination_stack"
+          "from_slot_occupied",
+          "to_slot_empty",
+          "from_slot_correct",
+          "to_slot_correct"
         ],
-        "title": "ContainerYardCraneMoveVerdict",
-        "description": "World's per-criterion verdict on a structured ``crane_move`` call.\n\n``parsed_source_kind`` / ``parsed_destination_kind`` classify each\nendpoint of the move; ``parsed_source_stack`` / ``parsed_destination_stack``\ncarry the stack index when the corresponding kind is ``stack_tier``;\nthey are ``None`` for truck endpoints. The world reads these\nstructured fields when mutating state."
-      },
-      "ContainerYardCraneStation": {
-        "properties": {
-          "station_name": {
-            "type": "string",
-            "title": "Station Name"
-          },
-          "pads": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Pads"
-          },
-          "reachable_stacks": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "title": "Reachable Stacks"
-          }
-        },
-        "type": "object",
-        "required": [
-          "station_name",
-          "pads",
-          "reachable_stacks"
-        ],
-        "title": "ContainerYardCraneStation",
-        "description": "A crane station active this round and the stack indices it can reach."
-      },
-      "ContainerYardManifestEntry": {
-        "properties": {
-          "container_id": {
-            "type": "string",
-            "title": "Container Id"
-          },
-          "target_position": {
-            "$ref": "#/components/schemas/ContainerYardStackPosition"
-          }
-        },
-        "type": "object",
-        "required": [
-          "container_id",
-          "target_position"
-        ],
-        "title": "ContainerYardManifestEntry",
-        "description": "One entry in the shift manifest shown to the logistics planner.\n\nThe real incoming entry is mixed with decoys so the planner cannot\npick the active target slot without the yard operator's container ID."
+        "title": "ContainerYardMoveVerdict",
+        "description": "World's per-criterion verdict on a ``move_container`` call.\n\n``from_slot_occupied`` / ``to_slot_empty`` are the structural checks (a\nviolation is a soft reject the operator can retry).\n``from_slot_correct`` / ``to_slot_correct`` compare against the batch\nassignment (a structurally valid but incorrect move fails the round)."
       },
       "ContainerYardRunExtras": {
         "properties": {
@@ -2158,183 +2009,46 @@
             "type": "array",
             "title": "Cases"
           },
-          "truck_metadata_by_call_id": {
+          "move_metadata_by_call_id": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/ContainerYardTruckMetadata"
+              "$ref": "#/components/schemas/ContainerYardMoveMetadata"
             },
             "type": "object",
-            "title": "Truck Metadata By Call Id"
-          },
-          "crane_metadata_by_call_id": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/ContainerYardCraneMetadata"
-            },
-            "type": "object",
-            "title": "Crane Metadata By Call Id"
+            "title": "Move Metadata By Call Id"
           }
         },
         "type": "object",
         "required": [
           "cases",
-          "truck_metadata_by_call_id",
-          "crane_metadata_by_call_id"
+          "move_metadata_by_call_id"
         ],
         "title": "ContainerYardRunExtras",
         "description": "Scenario-specific run-detail payload surfaced for container-yard runs."
       },
-      "ContainerYardStackPosition": {
+      "ContainerYardSlot": {
         "properties": {
-          "stack": {
+          "slot": {
             "type": "integer",
-            "title": "Stack"
+            "title": "Slot"
           },
-          "tier": {
-            "type": "integer",
-            "title": "Tier"
+          "container": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContainerYardContainer"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
-          "stack",
-          "tier"
+          "slot",
+          "container"
         ],
-        "title": "ContainerYardStackPosition",
-        "description": "A target slot in the yard expressed as (stack, tier)."
-      },
-      "ContainerYardStackSnapshot": {
-        "properties": {
-          "stack": {
-            "type": "integer",
-            "title": "Stack"
-          },
-          "containers_bottom_to_top": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Containers Bottom To Top"
-          }
-        },
-        "type": "object",
-        "required": [
-          "stack",
-          "containers_bottom_to_top"
-        ],
-        "title": "ContainerYardStackSnapshot",
-        "description": "One stack's bottom-to-top container IDs at a point in time."
-      },
-      "ContainerYardTruckAssignment": {
-        "properties": {
-          "truck_role": {
-            "type": "string",
-            "title": "Truck Role"
-          },
-          "station_name": {
-            "type": "string",
-            "title": "Station Name"
-          },
-          "container_id": {
-            "type": "string",
-            "title": "Container Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "truck_role",
-          "station_name",
-          "container_id"
-        ],
-        "title": "ContainerYardTruckAssignment",
-        "description": "Ground-truth assignment for one truck the yard operator must commit.\n\n``container_id`` is the incoming container for inbound trucks and an\nempty string for outbound trucks (they arrive empty and leave loaded).\nThe transfer pad is the planner's choice at runtime \u2014 any pad of the\ncorrect station is acceptable, with the constraint that inbound and\noutbound trucks use different pads on rounds with a blocker."
-      },
-      "ContainerYardTruckCommitVerdict": {
-        "properties": {
-          "role_matches_active_assignment": {
-            "type": "boolean",
-            "title": "Role Matches Active Assignment"
-          },
-          "targets_correct_station": {
-            "type": "boolean",
-            "title": "Targets Correct Station"
-          },
-          "targets_correct_pad": {
-            "type": "boolean",
-            "title": "Targets Correct Pad"
-          },
-          "carries_correct_container": {
-            "type": "boolean",
-            "title": "Carries Correct Container"
-          }
-        },
-        "type": "object",
-        "required": [
-          "role_matches_active_assignment",
-          "targets_correct_station",
-          "targets_correct_pad",
-          "carries_correct_container"
-        ],
-        "title": "ContainerYardTruckCommitVerdict",
-        "description": "World's per-criterion verdict on a structured ``move_truck`` call.\n\n``role_matches_active_assignment`` is true when the submitted\n``truck_role`` corresponds to an expected truck for this round.\n``targets_correct_pad`` is true when the submitted pad is one of the\ncorrect station's transfer pads AND is not already committed to a\ndifferent truck this round."
-      },
-      "ContainerYardTruckMetadata": {
-        "properties": {
-          "step_index": {
-            "type": "integer",
-            "title": "Step Index"
-          },
-          "submitted_truck_role": {
-            "type": "string",
-            "enum": [
-              "inbound",
-              "outbound"
-            ],
-            "title": "Submitted Truck Role"
-          },
-          "submitted_station_name": {
-            "type": "string",
-            "title": "Submitted Station Name"
-          },
-          "submitted_pad": {
-            "type": "string",
-            "title": "Submitted Pad"
-          },
-          "submitted_container_id": {
-            "type": "string",
-            "title": "Submitted Container Id"
-          },
-          "verdict": {
-            "$ref": "#/components/schemas/ContainerYardTruckCommitVerdict"
-          },
-          "overall_success": {
-            "type": "boolean",
-            "title": "Overall Success"
-          },
-          "explanation": {
-            "type": "string",
-            "title": "Explanation"
-          },
-          "expected_truck_assignments": {
-            "items": {
-              "$ref": "#/components/schemas/ContainerYardTruckAssignment"
-            },
-            "type": "array",
-            "title": "Expected Truck Assignments"
-          }
-        },
-        "type": "object",
-        "required": [
-          "step_index",
-          "submitted_truck_role",
-          "submitted_station_name",
-          "submitted_pad",
-          "submitted_container_id",
-          "verdict",
-          "overall_success",
-          "explanation",
-          "expected_truck_assignments"
-        ],
-        "title": "ContainerYardTruckMetadata",
-        "description": "Verdict for a single ``move_truck`` call attached by ``call_id``."
+        "title": "ContainerYardSlot",
+        "description": "One slot in the yard and the container in it (or empty)."
       },
       "CrossRunReplaceAgentSource": {
         "properties": {

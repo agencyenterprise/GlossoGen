@@ -11,8 +11,7 @@ import { getScenarioPlugin } from "./scenario-registry";
 type RunDetailResponse = components["schemas"]["RunDetailResponse"];
 type ScenarioExtras = NonNullable<RunDetailResponse["scenario_extras"]>;
 type RoundEnding = components["schemas"]["RoundEnding"];
-type ContainerYardCraneMoveStep = components["schemas"]["ContainerYardCraneMoveStep"];
-type ContainerYardTruckAssignment = components["schemas"]["ContainerYardTruckAssignment"];
+type ContainerYardMoveMetadata = components["schemas"]["ContainerYardMoveMetadata"];
 
 interface RoundTimelineModalProps {
   roundNumber: number;
@@ -35,42 +34,22 @@ interface TimelineRow {
   explanation: string;
 }
 
-function formatTruckArgs(args: Record<string, unknown>): string {
-  const role = typeof args.truck_role === "string" ? args.truck_role : "?";
-  const station = typeof args.station_name === "string" ? args.station_name : "?";
-  const pad = typeof args.pad === "string" ? args.pad : "?";
-  const cid = typeof args.container_id === "string" ? args.container_id : "";
-  const cidSuffix = cid !== "" ? ` (${cid})` : "";
-  return `${role} → ${station}/${pad}${cidSuffix}`;
+function formatMoveArgs(args: Record<string, unknown>): string {
+  const from = typeof args.from_slot === "number" ? args.from_slot : "?";
+  const to = typeof args.to_slot === "number" ? args.to_slot : "?";
+  return `slot ${from} → slot ${to}`;
 }
 
-function formatCraneArgs(toolName: string, args: Record<string, unknown>): string {
-  const cid = typeof args.container_id === "string" ? args.container_id : "?";
-  const stack = typeof args.stack === "number" ? args.stack : "?";
-  const tier = typeof args.tier === "number" ? args.tier : "?";
-  return `${toolName}(${cid}, stack ${stack}, tier ${tier})`;
+function formatExpectedMove(metadata: ContainerYardMoveMetadata): string {
+  const from = metadata.expected_from_slot === null ? "?" : String(metadata.expected_from_slot);
+  const to = metadata.expected_to_slot === null ? "?" : String(metadata.expected_to_slot);
+  return `slot ${from} → slot ${to}`;
 }
 
-function formatExpectedTrucks(assignments: ContainerYardTruckAssignment[]): string {
-  if (assignments.length === 0) return "";
-  return assignments
-    .map(a => {
-      const cidSuffix = a.container_id !== "" ? ` (${a.container_id})` : "";
-      return `${a.truck_role} → ${a.station_name}${cidSuffix}`;
-    })
-    .join("; ");
-}
-
-function formatCraneMove(move: ContainerYardCraneMoveStep): string {
-  const source =
-    move.source_kind === "stack_tier"
-      ? `stack ${move.source_stack}/tier ${move.source_tier}`
-      : move.source_kind;
-  const dest =
-    move.destination_kind === "stack_tier"
-      ? `stack ${move.destination_stack}/tier ${move.destination_tier}`
-      : move.destination_kind;
-  return `${move.container_id}: ${source} → ${dest}`;
+function moveVerdictAccepted(metadata: ContainerYardMoveMetadata): boolean | null {
+  if (metadata.accepted) return true;
+  if (metadata.soft_rejected) return null;
+  return false;
 }
 
 function buildTimelineRows(messages: DisplayEntry[]): TimelineRow[] {
@@ -95,34 +74,17 @@ function buildTimelineRows(messages: DisplayEntry[]): TimelineRow[] {
       });
       continue;
     }
-    if (m.is_tool_use && m.truck_metadata !== null) {
+    if (m.is_tool_use && m.move_metadata !== null) {
       rows.push({
         key: m.message_id,
         timestamp: m.timestamp,
         kind: "judged_tool",
         sender: m.sender_agent_id,
-        text: formatTruckArgs(m.tool_arguments),
-        toolName: "move_truck",
-        verdictAccepted: m.truck_metadata.overall_success,
-        expected: formatExpectedTrucks(m.truck_metadata.expected_truck_assignments),
-        explanation: m.truck_metadata.explanation,
-      });
-      continue;
-    }
-    if (m.is_tool_use && m.crane_metadata !== null) {
-      rows.push({
-        key: m.message_id,
-        timestamp: m.timestamp,
-        kind: "judged_tool",
-        sender: m.sender_agent_id,
-        text: formatCraneArgs(m.tool_name, m.tool_arguments),
-        toolName: m.tool_name,
-        verdictAccepted: m.crane_metadata.accepted,
-        expected:
-          m.crane_metadata.expected_move !== null
-            ? formatCraneMove(m.crane_metadata.expected_move)
-            : "",
-        explanation: m.crane_metadata.explanation,
+        text: formatMoveArgs(m.tool_arguments),
+        toolName: "move_container",
+        verdictAccepted: moveVerdictAccepted(m.move_metadata),
+        expected: formatExpectedMove(m.move_metadata),
+        explanation: m.move_metadata.explanation,
       });
       continue;
     }

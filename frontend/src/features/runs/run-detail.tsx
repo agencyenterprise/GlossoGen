@@ -315,13 +315,9 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
       ...restStabilizeMetadata,
       ...sse.stabilizeMetadataByCallId,
     };
-    const truckMetadataByCallId =
+    const moveMetadataByCallId =
       scenarioExtras !== null && scenarioExtras.scenario_name === "container_yard_stacking"
-        ? scenarioExtras.truck_metadata_by_call_id
-        : {};
-    const craneMetadataByCallId =
-      scenarioExtras !== null && scenarioExtras.scenario_name === "container_yard_stacking"
-        ? scenarioExtras.crane_metadata_by_call_id
+        ? scenarioExtras.move_metadata_by_call_id
         : {};
 
     return mergeEntries(
@@ -330,8 +326,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
       [...restToolUse, ...newToolUse],
       [...restRunCycleFailures, ...newFailures],
       stabilizeMetadataByCallId,
-      truckMetadataByCallId,
-      craneMetadataByCallId
+      moveMetadataByCallId
     );
   }, [
     restData,

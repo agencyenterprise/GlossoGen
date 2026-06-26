@@ -1,12 +1,10 @@
 """Configuration knobs for the container_yard_stacking scenario.
 
-Controls the per-round inspection-window budget, case shuffling seed,
-round count, postmortem discussion phase, channel noise, the set of
-warmup rounds forced to a single delivery, and the optional two-team
-mode with mid-run crane-operator swap. Per-step blocker placement
-(whether a given delivery's target tier is already occupied) is not a
-user knob — it is determined by a fixed internal proportion shuffled
-per seed in ``yard_cases.py``.
+Controls the per-round inspection-window budget, case seed, round count,
+postmortem discussion phase, channel noise, the warmup rounds forced to a
+single container, the per-round batch-size distribution, and the yard size.
+Also the optional two-team mode with mid-run crane-operator swap and the
+intern mode.
 """
 
 from typing import Self
@@ -15,6 +13,7 @@ from pydantic import model_validator
 
 from schmidt.scenarios.base_knobs import BaseKnobs
 from schmidt.scenarios.channel_noise import NoiseReplacementMode
+from schmidt.scenarios.container_yard_stacking.ids import DEFAULT_YARD_SLOT_COUNT
 
 
 class ContainerYardStackingKnobs(BaseKnobs):
@@ -29,29 +28,18 @@ class ContainerYardStackingKnobs(BaseKnobs):
     ``random_letter`` replaces it with a different random letter leaving no
     marker (substitution channel).
 
-    Two-team mode runs two isolated teams (yard / planner / crane on
-    ``link_a`` / ``link_b``) on identical cases each round.
-    ``swap_round`` swaps the two teams' crane operators after that
-    round's main phase ends and clears link history so the new pairings
-    must re-establish their protocol. ``announce_swap`` toggles an
-    in-channel system message announcing the swap.
-    ``postmortem_after_swap`` controls whether postmortem stays enabled
-    after the swap fires.
-    ``easy_round_numbers`` is the set of round numbers forced to a single
-    delivery (single-step warmup cases) so agents learn the basic
-    deliver / lift protocol before facing multi-container coordination.
-    Every other round draws its step count from the configurable weighted
-    distribution (``step_count_values`` paired with ``step_count_weights``).
-    Each round is built from an independent per-round RNG, so toggling a
-    round in or out of this set never shifts the case stream for any other
-    round under a fixed ``seed``. Set to an empty list to disable the
-    warmup constraint entirely.
-    ``step_count_values`` and ``step_count_weights`` define the per-round
-    delivery-count distribution: a non-easy round draws one value from
-    ``step_count_values`` with the corresponding weight in
-    ``step_count_weights`` (the two lists must be the same non-empty
-    length). For example values ``[1, 2, 3, 4, 5]`` with weights
-    ``[20, 25, 20, 15, 15]`` yields a mean of about 2.65 deliveries.
+    Each round a batch of containers arrives in the yard's intake slots and
+    must be relocated to assigned target bays. ``batch_size_values`` paired
+    with ``batch_size_weights`` defines the per-round batch-size distribution
+    (the two lists must be the same non-empty length). ``yard_slot_count`` is
+    the number of slots in the yard; it must hold the batch plus its target
+    bays (``>= 2 * max(batch_size_values) + 2``). ``easy_round_numbers``
+    forces those rounds to a single container (warmup).
+
+    Two-team mode runs two isolated teams (spotter / planner / crane on
+    ``link_a`` / ``link_b``) on identical cases each round. ``swap_round``
+    swaps the two teams' crane operators after that round's main phase ends
+    and clears link history.
     """
 
     postmortem_enabled: bool
@@ -62,8 +50,9 @@ class ContainerYardStackingKnobs(BaseKnobs):
     channel_noise_level: float
     noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     easy_round_numbers: frozenset[int]
-    step_count_values: list[int]
-    step_count_weights: list[int]
+    batch_size_values: list[int]
+    batch_size_weights: list[int]
+    yard_slot_count: int = DEFAULT_YARD_SLOT_COUNT
     two_teams: bool = False
     swap_round: int | None = None
     announce_swap: bool = False
@@ -81,19 +70,29 @@ class ContainerYardStackingKnobs(BaseKnobs):
         return self
 
     @model_validator(mode="after")
-    def _validate_step_count_distribution(self) -> Self:
-        if len(self.step_count_values) == 0:
-            raise ValueError("step_count_values must be non-empty")
-        if len(self.step_count_values) != len(self.step_count_weights):
+    def _validate_batch_size_distribution(self) -> Self:
+        if len(self.batch_size_values) == 0:
+            raise ValueError("batch_size_values must be non-empty")
+        if len(self.batch_size_values) != len(self.batch_size_weights):
             raise ValueError(
-                f"step_count_values and step_count_weights must have the same length "
-                f"(got {len(self.step_count_values)} values and "
-                f"{len(self.step_count_weights)} weights)"
+                f"batch_size_values and batch_size_weights must have the same length "
+                f"(got {len(self.batch_size_values)} values and "
+                f"{len(self.batch_size_weights)} weights)"
             )
-        if any(value < 1 for value in self.step_count_values):
-            raise ValueError(f"step_count_values must all be >= 1 (got {self.step_count_values})")
-        if any(weight <= 0 for weight in self.step_count_weights):
-            raise ValueError(f"step_count_weights must all be > 0 (got {self.step_count_weights})")
+        if any(value < 1 for value in self.batch_size_values):
+            raise ValueError(f"batch_size_values must all be >= 1 (got {self.batch_size_values})")
+        if any(weight <= 0 for weight in self.batch_size_weights):
+            raise ValueError(f"batch_size_weights must all be > 0 (got {self.batch_size_weights})")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_yard_capacity(self) -> Self:
+        max_batch = max(self.batch_size_values)
+        if self.yard_slot_count < 2 * max_batch + 2:
+            raise ValueError(
+                f"yard_slot_count must be >= 2 * max(batch_size_values) + 2 "
+                f"(got yard_slot_count={self.yard_slot_count}, max batch={max_batch})"
+            )
         return self
 
     @model_validator(mode="after")

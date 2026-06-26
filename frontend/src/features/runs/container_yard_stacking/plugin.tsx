@@ -1,12 +1,10 @@
 /**
  * Container-yard-stacking frontend plug-in.
  *
- * Surfaces the per-round case-detail header in the round-timeline modal
- * and the full knobs form (mode selector + per-mode fields + shared
- * settings) for the "Create simulation" page. The inline per-tool-call
- * verdict rendering for ``move_truck`` / ``place_on_stack`` /
- * ``lift_from_stack`` lives on ``DisplayEntry`` and is rendered directly
- * by the platform's ``ToolCallDisplay``.
+ * Surfaces the per-round case-detail header (batch assignment of each
+ * container's intake slot → target bay, plus row occupancy) in the
+ * round-timeline modal and the full knobs form (mode selector + per-mode
+ * fields + shared settings) for the "Create simulation" page.
  */
 
 import type { AgentModelOverride } from "../agent-model-overrides";

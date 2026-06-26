@@ -757,28 +757,32 @@ export interface components {
             token_count: number;
         };
         /**
-         * ContainerYardCaseStepDTO
-         * @description Ground-truth plan for one delivery within a round.
+         * ContainerYardAttribute
+         * @description One (dimension, value) pair of a container's attribute bundle.
          */
-        ContainerYardCaseStepDTO: {
-            /** Step Index */
-            step_index: number;
-            /** Incoming Container Id */
-            incoming_container_id: string;
-            target_position: components["schemas"]["ContainerYardStackPosition"];
-            /** Correct Crane Station */
-            correct_crane_station: string;
-            /** Truck Assignments */
-            truck_assignments: components["schemas"]["ContainerYardTruckAssignment"][];
-            /** Expected Move Sequence */
-            expected_move_sequence: components["schemas"]["ContainerYardCraneMoveStep"][];
+        ContainerYardAttribute: {
+            /** Name */
+            name: string;
+            /** Value */
+            value: string;
+        };
+        /**
+         * ContainerYardBatchItem
+         * @description One container in the round's batch: its attributes, intake slot, and target bay.
+         */
+        ContainerYardBatchItem: {
+            container: components["schemas"]["ContainerYardContainer"];
+            /** Intake Slot */
+            intake_slot: number;
+            /** Target Slot */
+            target_slot: number;
         };
         /**
          * ContainerYardCaseSummary
          * @description Per-round case metadata used by the round-detail panel.
          *
-         *     Mirrors the ``ContainerYardCaseStarted`` event one-for-one, repackaged
-         *     as a stable DTO so the frontend never has to touch raw event JSON.
+         *     Mirrors the ``ContainerYardCaseStarted`` event, repackaged as a stable
+         *     DTO so the frontend never has to touch raw event JSON.
          */
         ContainerYardCaseSummary: {
             /** Round Number */
@@ -787,124 +791,66 @@ export interface components {
             case_number: number;
             /** Round Time Budget Seconds */
             round_time_budget_seconds: number;
-            /** Active Crane Stations */
-            active_crane_stations: components["schemas"]["ContainerYardCraneStation"][];
-            /** Initial Stacks */
-            initial_stacks: components["schemas"]["ContainerYardStackSnapshot"][];
-            /** Manifest */
-            manifest: components["schemas"]["ContainerYardManifestEntry"][];
-            /** Steps */
-            steps: components["schemas"]["ContainerYardCaseStepDTO"][];
+            /** Yard Slot Count */
+            yard_slot_count: number;
+            /** Initial Row */
+            initial_row: components["schemas"]["ContainerYardSlot"][];
+            /** Batch */
+            batch: components["schemas"]["ContainerYardBatchItem"][];
         };
         /**
-         * ContainerYardCraneMetadata
-         * @description Verdict for a single ``place_on_stack``/``lift_from_stack`` call.
-         *
-         *     ``expected_move`` is the planner's expected next move at the time the
-         *     call was made — useful for showing "expected vs submitted" inline.
+         * ContainerYardContainer
+         * @description A yard container described entirely by its ordered attribute bundle.
          */
-        ContainerYardCraneMetadata: {
+        ContainerYardContainer: {
+            /** Attributes */
+            attributes: components["schemas"]["ContainerYardAttribute"][];
+        };
+        /**
+         * ContainerYardMoveMetadata
+         * @description Verdict for a single ``move_container`` call attached by ``call_id``.
+         *
+         *     ``expected_from_slot`` / ``expected_to_slot`` are the batch container's
+         *     ground-truth intake slot and target bay for the step the move targeted,
+         *     useful for showing "expected vs submitted" inline.
+         */
+        ContainerYardMoveMetadata: {
             /** Step Index */
             step_index: number;
-            /** Move Index */
-            move_index: number;
-            submitted_move: components["schemas"]["ContainerYardCraneMoveStep"];
-            verdict: components["schemas"]["ContainerYardCraneMoveVerdict"];
+            /** Submitted From Slot */
+            submitted_from_slot: number;
+            /** Submitted To Slot */
+            submitted_to_slot: number;
+            verdict: components["schemas"]["ContainerYardMoveVerdict"];
             /** Accepted */
             accepted: boolean;
+            /** Soft Rejected */
+            soft_rejected: boolean;
             /** Explanation */
             explanation: string;
-            expected_move: components["schemas"]["ContainerYardCraneMoveStep"] | null;
+            /** Expected From Slot */
+            expected_from_slot: number | null;
+            /** Expected To Slot */
+            expected_to_slot: number | null;
         };
         /**
-         * ContainerYardCraneMoveStep
-         * @description One step in the expected crane plan or in the agent's submitted history.
+         * ContainerYardMoveVerdict
+         * @description World's per-criterion verdict on a ``move_container`` call.
          *
-         *     The endpoints are structured (no string rendering): ``source_kind`` is
-         *     ``"inbound_truck"`` or ``"stack_tier"``; ``destination_kind`` is
-         *     ``"outbound_truck"`` or ``"stack_tier"``. The ``*_stack`` / ``*_tier``
-         *     fields are populated only when the corresponding kind is
-         *     ``"stack_tier"`` and ``None`` otherwise.
+         *     ``from_slot_occupied`` / ``to_slot_empty`` are the structural checks (a
+         *     violation is a soft reject the operator can retry).
+         *     ``from_slot_correct`` / ``to_slot_correct`` compare against the batch
+         *     assignment (a structurally valid but incorrect move fails the round).
          */
-        ContainerYardCraneMoveStep: {
-            /** Move Index */
-            move_index: number;
-            /** Container Id */
-            container_id: string;
-            /**
-             * Source Kind
-             * @enum {string}
-             */
-            source_kind: "inbound_truck" | "stack_tier";
-            /** Source Stack */
-            source_stack: number | null;
-            /** Source Tier */
-            source_tier: number | null;
-            /**
-             * Destination Kind
-             * @enum {string}
-             */
-            destination_kind: "outbound_truck" | "stack_tier";
-            /** Destination Stack */
-            destination_stack: number | null;
-            /** Destination Tier */
-            destination_tier: number | null;
-        };
-        /**
-         * ContainerYardCraneMoveVerdict
-         * @description World's per-criterion verdict on a structured ``crane_move`` call.
-         *
-         *     ``parsed_source_kind`` / ``parsed_destination_kind`` classify each
-         *     endpoint of the move; ``parsed_source_stack`` / ``parsed_destination_stack``
-         *     carry the stack index when the corresponding kind is ``stack_tier``;
-         *     they are ``None`` for truck endpoints. The world reads these
-         *     structured fields when mutating state.
-         */
-        ContainerYardCraneMoveVerdict: {
-            /** Matches Expected Next Move */
-            matches_expected_next_move: boolean;
-            /** Source Currently Holds Container */
-            source_currently_holds_container: boolean;
-            /** Destination Currently Empty */
-            destination_currently_empty: boolean;
-            /**
-             * Parsed Source Kind
-             * @enum {string}
-             */
-            parsed_source_kind: "inbound_truck" | "outbound_truck" | "stack_tier";
-            /** Parsed Source Stack */
-            parsed_source_stack: number | null;
-            /**
-             * Parsed Destination Kind
-             * @enum {string}
-             */
-            parsed_destination_kind: "inbound_truck" | "outbound_truck" | "stack_tier";
-            /** Parsed Destination Stack */
-            parsed_destination_stack: number | null;
-        };
-        /**
-         * ContainerYardCraneStation
-         * @description A crane station active this round and the stack indices it can reach.
-         */
-        ContainerYardCraneStation: {
-            /** Station Name */
-            station_name: string;
-            /** Pads */
-            pads: string[];
-            /** Reachable Stacks */
-            reachable_stacks: number[];
-        };
-        /**
-         * ContainerYardManifestEntry
-         * @description One entry in the shift manifest shown to the logistics planner.
-         *
-         *     The real incoming entry is mixed with decoys so the planner cannot
-         *     pick the active target slot without the yard operator's container ID.
-         */
-        ContainerYardManifestEntry: {
-            /** Container Id */
-            container_id: string;
-            target_position: components["schemas"]["ContainerYardStackPosition"];
+        ContainerYardMoveVerdict: {
+            /** From Slot Occupied */
+            from_slot_occupied: boolean;
+            /** To Slot Empty */
+            to_slot_empty: boolean;
+            /** From Slot Correct */
+            from_slot_correct: boolean;
+            /** To Slot Correct */
+            to_slot_correct: boolean;
         };
         /**
          * ContainerYardRunExtras
@@ -918,98 +864,19 @@ export interface components {
             scenario_name: "container_yard_stacking";
             /** Cases */
             cases: components["schemas"]["ContainerYardCaseSummary"][];
-            /** Truck Metadata By Call Id */
-            truck_metadata_by_call_id: {
-                [key: string]: components["schemas"]["ContainerYardTruckMetadata"];
-            };
-            /** Crane Metadata By Call Id */
-            crane_metadata_by_call_id: {
-                [key: string]: components["schemas"]["ContainerYardCraneMetadata"];
+            /** Move Metadata By Call Id */
+            move_metadata_by_call_id: {
+                [key: string]: components["schemas"]["ContainerYardMoveMetadata"];
             };
         };
         /**
-         * ContainerYardStackPosition
-         * @description A target slot in the yard expressed as (stack, tier).
+         * ContainerYardSlot
+         * @description One slot in the yard and the container in it (or empty).
          */
-        ContainerYardStackPosition: {
-            /** Stack */
-            stack: number;
-            /** Tier */
-            tier: number;
-        };
-        /**
-         * ContainerYardStackSnapshot
-         * @description One stack's bottom-to-top container IDs at a point in time.
-         */
-        ContainerYardStackSnapshot: {
-            /** Stack */
-            stack: number;
-            /** Containers Bottom To Top */
-            containers_bottom_to_top: string[];
-        };
-        /**
-         * ContainerYardTruckAssignment
-         * @description Ground-truth assignment for one truck the yard operator must commit.
-         *
-         *     ``container_id`` is the incoming container for inbound trucks and an
-         *     empty string for outbound trucks (they arrive empty and leave loaded).
-         *     The transfer pad is the planner's choice at runtime — any pad of the
-         *     correct station is acceptable, with the constraint that inbound and
-         *     outbound trucks use different pads on rounds with a blocker.
-         */
-        ContainerYardTruckAssignment: {
-            /** Truck Role */
-            truck_role: string;
-            /** Station Name */
-            station_name: string;
-            /** Container Id */
-            container_id: string;
-        };
-        /**
-         * ContainerYardTruckCommitVerdict
-         * @description World's per-criterion verdict on a structured ``move_truck`` call.
-         *
-         *     ``role_matches_active_assignment`` is true when the submitted
-         *     ``truck_role`` corresponds to an expected truck for this round.
-         *     ``targets_correct_pad`` is true when the submitted pad is one of the
-         *     correct station's transfer pads AND is not already committed to a
-         *     different truck this round.
-         */
-        ContainerYardTruckCommitVerdict: {
-            /** Role Matches Active Assignment */
-            role_matches_active_assignment: boolean;
-            /** Targets Correct Station */
-            targets_correct_station: boolean;
-            /** Targets Correct Pad */
-            targets_correct_pad: boolean;
-            /** Carries Correct Container */
-            carries_correct_container: boolean;
-        };
-        /**
-         * ContainerYardTruckMetadata
-         * @description Verdict for a single ``move_truck`` call attached by ``call_id``.
-         */
-        ContainerYardTruckMetadata: {
-            /** Step Index */
-            step_index: number;
-            /**
-             * Submitted Truck Role
-             * @enum {string}
-             */
-            submitted_truck_role: "inbound" | "outbound";
-            /** Submitted Station Name */
-            submitted_station_name: string;
-            /** Submitted Pad */
-            submitted_pad: string;
-            /** Submitted Container Id */
-            submitted_container_id: string;
-            verdict: components["schemas"]["ContainerYardTruckCommitVerdict"];
-            /** Overall Success */
-            overall_success: boolean;
-            /** Explanation */
-            explanation: string;
-            /** Expected Truck Assignments */
-            expected_truck_assignments: components["schemas"]["ContainerYardTruckAssignment"][];
+        ContainerYardSlot: {
+            /** Slot */
+            slot: number;
+            container: components["schemas"]["ContainerYardContainer"] | null;
         };
         /**
          * CrossRunReplaceAgentSource

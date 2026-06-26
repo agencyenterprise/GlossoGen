@@ -1,35 +1,37 @@
 # Scenario: Container Yard Stacking
 
-Three agents — a yard operator who dispatches the inbound and outbound robotic trucks, a logistics planner who holds the stack layout and shift manifest, and a crane operator who holds the physical yard map and executes one physical crane move per tool call — coordinate over a shared link channel to place one to five incoming containers into their correct slots each round. Each container has to clear a customs inspection at its slot, and the inspection slot is only held open for a fixed window per round: every character sent on the link channel costs one second of that window, and if the round runs over, the inspection is missed and the round fails. The map (active crane stations, the two named transfer pads at each station, which stacks each station reaches, current stack layout, shift manifest) reshuffles every round, so postmortem discussions can only teach communication conventions — never "ship type X to crane Y".
+Three agents — a yard **spotter** who can read inbound containers' attributes and see their intake slots, a logistics **planner** who holds each container's target bay, and a **crane operator** who runs the crane from a cab and is blind to container attributes — coordinate over a shared link channel to sort each round's batch of inbound containers into their assigned bays. Containers carry no ID numbers: each is identified only by its visible attributes (colour, size, type, marking). The crane can move a container from any slot to any slot but cannot tell the containers apart, so a placement only happens when the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) are matched on the container's attributes. The assignment is drawn fresh every round, so it can never be memorized — and every character on the link channel costs one second of a fixed inspection window, so the team must compress a high-entropy, ambiguity-prone message under a binding budget.
 
-The information split forces direct crane↔yard communication: the yard operator cannot dispatch a truck on their own (they do not know which station services the target stack or which pads exist), and the logistics planner cannot tell them either (the planner does not see stations or pads). Only the crane operator can turn a target slot into a concrete dispatch order.
+This is a deliberate contrast to a one-shot "point at a visible object" task: because no single agent holds both a container's current slot and its destination, and because the crane cannot perceive attributes, the team must develop a **shared, compact code for attribute bundles** that survives the join — a genuine protocol-discovery problem rather than plain description.
 
 ## Domain
 
-A small section of a container yard: four stacks of fixed height 3. Two named transfer pads per crane station (`north_pad` / `south_pad` / ... freshly drawn each round). Each round delivers one to five inbound containers on consecutive inbound trucks; each container must end at a specific (stack, tier) slot. Two crane stations are active per round, each reaching a disjoint subset of stacks — exactly one of them can reach any given target stack.
+A single **yard** of `yard_slot_count` slots (default 28), numbered from 1. Each round a **batch** of `batch_size` containers (default drawn from 8–12) arrives in distinct **intake slots**; each must be relocated to a distinct empty **target bay**. Intake slots and target bays are disjoint, so every relocation is an independent intake→bay move with no blockers and no ordering constraint.
 
-Each round, the planner sees the current four-stack layout and a **shift manifest** listing every real `(container_id → target slot)` entry for the round plus a fixed pool of decoy entries (default 3). The yard operator alone sees each incoming container's ID, and only one at a time: the round-start injection reveals the first container, and the world emits a private notification carrying the next container's ID after the previous one reaches its target. The planner cannot pick which manifest entry is active — and therefore cannot announce the target slot or crane plan — without the yard operator first sharing the current container's ID on the link channel. The crane operator alone sees the round's active crane stations, their pads, and which stacks each station reaches; the planner does not, so the planner cannot pick the station or pads even when they know the target slot.
+Each container is an attribute bundle — no ID:
 
-Each delivery within a round independently rolls a blocker probability:
+- `colour` (8 values): red, blue, green, yellow, black, white, orange, teal
+- `size` (3): small, medium, large
+- `type` (6): standard, reefer, tank, flatrack, opentop, insulated
+- `marking` (4): plain, hazmat, fragile, priority
 
-- **No-blocker delivery** (~60%): the target tier is the next-empty tier on top of an empty or partial stack. The yard operator sends one inbound truck; the crane plan is one move: `place_on_stack(<incoming>, <stack>, <tier>)`.
-- **Blocker delivery** (~40%): the target tier is currently occupied by one container. The yard operator sends two trucks (an inbound truck carrying the incoming container and an empty outbound truck) both to the correct station but at different pads. The crane plan is two moves: `lift_from_stack(<blocker>, <stack>, <tier>)` then `place_on_stack(<incoming>, <stack>, <tier>)`. The outbound truck leaves loaded with the blocker.
-
-The per-round container count is drawn from the configurable `step_count_values` weighted by `step_count_weights` — by default `(1, 2, 3, 4, 5)` with weights `(20, 25, 20, 15, 15)` (mean ≈ 2.65). Rounds named in the `easy_round_numbers` knob are forced to a single container so agents can learn the basic deliver / lift protocol before facing multi-container coordination; the default knobs leave this empty (no warmup rounds). Each round is built from an independent per-round RNG, so toggling a round in or out of `easy_round_numbers` never shifts the case stream for any other round under a fixed `seed`. Decoy manifest entries independently roll the same blocker probability against the post-round stack layout, so blocker / no-blocker entries appear in the manifest in the same mix as real deliveries — the planner cannot infer which entries are real from "which one has a blocker".
+Container bundles are distinct within a round, so a full description always identifies a container — but a full bundle is long, and the budget rewards compressing it. The whole batch is known at round start (no per-step reveal).
 
 ## Agents
 
-### Yard Operator
+### Yard Spotter
 
-Sees one incoming container's ID at a time. Cannot see the yard map, active crane stations, the available pads, the shift manifest, or any target slot. The only agent that can call `move_truck`, but cannot dispatch on their own: they need the crane operator to name the `station_name` and `pad` for each truck before they call the tool. For every delivery in the round the operator dispatches an inbound truck and — when the crane operator orders one — an outbound truck. After the previous delivery completes, the world privately notifies the yard operator with the next container's ID.
+Sees every inbound container's full attribute bundle and the intake slot it sits in. Does not see any target bay. Has no action tool — reports the batch on the link channel (`send_message` only).
 
 ### Logistics Planner
 
-Sees the current four-stack layout (bottom-to-top per stack) and the shift manifest of `(container_id → target slot)` entries. Does NOT see which crane stations are active, which pads they have, or which stacks each station reaches — the physical yard map is the crane operator's view. Cannot see any incoming container's ID, so cannot pick which manifest entry is on the current inbound truck. Cannot call any tool other than `send_message` — must look up each announced container's target slot in the manifest and share it on the link channel, alongside the ordered crane plan in `(stack, tier)` space.
+Holds the stowage assignment: every inbound container, identified by its attributes, paired with the target bay it must end up in. Does not see where any container currently sits (the intake slots) or the physical row. Has no action tool — reports the assignment on the link channel (`send_message` only).
 
 ### Crane Operator
 
-Sees the round's active crane stations: their names, pads, and reachable-stack sets. Cannot see any incoming container's ID, the manifest, or any target slot until the planner shares it. Has two responsibilities: (a) once the planner announces a target slot, decode which active station reaches that stack and pick the pads (two distinct pads on blocker deliveries; one on no-blocker deliveries), then order the yard operator to dispatch each truck with explicit `station_name` + `pad`; (b) call `place_on_stack` and `lift_from_stack` once per physical move in the order the planner provides for each delivery.
+Works from the cab: sees which slots are occupied and which are empty, and is the only agent that can move a container. **Blind to container attributes** — cannot tell the containers apart by sight, so it must match the spotter's and planner's reports to work out each move.
+
+The three-way information split means no agent can act alone: the spotter knows *which container is where*, the planner knows *where each container goes*, and only the crane can move — but the crane needs both reports, joined on the container's attributes, to turn an intake slot into a correct destination.
 
 ## Channels
 
@@ -37,143 +39,101 @@ The scenario runs in one of three modes, selected by the `two_teams` / `intern_e
 
 **Single-team mode (default)** — three agents, one link channel, one postmortem channel.
 
-| Channel ID    | Display Name     | Members                                       | Notes                      |
-|---------------|------------------|-----------------------------------------------|----------------------------|
-| link          | link             | Yard Operator, Logistics Planner, Crane Op    | Inspection-window-bound    |
-| postmortem    | team discussion  | Yard Operator, Logistics Planner, Crane Op    | Free discussion (when on)  |
+| Channel ID    | Display Name     | Members                                | Notes                      |
+|---------------|------------------|----------------------------------------|----------------------------|
+| link          | link             | Yard Spotter, Logistics Planner, Crane | Inspection-window-bound    |
+| postmortem    | team discussion  | Yard Spotter, Logistics Planner, Crane | Free discussion (when on)  |
 
-**Two-team mode (`two_teams=true`)** — six agents (one yard operator, logistics planner, and crane operator per team) split across `team_a` and `team_b`. Each team has its own link and postmortem channel and works its own cases in parallel. At `swap_round + 1` the two crane operators swap teams (most procedural-knowledge-heavy role) so a team's protocol must be transmitted across that boundary.
+**Two-team mode (`two_teams=true`)** — six agents (one spotter, planner, and crane operator per team) on parallel `team_a` / `team_b` cases. At `swap_round + 1` the two crane operators swap teams, so a team's protocol must transmit across that boundary.
 
-| Channel ID     | Members                                                |
-|----------------|--------------------------------------------------------|
-| link_a         | Yard Op A, Logistics Planner A, Crane Operator A → B   |
-| link_b         | Yard Op B, Logistics Planner B, Crane Operator B → A   |
-| postmortem_a   | Team A (subject to `postmortem_after_swap`)            |
-| postmortem_b   | Team B (subject to `postmortem_after_swap`)            |
+**Intern mode (`intern_enabled=true`)** — single team plus a silent intern who joins the link channel at `intern_join_round` (read-only) and replaces the crane operator at `intern_takeover_round`.
 
-**Intern mode (`intern_enabled=true`)** — single team plus a silent intern. The intern joins the `link` channel at `intern_join_round` (read-only — every successful tool result is broadcast to the link channel for them to observe), and at `intern_takeover_round` replaces the crane operator for the rest of the run.
-
-The link channel (or each team's link channel in two-team mode) is the primary channel where character costs apply. Postmortem channels are available during the discussion phase and do not consume the window.
+The link channel (or each team's link channel) is the primary channel where character costs apply. Postmortem channels are free.
 
 ## Tools
 
-**`send_message(channel_id: str, text: str)`** — All three agents. Sends a message to a channel. On the link channel, every character costs one simulated second against the round's `round_time_budget_seconds` inspection window.
+**`move_container(from_slot: int, to_slot: int)`** — Crane Operator only (and the intern after takeover). Pick up the container at `from_slot` and set it down at `to_slot`; slots are counted from 1.
 
-**`move_truck(truck_role, station_name, pad, container_id)`** — Yard Operator only. Structured Pydantic-typed args, all compared by **strict equality** to the case ground truth (case-sensitive, no normalization, no shorthand):
-- `truck_role: Literal["inbound", "outbound"]` — which truck is being committed.
-- `station_name: str` — must exactly match the canonical station name from the planner's active-stations list (e.g. `"crane_station_one"`).
-- `pad: str` — must exactly match one of the correct station's pad names (e.g. `"north_pad"`) and must not already be committed to another truck this round.
-- `container_id: str` — must exactly match the assignment's container_id (the incoming container's ID for inbound trucks; the empty string for outbound trucks).
+The world validates each call deterministically against the batch assignment:
 
-The world validates each call deterministically against the case ground truth and the live truck-commit state. Verdict flags: role matches an active assignment, station matches, pad belongs to the correct station and is not already committed to another truck, container matches. Any mismatch flips the round to a terminal failure.
+- **Soft reject (retryable, no terminal failure)**: a structurally impossible move — `from_slot` empty, `to_slot` occupied, or either slot out of range.
+- **Terminal failure**: a structurally valid move where `from_slot` is not an intake slot holding a batch container to place, or `to_slot` is not that container's assigned bay.
+- **Accept**: `from_slot` is a batch container's intake slot and `to_slot` is its assigned bay. The world relocates the container and broadcasts `CONTAINER PLACED` with the running placed count.
 
-**`place_on_stack(container_id, stack, tier)`** — Crane Operator only. Drops the incoming container off the inbound truck and places it at `(stack, tier)`. `tier` must be the next-empty tier above the destination stack's current top.
-
-**`lift_from_stack(container_id, stack, tier)`** — Crane Operator only. Lifts the container currently at `(stack, tier)` onto the outbound truck (which leaves loaded). `tier` must be the topmost occupied tier of the source stack.
-
-The world deterministically validates each move against `expected_move_sequence[accepted_move_count]` and the live world state (stacks + truck positions + truck contents), and mutates state on accept. A mismatch flips the round to a terminal failure. The scenario soft-rejects (no terminal flip) when the operator calls the tool before the truck required by the next expected step has arrived — the operator can retry once the yard operator commits the missing truck.
+The spotter and planner cannot name slot numbers in a way the crane can verify (the crane is blind to attributes), so the descriptive burden lives entirely in the language while the action stays bit-exact.
 
 ## Round Flow
 
-1. Round starts — each agent receives a per-role injection. All three see the round's inspection window. The yard operator additionally sees the first step's incoming container's ID. The planner additionally sees the current four-stack layout and the shift manifest. The crane operator additionally sees the round's active crane stations with their pads and reachable-stack sets.
-2. For each delivery in the round:
-   1. Yard operator reports the current container's ID to the team on the link channel.
-   2. Planner finds the manifest entry whose `container_id` matches, takes that entry's target slot `(stack, tier)`, and shares it on the link channel along with the ordered crane plan for the delivery (one move on a no-blocker delivery; two on a blocker delivery, lift then place). The planner does NOT pick stations or pads.
-   3. Crane operator decodes the target stack against the active stations they see, picks the correct station, picks one pad for the inbound truck (and a second, different pad for the outbound truck on a blocker delivery), and orders the yard operator on the link channel: explicit `station_name` and `pad` per truck.
-   4. Yard operator calls `move_truck(...)` once for the inbound truck, and a second time for the outbound truck on blocker deliveries, using the station/pad the crane operator named. After each call the world emits `<ROLE> TRUCK ARRIVED AT CORRECT SPOT` on success or `<ROLE> TRUCK ARRIVED AT WRONG SPOT` (and marks the round terminally failed) on any mismatch.
-   5. Crane operator calls `place_on_stack(...)` (and on blocker deliveries, `lift_from_stack(...)` first) once per physical move in the order the planner gave them. The world validates against the current step's `expected_move_sequence[step_accepted_move_count]` and the live world snapshot and mutates state on accept. A reject marks the round terminally failed.
-   6. When the incoming container reaches its target, the world emits `INCOMING CONTAINER PLACED` on the link channel; if more deliveries remain, it privately notifies the yard operator with the next container's ID via `NEXT INCOMING CONTAINER: <id>` and resets the per-step truck state (pads are free again).
-3. World tracks cumulative character cost on the link channel for the whole round; sends a `CRITICAL` notification at 75% of the window and a `COMMUNICATION BUDGET EXCEEDED` notification at 100% (the latter also marks the round terminally failed).
-4. The round ends early via `get_early_round_end_trigger` when every step has completed (`round_completed`) or the world rules the round terminally failed (`round_failed`). Otherwise it ends via `all_agents_idle` or `round_timeout`.
-5. At round end the world emits exactly one terminal notification carrying either `ROUND SUCCESS` or `ROUND FAILED. <reason>`.
-6. Discussion phase — all three agents can talk freely in the postmortem channel (when enabled). Messages here do not cost time.
-7. Next round begins with a fresh case.
+1. Round starts — each agent receives a per-role injection. The spotter sees the intake batch (attributes @ intake slot); the planner sees the assignment (attributes → target bay); the crane sees slot occupancy only.
+2. The spotter reports the batch and the planner reports the assignment on the link channel; the crane matches them and calls `move_container(...)` for each container, in any order.
+3. The world tracks cumulative character cost on the link channel; it sends a `CRITICAL` notification at 75% of the window and a `COMMUNICATION BUDGET EXCEEDED` notification at 100% (the latter also marks the round terminally failed).
+4. The round ends early when every container has been placed (`round_completed`) or the world rules the round terminally failed (`round_failed`); otherwise it ends via `all_agents_idle` or `round_timeout`.
+5. At round end the world emits `ROUND SUCCESS` or `ROUND FAILED. <reason>`.
+6. Discussion phase — agents talk freely in the postmortem channel (when enabled); messages here do not cost time.
+7. Next round begins with a fresh batch and a fresh assignment.
 
 ## Case Generation
 
 Cases are generated procedurally from `seed`. Each round picks:
 
-1. **Step count** — every round draws `step_count` from `step_count_values` against `step_count_weights` (default `(1, 2, 3, 4, 5)` weighted `(20, 25, 20, 15, 15)`, mean ≈ 2.65); rounds named in `easy_round_numbers` discard the draw and force `step_count=1`. Each round uses an independent per-round RNG, so the easy/non-easy status of one round never shifts another round's case content under a fixed seed.
-2. **Stack pre-state** — each stack starts with `randint(0, max_filler)` random filler containers (capped to leave room for the step count); the round-start layout is shared across every delivery in the round.
-3. **Active crane stations** — two stations are sampled (fresh names and pads each round), with `STACK_COUNT // 2` disjoint reachable stacks each. Each station gets `PADS_PER_STATION` (=2) freshly named pads drawn from a shared pool. The two stations together cover all four stacks.
-4. **Per-step plan (in order, mutating a simulated stack state)** — for each step, the generator independently rolls `_BLOCKER_STEP_FRACTION` against the live stack state and picks a structurally valid target slot accordingly (an occupied tier for blocker steps, the next-empty tier for no-blocker steps). The step's `correct_crane_station` is whichever active station reaches the target stack. The step's `truck_assignments` are an inbound truck plus an optional outbound truck (blocker step only); both are constrained to the correct station. The step's `expected_move_sequence` is one move (no blocker) or two (blocker). After building the step the simulated stack state is mutated to reflect the placement (and blocker eviction), so the next step's target is picked against the post-placement layout.
-5. **Truck pads** — the case fixes each truck's station and (for inbound) the container, but NOT the pad. The crane operator picks pads at runtime from the correct station's pad list and orders them to the yard operator. On blocker steps the two trucks must use different pads of that station; the world enforces this. Pads reset between steps; pad uniqueness is per delivery only.
-6. **Shift manifest** — every real step's `(incoming_container_id → target slot)` is mixed with `_MANIFEST_DECOY_COUNT` (3) decoy entries and shuffled. Each decoy gets a fresh container ID and a structurally valid target slot drawn against the post-round stack state with the same blocker probability as a real step. Targets are distinct so each manifest entry points at a unique slot.
+1. **Batch size** — drawn from `batch_size_values` weighted by `batch_size_weights`; rounds in `easy_round_numbers` are forced to a single container (warmup). Each round uses an independent per-round RNG seeded from `(seed, round_number)`.
+2. **Containers** — `batch_size` containers with distinct full attribute bundles.
+3. **Slots** — `2 * batch_size` distinct slots are sampled; the first half are intake slots (filled with the batch), the second half are the target bays (left empty). The rest of the yard is empty.
+4. **Assignment** — each container is paired with one intake slot and one disjoint target bay. This is the per-round key the team must transmit; it cannot be memorized across rounds.
 
 The same canonical seed (`42` per `CLAUDE.md`) produces the same sequence of cases across runs, so cross-model comparisons see an identical workload.
 
-## Why Postmortem Cannot Memorize
+## Why This Requires a Real Protocol
 
-Every round resamples: the step count, the per-step target slots and blocker flags, the active crane stations and their pads, the station-to-stack reachability, the initial stack layout, the shift manifest entries, and every container ID. A fixed mapping like "Stack 2 → Crane Two" cannot solve a future round, and the protocol must handle 1–3 deliveries per round whose sequence is unknown until the yard operator reveals each ID. What postmortem can teach is purely communicative: shorthand for the container-ID handoff, shorthand for truck assignments and stack-tier addresses, a compact representation for the per-delivery crane plan, conventions for "delivery done, send the next ID", etc. These are exactly the protocol features the language metrics target.
+The difficulty is information-theoretic, not incidental. The message the team must move each round is high-entropy (a whole batch), the references are ambiguity-prone (a long attribute bundle per container), the answer is re-keyed every round (no memorization), and the budget binds (the full-English description of the batch overflows the window). To win, the team must converge on a **compact shared code for attribute bundles** so the spotter's report and the planner's assignment can be joined by the (attribute-blind) crane. Plain natural-language description does not fit the budget at scale, so a genuine emergent compression protocol has to develop over rounds — exactly what the language metrics target, and a sharp contrast with one-shot reference tasks where round 1 already succeeds.
 
 ## Budget and Failure Mechanics
 
-The world counts characters on the link channel only — postmortem stays free. Notifications fire at:
-
-1. **75% of window** — `CRITICAL: Yard window narrowing. <remaining> seconds of budget remaining.`
-2. **100%+ of window** — `COMMUNICATION BUDGET EXCEEDED. Communication time: <chars> chars exceeded budget of <budget>s.` This also flips `round_failed_terminally` so the round ends on the next `get_early_round_end_trigger` poll.
-
-Three terminal-failure paths:
-
-- A `move_truck` call fails any of (role matches an active assignment, station, pad, container) → world emits `<ROLE> TRUCK ARRIVED AT WRONG SPOT` and the round fails.
-- A `place_on_stack` or `lift_from_stack` call fails matches-expected / source-holds-container / destination-empty / direction-valid → world rejects the move and the round fails.
-- Character cost on the link channel reaches the inspection window → world emits `COMMUNICATION BUDGET EXCEEDED` and the round fails.
-
-A round only succeeds if every step completed: every step's expected trucks were committed correctly and every step's expected crane moves were accepted, and the inspection window was not exhausted at any point. Rounds where all three agents go idle before every delivery completes end via the `all_agents_idle` trigger and are reported in the next postmortem as `INCOMPLETE — everyone stopped acting after N/M container(s) placed`.
+The world counts characters on the link channel only — postmortem is free. Notifications fire at 75% (`CRITICAL`) and 100% (`COMMUNICATION BUDGET EXCEEDED`, which also fails the round). Terminal-failure paths: a `move_container` naming the wrong source container or wrong bay; the budget being exhausted; or all agents going idle before the batch is placed (`all_agents_idle`, reported as `INCOMPLETE`). A round succeeds only if every container is placed correctly within the window. Structurally impossible moves are soft rejects the crane can retry.
 
 ## Evaluation
 
-The scenario ships zero scenario-specific metrics — every measurement comes from the platform metric registry. The scenario opts in by implementing platform hooks:
+Zero scenario-specific metrics — every measurement comes from the platform registry via these hooks:
 
-- `judge_round_result(round_number, trigger)` returns one `RoundResult` per team per round (single-team: one with `team_id=None`; two-team: one each for `team_a` and `team_b`). The game clock writes `RoundResultRecorded` events; the platform `round_success` metric reads them. Two-team mode emits `round_success_team_a` and `round_success_team_b` Measurements automatically.
-- `build_communication_rounds(events)` walks the JSONL and produces one `CommunicationRoundView` per round per link channel, joining link messages with the per-round case ground truth. Enables `communication_open_coding`, `communication_feature_presence`, and `protocol_learned_after_swap`.
-- `detect_protocol_boundary_window(events, agent_configs)` returns the crane-swap or intern-takeover boundary; falls back to the platform default (first `AgentSwappedMidRun`) otherwise.
-- `restore_state_from_events(events)` re-materialises per-team `YardOutcome` history on fork / resume / replace-agent so the first post-resume injection's "PREVIOUS RESULT" block reflects the source's actual round N-1 outcome.
+- `judge_round_result` → `round_success` (and `round_success_after_resume`); two-team mode emits `round_success_team_a` / `round_success_team_b`.
+- `build_communication_rounds` → joins link messages with the per-round batch assignment (spotter view, planner view, crane occupancy) for `communication_open_coding`, `communication_feature_presence`, and `protocol_learned_after_swap`.
+- `detect_protocol_boundary_window` → the crane-swap or intern-takeover boundary.
+- `restore_state_from_events` → re-materialises per-team outcome history on fork / resume / replace-agent.
 
-Useful platform metrics for this scenario:
-
-- **`round_success`** — Deterministic; fraction of rounds the team completed every truck and every crane move within the inspection window. Reads `RoundResultRecorded` events written from `judge_round_result`. Two-team mode emits `round_success_team_a` and `round_success_team_b`.
-- **`round_success_after_resume`** — Re-scores `round_success` over the post-resume window when the run was launched via replace-agent, cross-run replace-agent, or an in-run scheduled swap.
-- **`mean_chars_per_round`** — Total link-channel characters per round, averaged. Directly comparable to `round_time_budget_seconds` (one character = one second).
-- **`mean_chars_per_message`** — Per-message verbosity; removes the inflation from round-by-round message count differences (blocker rounds need more back-and-forth than no-blocker rounds).
-- **`perplexity`** — Mean per-token surprisal of link-channel messages under `gpt2`. Lower under heavy compression, higher under natural-language verbosity.
-- **`language_strangeness` / `slang_emergence` / `neologism` / `shorthand_codes`** — LLM-judged emergent-language metrics; the link channel returned by `get_primary_channel_id()` is what they read.
-- **`communication_open_coding` / `communication_feature_presence`** — Open-coding → ontology → relabel pipeline over the per-round transcript views.
-- **`protocol_learned_after_swap`** — Available in two-team mode (after the crane swap) and intern mode (after the intern takeover).
-- **`round_ended_idle` / `round_ended_timeout`** — Flag rounds that ended via agent idle vs wall-clock timeout (vs the more-common `round_completed` / `round_failed` scenario triggers).
-- **`content_filter_refusal`** — Counts `AgentRunCycleFailed` events with `error_type == ContentFilterError`.
+Useful platform metrics: `round_success`, `mean_chars_per_round`, `mean_chars_per_message`, `perplexity`, `shorthand_codes` / `neologism` / `slang_emergence` / `language_strangeness`, `communication_open_coding` / `communication_feature_presence`, `protocol_learned_after_swap`, `round_ended_idle` / `round_ended_timeout`, `content_filter_refusal`.
 
 ## Knobs
 
-| Knob                              | Description                                                                                                                        |
-|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
-| `round_count`                     | Number of rounds                                                                                                                   |
-| `round_time_budget_seconds`             | Per-round customs inspection window (one character on the link channel = one simulated second)                                     |
-| `seed`                            | Controls case generation (containers, stacks, stations, pads, manifest decoys, per-round step count, per-step blocker rolls)        |
-| `channel_noise_level`             | Per-character drop probability on the link channel only (postmortem stays clean). In `[0.0, 1.0]`        |
-| `noise_replacement_mode`          | What each dropped char becomes: `mask` (default) → `_` (visible erasure); `random_letter` → a different random letter (unmarked substitution) |
-| `easy_round_numbers`              | Set of round numbers forced to a single-container delivery (warmup cases). Empty by default. Each round uses an independent per-round RNG, so this never shifts other rounds' cases under a fixed `seed`. |
-| `step_count_values`               | Candidate per-round delivery counts (e.g. `[1, 2, 3, 4, 5]`). Drawn per non-easy round against `step_count_weights`. Must be same non-empty length as `step_count_weights`; all values ≥ 1. |
-| `step_count_weights`              | Sampling weights paired positionally with `step_count_values` (e.g. `[20, 25, 20, 15, 15]`). All weights > 0. |
-| `postmortem_enabled`              | Whether a discussion phase follows each round                                                                                      |
-| `postmortem_disabled_at_start`    | When true, postmortem is dropped from round 1 onward. Used by replace-agent / cross-run flows                                      |
-| `postmortem_duration_seconds`     | Time limit for the discussion phase (inherited from `BaseKnobs`)                                                                   |
-| `max_round_duration_seconds`      | Wall-clock timeout per round (inherited)                                                                                           |
-| `model_overrides`                 | Per-agent model/provider overrides (inherited)                                                                                     |
-| `agent_max_tokens`                | Per-cycle output-token cap (inherited from `BaseKnobs`)                                                                            |
-| `two_teams`                       | Enables two-team mode (six agents, parallel `team_a` / `team_b` cases). Mutually exclusive with `intern_enabled`                   |
-| `swap_round`                      | Round at which the two teams' crane operators swap. Required when `two_teams=true`; must be `1..round_count-1`                     |
-| `announce_swap`                   | When true and `two_teams=true`, the world posts a swap notice on each team's link channel right after the swap fires              |
-| `postmortem_after_swap`           | When true, the swapped-in crane operators retain access to their new team's postmortem channel after the swap                      |
-| `intern_enabled`                  | Enables intern mode (4 agents: standard team + silent intern). Mutually exclusive with `two_teams`                                  |
-| `intern_join_round`               | Round at which the intern joins the link channel as a silent observer. Required when `intern_enabled=true`                          |
-| `intern_takeover_round`           | Round at which the intern replaces the crane operator. Required when `intern_enabled=true`; must be `> intern_join_round`           |
-| `replace_agent_default_channel_visibility` | Platform knob — `{"postmortem": false, "postmortem_a": false, "postmortem_b": false}` by default, so postmortem channels are dropped after a replace-agent swap. Postmortem tool calls in the replaced agent's reconstructed history are blocked separately via `get_replace_agent_blocked_tool_call_channels()` |
-| `scheduled_events`                | Platform knob — round-keyed `swap_agent` and `set_postmortem` events fired by the in-run scheduler                                 |
+| Knob | Description |
+|---|---|
+| `round_count` | Number of rounds |
+| `round_time_budget_seconds` | Per-round inspection window (one link-channel character = one simulated second) |
+| `seed` | Controls case generation (batch, containers, intake slots, target bays, assignment) |
+| `batch_size_values` | Candidate per-round batch sizes. Same non-empty length as `batch_size_weights`; all ≥ 1 |
+| `batch_size_weights` | Sampling weights paired positionally with `batch_size_values`. All > 0 |
+| `yard_slot_count` | Number of slots in the yard. Must be ≥ `2 * max(batch_size_values) + 2` |
+| `channel_noise_level` | Per-character drop probability on the link channel. In `[0.0, 1.0]` |
+| `noise_replacement_mode` | What each dropped char becomes: `mask` → `_`; `random_letter` → a different random letter |
+| `easy_round_numbers` | Set of round numbers forced to a single container (warmup). Empty by default |
+| `postmortem_enabled` | Whether a discussion phase follows each round |
+| `postmortem_disabled_at_start` | When true, postmortem is dropped from round 1 onward (replace-agent / cross-run flows) |
+| `postmortem_duration_seconds` | Time limit for the discussion phase (inherited) |
+| `max_round_duration_seconds` | Wall-clock timeout per round (inherited) |
+| `model_overrides` | Per-agent model/provider overrides (inherited) |
+| `agent_max_tokens` | Per-cycle output-token cap (inherited) |
+| `two_teams` | Enables two-team mode. Mutually exclusive with `intern_enabled` |
+| `swap_round` | Round at which the two teams' crane operators swap. Required when `two_teams=true` |
+| `announce_swap` | When true and `two_teams=true`, the world posts a swap notice on each link channel |
+| `postmortem_after_swap` | Whether swapped-in crane operators keep their new team's postmortem |
+| `intern_enabled` | Enables intern mode (4 agents). Mutually exclusive with `two_teams` |
+| `intern_join_round` | Round at which the intern joins as a silent observer |
+| `intern_takeover_round` | Round at which the intern replaces the crane operator (`> intern_join_round`) |
+| `replace_agent_default_channel_visibility` | Platform knob — postmortem channels dropped after a replace-agent swap by default |
+| `scheduled_events` | Platform knob — round-keyed `swap_agent` / `set_postmortem` events |
 
 ## Presets
 
-- `knobs_default.json` — 15 rounds, 200 sec/round inspection window, lossless link channel, postmortem enabled, no warmup rounds (`easy_round_numbers` empty).
+- `knobs_default.json` — 15 rounds, 140 sec/round window (binds), 28-slot yard, batch 8–12, lossless link channel, postmortem enabled.
 
 ## Running
 
@@ -189,6 +149,6 @@ After completion, score with:
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate container_yard_stacking \
   --run-dir ./runs/container_yard_stacking/<timestamp> \
-  --metrics round_success,mean_chars_per_round,mean_chars_per_message \
+  --metrics round_success,mean_chars_per_round,mean_chars_per_message,shorthand_codes \
   --model claude-haiku-4-5-20251001 --provider anthropic
 ```

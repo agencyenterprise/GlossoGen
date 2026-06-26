@@ -1,23 +1,20 @@
 """Container yard stacking simulation scenario.
 
-Three agents coordinate over one shared link channel: the yard
-operator (sees only the incoming container's ID and dispatches trucks
-on the crane operator's orders), the logistics planner (sees only the
-stack layout and shift manifest and shares the target slot + crane plan),
-and the crane operator (sees the active crane stations with their pads
-and reachable stacks, orders each truck's station + pad to the yard
-operator, and executes one physical crane move per tool call). The
-information split forces crane↔yard communication: only the crane
-operator knows where to send each truck. Both action tools take
-structured Pydantic-typed args (no free-text parsing); the world
-validates each call deterministically against the round's truck
-assignments and the live world state. Round success requires every
-expected truck to arrive at the correct spot, every expected crane
-move to be accepted in order, and the communication budget on the
-link channel not to be exceeded.
+Three agents coordinate over one shared link channel: the yard scanner
+(sees only the current target container's attributes, one at a time), the
+logistics planner (holds the rulebook pairing each container with its goal
+slot, expressed relative to a landmark container), and the crane operator
+(sees the whole yard row and is the only agent that can move a container).
+The information split forces description-based communication: a container is
+named by its attributes, a goal slot by its position relative to a landmark.
+The single ``move_container`` tool is graded deterministically against the
+round's ground truth (source slot == the target's slot, destination slot ==
+the goal slot) and the live row. Round success requires every container to be
+relocated correctly and the communication budget on the link channel not to
+be exceeded.
 
 Heavy logic lives in dedicated sibling modules: :mod:`agent_factory`
-(agent/channel construction), :mod:`mcp_tools` (the three move tools),
+(agent/channel construction), :mod:`mcp_tools` (the move_container tool),
 :mod:`injection_rendering` (per-round and postmortem prompts),
 :mod:`case_event_conversion` (yard-case → event-log adapters), and
 :mod:`team_routing` (agent/channel/team ID lookups).
@@ -159,8 +156,9 @@ class ContainerYardStackingScenario(SimulationScenario):
             round_count=knobs.round_count,
             round_time_budget_seconds=knobs.round_time_budget_seconds,
             easy_round_numbers=knobs.easy_round_numbers,
-            step_count_values=knobs.step_count_values,
-            step_count_weights=knobs.step_count_weights,
+            batch_size_values=knobs.batch_size_values,
+            batch_size_weights=knobs.batch_size_weights,
+            yard_slot_count=knobs.yard_slot_count,
         )
         self._noise_rng = random.Random(knobs.seed)
         self._agent_display_names: dict[str, str] = build_agent_display_names(
@@ -343,7 +341,7 @@ class ContainerYardStackingScenario(SimulationScenario):
             return None
         teams = self._world.team_ids
         every_team_completed = all(
-            self._world.current_step(team_id=team_id) is None
+            self._world.all_placed(team_id=team_id)
             and not self._world.round_failed_terminally(team_id=team_id)
             and not self._world.round_budget_exceeded(team_id=team_id)
             for team_id in teams
@@ -352,7 +350,7 @@ class ContainerYardStackingScenario(SimulationScenario):
             return "round_completed"
         every_team_done = all(
             self._world.round_failed_terminally(team_id=team_id)
-            or self._world.current_step(team_id=team_id) is None
+            or self._world.all_placed(team_id=team_id)
             for team_id in teams
         )
         if every_team_done:
@@ -470,7 +468,7 @@ class ContainerYardStackingScenario(SimulationScenario):
         return self._world
 
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:
-        """Return the move_truck and crane_move tools."""
+        """Return the move_container tool."""
         return build_mcp_tools(
             world=self._world,
             knobs=self._knobs,

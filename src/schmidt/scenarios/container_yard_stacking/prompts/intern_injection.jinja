@@ -5,10 +5,10 @@ Round {{ round_number }}
 {% if intern_active %}
 You are the active crane operator from this round onwards. Inspection window: {{ current_case.round_time_budget_seconds }}s.
 
-ACTIVE CRANE STATIONS:
-{% for station in current_case.active_crane_stations %}- {{ station.station_name }} (pads: {{ station.pads | join(', ') }}) — can reach stacks: {{ station.reachable_stacks | join(', ') }}
+SLOTS (you cannot read container attributes from the cab):
+{% for slot, status in crane_occupancy %}- Slot {{ slot }}: {{ status }}
 {% endfor %}
 {% else %}
-You are in silent-observation phase. Read everything on link. Do not call ``send_message`` — it will be rejected.
+You are in silent-observation phase. Read everything on link. Do not call send_message — it will be rejected.
 {% endif %}
 {% endif %}

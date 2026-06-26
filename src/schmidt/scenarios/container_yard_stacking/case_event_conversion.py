@@ -1,61 +1,56 @@
-"""Adapters that turn ``YardCase`` / ``CaseStep`` namedtuples into event-log models.
+"""Adapters that turn ``YardCase`` namedtuples into event-log models.
 
-The scenario keeps its ground truth as plain ``NamedTuple`` instances
-(see :mod:`yard_cases`) because they are convenient for in-process
-mutation and indexing. The event log serializes round-start state as
-Pydantic ``BaseModel`` instances (see :mod:`events`). The conversion
-helpers here bridge the two representations whenever the scenario
-emits a ``ContainerYardCaseStarted`` event or needs to surface a step
-in a truck/crane verdict.
+The scenario keeps its ground truth as plain ``NamedTuple`` instances (see
+:mod:`yard_cases`). The event log serializes round-start state as Pydantic
+``BaseModel`` instances (see :mod:`events`). The helpers here bridge the two
+whenever the scenario emits a ``ContainerYardCaseStarted`` event.
 """
 
-from schmidt.scenarios.container_yard_stacking.events import (
-    ContainerYardCaseStarted,
-    ContainerYardCaseStep,
-    ContainerYardCraneStation,
-    ContainerYardManifestEntry,
-    ContainerYardStackPosition,
-    ContainerYardStackSnapshot,
-    ContainerYardTruckAssignment,
+from schmidt.scenarios.container_yard_stacking.container_attributes import (
+    Container,
+    attribute_pairs,
 )
-from schmidt.scenarios.container_yard_stacking.yard_cases import CaseStep, TruckAssignment, YardCase
+from schmidt.scenarios.container_yard_stacking.events import (
+    ContainerYardAttribute,
+    ContainerYardBatchItem,
+    ContainerYardCaseStarted,
+    ContainerYardContainer,
+    ContainerYardSlot,
+)
+from schmidt.scenarios.container_yard_stacking.yard_cases import CaseStep, YardCase
 
 
-def truck_assignment_to_event(assignment: TruckAssignment) -> ContainerYardTruckAssignment:
-    """Convert the case namedtuple form to the event-log BaseModel form."""
-    return ContainerYardTruckAssignment(
-        truck_role=assignment.truck_role,
-        station_name=assignment.station_name,
-        container_id=assignment.container_id,
+def container_to_event(container: Container) -> ContainerYardContainer:
+    """Convert a case-layer container to its event-log form."""
+    return ContainerYardContainer(
+        attributes=[
+            ContainerYardAttribute(name=name, value=value)
+            for name, value in attribute_pairs(container=container)
+        ]
     )
 
 
-def correct_station_pads_for_step(case: YardCase, step: CaseStep) -> list[str]:
-    """Return the list of transfer pads at the step's correct crane station."""
-    for station in case.active_crane_stations:
-        if station.station_name == step.correct_crane_station:
-            return list(station.pads)
-    raise ValueError(
-        f"correct station {step.correct_crane_station} not found among active stations"
+def batch_item_to_event(step: CaseStep) -> ContainerYardBatchItem:
+    """Convert a case-layer batch step to its event-log form."""
+    return ContainerYardBatchItem(
+        container=container_to_event(container=step.container),
+        intake_slot=step.intake_slot,
+        target_slot=step.target_slot,
     )
 
 
-def case_step_to_event(step: CaseStep) -> ContainerYardCaseStep:
-    """Convert the case namedtuple step into the event-log BaseModel form."""
-    return ContainerYardCaseStep(
-        step_index=step.step_index,
-        incoming_container_id=step.incoming_container_id,
-        target_position=ContainerYardStackPosition(
-            stack=step.target_position.stack,
-            tier=step.target_position.tier,
-        ),
-        correct_crane_station=step.correct_crane_station,
-        truck_assignments=[
-            truck_assignment_to_event(assignment=assignment)
-            for assignment in step.truck_assignments
-        ],
-        expected_move_sequence=list(step.expected_move_sequence),
-    )
+def row_to_event(row: dict[int, Container | None]) -> list[ContainerYardSlot]:
+    """Convert the case-layer row dict to an ordered list of event-log slots."""
+    slots: list[ContainerYardSlot] = []
+    for slot in sorted(row.keys()):
+        container = row[slot]
+        if container is None:
+            slots.append(ContainerYardSlot(slot=slot, container=None))
+        else:
+            slots.append(
+                ContainerYardSlot(slot=slot, container=container_to_event(container=container))
+            )
+    return slots
 
 
 def case_started_event(round_number: int, case: YardCase) -> ContainerYardCaseStarted:
@@ -63,31 +58,8 @@ def case_started_event(round_number: int, case: YardCase) -> ContainerYardCaseSt
     return ContainerYardCaseStarted(
         round_number=round_number,
         case_number=case.case_number,
-        active_crane_stations=[
-            ContainerYardCraneStation(
-                station_name=station.station_name,
-                pads=list(station.pads),
-                reachable_stacks=list(station.reachable_stacks),
-            )
-            for station in case.active_crane_stations
-        ],
-        initial_stacks=[
-            ContainerYardStackSnapshot(
-                stack=stack_index,
-                containers_bottom_to_top=list(containers),
-            )
-            for stack_index, containers in sorted(case.initial_stacks.items())
-        ],
         round_time_budget_seconds=case.round_time_budget_seconds,
-        steps=[case_step_to_event(step=step) for step in case.steps],
-        manifest=[
-            ContainerYardManifestEntry(
-                container_id=entry.container_id,
-                target_position=ContainerYardStackPosition(
-                    stack=entry.target_position.stack,
-                    tier=entry.target_position.tier,
-                ),
-            )
-            for entry in case.manifest
-        ],
+        yard_slot_count=case.yard_slot_count,
+        initial_row=row_to_event(row=case.initial_row),
+        batch=[batch_item_to_event(step=step) for step in case.steps],
     )
