@@ -1,20 +1,24 @@
 """Procedural per-round case generation for the drive_module_repair scenario.
 
-A drive module has a fixed catalog of components, each at a fixed access
-depth (outer components must be serviced before deeper ones). Each round a
-subset of components is faulty; the correct replacement order is the faulty
-subset sorted by access depth (a unique total order). Two per-round secret
-mappings re-randomize so nothing memorizes:
+Each round puts one or more drive modules on the bench. A drive module has a
+fixed catalog of components, each at a fixed access depth (outer components
+must be serviced before deeper ones). Each module has its own faulty subset;
+the correct order is the faulty subset sorted by access depth. Two per-round
+secret mappings, **shared across all modules in the round**, re-randomize so
+nothing memorizes:
 
 - the **fault-tree**: a bijection component <-> symptom (the diagnostics
   engineer holds it; the technician only observes symptoms),
 - the **service spec**: each component's tool / torque / calibration (the
-  spec engineer holds it).
+  spec engineer holds it) — module-independent, so a component's spec is the
+  same wherever it appears.
 
-The derived ground truth for the round is the faulty components in
-access-depth order, each rendered to a ``judge_expected_action`` string the
-LLM judge scores the technician's free-text action against. Each round is
-built from an independent RNG keyed on ``(seed, round_number)``.
+The derived ground truth is a flat, ordered list of replacement stages:
+modules in canonical order (module-1 first), components within each module in
+access-depth order. Each stage is rendered to a ``judge_expected_action``
+string (naming the module) that the LLM judge scores the technician's
+free-text action against. Each round is built from an independent RNG keyed
+on ``(seed, round_number)``.
 """
 
 import random
@@ -29,7 +33,7 @@ class Component(NamedTuple):
 
 
 class ComponentSpec(NamedTuple):
-    """This round's service spec for one component."""
+    """This round's service spec for one component (shared across modules)."""
 
     component: str
     tool: str
@@ -37,10 +41,18 @@ class ComponentSpec(NamedTuple):
     calibration: str
 
 
+class ModulePanel(NamedTuple):
+    """The symptoms observed on one module's diagnostic panel this round."""
+
+    module_label: str
+    symptoms: tuple[str, ...]
+
+
 class Stage(NamedTuple):
     """One ordered replacement the technician must perform, with ground truth."""
 
     step_index: int
+    module_label: str
     component: str
     symptom: str
     tool: str
@@ -54,8 +66,9 @@ class DriveModuleCase(NamedTuple):
     """A single drive_module_repair case presented for one round."""
 
     case_number: int
-    replacement_count: int
-    panel_symptoms: tuple[str, ...]
+    module_count: int
+    total_replacement_count: int
+    module_panels: tuple[ModulePanel, ...]
     fault_tree: tuple[tuple[str, str], ...]
     spec_table: tuple[ComponentSpec, ...]
     stages: tuple[Stage, ...]
@@ -131,10 +144,15 @@ TORQUE_MIN_NM = 4
 TORQUE_MAX_NM = 24
 
 
-def render_expected_action(spec: ComponentSpec) -> str:
+def module_label(module_index: int) -> str:
+    """Return the canonical label for the ``module_index``-th module (1-based)."""
+    return f"module-{module_index}"
+
+
+def render_expected_action(module_label_value: str, spec: ComponentSpec) -> str:
     """Render the canonical expected-action string the LLM judge compares against."""
     return (
-        f"Replace the {spec.component}. Required tool: {spec.tool}. "
+        f"Replace {module_label_value}'s {spec.component}. Required tool: {spec.tool}. "
         f"Torque: {spec.torque_nm} Nm. Calibration procedure: {spec.calibration}."
     )
 
@@ -147,18 +165,22 @@ def component_access_order() -> tuple[Component, ...]:
 def _build_one_case(
     rng: random.Random,
     case_number: int,
-    replacement_count: int,
+    module_replacement_counts: list[int],
     round_time_budget_seconds: int,
 ) -> DriveModuleCase:
-    """Generate one case: faulty subset, fault-tree, spec table, ordered stages."""
+    """Generate one case: shared fault-tree + spec, per-module fault sets, ordered stages.
+
+    ``module_replacement_counts`` has one entry per module — the number of
+    faulty components on that module.
+    """
     component_ids = [component.component_id for component in COMPONENTS]
     depth_by_id = {component.component_id: component.access_depth for component in COMPONENTS}
 
-    # Per-round fault-tree: a bijection component -> symptom (re-randomized).
+    # Per-round fault-tree: a bijection component -> symptom (shared across modules).
     shuffled_symptoms = rng.sample(SYMPTOMS, len(component_ids))
     symptom_by_component = dict(zip(component_ids, shuffled_symptoms))
 
-    # Per-round service spec for every component (re-randomized).
+    # Per-round service spec for every component (module-independent).
     spec_by_component = {
         component_id: ComponentSpec(
             component=component_id,
@@ -169,36 +191,49 @@ def _build_one_case(
         for component_id in component_ids
     }
 
-    faulty = rng.sample(component_ids, replacement_count)
-    ordered = sorted(faulty, key=lambda component_id: depth_by_id[component_id])
+    module_panels: list[ModulePanel] = []
+    stages: list[Stage] = []
+    step_index = 0
+    for module_index, replacement_count in enumerate(module_replacement_counts, start=1):
+        label = module_label(module_index=module_index)
+        faulty = rng.sample(component_ids, replacement_count)
+        ordered = sorted(faulty, key=lambda component_id: depth_by_id[component_id])
 
-    panel_symptoms = [symptom_by_component[component_id] for component_id in faulty]
-    rng.shuffle(panel_symptoms)
+        panel = [symptom_by_component[component_id] for component_id in faulty]
+        rng.shuffle(panel)
+        module_panels.append(ModulePanel(module_label=label, symptoms=tuple(panel)))
 
-    stages = tuple(
-        Stage(
-            step_index=step_index,
-            component=component_id,
-            symptom=symptom_by_component[component_id],
-            tool=spec_by_component[component_id].tool,
-            torque_nm=spec_by_component[component_id].torque_nm,
-            calibration=spec_by_component[component_id].calibration,
-            access_depth=depth_by_id[component_id],
-            judge_expected_action=render_expected_action(spec=spec_by_component[component_id]),
-        )
-        for step_index, component_id in enumerate(ordered)
-    )
+        for component_id in ordered:
+            spec = spec_by_component[component_id]
+            stages.append(
+                Stage(
+                    step_index=step_index,
+                    module_label=label,
+                    component=component_id,
+                    symptom=symptom_by_component[component_id],
+                    tool=spec.tool,
+                    torque_nm=spec.torque_nm,
+                    calibration=spec.calibration,
+                    access_depth=depth_by_id[component_id],
+                    judge_expected_action=render_expected_action(
+                        module_label_value=label, spec=spec
+                    ),
+                )
+            )
+            step_index += 1
+
     fault_tree = tuple(
         (symptom_by_component[component_id], component_id) for component_id in component_ids
     )
     spec_table = tuple(spec_by_component[component_id] for component_id in component_ids)
     return DriveModuleCase(
         case_number=case_number,
-        replacement_count=replacement_count,
-        panel_symptoms=tuple(panel_symptoms),
+        module_count=len(module_replacement_counts),
+        total_replacement_count=len(stages),
+        module_panels=tuple(module_panels),
         fault_tree=fault_tree,
         spec_table=spec_table,
-        stages=stages,
+        stages=tuple(stages),
         round_time_budget_seconds=round_time_budget_seconds,
     )
 
@@ -208,33 +243,44 @@ def get_cases(
     round_count: int,
     round_time_budget_seconds: int,
     easy_round_numbers: frozenset[int],
+    module_count_values: list[int],
+    module_count_weights: list[int],
     replacements_count_values: list[int],
     replacements_count_weights: list[int],
 ) -> list[DriveModuleCase]:
     """Generate per-round drive-module cases deterministically.
 
-    Rounds named in ``easy_round_numbers`` are forced to a single faulty
-    component; every other round draws its faulty-component count from
-    ``replacements_count_values`` weighted by ``replacements_count_weights``
-    (clamped to the catalog size). Each round uses an independent RNG keyed on
+    Rounds named in ``easy_round_numbers`` are forced to a single module with a
+    single faulty component; every other round draws a module count from
+    ``module_count_values`` (weighted), and for each module a faulty-component
+    count from ``replacements_count_values`` (weighted), each clamped to the
+    catalog size. Each round uses an independent RNG keyed on
     ``(seed, round_number)``.
     """
     cases: list[DriveModuleCase] = []
     for case_index in range(round_count):
         case_number = case_index + 1
         round_rng = random.Random(f"{seed}-{case_number}")
-        drawn = round_rng.choices(
-            replacements_count_values, weights=replacements_count_weights, k=1
-        )[0]
         if case_number in easy_round_numbers:
-            replacement_count = 1
+            module_replacement_counts = [1]
         else:
-            replacement_count = min(drawn, len(COMPONENTS))
+            module_count = round_rng.choices(
+                module_count_values, weights=module_count_weights, k=1
+            )[0]
+            module_replacement_counts = [
+                min(
+                    round_rng.choices(
+                        replacements_count_values, weights=replacements_count_weights, k=1
+                    )[0],
+                    len(COMPONENTS),
+                )
+                for _ in range(module_count)
+            ]
         cases.append(
             _build_one_case(
                 rng=round_rng,
                 case_number=case_number,
-                replacement_count=replacement_count,
+                module_replacement_counts=module_replacement_counts,
                 round_time_budget_seconds=round_time_budget_seconds,
             )
         )

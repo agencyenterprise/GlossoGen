@@ -7,6 +7,7 @@ class DriveModuleOutcome(NamedTuple):
     """Result of a single drive-module case after a round completes."""
 
     case_number: int
+    module_count: int
     replacement_count: int
     replacements_done: int
     budget_exceeded: bool

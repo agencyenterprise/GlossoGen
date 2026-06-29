@@ -121,6 +121,8 @@ class DriveModuleRepairScenario(SimulationScenario):
             round_count=knobs.round_count,
             round_time_budget_seconds=knobs.round_time_budget_seconds,
             easy_round_numbers=knobs.easy_round_numbers,
+            module_count_values=knobs.module_count_values,
+            module_count_weights=knobs.module_count_weights,
             replacements_count_values=knobs.replacements_count_values,
             replacements_count_weights=knobs.replacements_count_weights,
         )
