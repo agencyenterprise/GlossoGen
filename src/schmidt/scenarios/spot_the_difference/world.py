@@ -122,16 +122,8 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         return self._teams[team_id].current_round_characters
 
     def all_teams_done(self) -> bool:
-        """Whether every team is finished this round (verdict recorded or budget blown).
-
-        Gated on the recorded verdict, not just the lock: ``try_lock_submission``
-        sets ``submitted`` before the async judge runs, so ending the round on
-        the lock alone would let the round be scored before the verdict lands. A
-        team that exhausts its character budget is also done (and ineligible).
-        """
-        return all(
-            team.verdict_recorded or team.round_budget_exceeded for team in self._teams.values()
-        )
+        """Whether every team is finished this round."""
+        return all(_team_done(team=team) for team in self._teams.values())
 
     def outcomes(self, team_id: str) -> list[DiffOutcome]:
         """Historical per-round outcomes for one team."""
@@ -312,6 +304,21 @@ class SpotTheDifferenceWorld(ScenarioWorld):
                 channel_id=team.link_channel_id,
                 text=f"{BUDGET_LOW_MARKER}. {budget - used} of {budget} budget characters remain.",
             )
+
+
+def _team_done(team: TeamState) -> bool:
+    """Whether one team is finished this round.
+
+    A team that submitted is done only once its async judge verdict is
+    recorded, even if it exceeded budget: ``try_lock_submission`` sets
+    ``submitted`` before the judge runs, so ending the round on the lock (or
+    on the budget flag) would score the round before the verdict lands and
+    record a stale ``found_count`` of 0. A team that never submitted is done
+    when it exhausts its character budget (it can no longer win).
+    """
+    if team.submitted:
+        return team.verdict_recorded
+    return team.round_budget_exceeded
 
 
 def _render_terminal_text(outcome: DiffOutcome) -> str:

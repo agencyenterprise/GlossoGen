@@ -2293,6 +2293,8 @@ export interface components {
          * @description Verdict for a single ``submit_differences`` call attached by ``call_id``.
          */
         SpotSubmissionMetadata: {
+            /** Round Number */
+            round_number: number;
             /** Team Id */
             team_id: string;
             /** Submitted Items */
@@ -2307,6 +2309,24 @@ export interface components {
             characters_at_submission: number;
             /** Explanation */
             explanation: string;
+        };
+        /**
+         * SpotTeamRoundResult
+         * @description One team's outcome for one round (the correctness-gate + win/loss verdict).
+         *
+         *     ``team_id`` is ``null`` in single-team mode. ``reason`` is the human-readable
+         *     explanation written by ``judge_round_result`` (e.g. ``won — found 3/3, 465
+         *     chars`` / ``did not submit (found 0/3, 576 chars)``).
+         */
+        SpotTeamRoundResult: {
+            /** Round Number */
+            round_number: number;
+            /** Team Id */
+            team_id: string | null;
+            /** Success */
+            success: boolean;
+            /** Reason */
+            reason: string;
         };
         /**
          * SpotTheDifferenceCaseSummary
@@ -2347,6 +2367,8 @@ export interface components {
             submission_metadata_by_call_id: {
                 [key: string]: components["schemas"]["SpotSubmissionMetadata"];
             };
+            /** Team Results */
+            team_results: components["schemas"]["SpotTeamRoundResult"][];
         };
         /**
          * StartEvaluationRequest

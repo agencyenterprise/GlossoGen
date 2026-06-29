@@ -1,17 +1,18 @@
 """spot_the_difference extension to the platform run-detail API.
 
-Materializes per-round case ground truth (both scenes and the planted
-differences) and per-tool-call submission verdicts (``submit_differences``)
-keyed by tool ``call_id``. The frontend renders the case data as a panel at
-the top of the round-timeline modal and the per-call verdicts inline
-alongside each tool call in the chat timeline.
+Materializes everything the round-detail panel needs from ``scenario_extras``
+alone: per-round case ground truth (both scenes and the planted differences),
+each team's ``submit_differences`` verdict (keyed by tool ``call_id`` and
+carrying its round), and the per-round-per-team outcome (success + reason).
+The frontend panel shows, per round, what differs between the two scenes, what
+each team submitted, and why each team passed or failed.
 """
 
 from typing import ClassVar, Literal
 
 from pydantic import BaseModel
 
-from schmidt.models.event import SimulationEvent, ToolResultReceived
+from schmidt.models.event import RoundResultRecorded, SimulationEvent, ToolResultReceived
 from schmidt.scenarios.spot_the_difference.events import (
     DifferenceSubmissionJudged,
     SpotObject,
@@ -42,6 +43,7 @@ class SpotTheDifferenceCaseSummary(BaseModel):
 class SpotSubmissionMetadata(BaseModel):
     """Verdict for a single ``submit_differences`` call attached by ``call_id``."""
 
+    round_number: int
     team_id: str
     submitted_items: list[str]
     matched_difference_indices: list[int]
@@ -51,12 +53,27 @@ class SpotSubmissionMetadata(BaseModel):
     explanation: str
 
 
+class SpotTeamRoundResult(BaseModel):
+    """One team's outcome for one round (the correctness-gate + win/loss verdict).
+
+    ``team_id`` is ``null`` in single-team mode. ``reason`` is the human-readable
+    explanation written by ``judge_round_result`` (e.g. ``won — found 3/3, 465
+    chars`` / ``did not submit (found 0/3, 576 chars)``).
+    """
+
+    round_number: int
+    team_id: str | None
+    success: bool
+    reason: str
+
+
 class SpotTheDifferenceRunExtras(ScenarioRunExtrasBase):
     """Scenario-specific run-detail payload surfaced for spot_the_difference runs."""
 
     scenario_name: Literal["spot_the_difference"] = "spot_the_difference"
     cases: list[SpotTheDifferenceCaseSummary]
     submission_metadata_by_call_id: dict[str, SpotSubmissionMetadata]
+    team_results: list[SpotTeamRoundResult]
 
 
 def _build_case(event: SpotTheDifferenceCaseStarted) -> SpotTheDifferenceCaseSummary:
@@ -82,6 +99,7 @@ def _build_cases(events: list[SimulationEvent]) -> list[SpotTheDifferenceCaseSum
 
 def _build_submission_metadata(judged: DifferenceSubmissionJudged) -> SpotSubmissionMetadata:
     return SpotSubmissionMetadata(
+        round_number=judged.round_number,
         team_id=judged.team_id,
         submitted_items=judged.submitted_items,
         matched_difference_indices=judged.matched_difference_indices,
@@ -90,6 +108,23 @@ def _build_submission_metadata(judged: DifferenceSubmissionJudged) -> SpotSubmis
         characters_at_submission=judged.characters_at_submission,
         explanation=judged.judge_explanation,
     )
+
+
+def _build_team_results(events: list[SimulationEvent]) -> list[SpotTeamRoundResult]:
+    """Materialize each ``RoundResultRecorded`` event as a per-team round outcome."""
+    results: list[SpotTeamRoundResult] = []
+    for event in events:
+        if not isinstance(event, RoundResultRecorded):
+            continue
+        results.append(
+            SpotTeamRoundResult(
+                round_number=event.round_number,
+                team_id=event.team_id,
+                success=event.success,
+                reason=event.reason,
+            )
+        )
+    return results
 
 
 def _build_call_id_map(events: list[SimulationEvent]) -> dict[str, SpotSubmissionMetadata]:
@@ -124,4 +159,5 @@ class SpotTheDifferenceRunDetailExtension(ScenarioRunDetailExtension):
         return SpotTheDifferenceRunExtras(
             cases=_build_cases(events=events),
             submission_metadata_by_call_id=_build_call_id_map(events=events),
+            team_results=_build_team_results(events=events),
         )
