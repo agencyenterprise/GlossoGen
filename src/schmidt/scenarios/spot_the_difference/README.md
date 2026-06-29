@@ -2,36 +2,56 @@
 
 Reconstruction-from-split-data scenario. Each team has two symmetric **viewers**:
 the left viewer sees scene A, the right viewer sees scene B — two near-identical
-scenes of objects (`shape, color, size @ (column, row)`) on an `N×N` grid.
-The environment plants exactly **K** differences in scene B drawn from a fixed
-taxonomy (attribute changed, object moved, object added, object removed).
-Neither viewer sees the other scene or the differences, so a difference is only
-discoverable by exchanging descriptions over the link channel.
+scenes of objects (a shape with a size and color). The environment plants exactly
+**K** differences in scene B from a fixed taxonomy (attribute changed, object
+moved, object added, object removed). Neither viewer sees the other scene or the
+differences, so a difference is only discoverable by exchanging descriptions over
+the link channel.
+
+The scenario is tuned so this requires genuine collaborative grounding rather
+than a serialize-and-diff dump:
+
+- **Duplicates.** The attribute vocabulary is small (4 shapes × 4 colors × 2
+  sizes), so at the scene sizes used here identical objects recur. A bundle does
+  not identify an object — position does.
+- **Relational positions, no coordinates.** Agents see each object only as a
+  coarse 3×3 region plus relations to other objects in their own scene ("a small
+  red square to its left"). The anchors are possibly-duplicate objects in a
+  layout that differs between the two scenes, so the two viewers' descriptions
+  do not align one-to-one.
+- **Hard character budget.** Every character a team sends on the link channel
+  counts against `round_time_budget_seconds`; the budget is far too small to
+  read a whole scene aloud, so teams must triage area by area. Exceeding it makes
+  the team ineligible for the round.
 
 ## Task & scoring
 
-- A viewer calls `submit_differences(differences)` with one free-text line per
-  difference. The first submission **locks** the team's answer for the round.
-- An LLM judge (the canonical haiku judge) matches the submitted list against
-  the K planted differences and counts false positives.
-- **Correctness gate:** a team is eligible only if it identifies every
-  difference with no false positives.
-- **Objective:** the total characters a team sends on the link channel. In
-  two-team mode, among eligible teams the one with the fewest characters wins;
-  the winner is announced at the start of the next round as in-context
-  reinforcement. In single-team mode the character total is simply the score to
-  minimize. There is no hard character budget — characters never fail a round.
+- A viewer calls `submit_differences(differences)` with one **plain-English**
+  line per difference. The first submission locks the team's answer.
+- The submission is scored by the **naive-reader judge** (`difference_judge.py` /
+  `prompts/difference_judge.jinja`, haiku): it judges each item on its own,
+  without using the ground truth as a decoding key, and **rejects** any item
+  whose object, position, or change is carried only by codes, coordinates, or
+  invented shorthand — so the compression pressure stays on the link chat, not
+  the submission. Ambiguous items (attributes shared by several objects with no
+  position) and items matching no real difference are false positives.
+- **Gate:** a team is eligible only if it identifies every difference, with no
+  false positives, **within budget**.
+- **Objective:** among eligible teams, fewest link-channel characters wins; the
+  winner is announced at the start of the next round as in-context
+  reinforcement. Single-team mode keeps the character total as the score.
 
 ## Modes
 
 - `two_teams: true` (default preset) — two isolated teams (`link_a` / `link_b`)
-  on the identical seeded scene pair each round.
-- `two_teams: false` (`knobs_single_team.json`) — one team; the rival is absent.
+  on the identical seeded scenes each round.
+- `two_teams: false` (`knobs_single_team.json`) — one team; no rival.
 
 ## Key knobs
 
 - `grid_size`, `object_count_*`, `difference_count_*` — scene size and K
   distribution. `easy_round_numbers` forces K=1 (warmup).
+- `round_time_budget_seconds` — hard per-round link-channel character budget.
 - `difference_kinds` — the enabled taxonomy subset.
 - `channel_noise_level` / `noise_replacement_mode` — per-character link noise.
 - `judge_model` / `judge_provider` — the submission judge.
@@ -45,8 +65,10 @@ the language-emergence family, `communication_*`, and the `protocol_*` family
 
 ## Files
 
-- `scene_generation.py` — seeded scene + K-difference planting (no LLM).
-- `world.py` / `world_state.py` — per-team character accounting, submission
-  locking, the correctness-gate + fewest-characters round scoring.
-- `difference_judge.py` / `mcp_tools.py` — the `submit_differences` LLM judge.
-- `scripts/check_scene_generation.py` — generation determinism/correctness check.
+- `scene_generation.py` — seeded scene + K-difference planting, region/relation
+  rendering, relational ground-truth descriptions (no LLM).
+- `world.py` / `world_state.py` — per-team character accounting, hard-budget
+  enforcement, submission locking, correctness-gate + fewest-characters scoring.
+- `difference_judge.py` / `mcp_tools.py` — the `submit_differences` naive-reader judge.
+- `scripts/check_scene_generation.py` — generation determinism/correctness check
+  (duplicates occur, moves cross regions, descriptions present).

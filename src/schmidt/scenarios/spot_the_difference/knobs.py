@@ -2,13 +2,13 @@
 
 Controls the grid size, the per-round object-count and difference-count
 distributions, which difference kinds are enabled, the warmup rounds forced
-to a single difference, the postmortem discussion phase, channel noise, and
-the optional two-team competitive mode.
+to a single difference, the postmortem discussion phase, channel noise, the
+hard per-round character budget, and the optional two-team competitive mode.
 
-There is no hard per-round character budget: ``round_time_budget_seconds``
-(inherited from :class:`BaseKnobs`) is left unset. The total characters a team
-exchanges is the soft optimization objective — among teams that correctly
-find every difference, fewest characters wins — never a fail condition.
+``round_time_budget_seconds`` is a hard cap: every character a team sends on
+the link channel counts against it, and a team that reaches the cap is
+ineligible for that round. Among teams that find every difference within
+budget, fewest characters wins.
 """
 
 from typing import Self
@@ -31,16 +31,18 @@ class SpotTheDifferenceKnobs(BaseKnobs):
     K planted differences drawn from ``difference_kinds``. ``object_count_*``
     sets the per-round object-count distribution, ``difference_count_*`` sets
     the per-round K distribution, and ``easy_round_numbers`` forces those
-    rounds to K=1 (warmup). ``channel_noise_level`` is the per-character drop
-    probability on the link channel and ``noise_replacement_mode`` selects
-    what each dropped character becomes (``mask`` -> ``_`` erasure,
-    ``random_letter`` -> a different random letter substitution).
+    rounds to K=1 (warmup). ``round_time_budget_seconds`` is the hard
+    per-round link-channel character budget. ``channel_noise_level`` is the
+    per-character drop probability on the link channel and
+    ``noise_replacement_mode`` selects what each dropped character becomes
+    (``mask`` -> ``_`` erasure, ``random_letter`` -> a different random letter
+    substitution).
 
     Two-team mode runs two isolated teams (each a left viewer on scene A and a
     right viewer on scene B, on ``link_a`` / ``link_b``) on the identical
     scene pair each round, so the per-round winner (fewest characters among
-    teams that found every difference) can be announced as in-context
-    reinforcement.
+    teams that found every difference within budget) can be announced as
+    in-context reinforcement.
     """
 
     judge_model: str
@@ -48,6 +50,7 @@ class SpotTheDifferenceKnobs(BaseKnobs):
     postmortem_enabled: bool
     postmortem_disabled_at_start: bool
     round_count: int
+    round_time_budget_seconds: int  # pyright: ignore[reportIncompatibleVariableOverride]
     seed: int
     grid_size: int
     object_count_values: list[int]
@@ -109,6 +112,14 @@ class SpotTheDifferenceKnobs(BaseKnobs):
             raise ValueError(
                 f"difference_kinds entries must be one of {sorted(_VALID_DIFFERENCE_KINDS)} "
                 f"(got invalid {invalid})"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_budget(self) -> Self:
+        if self.round_time_budget_seconds <= 0:
+            raise ValueError(
+                f"round_time_budget_seconds must be > 0 (got {self.round_time_budget_seconds})"
             )
         return self
 

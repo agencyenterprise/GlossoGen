@@ -2,9 +2,10 @@
 
 Each round, both viewers on a team receive a Jinja-rendered injection that
 shows only *their* scene's objects (left viewer = scene A, right viewer =
-scene B), the number of differences to find, and the previous round's result.
-Neither viewer's injection ever contains the other scene or the planted
-differences.
+scene B), rendered relationally (region + relations to other objects, never
+exact coordinates), the number of differences to find, the character budget,
+and the previous round's result. Neither viewer's injection ever contains the
+other scene or the planted differences.
 """
 
 from schmidt.scenarios.spot_the_difference.ids import (
@@ -12,23 +13,13 @@ from schmidt.scenarios.spot_the_difference.ids import (
     VIEWER_LEFT_INJECTION_TEMPLATE,
     VIEWER_RIGHT_INJECTION_TEMPLATE,
 )
-from schmidt.scenarios.spot_the_difference.scene_generation import (
-    DiffCase,
-    SceneObject,
-    render_object,
-)
+from schmidt.scenarios.spot_the_difference.scene_generation import DiffCase, render_scene_relational
 from schmidt.scenarios.spot_the_difference.team_routing import (
     AGENT_ID_TO_SCENE_SIDE,
     scene_side_for_agent,
 )
 from schmidt.scenarios.spot_the_difference.world_state import DiffOutcome
 from schmidt.template_renderer import TemplateRenderer
-
-
-def _render_scene_lines(scene: tuple[SceneObject, ...]) -> list[str]:
-    """Render a scene's objects top-to-bottom, left-to-right."""
-    ordered = sorted(scene, key=lambda obj: (obj.row, obj.column))
-    return [render_object(obj=obj) for obj in ordered]
 
 
 def render_round_injection(
@@ -53,9 +44,9 @@ def render_round_injection(
         template_name=template_name,
         template_variables={
             "round_number": round_number,
-            "grid_size": case.grid_size,
             "difference_count": case.difference_count,
-            "my_objects": _render_scene_lines(scene=my_scene),
+            "round_time_budget_seconds": case.round_time_budget_seconds,
+            "my_objects": render_scene_relational(scene=my_scene, grid_size=case.grid_size),
             "previous_outcome": previous_outcome,
             "two_teams": two_teams,
         },

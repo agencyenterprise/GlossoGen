@@ -195,7 +195,8 @@ export interface paths {
          *     Validates that the run exists and is complete, that no evaluation is
          *     already in progress, and that the requested metrics and provider
          *     are valid. Launches ``python -m schmidt evaluate`` as a detached
-         *     background process.
+         *     background process. Rejected with 403 when evaluations are disabled
+         *     via the ``ENABLE_EVALUATIONS`` env var.
          */
         post: operations["start_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluate_post"];
         delete?: never;
@@ -503,6 +504,26 @@ export interface paths {
          * @description Health check endpoint.
          */
         get: operations["health_api_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/server-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Server Config
+         * @description Public server feature flags consumed by the frontend.
+         */
+        get: operations["server_config_api_server_config_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2220,8 +2241,19 @@ export interface components {
             providers: string[];
         };
         /**
+         * ServerConfigResponse
+         * @description Public server feature flags consumed by the frontend.
+         */
+        ServerConfigResponse: {
+            /** Evaluations Enabled */
+            evaluations_enabled: boolean;
+        };
+        /**
          * SpotObject
          * @description One scene object: a shape/color/size bundle at a grid cell.
+         *
+         *     ``column`` / ``row`` are the internal geometry (never shown to agents);
+         *     ``region`` is the coarse 3x3 area the agents actually see.
          */
         SpotObject: {
             /** Shape */
@@ -2234,6 +2266,8 @@ export interface components {
             column: number;
             /** Row */
             row: number;
+            /** Region */
+            region: string;
         };
         /**
          * SpotPlantedDifference
@@ -3382,6 +3416,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    server_config_api_server_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerConfigResponse"];
                 };
             };
         };

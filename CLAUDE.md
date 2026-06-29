@@ -204,6 +204,7 @@ cp .env.example .env
 | `CLERK_AUTHORIZED_PARTIES` | Optional (Clerk mode) | Comma-separated list of frontend origins allowed to mint tokens for this backend (e.g. `http://localhost:3000,https://app.example.com`). |
 | `ALLOWED_ORIGINS` | Optional | Comma-separated CORS origins (defaults to `http://localhost:3000`) |
 | `SCHMIDT_RUNS_DIR` | Optional | Directory for simulation run data (defaults to `./runs`) |
+| `ENABLE_EVALUATIONS` | Optional | Whether the REST evaluate endpoint (the frontend "Run Eval" button) is enabled. Defaults to enabled; set to `false`/`0`/`no`/`off` to disable (endpoint returns 403, frontend hides the button via `GET /api/server-config`). Does not affect the CLI `schmidt evaluate` command. |
 | `OAUTH_ISSUER_URL` | Yes (for MCP) | Public backend URL for MCP OAuth (MCP is disabled if unset) |
 | `SELF_HOSTED_BASE_URLS` | Required for `--provider self-hosted` | JSON object mapping model name → OpenAI-compatible `/v1` base URL. Example: `{"meta-llama/Llama-3.3-70B-Instruct":"https://....modal.run/v1","Qwen/Qwen3-32B":"https://....modal.run/v1"}` |
 | `SELF_HOSTED_API_KEY` | Required for `--provider self-hosted` | Bearer token shared across all entries in `SELF_HOSTED_BASE_URLS` (matches each server's `--api-key`) |

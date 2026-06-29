@@ -15,11 +15,11 @@ from typing import NamedTuple
 class DiffOutcome(NamedTuple):
     """Result of one round for one team.
 
-    ``eligible`` is the correctness gate (submitted, every planted difference
-    found, no false positives). ``won`` is True only in two-team mode for the
-    eligible team(s) with the fewest characters. The ``opponent_*`` fields
-    describe the single other team in two-team mode and are ``None`` in solo
-    mode.
+    ``eligible`` is the gate (submitted, every planted difference found, no
+    false positives, and the character budget not exceeded). ``won`` is True
+    only in two-team mode for the eligible team(s) with the fewest characters.
+    The ``opponent_*`` fields describe the single other team in two-team mode
+    and are ``None`` in solo mode.
     """
 
     case_number: int
@@ -29,6 +29,7 @@ class DiffOutcome(NamedTuple):
     false_positive_count: int
     found_all: bool
     submitted: bool
+    budget_exceeded: bool
     characters_used: int
     eligible: bool
     won: bool
@@ -45,6 +46,7 @@ class SubmissionSnapshot(NamedTuple):
     found_all: bool
     false_positive_count: int
     found_count: int
+    budget_exceeded: bool
     characters: int
 
 
@@ -55,6 +57,7 @@ class TeamState:
     team_id: str
     link_channel_id: str
     current_round_characters: int = 0
+    round_budget_exceeded: bool = False
     submitted: bool = False
     verdict_recorded: bool = False
     submitted_found_all: bool = False
@@ -62,6 +65,7 @@ class TeamState:
     submitted_found_count: int = 0
     characters_at_submission: int = 0
     round_outcome_marked: bool = False
+    notified_thresholds: set[str] = field(default_factory=set[str])
     outcomes: list[DiffOutcome] = field(default_factory=list[DiffOutcome])
 
     def snapshot(self) -> SubmissionSnapshot:
@@ -75,12 +79,14 @@ class TeamState:
             found_all=self.submitted_found_all,
             false_positive_count=self.submitted_false_positives,
             found_count=self.submitted_found_count,
+            budget_exceeded=self.round_budget_exceeded,
             characters=characters,
         )
 
     def reset_for_new_round(self) -> None:
         """Clear all per-round counters and the locked submission."""
         self.current_round_characters = 0
+        self.round_budget_exceeded = False
         self.submitted = False
         self.verdict_recorded = False
         self.submitted_found_all = False
@@ -88,11 +94,17 @@ class TeamState:
         self.submitted_found_count = 0
         self.characters_at_submission = 0
         self.round_outcome_marked = False
+        self.notified_thresholds = set()
 
 
 def _is_eligible(snapshot: SubmissionSnapshot) -> bool:
-    """Whether a snapshot passes the correctness gate."""
-    return snapshot.submitted and snapshot.found_all and snapshot.false_positive_count == 0
+    """Whether a snapshot passes the gate: correct, no false positives, within budget."""
+    return (
+        snapshot.submitted
+        and snapshot.found_all
+        and snapshot.false_positive_count == 0
+        and not snapshot.budget_exceeded
+    )
 
 
 def build_round_outcomes(
@@ -130,6 +142,7 @@ def build_round_outcomes(
             false_positive_count=snap.false_positive_count,
             found_all=snap.found_all,
             submitted=snap.submitted,
+            budget_exceeded=snap.budget_exceeded,
             characters_used=snap.characters,
             eligible=_is_eligible(snapshot=snap),
             won=(two_teams and team_id in winners),

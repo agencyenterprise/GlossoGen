@@ -158,6 +158,7 @@ class SpotTheDifferenceScenario(SimulationScenario):
             seed=knobs.seed,
             round_count=knobs.round_count,
             grid_size=knobs.grid_size,
+            round_time_budget_seconds=knobs.round_time_budget_seconds,
             object_count_values=knobs.object_count_values,
             object_count_weights=knobs.object_count_weights,
             difference_count_values=knobs.difference_count_values,
@@ -309,11 +310,11 @@ class SpotTheDifferenceScenario(SimulationScenario):
         return results
 
     def get_early_round_end_trigger(self) -> str | None:
-        """End the round once every team has locked a submission."""
+        """End the round once every team has submitted or exhausted its budget."""
         if self._world.current_case is None:
             return None
-        if self._world.all_teams_submitted():
-            return "all_submitted"
+        if self._world.all_teams_done():
+            return "all_teams_done"
         return None
 
     async def on_round_ended(self, round_number: int, trigger: str) -> None:

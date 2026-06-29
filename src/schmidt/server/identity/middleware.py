@@ -61,6 +61,7 @@ _UNAUTHENTICATED_PREFIXES = (
 _UNAUTHENTICATED_EXACT = frozenset(
     {
         "/api/health",
+        "/api/server-config",
     }
 )
 

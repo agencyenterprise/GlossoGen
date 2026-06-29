@@ -50,8 +50,8 @@ def build_communication_rounds(events: list[SimulationEvent]) -> list[Communicat
 
 
 def _render_object(obj: SpotObject) -> str:
-    """Render one scene object as ``<size> <color> <shape> @ (col, row)``."""
-    return f"{obj.size} {obj.color} {obj.shape} @ (col {obj.column}, row {obj.row})"
+    """Render one scene object as ``<size> <color> <shape> in the <region>``."""
+    return f"{obj.size} {obj.color} {obj.shape} in the {obj.region}"
 
 
 def _render_header(case: SpotTheDifferenceCaseStarted | None) -> str:

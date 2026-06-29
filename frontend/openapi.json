@@ -602,7 +602,7 @@
     "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/evaluate": {
       "post": {
         "summary": "Start Evaluation",
-        "description": "Launch an evaluation subprocess for a completed simulation run.\n\nValidates that the run exists and is complete, that no evaluation is\nalready in progress, and that the requested metrics and provider\nare valid. Launches ``python -m schmidt evaluate`` as a detached\nbackground process.",
+        "description": "Launch an evaluation subprocess for a completed simulation run.\n\nValidates that the run exists and is complete, that no evaluation is\nalready in progress, and that the requested metrics and provider\nare valid. Launches ``python -m schmidt evaluate`` as a detached\nbackground process. Rejected with 403 when evaluations are disabled\nvia the ``ENABLE_EVALUATIONS`` env var.",
         "operationId": "start_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluate_post",
         "parameters": [
           {
@@ -1314,6 +1314,25 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/server-config": {
+      "get": {
+        "summary": "Server Config",
+        "description": "Public server feature flags consumed by the frontend.",
+        "operationId": "server_config_api_server_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerConfigResponse"
                 }
               }
             }
@@ -4826,6 +4845,20 @@
         "title": "ScenariosResponse",
         "description": "Response listing all available scenarios, models, and providers."
       },
+      "ServerConfigResponse": {
+        "properties": {
+          "evaluations_enabled": {
+            "type": "boolean",
+            "title": "Evaluations Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluations_enabled"
+        ],
+        "title": "ServerConfigResponse",
+        "description": "Public server feature flags consumed by the frontend."
+      },
       "SpotObject": {
         "properties": {
           "shape": {
@@ -4847,6 +4880,10 @@
           "row": {
             "type": "integer",
             "title": "Row"
+          },
+          "region": {
+            "type": "string",
+            "title": "Region"
           }
         },
         "type": "object",
@@ -4855,10 +4892,11 @@
           "color",
           "size",
           "column",
-          "row"
+          "row",
+          "region"
         ],
         "title": "SpotObject",
-        "description": "One scene object: a shape/color/size bundle at a grid cell."
+        "description": "One scene object: a shape/color/size bundle at a grid cell.\n\n``column`` / ``row`` are the internal geometry (never shown to agents);\n``region`` is the coarse 3x3 area the agents actually see."
       },
       "SpotPlantedDifference": {
         "properties": {

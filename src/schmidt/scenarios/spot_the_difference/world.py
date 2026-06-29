@@ -20,6 +20,8 @@ from typing import Any
 
 from schmidt.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
 from schmidt.scenarios.spot_the_difference.ids import (
+    BUDGET_EXCEEDED_MARKER,
+    BUDGET_LOW_MARKER,
     LINK_A_CHANNEL_ID,
     LINK_B_CHANNEL_ID,
     LINK_CHANNEL_ID,
@@ -46,6 +48,9 @@ from schmidt.scenarios.spot_the_difference.world_state import (
 )
 
 logger = logging.getLogger(__name__)
+
+_THRESHOLD_LOW = "low"
+_THRESHOLD_EXCEEDED = "exceeded"
 
 
 class SpotTheDifferenceWorld(ScenarioWorld):
@@ -116,14 +121,17 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         """Running character count on ``team_id``'s link channel this round."""
         return self._teams[team_id].current_round_characters
 
-    def all_teams_submitted(self) -> bool:
-        """Whether every team's submission has been locked AND judged this round.
+    def all_teams_done(self) -> bool:
+        """Whether every team is finished this round (verdict recorded or budget blown).
 
         Gated on the recorded verdict, not just the lock: ``try_lock_submission``
         sets ``submitted`` before the async judge runs, so ending the round on
-        the lock alone would let the round be scored before the verdict lands.
+        the lock alone would let the round be scored before the verdict lands. A
+        team that exhausts its character budget is also done (and ineligible).
         """
-        return all(team.verdict_recorded for team in self._teams.values())
+        return all(
+            team.verdict_recorded or team.round_budget_exceeded for team in self._teams.values()
+        )
 
     def outcomes(self, team_id: str) -> list[DiffOutcome]:
         """Historical per-round outcomes for one team."""
@@ -247,7 +255,7 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         text: str,
         token_count: int,
     ) -> None:
-        """Accumulate link-channel characters for the right team."""
+        """Accumulate link-channel characters and flag budget exhaustion per team."""
         _ = agent_id, token_count
         team_id = team_id_for_channel(channel_id=channel_id)
         if team_id is None:
@@ -255,18 +263,55 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         team = self._teams.get(team_id)
         if team is None:
             return
+        if team.submitted:
+            # Answer already locked; post-submission chatter does not change the score.
+            return
         team.current_round_characters += len(text)
+        case = self._current_case
+        if case is None:
+            return
+        if team.current_round_characters >= case.round_time_budget_seconds:
+            team.round_budget_exceeded = True
 
     async def run(self, context: WorldContext) -> None:
-        """Drain the event stream; round scoring is driven by scenario hooks."""
+        """Process messages and warn each team as it nears / exceeds its budget."""
         self._context = context
         try:
             while True:
                 event = await context.next_event()
                 if isinstance(event, RoundAdvancedEvent):
                     continue
+                team_id = team_id_for_channel(channel_id=event.channel_id)
+                if team_id is None:
+                    continue
+                await self._send_budget_notifications(team_id=team_id)
         except asyncio.CancelledError:
             return
+
+    async def _send_budget_notifications(self, team_id: str) -> None:
+        """Emit a one-time budget-low and budget-exceeded notice for a team."""
+        case = self._current_case
+        if case is None:
+            return
+        team = self._teams[team_id]
+        budget = case.round_time_budget_seconds
+        used = team.current_round_characters
+        if team.round_budget_exceeded and _THRESHOLD_EXCEEDED not in team.notified_thresholds:
+            team.notified_thresholds.update([_THRESHOLD_LOW, _THRESHOLD_EXCEEDED])
+            await self._context.send_update_to_channel(
+                channel_id=team.link_channel_id,
+                text=(
+                    f"{BUDGET_EXCEEDED_MARKER}. You have sent {used} characters; the budget was "
+                    f"{budget}. This round can no longer be won — submit now if you can."
+                ),
+            )
+            return
+        if used >= budget * 0.75 and _THRESHOLD_LOW not in team.notified_thresholds:
+            team.notified_thresholds.add(_THRESHOLD_LOW)
+            await self._context.send_update_to_channel(
+                channel_id=team.link_channel_id,
+                text=f"{BUDGET_LOW_MARKER}. {budget - used} of {budget} budget characters remain.",
+            )
 
 
 def _render_terminal_text(outcome: DiffOutcome) -> str:
@@ -274,12 +319,17 @@ def _render_terminal_text(outcome: DiffOutcome) -> str:
     found = f"found {outcome.found_count}/{outcome.total_differences} differences"
     if outcome.false_positive_count > 0:
         found = f"{found}, {outcome.false_positive_count} incorrect"
+    characters = f"{outcome.characters_used} characters"
+    if outcome.budget_exceeded:
+        return (
+            f"{ROUND_RESULT_MARKER}. Communication budget exceeded ({characters}) — "
+            f"ineligible this round ({found})."
+        )
     if not outcome.submitted:
         return (
             f"{ROUND_RESULT_MARKER}. Your team did not submit in time "
             f"({found} would have been judged from your last lock)."
         )
-    characters = f"{outcome.characters_used} characters"
     if not outcome.competitive:
         if outcome.eligible:
             return f"{ROUND_RESULT_MARKER}. Correct — {found} using {characters}."

@@ -23,6 +23,7 @@ import { useSearchParams } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import { useEventStream } from "@/shared/lib/use-event-stream";
+import { useServerConfig } from "@/shared/lib/use-server-config";
 import { useGroupPath } from "@/features/auth/group-context";
 import { buildAgentColorMap, buildChannelColorMap } from "./agent-colors";
 import { AgentDrawer } from "./agent-drawer";
@@ -86,6 +87,11 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const [copiedRunId, setCopiedRunId] = useState(false);
   const [showLabelPicker, setShowLabelPicker] = useState(false);
   const [showNoteEditor, setShowNoteEditor] = useState(false);
+
+  const { data: serverConfig } = useServerConfig();
+  // Treat undefined (still loading) as enabled so the button only hides when
+  // the server explicitly reports evaluations disabled.
+  const evaluationsEnabled = serverConfig?.evaluations_enabled !== false;
 
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -510,7 +516,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
               ))}
             </span>
           </span>
-          {!isInProgress && !evaluationInProgress && runCompleted ? (
+          {!isInProgress && !evaluationInProgress && runCompleted && evaluationsEnabled ? (
             <>
               {" · "}
               <span className="group/eval relative">
@@ -745,7 +751,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
       </div>
 
       {/* Start evaluation modal */}
-      {showEvalModal ? (
+      {showEvalModal && evaluationsEnabled ? (
         <StartEvaluationModal
           runId={runId}
           scenarioName={restData.scenario_name}
