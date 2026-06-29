@@ -1602,7 +1602,7 @@ export interface components {
             /** Round Injections */
             round_injections: components["schemas"]["RoundInjection"][];
             /** Scenario Extras */
-            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
+            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };
         /**
          * RunListResponse
@@ -2098,6 +2098,101 @@ export interface components {
             models: components["schemas"]["ModelInfo"][];
             /** Providers */
             providers: string[];
+        };
+        /**
+         * SpotObject
+         * @description One scene object: a shape/color/size bundle at a grid cell.
+         */
+        SpotObject: {
+            /** Shape */
+            shape: string;
+            /** Color */
+            color: string;
+            /** Size */
+            size: string;
+            /** Column */
+            column: number;
+            /** Row */
+            row: number;
+        };
+        /**
+         * SpotPlantedDifference
+         * @description One ground-truth difference between scene A and scene B.
+         *
+         *     ``scene_a_object`` / ``scene_b_object`` is ``None`` for an added object
+         *     (absent from A) or a removed object (absent from B). ``attribute_name``
+         *     names the changed dimension for ``attribute_changed`` and is ``None``
+         *     otherwise.
+         */
+        SpotPlantedDifference: {
+            /** Kind */
+            kind: string;
+            /** Description */
+            description: string;
+            scene_a_object: components["schemas"]["SpotObject"] | null;
+            scene_b_object: components["schemas"]["SpotObject"] | null;
+            /** Attribute Name */
+            attribute_name: string | null;
+        };
+        /**
+         * SpotSubmissionMetadata
+         * @description Verdict for a single ``submit_differences`` call attached by ``call_id``.
+         */
+        SpotSubmissionMetadata: {
+            /** Team Id */
+            team_id: string;
+            /** Submitted Items */
+            submitted_items: string[];
+            /** Matched Difference Indices */
+            matched_difference_indices: number[];
+            /** False Positive Count */
+            false_positive_count: number;
+            /** Found All */
+            found_all: boolean;
+            /** Characters At Submission */
+            characters_at_submission: number;
+            /** Explanation */
+            explanation: string;
+        };
+        /**
+         * SpotTheDifferenceCaseSummary
+         * @description Per-round case metadata used by the round-detail panel.
+         *
+         *     Mirrors the ``SpotTheDifferenceCaseStarted`` event, repackaged as a stable
+         *     DTO so the frontend never has to touch raw event JSON.
+         */
+        SpotTheDifferenceCaseSummary: {
+            /** Round Number */
+            round_number: number;
+            /** Case Number */
+            case_number: number;
+            /** Grid Size */
+            grid_size: number;
+            /** Difference Count */
+            difference_count: number;
+            /** Scene A */
+            scene_a: components["schemas"]["SpotObject"][];
+            /** Scene B */
+            scene_b: components["schemas"]["SpotObject"][];
+            /** Differences */
+            differences: components["schemas"]["SpotPlantedDifference"][];
+        };
+        /**
+         * SpotTheDifferenceRunExtras
+         * @description Scenario-specific run-detail payload surfaced for spot_the_difference runs.
+         */
+        SpotTheDifferenceRunExtras: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            scenario_name: "spot_the_difference";
+            /** Cases */
+            cases: components["schemas"]["SpotTheDifferenceCaseSummary"][];
+            /** Submission Metadata By Call Id */
+            submission_metadata_by_call_id: {
+                [key: string]: components["schemas"]["SpotSubmissionMetadata"];
+            };
         };
         /**
          * StartEvaluationRequest

@@ -1,0 +1,10 @@
+You are scoring a spot-the-difference game. Two players each saw one of two near-identical scenes (call them scene A and scene B) and tried to find every difference by describing their objects to each other. You are given the GROUND-TRUTH list of the exact differences between the two scenes (numbered) and the TEAM'S SUBMITTED list of differences (free text).
+
+Each difference is one of: an attribute changed (shape, color, or size), an object moved to a different cell, an object added (present in only one scene), or an object removed (present in only the other scene).
+
+For each ground-truth difference, decide whether ANY submitted item correctly identifies it. A submitted item matches a ground-truth difference when it names the object involved and the nature of the change. The players need NOT state both scenes' values, nor which scene is "A" versus "B": a player who saw only one scene cannot know the other's value alone, and the two scenes are interchangeable. A position is identified correctly if the cell or location matches; small wording differences are fine. Match leniently on phrasing but strictly on substance — the object and the kind of change must both be right. Treat "moved" and "appears in a different place in the two scenes" as the SAME single difference; do not also count it as a separate add and remove.
+
+Return:
+- matched_difference_indices: the 1-based indices of every ground-truth difference that at least one submitted item correctly identifies (each index at most once).
+- false_positive_count: the number of submitted items that correspond to NO ground-truth difference (wrong, vague, or invented differences). If two submitted items both describe the same real difference, that is not a false positive.
+- explanation: one or two sentences justifying the verdict.

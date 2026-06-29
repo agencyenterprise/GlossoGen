@@ -3563,6 +3563,9 @@
                     "$ref": "#/components/schemas/OrbitalAnomalyRunExtras"
                   },
                   {
+                    "$ref": "#/components/schemas/SpotTheDifferenceRunExtras"
+                  },
+                  {
                     "$ref": "#/components/schemas/VeyruRunExtras"
                   }
                 ],
@@ -3571,6 +3574,7 @@
                   "mapping": {
                     "container_yard_stacking": "#/components/schemas/ContainerYardRunExtras",
                     "orbital_anomaly": "#/components/schemas/OrbitalAnomalyRunExtras",
+                    "spot_the_difference": "#/components/schemas/SpotTheDifferenceRunExtras",
                     "veyru": "#/components/schemas/VeyruRunExtras"
                   }
                 }
@@ -4588,6 +4592,227 @@
         ],
         "title": "ScenariosResponse",
         "description": "Response listing all available scenarios, models, and providers."
+      },
+      "SpotObject": {
+        "properties": {
+          "shape": {
+            "type": "string",
+            "title": "Shape"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "size": {
+            "type": "string",
+            "title": "Size"
+          },
+          "column": {
+            "type": "integer",
+            "title": "Column"
+          },
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          }
+        },
+        "type": "object",
+        "required": [
+          "shape",
+          "color",
+          "size",
+          "column",
+          "row"
+        ],
+        "title": "SpotObject",
+        "description": "One scene object: a shape/color/size bundle at a grid cell."
+      },
+      "SpotPlantedDifference": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "scene_a_object": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpotObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scene_b_object": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpotObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "attribute_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attribute Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "description",
+          "scene_a_object",
+          "scene_b_object",
+          "attribute_name"
+        ],
+        "title": "SpotPlantedDifference",
+        "description": "One ground-truth difference between scene A and scene B.\n\n``scene_a_object`` / ``scene_b_object`` is ``None`` for an added object\n(absent from A) or a removed object (absent from B). ``attribute_name``\nnames the changed dimension for ``attribute_changed`` and is ``None``\notherwise."
+      },
+      "SpotSubmissionMetadata": {
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "title": "Team Id"
+          },
+          "submitted_items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Submitted Items"
+          },
+          "matched_difference_indices": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Matched Difference Indices"
+          },
+          "false_positive_count": {
+            "type": "integer",
+            "title": "False Positive Count"
+          },
+          "found_all": {
+            "type": "boolean",
+            "title": "Found All"
+          },
+          "characters_at_submission": {
+            "type": "integer",
+            "title": "Characters At Submission"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "team_id",
+          "submitted_items",
+          "matched_difference_indices",
+          "false_positive_count",
+          "found_all",
+          "characters_at_submission",
+          "explanation"
+        ],
+        "title": "SpotSubmissionMetadata",
+        "description": "Verdict for a single ``submit_differences`` call attached by ``call_id``."
+      },
+      "SpotTheDifferenceCaseSummary": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "case_number": {
+            "type": "integer",
+            "title": "Case Number"
+          },
+          "grid_size": {
+            "type": "integer",
+            "title": "Grid Size"
+          },
+          "difference_count": {
+            "type": "integer",
+            "title": "Difference Count"
+          },
+          "scene_a": {
+            "items": {
+              "$ref": "#/components/schemas/SpotObject"
+            },
+            "type": "array",
+            "title": "Scene A"
+          },
+          "scene_b": {
+            "items": {
+              "$ref": "#/components/schemas/SpotObject"
+            },
+            "type": "array",
+            "title": "Scene B"
+          },
+          "differences": {
+            "items": {
+              "$ref": "#/components/schemas/SpotPlantedDifference"
+            },
+            "type": "array",
+            "title": "Differences"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "case_number",
+          "grid_size",
+          "difference_count",
+          "scene_a",
+          "scene_b",
+          "differences"
+        ],
+        "title": "SpotTheDifferenceCaseSummary",
+        "description": "Per-round case metadata used by the round-detail panel.\n\nMirrors the ``SpotTheDifferenceCaseStarted`` event, repackaged as a stable\nDTO so the frontend never has to touch raw event JSON."
+      },
+      "SpotTheDifferenceRunExtras": {
+        "properties": {
+          "scenario_name": {
+            "type": "string",
+            "const": "spot_the_difference",
+            "title": "Scenario Name",
+            "default": "spot_the_difference"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/SpotTheDifferenceCaseSummary"
+            },
+            "type": "array",
+            "title": "Cases"
+          },
+          "submission_metadata_by_call_id": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SpotSubmissionMetadata"
+            },
+            "type": "object",
+            "title": "Submission Metadata By Call Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cases",
+          "submission_metadata_by_call_id"
+        ],
+        "title": "SpotTheDifferenceRunExtras",
+        "description": "Scenario-specific run-detail payload surfaced for spot_the_difference runs."
       },
       "StartEvaluationRequest": {
         "properties": {
