@@ -5,8 +5,40 @@ type ChannelMessage = components["schemas"]["ChannelMessage"];
 type ReasoningEntry = components["schemas"]["ReasoningEntry"];
 type ToolUseEntry = components["schemas"]["ToolUseEntry"];
 type AgentRunCycleFailedEntry = components["schemas"]["AgentRunCycleFailedEntry"];
-type VeyruStabilizeMetadata = components["schemas"]["VeyruStabilizeMetadata"];
 type ContainerYardMoveMetadata = components["schemas"]["ContainerYardMoveMetadata"];
+type ScenarioExtras = NonNullable<components["schemas"]["RunDetailResponse"]["scenario_extras"]>;
+
+/** Generic LLM-judge ground truth for a single judged action tool call.
+ *
+ *  Scenarios whose executor submits a free-text action scored by an LLM
+ *  judge (veyru `stabilize_veyru`, orbital_anomaly `actuate_panel`,
+ *  drive_module_repair `replace_component`) all surface the same three
+ *  facts per call. The run-detail page extracts whichever scenario-specific
+ *  ``*_metadata_by_call_id`` map the run's ``scenario_extras`` carries into
+ *  this single shape. The richer container-yard move verdict keeps its own
+ *  ``move_metadata`` channel. */
+export interface JudgeGroundTruthMetadata {
+  expected_actions: string;
+  judge_match: boolean;
+  judge_explanation: string;
+}
+
+/** Extract the per-call LLM-judge ground truth from a run's
+ *  ``scenario_extras``, normalizing each judged-action scenario's
+ *  scenario-specific ``*_metadata_by_call_id`` map into the common
+ *  :class:`JudgeGroundTruthMetadata` shape. Returns an empty map for
+ *  scenarios with no judged action. */
+export function judgeMetadataFromExtras(
+  extras: ScenarioExtras | null
+): Record<string, JudgeGroundTruthMetadata> {
+  if (extras === null) return {};
+  if (extras.scenario_name === "veyru") return extras.stabilize_metadata_by_call_id;
+  if (extras.scenario_name === "orbital_anomaly") return extras.actuation_metadata_by_call_id;
+  if (extras.scenario_name === "drive_module_repair") {
+    return extras.replacement_metadata_by_call_id;
+  }
+  return {};
+}
 
 /** Unified display type used by ChatPane and AgentDrawer to render
  *  channel messages, reasoning entries, tool uses, and run-cycle failures
@@ -43,7 +75,7 @@ export interface DisplayEntry {
   call_id: string;
   /** Paired entry's message_id for click-to-scroll (empty when there is no pair). */
   paired_message_id: string;
-  stabilize_metadata: VeyruStabilizeMetadata | null;
+  judge_metadata: JudgeGroundTruthMetadata | null;
   move_metadata: ContainerYardMoveMetadata | null;
   /** Exception class name for run-cycle failure entries (empty otherwise). */
   error_type: string;
@@ -63,7 +95,7 @@ const EMPTY_ENTRY_DEFAULTS = {
   tool_result: null as string | null,
   call_id: "",
   paired_message_id: "",
-  stabilize_metadata: null as VeyruStabilizeMetadata | null,
+  judge_metadata: null as JudgeGroundTruthMetadata | null,
   move_metadata: null as ContainerYardMoveMetadata | null,
   error_type: "",
   cycle: 0,
@@ -72,8 +104,8 @@ const EMPTY_ENTRY_DEFAULTS = {
 /** Merge channel messages, reasoning entries, tool uses, and run-cycle
  *  failures into a single sorted array.
  *
- *  ``stabilizeMetadataByCallId`` carries the veyru-only stabilize-judge
- *  metadata keyed by tool ``call_id`` (empty for non-veyru runs).
+ *  ``judgeMetadataByCallId`` carries the generic LLM-judge ground truth
+ *  keyed by tool ``call_id`` (empty for scenarios with no judged action).
  *  ``moveMetadataByCallId`` carries the container-yard-only move_container
  *  verdict keyed by tool ``call_id`` (empty for non-yard runs). Plumbed in
  *  by the run-detail page from ``RunDetailResponse.scenario_extras`` and the
@@ -83,7 +115,7 @@ export function mergeEntries(
   reasoning: ReasoningEntry[],
   toolUse: ToolUseEntry[],
   runCycleFailures: AgentRunCycleFailedEntry[],
-  stabilizeMetadataByCallId: Record<string, VeyruStabilizeMetadata>,
+  judgeMetadataByCallId: Record<string, JudgeGroundTruthMetadata>,
   moveMetadataByCallId: Record<string, ContainerYardMoveMetadata>
 ): DisplayEntry[] {
   const channelEntries: DisplayEntry[] = messages.map(m => ({
@@ -147,7 +179,7 @@ export function mergeEntries(
       tool_result: split ? null : t.result,
       call_id: t.call_id,
       paired_message_id: split ? resultMessageId : "",
-      stabilize_metadata: stabilizeMetadataByCallId[t.call_id] ?? null,
+      judge_metadata: judgeMetadataByCallId[t.call_id] ?? null,
       move_metadata: moveMetadataByCallId[t.call_id] ?? null,
     });
     if (split && t.result_timestamp !== null) {

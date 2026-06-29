@@ -84,6 +84,8 @@ step_count  # unused variable (src/schmidt/scenarios/container_yard_stacking/wor
 _._validate_channel_noise_level  # unused method (src/schmidt/scenarios/drive_module_repair/knobs.py:55)
 _._validate_module_distribution  # unused method (src/schmidt/scenarios/drive_module_repair/knobs.py:63)
 _._validate_replacements_distribution  # unused method (src/schmidt/scenarios/drive_module_repair/knobs.py:72)
+replacement_metadata_by_call_id  # unused variable (src/schmidt/scenarios/drive_module_repair/run_detail_extension.py:94)
+DriveModuleRepairRunDetailExtension  # unused class (src/schmidt/scenarios/drive_module_repair/run_detail_extension.py:157)
 replacements_done  # unused variable (src/schmidt/scenarios/drive_module_repair/world_state.py:12)
 _._validate_pool_sizes  # unused method (src/schmidt/scenarios/hospital_bed_assignment_privacy/knobs.py:48)
 _._validate_intercept_attempts  # unused method (src/schmidt/scenarios/hospital_bed_assignment_privacy/knobs.py:73)

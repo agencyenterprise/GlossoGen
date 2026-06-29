@@ -1,6 +1,6 @@
 # Scenario: Drive Module Repair
 
-Three agents service one or more failing drive modules each round. The information needed to act is split three ways with a real dependency chain, and the heavy per-round payload (the per-component specs) must be transmitted and reconstructed precisely under a communication budget. When several modules are on the bench, every message must also be tagged with the module it refers to (module addressing). Round scoring uses a veyru-style free-text action + LLM judge.
+Three agents service one or more failing drive modules each round. The information needed to act is split three ways with a real dependency chain, and the heavy per-round payload (each component's **full multi-step replacement procedure**) must be transmitted and reconstructed precisely under a communication budget. When several modules are on the bench, every message must also be tagged with the module it refers to (module addressing). Round scoring uses a veyru-style free-text action + LLM judge.
 
 ## Agents
 
@@ -8,7 +8,15 @@ Three agents service one or more failing drive modules each round. The informati
 |---|---|---|
 | **Field technician** | the device's **diagnostic panel** (observed symptoms); is the **only** agent that can act | `send_message`, `replace_component` |
 | **Diagnostics engineer** | this round's **fault-tree** (symptom → faulty component) + the fixed component access-depth order | `send_message` |
-| **Spec engineer** | this round's **service-spec table** (component → tool, torque, calibration) | `send_message` |
+| **Spec engineer** | this round's **service sheet** (component → full multi-step replacement procedure: ordered steps with tool, torque, passes, calibration, and class-specific counts / pattern / hold durations) | `send_message` |
+
+## The action: a full multi-step procedure
+
+Each component's replacement is **not** a single fact but an ordered multi-step service procedure, so every `replace_component` action is a compound procedure the technician must transmit and perform precisely — not "swap part X". The procedure *shape* is fixed by the component's **service class** (`bolted-panel`, `rotating-assembly`, `press-fit`, `electrical-pack`, `sensor`); the *parameters* (tool, torque, passes, calibration, fastener/lead counts, tightening pattern, hold/settle durations) are drawn per unit per round. Example:
+
+> *Replace module-2's terminal_block. De-energize and discharge the bus, holding 5s. Disconnect the 6 leads and lift out the old part with hex-6. Fit the replacement and torque the terminals to 8 Nm in 2 passes. Run the seat-and-lock routine and verify.*
+
+The LLM judge scores the technician's free-text action against the full procedure — the unit, the component, and every step with its parameters, in order — lenient on wording, strict on substance.
 
 All three share one budgeted channel `bay` (primary; one character = one simulated second; optional per-character noise) plus an optional `postmortem` discussion channel.
 
@@ -18,8 +26,8 @@ Faults are revealed to the technician **one at a time** (veyru-style): the techn
 
 1. The technician reports the currently-showing symptom (tagged with its unit).
 2. The diagnostics engineer matches it against this round's fault-tree and names the faulty component.
-3. The spec engineer gives that component's tool / torque / calibration **for the current unit**.
-4. The technician performs the replacement — one free-text `replace_component` call naming the unit. An LLM judge (haiku) scores it against the current stage's expected (unit, component, tool, torque, calibration) — lenient on wording, strict on the five facts. On acceptance, the tool result reveals the next fault (or moves to the next unit); when the technician crosses onto a new unit, that unit's spec sheet is pushed to the spec engineer.
+3. The spec engineer relays that component's **full replacement procedure for the current unit** — every step in order with every parameter.
+4. The technician performs the replacement — one free-text `replace_component` call naming the unit and carrying out the whole procedure. An LLM judge (haiku) scores it against the current stage's expected procedure — the unit, the component, and every step with its parameters, in order — lenient on wording, strict on substance. On acceptance, the tool result reveals the next fault (or moves to the next unit); when the technician crosses onto a new unit, that unit's service sheet is pushed to the spec engineer.
 
 Round **success** = every fault on every unit fixed correctly within the communication budget. The round fails if the budget is exhausted or the round ends (idle/timeout) before everything is repaired.
 
@@ -27,7 +35,7 @@ Round **success** = every fault on every unit fixed correctly within the communi
 
 Several drive units can be on the bench in one round (`module_count_*`), each with its own faulty subset, serviced in a fixed canonical order (module-1 first), depth-ordered within a unit. The ground-truth stage list is the units' depth-ordered faults concatenated, so the single-pointer staged world and judge are unchanged — each stage's expected action just names its unit.
 
-Each unit is a different **revision**: both its fault-tree (symptom → component) and its service specs (component → tool/torque/calibration) are drawn independently per unit and re-randomized every round, so the same symptom can mean a different component on another unit and the same component can take different settings.
+Each unit is a different **revision**: both its fault-tree (symptom → component) and its service procedures (component → full multi-step procedure) are drawn independently per unit and re-randomized every round, so the same symptom can mean a different component on another unit and the same component's procedure takes different parameters.
 
 The team is kept **count-blind** so it never knows the workload in advance:
 - The technician discovers faults one at a time via the `replace_component` tool return (the round-start injection shows only the first fault).
@@ -38,9 +46,9 @@ The team is kept **count-blind** so it never knows the workload in advance:
 ## Why all three are essential (and it's not a veyru relay)
 
 - Only the technician sees the panels (the engineers hold *mappings*, not the instance), so the engineers need the technician's report.
-- The fault-tree and the per-unit specs **re-randomize every round**, so the technician can never self-diagnose or self-spec and must rely on both engineers.
-- Each fault requires the diagnostics engineer (symptom → component) *and* the spec engineer (component → this unit's tool/torque/calibration); the technician must **fuse** the two and address the right unit — an A→B→C→A dependency chain with fusion at the executor, not a single expert→novice relay.
-- The heaviest payload (the per-component, per-unit tool/torque/calibration) sits on the spec engineer, so the third agent carries real bandwidth.
+- The fault-tree and the per-unit procedures **re-randomize every round**, so the technician can never self-diagnose or self-service and must rely on both engineers.
+- Each fault requires the diagnostics engineer (symptom → component) *and* the spec engineer (component → this unit's full multi-step procedure); the technician must **fuse** the two and address the right unit — an A→B→C→A dependency chain with fusion at the executor, not a single expert→novice relay.
+- The heaviest payload (the per-component, per-unit multi-step procedure) sits on the spec engineer, so the third agent carries real bandwidth — each action is a full procedure to transmit, not a single fact.
 
 ## Knobs
 

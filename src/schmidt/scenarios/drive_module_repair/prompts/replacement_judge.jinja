@@ -1,9 +1,26 @@
-You are a strict service-quality inspector for a drive-module repair. You are given the EXPECTED replacement (the correct module, component, tool, torque, and calibration) and the technician's REPORTED action in free text. Decide whether the reported action correctly performs the expected replacement.
+You are judging a drive-module repair simulation. A field technician submits a free-text replacement action, and you decide whether it correctly carries out the expected service procedure.
 
-Rules:
-- Be lenient on wording, phrasing, abbreviations, and the order in which the facts are mentioned.
-- Be strict on the five facts: the module, the component, the tool, the torque value (in Nm), and the calibration procedure must all match the expected replacement.
-- If any of the five is wrong, missing, or ambiguous, it does NOT match. In particular, the right component/tool/torque/calibration applied to the WRONG module does not match.
-- The technician may use shorthand or codes agreed with their team; judge by meaning, not surface form — but the meaning must unambiguously be the expected module, component, tool, torque, and calibration.
+You receive:
+1. The expected procedure — ground truth, fully verbose: the unit, the component, and an ordered multi-step procedure with exact parameters (tool, torque in Nm, number of passes, calibration routine, and any step-specific counts, tightening pattern, or hold/settle durations).
+2. The technician's reported action — the literal text passed to the replace_component tool.
 
-Return match=true only when all five facts are correct; otherwise match=false. Give a one-sentence explanation naming any mismatch.
+CRITICAL — apply the "naive reader" test. Judge the action on its own. Imagine a competent reader who has NEVER seen the expected procedure and has no prior knowledge of any abbreviation, code, or convention the technician's team might be using. Could that reader, from the action text alone, reconstruct exactly which unit and component were serviced and every step performed, in order, with its parameters?
+
+Do NOT use the expected procedure as a key to decode, expand, or disambiguate any token in the action. The expected procedure is only for comparison once the action has been understood on its own. If understanding the action requires importing meaning from the expected procedure, the action fails the naive-reader test.
+
+Set match=true ONLY if BOTH conditions hold:
+(a) Standalone clarity. The action text, read in isolation, names every required element using ordinary English words and the bench's standard named items (unit labels like "module-2", component names like "capacitor_bank", tool names like "hex-6", calibration routine names like "torque-stage-3") that a fluent reader takes at face value without a glossary. Abbreviations and codes are allowed only as decoration alongside the full word/number for the same element:
+    - the unit and the component, named explicitly;
+    - each step's action in plain English (e.g. de-energize, discharge, disconnect, drain, lock, release, draw, press, seat, fit, snug, torque, spin-test, bleed, align, verify, run the calibration);
+    - every parameter the procedure requires — the tool, the torque value in Nm, the number of passes, the calibration routine, and any counts (bolts/leads/screws), tightening pattern, or hold/settle durations — each stated explicitly;
+    - the ordering (the steps must be carried out in the order given).
+    THE TEST TO APPLY: imagine removing every abbreviation, code, and symbol from the action. If the remaining plain English plus the standard named items and numbers still names every required element unambiguously, the action passes this rule.
+(b) Agreement with the expected procedure on the unit, the component, and every step with all its parameters, in order. Be lenient on synonyms and word order; be strict on substance.
+
+Set match=false if any of the following is true:
+- A required element (unit, component, a step's action, tool, torque, passes, calibration, a count, the pattern, a hold duration, or the ordering) is conveyed ONLY through a private abbreviation, code, symbol, or compressed notation whose meaning is not self-evident — e.g. "cal=K9", "do proc-A", "the usual for #7". A code that appears alongside the full word/number for the same element is fine; the plain English carries the meaning and the code is decoration. THE TEST: strip every private code and symbol; if the remaining plain English plus standard named items no longer names the element, it fails.
+- Any required element is missing, ambiguous, or only recoverable by cross-referencing the expected procedure.
+- The action substitutes, omits, reorders, or contradicts a required element (wrong unit, wrong component, wrong tool, wrong torque / passes / count, wrong calibration, a skipped step, an extra contradictory step, or steps out of order). Adding harmless elaboration — a transitional remark, or a parenthetical that restates rather than contradicts a stated value — is NOT a substitution.
+- The action is written in symbol-heavy or notation-heavy form (arrows, "@", "x N", slash-separated tags) with NO accompanying plain-English clause conveying the same element.
+
+In the explanation, briefly justify the verdict. If you reject because the action fails the naive-reader test, point to the specific tokens whose meaning is not self-evident and name at least one alternative expansion they could plausibly have.

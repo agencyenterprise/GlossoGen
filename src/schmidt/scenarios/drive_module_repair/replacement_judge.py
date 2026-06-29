@@ -1,6 +1,7 @@
 """LLM-based judge that evaluates whether the technician's free-text
-replacement action matches the expected component / tool / torque /
-calibration for the current stage.
+replacement action carries out the expected multi-step service procedure
+(unit + component + every ordered step with its parameters) for the current
+stage.
 
 Uses ``generate_structured`` to get a validated yes/no judgment with an
 explanation from the configured judge model. To suppress per-call
@@ -40,9 +41,14 @@ async def judge_replacement(
 ) -> ReplacementJudgment:
     """Ask the LLM judge whether the technician's action matches the expected one.
 
-    ``expected_action`` is the pre-rendered description of the correct
-    replacement (component + tool + torque + calibration). The judge is
-    lenient on wording but strict on those four facts.
+    ``expected_action`` is the pre-rendered correct replacement: the unit and
+    component followed by the ordered multi-step service procedure (tool,
+    torque, passes, calibration, and class-specific counts / patterns / hold
+    durations). The judge applies a "naive reader" test: the action must
+    reconstruct the full procedure in plain English (private codes allowed only
+    as decoration alongside the full word), and the expected procedure is never
+    used to decode the action. It is lenient on wording but strict on the unit,
+    the component, and every step with its parameters, in order.
 
     Runs ``JUDGE_VOTE_COUNT`` independent judge calls concurrently and returns
     the majority verdict.

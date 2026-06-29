@@ -3,8 +3,8 @@
 Each round every agent receives a role-specific injection: the field
 technician sees the diagnostic panel (the observed symptoms), the diagnostics
 engineer sees this round's fault-tree (symptom -> component), and the spec
-engineer sees this round's service-spec table (component -> tool / torque /
-calibration). The helpers here pick the right template per role.
+engineer sees this round's service sheet (component -> full multi-step
+replacement procedure). The helpers here pick the right template per role.
 """
 
 from schmidt.scenarios.drive_module_repair.drive_module_cases import DriveModuleCase

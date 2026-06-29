@@ -52,11 +52,11 @@ function moveVerdictAccepted(metadata: ContainerYardMoveMetadata): boolean | nul
   return false;
 }
 
-function buildTimelineRows(messages: DisplayEntry[]): TimelineRow[] {
+function buildTimelineRows(messages: DisplayEntry[], primaryChannelId: string): TimelineRow[] {
   const rows: TimelineRow[] = [];
   for (const m of messages) {
     if (m.is_reasoning || m.is_run_cycle_failure || m.is_notification_result) continue;
-    if (m.is_tool_use && m.tool_name === "stabilize_veyru") {
+    if (m.is_tool_use && m.judge_metadata !== null) {
       const action =
         typeof m.tool_arguments.action === "string"
           ? (m.tool_arguments.action as string)
@@ -67,10 +67,10 @@ function buildTimelineRows(messages: DisplayEntry[]): TimelineRow[] {
         kind: "judged_tool",
         sender: m.sender_agent_id,
         text: action,
-        toolName: "stabilize_veyru",
-        verdictAccepted: m.stabilize_metadata?.judge_match ?? null,
-        expected: m.stabilize_metadata?.expected_actions ?? "",
-        explanation: m.stabilize_metadata?.judge_explanation ?? "",
+        toolName: m.tool_name,
+        verdictAccepted: m.judge_metadata.judge_match,
+        expected: m.judge_metadata.expected_actions,
+        explanation: m.judge_metadata.judge_explanation,
       });
       continue;
     }
@@ -89,7 +89,7 @@ function buildTimelineRows(messages: DisplayEntry[]): TimelineRow[] {
       continue;
     }
     if (m.is_tool_use) continue;
-    if (m.channel_id !== "link") continue;
+    if (m.channel_id !== primaryChannelId) continue;
     rows.push({
       key: m.message_id,
       timestamp: m.timestamp,
@@ -148,6 +148,7 @@ export function RoundTimelineModal({
 }: RoundTimelineModalProps) {
   const plugin = getScenarioPlugin(scenarioName);
   const RoundDetailPanel = plugin.RoundDetailPanel;
+  const primaryChannelId = plugin.primaryChannelId;
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -158,7 +159,10 @@ export function RoundTimelineModal({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const rows = useMemo(() => buildTimelineRows(messages), [messages]);
+  const rows = useMemo(
+    () => buildTimelineRows(messages, primaryChannelId),
+    [messages, primaryChannelId]
+  );
 
   return createPortal(
     <div
@@ -226,7 +230,7 @@ export function RoundTimelineModal({
                         </>
                       ) : (
                         <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
-                          #link
+                          #{primaryChannelId}
                         </span>
                       )}
                     </div>

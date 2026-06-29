@@ -46,14 +46,17 @@ __all__ = [
 
 
 def _render_spec_sheet(table: ModuleSpecTable) -> str:
-    """Render one unit's service-spec sheet as a notification string for the spec engineer."""
+    """Render one unit's service sheet as a notification string for the spec engineer.
+
+    Each component carries its full multi-step replacement procedure for this
+    unit (the spec engineer must relay the whole procedure when the component is
+    named).
+    """
     lines = [
-        f"- {spec.component}: tool {spec.tool}, torque {spec.torque_nm} Nm, "
-        f"calibration {spec.calibration}"
-        for spec in table.specs
+        f"- {spec.component} ({spec.service_class}): {' '.join(spec.steps)}" for spec in table.specs
     ]
     body = "\n".join(lines)
-    return f"SERVICE-SPEC SHEET for {table.module_label} (this unit's revision):\n{body}"
+    return f"SERVICE SHEET for {table.module_label} (this unit's revision):\n{body}"
 
 
 def _render_fault_tree(tree: ModuleFaultTree) -> str:

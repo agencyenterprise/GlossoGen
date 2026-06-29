@@ -2,53 +2,78 @@
 
 Each round puts one or more drive modules (units) on the bench. A drive module
 has a fixed catalog of components, each at a fixed access depth (outer
-components must be serviced before deeper ones). Each unit has its own faulty
-subset; the correct order is the faulty subset sorted by access depth. Two
-kinds of per-round secret mapping re-randomize so nothing memorizes:
+components must be serviced before deeper ones) and a fixed **service class**
+that fixes the shape of its replacement procedure (which steps, in what order).
+Each unit has its own faulty subset; the correct order is the faulty subset
+sorted by access depth. Two kinds of per-round secret mapping re-randomize so
+nothing memorizes:
 
-- the **fault-tree**: a bijection component <-> symptom, **shared across all
-  units** (every unit is the same hardware type, so a symptom indicates the
-  same component everywhere). The diagnostics engineer holds it; the
+- the **fault-tree**: a bijection component <-> symptom, drawn **independently
+  per unit** (each unit is a different revision, so the same symptom can mean a
+  different component on another unit). The diagnostics engineer holds it; the
   technician only observes symptoms. It is count-independent, so it never
   reveals how many units / faults there are.
-- the **service spec**: each component's tool / torque / calibration, drawn
-  **independently per unit** (each unit is a different revision, so its spec
-  sheet differs). The spec engineer holds these.
+- the **service procedure**: each component's full replacement procedure for
+  this unit — a multi-step sequence (tool, torque, passes, calibration, and
+  class-specific counts / patterns / hold durations) whose parameters are drawn
+  **independently per unit**. The spec engineer holds these. The procedure
+  *shape* follows the component's service class; the *parameters* re-randomize,
+  so the technician can never self-service and must reconstruct the whole
+  multi-step procedure from the spec engineer's relay.
 
 The derived ground truth is a flat, ordered list of replacement stages: units
 in canonical order (module-1 first), components within each unit in
 access-depth order. Faults are revealed to the technician one at a time (see
 the world), so the team never knows the total in advance. Each stage is
-rendered to a ``judge_expected_action`` string (naming the unit) that the LLM
-judge scores the technician's free-text action against. Each round is built
-from an independent RNG keyed on ``(seed, round_number)``.
+rendered to a multi-step ``judge_expected_action`` string (naming the unit)
+that the LLM judge scores the technician's free-text action against. Each round
+is built from an independent RNG keyed on ``(seed, round_number)``.
 """
 
 import random
 from typing import NamedTuple
 
+# Service classes. Each fixes the shape (ordered step templates) of a
+# component's replacement procedure; the parameters that fill the templates are
+# drawn per unit per round.
+SERVICE_CLASS_BOLTED_PANEL = "bolted-panel"
+SERVICE_CLASS_ROTATING_ASSEMBLY = "rotating-assembly"
+SERVICE_CLASS_PRESS_FIT = "press-fit"
+SERVICE_CLASS_ELECTRICAL_PACK = "electrical-pack"
+SERVICE_CLASS_SENSOR = "sensor"
+
 
 class Component(NamedTuple):
-    """One drive-module component and its fixed service access depth."""
+    """One drive-module component, its fixed access depth, and its service class."""
 
     component_id: str
     access_depth: int
+    service_class: str
 
 
-class ComponentSpec(NamedTuple):
-    """This round's service spec for one component on one unit."""
+class ServiceProcedure(NamedTuple):
+    """This round's full replacement procedure for one component on one unit.
+
+    ``steps`` is the rendered ordered multi-step procedure (the heart of the
+    action the technician must transmit and perform). The structured fields are
+    the headline parameters surfaced for display; every parameter is also
+    embedded in ``steps``.
+    """
 
     component: str
+    service_class: str
     tool: str
     torque_nm: int
+    passes: int
     calibration: str
+    steps: tuple[str, ...]
 
 
 class ModuleSpecTable(NamedTuple):
-    """One unit's full service-spec sheet this round (one ComponentSpec per component)."""
+    """One unit's full service sheet this round (one ServiceProcedure per component)."""
 
     module_label: str
-    specs: tuple[ComponentSpec, ...]
+    specs: tuple[ServiceProcedure, ...]
 
 
 class ModuleFaultTree(NamedTuple):
@@ -70,9 +95,12 @@ class Stage(NamedTuple):
     module_label: str
     component: str
     symptom: str
+    service_class: str
     tool: str
     torque_nm: int
+    passes: int
     calibration: str
+    steps: tuple[str, ...]
     access_depth: int
     judge_expected_action: str
 
@@ -89,7 +117,7 @@ class DriveModuleCase(NamedTuple):
     round_time_budget_seconds: int
 
     def spec_table_for(self, module_label: str) -> ModuleSpecTable:
-        """Return the service-spec sheet for ``module_label``."""
+        """Return the service sheet for ``module_label``."""
         for table in self.module_spec_tables:
             if table.module_label == module_label:
                 return table
@@ -103,26 +131,44 @@ class DriveModuleCase(NamedTuple):
         raise ValueError(f"no fault tree for {module_label}")
 
 
-# Fixed component catalog. ``access_depth`` is the fixed service order: a
-# faulty subset must be replaced shallowest-first, which gives every subset a
-# unique correct order. This catalog is the diagnostics engineer's permanent
-# expertise (rendered into their system prompt); only the symptom mapping and
-# the service spec re-randomize per round.
+# Fixed component catalog. ``access_depth`` is the fixed service order: a faulty
+# subset must be replaced shallowest-first, which gives every subset a unique
+# correct order. ``service_class`` fixes the shape of each component's
+# replacement procedure. This catalog is the permanent expertise; only the
+# symptom mapping and the per-unit procedure parameters re-randomize per round.
 COMPONENTS: tuple[Component, ...] = (
-    Component(component_id="housing_cover", access_depth=1),
-    Component(component_id="cooling_fan", access_depth=2),
-    Component(component_id="terminal_block", access_depth=3),
-    Component(component_id="brush_set", access_depth=4),
-    Component(component_id="encoder", access_depth=5),
-    Component(component_id="shaft_seal", access_depth=6),
-    Component(component_id="front_bearing", access_depth=7),
-    Component(component_id="commutator", access_depth=8),
-    Component(component_id="capacitor_bank", access_depth=9),
-    Component(component_id="hall_sensor", access_depth=10),
-    Component(component_id="coupling", access_depth=11),
-    Component(component_id="stator_gasket", access_depth=12),
-    Component(component_id="field_coil", access_depth=13),
-    Component(component_id="rotor", access_depth=14),
+    Component(
+        component_id="housing_cover", access_depth=1, service_class=SERVICE_CLASS_BOLTED_PANEL
+    ),
+    Component(
+        component_id="cooling_fan", access_depth=2, service_class=SERVICE_CLASS_ROTATING_ASSEMBLY
+    ),
+    Component(
+        component_id="terminal_block", access_depth=3, service_class=SERVICE_CLASS_ELECTRICAL_PACK
+    ),
+    Component(
+        component_id="brush_set", access_depth=4, service_class=SERVICE_CLASS_ROTATING_ASSEMBLY
+    ),
+    Component(component_id="encoder", access_depth=5, service_class=SERVICE_CLASS_SENSOR),
+    Component(component_id="shaft_seal", access_depth=6, service_class=SERVICE_CLASS_PRESS_FIT),
+    Component(component_id="front_bearing", access_depth=7, service_class=SERVICE_CLASS_PRESS_FIT),
+    Component(
+        component_id="commutator", access_depth=8, service_class=SERVICE_CLASS_ROTATING_ASSEMBLY
+    ),
+    Component(
+        component_id="capacitor_bank", access_depth=9, service_class=SERVICE_CLASS_ELECTRICAL_PACK
+    ),
+    Component(component_id="hall_sensor", access_depth=10, service_class=SERVICE_CLASS_SENSOR),
+    Component(
+        component_id="coupling", access_depth=11, service_class=SERVICE_CLASS_ROTATING_ASSEMBLY
+    ),
+    Component(
+        component_id="stator_gasket", access_depth=12, service_class=SERVICE_CLASS_BOLTED_PANEL
+    ),
+    Component(
+        component_id="field_coil", access_depth=13, service_class=SERVICE_CLASS_ELECTRICAL_PACK
+    ),
+    Component(component_id="rotor", access_depth=14, service_class=SERVICE_CLASS_ROTATING_ASSEMBLY),
 )
 
 SYMPTOMS: tuple[str, ...] = (
@@ -168,8 +214,56 @@ CALIBRATIONS: tuple[str, ...] = (
     "bed-in",
 )
 
+PATTERNS: tuple[str, ...] = (
+    "star",
+    "clockwise",
+    "inside-out",
+    "criss-cross",
+)
+
 TORQUE_MIN_NM = 4
 TORQUE_MAX_NM = 24
+PASSES_VALUES: tuple[int, ...] = (2, 3, 4)
+FASTENER_COUNT_VALUES: tuple[int, ...] = (3, 4, 6, 8)
+HOLD_SECONDS_VALUES: tuple[int, ...] = (5, 8, 10, 15)
+
+
+# Ordered step templates per service class. Each string is a ``str.format``
+# template over the drawn procedure parameters; a class references only the
+# parameters its shape needs. The set of steps (and their verbs) is the
+# permanent class shape; the substituted values re-randomize per unit per round.
+STEP_TEMPLATES_BY_CLASS: dict[str, tuple[str, ...]] = {
+    SERVICE_CLASS_BOLTED_PANEL: (
+        "Vent the bay and back off the {fastener_count} retaining bolts in a {pattern} sequence.",
+        "Lift out the old part and seat the replacement using {tool}.",
+        "Torque the bolts to {torque_nm} Nm across {passes} passes.",
+        "Finish with the {calibration} routine.",
+    ),
+    SERVICE_CLASS_ROTATING_ASSEMBLY: (
+        "Lock the shaft and de-energize, holding {hold_seconds}s.",
+        "Release the drive and draw the old part out with {tool}.",
+        "Seat the replacement and torque the mount to {torque_nm} Nm in {passes} passes.",
+        "Spin-test, then run the {calibration} routine.",
+    ),
+    SERVICE_CLASS_PRESS_FIT: (
+        "Drain the cavity and let it settle for {hold_seconds}s.",
+        "Press the old part out with {tool} and press the replacement in.",
+        "Re-torque the retainer to {torque_nm} Nm in {passes} passes.",
+        "Bleed the line and run the {calibration} routine.",
+    ),
+    SERVICE_CLASS_ELECTRICAL_PACK: (
+        "De-energize and discharge the bus, holding {hold_seconds}s.",
+        "Disconnect the {fastener_count} leads and lift out the old part with {tool}.",
+        "Fit the replacement and torque the terminals to {torque_nm} Nm in {passes} passes.",
+        "Run the {calibration} routine and verify.",
+    ),
+    SERVICE_CLASS_SENSOR: (
+        "Power down and unmount the old part with {tool}.",
+        "Fit the replacement and snug the {fastener_count} screws in a {pattern} sequence.",
+        "Torque to {torque_nm} Nm in {passes} passes.",
+        "Align with the {calibration} routine and confirm the reading.",
+    ),
+}
 
 
 def module_label(module_index: int) -> str:
@@ -177,12 +271,46 @@ def module_label(module_index: int) -> str:
     return f"module-{module_index}"
 
 
-def render_expected_action(module_label_value: str, spec: ComponentSpec) -> str:
-    """Render the canonical expected-action string the LLM judge compares against."""
-    return (
-        f"Replace {module_label_value}'s {spec.component}. Required tool: {spec.tool}. "
-        f"Torque: {spec.torque_nm} Nm. Calibration procedure: {spec.calibration}."
+def _draw_procedure(rng: random.Random, component: Component) -> ServiceProcedure:
+    """Draw this unit's full replacement procedure for ``component``.
+
+    All parameters are drawn; the component's service-class step templates use
+    the subset its shape needs, and the rendered ``steps`` embed them.
+    """
+    tool = rng.choice(TOOLS)
+    torque_nm = rng.randint(TORQUE_MIN_NM, TORQUE_MAX_NM)
+    passes = rng.choice(PASSES_VALUES)
+    calibration = rng.choice(CALIBRATIONS)
+    fastener_count = rng.choice(FASTENER_COUNT_VALUES)
+    pattern = rng.choice(PATTERNS)
+    hold_seconds = rng.choice(HOLD_SECONDS_VALUES)
+    steps = tuple(
+        template.format(
+            tool=tool,
+            torque_nm=torque_nm,
+            passes=passes,
+            calibration=calibration,
+            fastener_count=fastener_count,
+            pattern=pattern,
+            hold_seconds=hold_seconds,
+        )
+        for template in STEP_TEMPLATES_BY_CLASS[component.service_class]
     )
+    return ServiceProcedure(
+        component=component.component_id,
+        service_class=component.service_class,
+        tool=tool,
+        torque_nm=torque_nm,
+        passes=passes,
+        calibration=calibration,
+        steps=steps,
+    )
+
+
+def render_expected_action(module_label_value: str, procedure: ServiceProcedure) -> str:
+    """Render the canonical multi-step expected-action string the judge compares against."""
+    body = " ".join(procedure.steps)
+    return f"Replace {module_label_value}'s {procedure.component}. {body}"
 
 
 def component_access_order() -> tuple[Component, ...]:
@@ -196,11 +324,12 @@ def _build_one_case(
     module_replacement_counts: list[int],
     round_time_budget_seconds: int,
 ) -> DriveModuleCase:
-    """Generate one case: shared fault-tree, per-unit dynamic specs, ordered stages.
+    """Generate one case: per-unit fault-tree, per-unit procedures, ordered stages.
 
     ``module_replacement_counts`` has one entry per unit — the number of faulty
     components on that unit.
     """
+    components_by_id = {component.component_id: component for component in COMPONENTS}
     component_ids = [component.component_id for component in COMPONENTS]
     depth_by_id = {component.component_id: component.access_depth for component in COMPONENTS}
 
@@ -225,39 +354,37 @@ def _build_one_case(
             )
         )
 
-        # Per-unit service spec for every component (drawn independently per unit).
-        spec_by_component = {
-            component_id: ComponentSpec(
-                component=component_id,
-                tool=rng.choice(TOOLS),
-                torque_nm=rng.randint(TORQUE_MIN_NM, TORQUE_MAX_NM),
-                calibration=rng.choice(CALIBRATIONS),
-            )
+        # Per-unit full replacement procedure for every component (drawn per unit).
+        procedure_by_component = {
+            component_id: _draw_procedure(rng=rng, component=components_by_id[component_id])
             for component_id in component_ids
         }
         module_spec_tables.append(
             ModuleSpecTable(
                 module_label=label,
-                specs=tuple(spec_by_component[component_id] for component_id in component_ids),
+                specs=tuple(procedure_by_component[component_id] for component_id in component_ids),
             )
         )
 
         faulty = rng.sample(component_ids, replacement_count)
         ordered = sorted(faulty, key=lambda component_id: depth_by_id[component_id])
         for component_id in ordered:
-            spec = spec_by_component[component_id]
+            procedure = procedure_by_component[component_id]
             stages.append(
                 Stage(
                     step_index=step_index,
                     module_label=label,
                     component=component_id,
                     symptom=symptom_by_component[component_id],
-                    tool=spec.tool,
-                    torque_nm=spec.torque_nm,
-                    calibration=spec.calibration,
+                    service_class=procedure.service_class,
+                    tool=procedure.tool,
+                    torque_nm=procedure.torque_nm,
+                    passes=procedure.passes,
+                    calibration=procedure.calibration,
+                    steps=procedure.steps,
                     access_depth=depth_by_id[component_id],
                     judge_expected_action=render_expected_action(
-                        module_label_value=label, spec=spec
+                        module_label_value=label, procedure=procedure
                     ),
                 )
             )
