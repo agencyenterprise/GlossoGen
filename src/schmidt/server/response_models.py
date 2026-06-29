@@ -21,3 +21,9 @@ class LaunchStatus(str, Enum):
     """Status value for subprocess launch responses."""
 
     STARTED = "started"
+
+
+class ServerConfigResponse(BaseModel):
+    """Public server feature flags consumed by the frontend."""
+
+    evaluations_enabled: bool

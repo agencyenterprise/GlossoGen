@@ -1,10 +1,28 @@
-You are scoring a spot-the-difference game. Two players each saw one of two near-identical scenes (call them scene A and scene B) and tried to find every difference by describing their objects to each other. You are given the GROUND-TRUTH list of the exact differences between the two scenes (numbered) and the TEAM'S SUBMITTED list of differences (free text).
+You are scoring a spot-the-difference game. Two players each saw one of two near-identical scenes (call them scene A and scene B) and tried to find every difference by describing their objects to each other. Objects are shapes with a size and color, placed in a scene; several objects can be identical in shape/color/size, so position is what tells them apart. Position is described only qualitatively — a coarse area ("upper-left", "center", "lower-right", "top", "middle", "bottom") and relations to other objects ("just left of the blue star", "below a small red square"). There are no exact coordinates.
 
-Each difference is one of: an attribute changed (shape, color, or size), an object moved to a different cell, an object added (present in only one scene), or an object removed (present in only the other scene).
+You receive:
+1. The GROUND-TRUTH list of the exact differences (numbered), each naming the object (size/color/shape), its area/relations, and the change.
+2. The TEAM'S SUBMITTED list of differences (free text).
 
-For each ground-truth difference, decide whether ANY submitted item correctly identifies it. A submitted item matches a ground-truth difference when it names the object involved and the nature of the change. The players need NOT state both scenes' values, nor which scene is "A" versus "B": a player who saw only one scene cannot know the other's value alone, and the two scenes are interchangeable. A position is identified correctly if the cell or location matches; small wording differences are fine. Match leniently on phrasing but strictly on substance — the object and the kind of change must both be right. Treat "moved" and "appears in a different place in the two scenes" as the SAME single difference; do not also count it as a separate add and remove.
+Each difference is one of: an attribute changed (shape, color, or size), an object moved to a different area, an object added (present in only one scene), or an object removed (present in only the other scene).
+
+CRITICAL — apply the "naive reader" test to each submitted item. Judge it on its own. Imagine a competent reader who has NEVER seen the ground truth and has no knowledge of any abbreviation, code, coordinate convention, or shorthand the team invented while talking. Could that reader, from the submitted text alone, tell WHICH object in WHICH area is meant and WHAT changed? Do NOT use the ground truth (or your own imagination) to decode, expand, or disambiguate any token in a submitted item. The ground truth is only for comparison once the item has been understood on its own.
+
+A submitted item MATCHES a ground-truth difference ONLY if BOTH hold:
+(a) Standalone clarity — read in isolation, the item names, in ordinary English:
+    - the object by its attributes in plain words (e.g. "small red circle"), or for an added/removed object, the object that is extra or missing;
+    - enough position to identify which object is meant — a plain-English area word and/or a relation to another object ("in the upper-left", "next to the blue star"). This is REQUIRED whenever several objects share the same attributes: "a red circle changed color" is NOT acceptable if more than one red circle exists and no area/relation pins it down;
+    - the change in plain English (a different shape/color/size; moved to/from an area; extra in one scene; missing from one scene).
+  Abbreviations, invented codes, coordinate numbers ("3,5", "r3c5"), and symbols are allowed only as DECORATION beside the plain English. THE TEST: mentally delete every abbreviation, code, coordinate token, and symbol from the item. If the remaining plain English still names the object, its area/relation, and the change unambiguously, it passes. If a required part survives only as a code or coordinate, it fails.
+(b) Substance agreement with that ground-truth difference: the same object (attributes match and the area/relations are consistent — be lenient about WHICH neighbor is cited, strict that the area and object are right) and the same change kind and direction. Treat "moved" and "appears in a different area in the two scenes" as the SAME difference; do not also count it as a separate add and remove. The two scenes are interchangeable, so do not penalize which scene the player calls "mine" vs "theirs".
+
+Count a submitted item as a FALSE POSITIVE if any of these is true:
+- the object, its position, or the change is carried ONLY by a code, coordinate, or shorthand whose meaning is not self-evident in plain English (it fails the naive-reader test);
+- it is too vague to identify which object is meant (e.g. names only attributes shared by several objects with no area/relation);
+- it does not correspond to any ground-truth difference, or it contradicts one (wrong object, wrong area, wrong change).
+Be lenient on synonyms and word order; be strict on substance and on the naive-reader test. Adding extra corroborating detail (an extra relation, a confirmation) is fine and never a reason to reject.
 
 Return:
-- matched_difference_indices: the 1-based indices of every ground-truth difference that at least one submitted item correctly identifies (each index at most once).
-- false_positive_count: the number of submitted items that correspond to NO ground-truth difference (wrong, vague, or invented differences). If two submitted items both describe the same real difference, that is not a false positive.
-- explanation: one or two sentences justifying the verdict.
+- matched_difference_indices: the 1-based indices of every ground-truth difference identified by at least one clear, correct submitted item (each index at most once).
+- false_positive_count: the number of submitted items that are false positives by the rules above. If two items describe the same real difference, that is not a false positive (count it once toward matched, neither as false).
+- explanation: one or two sentences. If you reject an item on the naive-reader test, name the specific token whose meaning is not self-evident.

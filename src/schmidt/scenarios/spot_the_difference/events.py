@@ -14,13 +14,18 @@ from schmidt.models.event_base import EventBase
 
 
 class SpotObject(BaseModel):
-    """One scene object: a shape/color/size bundle at a grid cell."""
+    """One scene object: a shape/color/size bundle at a grid cell.
+
+    ``column`` / ``row`` are the internal geometry (never shown to agents);
+    ``region`` is the coarse 3x3 area the agents actually see.
+    """
 
     shape: str
     color: str
     size: str
     column: int
     row: int
+    region: str
 
 
 class SpotPlantedDifference(BaseModel):
@@ -49,6 +54,7 @@ class SpotTheDifferenceCaseStarted(EventBase):
     event_type: Literal["spot_the_difference_case_started"] = "spot_the_difference_case_started"
     case_number: int
     grid_size: int
+    round_time_budget_seconds: int
     difference_count: int
     scene_a: list[SpotObject]
     scene_b: list[SpotObject]

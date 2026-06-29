@@ -16,6 +16,7 @@ from starlette.routing import Route
 from schmidt.db.local_tenant import LOCAL_GROUP_ID
 from schmidt.db.pool import close_pool, create_pool, get_database_url
 from schmidt.server.error_logging_handlers import register_error_logging_handlers
+from schmidt.server.feature_flags import load_feature_flags
 from schmidt.server.identity.bootstrap import ensure_local_group
 from schmidt.server.identity.middleware import ClerkIdentityMiddleware
 from schmidt.server.identity.settings import load_identity_settings
@@ -27,7 +28,7 @@ from schmidt.server.mcp.oauth_provider import SchmidtOAuthProvider
 from schmidt.server.mcp.oauth_storage import OAuthStorage
 from schmidt.server.mcp.oauth_storage_port import OAuthStoragePort
 from schmidt.server.pdf.router import router as pdf_export_router
-from schmidt.server.response_models import HealthResponse, HealthStatus
+from schmidt.server.response_models import HealthResponse, HealthStatus, ServerConfigResponse
 from schmidt.server.runs.bundle_router import router as bundle_router
 from schmidt.server.runs.router import router as runs_router
 from schmidt.server.scenarios.router import router as scenarios_router
@@ -39,6 +40,7 @@ logger = logging.getLogger(__name__)
 _oauth_issuer_url = os.environ.get("OAUTH_ISSUER_URL")
 _runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs"))
 _identity_settings = load_identity_settings()
+_feature_flags = load_feature_flags()
 
 
 def _resolve_frontend_url() -> str:
@@ -106,6 +108,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         logger.info("Running in local mode (CLERK_SECRET_KEY unset)")
     else:
         logger.info("Running with Clerk authentication")
+
+    app.state.feature_flags = _feature_flags
+    if not _feature_flags.evaluations_enabled:
+        logger.info(
+            "Evaluations disabled (ENABLE_EVALUATIONS=false) — the REST "
+            "evaluate endpoint will reject requests"
+        )
 
     if _oauth_issuer_url is not None:
         logger.info("OAuth enabled (issuer=%s)", _oauth_issuer_url)
@@ -222,3 +231,9 @@ else:
 async def health() -> HealthResponse:
     """Health check endpoint."""
     return HealthResponse(status=HealthStatus.OK)
+
+
+@app.get("/api/server-config", response_model=ServerConfigResponse)
+async def server_config() -> ServerConfigResponse:
+    """Public server feature flags consumed by the frontend."""
+    return ServerConfigResponse(evaluations_enabled=_feature_flags.evaluations_enabled)

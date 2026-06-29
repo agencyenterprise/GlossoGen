@@ -4,7 +4,7 @@
     "agent_role_filter": "viewer",
     "inputs": {
       "difference_count": 2,
-      "my_scene": "- large red circle at column 2, row 3\n- small blue square at column 5, row 1\n- medium green triangle at column 7, row 6\n- small yellow star at column 1, row 7"
+      "my_scene": "- a small red circle in the upper-left, with a large blue star to its right and a small red circle below it\n- a large blue star in the upper-center, with a small red circle to its left\n- a small red circle in the middle-left, with a small red circle above it and a large green square to its lower-right\n- a large green square in the center, with a small red circle to its upper-left\n- a small yellow triangle in the lower-right, with a large green square above it"
     }
   },
   {
@@ -12,7 +12,7 @@
     "agent_role_filter": "viewer",
     "inputs": {
       "difference_count": 3,
-      "my_scene": "- small purple hexagon at column 1, row 2\n- large orange star at column 4, row 4\n- medium blue circle at column 6, row 2\n- small green square at column 3, row 7\n- large pink triangle at column 8, row 5\n- medium brown diamond at column 2, row 6"
+      "my_scene": "- a large yellow circle in the upper-left, with a small blue triangle to its lower-right\n- a small blue triangle in the upper-center, with a large yellow circle to its upper-left and a small blue triangle below it\n- a small blue triangle in the center, with a small blue triangle above it\n- a large red star in the middle-right, with a small green square to its lower-left\n- a small green square in the lower-left, with a large red star to its upper-right\n- a large yellow circle in the lower-right, with a small green square to its left"
     }
   },
   {
@@ -20,7 +20,7 @@
     "agent_role_filter": "viewer",
     "inputs": {
       "difference_count": 4,
-      "my_scene": "- medium yellow cross at column 1, row 1\n- small red diamond at column 3, row 2\n- large green heart at column 5, row 3\n- small blue triangle at column 7, row 4\n- medium purple circle at column 2, row 6\n- large orange square at column 6, row 7\n- small pink star at column 8, row 8"
+      "my_scene": "- a small green circle in the upper-left, with a small green circle to its right\n- a small green circle in the upper-center, with a small green circle to its left and a large red square below it\n- a large red square in the center, with a small green circle above it and a large red square to its lower-right\n- a large red square in the lower-center, with a large red square to its upper-left\n- a small blue star in the middle-right, with a large red square to its lower-left\n- a small blue star in the lower-right, with a small blue star above it"
     }
   },
   {
@@ -28,7 +28,7 @@
     "agent_role_filter": "viewer",
     "inputs": {
       "difference_count": 1,
-      "my_scene": "- large blue triangle at column 3, row 3\n- small red circle at column 6, row 5\n- medium green square at column 1, row 8"
+      "my_scene": "- a large blue triangle in the upper-left, with a small yellow circle to its lower-right\n- a small yellow circle in the center, with a large blue triangle to its upper-left and a small yellow circle to its lower-right\n- a small yellow circle in the lower-right, with a small yellow circle to its upper-left"
     }
   }
 ]

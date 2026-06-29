@@ -1,15 +1,23 @@
 """Sanity-check spot_the_difference scene generation.
 
-Asserts determinism (same seed -> identical cases), that each case differs in
-exactly K detectable ways, that planted differences are isolated (distinct
-objects / cells), and that easy rounds collapse to K=1. Run directly:
+Asserts determinism (same seed -> identical cases), that applying the K
+planted edits to scene A reproduces scene B exactly, that duplicate bundles
+occur at the configured scene sizes, that every ``object_moved`` crosses a
+region, that each difference carries a relational description, and that easy
+rounds collapse to K=1. Run directly:
 
     VIRTUAL_ENV= uv run --no-sync python -m \
       schmidt.scenarios.spot_the_difference.scripts.check_scene_generation
 """
 
 from schmidt.scenarios.spot_the_difference.ids import DifferenceKind
-from schmidt.scenarios.spot_the_difference.scene_generation import DiffCase, SceneObject, get_cases
+from schmidt.scenarios.spot_the_difference.scene_generation import (
+    DiffCase,
+    SceneObject,
+    get_cases,
+    region_of,
+    render_scene_relational,
+)
 
 _KINDS = [kind.value for kind in DifferenceKind]
 
@@ -41,13 +49,33 @@ def _assert_unique_cells(case: DiffCase) -> None:
     assert len(b_cells) == len(set(b_cells)), f"scene B duplicate cells in case {case.case_number}"
 
 
+def _has_duplicate_bundle(case: DiffCase) -> bool:
+    bundles = [obj.bundle for obj in case.scene_a]
+    return len(bundles) != len(set(bundles))
+
+
+def _assert_moves_cross_region(case: DiffCase) -> None:
+    for diff in case.differences:
+        if diff.kind != DifferenceKind.OBJECT_MOVED:
+            continue
+        a = diff.scene_a_object
+        b = diff.scene_b_object
+        assert a is not None and b is not None
+        region_a = region_of(column=a.column, row=a.row, grid_size=case.grid_size)
+        region_b = region_of(column=b.column, row=b.row, grid_size=case.grid_size)
+        assert (
+            region_a != region_b
+        ), f"case {case.case_number}: moved object stayed in region {region_a}"
+
+
 def _generate() -> list[DiffCase]:
-    """Generate the canonical 15-round batch used by every assertion."""
+    """Generate the canonical batch used by every assertion."""
     return get_cases(
         seed=42,
         round_count=15,
-        grid_size=8,
-        object_count_values=[5, 6, 7],
+        grid_size=12,
+        round_time_budget_seconds=500,
+        object_count_values=[12, 15, 18],
         object_count_weights=[1, 1, 1],
         difference_count_values=[2, 3, 4],
         difference_count_weights=[1, 1, 1],
@@ -62,8 +90,10 @@ def main() -> None:
     cases_two = _generate()
     assert cases_one == cases_two, "generation is not deterministic for a fixed seed"
 
+    rounds_with_duplicates = 0
     for case in cases_one:
         _assert_unique_cells(case=case)
+        _assert_moves_cross_region(case=case)
         planted = len(case.differences)
         assert planted == case.difference_count, (
             f"case {case.case_number}: planted {planted} != difference_count "
@@ -75,16 +105,28 @@ def main() -> None:
         assert set(case.scene_a) != set(
             case.scene_b
         ), f"case {case.case_number}: scenes are identical"
+        for diff in case.differences:
+            assert diff.description, f"case {case.case_number}: empty description for {diff.kind}"
         if case.case_number in {1, 2, 3}:
             assert case.difference_count == 1, f"easy case {case.case_number} K != 1"
+        if _has_duplicate_bundle(case=case):
+            rounds_with_duplicates += 1
 
+    assert (
+        rounds_with_duplicates > 0
+    ), "no round contained duplicate bundles; vocab/scene too sparse"
     kinds_seen = sorted({diff.kind.value for case in cases_one for diff in case.differences})
-    print(f"OK: {len(cases_one)} cases, deterministic, kinds exercised: {kinds_seen}")
-    for case in cases_one[:5]:
-        print(
-            f"  round {case.case_number}: {len(case.scene_a)} objs, K={case.difference_count}, "
-            f"kinds={[d.kind.value for d in case.differences]}"
-        )
+    print(
+        f"OK: {len(cases_one)} cases, deterministic, kinds={kinds_seen}, "
+        f"{rounds_with_duplicates}/{len(cases_one)} rounds with duplicate bundles"
+    )
+    sample = cases_one[3]
+    print(f"--- sample round {sample.case_number} (K={sample.difference_count}) scene A ---")
+    for line in render_scene_relational(scene=sample.scene_a, grid_size=sample.grid_size)[:5]:
+        print(f"  {line}")
+    print("--- planted differences ---")
+    for diff in sample.differences:
+        print(f"  [{diff.kind.value}] {diff.description}")
 
 
 if __name__ == "__main__":

@@ -32,6 +32,7 @@ def restore_outcomes_from_events(
 ) -> None:
     """Append a ``DiffOutcome`` to each team for every completed round in ``events``."""
     difference_count_by_round: dict[int, int] = {}
+    budget_by_round: dict[int, int] = {}
     judged_by_round_team: dict[int, dict[str, DifferenceSubmissionJudged]] = {}
     characters_by_round_team: dict[int, dict[str, int]] = {}
     completed_rounds: set[int] = set()
@@ -41,6 +42,7 @@ def restore_outcomes_from_events(
             continue
         if isinstance(event, SpotTheDifferenceCaseStarted):
             difference_count_by_round[round_number] = event.difference_count
+            budget_by_round[round_number] = event.round_time_budget_seconds
         elif isinstance(event, DifferenceSubmissionJudged):
             judged_by_round_team.setdefault(round_number, {})[event.team_id] = event
         elif isinstance(event, MessageSent):
@@ -59,10 +61,14 @@ def restore_outcomes_from_events(
             for team in teams.values()
         ):
             continue
+        budget = budget_by_round.get(round_number)
+        if budget is None:
+            budget = cases[round_number - 1].round_time_budget_seconds
         snapshots = _snapshots_for_round(
             team_ids=list(teams.keys()),
             judged=judged_by_round_team.get(round_number, {}),
             characters=characters_by_round_team.get(round_number, {}),
+            budget=budget,
         )
         total_differences = difference_count_by_round.get(
             round_number, cases[round_number - 1].difference_count
@@ -82,18 +88,26 @@ def _snapshots_for_round(
     team_ids: list[str],
     judged: dict[str, DifferenceSubmissionJudged],
     characters: dict[str, int],
+    budget: int,
 ) -> dict[str, SubmissionSnapshot]:
-    """Build each team's submission snapshot for one completed round."""
+    """Build each team's submission snapshot for one completed round.
+
+    A submitted team's characters are the value latched at submission; a team
+    that never submitted is charged its total link-channel characters. Either
+    way ``budget_exceeded`` is the relevant character count reaching ``budget``.
+    """
     snapshots: dict[str, SubmissionSnapshot] = {}
     for team_id in team_ids:
         event = judged.get(team_id)
         if event is None:
+            total = characters.get(team_id, 0)
             snapshots[team_id] = SubmissionSnapshot(
                 submitted=False,
                 found_all=False,
                 false_positive_count=0,
                 found_count=0,
-                characters=characters.get(team_id, 0),
+                budget_exceeded=total >= budget,
+                characters=total,
             )
             continue
         snapshots[team_id] = SubmissionSnapshot(
@@ -101,6 +115,7 @@ def _snapshots_for_round(
             found_all=event.found_all,
             false_positive_count=event.false_positive_count,
             found_count=len(set(event.matched_difference_indices)),
+            budget_exceeded=event.characters_at_submission >= budget,
             characters=event.characters_at_submission,
         )
     return snapshots

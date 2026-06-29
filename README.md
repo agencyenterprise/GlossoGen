@@ -551,6 +551,7 @@ Railway environment variables for the backend:
 - `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`, etc.) — provider keys for running simulations.
 - `ALLOWED_ORIGINS` — comma-separated frontend URLs for CORS.
 - `OAUTH_ISSUER_URL` — public backend URL to enable MCP OAuth.
+- `ENABLE_EVALUATIONS` — set to `false` to disable the REST evaluate endpoint (the frontend "Run Eval" button): the endpoint returns 403 and the frontend hides the button. Defaults to enabled. Does not affect the CLI `schmidt evaluate` command.
 
 The frontend requires `NEXT_PUBLIC_API_URL` as a build arg pointing to the backend URL, plus `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` for Clerk-mode operation.
 

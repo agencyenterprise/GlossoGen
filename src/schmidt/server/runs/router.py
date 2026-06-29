@@ -318,8 +318,15 @@ async def start_evaluation(
     Validates that the run exists and is complete, that no evaluation is
     already in progress, and that the requested metrics and provider
     are valid. Launches ``python -m schmidt evaluate`` as a detached
-    background process.
+    background process. Rejected with 403 when evaluations are disabled
+    via the ``ENABLE_EVALUATIONS`` env var.
     """
+    if not request.app.state.feature_flags.evaluations_enabled:
+        raise HTTPException(
+            status_code=403,
+            detail="Evaluations are disabled on this server",
+        )
+
     resolved = await resolve_run_or_404(
         request=request, scenario=scenario, run_dir_name=run_dir_name
     )
