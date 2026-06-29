@@ -14,6 +14,7 @@ import { DEFAULT_SCENARIO_PLUGIN } from "./default-plugin";
 import { driveModuleRepairPlugin } from "./drive_module_repair/plugin";
 import { orbitalAnomalyPlugin } from "./orbital_anomaly/plugin";
 import type { ScenarioPlugin } from "./scenario-plugin";
+import { spotTheDifferencePlugin } from "./spot_the_difference/plugin";
 import { veyruPlugin } from "./veyru/plugin";
 
 const SCENARIO_PLUGINS: Record<string, ScenarioPlugin> = {
@@ -21,6 +22,7 @@ const SCENARIO_PLUGINS: Record<string, ScenarioPlugin> = {
   [containerYardStackingPlugin.scenarioName]: containerYardStackingPlugin,
   [orbitalAnomalyPlugin.scenarioName]: orbitalAnomalyPlugin,
   [driveModuleRepairPlugin.scenarioName]: driveModuleRepairPlugin,
+  [spotTheDifferencePlugin.scenarioName]: spotTheDifferencePlugin,
 };
 
 /** Return the plug-in registered for ``scenarioName`` or the default no-op plug-in. */

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 _renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
 
-JUDGE_VOTE_COUNT = 1
+JUDGE_VOTE_COUNT = 3
 JUDGE_TEMPERATURE = 0.0
 
 

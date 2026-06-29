@@ -4953,6 +4953,10 @@
       },
       "SpotSubmissionMetadata": {
         "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
           "team_id": {
             "type": "string",
             "title": "Team Id"
@@ -4990,6 +4994,7 @@
         },
         "type": "object",
         "required": [
+          "round_number",
           "team_id",
           "submitted_items",
           "matched_difference_indices",
@@ -5000,6 +5005,42 @@
         ],
         "title": "SpotSubmissionMetadata",
         "description": "Verdict for a single ``submit_differences`` call attached by ``call_id``."
+      },
+      "SpotTeamRoundResult": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "team_id",
+          "success",
+          "reason"
+        ],
+        "title": "SpotTeamRoundResult",
+        "description": "One team's outcome for one round (the correctness-gate + win/loss verdict).\n\n``team_id`` is ``null`` in single-team mode. ``reason`` is the human-readable\nexplanation written by ``judge_round_result`` (e.g. ``won \u2014 found 3/3, 465\nchars`` / ``did not submit (found 0/3, 576 chars)``)."
       },
       "SpotTheDifferenceCaseSummary": {
         "properties": {
@@ -5075,12 +5116,20 @@
             },
             "type": "object",
             "title": "Submission Metadata By Call Id"
+          },
+          "team_results": {
+            "items": {
+              "$ref": "#/components/schemas/SpotTeamRoundResult"
+            },
+            "type": "array",
+            "title": "Team Results"
           }
         },
         "type": "object",
         "required": [
           "cases",
-          "submission_metadata_by_call_id"
+          "submission_metadata_by_call_id",
+          "team_results"
         ],
         "title": "SpotTheDifferenceRunExtras",
         "description": "Scenario-specific run-detail payload surfaced for spot_the_difference runs."
