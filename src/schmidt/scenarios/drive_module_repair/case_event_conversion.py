@@ -10,6 +10,7 @@ from schmidt.scenarios.drive_module_repair.drive_module_cases import DriveModule
 from schmidt.scenarios.drive_module_repair.events import (
     DriveModuleCaseStarted,
     DriveModuleFaultEntry,
+    DriveModuleModulePanel,
     DriveModuleSpecEntry,
     DriveModuleStage,
 )
@@ -20,8 +21,12 @@ def case_started_event(round_number: int, case: DriveModuleCase) -> DriveModuleC
     return DriveModuleCaseStarted(
         round_number=round_number,
         case_number=case.case_number,
-        replacement_count=case.replacement_count,
-        panel_symptoms=list(case.panel_symptoms),
+        module_count=case.module_count,
+        replacement_count=case.total_replacement_count,
+        module_panels=[
+            DriveModuleModulePanel(module_label=panel.module_label, symptoms=list(panel.symptoms))
+            for panel in case.module_panels
+        ],
         fault_tree=[
             DriveModuleFaultEntry(symptom=symptom, component=component)
             for symptom, component in case.fault_tree
@@ -38,6 +43,7 @@ def case_started_event(round_number: int, case: DriveModuleCase) -> DriveModuleC
         stages=[
             DriveModuleStage(
                 step_index=stage.step_index,
+                module_label=stage.module_label,
                 component=stage.component,
                 symptom=stage.symptom,
                 tool=stage.tool,

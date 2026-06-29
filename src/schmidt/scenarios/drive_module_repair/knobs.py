@@ -26,11 +26,15 @@ class DriveModuleRepairKnobs(BaseKnobs):
     becomes (``mask`` = visible erasure, ``random_letter`` = silent
     substitution). ``judge_model`` / ``judge_provider`` select the LLM that
     judges each replacement action. ``easy_round_numbers`` forces a single
-    faulty component (warmup). Every other round draws its faulty-component
+    module with a single faulty component (warmup). Every other round draws a
+    module count from ``module_count_values`` weighted by
+    ``module_count_weights``, and for each module draws a faulty-component
     count from ``replacements_count_values`` weighted by
-    ``replacements_count_weights`` (same non-empty length). Each round is
-    built from an independent per-round RNG so toggling one round never
-    shifts another round's case under a fixed ``seed``.
+    ``replacements_count_weights``. Modules are serviced in a fixed canonical
+    order (module-1 first); within each module, components are replaced in
+    access-depth order. Each round is built from an independent per-round RNG
+    so toggling one round never shifts another round's case under a fixed
+    ``seed``.
     """
 
     judge_model: str
@@ -43,6 +47,8 @@ class DriveModuleRepairKnobs(BaseKnobs):
     channel_noise_level: float
     noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     easy_round_numbers: frozenset[int]
+    module_count_values: list[int]
+    module_count_weights: list[int]
     replacements_count_values: list[int]
     replacements_count_weights: list[int]
 
@@ -55,22 +61,34 @@ class DriveModuleRepairKnobs(BaseKnobs):
         return self
 
     @model_validator(mode="after")
-    def _validate_replacements_distribution(self) -> Self:
-        if len(self.replacements_count_values) == 0:
-            raise ValueError("replacements_count_values must be non-empty")
-        if len(self.replacements_count_values) != len(self.replacements_count_weights):
-            raise ValueError(
-                f"replacements_count_values and replacements_count_weights must have the same "
-                f"length (got {len(self.replacements_count_values)} values and "
-                f"{len(self.replacements_count_weights)} weights)"
-            )
-        if any(value < 1 for value in self.replacements_count_values):
-            raise ValueError(
-                f"replacements_count_values must all be >= 1 (got {self.replacements_count_values})"
-            )
-        if any(weight <= 0 for weight in self.replacements_count_weights):
-            raise ValueError(
-                f"replacements_count_weights must all be > 0 "
-                f"(got {self.replacements_count_weights})"
-            )
+    def _validate_module_distribution(self) -> Self:
+        _validate_count_distribution(
+            values=self.module_count_values,
+            weights=self.module_count_weights,
+            name="module_count",
+        )
         return self
+
+    @model_validator(mode="after")
+    def _validate_replacements_distribution(self) -> Self:
+        _validate_count_distribution(
+            values=self.replacements_count_values,
+            weights=self.replacements_count_weights,
+            name="replacements_count",
+        )
+        return self
+
+
+def _validate_count_distribution(values: list[int], weights: list[int], name: str) -> None:
+    """Validate a paired (values, weights) count distribution; raise on any problem."""
+    if len(values) == 0:
+        raise ValueError(f"{name}_values must be non-empty")
+    if len(values) != len(weights):
+        raise ValueError(
+            f"{name}_values and {name}_weights must have the same length "
+            f"(got {len(values)} values and {len(weights)} weights)"
+        )
+    if any(value < 1 for value in values):
+        raise ValueError(f"{name}_values must all be >= 1 (got {values})")
+    if any(weight <= 0 for weight in weights):
+        raise ValueError(f"{name}_weights must all be > 0 (got {weights})")

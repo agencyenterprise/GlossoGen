@@ -31,11 +31,12 @@ class DriveModuleSpecEntry(BaseModel):
 class DriveModuleStage(BaseModel):
     """One ordered replacement the technician must perform, with its ground truth.
 
-    ``judge_expected_action`` is the canonical rendered description the LLM
-    judge compares the technician's free-text action against.
+    ``judge_expected_action`` is the canonical rendered description (naming the
+    module) the LLM judge compares the technician's free-text action against.
     """
 
     step_index: int
+    module_label: str
     component: str
     symptom: str
     tool: str
@@ -45,21 +46,29 @@ class DriveModuleStage(BaseModel):
     judge_expected_action: str
 
 
+class DriveModuleModulePanel(BaseModel):
+    """The symptoms observed on one module's diagnostic panel this round."""
+
+    module_label: str
+    symptoms: list[str]
+
+
 class DriveModuleCaseStarted(EventBase):
     """Emitted once at round start with the full ground-truth case.
 
-    ``panel_symptoms`` is what the field technician observes (private to A).
-    ``fault_tree`` is the per-round symptom -> component mapping (private to
-    the diagnostics engineer). ``spec_table`` is the per-round component ->
-    tool/torque/calibration mapping (private to the spec engineer).
-    ``stages`` is the derived ordered ground truth (faulty components in
-    access-depth order, each fully specified).
+    ``module_panels`` is what the field technician observes per module (private
+    to A). ``fault_tree`` is the per-round symptom -> component mapping (private
+    to the diagnostics engineer); ``spec_table`` is the per-round component ->
+    tool/torque/calibration mapping (private to the spec engineer); both are
+    shared across modules. ``stages`` is the derived ordered ground truth:
+    modules in canonical order, components within each in access-depth order.
     """
 
     event_type: Literal["drive_module_case_started"] = "drive_module_case_started"
     case_number: int
+    module_count: int
     replacement_count: int
-    panel_symptoms: list[str]
+    module_panels: list[DriveModuleModulePanel]
     fault_tree: list[DriveModuleFaultEntry]
     spec_table: list[DriveModuleSpecEntry]
     stages: list[DriveModuleStage]

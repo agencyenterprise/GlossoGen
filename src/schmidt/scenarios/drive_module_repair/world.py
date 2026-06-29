@@ -199,7 +199,8 @@ class DriveModuleWorld(ScenarioWorld):
             failure_reason = ""
         return DriveModuleOutcome(
             case_number=case.case_number,
-            replacement_count=case.replacement_count,
+            module_count=case.module_count,
+            replacement_count=case.total_replacement_count,
             replacements_done=min(self._current_stage_index, len(case.stages)),
             budget_exceeded=self._round_budget_exceeded,
             characters_used=self._current_round_characters,

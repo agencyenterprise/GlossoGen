@@ -1,6 +1,6 @@
 # Scenario: Drive Module Repair
 
-Three agents service a failing drive module each round. The information needed to act is split three ways with a real dependency chain, and the heavy per-round payload (the per-component specs) must be transmitted and reconstructed precisely under a communication budget. Round scoring uses a veyru-style free-text action + LLM judge.
+Three agents service one or more failing drive modules each round. The information needed to act is split three ways with a real dependency chain, and the heavy per-round payload (the per-component specs) must be transmitted and reconstructed precisely under a communication budget. When several modules are on the bench, every message must also be tagged with the module it refers to (module addressing). Round scoring uses a veyru-style free-text action + LLM judge.
 
 ## Agents
 
@@ -17,9 +17,13 @@ All three share one budgeted channel `bay` (primary; one character = one simulat
 1. The technician inspects the panel and reports the observed symptoms.
 2. The diagnostics engineer matches the symptoms against this round's fault-tree, identifies the faulty components, and transmits them **in access-depth order** (outermost first — a unique correct order).
 3. The spec engineer looks up the named components in this round's spec table and transmits each one's tool / torque / calibration.
-4. The technician performs the replacements **in order**, one free-text `replace_component` call each. An LLM judge (haiku) scores each action against the current stage's expected (component, tool, torque, calibration) — lenient on wording, strict on the four facts. Only the current required replacement is accepted, which hard-enforces the order.
+4. The technician performs the replacements **in order** — working module by module (module-1 first), components within a module in access-depth order — one free-text `replace_component` call each, naming the module. An LLM judge (haiku) scores each action against the current stage's expected (module, component, tool, torque, calibration) — lenient on wording, strict on the five facts. Only the current required replacement is accepted, which hard-enforces the order.
 
-Round **success** = every component replaced correctly, in order, within the communication budget. The round fails if the budget is exhausted or the round ends (idle/timeout) before the module is fully repaired.
+Round **success** = every component on every module replaced correctly, in order, within the communication budget. The round fails if the budget is exhausted or the round ends (idle/timeout) before all modules are fully repaired.
+
+## Multiple modules per round
+
+Several drive modules can be on the bench in one round (`module_count_*`), each with its own faulty subset. The fault-tree and the service spec are **shared** across the round's modules (a component's spec is module-independent — so the spec engineer specs each *distinct* faulty component once and the team reuses it), but each module has its own fault set, so the protocol must tag every symptom, plan, and spec with the module it refers to. Modules are serviced in a fixed canonical order (module-1 first); the ground-truth stage list is simply the modules' depth-ordered replacements concatenated, so the single-pointer staged world and LLM judge are unchanged — each stage's expected action just names its module.
 
 ## Why all three are essential (and it's not a veyru relay)
 
@@ -38,8 +42,9 @@ Round **success** = every component replaced correctly, in order, within the com
 | `seed` | Case-generation seed |
 | `postmortem_enabled` / `postmortem_disabled_at_start` / `postmortem_duration_seconds` | Discussion-phase controls |
 | `channel_noise_level` / `noise_replacement_mode` | Per-character bay-channel noise (`mask` erasure / `random_letter` substitution) |
-| `easy_round_numbers` | Rounds forced to a single faulty component (warmup) |
-| `replacements_count_values` / `replacements_count_weights` | Per-round faulty-component-count distribution |
+| `easy_round_numbers` | Rounds forced to a single module with a single faulty component (warmup) |
+| `module_count_values` / `module_count_weights` | Per-round module-count distribution |
+| `replacements_count_values` / `replacements_count_weights` | Per-module faulty-component-count distribution |
 
 ## Evaluation
 
