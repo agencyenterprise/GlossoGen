@@ -1,0 +1,7 @@
+{% include "_previous_round_result.jinja" %}
+--- ROUND {{ round_number }} ---
+There {% if difference_count == 1 %}is exactly 1 difference{% else %}are exactly {{ difference_count }} differences{% endif %} between your scene and your partner's scene.
+
+YOUR SCENE ({{ my_objects | length }} object(s) on a {{ grid_size }}x{{ grid_size }} grid):
+{% for line in my_objects %}- {{ line }}
+{% endfor %}

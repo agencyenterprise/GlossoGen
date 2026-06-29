@@ -1,0 +1,34 @@
+[
+  {
+    "id": "viewer_00_small",
+    "agent_role_filter": "viewer",
+    "inputs": {
+      "difference_count": 2,
+      "my_scene": "- large red circle at column 2, row 3\n- small blue square at column 5, row 1\n- medium green triangle at column 7, row 6\n- small yellow star at column 1, row 7"
+    }
+  },
+  {
+    "id": "viewer_01_medium",
+    "agent_role_filter": "viewer",
+    "inputs": {
+      "difference_count": 3,
+      "my_scene": "- small purple hexagon at column 1, row 2\n- large orange star at column 4, row 4\n- medium blue circle at column 6, row 2\n- small green square at column 3, row 7\n- large pink triangle at column 8, row 5\n- medium brown diamond at column 2, row 6"
+    }
+  },
+  {
+    "id": "viewer_02_dense",
+    "agent_role_filter": "viewer",
+    "inputs": {
+      "difference_count": 4,
+      "my_scene": "- medium yellow cross at column 1, row 1\n- small red diamond at column 3, row 2\n- large green heart at column 5, row 3\n- small blue triangle at column 7, row 4\n- medium purple circle at column 2, row 6\n- large orange square at column 6, row 7\n- small pink star at column 8, row 8"
+    }
+  },
+  {
+    "id": "viewer_03_single",
+    "agent_role_filter": "viewer",
+    "inputs": {
+      "difference_count": 1,
+      "my_scene": "- large blue triangle at column 3, row 3\n- small red circle at column 6, row 5\n- medium green square at column 1, row 8"
+    }
+  }
+]
