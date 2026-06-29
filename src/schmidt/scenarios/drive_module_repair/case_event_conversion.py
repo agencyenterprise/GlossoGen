@@ -10,7 +10,8 @@ from schmidt.scenarios.drive_module_repair.drive_module_cases import DriveModule
 from schmidt.scenarios.drive_module_repair.events import (
     DriveModuleCaseStarted,
     DriveModuleFaultEntry,
-    DriveModuleModulePanel,
+    DriveModuleModuleFaultTree,
+    DriveModuleModuleSpec,
     DriveModuleSpecEntry,
     DriveModuleStage,
 )
@@ -23,22 +24,30 @@ def case_started_event(round_number: int, case: DriveModuleCase) -> DriveModuleC
         case_number=case.case_number,
         module_count=case.module_count,
         replacement_count=case.total_replacement_count,
-        module_panels=[
-            DriveModuleModulePanel(module_label=panel.module_label, symptoms=list(panel.symptoms))
-            for panel in case.module_panels
-        ],
-        fault_tree=[
-            DriveModuleFaultEntry(symptom=symptom, component=component)
-            for symptom, component in case.fault_tree
-        ],
-        spec_table=[
-            DriveModuleSpecEntry(
-                component=spec.component,
-                tool=spec.tool,
-                torque_nm=spec.torque_nm,
-                calibration=spec.calibration,
+        module_fault_trees=[
+            DriveModuleModuleFaultTree(
+                module_label=tree.module_label,
+                entries=[
+                    DriveModuleFaultEntry(symptom=symptom, component=component)
+                    for symptom, component in tree.entries
+                ],
             )
-            for spec in case.spec_table
+            for tree in case.module_fault_trees
+        ],
+        module_spec_tables=[
+            DriveModuleModuleSpec(
+                module_label=table.module_label,
+                specs=[
+                    DriveModuleSpecEntry(
+                        component=spec.component,
+                        tool=spec.tool,
+                        torque_nm=spec.torque_nm,
+                        calibration=spec.calibration,
+                    )
+                    for spec in table.specs
+                ],
+            )
+            for table in case.module_spec_tables
         ],
         stages=[
             DriveModuleStage(

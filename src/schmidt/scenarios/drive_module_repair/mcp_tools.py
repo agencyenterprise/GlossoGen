@@ -16,7 +16,6 @@ from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, reso
 from schmidt.scenario_protocol import ScenarioRuntimeHandle
 from schmidt.scenarios.drive_module_repair.events import DriveModuleReplacementJudged
 from schmidt.scenarios.drive_module_repair.ids import (
-    DEVICE_REPAIRED_MARKER,
     FIELD_TECHNICIAN_ID,
     REPLACEMENT_ACCEPTED_MARKER,
     REPLACEMENT_INEFFECTIVE_MARKER,
@@ -71,13 +70,8 @@ def build_mcp_tools(
             )
 
         if judgment.match:
-            has_more = await world.perform_replacement()
-            if has_more:
-                return (
-                    f"{REPLACEMENT_ACCEPTED_MARKER}. The module still needs more work — "
-                    "move to the next component in the engineer's order."
-                )
-            return f"{REPLACEMENT_ACCEPTED_MARKER}. {DEVICE_REPAIRED_MARKER}."
+            reveal = await world.perform_replacement()
+            return f"{REPLACEMENT_ACCEPTED_MARKER}. {reveal}"
         return (
             f"{REPLACEMENT_INEFFECTIVE_MARKER}. That is not the correct next replacement — "
             "recheck the component, tool, torque, and calibration with the engineers."
