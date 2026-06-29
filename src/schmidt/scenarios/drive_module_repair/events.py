@@ -20,28 +20,40 @@ class DriveModuleFaultEntry(BaseModel):
 
 
 class DriveModuleSpecEntry(BaseModel):
-    """One row of the per-round service-spec table for a component."""
+    """One component's full replacement procedure on one unit this round.
+
+    ``steps`` is the rendered ordered multi-step procedure; ``service_class``,
+    ``tool``, ``torque_nm``, ``passes``, and ``calibration`` are the headline
+    parameters (all also embedded in ``steps``).
+    """
 
     component: str
+    service_class: str
     tool: str
     torque_nm: int
+    passes: int
     calibration: str
+    steps: list[str]
 
 
 class DriveModuleStage(BaseModel):
     """One ordered replacement the technician must perform, with its ground truth.
 
-    ``judge_expected_action`` is the canonical rendered description (naming the
-    module) the LLM judge compares the technician's free-text action against.
+    ``judge_expected_action`` is the canonical rendered multi-step procedure
+    (naming the module) the LLM judge compares the technician's free-text action
+    against. ``steps`` is the same procedure as an ordered list.
     """
 
     step_index: int
     module_label: str
     component: str
     symptom: str
+    service_class: str
     tool: str
     torque_nm: int
+    passes: int
     calibration: str
+    steps: list[str]
     access_depth: int
     judge_expected_action: str
 

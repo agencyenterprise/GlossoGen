@@ -44,6 +44,7 @@ function VeyruKnobsFormAdapter({
 
 export const veyruPlugin: ScenarioPlugin = {
   scenarioName: "veyru",
+  primaryChannelId: "link",
   knobsForm: {
     Component: VeyruKnobsFormAdapter,
     validate: state => validateVeyruState(state as VeyruKnobsState),

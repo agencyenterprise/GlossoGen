@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { components } from "@/types/api.gen";
+import type { JudgeGroundTruthMetadata } from "@/features/runs/display-entry";
 import { buildApiUrlWithToken } from "./api-client";
+
+/** MCP tool names whose results carry an LLM-judge verdict, paired live from
+ *  the matching ``*_judged`` SSE event. One per judged-action scenario. */
+const JUDGED_ACTION_TOOL_NAMES = new Set<string>([
+  "stabilize_veyru",
+  "actuate_panel",
+  "replace_component",
+]);
 
 type ChannelMessage = components["schemas"]["ChannelMessage"];
 type ReasoningEntry = components["schemas"]["ReasoningEntry"];
@@ -22,7 +31,8 @@ type SSEAgentCostUpdated = components["schemas"]["SSEAgentCostUpdated"];
 type SSEDebugLog = components["schemas"]["SSEDebugLog"];
 type SSEAgentRunCycleFailed = components["schemas"]["SSEAgentRunCycleFailed"];
 type SSEVeyruStabilizationJudged = components["schemas"]["SSEVeyruStabilizationJudged"];
-type VeyruStabilizeMetadata = components["schemas"]["VeyruStabilizeMetadata"];
+type SSEOrbitalAnomalyActuationJudged = components["schemas"]["SSEOrbitalAnomalyActuationJudged"];
+type SSEDriveModuleReplacementJudged = components["schemas"]["SSEDriveModuleReplacementJudged"];
 type AgentRunCycleFailedEntry = components["schemas"]["AgentRunCycleFailedEntry"];
 
 /** State returned by the useEventStream hook. */
@@ -43,10 +53,11 @@ export interface EventStreamState {
   totalCostUsd: number;
   /** Duration in seconds from the simulation_ended event. */
   durationSeconds: number;
-  /** Veyru-only: stabilize-judge metadata keyed by tool ``call_id``. Empty
-   *  for non-veyru runs. Mirrors ``VeyruRunExtras.stabilize_metadata_by_call_id``
-   *  but accumulated live from the SSE stream. */
-  stabilizeMetadataByCallId: Record<string, VeyruStabilizeMetadata>;
+  /** Generic LLM-judge ground truth keyed by tool ``call_id``, accumulated
+   *  live from each judged-action scenario's ``*_judged`` SSE event. Empty
+   *  for scenarios with no judged action. Mirrors the REST
+   *  ``scenario_extras.*_metadata_by_call_id`` map. */
+  judgeMetadataByCallId: Record<string, JudgeGroundTruthMetadata>;
 }
 
 /**
@@ -75,13 +86,13 @@ export function useEventStream(
   const [isConnected, setIsConnected] = useState(false);
   const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
   const [runCycleFailures, setRunCycleFailures] = useState<AgentRunCycleFailedEntry[]>([]);
-  const [stabilizeMetadataByCallId, setStabilizeMetadataByCallId] = useState<
-    Record<string, VeyruStabilizeMetadata>
+  const [judgeMetadataByCallId, setJudgeMetadataByCallId] = useState<
+    Record<string, JudgeGroundTruthMetadata>
   >({});
 
   const agentCostsRef = useRef<Map<string, number>>(new Map());
   const seenSseIdsRef = useRef<Set<string>>(new Set());
-  const pendingStabilizeMetadataRef = useRef<Map<string, VeyruStabilizeMetadata[]>>(new Map());
+  const pendingJudgeMetadataRef = useRef<Map<string, JudgeGroundTruthMetadata[]>>(new Map());
   const knownIdsRef = useRef(knownEventIds);
   useEffect(() => {
     knownIdsRef.current = knownEventIds;
@@ -97,10 +108,10 @@ export function useEventStream(
     setStatus(null);
     setDebugLogs([]);
     setRunCycleFailures([]);
-    setStabilizeMetadataByCallId({});
+    setJudgeMetadataByCallId({});
     agentCostsRef.current = new Map();
     seenSseIdsRef.current = new Set();
-    pendingStabilizeMetadataRef.current = new Map();
+    pendingJudgeMetadataRef.current = new Map();
   }, []);
 
   useEffect(() => {
@@ -237,12 +248,12 @@ export function useEventStream(
       eventSource.addEventListener("tool_result_received", (e: MessageEvent) => {
         const data: SSEToolResultReceived = JSON.parse(e.data);
         if (isDuplicate(data.event_id)) return;
-        if (data.tool_name === "stabilize_veyru") {
-          const queue = pendingStabilizeMetadataRef.current.get(data.agent_id);
+        if (JUDGED_ACTION_TOOL_NAMES.has(data.tool_name)) {
+          const queue = pendingJudgeMetadataRef.current.get(data.agent_id);
           if (queue && queue.length > 0) {
             const attachedMetadata = queue.shift();
             if (attachedMetadata !== undefined) {
-              setStabilizeMetadataByCallId(prev => ({
+              setJudgeMetadataByCallId(prev => ({
                 ...prev,
                 [data.call_id]: attachedMetadata,
               }));
@@ -281,18 +292,43 @@ export function useEventStream(
         });
       });
 
+      /** Queue a judged verdict per agent so the next matching tool_result
+       *  (same agent, FIFO) can attach it by call_id. */
+      function enqueueJudgeMetadata(agentId: string, metadata: JudgeGroundTruthMetadata) {
+        const queueMap = pendingJudgeMetadataRef.current;
+        const existing = queueMap.get(agentId) ?? [];
+        existing.push(metadata);
+        queueMap.set(agentId, existing);
+      }
+
       eventSource.addEventListener("veyru_stabilization_judged", (e: MessageEvent) => {
         const data: SSEVeyruStabilizationJudged = JSON.parse(e.data);
         if (isDuplicate(data.event_id)) return;
-        const metadata: VeyruStabilizeMetadata = {
+        enqueueJudgeMetadata(data.agent_id, {
           expected_actions: data.expected_actions,
           judge_match: data.judge_match,
           judge_explanation: data.judge_explanation,
-        };
-        const queueMap = pendingStabilizeMetadataRef.current;
-        const existing = queueMap.get(data.agent_id) ?? [];
-        existing.push(metadata);
-        queueMap.set(data.agent_id, existing);
+        });
+      });
+
+      eventSource.addEventListener("orbital_anomaly_actuation_judged", (e: MessageEvent) => {
+        const data: SSEOrbitalAnomalyActuationJudged = JSON.parse(e.data);
+        if (isDuplicate(data.event_id)) return;
+        enqueueJudgeMetadata(data.agent_id, {
+          expected_actions: data.expected_actions,
+          judge_match: data.judge_match,
+          judge_explanation: data.judge_explanation,
+        });
+      });
+
+      eventSource.addEventListener("drive_module_replacement_judged", (e: MessageEvent) => {
+        const data: SSEDriveModuleReplacementJudged = JSON.parse(e.data);
+        if (isDuplicate(data.event_id)) return;
+        enqueueJudgeMetadata(data.agent_id, {
+          expected_actions: data.expected_action,
+          judge_match: data.judge_match,
+          judge_explanation: data.judge_explanation,
+        });
       });
 
       eventSource.addEventListener("simulation_ended", (e: MessageEvent) => {
@@ -370,6 +406,6 @@ export function useEventStream(
     runCycleFailures,
     totalCostUsd,
     durationSeconds,
-    stabilizeMetadataByCallId,
+    judgeMetadataByCallId,
   };
 }

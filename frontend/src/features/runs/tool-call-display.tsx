@@ -4,8 +4,8 @@ import { useState } from "react";
 import { ChevronRight, Wrench } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
+import type { JudgeGroundTruthMetadata } from "./display-entry";
 
-type VeyruStabilizeMetadata = components["schemas"]["VeyruStabilizeMetadata"];
 type ContainerYardMoveMetadata = components["schemas"]["ContainerYardMoveMetadata"];
 
 /** Strip the MCP prefix from tool names for display. */
@@ -34,7 +34,7 @@ interface ToolCallDisplayProps {
   toolName: string;
   arguments: Record<string, unknown>;
   result: string | null;
-  stabilizeMetadata?: VeyruStabilizeMetadata | null;
+  judgeMetadata?: JudgeGroundTruthMetadata | null;
   moveMetadata?: ContainerYardMoveMetadata | null;
 }
 
@@ -105,7 +105,7 @@ export function ToolCallDisplay({
   toolName,
   arguments: args,
   result,
-  stabilizeMetadata,
+  judgeMetadata,
   moveMetadata,
 }: ToolCallDisplayProps) {
   const [expanded, setExpanded] = useState(false);
@@ -168,7 +168,7 @@ export function ToolCallDisplay({
             </div>
           ) : null}
 
-          {stabilizeMetadata ? (
+          {judgeMetadata ? (
             <div>
               <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Judge Ground Truth
@@ -176,22 +176,22 @@ export function ToolCallDisplay({
               <div className="space-y-1 rounded bg-muted p-2 font-mono text-[10px]">
                 <div>
                   <span className="font-medium text-muted-foreground">expected:</span>{" "}
-                  <span className="whitespace-pre-wrap">{stabilizeMetadata.expected_actions}</span>
+                  <span className="whitespace-pre-wrap">{judgeMetadata.expected_actions}</span>
                 </div>
                 <div>
                   <span className="font-medium text-muted-foreground">match:</span>{" "}
                   <span
                     className={cn(
                       "font-medium",
-                      stabilizeMetadata.judge_match ? "text-emerald-500" : "text-red-500"
+                      judgeMetadata.judge_match ? "text-emerald-500" : "text-red-500"
                     )}
                   >
-                    {String(stabilizeMetadata.judge_match)}
+                    {String(judgeMetadata.judge_match)}
                   </span>
                 </div>
                 <div>
                   <span className="font-medium text-muted-foreground">explanation:</span>{" "}
-                  <span className="whitespace-pre-wrap">{stabilizeMetadata.judge_explanation}</span>
+                  <span className="whitespace-pre-wrap">{judgeMetadata.judge_explanation}</span>
                 </div>
               </div>
             </div>

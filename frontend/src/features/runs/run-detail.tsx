@@ -33,7 +33,7 @@ import {
 } from "./agent-instance";
 import { ChatPane, type AgentSwapDivider } from "./chat-pane";
 import { CollapsibleConfigBadges } from "./collapsible-config-badges";
-import { mergeEntries } from "./display-entry";
+import { judgeMetadataFromExtras, mergeEntries } from "./display-entry";
 import { LabelBadges } from "./eval-label-group";
 import { EvalLogPanel } from "./eval-log-panel";
 import { EvalPanel } from "./eval-panel";
@@ -307,13 +307,9 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     const newFailures = sse.runCycleFailures.filter(f => !seenFailureIds.has(f.message_id));
 
     const scenarioExtras = restData?.scenario_extras ?? null;
-    const restStabilizeMetadata =
-      scenarioExtras !== null && scenarioExtras.scenario_name === "veyru"
-        ? scenarioExtras.stabilize_metadata_by_call_id
-        : {};
-    const stabilizeMetadataByCallId = {
-      ...restStabilizeMetadata,
-      ...sse.stabilizeMetadataByCallId,
+    const judgeMetadataByCallId = {
+      ...judgeMetadataFromExtras(scenarioExtras),
+      ...sse.judgeMetadataByCallId,
     };
     const moveMetadataByCallId =
       scenarioExtras !== null && scenarioExtras.scenario_name === "container_yard_stacking"
@@ -325,7 +321,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
       [...restReasoning, ...newReasoning],
       [...restToolUse, ...newToolUse],
       [...restRunCycleFailures, ...newFailures],
-      stabilizeMetadataByCallId,
+      judgeMetadataByCallId,
       moveMetadataByCallId
     );
   }, [
@@ -334,7 +330,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     sse.reasoning,
     sse.toolUse,
     sse.runCycleFailures,
-    sse.stabilizeMetadataByCallId,
+    sse.judgeMetadataByCallId,
   ]);
 
   // Auto-highlight a message from ?highlight= query param (e.g. from branches viewer)

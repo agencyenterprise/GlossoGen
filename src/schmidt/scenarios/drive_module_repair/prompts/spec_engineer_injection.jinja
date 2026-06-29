@@ -1,11 +1,11 @@
 {% include "_previous_round_result.jinja" %}
 {% if current_case is not none %}
---- SERVICE-SPEC SHEET ({{ current_case.module_spec_tables[0].module_label }}) ---
+--- SERVICE SHEET ({{ current_case.module_spec_tables[0].module_label }}) ---
 Round {{ round_number }}
 Service window: {{ current_case.round_time_budget_seconds }}s (one character on the bay channel = one second; shared across all three of you)
 
-This shift's spec sheet for {{ current_case.module_spec_tables[0].module_label }} — tool / torque / calibration per component (this unit's revision):
-{% for spec in current_case.module_spec_tables[0].specs %}- {{ spec.component }}: tool {{ spec.tool }}, torque {{ spec.torque_nm }} Nm, calibration {{ spec.calibration }}
+This shift's service sheet for {{ current_case.module_spec_tables[0].module_label }} — the full replacement procedure per component (this unit's revision):
+{% for spec in current_case.module_spec_tables[0].specs %}- {{ spec.component }} ({{ spec.service_class }}): {{ spec.steps | join(" ") }}
 {% endfor %}
-Each unit on the bench is a different revision with its own spec sheet; you will receive the next unit's sheet only when the technician reaches it (so you will not know how many units there are in advance). Once the diagnostics engineer names a faulty component, give the technician its tool, torque, and calibration for the current unit. You cannot see the panels yourself.
+Each unit on the bench is a different revision with its own sheet; you will receive the next unit's sheet only when the technician reaches it. Once the diagnostics engineer names a faulty component, relay its full procedure for the current unit — every step in order with every parameter. You cannot see the panels yourself.
 {% endif %}

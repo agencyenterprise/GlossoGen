@@ -40,9 +40,12 @@ def case_started_event(round_number: int, case: DriveModuleCase) -> DriveModuleC
                 specs=[
                     DriveModuleSpecEntry(
                         component=spec.component,
+                        service_class=spec.service_class,
                         tool=spec.tool,
                         torque_nm=spec.torque_nm,
+                        passes=spec.passes,
                         calibration=spec.calibration,
+                        steps=list(spec.steps),
                     )
                     for spec in table.specs
                 ],
@@ -55,9 +58,12 @@ def case_started_event(round_number: int, case: DriveModuleCase) -> DriveModuleC
                 module_label=stage.module_label,
                 component=stage.component,
                 symptom=stage.symptom,
+                service_class=stage.service_class,
                 tool=stage.tool,
                 torque_nm=stage.torque_nm,
+                passes=stage.passes,
                 calibration=stage.calibration,
+                steps=list(stage.steps),
                 access_depth=stage.access_depth,
                 judge_expected_action=stage.judge_expected_action,
             )

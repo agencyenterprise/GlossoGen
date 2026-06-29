@@ -51,6 +51,7 @@ function ContainerYardKnobsFormAdapter({
 
 export const containerYardStackingPlugin: ScenarioPlugin = {
   scenarioName: "container_yard_stacking",
+  primaryChannelId: "link",
   knobsForm: {
     Component: ContainerYardKnobsFormAdapter,
     validate: state => validateContainerYardState(state as ContainerYardKnobsState),

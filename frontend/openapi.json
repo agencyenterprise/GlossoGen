@@ -730,6 +730,9 @@
                       "$ref": "#/components/schemas/SSEAgentRunCycleFailed"
                     },
                     {
+                      "$ref": "#/components/schemas/SSEDriveModuleReplacementJudged"
+                    },
+                    {
                       "$ref": "#/components/schemas/SSEOrbitalAnomalyActuationJudged"
                     },
                     {
@@ -752,6 +755,7 @@
                       "agent_cost_updated": "#/components/schemas/SSEAgentCostUpdated",
                       "debug_log": "#/components/schemas/SSEDebugLog",
                       "agent_run_cycle_failed": "#/components/schemas/SSEAgentRunCycleFailed",
+                      "drive_module_replacement_judged": "#/components/schemas/SSEDriveModuleReplacementJudged",
                       "orbital_anomaly_actuation_judged": "#/components/schemas/SSEOrbitalAnomalyActuationJudged",
                       "veyru_stabilization_judged": "#/components/schemas/SSEVeyruStabilizationJudged"
                     }
@@ -2346,6 +2350,170 @@
         "title": "DerivedRunReference",
         "description": "One child run derived from the parent currently being viewed.\n\nA child is any run whose timeline parent is this run: created via\n``replace-agent`` (``derivation_type == \"replace_agent\"``),\n``resume-at-round`` (``\"resume_at_round\"``), or\n``cross-run-replace-agent`` with this run as source A\n(``\"cross_run_replace_agent\"``). Source-B-only usage is not represented."
       },
+      "DriveModuleCaseStageDTO": {
+        "properties": {
+          "step_index": {
+            "type": "integer",
+            "title": "Step Index"
+          },
+          "module_label": {
+            "type": "string",
+            "title": "Module Label"
+          },
+          "component": {
+            "type": "string",
+            "title": "Component"
+          },
+          "symptom": {
+            "type": "string",
+            "title": "Symptom"
+          },
+          "service_class": {
+            "type": "string",
+            "title": "Service Class"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "torque_nm": {
+            "type": "integer",
+            "title": "Torque Nm"
+          },
+          "passes": {
+            "type": "integer",
+            "title": "Passes"
+          },
+          "calibration": {
+            "type": "string",
+            "title": "Calibration"
+          },
+          "steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "judge_expected_action": {
+            "type": "string",
+            "title": "Judge Expected Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step_index",
+          "module_label",
+          "component",
+          "symptom",
+          "service_class",
+          "tool",
+          "torque_nm",
+          "passes",
+          "calibration",
+          "steps",
+          "judge_expected_action"
+        ],
+        "title": "DriveModuleCaseStageDTO",
+        "description": "One ordered replacement stage: the unit, fault, and full expected procedure.\n\n``steps`` is the ordered multi-step procedure; ``service_class``, ``tool``,\n``torque_nm``, ``passes``, and ``calibration`` are the headline parameters."
+      },
+      "DriveModuleCaseSummary": {
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "case_number": {
+            "type": "integer",
+            "title": "Case Number"
+          },
+          "module_count": {
+            "type": "integer",
+            "title": "Module Count"
+          },
+          "replacement_count": {
+            "type": "integer",
+            "title": "Replacement Count"
+          },
+          "round_time_budget_seconds": {
+            "type": "integer",
+            "title": "Round Time Budget Seconds"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/DriveModuleCaseStageDTO"
+            },
+            "type": "array",
+            "title": "Stages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_number",
+          "case_number",
+          "module_count",
+          "replacement_count",
+          "round_time_budget_seconds",
+          "stages"
+        ],
+        "title": "DriveModuleCaseSummary",
+        "description": "Per-round case metadata for the round-timeline modal.\n\nOne entry per round, mirroring the ``DriveModuleCaseStarted`` event.\n``stages`` is the full ground truth (every unit's faults concatenated in\ncanonical order); each stage names its unit so the modal can group by it."
+      },
+      "DriveModuleRepairRunExtras": {
+        "properties": {
+          "scenario_name": {
+            "type": "string",
+            "const": "drive_module_repair",
+            "title": "Scenario Name",
+            "default": "drive_module_repair"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/DriveModuleCaseSummary"
+            },
+            "type": "array",
+            "title": "Cases"
+          },
+          "replacement_metadata_by_call_id": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DriveModuleReplacementMetadata"
+            },
+            "type": "object",
+            "title": "Replacement Metadata By Call Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cases",
+          "replacement_metadata_by_call_id"
+        ],
+        "title": "DriveModuleRepairRunExtras",
+        "description": "Scenario-specific run-detail payload surfaced for drive_module_repair runs."
+      },
+      "DriveModuleReplacementMetadata": {
+        "properties": {
+          "expected_actions": {
+            "type": "string",
+            "title": "Expected Actions"
+          },
+          "judge_match": {
+            "type": "boolean",
+            "title": "Judge Match"
+          },
+          "judge_explanation": {
+            "type": "string",
+            "title": "Judge Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_actions",
+          "judge_match",
+          "judge_explanation"
+        ],
+        "title": "DriveModuleReplacementMetadata",
+        "description": "Judge context captured for a single ``replace_component`` call.\n\nAttached to the corresponding tool-use entry so the frontend can show\nthe expected replacement and the LLM judge's verdict alongside the call."
+      },
       "EvalCostResponse": {
         "properties": {
           "input_tokens": {
@@ -3560,6 +3728,9 @@
                     "$ref": "#/components/schemas/ContainerYardRunExtras"
                   },
                   {
+                    "$ref": "#/components/schemas/DriveModuleRepairRunExtras"
+                  },
+                  {
                     "$ref": "#/components/schemas/OrbitalAnomalyRunExtras"
                   },
                   {
@@ -3573,6 +3744,7 @@
                   "propertyName": "scenario_name",
                   "mapping": {
                     "container_yard_stacking": "#/components/schemas/ContainerYardRunExtras",
+                    "drive_module_repair": "#/components/schemas/DriveModuleRepairRunExtras",
                     "orbital_anomaly": "#/components/schemas/OrbitalAnomalyRunExtras",
                     "spot_the_difference": "#/components/schemas/SpotTheDifferenceRunExtras",
                     "veyru": "#/components/schemas/VeyruRunExtras"
@@ -4018,6 +4190,67 @@
         ],
         "title": "SSEDebugLog",
         "description": "SSE event for a real-time debug log entry from the simulation process."
+      },
+      "SSEDriveModuleReplacementJudged": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "const": "drive_module_replacement_judged",
+            "title": "Event Type"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "step_index": {
+            "type": "integer",
+            "title": "Step Index"
+          },
+          "expected_action": {
+            "type": "string",
+            "title": "Expected Action"
+          },
+          "technician_action": {
+            "type": "string",
+            "title": "Technician Action"
+          },
+          "judge_match": {
+            "type": "boolean",
+            "title": "Judge Match"
+          },
+          "judge_explanation": {
+            "type": "string",
+            "title": "Judge Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_id",
+          "timestamp",
+          "agent_id",
+          "round_number",
+          "step_index",
+          "expected_action",
+          "technician_action",
+          "judge_match",
+          "judge_explanation"
+        ],
+        "title": "SSEDriveModuleReplacementJudged",
+        "description": "SSE event carrying the replacement judge's verdict for a replace_component call.\n\nMirrors the persisted :class:`DriveModuleReplacementJudged` field names,\nsince the live stream emits the raw event dict under its ``event_type``."
       },
       "SSEInjectionDelivered": {
         "properties": {

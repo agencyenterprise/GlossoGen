@@ -992,6 +992,91 @@ export interface components {
             headline_measurements: components["schemas"]["HeadlineMeasurement"][];
         };
         /**
+         * DriveModuleCaseStageDTO
+         * @description One ordered replacement stage: the unit, fault, and full expected procedure.
+         *
+         *     ``steps`` is the ordered multi-step procedure; ``service_class``, ``tool``,
+         *     ``torque_nm``, ``passes``, and ``calibration`` are the headline parameters.
+         */
+        DriveModuleCaseStageDTO: {
+            /** Step Index */
+            step_index: number;
+            /** Module Label */
+            module_label: string;
+            /** Component */
+            component: string;
+            /** Symptom */
+            symptom: string;
+            /** Service Class */
+            service_class: string;
+            /** Tool */
+            tool: string;
+            /** Torque Nm */
+            torque_nm: number;
+            /** Passes */
+            passes: number;
+            /** Calibration */
+            calibration: string;
+            /** Steps */
+            steps: string[];
+            /** Judge Expected Action */
+            judge_expected_action: string;
+        };
+        /**
+         * DriveModuleCaseSummary
+         * @description Per-round case metadata for the round-timeline modal.
+         *
+         *     One entry per round, mirroring the ``DriveModuleCaseStarted`` event.
+         *     ``stages`` is the full ground truth (every unit's faults concatenated in
+         *     canonical order); each stage names its unit so the modal can group by it.
+         */
+        DriveModuleCaseSummary: {
+            /** Round Number */
+            round_number: number;
+            /** Case Number */
+            case_number: number;
+            /** Module Count */
+            module_count: number;
+            /** Replacement Count */
+            replacement_count: number;
+            /** Round Time Budget Seconds */
+            round_time_budget_seconds: number;
+            /** Stages */
+            stages: components["schemas"]["DriveModuleCaseStageDTO"][];
+        };
+        /**
+         * DriveModuleRepairRunExtras
+         * @description Scenario-specific run-detail payload surfaced for drive_module_repair runs.
+         */
+        DriveModuleRepairRunExtras: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            scenario_name: "drive_module_repair";
+            /** Cases */
+            cases: components["schemas"]["DriveModuleCaseSummary"][];
+            /** Replacement Metadata By Call Id */
+            replacement_metadata_by_call_id: {
+                [key: string]: components["schemas"]["DriveModuleReplacementMetadata"];
+            };
+        };
+        /**
+         * DriveModuleReplacementMetadata
+         * @description Judge context captured for a single ``replace_component`` call.
+         *
+         *     Attached to the corresponding tool-use entry so the frontend can show
+         *     the expected replacement and the LLM judge's verdict alongside the call.
+         */
+        DriveModuleReplacementMetadata: {
+            /** Expected Actions */
+            expected_actions: string;
+            /** Judge Match */
+            judge_match: boolean;
+            /** Judge Explanation */
+            judge_explanation: string;
+        };
+        /**
          * EvalCostResponse
          * @description Evaluation cost summary for the run detail endpoint.
          */
@@ -1602,7 +1687,7 @@ export interface components {
             /** Round Injections */
             round_injections: components["schemas"]["RoundInjection"][];
             /** Scenario Extras */
-            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
+            scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };
         /**
          * RunListResponse
@@ -1789,6 +1874,41 @@ export interface components {
             level: string;
             /** Message */
             message: string;
+        };
+        /**
+         * SSEDriveModuleReplacementJudged
+         * @description SSE event carrying the replacement judge's verdict for a replace_component call.
+         *
+         *     Mirrors the persisted :class:`DriveModuleReplacementJudged` field names,
+         *     since the live stream emits the raw event dict under its ``event_type``.
+         */
+        SSEDriveModuleReplacementJudged: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event_type: "drive_module_replacement_judged";
+            /** Event Id */
+            event_id: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Round Number */
+            round_number: number;
+            /** Step Index */
+            step_index: number;
+            /** Expected Action */
+            expected_action: string;
+            /** Technician Action */
+            technician_action: string;
+            /** Judge Match */
+            judge_match: boolean;
+            /** Judge Explanation */
+            judge_explanation: string;
         };
         /**
          * SSEInjectionDelivered
@@ -2851,7 +2971,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolCallInvoked"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSEAgentCostUpdated"] | components["schemas"]["SSEDebugLog"] | components["schemas"]["SSEAgentRunCycleFailed"] | components["schemas"]["SSEOrbitalAnomalyActuationJudged"] | components["schemas"]["SSEVeyruStabilizationJudged"];
+                    "application/json": components["schemas"]["SSESimulationStarted"] | components["schemas"]["SSEAgentRegistered"] | components["schemas"]["SSEAgentConnected"] | components["schemas"]["SSEMessageSent"] | components["schemas"]["SSELLMResponseReceived"] | components["schemas"]["SSEToolCallInvoked"] | components["schemas"]["SSEToolResultReceived"] | components["schemas"]["SSERoundAdvanced"] | components["schemas"]["SSEInjectionDelivered"] | components["schemas"]["SSESimulationEnded"] | components["schemas"]["SSEAgentCostUpdated"] | components["schemas"]["SSEDebugLog"] | components["schemas"]["SSEAgentRunCycleFailed"] | components["schemas"]["SSEDriveModuleReplacementJudged"] | components["schemas"]["SSEOrbitalAnomalyActuationJudged"] | components["schemas"]["SSEVeyruStabilizationJudged"];
                 };
             };
             /** @description Validation Error */
