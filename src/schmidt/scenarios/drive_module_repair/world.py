@@ -16,13 +16,20 @@ import asyncio
 import logging
 
 from schmidt.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
-from schmidt.scenarios.drive_module_repair.drive_module_cases import DriveModuleCase, Stage
+from schmidt.scenarios.drive_module_repair.drive_module_cases import (
+    DriveModuleCase,
+    ModuleFaultTree,
+    ModuleSpecTable,
+    Stage,
+)
 from schmidt.scenarios.drive_module_repair.ids import (
     BAY_CHANNEL_ID,
     BUDGET_EXCEEDED_MARKER,
     DEVICE_FAILED_MARKER,
     DEVICE_REPAIRED_MARKER,
+    DIAGNOSTICS_ENGINEER_ID,
     POSTMORTEM_CHANNEL_ID,
+    SPEC_ENGINEER_ID,
 )
 from schmidt.scenarios.drive_module_repair.world_state import DriveModuleOutcome
 
@@ -36,6 +43,24 @@ __all__ = [
     "DriveModuleOutcome",
     "DriveModuleWorld",
 ]
+
+
+def _render_spec_sheet(table: ModuleSpecTable) -> str:
+    """Render one unit's service-spec sheet as a notification string for the spec engineer."""
+    lines = [
+        f"- {spec.component}: tool {spec.tool}, torque {spec.torque_nm} Nm, "
+        f"calibration {spec.calibration}"
+        for spec in table.specs
+    ]
+    body = "\n".join(lines)
+    return f"SERVICE-SPEC SHEET for {table.module_label} (this unit's revision):\n{body}"
+
+
+def _render_fault_tree(tree: ModuleFaultTree) -> str:
+    """Render one unit's fault-tree as a notification string for the diagnostics engineer."""
+    lines = [f'- "{symptom}" -> {component}' for symptom, component in tree.entries]
+    body = "\n".join(lines)
+    return f"FAULT-TREE for {tree.module_label} (this unit's revision):\n{body}"
 
 
 class DriveModuleWorld(ScenarioWorld):
@@ -56,6 +81,7 @@ class DriveModuleWorld(ScenarioWorld):
         self._round_budget_exceeded: bool = False
         self._current_stage_index: int = 0
         self._notified_thresholds: set[str] = set()
+        self._revealed_modules: set[str] = set()
         self._round_outcome_marked: bool = False
         self._outcomes: list[DriveModuleOutcome] = []
 
@@ -118,28 +144,57 @@ class DriveModuleWorld(ScenarioWorld):
             return False
         return self._current_stage_index >= len(case.stages)
 
-    async def perform_replacement(self) -> bool:
-        """Accept the current replacement and advance the stage index.
+    async def perform_replacement(self) -> str:
+        """Accept the current replacement, advance the stage, and reveal what comes next.
 
-        Returns True if more replacements remain, False if the device is now
-        fully repaired. Broadcasts a generic progress notification to the bay
-        channel (the next component's identity stays with the engineers).
+        Returns the private reveal string for the technician's tool result: the
+        next fault's symptom (faults are revealed one at a time, so the team
+        never knows the total in advance), or the device-repaired marker. When
+        the next fault is on a new unit, that unit's per-revision spec sheet is
+        pushed to the spec engineer (units are revealed progressively, so the
+        spec engineer is also count-blind).
         """
         case = self._current_case
         if case is None:
-            return False
+            return ""
+        completed = case.stages[self._current_stage_index]
         self._current_stage_index += 1
         if self._current_stage_index >= len(case.stages):
             await self._context.send_update_to_channel(
                 channel_id=BAY_CHANNEL_ID,
-                text=f"{DEVICE_REPAIRED_MARKER}. All components replaced.",
+                text=f"{DEVICE_REPAIRED_MARKER}. All units serviced.",
             )
-            return False
-        await self._context.send_update_to_channel(
-            channel_id=BAY_CHANNEL_ID,
-            text="Replacement accepted; the module still needs more work.",
+            return f"{DEVICE_REPAIRED_MARKER}. All units serviced this round."
+        nxt = case.stages[self._current_stage_index]
+        if nxt.module_label != completed.module_label:
+            await self._reveal_unit_to_engineers(case=case, module_label=nxt.module_label)
+            return (
+                f"{completed.module_label} fully serviced. Now inspecting {nxt.module_label}; "
+                f"its panel shows: {nxt.symptom}. Report it to the diagnostics engineer."
+            )
+        return (
+            f"Replacement accepted. {nxt.module_label} still shows: {nxt.symptom}. "
+            "Report it to the diagnostics engineer."
         )
-        return True
+
+    async def _reveal_unit_to_engineers(self, case: DriveModuleCase, module_label: str) -> None:
+        """Push a newly-reached unit's fault-tree and spec sheet to the engineers (once).
+
+        Each unit is a different revision, so both the diagnostics engineer's
+        fault-tree and the spec engineer's sheet are unit-specific and revealed
+        only when the technician reaches that unit (keeping both count-blind).
+        """
+        if module_label in self._revealed_modules:
+            return
+        self._revealed_modules.add(module_label)
+        await self._context.send_update_to_agent(
+            agent_id=DIAGNOSTICS_ENGINEER_ID,
+            text=_render_fault_tree(tree=case.fault_tree_for(module_label=module_label)),
+        )
+        await self._context.send_update_to_agent(
+            agent_id=SPEC_ENGINEER_ID,
+            text=_render_spec_sheet(table=case.spec_table_for(module_label=module_label)),
+        )
 
     def previous_outcome(self) -> DriveModuleOutcome | None:
         """Return the most recent finished round's outcome, or None on round 1."""
@@ -176,6 +231,11 @@ class DriveModuleWorld(ScenarioWorld):
         self._round_budget_exceeded = False
         self._current_stage_index = 0
         self._notified_thresholds = set()
+        # The first unit's spec sheet ships in the spec engineer's round-start
+        # injection, so it counts as already revealed; later units are pushed
+        # when the technician reaches them.
+        first_stage = self._current_case.stages[0]
+        self._revealed_modules = {first_stage.module_label}
         self._round_outcome_marked = False
 
     def mark_round_outcome(self, round_number: int) -> None:

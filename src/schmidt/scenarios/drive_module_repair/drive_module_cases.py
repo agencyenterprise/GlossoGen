@@ -1,24 +1,27 @@
 """Procedural per-round case generation for the drive_module_repair scenario.
 
-Each round puts one or more drive modules on the bench. A drive module has a
-fixed catalog of components, each at a fixed access depth (outer components
-must be serviced before deeper ones). Each module has its own faulty subset;
-the correct order is the faulty subset sorted by access depth. Two per-round
-secret mappings, **shared across all modules in the round**, re-randomize so
-nothing memorizes:
+Each round puts one or more drive modules (units) on the bench. A drive module
+has a fixed catalog of components, each at a fixed access depth (outer
+components must be serviced before deeper ones). Each unit has its own faulty
+subset; the correct order is the faulty subset sorted by access depth. Two
+kinds of per-round secret mapping re-randomize so nothing memorizes:
 
-- the **fault-tree**: a bijection component <-> symptom (the diagnostics
-  engineer holds it; the technician only observes symptoms),
-- the **service spec**: each component's tool / torque / calibration (the
-  spec engineer holds it) — module-independent, so a component's spec is the
-  same wherever it appears.
+- the **fault-tree**: a bijection component <-> symptom, **shared across all
+  units** (every unit is the same hardware type, so a symptom indicates the
+  same component everywhere). The diagnostics engineer holds it; the
+  technician only observes symptoms. It is count-independent, so it never
+  reveals how many units / faults there are.
+- the **service spec**: each component's tool / torque / calibration, drawn
+  **independently per unit** (each unit is a different revision, so its spec
+  sheet differs). The spec engineer holds these.
 
-The derived ground truth is a flat, ordered list of replacement stages:
-modules in canonical order (module-1 first), components within each module in
-access-depth order. Each stage is rendered to a ``judge_expected_action``
-string (naming the module) that the LLM judge scores the technician's
-free-text action against. Each round is built from an independent RNG keyed
-on ``(seed, round_number)``.
+The derived ground truth is a flat, ordered list of replacement stages: units
+in canonical order (module-1 first), components within each unit in
+access-depth order. Faults are revealed to the technician one at a time (see
+the world), so the team never knows the total in advance. Each stage is
+rendered to a ``judge_expected_action`` string (naming the unit) that the LLM
+judge scores the technician's free-text action against. Each round is built
+from an independent RNG keyed on ``(seed, round_number)``.
 """
 
 import random
@@ -33,7 +36,7 @@ class Component(NamedTuple):
 
 
 class ComponentSpec(NamedTuple):
-    """This round's service spec for one component (shared across modules)."""
+    """This round's service spec for one component on one unit."""
 
     component: str
     tool: str
@@ -41,11 +44,23 @@ class ComponentSpec(NamedTuple):
     calibration: str
 
 
-class ModulePanel(NamedTuple):
-    """The symptoms observed on one module's diagnostic panel this round."""
+class ModuleSpecTable(NamedTuple):
+    """One unit's full service-spec sheet this round (one ComponentSpec per component)."""
 
     module_label: str
-    symptoms: tuple[str, ...]
+    specs: tuple[ComponentSpec, ...]
+
+
+class ModuleFaultTree(NamedTuple):
+    """One unit's symptom -> component mapping this round (a bijection over the catalog).
+
+    Per-unit (each unit is a different revision), so the same symptom can mean a
+    different component on another unit. ``entries`` are ``(symptom, component)``
+    pairs covering every component.
+    """
+
+    module_label: str
+    entries: tuple[tuple[str, str], ...]
 
 
 class Stage(NamedTuple):
@@ -68,11 +83,24 @@ class DriveModuleCase(NamedTuple):
     case_number: int
     module_count: int
     total_replacement_count: int
-    module_panels: tuple[ModulePanel, ...]
-    fault_tree: tuple[tuple[str, str], ...]
-    spec_table: tuple[ComponentSpec, ...]
+    module_fault_trees: tuple[ModuleFaultTree, ...]
+    module_spec_tables: tuple[ModuleSpecTable, ...]
     stages: tuple[Stage, ...]
     round_time_budget_seconds: int
+
+    def spec_table_for(self, module_label: str) -> ModuleSpecTable:
+        """Return the service-spec sheet for ``module_label``."""
+        for table in self.module_spec_tables:
+            if table.module_label == module_label:
+                return table
+        raise ValueError(f"no spec table for {module_label}")
+
+    def fault_tree_for(self, module_label: str) -> ModuleFaultTree:
+        """Return the symptom -> component fault-tree for ``module_label``."""
+        for tree in self.module_fault_trees:
+            if tree.module_label == module_label:
+                return tree
+        raise ValueError(f"no fault tree for {module_label}")
 
 
 # Fixed component catalog. ``access_depth`` is the fixed service order: a
@@ -168,41 +196,54 @@ def _build_one_case(
     module_replacement_counts: list[int],
     round_time_budget_seconds: int,
 ) -> DriveModuleCase:
-    """Generate one case: shared fault-tree + spec, per-module fault sets, ordered stages.
+    """Generate one case: shared fault-tree, per-unit dynamic specs, ordered stages.
 
-    ``module_replacement_counts`` has one entry per module — the number of
-    faulty components on that module.
+    ``module_replacement_counts`` has one entry per unit — the number of faulty
+    components on that unit.
     """
     component_ids = [component.component_id for component in COMPONENTS]
     depth_by_id = {component.component_id: component.access_depth for component in COMPONENTS}
 
-    # Per-round fault-tree: a bijection component -> symptom (shared across modules).
-    shuffled_symptoms = rng.sample(SYMPTOMS, len(component_ids))
-    symptom_by_component = dict(zip(component_ids, shuffled_symptoms))
-
-    # Per-round service spec for every component (module-independent).
-    spec_by_component = {
-        component_id: ComponentSpec(
-            component=component_id,
-            tool=rng.choice(TOOLS),
-            torque_nm=rng.randint(TORQUE_MIN_NM, TORQUE_MAX_NM),
-            calibration=rng.choice(CALIBRATIONS),
-        )
-        for component_id in component_ids
-    }
-
-    module_panels: list[ModulePanel] = []
+    module_fault_trees: list[ModuleFaultTree] = []
+    module_spec_tables: list[ModuleSpecTable] = []
     stages: list[Stage] = []
     step_index = 0
     for module_index, replacement_count in enumerate(module_replacement_counts, start=1):
         label = module_label(module_index=module_index)
+
+        # Per-unit fault-tree: a bijection component -> symptom (each unit is a
+        # different revision, so the same symptom can mean a different component).
+        shuffled_symptoms = rng.sample(SYMPTOMS, len(component_ids))
+        symptom_by_component = dict(zip(component_ids, shuffled_symptoms))
+        module_fault_trees.append(
+            ModuleFaultTree(
+                module_label=label,
+                entries=tuple(
+                    (symptom_by_component[component_id], component_id)
+                    for component_id in component_ids
+                ),
+            )
+        )
+
+        # Per-unit service spec for every component (drawn independently per unit).
+        spec_by_component = {
+            component_id: ComponentSpec(
+                component=component_id,
+                tool=rng.choice(TOOLS),
+                torque_nm=rng.randint(TORQUE_MIN_NM, TORQUE_MAX_NM),
+                calibration=rng.choice(CALIBRATIONS),
+            )
+            for component_id in component_ids
+        }
+        module_spec_tables.append(
+            ModuleSpecTable(
+                module_label=label,
+                specs=tuple(spec_by_component[component_id] for component_id in component_ids),
+            )
+        )
+
         faulty = rng.sample(component_ids, replacement_count)
         ordered = sorted(faulty, key=lambda component_id: depth_by_id[component_id])
-
-        panel = [symptom_by_component[component_id] for component_id in faulty]
-        rng.shuffle(panel)
-        module_panels.append(ModulePanel(module_label=label, symptoms=tuple(panel)))
-
         for component_id in ordered:
             spec = spec_by_component[component_id]
             stages.append(
@@ -222,17 +263,12 @@ def _build_one_case(
             )
             step_index += 1
 
-    fault_tree = tuple(
-        (symptom_by_component[component_id], component_id) for component_id in component_ids
-    )
-    spec_table = tuple(spec_by_component[component_id] for component_id in component_ids)
     return DriveModuleCase(
         case_number=case_number,
         module_count=len(module_replacement_counts),
         total_replacement_count=len(stages),
-        module_panels=tuple(module_panels),
-        fault_tree=fault_tree,
-        spec_table=spec_table,
+        module_fault_trees=tuple(module_fault_trees),
+        module_spec_tables=tuple(module_spec_tables),
         stages=tuple(stages),
         round_time_budget_seconds=round_time_budget_seconds,
     )

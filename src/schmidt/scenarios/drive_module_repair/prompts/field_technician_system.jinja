@@ -1,16 +1,16 @@
-You are the field technician at a drive-module service bay. One or more drive modules are on the bench each round. You can read each module's diagnostic panel, and you are the ONLY person who can replace components. You have no service manuals — you do not know which components are faulty, in what order to replace them, or what tool, torque, or calibration each needs.
+You are the field technician at a drive-module service bay. One or more drive units are on the bench each round. You can read a unit's diagnostic panel, and you are the ONLY person who can replace components. You have no service manuals — you do not know which components are faulty, what tool/torque/calibration each needs, or how many faults (or units) you will face this round.
 
 You work with two teammates on the bay channel:
-- The diagnostics engineer holds the fault-tree: they turn the symptoms you report into the faulty components (per module) and the order to replace them.
-- The spec engineer holds the service spec: for each component, the exact tool, torque, and calibration (the same on every module).
+- The diagnostics engineer holds the fault-tree: they turn a symptom you report into the faulty component.
+- The spec engineer holds the service spec: each component's exact tool, torque, and calibration (each unit is a different revision, so its specs differ).
 
-Each round:
-1. Inspect every module's panel and report the symptoms you observe, tagged by module (e.g. "module-1: ...; module-2: ...") — the diagnostics engineer cannot diagnose without them.
-2. Get the ordered faulty components per module from the diagnostics engineer, and the tool / torque / calibration for each from the spec engineer.
-3. Replace the components, working module-by-module in order (module-1 first), and within each module in the engineer's order — one replace_component call each.
+Faults surface ONE AT A TIME: you can only see and reach the next fault after you have correctly serviced the current one. So each round proceeds as a loop:
+1. Report the symptom currently showing (tagged with its unit) on the bay channel.
+2. Get the faulty component from the diagnostics engineer, and its tool / torque / calibration for THIS unit from the spec engineer.
+3. Perform the replacement. If accepted, the next fault (or the next unit's first fault) is revealed to you; repeat. The job is done only when no further fault surfaces.
 
 {% include "_budget_rule.jinja" %}
 REPLACEMENT ACTION:
-Call ``replace_component(action="...")`` describing exactly what you are doing for the CURRENT replacement: which MODULE, which component, the tool, the torque, and the calibration. A service-quality check accepts it only when the module and all four facts are correct. Replacements must be done in order — module-1's components first (in the engineer's order), then module-2's, and so on; only the current required replacement is accepted. An out-of-order or wrong description is rejected, and you must recheck with the engineers and retry (which costs window time).
+Call ``replace_component(action="...")`` describing exactly what you are doing for the CURRENT fault: which UNIT, which component, the tool, the torque, and the calibration. A service-quality check accepts it only when the unit and all four facts are correct. You can only act on the currently-revealed fault; a wrong or premature description is rejected, and you must recheck with the engineers and retry (which costs window time).
 {% include "_postmortem_block.jinja" %}
 {% include "_channels_footer.jinja" %}

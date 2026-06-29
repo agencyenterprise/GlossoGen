@@ -46,31 +46,40 @@ class DriveModuleStage(BaseModel):
     judge_expected_action: str
 
 
-class DriveModuleModulePanel(BaseModel):
-    """The symptoms observed on one module's diagnostic panel this round."""
+class DriveModuleModuleSpec(BaseModel):
+    """One unit's full service-spec sheet this round (per-unit dynamic specs)."""
 
     module_label: str
-    symptoms: list[str]
+    specs: list[DriveModuleSpecEntry]
+
+
+class DriveModuleModuleFaultTree(BaseModel):
+    """One unit's symptom -> component fault-tree this round (per-unit dynamic)."""
+
+    module_label: str
+    entries: list[DriveModuleFaultEntry]
 
 
 class DriveModuleCaseStarted(EventBase):
     """Emitted once at round start with the full ground-truth case.
 
-    ``module_panels`` is what the field technician observes per module (private
-    to A). ``fault_tree`` is the per-round symptom -> component mapping (private
-    to the diagnostics engineer); ``spec_table`` is the per-round component ->
-    tool/torque/calibration mapping (private to the spec engineer); both are
-    shared across modules. ``stages`` is the derived ordered ground truth:
-    modules in canonical order, components within each in access-depth order.
+    ``module_fault_trees`` is the per-unit symptom -> component mapping (held by
+    the diagnostics engineer; each unit is a different revision).
+    ``module_spec_tables`` is the per-unit component -> tool/torque/calibration
+    mapping (held by the spec engineer). ``stages`` is the derived ordered
+    ground truth: units in canonical order, components within each in
+    access-depth order. Faults are revealed to the technician one at a time at
+    runtime, and each unit's fault-tree + spec sheet are pushed to the engineers
+    only when that unit is reached, so the full case here is the ground truth,
+    not what any agent sees up front.
     """
 
     event_type: Literal["drive_module_case_started"] = "drive_module_case_started"
     case_number: int
     module_count: int
     replacement_count: int
-    module_panels: list[DriveModuleModulePanel]
-    fault_tree: list[DriveModuleFaultEntry]
-    spec_table: list[DriveModuleSpecEntry]
+    module_fault_trees: list[DriveModuleModuleFaultTree]
+    module_spec_tables: list[DriveModuleModuleSpec]
     stages: list[DriveModuleStage]
     round_time_budget_seconds: int
 

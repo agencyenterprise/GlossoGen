@@ -4,8 +4,6 @@
 Round {{ round_number }}
 Service window: {{ current_case.round_time_budget_seconds }}s (one character on the bay channel = one second; shared across all three of you)
 
-{{ current_case.module_count }} module(s) on the bench. You inspect each panel and observe:
-{% for panel in current_case.module_panels %}- {{ panel.module_label }}: {% for symptom in panel.symptoms %}{{ symptom }}{% if not loop.last %}; {% endif %}{% endfor %}
-{% endfor %}
-Report these to the diagnostics engineer, tagged by module. You do not know which components are faulty or how to service them — the engineers do.
+You begin on {{ current_case.stages[0].module_label }}. Inspecting its panel, you observe: {{ current_case.stages[0].symptom }}.
+You do NOT know how many faults — or how many units — you will face this round. Each accepted replacement reveals the next fault (or moves you to the next unit); the job is done only when nothing more surfaces. Report this symptom to the diagnostics engineer (tagged with the unit); you do not know which component is faulty or how to service it — the engineers do.
 {% endif %}
