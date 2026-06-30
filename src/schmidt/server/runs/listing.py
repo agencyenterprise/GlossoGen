@@ -86,7 +86,14 @@ async def _build_summaries(
     runs_dir: Path,
     descriptors: list[RunDescriptor],
 ) -> list[RunSummary]:
-    """Enrich descriptors into summaries concurrently, dropping invalid runs."""
+    """Enrich descriptors into summaries concurrently, dropping invalid runs.
+
+    The descriptor's ``timestamp`` overrides the summary's ``timestamp`` so
+    the API surfaces the run's creation time *in this group's view* — for
+    runs imported from another deployment that is the row's ``created_at``
+    (when import happened), not the run dir name's unix timestamp (when the
+    original simulation ran). For natively-launched runs the two agree.
+    """
     tasks = [
         asyncio.create_task(
             build_summary(
@@ -97,7 +104,11 @@ async def _build_summaries(
         for descriptor in descriptors
     ]
     results = await asyncio.gather(*tasks)
-    return [summary for summary in results if summary is not None]
+    return [
+        summary.model_copy(update={"timestamp": descriptor.timestamp})
+        for descriptor, summary in zip(descriptors, results, strict=True)
+        if summary is not None
+    ]
 
 
 def _matches_labels(run_dir: Path, required: frozenset[str]) -> bool:
