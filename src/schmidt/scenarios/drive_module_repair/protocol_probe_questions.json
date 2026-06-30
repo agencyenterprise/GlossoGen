@@ -1,0 +1,164 @@
+[
+  {
+    "id": "ft_00_grinding",
+    "agent_role_filter": "field_technician",
+    "inputs": {
+      "unit": "module-1",
+      "symptom": "grinding on spin-up"
+    }
+  },
+  {
+    "id": "ft_01_arcing",
+    "agent_role_filter": "field_technician",
+    "inputs": {
+      "unit": "module-1",
+      "symptom": "contact arcing"
+    }
+  },
+  {
+    "id": "ft_02_oil_weep",
+    "agent_role_filter": "field_technician",
+    "inputs": {
+      "unit": "module-2",
+      "symptom": "oil weeping at a joint"
+    }
+  },
+  {
+    "id": "ft_03_thermal_spike",
+    "agent_role_filter": "field_technician",
+    "inputs": {
+      "unit": "module-2",
+      "symptom": "a thermal spike in the core"
+    }
+  },
+  {
+    "id": "ft_04_phase_imbalance",
+    "agent_role_filter": "field_technician",
+    "inputs": {
+      "unit": "module-3",
+      "symptom": "phase imbalance across the windings"
+    }
+  },
+  {
+    "id": "ft_05_sluggish_throttle",
+    "agent_role_filter": "field_technician",
+    "inputs": {
+      "unit": "module-1",
+      "symptom": "sluggish throttle response"
+    }
+  },
+  {
+    "id": "de_00_front_bearing",
+    "agent_role_filter": "diagnostics_engineer",
+    "inputs": {
+      "technician_message": "module-1: grinding on spin-up",
+      "unit": "module-1",
+      "symptom": "grinding on spin-up",
+      "component": "front_bearing"
+    }
+  },
+  {
+    "id": "de_01_commutator",
+    "agent_role_filter": "diagnostics_engineer",
+    "inputs": {
+      "technician_message": "module-1: contact arcing",
+      "unit": "module-1",
+      "symptom": "contact arcing",
+      "component": "commutator"
+    }
+  },
+  {
+    "id": "de_02_shaft_seal",
+    "agent_role_filter": "diagnostics_engineer",
+    "inputs": {
+      "technician_message": "module-2: oil weeping at a joint",
+      "unit": "module-2",
+      "symptom": "oil weeping at a joint",
+      "component": "shaft_seal"
+    }
+  },
+  {
+    "id": "de_03_capacitor_bank",
+    "agent_role_filter": "diagnostics_engineer",
+    "inputs": {
+      "technician_message": "module-2: current ripple on the output",
+      "unit": "module-2",
+      "symptom": "current ripple on the output",
+      "component": "capacitor_bank"
+    }
+  },
+  {
+    "id": "de_04_encoder",
+    "agent_role_filter": "diagnostics_engineer",
+    "inputs": {
+      "technician_message": "module-3: overspeed drift",
+      "unit": "module-3",
+      "symptom": "overspeed drift",
+      "component": "encoder"
+    }
+  },
+  {
+    "id": "de_05_rotor",
+    "agent_role_filter": "diagnostics_engineer",
+    "inputs": {
+      "technician_message": "module-1: an audible whine under load",
+      "unit": "module-1",
+      "symptom": "an audible whine under load",
+      "component": "rotor"
+    }
+  },
+  {
+    "id": "se_00_front_bearing",
+    "agent_role_filter": "spec_engineer",
+    "inputs": {
+      "unit": "module-1",
+      "component": "front_bearing",
+      "procedure": "Replace module-1's front_bearing. Drain the cavity and let it settle for 10s. Press the old part out with puller-A and press the replacement in. Re-torque the retainer to 14 Nm in 3 passes. Bleed the line and run the bleed-then-seat routine."
+    }
+  },
+  {
+    "id": "se_01_rotor",
+    "agent_role_filter": "spec_engineer",
+    "inputs": {
+      "unit": "module-1",
+      "component": "rotor",
+      "procedure": "Replace module-1's rotor. Lock the shaft and de-energize, holding 8s. Release the drive and draw the old part out with hex-6. Seat the replacement and torque the mount to 18 Nm in 4 passes. Spin-test, then run the phase-align-B routine."
+    }
+  },
+  {
+    "id": "se_02_capacitor_bank",
+    "agent_role_filter": "spec_engineer",
+    "inputs": {
+      "unit": "module-2",
+      "component": "capacitor_bank",
+      "procedure": "Replace module-2's capacitor_bank. De-energize and discharge the bus, holding 5s. Disconnect the 6 leads and lift out the old part with driver-3. Fit the replacement and torque the terminals to 21 Nm in 2 passes. Run the torque-stage-3 routine and verify."
+    }
+  },
+  {
+    "id": "se_03_encoder",
+    "agent_role_filter": "spec_engineer",
+    "inputs": {
+      "unit": "module-2",
+      "component": "encoder",
+      "procedure": "Replace module-2's encoder. Power down and unmount the old part with hex-2. Fit the replacement and snug the 8 screws in a clockwise sequence. Torque to 16 Nm in 2 passes. Align with the null-balance routine and confirm the reading."
+    }
+  },
+  {
+    "id": "se_04_housing_cover",
+    "agent_role_filter": "spec_engineer",
+    "inputs": {
+      "unit": "module-3",
+      "component": "housing_cover",
+      "procedure": "Replace module-3's housing_cover. Vent the bay and back off the 4 retaining bolts in a star sequence. Lift out the old part and seat the replacement using driver-1. Torque the bolts to 12 Nm across 3 passes. Finish with the seat-and-lock routine."
+    }
+  },
+  {
+    "id": "se_05_shaft_seal",
+    "agent_role_filter": "spec_engineer",
+    "inputs": {
+      "unit": "module-1",
+      "component": "shaft_seal",
+      "procedure": "Replace module-1's shaft_seal. Drain the cavity and let it settle for 15s. Press the old part out with clamp-2 and press the replacement in. Re-torque the retainer to 9 Nm in 4 passes. Bleed the line and run the purge-cycle routine."
+    }
+  }
+]

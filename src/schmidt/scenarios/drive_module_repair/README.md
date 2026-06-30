@@ -75,9 +75,22 @@ python -m schmidt run drive_module_repair \
   --config src/schmidt/scenarios/drive_module_repair/knobs_default.json
 ```
 
+## Implemented platform hooks
+
+All generic-metric and study hooks are wired:
+
+- `judge_round_result` → `round_success` / `round_success_after_resume`
+- `get_primary_channel_id` → `bay` (enables `perplexity`, `mean_chars_per_*`, the language-emergence judges)
+- `build_communication_rounds` → `communication_open_coding`, `communication_feature_presence`, `protocol_learned_after_swap`
+- `get_protocol_probe_config` → the `protocol_probe` family (question bank `protocol_probe_questions.json`, probe templates in `prompts/probe/`)
+- `get_protocol_explanation_config` → per-role describe templates in `prompts/describe/`
+- `restore_state_from_events` → accurate "PREVIOUS ROUND RESULT" injection context after fork / resume / replace-agent
+- `get_replace_agent_blocked_tool_call_channels` → strips the postmortem channel from a swapped-in agent's history
+- `run_detail_extension.py` + the frontend plugin → per-round case panel + per-action judge verdict
+
 ## Deferred follow-ons
 
-Not implemented in v1 (all additive): the `protocol_probe` family (needs a bespoke 3-role question bank + probe/describe templates), `communication_open_coding`/`communication_feature_presence` (needs `build_communication_rounds`), a `run_detail_extension.py` + frontend plugin, and veyru-style study modes (swap / intern / two-team).
+Veyru-style **study modes** (agent swap / intern takeover / two-team) are not implemented — they require multi-team world state plus the swap / intern lifecycle, a scenario-design effort separate from the additive hooks above. (`detect_protocol_boundary_window` is intentionally left to the platform default, which detects the first `AgentSwappedMidRun`; a scenario-specific override only becomes useful once a study mode exists.)
 
 ## Design note
 
