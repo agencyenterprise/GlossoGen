@@ -522,4 +522,10 @@ def _outcome_reason(outcome: DiffOutcome) -> str:
         return f"won — {base}"
     if outcome.eligible:
         return f"all found — {base}"
+    if (
+        outcome.budget_exceeded
+        and outcome.found_count == outcome.total_differences
+        and outcome.false_positive_count == 0
+    ):
+        return f"over budget — {base}"
     return f"incomplete — {base}"
