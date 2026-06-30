@@ -53,6 +53,12 @@ than a serialize-and-diff dump:
   distribution. `easy_round_numbers` forces K=1 (warmup).
 - `round_time_budget_seconds` — hard per-round link-channel character budget.
 - `difference_kinds` — the enabled taxonomy subset.
+- `all_must_submit` — when `true`, both teammates must each call
+  `submit_differences` (the round is lost for any team where one member never
+  submits), both answers are judged, and the team is eligible only if the two
+  answers agree on the same full set of differences with no false positives.
+  When `false` (default) the first submission from either member locks and
+  scores the team.
 - `channel_noise_level` / `noise_replacement_mode` — per-character link noise.
 - `judge_model` / `judge_provider` — the submission judge.
 

@@ -2,10 +2,14 @@
 
 The world holds one ``TeamState`` per team (solo mode keeps one; two-team
 mode keeps two). Each ``TeamState`` carries the running link-channel character
-count, the team's locked submission verdict, and the rolling list of finished
-``DiffOutcome`` entries. ``build_round_outcomes`` is the single place the
-correctness gate and the fewest-characters-wins comparison live, shared by the
-live world and the event-log reconstructor.
+count, the team's per-member submissions, the locked team verdict, and the
+rolling list of finished ``DiffOutcome`` entries. ``build_round_outcomes`` is
+the single place the correctness gate and the fewest-characters-wins comparison
+live, shared by the live world and the event-log reconstructor.
+
+When ``all_must_submit`` is set, a team is "complete" only once every member
+has submitted; the team verdict then requires both answers to agree on the same
+full set of differences (see :mod:`difference_judge.combine_team_verdict`).
 """
 
 from dataclasses import dataclass, field
@@ -15,11 +19,14 @@ from typing import NamedTuple
 class DiffOutcome(NamedTuple):
     """Result of one round for one team.
 
-    ``eligible`` is the gate (submitted, every planted difference found, no
-    false positives, and the character budget not exceeded). ``won`` is True
-    only in two-team mode for the eligible team(s) with the fewest characters.
-    The ``opponent_*`` fields describe the single other team in two-team mode
-    and are ``None`` in solo mode.
+    ``eligible`` is the gate (the submission requirement met, every planted
+    difference found, no false positives, and the character budget not
+    exceeded). ``won`` is True only in two-team mode for the eligible team(s)
+    with the fewest characters. ``members_submitted`` / ``members_required``
+    record the submission gate (``members_required`` is 2 under
+    ``all_must_submit``, else 1) and ``agreed`` is whether the members' answers
+    matched the same set of differences. The ``opponent_*`` fields describe the
+    single other team in two-team mode and are ``None`` in solo mode.
     """
 
     case_number: int
@@ -31,6 +38,9 @@ class DiffOutcome(NamedTuple):
     submitted: bool
     budget_exceeded: bool
     characters_used: int
+    members_submitted: int
+    members_required: int
+    agreed: bool
     eligible: bool
     won: bool
     competitive: bool
@@ -48,6 +58,9 @@ class SubmissionSnapshot(NamedTuple):
     found_count: int
     budget_exceeded: bool
     characters: int
+    members_submitted: int
+    members_required: int
+    agreed: bool
 
 
 @dataclass
@@ -56,49 +69,74 @@ class TeamState:
 
     team_id: str
     link_channel_id: str
+    member_agent_ids: frozenset[str]
+    all_must_submit: bool
     current_round_characters: int = 0
     round_budget_exceeded: bool = False
-    submitted: bool = False
+    submissions_by_agent: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
+    team_locked: bool = False
     verdict_recorded: bool = False
-    submitted_found_all: bool = False
-    submitted_false_positives: int = 0
-    submitted_found_count: int = 0
+    team_found_all: bool = False
+    team_false_positives: int = 0
+    team_found_count: int = 0
+    team_agreed: bool = True
     characters_at_submission: int = 0
     round_outcome_marked: bool = False
     notified_thresholds: set[str] = field(default_factory=set[str])
     outcomes: list[DiffOutcome] = field(default_factory=list[DiffOutcome])
 
+    @property
+    def members_required(self) -> int:
+        """How many members must submit for the team to be scored."""
+        if self.all_must_submit:
+            return len(self.member_agent_ids)
+        return 1
+
+    @property
+    def is_complete(self) -> bool:
+        """Whether the team has met its submission requirement this round."""
+        return len(self.submissions_by_agent) >= self.members_required
+
+    def has_agent_submitted(self, agent_id: str) -> bool:
+        """Whether ``agent_id`` has already submitted this round."""
+        return agent_id in self.submissions_by_agent
+
     def snapshot(self) -> SubmissionSnapshot:
         """Capture this team's end-of-round submission state."""
-        if self.submitted:
+        if self.team_locked:
             characters = self.characters_at_submission
         else:
             characters = self.current_round_characters
         return SubmissionSnapshot(
-            submitted=self.submitted,
-            found_all=self.submitted_found_all,
-            false_positive_count=self.submitted_false_positives,
-            found_count=self.submitted_found_count,
+            submitted=self.team_locked,
+            found_all=self.team_found_all,
+            false_positive_count=self.team_false_positives,
+            found_count=self.team_found_count,
             budget_exceeded=self.round_budget_exceeded,
             characters=characters,
+            members_submitted=len(self.submissions_by_agent),
+            members_required=self.members_required,
+            agreed=self.team_agreed,
         )
 
     def reset_for_new_round(self) -> None:
-        """Clear all per-round counters and the locked submission."""
+        """Clear all per-round counters, submissions, and the locked verdict."""
         self.current_round_characters = 0
         self.round_budget_exceeded = False
-        self.submitted = False
+        self.submissions_by_agent = {}
+        self.team_locked = False
         self.verdict_recorded = False
-        self.submitted_found_all = False
-        self.submitted_false_positives = 0
-        self.submitted_found_count = 0
+        self.team_found_all = False
+        self.team_false_positives = 0
+        self.team_found_count = 0
+        self.team_agreed = True
         self.characters_at_submission = 0
         self.round_outcome_marked = False
         self.notified_thresholds = set()
 
 
 def _is_eligible(snapshot: SubmissionSnapshot) -> bool:
-    """Whether a snapshot passes the gate: correct, no false positives, within budget."""
+    """Whether a snapshot passes the gate: complete, correct, no false positives, within budget."""
     return (
         snapshot.submitted
         and snapshot.found_all
@@ -144,6 +182,9 @@ def build_round_outcomes(
             submitted=snap.submitted,
             budget_exceeded=snap.budget_exceeded,
             characters_used=snap.characters,
+            members_submitted=snap.members_submitted,
+            members_required=snap.members_required,
+            agreed=snap.agreed,
             eligible=_is_eligible(snapshot=snap),
             won=(two_teams and team_id in winners),
             competitive=two_teams,

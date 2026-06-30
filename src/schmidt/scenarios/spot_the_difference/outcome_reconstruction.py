@@ -3,14 +3,16 @@
 Used on resume / fork / replace-agent to seed the world's outcome history so
 the next-round injection can render an accurate "previous round" block. The
 reconstructor reads ``SpotTheDifferenceCaseStarted`` for each round's K,
-``DifferenceSubmissionJudged`` for each team's locked verdict, ``MessageSent``
-on the link channels to recover characters for any team that never submitted,
-and ``RoundEnded`` to know which rounds are complete.
+``DifferenceSubmissionJudged`` for each member's locked answer (two per team
+under ``all_must_submit``), ``MessageSent`` on the link channels to recover
+characters for any team that never locked, and ``RoundEnded`` to know which
+rounds are complete.
 """
 
 from typing import Any
 
 from schmidt.models.event import MessageSent, RoundEnded
+from schmidt.scenarios.spot_the_difference.difference_judge import combine_team_verdict
 from schmidt.scenarios.spot_the_difference.events import (
     DifferenceSubmissionJudged,
     SpotTheDifferenceCaseStarted,
@@ -33,7 +35,7 @@ def restore_outcomes_from_events(
     """Append a ``DiffOutcome`` to each team for every completed round in ``events``."""
     difference_count_by_round: dict[int, int] = {}
     budget_by_round: dict[int, int] = {}
-    judged_by_round_team: dict[int, dict[str, DifferenceSubmissionJudged]] = {}
+    judged_by_round_team: dict[int, dict[str, list[DifferenceSubmissionJudged]]] = {}
     characters_by_round_team: dict[int, dict[str, int]] = {}
     completed_rounds: set[int] = set()
     for event in events:
@@ -44,7 +46,8 @@ def restore_outcomes_from_events(
             difference_count_by_round[round_number] = event.difference_count
             budget_by_round[round_number] = event.round_time_budget_seconds
         elif isinstance(event, DifferenceSubmissionJudged):
-            judged_by_round_team.setdefault(round_number, {})[event.team_id] = event
+            team_bucket = judged_by_round_team.setdefault(round_number, {})
+            team_bucket.setdefault(event.team_id, []).append(event)
         elif isinstance(event, MessageSent):
             message_team_id = team_id_for_channel(channel_id=event.message.channel_id)
             if message_team_id is None:
@@ -64,14 +67,15 @@ def restore_outcomes_from_events(
         budget = budget_by_round.get(round_number)
         if budget is None:
             budget = cases[round_number - 1].round_time_budget_seconds
+        total_differences = difference_count_by_round.get(round_number)
+        if total_differences is None:
+            total_differences = cases[round_number - 1].difference_count
         snapshots = _snapshots_for_round(
-            team_ids=list(teams.keys()),
+            teams=teams,
+            total_differences=total_differences,
             judged=judged_by_round_team.get(round_number, {}),
             characters=characters_by_round_team.get(round_number, {}),
             budget=budget,
-        )
-        total_differences = difference_count_by_round.get(
-            round_number, cases[round_number - 1].difference_count
         )
         outcomes = build_round_outcomes(
             case_number=round_number,
@@ -85,21 +89,25 @@ def restore_outcomes_from_events(
 
 
 def _snapshots_for_round(
-    team_ids: list[str],
-    judged: dict[str, DifferenceSubmissionJudged],
+    teams: dict[str, TeamState],
+    total_differences: int,
+    judged: dict[str, list[DifferenceSubmissionJudged]],
     characters: dict[str, int],
     budget: int,
 ) -> dict[str, SubmissionSnapshot]:
     """Build each team's submission snapshot for one completed round.
 
-    A submitted team's characters are the value latched at submission; a team
-    that never submitted is charged its total link-channel characters. Either
-    way ``budget_exceeded`` is the relevant character count reaching ``budget``.
+    A team that met its submission requirement is scored from the combined
+    member verdicts and the characters latched at lock; a team that did not
+    (no submission, or only one member under ``all_must_submit``) is charged its
+    total link-channel characters and marked not-submitted.
     """
     snapshots: dict[str, SubmissionSnapshot] = {}
-    for team_id in team_ids:
-        event = judged.get(team_id)
-        if event is None:
+    for team_id, team in teams.items():
+        member_events = judged.get(team_id, [])
+        members_submitted = len(member_events)
+        members_required = team.members_required
+        if members_submitted < members_required:
             total = characters.get(team_id, 0)
             snapshots[team_id] = SubmissionSnapshot(
                 submitted=False,
@@ -108,14 +116,26 @@ def _snapshots_for_round(
                 found_count=0,
                 budget_exceeded=total >= budget,
                 characters=total,
+                members_submitted=members_submitted,
+                members_required=members_required,
+                agreed=True,
             )
             continue
+        verdict = combine_team_verdict(
+            matched_sets=[set(event.matched_difference_indices) for event in member_events],
+            false_positive_counts=[event.false_positive_count for event in member_events],
+            total_differences=total_differences,
+        )
+        latched_characters = max(event.characters_at_submission for event in member_events)
         snapshots[team_id] = SubmissionSnapshot(
             submitted=True,
-            found_all=event.found_all,
-            false_positive_count=event.false_positive_count,
-            found_count=len(set(event.matched_difference_indices)),
-            budget_exceeded=event.characters_at_submission >= budget,
-            characters=event.characters_at_submission,
+            found_all=verdict.found_all,
+            false_positive_count=verdict.false_positive_count,
+            found_count=verdict.found_count,
+            budget_exceeded=latched_characters >= budget,
+            characters=latched_characters,
+            members_submitted=members_submitted,
+            members_required=members_required,
+            agreed=verdict.agreed,
         )
     return snapshots
