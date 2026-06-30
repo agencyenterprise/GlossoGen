@@ -154,14 +154,20 @@ async def list_runs_for_group(
     limit: int,
     offset: int,
 ) -> list[RunRow]:
-    """Return runs owned by ``group_id``, newest first, optionally filtered by scenario."""
+    """Return runs owned by ``group_id``, newest first, optionally filtered by scenario.
+
+    Ordering is by the unix-epoch prefix of ``run_dir_name`` (= when the
+    simulation originally ran), descending. This matches what the UI displays
+    as the run date, so an old run re-imported today does not jump above
+    sims actually launched today.
+    """
     async with conn.cursor() as cur:
         if scenario is None:
             await cur.execute(
                 f"""
                 SELECT {_RUN_COLUMNS} FROM runs
                 WHERE group_id = %s
-                ORDER BY created_at DESC
+                ORDER BY split_part(run_dir_name, '_', 1)::bigint DESC, run_dir_name DESC
                 LIMIT %s OFFSET %s
                 """,
                 (group_id, limit, offset),
@@ -171,7 +177,7 @@ async def list_runs_for_group(
                 f"""
                 SELECT {_RUN_COLUMNS} FROM runs
                 WHERE group_id = %s AND scenario = %s
-                ORDER BY created_at DESC
+                ORDER BY split_part(run_dir_name, '_', 1)::bigint DESC, run_dir_name DESC
                 LIMIT %s OFFSET %s
                 """,
                 (group_id, scenario, limit, offset),
@@ -200,7 +206,7 @@ async def list_children_of_run(
             WHERE group_id = %s
               AND source_run_scenario = %s
               AND source_run_dir_name = %s
-            ORDER BY created_at DESC
+            ORDER BY split_part(run_dir_name, '_', 1)::bigint DESC, run_dir_name DESC
             """,
             (group_id, parent_scenario, parent_run_dir_name),
         )
