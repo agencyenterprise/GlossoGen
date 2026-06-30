@@ -36,17 +36,15 @@ from analysis.results_viewer.series_plot import (
     series_color_map,
 )
 
-_BASELINE_FAMILY_LABELS = frozenset(
-    {"baseline", "baseline_oss", "channel_noise", "drive_baseline", "drive_calib_clean"}
-)
+_BASELINE_FAMILY_LABELS = frozenset({"baseline", "baseline_oss", "channel_noise"})
 
 
 def _scenarios_with_baseline_runs(evaluated: list[EvaluatedRun]) -> list[str]:
     """Return every scenario that has at least one baseline-family run.
 
     Auto-discovered from the loaded runs so any scenario whose runs ship a
-    ``baseline``, ``baseline_oss``, ``channel_noise``, ``drive_baseline``, or
-    ``drive_calib_clean`` label appears in the radio selector without code changes.
+    ``baseline``, ``baseline_oss``, or ``channel_noise`` label appears in the
+    radio selector without code changes.
     """
     out: set[str] = set()
     for run in evaluated:

@@ -17,7 +17,7 @@
     "object_added",
     "object_removed"
   ],
-  "easy_round_numbers": [1, 2, 3],
+  "easy_round_numbers": [],
   "channel_noise_level": 0.0,
   "noise_replacement_mode": "mask",
   "two_teams": false,
