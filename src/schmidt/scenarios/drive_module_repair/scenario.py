@@ -38,6 +38,9 @@ from schmidt.evaluation.metric_core.measurement import Measurement
 from schmidt.evaluation.metric_core.metric_protocol import Metric
 from schmidt.evaluation.metric_core.metric_registry import GENERIC_METRIC_REGISTRY
 from schmidt.evaluation.metric_core.metric_run_options import MetricRunOptions
+from schmidt.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
+from schmidt.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
+from schmidt.evaluation.metrics.communication.round_view import CommunicationRoundView
 from schmidt.evaluation.reports.evaluation_cost import compute_evaluation_cost
 from schmidt.evaluation.reports.evaluation_report import (
     EvaluationReport,
@@ -49,6 +52,7 @@ from schmidt.evaluation.reports.evaluation_report import (
 from schmidt.llm.provider_factory import create_provider
 from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel
+from schmidt.models.event import SimulationEvent
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.runtime.scenario_world import ScenarioWorld
 from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
@@ -61,6 +65,9 @@ from schmidt.scenarios.drive_module_repair.agent_factory import (
 )
 from schmidt.scenarios.drive_module_repair.case_event_conversion import case_started_event
 from schmidt.scenarios.drive_module_repair.drive_module_cases import get_cases
+from schmidt.scenarios.drive_module_repair.evaluation.build_communication_rounds import (
+    build_communication_rounds,
+)
 from schmidt.scenarios.drive_module_repair.ids import (
     BAY_CHANNEL_ID,
     DIAGNOSTICS_ENGINEER_ID,
@@ -83,6 +90,15 @@ from schmidt.template_renderer import TemplateRenderer
 logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+
+def _protocol_role_groups() -> dict[str, frozenset[str]]:
+    """Map each role-filter string to the role names it covers (single-team, three roles)."""
+    return {
+        "field_technician": frozenset({FIELD_TECHNICIAN_ROLE}),
+        "diagnostics_engineer": frozenset({DIAGNOSTICS_ENGINEER_ROLE}),
+        "spec_engineer": frozenset({SPEC_ENGINEER_ROLE}),
+    }
 
 
 class DriveModuleRepairScenario(SimulationScenario):
@@ -302,6 +318,41 @@ class DriveModuleRepairScenario(SimulationScenario):
     def get_primary_channel_id(self) -> str | None:
         """Return the bay channel where the communication budget applies."""
         return BAY_CHANNEL_ID
+
+    def build_communication_rounds(
+        self, events: list[SimulationEvent]
+    ) -> list[CommunicationRoundView]:
+        """Join bay-channel messages with each round's per-fault ground truth."""
+        return build_communication_rounds(events=events)
+
+    def get_protocol_explanation_config(self) -> ProtocolExplanationConfig | None:
+        """Point the protocol_explanation metric at the per-role describe templates."""
+        return ProtocolExplanationConfig(
+            prompts_dir=PROMPTS_DIR / "describe",
+            role_groups=_protocol_role_groups(),
+            role_templates={
+                "field_technician": "field_technician_describe.jinja",
+                "diagnostics_engineer": "diagnostics_engineer_describe.jinja",
+                "spec_engineer": "spec_engineer_describe.jinja",
+            },
+        )
+
+    def get_protocol_probe_config(self) -> ProtocolProbeConfig | None:
+        """Point the protocol-probe metric family at the question bank and probe prompts."""
+        return ProtocolProbeConfig(
+            questions_path=Path(__file__).resolve().parent / "protocol_probe_questions.json",
+            prompts_dir=PROMPTS_DIR / "probe",
+            role_groups=_protocol_role_groups(),
+            role_templates={
+                "field_technician": "field_technician_probe.jinja",
+                "diagnostics_engineer": "diagnostics_engineer_probe.jinja",
+                "spec_engineer": "spec_engineer_probe.jinja",
+            },
+        )
+
+    def restore_state_from_events(self, events: list[Any]) -> None:
+        """Seed the world's per-round outcomes from source events on resume / fork."""
+        self._world.restore_outcomes_from_events(events=events)
 
     def get_world(self) -> ScenarioWorld:
         """Return the drive-module world."""

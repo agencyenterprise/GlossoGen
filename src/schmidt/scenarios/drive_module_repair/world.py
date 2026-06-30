@@ -15,12 +15,17 @@ budget.
 import asyncio
 import logging
 
+from schmidt.models.event import MessageSent, RoundResultRecorded, SimulationEvent
 from schmidt.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
 from schmidt.scenarios.drive_module_repair.drive_module_cases import (
     DriveModuleCase,
     ModuleFaultTree,
     ModuleSpecTable,
     Stage,
+)
+from schmidt.scenarios.drive_module_repair.events import (
+    DriveModuleCaseStarted,
+    DriveModuleReplacementJudged,
 )
 from schmidt.scenarios.drive_module_repair.ids import (
     BAY_CHANNEL_ID,
@@ -204,6 +209,65 @@ class DriveModuleWorld(ScenarioWorld):
         if len(self._outcomes) == 0:
             return None
         return self._outcomes[-1]
+
+    def restore_outcomes_from_events(self, events: list[SimulationEvent]) -> None:
+        """Rebuild ``_outcomes`` from a source event list on resume / fork / replace-agent.
+
+        Reconstructs one ``DriveModuleOutcome`` per round that has a
+        ``RoundResultRecorded`` event, mirroring ``_resolve``: case fields from
+        ``DriveModuleCaseStarted``, accepted replacements from
+        ``DriveModuleReplacementJudged`` (``judge_match``), characters from
+        bay-channel ``MessageSent``, and ``round_succeeded`` from the recorded
+        result. This makes the resumed run's "PREVIOUS ROUND RESULT" injection
+        reflect the source run's actual outcomes.
+        """
+        cases: dict[int, DriveModuleCaseStarted] = {}
+        accepted: dict[int, int] = {}
+        chars: dict[int, int] = {}
+        succeeded: dict[int, bool] = {}
+        for event in events:
+            if isinstance(event, DriveModuleCaseStarted):
+                cases[event.round_number] = event
+            elif isinstance(event, DriveModuleReplacementJudged):
+                if event.judge_match:
+                    accepted[event.round_number] = accepted.get(event.round_number, 0) + 1
+            elif isinstance(event, MessageSent):
+                if event.message.channel_id == BAY_CHANNEL_ID:
+                    chars[event.round_number] = chars.get(event.round_number, 0) + len(
+                        event.message.text
+                    )
+            elif isinstance(event, RoundResultRecorded):
+                succeeded[event.round_number] = event.success
+        outcomes: list[DriveModuleOutcome] = []
+        for round_number in sorted(succeeded):
+            case = cases.get(round_number)
+            if case is None:
+                continue
+            replacements_done = min(accepted.get(round_number, 0), case.replacement_count)
+            characters_used = chars.get(round_number, 0)
+            budget_exceeded = characters_used >= case.round_time_budget_seconds
+            device_repaired = replacements_done >= case.replacement_count
+            if budget_exceeded:
+                failure_reason = "Communication budget exhausted."
+            elif not device_repaired:
+                failure_reason = "Round ended before all components were correctly replaced."
+            else:
+                failure_reason = ""
+            outcomes.append(
+                DriveModuleOutcome(
+                    case_number=case.case_number,
+                    module_count=case.module_count,
+                    replacement_count=case.replacement_count,
+                    replacements_done=replacements_done,
+                    budget_exceeded=budget_exceeded,
+                    characters_used=characters_used,
+                    round_time_budget_seconds=case.round_time_budget_seconds,
+                    device_repaired=device_repaired,
+                    round_succeeded=succeeded[round_number],
+                    failure_reason=failure_reason,
+                )
+            )
+        self._outcomes = outcomes
 
     def on_message(
         self,
