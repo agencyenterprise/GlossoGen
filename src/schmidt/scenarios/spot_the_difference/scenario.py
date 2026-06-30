@@ -177,6 +177,7 @@ class SpotTheDifferenceScenario(SimulationScenario):
             cases=self._cases,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
             two_teams=knobs.two_teams,
+            all_must_submit=knobs.all_must_submit,
         )
         self._judge_provider = create_provider(
             provider_name=knobs.judge_provider,
@@ -516,12 +517,19 @@ def _outcome_reason(outcome: DiffOutcome) -> str:
     if outcome.false_positive_count > 0:
         base = f"{base}, {outcome.false_positive_count} incorrect"
     base = f"{base}, {outcome.characters_used} chars"
+    if outcome.members_required > 1 and outcome.members_submitted < outcome.members_required:
+        return (
+            f"only {outcome.members_submitted}/{outcome.members_required} members submitted "
+            f"({base})"
+        )
     if not outcome.submitted:
         return f"did not submit ({base})"
     if outcome.competitive and outcome.won:
         return f"won — {base}"
     if outcome.eligible:
         return f"all found — {base}"
+    if not outcome.agreed:
+        return f"members disagreed — {base}"
     if (
         outcome.budget_exceeded
         and outcome.found_count == outcome.total_differences

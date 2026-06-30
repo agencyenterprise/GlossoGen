@@ -21,6 +21,7 @@
   "channel_noise_level": 0.0,
   "noise_replacement_mode": "mask",
   "two_teams": true,
+  "all_must_submit": false,
   "judge_model": "claude-haiku-4-5-20251001",
   "judge_provider": "anthropic",
   "model_overrides": {},

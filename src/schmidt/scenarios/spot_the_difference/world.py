@@ -1,12 +1,14 @@
 """World simulation for the spot_the_difference scenario.
 
-Tracks per-team link-channel character usage and the team's locked
-submission. The world is mutated by the one scenario tool: a viewer calls
-``submit_differences`` with a free-text list of differences; the tool locks
-the team's answer (snapshotting its character count), the LLM judge scores it,
-and ``record_submission_result`` stores the verdict. At round end the world
-scores every team — correctness gate, then fewest-characters-wins — and
-reveals each team's result on its link channel.
+Tracks per-team link-channel character usage and the team's per-member
+submissions. The world is mutated by the one scenario tool: a viewer calls
+``submit_differences`` with a free-text list of differences;
+``record_agent_submission`` stores that member's answer and locks the team
+(snapshotting its character count) once the submission requirement is met (one
+member, or both under ``all_must_submit``). The LLM judge then scores every
+submitted answer and ``record_team_verdict`` stores the combined verdict. At
+round end the world scores every team — correctness gate, then
+fewest-characters-wins — and reveals each team's result on its link channel.
 
 Heavy logic lives in dedicated sibling modules: :mod:`world_state` (the
 ``TeamState`` / ``DiffOutcome`` types and the round-scoring function) and
@@ -40,7 +42,11 @@ from schmidt.scenarios.spot_the_difference.outcome_reconstruction import (
     restore_outcomes_from_events,
 )
 from schmidt.scenarios.spot_the_difference.scene_generation import DiffCase
-from schmidt.scenarios.spot_the_difference.team_routing import team_id_for_channel
+from schmidt.scenarios.spot_the_difference.team_routing import (
+    team_id_for_channel,
+    viewer_left_id_for_team,
+    viewer_right_id_for_team,
+)
 from schmidt.scenarios.spot_the_difference.world_state import (
     DiffOutcome,
     TeamState,
@@ -67,24 +73,40 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         cases: list[DiffCase],
         postmortem_globally_disabled: bool,
         two_teams: bool,
+        all_must_submit: bool,
     ) -> None:
         self._cases = cases
         self._two_teams = two_teams
+        self._all_must_submit = all_must_submit
         self._current_case: DiffCase | None = None
         self._in_postmortem: bool = False
         self._postmortem_globally_disabled: bool = postmortem_globally_disabled
-        self._teams: dict[str, TeamState] = self._build_teams(two_teams=two_teams)
+        self._teams: dict[str, TeamState] = self._build_teams(
+            two_teams=two_teams, all_must_submit=all_must_submit
+        )
 
     @staticmethod
-    def _build_teams(two_teams: bool) -> dict[str, TeamState]:
+    def _build_teams(two_teams: bool, all_must_submit: bool) -> dict[str, TeamState]:
         """Initialize the team-state map for single or two-team mode."""
         if two_teams:
-            return {
-                TEAM_A_ID: TeamState(team_id=TEAM_A_ID, link_channel_id=LINK_A_CHANNEL_ID),
-                TEAM_B_ID: TeamState(team_id=TEAM_B_ID, link_channel_id=LINK_B_CHANNEL_ID),
-            }
+            team_ids = [TEAM_A_ID, TEAM_B_ID]
+            link_ids = {TEAM_A_ID: LINK_A_CHANNEL_ID, TEAM_B_ID: LINK_B_CHANNEL_ID}
+        else:
+            team_ids = [TEAM_SOLO_ID]
+            link_ids = {TEAM_SOLO_ID: LINK_CHANNEL_ID}
         return {
-            TEAM_SOLO_ID: TeamState(team_id=TEAM_SOLO_ID, link_channel_id=LINK_CHANNEL_ID),
+            team_id: TeamState(
+                team_id=team_id,
+                link_channel_id=link_ids[team_id],
+                member_agent_ids=frozenset(
+                    {
+                        viewer_left_id_for_team(team_id=team_id),
+                        viewer_right_id_for_team(team_id=team_id),
+                    }
+                ),
+                all_must_submit=all_must_submit,
+            )
+            for team_id in team_ids
         }
 
     @property
@@ -154,32 +176,57 @@ class SpotTheDifferenceWorld(ScenarioWorld):
             return frozenset()
         return frozenset({POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID})
 
-    def try_lock_submission(self, team_id: str) -> int | None:
-        """Lock ``team_id``'s answer for the round, returning its character count.
+    @property
+    def all_must_submit(self) -> bool:
+        """Whether every team member must submit before the team is scored."""
+        return self._all_must_submit
 
-        Returns ``None`` if the team has already submitted. Synchronous and
-        atomic: snapshots the live character count before any judge call so
-        post-submission chatter cannot change the scored total.
+    def is_team_locked(self, team_id: str) -> bool:
+        """Whether ``team_id``'s answer is already locked for the round."""
+        return self._teams[team_id].team_locked
+
+    def has_agent_submitted(self, team_id: str, agent_id: str) -> bool:
+        """Whether ``agent_id`` has already submitted for ``team_id`` this round."""
+        return self._teams[team_id].has_agent_submitted(agent_id=agent_id)
+
+    def record_agent_submission(self, team_id: str, agent_id: str, items: list[str]) -> bool:
+        """Record one member's answer; lock the team once the requirement is met.
+
+        Returns ``True`` when this submission completes the team (all required
+        members have now submitted). Completing the team snapshots the live
+        character count synchronously, before any judge call, so post-submission
+        chatter cannot change the scored total.
         """
         team = self._teams[team_id]
-        if team.submitted:
-            return None
-        team.submitted = True
+        team.submissions_by_agent[agent_id] = items
+        if not team.is_complete:
+            return False
+        team.team_locked = True
         team.characters_at_submission = team.current_round_characters
-        return team.characters_at_submission
+        return True
 
-    def record_submission_result(
+    def team_submissions(self, team_id: str) -> dict[str, list[str]]:
+        """Return the per-member answers recorded for ``team_id`` this round."""
+        return dict(self._teams[team_id].submissions_by_agent)
+
+    def characters_at_submission(self, team_id: str) -> int:
+        """Return the character count latched when ``team_id`` locked its answer."""
+        return self._teams[team_id].characters_at_submission
+
+    def record_team_verdict(
         self,
         team_id: str,
         found_all: bool,
         false_positive_count: int,
         found_count: int,
+        agreed: bool,
     ) -> None:
-        """Store the judge's verdict on ``team_id``'s locked submission."""
+        """Store the combined judge verdict on ``team_id``'s locked answers."""
         team = self._teams[team_id]
-        team.submitted_found_all = found_all
-        team.submitted_false_positives = false_positive_count
-        team.submitted_found_count = found_count
+        team.team_found_all = found_all
+        team.team_false_positives = false_positive_count
+        team.team_found_count = found_count
+        team.team_agreed = agreed
         team.verdict_recorded = True
 
     async def announce_submission_locked(self, team_id: str) -> None:
@@ -255,7 +302,7 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         team = self._teams.get(team_id)
         if team is None:
             return
-        if team.submitted:
+        if team.team_locked:
             # Answer already locked; post-submission chatter does not change the score.
             return
         team.current_round_characters += len(text)
@@ -309,14 +356,16 @@ class SpotTheDifferenceWorld(ScenarioWorld):
 def _team_done(team: TeamState) -> bool:
     """Whether one team is finished this round.
 
-    A team that submitted is done only once its async judge verdict is
-    recorded, even if it exceeded budget: ``try_lock_submission`` sets
-    ``submitted`` before the judge runs, so ending the round on the lock (or
-    on the budget flag) would score the round before the verdict lands and
-    record a stale ``found_count`` of 0. A team that never submitted is done
-    when it exhausts its character budget (it can no longer win).
+    A team whose answer is locked (all required members submitted) is done
+    only once its async judge verdict is recorded, even if it exceeded budget:
+    ``record_agent_submission`` sets ``team_locked`` before the judge runs, so
+    ending the round on the lock (or on the budget flag) would score the round
+    before the verdict lands and record a stale ``found_count`` of 0. A team
+    that has not locked is done when it exhausts its character budget (it can no
+    longer win) — under ``all_must_submit`` this also covers a team where only
+    one member ever submits.
     """
-    if team.submitted:
+    if team.team_locked:
         return team.verdict_recorded
     return team.round_budget_exceeded
 
@@ -332,10 +381,20 @@ def _render_terminal_text(outcome: DiffOutcome) -> str:
             f"{ROUND_RESULT_MARKER}. Communication budget exceeded ({characters}) — "
             f"ineligible this round ({found})."
         )
+    if outcome.members_required > 1 and outcome.members_submitted < outcome.members_required:
+        return (
+            f"{ROUND_RESULT_MARKER}. Ineligible — only {outcome.members_submitted} of "
+            f"{outcome.members_required} teammates submitted; both must submit."
+        )
     if not outcome.submitted:
         return (
             f"{ROUND_RESULT_MARKER}. Your team did not submit in time "
             f"({found} would have been judged from your last lock)."
+        )
+    if not outcome.agreed:
+        return (
+            f"{ROUND_RESULT_MARKER}. Ineligible — your answers disagreed ({found}); "
+            f"both teammates must submit the same set of differences."
         )
     if not outcome.competitive:
         if outcome.eligible:

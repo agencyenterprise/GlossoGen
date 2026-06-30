@@ -182,6 +182,7 @@ def build_agents(
                         "channel_noise_level": knobs.channel_noise_level,
                         "noise_replacement_mode": knobs.noise_replacement_mode.value,
                         "two_teams": knobs.two_teams,
+                        "all_must_submit": knobs.all_must_submit,
                         "grid_size": knobs.grid_size,
                         "difference_kinds": knobs.difference_kinds,
                     },

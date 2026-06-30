@@ -43,6 +43,13 @@ class SpotTheDifferenceKnobs(BaseKnobs):
     scene pair each round, so the per-round winner (fewest characters among
     teams that found every difference within budget) can be announced as
     in-context reinforcement.
+
+    ``all_must_submit`` makes both teammates submit their own answer: a team is
+    scored only once both members call ``submit_differences`` (the round is lost
+    for any team where one member never submits), both answers are sent to the
+    judge, and the team is eligible only if the two answers agree on the same
+    full set of K differences with no false positives. When off (default), the
+    first submission from either member locks and scores the team.
     """
 
     judge_model: str
@@ -62,6 +69,7 @@ class SpotTheDifferenceKnobs(BaseKnobs):
     channel_noise_level: float = Field(ge=0.0, le=1.0)
     noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     two_teams: bool = False
+    all_must_submit: bool = False
 
     @model_validator(mode="after")
     def _validate_object_count_distribution(self) -> Self:
