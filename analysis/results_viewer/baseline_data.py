@@ -24,8 +24,15 @@ from analysis.results_viewer.run_catalog import EvaluatedRun
 _BASELINE_LABEL = "baseline"
 _BASELINE_OSS_LABEL = "baseline_oss"
 _CHANNEL_NOISE_LABEL = "channel_noise"
+_DRIVE_BASELINE_LABEL = "drive_baseline"
+_DRIVE_CALIB_CLEAN_LABEL = "drive_calib_clean"
 _NOISE_LABEL_PREFIX = "noise="
-_BASELINE_LABELS = frozenset({_BASELINE_LABEL, _BASELINE_OSS_LABEL, _CHANNEL_NOISE_LABEL})
+# drive_module_repair's baseline + calibration runs are budget sweeps too; both
+# map to a single "drive" series per model so they form one budget→metric curve.
+_DRIVE_LABELS = frozenset({_DRIVE_BASELINE_LABEL, _DRIVE_CALIB_CLEAN_LABEL})
+_BASELINE_LABELS = (
+    frozenset({_BASELINE_LABEL, _BASELINE_OSS_LABEL, _CHANNEL_NOISE_LABEL}) | _DRIVE_LABELS
+)
 _ROUND_SUCCESS_METRIC = "round_success"
 _ROUND_ENDED_IDLE_METRIC = "round_ended_idle"
 _ROUND_ENDED_TIMEOUT_METRIC = "round_ended_timeout"
@@ -322,6 +329,8 @@ def _resolve_kind(matching: frozenset[str], labels: list[str]) -> str:
     each noise level renders as its own series across budgets. Falls back to
     ``baseline_oss`` then ``baseline`` for the original baseline kinds.
     """
+    if _DRIVE_LABELS & matching:
+        return "drive"
     if _CHANNEL_NOISE_LABEL in matching:
         level = _noise_level_from_labels(labels=labels)
         return f"{_CHANNEL_NOISE_LABEL}(noise={level})"
@@ -341,8 +350,9 @@ def _noise_level_from_labels(labels: list[str]) -> str:
 def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
     """Convert an ``EvaluatedRun`` into a ``BaselineRun`` if it qualifies.
 
-    A run qualifies when it has the ``baseline``, ``baseline_oss``, or
-    ``channel_noise`` label, a budget knob in its scenario_config, and a
+    A run qualifies when it has a baseline-family label (``baseline``,
+    ``baseline_oss``, ``channel_noise``, ``drive_baseline``, or
+    ``drive_calib_clean``), a budget knob in its scenario_config, and a
     ``round_success`` metric in its evaluation report. The two round-end
     metrics default to 0.0 when missing so older runs evaluated before they
     existed still render on the chart (just as a flat zero line).
