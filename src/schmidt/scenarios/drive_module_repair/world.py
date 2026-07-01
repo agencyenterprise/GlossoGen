@@ -2,7 +2,7 @@
 
 Tracks the running character count on the bay channel and the technician's
 progress through the round's ordered replacement stages. Each accepted
-``replace_component`` advances the stage index (the order is hard-enforced:
+``service_component`` advances the stage index (the order is hard-enforced:
 only the current required replacement is accepted); completing every stage
 repairs the device. The round fails if the communication budget is exhausted
 or the round ends before every component is correctly replaced.

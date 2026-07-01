@@ -15,13 +15,13 @@ advisors. The spec engineer depends on the diagnostics engineer (specs are
 keyed to the chosen components), forming an A->B->C->A dependency chain that
 is not a single expert->novice relay.
 
-Each ``replace_component`` action is free text scored by an LLM judge
+Each ``service_component`` action is free text scored by an LLM judge
 against the current stage's expected (component, tool, torque, calibration).
 Round success requires every component replaced correctly, in order, within
 the communication budget.
 
 Heavy logic lives in dedicated sibling modules: :mod:`agent_factory`
-(agent/channel construction), :mod:`mcp_tools` (the replace_component tool),
+(agent/channel construction), :mod:`mcp_tools` (the service_component tool),
 :mod:`replacement_judge` (the LLM judge), :mod:`injection_rendering`
 (per-round and postmortem prompts), :mod:`drive_module_cases` (per-round case
 generation), :mod:`world_state` (the outcome type), and
@@ -202,7 +202,7 @@ class DriveModuleRepairScenario(SimulationScenario):
         return self._agent_display_names.get(agent_id, agent_id)
 
     def bind_runtime(self, runtime: ScenarioRuntimeHandle) -> None:
-        """Stash the runtime handle so the replace_component tool can emit verdict events."""
+        """Stash the runtime handle so the service_component tool can emit verdict events."""
         self._runtime = runtime
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
@@ -359,7 +359,7 @@ class DriveModuleRepairScenario(SimulationScenario):
         return self._world
 
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:
-        """Return the replace_component tool."""
+        """Return the service_component tool."""
         return build_mcp_tools(
             world=self._world,
             judge_provider=self._judge_provider,

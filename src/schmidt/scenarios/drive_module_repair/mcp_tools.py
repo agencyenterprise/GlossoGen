@@ -1,7 +1,7 @@
 """The single MCP tool the drive_module_repair scenario exposes.
 
-``replace_component`` is the field technician's action. Each call submits
-free text describing the replacement being performed; an LLM judge compares
+``service_component`` is the field technician's action. Each call submits
+free text describing the full service procedure being performed; an LLM judge compares
 it against the current stage's ground-truth expected action (component +
 tool + torque + calibration) and decides whether it counts. Accepted calls
 advance the stage index in order (only the current required replacement is
@@ -19,6 +19,7 @@ from schmidt.scenarios.drive_module_repair.ids import (
     FIELD_TECHNICIAN_ID,
     REPLACEMENT_ACCEPTED_MARKER,
     REPLACEMENT_INEFFECTIVE_MARKER,
+    SERVICE_COMPONENT_TOOL,
 )
 from schmidt.scenarios.drive_module_repair.replacement_judge import judge_replacement
 from schmidt.scenarios.drive_module_repair.world import DriveModuleWorld
@@ -29,10 +30,10 @@ def build_mcp_tools(
     judge_provider: LLMProvider,
     get_runtime: Callable[[], ScenarioRuntimeHandle | None],
 ) -> list[ScenarioMcpTool]:
-    """Return the single-element ``replace_component`` tool list."""
+    """Return the single-element ``service_component`` tool list."""
 
-    async def replace_component(ctx: ToolContext, action: str) -> str:
-        """Perform a component replacement on the drive module."""
+    async def service_component(ctx: ToolContext, action: str) -> str:
+        """Perform a component's full service procedure on the drive module."""
         agent_id = resolve_agent_id(ctx=ctx)
         if agent_id != FIELD_TECHNICIAN_ID:
             return "Only the field technician can replace components."
@@ -81,13 +82,14 @@ def build_mcp_tools(
 
     return [
         ScenarioMcpTool(
-            name="replace_component",
+            name=SERVICE_COMPONENT_TOOL,
             description=(
-                "Replace the next required component on the drive module. Describe "
-                "exactly what you are doing: which component, the tool, the torque, and "
-                "the calibration. Replacements must be done in the engineer's order; "
-                "only the current required replacement is accepted."
+                "Service the next required component on the drive module: carry out its "
+                "full replacement procedure. Describe exactly what you are doing — the "
+                "component and every step with its parameters (tool, torque, passes, "
+                "calibration). Components must be serviced in the engineer's order; "
+                "only the current required component is accepted."
             ),
-            executor=replace_component,
+            executor=service_component,
         ),
     ]

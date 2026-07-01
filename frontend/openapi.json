@@ -2531,7 +2531,7 @@
           "judge_explanation"
         ],
         "title": "DriveModuleReplacementMetadata",
-        "description": "Judge context captured for a single ``replace_component`` call.\n\nAttached to the corresponding tool-use entry so the frontend can show\nthe expected replacement and the LLM judge's verdict alongside the call."
+        "description": "Judge context captured for a single ``service_component`` call.\n\nAttached to the corresponding tool-use entry so the frontend can show\nthe expected replacement and the LLM judge's verdict alongside the call."
       },
       "EvalCostResponse": {
         "properties": {
@@ -4269,7 +4269,7 @@
           "judge_explanation"
         ],
         "title": "SSEDriveModuleReplacementJudged",
-        "description": "SSE event carrying the replacement judge's verdict for a replace_component call.\n\nMirrors the persisted :class:`DriveModuleReplacementJudged` field names,\nsince the live stream emits the raw event dict under its ``event_type``."
+        "description": "SSE event carrying the replacement judge's verdict for a service_component call.\n\nMirrors the persisted :class:`DriveModuleReplacementJudged` field names,\nsince the live stream emits the raw event dict under its ``event_type``."
       },
       "SSEInjectionDelivered": {
         "properties": {

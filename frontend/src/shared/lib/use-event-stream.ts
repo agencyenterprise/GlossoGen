@@ -6,10 +6,13 @@ import type { JudgeGroundTruthMetadata } from "@/features/runs/display-entry";
 import { buildApiUrlWithToken } from "./api-client";
 
 /** MCP tool names whose results carry an LLM-judge verdict, paired live from
- *  the matching ``*_judged`` SSE event. One per judged-action scenario. */
+ *  the matching ``*_judged`` SSE event. One per judged-action scenario;
+ *  drive_module_repair lists both its current ``service_component`` name and
+ *  the pre-rename ``replace_component`` recorded in older run logs. */
 const JUDGED_ACTION_TOOL_NAMES = new Set<string>([
   "stabilize_veyru",
   "actuate_panel",
+  "service_component",
   "replace_component",
 ]);
 
