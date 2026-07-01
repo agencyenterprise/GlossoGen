@@ -36,6 +36,9 @@ from schmidt.evaluation.metrics.protocol_probe import (
     ProtocolProbeMetric,
     ProtocolProbeReplicaSelfSimilarityMetric,
 )
+from schmidt.evaluation.metrics.round_ended.postmortem_ended_timeout_metric import (
+    PostmortemEndedTimeoutMetric,
+)
 from schmidt.evaluation.metrics.round_ended.round_ended_idle_metric import RoundEndedIdleMetric
 from schmidt.evaluation.metrics.round_ended.round_ended_timeout_metric import (
     RoundEndedTimeoutMetric,
@@ -61,6 +64,7 @@ _GENERIC_METRICS: list[type[Metric]] = [
     MessageEntropyMetric,
     NeologismMetric,
     PerplexityMetric,
+    PostmortemEndedTimeoutMetric,
     ProtocolExplanationMetric,
     ProtocolLearnedAfterSwapMetric,
     ProtocolProbeMetric,

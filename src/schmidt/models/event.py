@@ -197,6 +197,20 @@ class PostmortemStarted(EventBase):
     event_type: Literal["postmortem_started"] = "postmortem_started"
 
 
+class PostmortemEnded(EventBase):
+    """Emitted when a round's postmortem discussion phase ends.
+
+    The postmortem-phase counterpart of :class:`RoundEnded`. ``trigger`` records
+    why the postmortem terminated (``all_agents_idle`` or ``postmortem_timeout``).
+    Emitted for every postmortem phase, including the final round's — which is not
+    followed by a ``RoundAdvanced`` and would otherwise have no event capturing why
+    it ended.
+    """
+
+    event_type: Literal["postmortem_ended"] = "postmortem_ended"
+    trigger: str
+
+
 class ChannelHistoryCleared(EventBase):
     """Emitted when a channel's message history is wiped mid-run."""
 
@@ -280,6 +294,7 @@ _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
     RoundResultRecorded,
     InjectionDelivered,
     PostmortemStarted,
+    PostmortemEnded,
     ChannelHistoryCleared,
     ChannelMembershipChanged,
     WorldEventDelivered,

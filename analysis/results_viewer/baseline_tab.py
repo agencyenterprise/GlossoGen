@@ -4,7 +4,8 @@ A series is one (model, postmortem_enabled) variant — each gets its own line a
 colour, so e.g. sonnet-4.6 with postmortem and sonnet-4.6 without postmortem
 render as two distinct traces. The user picks which metric is on the Y axis
 (``round_success`` / ``round_ended_idle`` / ``round_ended_timeout`` /
-``content_filter_refusal`` / ``perplexity``); the same chart adapts its Y range
+``postmortem_ended_timeout`` / ``content_filter_refusal`` / ``perplexity`` /
+``mcr`` / ``mcm``); the same chart adapts its Y range
 and tick spacing to the selected metric. Clicking a replica dot opens the
 corresponding run in the schmidt frontend (URL is attached to each point as
 ``customdata`` and read back from the chart's selection event).

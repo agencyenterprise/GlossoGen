@@ -19,6 +19,7 @@ GENERIC_METRIC_NAMES: list[str] = [
     "message_entropy",
     "neologism",
     "perplexity",
+    "postmortem_ended_timeout",
     "protocol_explanation",
     "protocol_learned_after_swap",
     "protocol_probe",
