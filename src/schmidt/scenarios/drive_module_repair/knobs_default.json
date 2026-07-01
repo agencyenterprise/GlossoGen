@@ -4,7 +4,7 @@
   "judge_provider": "anthropic",
   "postmortem_enabled": true,
   "postmortem_disabled_at_start": false,
-  "postmortem_duration_seconds": 120,
+  "postmortem_duration_seconds": 900,
   "round_count": 15,
   "round_time_budget_seconds": 900,
   "seed": 42,
