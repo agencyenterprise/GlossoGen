@@ -73,8 +73,10 @@ def build_mcp_tools(
             reveal = await world.perform_replacement()
             return f"{REPLACEMENT_ACCEPTED_MARKER}. {reveal}"
         return (
-            f"{REPLACEMENT_INEFFECTIVE_MARKER}. That is not the correct next replacement — "
-            "recheck the component, tool, torque, and calibration with the engineers."
+            f"{REPLACEMENT_INEFFECTIVE_MARKER}. The replacement was not accepted — either it "
+            "does not match the current required replacement, or it could not be read "
+            "unambiguously as a complete, plain-language procedure. Recheck the unit, component, "
+            "and every step and parameter with the engineers, and state them explicitly, in full."
         )
 
     return [
