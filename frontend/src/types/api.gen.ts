@@ -1084,7 +1084,7 @@ export interface components {
         };
         /**
          * DriveModuleReplacementMetadata
-         * @description Judge context captured for a single ``replace_component`` call.
+         * @description Judge context captured for a single ``service_component`` call.
          *
          *     Attached to the corresponding tool-use entry so the frontend can show
          *     the expected replacement and the LLM judge's verdict alongside the call.
@@ -1898,7 +1898,7 @@ export interface components {
         };
         /**
          * SSEDriveModuleReplacementJudged
-         * @description SSE event carrying the replacement judge's verdict for a replace_component call.
+         * @description SSE event carrying the replacement judge's verdict for a service_component call.
          *
          *     Mirrors the persisted :class:`DriveModuleReplacementJudged` field names,
          *     since the live stream emits the raw event dict under its ``event_type``.

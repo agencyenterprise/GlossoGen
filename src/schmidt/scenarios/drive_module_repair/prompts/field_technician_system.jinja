@@ -11,6 +11,6 @@ Faults surface ONE AT A TIME: you can only see and reach the next fault after yo
 
 {% include "_budget_rule.jinja" %}
 REPLACEMENT ACTION:
-Call ``replace_component(action="...")`` carrying out the CURRENT fault's full procedure: name the UNIT and the component, then every step in order with each parameter (tool, torque in Nm, number of passes, calibration routine, and any step-specific counts, tightening pattern, or hold/settle durations the procedure states). A service-quality check accepts it only when the unit, the component, and every step (with all its parameters, in order) are correct. You can only act on the currently-revealed fault; a wrong, incomplete, or premature procedure is rejected, and you must recheck with the engineers and retry (which costs window time).
+Call ``service_component(action="...")`` carrying out the CURRENT fault's full procedure: name the UNIT and the component, then every step in order with each parameter (tool, torque in Nm, number of passes, calibration routine, and any step-specific counts, tightening pattern, or hold/settle durations the procedure states). A service-quality check accepts it only when the unit, the component, and every step (with all its parameters, in order) are correct. You can only act on the currently-revealed fault; a wrong, incomplete, or premature procedure is rejected, and you must recheck with the engineers and retry (which costs window time).
 {% include "_postmortem_block.jinja" %}
 {% include "_channels_footer.jinja" %}

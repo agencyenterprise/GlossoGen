@@ -6,13 +6,13 @@ Three agents service one or more failing drive modules each round. The informati
 
 | Agent | Private information (per round) | Tools |
 |---|---|---|
-| **Field technician** | the device's **diagnostic panel** (observed symptoms); is the **only** agent that can act | `send_message`, `replace_component` |
+| **Field technician** | the device's **diagnostic panel** (observed symptoms); is the **only** agent that can act | `send_message`, `service_component` |
 | **Diagnostics engineer** | this round's **fault-tree** (symptom → faulty component) + the fixed component access-depth order | `send_message` |
 | **Spec engineer** | this round's **service sheet** (component → full multi-step replacement procedure: ordered steps with tool, torque, passes, calibration, and class-specific counts / pattern / hold durations) | `send_message` |
 
 ## The action: a full multi-step procedure
 
-Each component's replacement is **not** a single fact but an ordered multi-step service procedure, so every `replace_component` action is a compound procedure the technician must transmit and perform precisely — not "swap part X". The procedure *shape* is fixed by the component's **service class** (`bolted-panel`, `rotating-assembly`, `press-fit`, `electrical-pack`, `sensor`); the *parameters* (tool, torque, passes, calibration, fastener/lead counts, tightening pattern, hold/settle durations) are drawn per unit per round. Example:
+Each component's replacement is **not** a single fact but an ordered multi-step service procedure, so every `service_component` action is a compound procedure the technician must transmit and perform precisely — not "swap part X". The procedure *shape* is fixed by the component's **service class** (`bolted-panel`, `rotating-assembly`, `press-fit`, `electrical-pack`, `sensor`); the *parameters* (tool, torque, passes, calibration, fastener/lead counts, tightening pattern, hold/settle durations) are drawn per unit per round. Example:
 
 > *Replace module-2's terminal_block. De-energize and discharge the bus, holding 5s. Disconnect the 6 leads and lift out the old part with hex-6. Fit the replacement and torque the terminals to 8 Nm in 2 passes. Run the seat-and-lock routine and verify.*
 
@@ -27,7 +27,7 @@ Faults are revealed to the technician **one at a time** (veyru-style): the techn
 1. The technician reports the currently-showing symptom (tagged with its unit).
 2. The diagnostics engineer matches it against this round's fault-tree and names the faulty component.
 3. The spec engineer relays that component's **full replacement procedure for the current unit** — every step in order with every parameter.
-4. The technician performs the replacement — one free-text `replace_component` call naming the unit and carrying out the whole procedure. An LLM judge (haiku) scores it against the current stage's expected procedure — the unit, the component, and every step with its parameters, in order — lenient on wording, strict on substance. On acceptance, the tool result reveals the next fault (or moves to the next unit); when the technician crosses onto a new unit, that unit's service sheet is pushed to the spec engineer.
+4. The technician performs the replacement — one free-text `service_component` call naming the unit and carrying out the whole procedure. An LLM judge (haiku) scores it against the current stage's expected procedure — the unit, the component, and every step with its parameters, in order — lenient on wording, strict on substance. On acceptance, the tool result reveals the next fault (or moves to the next unit); when the technician crosses onto a new unit, that unit's service sheet is pushed to the spec engineer.
 
 Round **success** = every fault on every unit fixed correctly within the communication budget. The round fails if the budget is exhausted or the round ends (idle/timeout) before everything is repaired.
 
@@ -38,7 +38,7 @@ Several drive units can be on the bench in one round (`module_count_*`), each wi
 Each unit is a different **revision**: both its fault-tree (symptom → component) and its service procedures (component → full multi-step procedure) are drawn independently per unit and re-randomized every round, so the same symptom can mean a different component on another unit and the same component's procedure takes different parameters.
 
 The team is kept **count-blind** so it never knows the workload in advance:
-- The technician discovers faults one at a time via the `replace_component` tool return (the round-start injection shows only the first fault).
+- The technician discovers faults one at a time via the `service_component` tool return (the round-start injection shows only the first fault).
 - The diagnostics engineer gets unit-1's **fault-tree** at round start and each later unit's fault-tree only when the technician reaches it (pushed as a world notification).
 - The spec engineer gets unit-1's **spec sheet** at round start and each later unit's sheet the same way.
 - So neither engineer learns the unit count in advance, the unit tag is load-bearing on *both* the diagnosis and the spec channels, and there is no cross-unit reuse shortcut on either. The reveal order *is* the fix order, so the diagnostics engineer's role is pure per-unit diagnosis (it does not plan ordering).
@@ -54,7 +54,7 @@ The team is kept **count-blind** so it never knows the workload in advance:
 
 | Knob | Description |
 |---|---|
-| `judge_model` / `judge_provider` | LLM judge for `replace_component` actions (canonical: `claude-haiku-4-5-20251001` / `anthropic`) |
+| `judge_model` / `judge_provider` | LLM judge for `service_component` actions (canonical: `claude-haiku-4-5-20251001` / `anthropic`) |
 | `round_count` | Number of rounds |
 | `round_time_budget_seconds` | Per-round character budget on the bay channel |
 | `seed` | Case-generation seed |
@@ -94,4 +94,4 @@ Veyru-style **study modes** (agent swap / intern takeover / two-team) are not im
 
 ## Design note
 
-Order is enforced by the reveal itself — only the currently-revealed fault can be serviced, and the next fault is not revealed until the current one is correctly fixed — so there is no "wrong order" to attempt. An incorrect `replace_component` on the current fault is **retryable** (the stage simply doesn't advance), which keeps single LLM-judge misjudgments non-fatal; persistent wrong attempts fail the round by exhausting the budget. Making a wrong replacement immediately terminal is an available stricter variant.
+Order is enforced by the reveal itself — only the currently-revealed fault can be serviced, and the next fault is not revealed until the current one is correctly fixed — so there is no "wrong order" to attempt. An incorrect `service_component` on the current fault is **retryable** (the stage simply doesn't advance), which keeps single LLM-judge misjudgments non-fatal; persistent wrong attempts fail the round by exhausting the budget. Making a wrong replacement immediately terminal is an available stricter variant.

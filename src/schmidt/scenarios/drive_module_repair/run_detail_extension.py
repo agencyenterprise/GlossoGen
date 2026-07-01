@@ -21,13 +21,18 @@ from schmidt.scenarios.drive_module_repair.events import (
     DriveModuleCaseStarted,
     DriveModuleReplacementJudged,
 )
-from schmidt.scenarios.drive_module_repair.ids import REPLACE_COMPONENT_TOOL
+from schmidt.scenarios.drive_module_repair.ids import SERVICE_COMPONENT_TOOL
 from schmidt.server.runs.run_detail_types import AgentDetail, ChannelMessage
 from schmidt.server.runs.scenario_extension import ScenarioRunDetailExtension, ScenarioRunExtrasBase
 
+# The field technician's action tool. ``service_component`` is the current name;
+# ``replace_component`` is the name recorded in run logs created before the rename,
+# so both are accepted when pairing judge verdicts to tool results.
+ACTION_TOOL_NAMES = frozenset({SERVICE_COMPONENT_TOOL, "replace_component"})
+
 
 class DriveModuleReplacementMetadata(BaseModel):
-    """Judge context captured for a single ``replace_component`` call.
+    """Judge context captured for a single ``service_component`` call.
 
     Attached to the corresponding tool-use entry so the frontend can show
     the expected replacement and the LLM judge's verdict alongside the call.
@@ -75,7 +80,7 @@ class DriveModuleCaseSummary(BaseModel):
 
 
 class SSEDriveModuleReplacementJudged(BaseModel):
-    """SSE event carrying the replacement judge's verdict for a replace_component call.
+    """SSE event carrying the replacement judge's verdict for a service_component call.
 
     Mirrors the persisted :class:`DriveModuleReplacementJudged` field names,
     since the live stream emits the raw event dict under its ``event_type``.
@@ -137,7 +142,7 @@ def _build_cases(events: list[SimulationEvent]) -> list[DriveModuleCaseSummary]:
 def _build_replacement_metadata_by_call_id(
     events: list[SimulationEvent],
 ) -> dict[str, DriveModuleReplacementMetadata]:
-    """Pair each ``DriveModuleReplacementJudged`` with its ``replace_component`` tool result.
+    """Pair each ``DriveModuleReplacementJudged`` with its ``service_component`` tool result.
 
     The judged events are emitted in the same FIFO order as the corresponding
     tool results, scoped per agent; walks both event types chronologically and
@@ -155,7 +160,7 @@ def _build_replacement_metadata_by_call_id(
                 )
             )
         elif isinstance(event, ToolResultReceived):
-            if event.tool_name != REPLACE_COMPONENT_TOOL:
+            if event.tool_name not in ACTION_TOOL_NAMES:
                 continue
             queue = pending_by_agent.get(event.agent_id)
             if not queue:

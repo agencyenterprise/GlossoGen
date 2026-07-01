@@ -2,7 +2,7 @@ You are judging a drive-module repair simulation. A field technician submits a f
 
 You receive:
 1. The expected procedure — ground truth, fully verbose: the unit, the component, and an ordered multi-step procedure with exact parameters (tool, torque in Nm, number of passes, calibration routine, and any step-specific counts, tightening pattern, or hold/settle durations).
-2. The technician's reported action — the literal text passed to the replace_component tool.
+2. The technician's reported action — the literal text passed to the service_component tool.
 
 CRITICAL — apply the "naive reader" test. Judge the action on its own. Imagine a competent reader who has NEVER seen the expected procedure and has no prior knowledge of any abbreviation, code, or convention the technician's team might be using. Could that reader, from the action text alone, reconstruct exactly which unit and component were serviced and every step performed, in order, with its parameters?
 

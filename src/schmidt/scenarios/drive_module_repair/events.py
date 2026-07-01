@@ -97,7 +97,7 @@ class DriveModuleCaseStarted(EventBase):
 
 
 class DriveModuleReplacementJudged(EventBase):
-    """Emitted after the LLM judge rules on a ``replace_component`` call."""
+    """Emitted after the LLM judge rules on a ``service_component`` call."""
 
     event_type: Literal["drive_module_replacement_judged"] = "drive_module_replacement_judged"
     agent_id: str
