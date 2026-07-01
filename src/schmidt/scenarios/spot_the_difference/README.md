@@ -19,10 +19,11 @@ than a serialize-and-diff dump:
   red square to its left"). The anchors are possibly-duplicate objects in a
   layout that differs between the two scenes, so the two viewers' descriptions
   do not align one-to-one.
-- **Hard character budget.** Every character a team sends on the link channel
-  counts against `round_time_budget_seconds`; the budget is far too small to
-  read a whole scene aloud, so teams must triage area by area. Exceeding it makes
-  the team ineligible for the round.
+- **Optional character budget.** `round_time_budget_seconds` is an optional hard
+  cap: when positive, every character a team sends on the link channel counts
+  against it and exceeding it makes the team ineligible for the round. The
+  default is `-1` (no cap) — the competitive fewest-characters-wins objective
+  already pressures teams to stay terse.
 
 ## Task & scoring
 
@@ -36,7 +37,7 @@ than a serialize-and-diff dump:
   the submission. Ambiguous items (attributes shared by several objects with no
   position) and items matching no real difference are false positives.
 - **Gate:** a team is eligible only if it identifies every difference, with no
-  false positives, **within budget**.
+  false positives (and within budget when one is set).
 - **Objective:** among eligible teams, fewest link-channel characters wins; the
   winner is announced at the start of the next round as in-context
   reinforcement. Single-team mode keeps the character total as the score.
@@ -51,14 +52,15 @@ than a serialize-and-diff dump:
 
 - `grid_size`, `object_count_*`, `difference_count_*` — scene size and K
   distribution. `easy_round_numbers` forces K=1 (warmup).
-- `round_time_budget_seconds` — hard per-round link-channel character budget.
+- `round_time_budget_seconds` — optional per-round link-channel character cap
+  (`-1` = no cap, the default).
 - `difference_kinds` — the enabled taxonomy subset.
-- `all_must_submit` — when `true`, both teammates must each call
+- `all_must_submit` (default `true`) — both teammates must each call
   `submit_differences` (the round is lost for any team where one member never
   submits), both answers are judged, and the team is eligible only if the two
   answers agree on the same full set of differences with no false positives.
-  When `false` (default) the first submission from either member locks and
-  scores the team.
+  Set `false` to let the first submission from either member lock and score the
+  team.
 - `channel_noise_level` / `noise_replacement_mode` — per-character link noise.
 - `judge_model` / `judge_provider` — the submission judge.
 

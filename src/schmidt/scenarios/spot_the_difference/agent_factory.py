@@ -183,6 +183,7 @@ def build_agents(
                         "noise_replacement_mode": knobs.noise_replacement_mode.value,
                         "two_teams": knobs.two_teams,
                         "all_must_submit": knobs.all_must_submit,
+                        "round_time_budget_seconds": knobs.round_time_budget_seconds,
                         "grid_size": knobs.grid_size,
                         "difference_kinds": knobs.difference_kinds,
                     },
