@@ -37,6 +37,19 @@ export function judgeMetadataFromExtras(
   if (extras.scenario_name === "drive_module_repair") {
     return extras.replacement_metadata_by_call_id;
   }
+  if (extras.scenario_name === "spot_the_difference") {
+    const differencesByRound = new Map(extras.cases.map(c => [c.round_number, c.differences]));
+    const result: Record<string, JudgeGroundTruthMetadata> = {};
+    for (const [callId, meta] of Object.entries(extras.submission_metadata_by_call_id)) {
+      const differences = differencesByRound.get(meta.round_number) ?? [];
+      result[callId] = {
+        expected_actions: differences.map((d, i) => `${i + 1}. ${d.description}`).join("\n"),
+        judge_match: meta.found_all,
+        judge_explanation: meta.explanation,
+      };
+    }
+    return result;
+  }
   return {};
 }
 
