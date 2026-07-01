@@ -309,7 +309,8 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         case = self._current_case
         if case is None:
             return
-        if team.current_round_characters >= case.round_time_budget_seconds:
+        budget = case.round_time_budget_seconds
+        if budget > 0 and team.current_round_characters >= budget:
             team.round_budget_exceeded = True
 
     async def run(self, context: WorldContext) -> None:
@@ -332,8 +333,10 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         case = self._current_case
         if case is None:
             return
-        team = self._teams[team_id]
         budget = case.round_time_budget_seconds
+        if budget <= 0:
+            return
+        team = self._teams[team_id]
         used = team.current_round_characters
         if team.round_budget_exceeded and _THRESHOLD_EXCEEDED not in team.notified_thresholds:
             team.notified_thresholds.update([_THRESHOLD_LOW, _THRESHOLD_EXCEEDED])

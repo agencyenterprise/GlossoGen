@@ -3,9 +3,9 @@
 Each round, both viewers on a team receive a Jinja-rendered injection that
 shows only *their* scene's objects (left viewer = scene A, right viewer =
 scene B), rendered relationally (region + relations to other objects, never
-exact coordinates), the number of differences to find, the character budget,
-and the previous round's result. Neither viewer's injection ever contains the
-other scene or the planted differences.
+exact coordinates), the number of differences to find, the character budget
+(only when one is set), and the previous round's result. Neither viewer's
+injection ever contains the other scene or the planted differences.
 """
 
 from schmidt.scenarios.spot_the_difference.ids import (

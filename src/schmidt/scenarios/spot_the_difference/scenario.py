@@ -311,7 +311,7 @@ class SpotTheDifferenceScenario(SimulationScenario):
         return results
 
     def get_early_round_end_trigger(self) -> str | None:
-        """End the round once every team has submitted or exhausted its budget."""
+        """End the round once every team has submitted (or exhausted its budget when one is set)."""
         if self._world.current_case is None:
             return None
         if self._world.all_teams_done():

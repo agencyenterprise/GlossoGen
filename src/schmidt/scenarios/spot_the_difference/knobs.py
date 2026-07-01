@@ -3,12 +3,13 @@
 Controls the grid size, the per-round object-count and difference-count
 distributions, which difference kinds are enabled, the warmup rounds forced
 to a single difference, the postmortem discussion phase, channel noise, the
-hard per-round character budget, and the optional two-team competitive mode.
+optional per-round character budget, and the optional two-team competitive mode.
 
-``round_time_budget_seconds`` is a hard cap: every character a team sends on
-the link channel counts against it, and a team that reaches the cap is
-ineligible for that round. Among teams that find every difference within
-budget, fewest characters wins.
+``round_time_budget_seconds`` is an optional hard cap: when positive, every
+character a team sends on the link channel counts against it and a team that
+reaches the cap is ineligible for that round; set it to ``-1`` (the default) to
+disable the cap entirely. Either way the character count is tracked, and among
+teams that find every difference the one with the fewest characters wins.
 """
 
 from typing import Self
@@ -31,8 +32,9 @@ class SpotTheDifferenceKnobs(BaseKnobs):
     K planted differences drawn from ``difference_kinds``. ``object_count_*``
     sets the per-round object-count distribution, ``difference_count_*`` sets
     the per-round K distribution, and ``easy_round_numbers`` forces those
-    rounds to K=1 (warmup). ``round_time_budget_seconds`` is the hard
-    per-round link-channel character budget. ``channel_noise_level`` is the
+    rounds to K=1 (warmup). ``round_time_budget_seconds`` is the optional
+    per-round link-channel character cap (``-1`` = no cap, the default).
+    ``channel_noise_level`` is the
     per-character drop probability on the link channel and
     ``noise_replacement_mode`` selects what each dropped character becomes
     (``mask`` -> ``_`` erasure, ``random_letter`` -> a different random letter
@@ -41,15 +43,15 @@ class SpotTheDifferenceKnobs(BaseKnobs):
     Two-team mode runs two isolated teams (each a left viewer on scene A and a
     right viewer on scene B, on ``link_a`` / ``link_b``) on the identical
     scene pair each round, so the per-round winner (fewest characters among
-    teams that found every difference within budget) can be announced as
-    in-context reinforcement.
+    teams that found every difference) can be announced as in-context
+    reinforcement.
 
-    ``all_must_submit`` makes both teammates submit their own answer: a team is
-    scored only once both members call ``submit_differences`` (the round is lost
-    for any team where one member never submits), both answers are sent to the
-    judge, and the team is eligible only if the two answers agree on the same
-    full set of K differences with no false positives. When off (default), the
-    first submission from either member locks and scores the team.
+    ``all_must_submit`` (the default) makes both teammates submit their own
+    answer: a team is scored only once both members call ``submit_differences``
+    (the round is lost for any team where one member never submits), both
+    answers are sent to the judge, and the team is eligible only if the two
+    answers agree on the same full set of K differences with no false positives.
+    When off, the first submission from either member locks and scores the team.
     """
 
     judge_model: str
@@ -69,7 +71,7 @@ class SpotTheDifferenceKnobs(BaseKnobs):
     channel_noise_level: float = Field(ge=0.0, le=1.0)
     noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     two_teams: bool = False
-    all_must_submit: bool = False
+    all_must_submit: bool = True
 
     @model_validator(mode="after")
     def _validate_object_count_distribution(self) -> Self:
@@ -125,9 +127,10 @@ class SpotTheDifferenceKnobs(BaseKnobs):
 
     @model_validator(mode="after")
     def _validate_budget(self) -> Self:
-        if self.round_time_budget_seconds <= 0:
+        if self.round_time_budget_seconds != -1 and self.round_time_budget_seconds <= 0:
             raise ValueError(
-                f"round_time_budget_seconds must be > 0 (got {self.round_time_budget_seconds})"
+                f"round_time_budget_seconds must be > 0, or -1 for no budget "
+                f"(got {self.round_time_budget_seconds})"
             )
         return self
 
