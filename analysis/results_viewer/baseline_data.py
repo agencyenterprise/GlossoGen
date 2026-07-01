@@ -1,11 +1,13 @@
 """Load baseline-labeled runs with the metrics used by the baseline tab plot.
 
-Carries the three round-level metrics we currently plot: ``round_success``
+Carries the round-level metrics we currently plot: ``round_success``
 (rounds fully stabilized), ``round_ended_idle`` (rounds ended because all
-agents went idle on ``read_notifications``), and ``round_ended_timeout``
-(rounds ended because the wall-clock round duration was reached). All three
-are integer counts of rounds out of ``total_rounds``, so they share a common
-Y axis scaled to the simulation's round count.
+agents went idle on ``read_notifications``), ``round_ended_timeout`` (rounds
+whose main phase ended because the wall-clock duration was reached), and
+``postmortem_ended_timeout`` (rounds whose *postmortem* phase ended on the
+wall-clock timeout rather than all agents going idle). All are integer counts
+of rounds out of ``total_rounds``, so they share a common Y axis scaled to the
+simulation's round count.
 
 This module is streamlit-free so it can be reused by ad-hoc analysis scripts.
 """
@@ -29,6 +31,7 @@ _BASELINE_LABELS = frozenset({_BASELINE_LABEL, _BASELINE_OSS_LABEL, _CHANNEL_NOI
 _ROUND_SUCCESS_METRIC = "round_success"
 _ROUND_ENDED_IDLE_METRIC = "round_ended_idle"
 _ROUND_ENDED_TIMEOUT_METRIC = "round_ended_timeout"
+_POSTMORTEM_ENDED_TIMEOUT_METRIC = "postmortem_ended_timeout"
 _CONTENT_FILTER_REFUSAL_METRIC = "content_filter_refusal"
 
 
@@ -52,6 +55,7 @@ class BaselineRun(NamedTuple):
     round_success: int
     round_ended_idle: int
     round_ended_timeout: int
+    postmortem_ended_timeout: int
     content_filter_refusal_rounds: int
     content_filter_refusal_total: int
     perplexity_score: float | None
@@ -193,6 +197,22 @@ METRIC_OPTIONS: list[MetricOption] = [
             "Deterministic (no LLM): reads the `RoundEnded` event's `trigger` "
             "field and counts entries equal to `round_timeout`. A high count "
             "means the round budget was insufficient for agents to converge."
+        ),
+    ),
+    MetricOption(
+        display_name="postmortem_ended_timeout",
+        attr="postmortem_ended_timeout",
+        y_axis_label="postmortem_ended_timeout (# of rounds whose postmortem hit the timeout)",
+        y_axis_kind="round_count",
+        description=(
+            "**postmortem_ended_timeout** — number of rounds whose *postmortem* "
+            "discussion phase ended because the wall-clock duration limit was "
+            "reached, rather than because all agents went idle.\n\n"
+            "Deterministic (no LLM): reads `PostmortemEnded` events (authoritative, "
+            "covers the final round) and falls back to `RoundAdvanced` with "
+            "`trigger=postmortem_timeout` for runs predating that event. A high "
+            "count means agents kept talking in postmortem until the clock cut "
+            "them off instead of winding down on their own."
         ),
     ),
     MetricOption(
@@ -360,6 +380,9 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
         return None
     idle = _flagged_round_count(evaluated=evaluated, metric_name=_ROUND_ENDED_IDLE_METRIC)
     timeout = _flagged_round_count(evaluated=evaluated, metric_name=_ROUND_ENDED_TIMEOUT_METRIC)
+    postmortem_timeout = _flagged_round_count(
+        evaluated=evaluated, metric_name=_POSTMORTEM_ENDED_TIMEOUT_METRIC
+    )
     refusal_rounds = _flagged_round_count(
         evaluated=evaluated, metric_name=_CONTENT_FILTER_REFUSAL_METRIC
     )
@@ -377,6 +400,7 @@ def build_baseline_run(evaluated: EvaluatedRun) -> BaselineRun | None:
         round_success=round_success,
         round_ended_idle=idle if idle is not None else 0,
         round_ended_timeout=timeout if timeout is not None else 0,
+        postmortem_ended_timeout=postmortem_timeout if postmortem_timeout is not None else 0,
         content_filter_refusal_rounds=refusal_rounds if refusal_rounds is not None else 0,
         content_filter_refusal_total=refusal_total,
         perplexity_score=perplexity_score(evaluated=evaluated),

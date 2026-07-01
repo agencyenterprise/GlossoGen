@@ -10,7 +10,13 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 
-from schmidt.models.event import RoundAdvanced, RoundEnded, RoundResultRecorded, RunStatus
+from schmidt.models.event import (
+    PostmortemEnded,
+    RoundAdvanced,
+    RoundEnded,
+    RoundResultRecorded,
+    RunStatus,
+)
 from schmidt.runtime.agent_session import AgentSession
 from schmidt.runtime.scenario_world import WorldContext
 from schmidt.runtime.simulation_state import SimulationRuntime
@@ -237,6 +243,12 @@ class GameClock:
 
             if self._in_postmortem:
                 self._in_postmortem = False
+                await self._event_logger.log(
+                    event=PostmortemEnded(
+                        round_number=self._runtime.current_round,
+                        trigger=trigger,
+                    ),
+                )
                 if self._runtime.current_round >= self._max_rounds:
                     logger.info(
                         "All %d rounds complete (after postmortem), ending simulation",
