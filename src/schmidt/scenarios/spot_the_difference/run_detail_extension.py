@@ -19,7 +19,11 @@ from schmidt.scenarios.spot_the_difference.events import (
     SpotPlantedDifference,
     SpotTheDifferenceCaseStarted,
 )
-from schmidt.scenarios.spot_the_difference.ids import SUBMIT_DIFFERENCES_TOOL
+from schmidt.scenarios.spot_the_difference.ids import (
+    SUBMISSION_RECORDED_MARKER,
+    SUBMISSION_WAITING_MARKER,
+    SUBMIT_DIFFERENCES_TOOL,
+)
 from schmidt.server.runs.run_detail_types import AgentDetail, ChannelMessage
 from schmidt.server.runs.scenario_extension import ScenarioRunDetailExtension, ScenarioRunExtrasBase
 
@@ -128,18 +132,34 @@ def _build_team_results(events: list[SimulationEvent]) -> list[SpotTeamRoundResu
 
 
 def _build_call_id_map(events: list[SimulationEvent]) -> dict[str, SpotSubmissionMetadata]:
-    """Pair each judge event to its tool-call ``call_id`` via FIFO per agent."""
-    pending_by_agent: dict[str, list[SpotSubmissionMetadata]] = {}
-    by_call_id: dict[str, SpotSubmissionMetadata] = {}
+    """Pair each judge verdict to its ``submit_differences`` tool-call ``call_id``.
+
+    Keyed by ``(agent_id, round_number)``: an agent submits at most once per
+    round (later submits are rejected) and is judged at most once per round,
+    both in the same round — so the mapping is exact. A plain FIFO would
+    mis-pair here because under ``all_must_submit`` the first member's verdict
+    is logged only when the team locks (on the second member's call), i.e.
+    after that member's own tool result. Only accepted submit calls (recorded
+    or waiting-for-partner) are paired; rejected calls carry no verdict.
+    """
+    verdict_by_agent_round: dict[tuple[str, int], SpotSubmissionMetadata] = {}
     for event in events:
         if isinstance(event, DifferenceSubmissionJudged):
-            pending_by_agent.setdefault(event.agent_id, []).append(
+            verdict_by_agent_round[(event.agent_id, event.round_number)] = (
                 _build_submission_metadata(judged=event)
             )
-        elif isinstance(event, ToolResultReceived) and event.tool_name == SUBMIT_DIFFERENCES_TOOL:
-            queue = pending_by_agent.get(event.agent_id)
-            if queue:
-                by_call_id[event.call_id] = queue.pop(0)
+    by_call_id: dict[str, SpotSubmissionMetadata] = {}
+    for event in events:
+        if not isinstance(event, ToolResultReceived) or event.tool_name != SUBMIT_DIFFERENCES_TOOL:
+            continue
+        if not (
+            event.result.startswith(SUBMISSION_RECORDED_MARKER)
+            or event.result.startswith(SUBMISSION_WAITING_MARKER)
+        ):
+            continue
+        verdict = verdict_by_agent_round.get((event.agent_id, event.round_number))
+        if verdict is not None:
+            by_call_id[event.call_id] = verdict
     return by_call_id
 
 
