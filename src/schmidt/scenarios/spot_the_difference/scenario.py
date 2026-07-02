@@ -178,12 +178,13 @@ class SpotTheDifferenceScenario(SimulationScenario):
             two_teams=knobs.two_teams
         )
         self._channel_display_names: dict[str, str] = build_channel_display_names(
-            two_teams=knobs.two_teams
+            two_teams=knobs.two_teams, shared_link=knobs.shared_link
         )
         self._world = SpotTheDifferenceWorld(
             cases=self._cases,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
             two_teams=knobs.two_teams,
+            shared_link=knobs.shared_link,
             all_must_submit=knobs.all_must_submit,
         )
         self._judge_provider = create_provider(
@@ -378,7 +379,15 @@ class SpotTheDifferenceScenario(SimulationScenario):
         )
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
-        """Return each team's link channel so char metrics score teams separately."""
+        """Return the link channel(s) evaluators score.
+
+        Isolated two-team mode scores each team's own link channel separately
+        (``perplexity_team_a`` / ``_team_b``); ``shared_link`` collapses to the
+        single shared channel, so the char/language metrics pool both teams into
+        one measurement (base names). Solo mode uses the lone link channel.
+        """
+        if self._knobs.two_teams and self._knobs.shared_link:
+            return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
         if self._knobs.two_teams:
             return [
                 PrimaryChannel(channel_id=LINK_A_CHANNEL_ID, team_id=TEAM_A_ID),

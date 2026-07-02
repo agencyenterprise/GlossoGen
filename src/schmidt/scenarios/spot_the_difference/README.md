@@ -47,6 +47,12 @@ than a serialize-and-diff dump:
 - `two_teams: true` (default preset) — two isolated teams (`link_a` / `link_b`)
   on the identical seeded scenes each round.
 - `two_teams: false` (`knobs_single_team.json`) — one team; no rival.
+- `shared_link: true` (two-team only) — both teams share ONE link channel (all
+  four viewers are members) instead of `link_a` / `link_b`, so each team can read
+  the other's link messages; the `postmortem_a` / `postmortem_b` channels stay
+  private. Each team is still charged only for its own members' characters (the
+  win rule is unchanged), and the viewer prompts state that the opposing team can
+  see everything posted on the shared link.
 
 ## Key knobs
 
