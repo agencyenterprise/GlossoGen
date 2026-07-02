@@ -1,10 +1,17 @@
-"""Read a veyru run's JSONL once into per-agent models + per-round ground-truth context.
+"""Read a run's JSONL once into per-role agent models + per-round ground-truth context.
 
-Shared by the baseline round-success export and the protocol-learnability export.
-Walks ``agent_registered`` (per-agent model), ``veyru_case_started`` (stage ground
-truth), ``veyru_stabilization_judged`` (stabilized-stage count + substage advance),
-``injection_delivered`` (round-start briefings), and link-channel ``message_sent``
-events, bucketing each link message into the substage active when it was sent.
+Shared by the baseline round-success export, the channel-noise export, and the
+protocol-learnability export. The scan is scenario-agnostic: a
+:class:`ScenarioExportSpec` names the case-started / judged event types, the
+primary (budgeted) channel ids, the per-stage symptom / action fields, and the
+agent roles (each mapping one canonical role key to the agent ids that fill it).
+Concrete specs live in :mod:`analysis.run_export.scenario_export_specs`.
+
+Walks ``agent_registered`` (per-agent model), the case-started event (stage
+ground truth), the judged event (stabilized-stage count + substage advance),
+``injection_delivered`` (round-start briefings), and primary-channel
+``message_sent`` events, bucketing each message into the substage active when it
+was sent.
 """
 
 from pathlib import Path
@@ -12,42 +19,57 @@ from typing import NamedTuple
 
 import orjson
 
-from schmidt.scenarios.veyru.ids import (
-    FIELD_OBSERVER_ID,
-    LINK_CHANNEL_IDS,
-    OBSERVER_A_ID,
-    OBSERVER_B_ID,
-    STABILIZATION_ENGINEER_A_ID,
-    STABILIZATION_ENGINEER_B_ID,
-    STABILIZATION_ENGINEER_ID,
-)
 
-FIELD_OBSERVER_IDS = frozenset({FIELD_OBSERVER_ID, OBSERVER_A_ID, OBSERVER_B_ID})
-# "specialist" is a legacy agent_id some early runs used for the engineer role.
-ENGINEER_IDS = frozenset(
-    {
-        STABILIZATION_ENGINEER_ID,
-        STABILIZATION_ENGINEER_A_ID,
-        STABILIZATION_ENGINEER_B_ID,
-        "specialist",
-    }
-)
+class RoleSpec(NamedTuple):
+    """One export role: a canonical key, the agent ids that fill it, and its columns.
+
+    ``role`` is the canonical key used within :class:`RunContext` / :class:`RoundContext`
+    and returned by :func:`sender_role`. ``agent_ids`` are every agent id that maps to
+    this role (e.g. veyru's engineer role spans the solo id, the two-team ``_a`` / ``_b``
+    variants, and the legacy ``specialist``). ``model_column`` / ``event_column`` are the
+    output column names the exporters emit for this role's model and round-start briefing.
+    """
+
+    role: str
+    agent_ids: frozenset[str]
+    model_column: str
+    event_column: str
+
+
+class ScenarioExportSpec(NamedTuple):
+    """Everything the scan needs to read one scenario's JSONL into export context.
+
+    ``primary_channel_ids`` are the budgeted-channel ids whose messages are bucketed
+    per substage. ``case_event_type`` carries the per-round ``stages`` ground truth;
+    ``stage_symptoms_field`` / ``stage_actions_field`` name the per-stage fields to read.
+    ``judged_event_type`` advances the substage pointer on each ``judge_match=True``.
+    ``roles`` is the ordered tuple of :class:`RoleSpec`, which drives both model
+    resolution and the output column layout.
+    """
+
+    scenario_name: str
+    primary_channel_ids: frozenset[str]
+    case_event_type: str
+    stage_symptoms_field: str
+    stage_actions_field: str
+    judged_event_type: str
+    roles: tuple[RoleSpec, ...]
 
 
 class StageGroundTruth(NamedTuple):
-    """One stage's ground truth: the symptoms the observer saw and the expected procedure."""
+    """One stage's ground truth: the symptoms the actor saw and the expected procedure."""
 
     symptoms: str
     actions: str
 
 
 class LinkMessage(NamedTuple):
-    """One link-channel message: which agent sent it, the persisted text, and its id.
+    """One primary-channel message: which agent sent it, the persisted text, and its id.
 
-    ``message`` is the text persisted on the channel — already
-    channel-transformed (e.g. veyru noise drops characters to ``_``).
-    ``message_id`` is the persisted message id, used to join back to the
-    pristine pre-transform text via the ``send_message`` tool result.
+    ``message`` is the text persisted on the channel — already channel-transformed
+    (e.g. veyru noise drops characters to ``_``). ``message_id`` is the persisted
+    message id, used to join back to the pristine pre-transform text via the
+    ``send_message`` tool result.
     """
 
     agent: str
@@ -56,29 +78,31 @@ class LinkMessage(NamedTuple):
 
 
 class RoundContext(NamedTuple):
-    """Per-round veyru ground truth and per-agent context read from the event log.
+    """Per-round ground truth and per-role context read from the event log.
 
     ``stages_reached`` is the number of stages the team actually progressed to:
     ``min(stabilized_stages + 1, total_stages)`` (the team always sees stage 1, each
     stabilized stage unlocks the next, and the stage they ended on counts as reached).
     Substages beyond ``stages_reached`` are not emitted. ``stabilized_stages`` is the
-    count of stages successfully stabilized this round. ``link_messages_by_substage``
-    maps a 1-indexed substage to the link-channel messages exchanged while it was active.
+    count of stages successfully stabilized this round. ``role_events`` maps each role
+    key to that round's round-start briefing. ``link_messages_by_substage`` maps a
+    1-indexed substage to the primary-channel messages exchanged while it was active.
     """
 
     stages: list[StageGroundTruth]
     stages_reached: int
     stabilized_stages: int
-    field_observer_event: str
-    engineer_event: str
+    role_events: dict[str, str]
     link_messages_by_substage: dict[int, list[LinkMessage]]
 
 
 class RunContext(NamedTuple):
-    """Per-run agent models plus per-round context, keyed by round number."""
+    """Per-run role models plus per-round context, keyed by round number.
 
-    field_observer_model: str
-    engineer_model: str
+    ``role_models`` maps each role key (from the spec) to the model that filled it.
+    """
+
+    role_models: dict[str, str]
     rounds: dict[int, RoundContext]
 
 
@@ -92,12 +116,13 @@ def model_family(model: str) -> str:
     return "other"
 
 
-def model_class(field_observer_model: str, engineer_model: str) -> str:
-    """Return ``closed`` / ``open`` / ``mixed`` from the two agents' model families.
+def model_class(role_models: dict[str, str]) -> str:
+    """Return ``closed`` / ``open`` / ``mixed`` from every role's model family.
 
-    ``mixed`` when one agent is open-weight and the other closed (cross-family teams).
+    ``mixed`` when at least one role is open-weight and at least one closed
+    (cross-family teams). Roles whose family is ``other`` (or unresolved) are ignored.
     """
-    families = {model_family(field_observer_model), model_family(engineer_model)}
+    families = {model_family(model) for model in role_models.values() if model}
     families.discard("other")
     if "open" in families and "closed" in families:
         return "mixed"
@@ -108,18 +133,17 @@ def model_class(field_observer_model: str, engineer_model: str) -> str:
     return "unknown"
 
 
-def sender_role(agent_id: str) -> str:
-    """Normalize a sender agent_id to ``field_observer`` or ``stabilization_engineer``.
+def sender_role(agent_id: str, spec: ScenarioExportSpec) -> str:
+    """Normalize a sender agent_id to its canonical role key from ``spec``.
 
-    The engineer role appears under several ids (``stabilization_engineer``, the two-team
-    ``_a`` / ``_b`` variants, and the legacy ``specialist``); they all map to
-    ``stabilization_engineer``. Field observers map to ``field_observer``. Any other
-    sender falls back to its raw agent_id.
+    Each role's ``agent_ids`` may span several ids (e.g. veyru's engineer role covers
+    the solo id, the two-team ``_a`` / ``_b`` variants, and the legacy ``specialist``);
+    they all map to the role key. Any sender not owned by a role falls back to its raw
+    agent_id.
     """
-    if agent_id in FIELD_OBSERVER_IDS:
-        return FIELD_OBSERVER_ID
-    if agent_id in ENGINEER_IDS:
-        return STABILIZATION_ENGINEER_ID
+    for role in spec.roles:
+        if agent_id in role.agent_ids:
+            return role.role
     return agent_id
 
 
@@ -129,6 +153,21 @@ def label_value(labels: list[str], prefix: str) -> str | None:
         if label.startswith(prefix):
             return label[len(prefix) :]
     return None
+
+
+def role_model_columns(context: RunContext, spec: ScenarioExportSpec) -> dict[str, str]:
+    """Return the ``{model_column: model}`` mapping for every role in ``spec``."""
+    return {role.model_column: context.role_models.get(role.role, "") for role in spec.roles}
+
+
+def role_event_columns(round_ctx: RoundContext, spec: ScenarioExportSpec) -> dict[str, str]:
+    """Return the ``{event_column: round-start briefing}`` mapping for every role in ``spec``."""
+    return {role.event_column: round_ctx.role_events.get(role.role, "") for role in spec.roles}
+
+
+def model_column_names(spec: ScenarioExportSpec) -> list[str]:
+    """Return the ordered per-role model column names (for stable sort keys)."""
+    return [role.model_column for role in spec.roles]
 
 
 def _resolve_model(models: dict[str, str], candidate_ids: frozenset[str]) -> str:
@@ -168,17 +207,16 @@ def _bucket_link_messages(
     return clamped
 
 
-def scan_run_context(jsonl_path: Path) -> RunContext:
-    """Read a run's JSONL once and extract per-agent models + per-round veyru context.
+def scan_run_context(jsonl_path: Path, spec: ScenarioExportSpec) -> RunContext:
+    """Read a run's JSONL once and extract per-role models + per-round context.
 
     Tracks the most recent ``round_advanced`` to backfill ``round_number`` on older
-    logs. ``stages`` come from ``veyru_case_started``; ``stabilized_stages`` from the
-    count of ``veyru_stabilization_judged`` events with ``judge_match=True`` (matching
-    ``outcome_reconstruction``); the round-start briefing is the first
-    ``injection_delivered`` per (round, agent). Each link-channel ``message_sent`` is
-    bucketed into the substage active when it was sent — a per-round counter that starts
-    at 1 and advances on every ``judge_match=True`` — so messages are attributed to the
-    stage the team was working on.
+    logs. ``stages`` come from the spec's case-started event; ``stabilized_stages`` from
+    the count of the spec's judged events with ``judge_match=True``; the round-start
+    briefing is the first ``injection_delivered`` per (round, agent). Each
+    primary-channel ``message_sent`` is bucketed into the substage active when it was
+    sent — a per-round counter that starts at 1 and advances on every ``judge_match=True``
+    — so messages are attributed to the stage the team was working on.
     """
     models: dict[str, str] = {}
     stages_by_round: dict[int, list[StageGroundTruth]] = {}
@@ -206,18 +244,18 @@ def scan_run_context(jsonl_path: Path) -> RunContext:
                 model = raw.get("model")
                 if isinstance(agent_id, str) and isinstance(model, str) and agent_id not in models:
                     models[agent_id] = model
-            elif event_type == "veyru_case_started" and round_number >= 1:
+            elif event_type == spec.case_event_type and round_number >= 1:
                 stages_by_round.setdefault(
                     round_number,
                     [
                         StageGroundTruth(
-                            symptoms=str(stage.get("observable_symptoms", "")),
-                            actions=str(stage.get("judge_expected_actions", "")),
+                            symptoms=str(stage.get(spec.stage_symptoms_field, "")),
+                            actions=str(stage.get(spec.stage_actions_field, "")),
                         )
                         for stage in raw.get("stages", [])
                     ],
                 )
-            elif event_type == "veyru_stabilization_judged" and round_number >= 1:
+            elif event_type == spec.judged_event_type and round_number >= 1:
                 if raw.get("judge_match") is True:
                     matched_by_round[round_number] = matched_by_round.get(round_number, 0) + 1
                     current_substage[round_number] = current_substage.get(round_number, 1) + 1
@@ -227,7 +265,7 @@ def scan_run_context(jsonl_path: Path) -> RunContext:
                     injections.setdefault((round_number, agent_id), str(raw.get("text", "")))
             elif event_type == "message_sent" and round_number >= 1:
                 message = raw.get("message") or {}
-                if message.get("channel_id") in LINK_CHANNEL_IDS:
+                if message.get("channel_id") in spec.primary_channel_ids:
                     substage = current_substage.get(round_number, 1)
                     links_by_round_substage.setdefault((round_number, substage), []).append(
                         LinkMessage(
@@ -255,14 +293,18 @@ def scan_run_context(jsonl_path: Path) -> RunContext:
             stages=stages,
             stages_reached=stages_reached,
             stabilized_stages=matched,
-            field_observer_event=_injection_for(injections, round_number, FIELD_OBSERVER_IDS),
-            engineer_event=_injection_for(injections, round_number, ENGINEER_IDS),
+            role_events={
+                role.role: _injection_for(injections, round_number, role.agent_ids)
+                for role in spec.roles
+            },
             link_messages_by_substage=_bucket_link_messages(
                 raw_buckets=links_grouped.get(round_number, {}), stages_reached=stages_reached
             ),
         )
     return RunContext(
-        field_observer_model=_resolve_model(models=models, candidate_ids=FIELD_OBSERVER_IDS),
-        engineer_model=_resolve_model(models=models, candidate_ids=ENGINEER_IDS),
+        role_models={
+            role.role: _resolve_model(models=models, candidate_ids=role.agent_ids)
+            for role in spec.roles
+        },
         rounds=rounds,
     )

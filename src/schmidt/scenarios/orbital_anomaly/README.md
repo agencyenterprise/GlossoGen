@@ -56,6 +56,6 @@ convergence).
 ## Metrics
 
 Implements `judge_round_result` (→ `round_success`) and
-`get_primary_channel_id` (→ `perplexity`, `mean_chars_per_round`,
+`get_primary_channels` (→ `perplexity`, `mean_chars_per_round`,
 `mean_chars_per_message`, and the language-phenomenon judges). Single team, so
 `round_success` emits one Measurement with `team_id=None`.

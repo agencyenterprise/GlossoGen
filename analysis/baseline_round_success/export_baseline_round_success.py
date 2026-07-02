@@ -12,9 +12,12 @@ design so it can be modelled or subset downstream:
   canonical fixed ``seed=42``. Pass ``--canonical-only`` to keep just the fixed-seed runs.
 
 Per-agent models come from the run's ``AgentRegistered`` events: every table carries
-``field_observer_model`` and ``engineer_model`` instead of a single ``model`` column.
-``model_class`` is derived from the two agents' model families: ``closed`` (both
-claude/gpt), ``open`` (both llama/qwen), or ``mixed`` (one open, one closed).
+one model column per scenario role (veyru: ``field_observer_model`` /
+``engineer_model``; drive_module_repair: ``field_technician_model`` /
+``diagnostics_engineer_model`` / ``spec_engineer_model``) instead of a single ``model``
+column. The role set comes from the ``--scenario`` flag's ``ScenarioExportSpec``.
+``model_class`` is derived from the roles' model families: ``closed`` (all claude/gpt),
+``open`` (all llama/qwen), or ``mixed`` (at least one open and one closed).
 
 Four output tables:
 
@@ -30,8 +33,8 @@ Four output tables:
   compressible/repetitive), and ``mcm`` (overall mean chars per message) from the report.
 - ``message_level`` — one row per link-channel message. Each row carries its substage
   context (``substage``, ``symptoms`` / ``actions``, ``substage_stabilized``),
-  ``message_index_in_substage``, ``message_agent`` (sender role, normalized to
-  ``field_observer`` or ``stabilization_engineer``), ``message_text``, ``chars``
+  ``message_index_in_substage``, ``message_agent`` (sender role, normalized to the
+  scenario's canonical role key from its ``ScenarioExportSpec``), ``message_text``, ``chars``
   (``len(message_text)``), ``perplexity`` (per-message mean per-token surprisal in nats
   under gpt2; blank for empty/single-token messages), ``english_ngram_surprisal``
   (per-message mean per-char surprisal under an English char trigram; higher = less
@@ -43,9 +46,9 @@ Four output tables:
   team reached (``min(stabilized_stages + 1, total_stages)``); substages with no link
   traffic produce no rows.
 - ``round_context`` — one row per (run, round) holding the large round-start briefings
-  (``field_observer_round_event`` / ``engineer_round_event``). Kept separate (join on
-  ``run_id`` + ``round_number``) so the briefing text is stored once per round rather
-  than duplicated on every message row.
+  (one column per role, e.g. ``field_observer_round_event`` / ``engineer_round_event``).
+  Kept separate (join on ``run_id`` + ``round_number``) so the briefing text is stored
+  once per round rather than duplicated on every message row.
 - ``budget_aggregate`` — per (models, postmortem, random_seed, budget)
   mean ± std of the success fraction; a sanity check against the plotted bands.
 
@@ -69,15 +72,20 @@ from analysis.results_viewer.measurement_scores import (
     read_labels,
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
-from analysis.veyru_run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
-from analysis.veyru_run_export.message_perplexity_scorer import MessagePerplexityScorer
-from analysis.veyru_run_export.run_context_scan import (
+from analysis.run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
+from analysis.run_export.message_perplexity_scorer import MessagePerplexityScorer
+from analysis.run_export.run_context_scan import (
     RunContext,
+    ScenarioExportSpec,
     model_class,
+    model_column_names,
+    role_event_columns,
+    role_model_columns,
     scan_run_context,
     sender_role,
 )
-from analysis.veyru_run_export.spreadsheet_writer import write_csvs, write_xlsx
+from analysis.run_export.scenario_export_specs import get_export_spec
+from analysis.run_export.spreadsheet_writer import write_csvs, write_xlsx
 from schmidt.evaluation.metric_core.character_entropy import character_entropy_bits
 from schmidt.evaluation.metric_core.gzip_compression import gzip_compression_ratio
 
@@ -198,7 +206,7 @@ def _round_success_per_round(evaluated: EvaluatedRun) -> list[tuple[int, float, 
 
 
 def _build_run_level_frame(
-    joined_runs: list[JoinedRun], contexts: dict[str, RunContext]
+    joined_runs: list[JoinedRun], contexts: dict[str, RunContext], spec: ScenarioExportSpec
 ) -> pd.DataFrame:
     """One row per run: covariates plus the Bernoulli numerator/denominator."""
     rows: list[dict[str, object]] = []
@@ -214,12 +222,8 @@ def _build_run_level_frame(
             {
                 "run_id": record.run_id,
                 "scenario": joined.evaluated.scenario_name,
-                "field_observer_model": context.field_observer_model,
-                "engineer_model": context.engineer_model,
-                "model_class": model_class(
-                    field_observer_model=context.field_observer_model,
-                    engineer_model=context.engineer_model,
-                ),
+                **role_model_columns(context=context, spec=spec),
+                "model_class": model_class(role_models=context.role_models),
                 "postmortem": record.postmortem_enabled,
                 "round_time_budget_seconds": record.budget,
                 "random_seed": _RANDOM_SEED_LABEL in record.labels,
@@ -240,8 +244,7 @@ def _build_run_level_frame(
     return frame.sort_values(
         by=[
             "model_class",
-            "field_observer_model",
-            "engineer_model",
+            *model_column_names(spec=spec),
             "postmortem",
             "round_time_budget_seconds",
             "run_id",
@@ -250,7 +253,7 @@ def _build_run_level_frame(
 
 
 def _build_message_level_frame(
-    joined_runs: list[JoinedRun], contexts: dict[str, RunContext]
+    joined_runs: list[JoinedRun], contexts: dict[str, RunContext], spec: ScenarioExportSpec
 ) -> pd.DataFrame:
     """Long format: one row per link-channel message, with its substage/round context.
 
@@ -268,10 +271,8 @@ def _build_message_level_frame(
         if record is None:
             continue
         context = contexts[record.run_id]
-        run_model_class = model_class(
-            field_observer_model=context.field_observer_model,
-            engineer_model=context.engineer_model,
-        )
+        run_model_class = model_class(role_models=context.role_models)
+        model_columns = role_model_columns(context=context, spec=spec)
         run_rows: list[dict[str, object]] = []
         for round_number, value, note in _round_success_per_round(evaluated=joined.evaluated):
             round_ctx = context.rounds.get(round_number)
@@ -285,8 +286,7 @@ def _build_message_level_frame(
                         {
                             "run_id": record.run_id,
                             "scenario": joined.evaluated.scenario_name,
-                            "field_observer_model": context.field_observer_model,
-                            "engineer_model": context.engineer_model,
+                            **model_columns,
                             "model_class": run_model_class,
                             "postmortem": record.postmortem_enabled,
                             "round_time_budget_seconds": record.budget,
@@ -297,7 +297,7 @@ def _build_message_level_frame(
                             "actions": stage.actions,
                             "substage_stabilized": int(substage <= round_ctx.stabilized_stages),
                             "message_index_in_substage": message_index,
-                            "message_agent": sender_role(agent_id=message.agent),
+                            "message_agent": sender_role(agent_id=message.agent, spec=spec),
                             "message_text": message.message,
                             "chars": len(message.message),
                             "success": int(round(value)),
@@ -333,13 +333,14 @@ def _build_message_level_frame(
 
 
 def _build_round_context_frame(
-    joined_runs: list[JoinedRun], contexts: dict[str, RunContext]
+    joined_runs: list[JoinedRun], contexts: dict[str, RunContext], spec: ScenarioExportSpec
 ) -> pd.DataFrame:
     """One row per (run, round) carrying the round-start briefings.
 
-    Holds the large ``field_observer_round_event`` / ``engineer_round_event`` text once
-    per round (join to ``message_level`` on ``run_id`` + ``round_number``) instead of
-    repeating it on every message row.
+    Holds the large per-role round-start briefing text (one column per role, e.g.
+    ``field_observer_round_event`` / ``engineer_round_event``) once per round (join to
+    ``message_level`` on ``run_id`` + ``round_number``) instead of repeating it on every
+    message row.
     """
     rows: list[dict[str, object]] = []
     for joined in joined_runs:
@@ -355,8 +356,7 @@ def _build_round_context_frame(
                 {
                     "run_id": record.run_id,
                     "round_number": round_number,
-                    "field_observer_round_event": round_ctx.field_observer_event,
-                    "engineer_round_event": round_ctx.engineer_event,
+                    **role_event_columns(round_ctx=round_ctx, spec=spec),
                 }
             )
     frame = pd.DataFrame(rows)
@@ -365,7 +365,9 @@ def _build_round_context_frame(
     return frame.sort_values(by=["run_id", "round_number"]).reset_index(drop=True)
 
 
-def _build_budget_aggregate_frame(run_level: pd.DataFrame) -> pd.DataFrame:
+def _build_budget_aggregate_frame(
+    run_level: pd.DataFrame, spec: ScenarioExportSpec
+) -> pd.DataFrame:
     """Per (model, postmortem, seed mode, budget) mean ± std of the success fraction.
 
     ``random_seed`` is a grouping key so the aggregate never pools runs from
@@ -375,8 +377,7 @@ def _build_budget_aggregate_frame(run_level: pd.DataFrame) -> pd.DataFrame:
         return run_level
     group_keys = [
         "model_class",
-        "field_observer_model",
-        "engineer_model",
+        *model_column_names(spec=spec),
         "postmortem",
         "random_seed",
         "round_time_budget_seconds",
@@ -419,6 +420,7 @@ def main() -> None:
     args = _parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    spec = get_export_spec(scenario_name=args.scenario)
     evaluated_runs = list_evaluated_runs(runs_dir=args.runs_dir)
     joined = _collect_joined_runs(evaluated_runs=evaluated_runs, scenario_name=args.scenario)
     kept = _apply_cohort_filters(joined_runs=joined, canonical_only=args.canonical_only)
@@ -432,14 +434,15 @@ def main() -> None:
 
     contexts = {
         joined.evaluated.run_id: scan_run_context(
-            jsonl_path=joined.evaluated.run_dir / f"{joined.evaluated.scenario_name}.jsonl"
+            jsonl_path=joined.evaluated.run_dir / f"{joined.evaluated.scenario_name}.jsonl",
+            spec=spec,
         )
         for joined in kept
     }
-    run_level = _build_run_level_frame(joined_runs=kept, contexts=contexts)
-    message_level = _build_message_level_frame(joined_runs=kept, contexts=contexts)
-    round_context = _build_round_context_frame(joined_runs=kept, contexts=contexts)
-    budget_aggregate = _build_budget_aggregate_frame(run_level=run_level)
+    run_level = _build_run_level_frame(joined_runs=kept, contexts=contexts, spec=spec)
+    message_level = _build_message_level_frame(joined_runs=kept, contexts=contexts, spec=spec)
+    round_context = _build_round_context_frame(joined_runs=kept, contexts=contexts, spec=spec)
+    budget_aggregate = _build_budget_aggregate_frame(run_level=run_level, spec=spec)
     frames = {
         "run_level": run_level,
         "message_level": message_level,

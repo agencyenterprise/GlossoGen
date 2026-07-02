@@ -48,7 +48,12 @@ from schmidt.models.channel import Channel
 from schmidt.models.event import SimulationEvent
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.runtime.scenario_world import ScenarioWorld
-from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
+from schmidt.scenario_protocol import (
+    PrimaryChannel,
+    RoundResult,
+    ScenarioRuntimeHandle,
+    SimulationScenario,
+)
 from schmidt.scenarios.channel_noise import apply_character_noise
 from schmidt.scenarios.veyru.agent_factory import (
     build_agent_display_names,
@@ -523,15 +528,15 @@ class VeyruScenario(SimulationScenario):
             rng=self._noise_rng,
         )
 
-    def get_primary_channel_id(self) -> str | None:
+    def get_primary_channels(self) -> list[PrimaryChannel]:
         """Return the comm link channel where budget constraints apply.
 
-        In two-team mode there are two primary channels; returns None since
-        evaluators that assume a single primary channel do not apply.
+        Two-team mode returns an empty list: the per-team char/compression
+        metrics are not wired for veyru's two link channels yet.
         """
         if self._knobs.two_teams:
-            return None
-        return LINK_CHANNEL_ID
+            return []
+        return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
 
     def build_communication_rounds(
         self, events: list[SimulationEvent]

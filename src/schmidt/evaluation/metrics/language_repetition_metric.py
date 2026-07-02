@@ -76,6 +76,7 @@ class _LinkMessage(NamedTuple):
     """One primary-channel message's identity and pristine text."""
 
     message_id: str
+    channel_id: str
     sender_agent_id: str
     text: str
 
@@ -117,68 +118,72 @@ class LanguageRepetitionMetric(Metric):
         run_dir: Path,
         options: MetricRunOptions,
     ) -> list[Measurement]:
-        """Judge per-message redundancy on pristine primary-channel text, per round."""
+        """Judge per-message redundancy on pristine primary-channel text, per round and channel."""
         _ = agent_configs, options
-        primary_channel_id = scenario.get_primary_channel_id()
-        if primary_channel_id is None:
+        channels = scenario.get_primary_channels()
+        if not channels:
             logger.info("%s: skipping — scenario has no primary channel", self.name)
             return []
 
-        rounds = _collect_link_messages_by_round(
-            events=events,
-            primary_channel_id=primary_channel_id,
-            pristine_index=build_pristine_text_index(events=events),
-        )
-        if not rounds:
-            logger.info(
-                "%s: skipping — no messages on primary channel %r",
-                self.name,
-                primary_channel_id,
-            )
-            return []
-
+        pristine_index = build_pristine_text_index(events=events)
         system_prompt = render_evaluator_prompt(
             template_name="evaluator_system.jinja",
             template_variables={},
         )
         semaphore = asyncio.Semaphore(_MAX_CONCURRENT_JUDGE_CALLS)
-        scored_rounds = await asyncio.gather(
-            *[
-                _score_round(
-                    llm_provider=llm_provider,
-                    system_prompt=system_prompt,
-                    round_messages=round_messages,
-                    semaphore=semaphore,
-                )
-                for round_messages in rounds
-            ]
-        )
-
-        message_scores = [score for round_scores in scored_rounds for score in round_scores]
-        if not message_scores:
-            logger.warning("%s: every judge replica failed for every round", self.name)
-            return []
-
-        _write_sidecar(run_dir=run_dir, message_scores=message_scores)
-
-        per_round = _per_round_observations(rounds=rounds, scored_rounds=scored_rounds)
-        overall = statistics.fmean(obs.value for obs in per_round)
-        max_factor = max(obs.value for obs in per_round)
-        summary = (
-            f"mean redundancy factor {overall:.2f}x across {len(per_round)} rounds "
-            f"(max {max_factor:.2f}x), per-message judged over {_JUDGE_REPLICAS} replicas; "
-            f"per-message factors in {_SIDECAR_FILENAME}"
-        )
-        return [
-            Measurement(
-                metric_name=self.name,
-                score=overall,
-                score_unit="mean encodings per information unit (x; 1.0 = no repetition)",
-                summary=summary,
-                per_round=per_round,
-                per_agent=[],
+        measurements: list[Measurement] = []
+        all_message_scores: list[_MessageScore] = []
+        for channel in channels:
+            rounds = _collect_link_messages_by_round(
+                events=events,
+                primary_channel_id=channel.channel_id,
+                pristine_index=pristine_index,
             )
-        ]
+            if not rounds:
+                logger.info("%s: no messages on primary channel %r", self.name, channel.channel_id)
+                continue
+
+            scored_rounds = await asyncio.gather(
+                *[
+                    _score_round(
+                        llm_provider=llm_provider,
+                        system_prompt=system_prompt,
+                        round_messages=round_messages,
+                        semaphore=semaphore,
+                    )
+                    for round_messages in rounds
+                ]
+            )
+            message_scores = [score for round_scores in scored_rounds for score in round_scores]
+            if not message_scores:
+                logger.warning(
+                    "%s: every judge replica failed on channel %r", self.name, channel.channel_id
+                )
+                continue
+            all_message_scores.extend(message_scores)
+
+            per_round = _per_round_observations(rounds=rounds, scored_rounds=scored_rounds)
+            overall = statistics.fmean(obs.value for obs in per_round)
+            max_factor = max(obs.value for obs in per_round)
+            summary = (
+                f"mean redundancy factor {overall:.2f}x across {len(per_round)} rounds on "
+                f"{channel.channel_id} (max {max_factor:.2f}x), per-message judged over "
+                f"{_JUDGE_REPLICAS} replicas; per-message factors in {_SIDECAR_FILENAME}"
+            )
+            measurements.append(
+                Measurement(
+                    metric_name=channel.metric_name(self.name),
+                    score=overall,
+                    score_unit="mean encodings per information unit (x; 1.0 = no repetition)",
+                    summary=summary,
+                    per_round=per_round,
+                    per_agent=[],
+                )
+            )
+
+        if all_message_scores:
+            _write_sidecar(run_dir=run_dir, message_scores=all_message_scores)
+        return measurements
 
 
 def _collect_link_messages_by_round(
@@ -199,6 +204,7 @@ def _collect_link_messages_by_round(
         by_round.setdefault(event.round_number, []).append(
             _LinkMessage(
                 message_id=event.message.message_id,
+                channel_id=event.message.channel_id,
                 sender_agent_id=event.message.sender_agent_id,
                 text=text,
             )
@@ -318,6 +324,7 @@ def _write_sidecar(run_dir: Path, message_scores: list[_MessageScore]) -> None:
                 "round_number": score.round_number,
                 "message_number": score.message_number,
                 "message_id": score.message.message_id,
+                "channel_id": score.message.channel_id,
                 "sender_agent_id": score.message.sender_agent_id,
                 "repetition_factor": score.mean_factor,
                 "replica_factors": score.replica_factors,

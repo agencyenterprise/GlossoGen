@@ -36,7 +36,12 @@ from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld
-from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
+from schmidt.scenario_protocol import (
+    PrimaryChannel,
+    RoundResult,
+    ScenarioRuntimeHandle,
+    SimulationScenario,
+)
 from schmidt.scenarios.channel_noise import apply_character_noise
 from schmidt.scenarios.satellite_contact_window.cases import CommandStep, SatelliteCase, get_cases
 from schmidt.scenarios.satellite_contact_window.command_judge import judge_command_sequence
@@ -511,9 +516,9 @@ class SatelliteContactWindowScenario(SimulationScenario):
             rng=self._noise_rng,
         )
 
-    def get_primary_channel_id(self) -> str | None:
+    def get_primary_channels(self) -> list[PrimaryChannel]:
         """Return the link channel where the contact-window budget applies."""
-        return LINK_CHANNEL_ID
+        return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
 
     def get_world(self) -> ScenarioWorld:
         """Return the satellite world that monitors contact-window progress."""

@@ -74,65 +74,69 @@ class GzipCompressionRatioMetric(Metric):
     ) -> list[Measurement]:
         """Score primary-channel messages and report per-round compression-ratio stats."""
         _ = agent_configs, llm_provider, run_dir, options
-        primary_channel_id = scenario.get_primary_channel_id()
-        if primary_channel_id is None:
+        channels = scenario.get_primary_channels()
+        if not channels:
             logger.info("%s: skipping — scenario has no primary channel", self.name)
             return []
 
         pristine_index = build_pristine_text_index(events=events)
-        rounds = collect_primary_messages_by_round(
-            events=events,
-            primary_channel_id=primary_channel_id,
-            pristine_index=pristine_index,
-        )
-        if not rounds:
+        measurements: list[Measurement] = []
+        for channel in channels:
+            rounds = collect_primary_messages_by_round(
+                events=events,
+                primary_channel_id=channel.channel_id,
+                pristine_index=pristine_index,
+            )
+            if not rounds:
+                logger.info(
+                    "%s: skipping — no messages on primary channel %r",
+                    self.name,
+                    channel.channel_id,
+                )
+                continue
+
+            round_compressions = [_score_round(round_messages=rm) for rm in rounds]
+            round_compressions = [rc for rc in round_compressions if rc is not None]
+
+            all_means = [rc.mean_ratio for rc in round_compressions]
+            total_messages = sum(rc.message_count for rc in round_compressions)
+            overall_mean = mean(values=all_means)
+            overall_std = population_std(values=all_means, value_mean=overall_mean)
+
+            per_round = [
+                RoundObservation(
+                    round_number=rc.round_number,
+                    value=rc.mean_ratio,
+                    note=f"{rc.message_count} messages, std={rc.std_ratio:.3f}",
+                )
+                for rc in round_compressions
+            ]
+            summary = (
+                f"{total_messages} messages on {channel.channel_id} across "
+                f"{len(round_compressions)} rounds; mean per-message gzip compression ratio "
+                f"{overall_mean:.3f} compressed/original (raw DEFLATE, gzip framing excluded; "
+                f"lower = more compressible/repetitive; "
+                f"round-to-round std {overall_std:.3f})"
+            )
+
             logger.info(
-                "%s: skipping — no messages on primary channel %r",
-                self.name,
-                primary_channel_id,
+                "gzip_compression_ratio: channel=%s rounds=%d messages=%d overall_mean=%.3f",
+                channel.channel_id,
+                len(round_compressions),
+                total_messages,
+                overall_mean,
             )
-            return []
-
-        round_compressions = [_score_round(round_messages=rm) for rm in rounds]
-        round_compressions = [rc for rc in round_compressions if rc is not None]
-
-        all_means = [rc.mean_ratio for rc in round_compressions]
-        total_messages = sum(rc.message_count for rc in round_compressions)
-        overall_mean = mean(values=all_means)
-        overall_std = population_std(values=all_means, value_mean=overall_mean)
-
-        per_round = [
-            RoundObservation(
-                round_number=rc.round_number,
-                value=rc.mean_ratio,
-                note=f"{rc.message_count} messages, std={rc.std_ratio:.3f}",
+            measurements.append(
+                Measurement(
+                    metric_name=channel.metric_name(self.name),
+                    score=overall_mean,
+                    score_unit="compressed/original",
+                    summary=summary,
+                    per_round=per_round,
+                    per_agent=[],
+                )
             )
-            for rc in round_compressions
-        ]
-        summary = (
-            f"{total_messages} messages on {primary_channel_id} across "
-            f"{len(round_compressions)} rounds; mean per-message gzip compression ratio "
-            f"{overall_mean:.3f} compressed/original (raw DEFLATE, gzip framing excluded; "
-            f"lower = more compressible/repetitive; "
-            f"round-to-round std {overall_std:.3f})"
-        )
-
-        logger.info(
-            "gzip_compression_ratio: rounds=%d messages=%d overall_mean=%.3f",
-            len(round_compressions),
-            total_messages,
-            overall_mean,
-        )
-        return [
-            Measurement(
-                metric_name=self.name,
-                score=overall_mean,
-                score_unit="compressed/original",
-                summary=summary,
-                per_round=per_round,
-                per_agent=[],
-            )
-        ]
+        return measurements
 
 
 def _score_round(round_messages: RoundMessages) -> RoundCompression | None:

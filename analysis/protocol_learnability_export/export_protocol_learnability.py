@@ -57,16 +57,20 @@ import pandas as pd
 
 from analysis.results_viewer.measurement_scores import read_labels, round_success_after_resume_score
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
-from analysis.veyru_run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
-from analysis.veyru_run_export.message_perplexity_scorer import MessagePerplexityScorer
-from analysis.veyru_run_export.run_context_scan import (
+from analysis.run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
+from analysis.run_export.message_perplexity_scorer import MessagePerplexityScorer
+from analysis.run_export.run_context_scan import (
     RunContext,
+    ScenarioExportSpec,
     label_value,
     model_class,
+    model_column_names,
+    role_model_columns,
     scan_run_context,
     sender_role,
 )
-from analysis.veyru_run_export.spreadsheet_writer import write_csvs, write_xlsx
+from analysis.run_export.scenario_export_specs import get_export_spec
+from analysis.run_export.spreadsheet_writer import write_csvs, write_xlsx
 from schmidt.evaluation.metric_core.character_entropy import character_entropy_bits
 from schmidt.evaluation.metric_core.gzip_compression import gzip_compression_ratio
 
@@ -217,7 +221,10 @@ def _build_record(evaluated: EvaluatedRun) -> ProtocolRunRecord | None:
 
 
 def _collect_records(
-    evaluated_runs: list[EvaluatedRun], scenario_name: str, allowed_phases: frozenset[str]
+    evaluated_runs: list[EvaluatedRun],
+    scenario_name: str,
+    allowed_phases: frozenset[str],
+    spec: ScenarioExportSpec,
 ) -> tuple[list[ProtocolRunRecord], dict[str, RunContext]]:
     """Scan every cohort run for ``scenario_name`` into records + per-run context.
 
@@ -238,7 +245,7 @@ def _collect_records(
             continue
         records.append(record)
         contexts[record.run_id] = scan_run_context(
-            jsonl_path=run.run_dir / f"{run.scenario_name}.jsonl"
+            jsonl_path=run.run_dir / f"{run.scenario_name}.jsonl", spec=spec
         )
     return records, contexts
 
@@ -246,6 +253,7 @@ def _collect_records(
 def _build_run_level_frame(
     records: list[ProtocolRunRecord],
     contexts: dict[str, RunContext],
+    spec: ScenarioExportSpec,
     perplexity_by_run: dict[str, float | None],
     english_ngram_by_run: dict[str, float | None],
     message_entropy_by_run: dict[str, float | None],
@@ -273,12 +281,8 @@ def _build_run_level_frame(
                 "scenario": record.scenario,
                 "phase": record.phase,
                 "src_id": record.src_id,
-                "field_observer_model": context.field_observer_model,
-                "engineer_model": context.engineer_model,
-                "model_class": model_class(
-                    field_observer_model=context.field_observer_model,
-                    engineer_model=context.engineer_model,
-                ),
+                **role_model_columns(context=context, spec=spec),
+                "model_class": model_class(role_models=context.role_models),
                 "observer_model": record.observer,
                 "postmortem": record.postmortem,
                 "round_time_budget_seconds": record.round_time_budget_seconds,
@@ -303,7 +307,7 @@ def _build_run_level_frame(
 
 
 def _build_message_level_frame(
-    records: list[ProtocolRunRecord], contexts: dict[str, RunContext]
+    records: list[ProtocolRunRecord], contexts: dict[str, RunContext], spec: ScenarioExportSpec
 ) -> pd.DataFrame:
     """One row per link-channel message across every round each cohort run played.
 
@@ -316,10 +320,8 @@ def _build_message_level_frame(
     rows: list[dict[str, object]] = []
     for record in records:
         context = contexts[record.run_id]
-        run_model_class = model_class(
-            field_observer_model=context.field_observer_model,
-            engineer_model=context.engineer_model,
-        )
+        run_model_class = model_class(role_models=context.role_models)
+        model_columns = role_model_columns(context=context, spec=spec)
         run_rows: list[dict[str, object]] = []
         for round_number, value, note in record.per_round:
             round_ctx = context.rounds.get(round_number)
@@ -335,8 +337,7 @@ def _build_message_level_frame(
                             "scenario": record.scenario,
                             "phase": record.phase,
                             "src_id": record.src_id,
-                            "field_observer_model": context.field_observer_model,
-                            "engineer_model": context.engineer_model,
+                            **model_columns,
                             "model_class": run_model_class,
                             "observer_model": record.observer,
                             "postmortem": record.postmortem,
@@ -348,7 +349,7 @@ def _build_message_level_frame(
                             "actions": stage.actions,
                             "substage_stabilized": int(substage <= round_ctx.stabilized_stages),
                             "message_index_in_substage": message_index,
-                            "message_agent": sender_role(agent_id=message.agent),
+                            "message_agent": sender_role(agent_id=message.agent, spec=spec),
                             "message_text": message.message,
                             "chars": len(message.message),
                             "success": int(round(value)),
@@ -440,6 +441,7 @@ def _delta(learned: float | None, baseline: float | None) -> float | None:
 def _build_baseline_aggregate_frame(
     records: list[ProtocolRunRecord],
     contexts: dict[str, RunContext],
+    spec: ScenarioExportSpec,
     cohort: _CohortSpec,
 ) -> pd.DataFrame:
     """One row per baseline mirroring the tab's BaselineLearnability, on after-resume score.
@@ -456,12 +458,8 @@ def _build_baseline_aggregate_frame(
         context = contexts[baseline.run_id]
         row: dict[str, object] = {
             "src_id": src_id,
-            "field_observer_model": context.field_observer_model,
-            "engineer_model": context.engineer_model,
-            "model_class": model_class(
-                field_observer_model=context.field_observer_model,
-                engineer_model=context.engineer_model,
-            ),
+            **role_model_columns(context=context, spec=spec),
+            "model_class": model_class(role_models=context.role_models),
             "round_time_budget_seconds": baseline.round_time_budget_seconds,
             "baseline_round_success_fraction": baseline.round_success_fraction,
             "cross_family_observer": None,
@@ -483,9 +481,7 @@ def _build_baseline_aggregate_frame(
     frame = pd.DataFrame(rows)
     if frame.empty:
         return frame
-    return frame.sort_values(by=["field_observer_model", "engineer_model", "src_id"]).reset_index(
-        drop=True
-    )
+    return frame.sort_values(by=[*model_column_names(spec=spec), "src_id"]).reset_index(drop=True)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -506,11 +502,13 @@ def main() -> None:
     args = _parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    spec = get_export_spec(scenario_name=args.scenario)
     evaluated_runs = list_evaluated_runs(runs_dir=args.runs_dir)
     records, contexts = _collect_records(
         evaluated_runs=evaluated_runs,
         scenario_name=args.scenario,
         allowed_phases=_ALLOWED_PHASES,
+        spec=spec,
     )
     baseline_count = sum(1 for record in records if record.phase == _PHASE_BASELINE)
     logger.info(
@@ -521,10 +519,11 @@ def main() -> None:
         len(records) - baseline_count,
     )
 
-    message_level = _build_message_level_frame(records=records, contexts=contexts)
+    message_level = _build_message_level_frame(records=records, contexts=contexts, spec=spec)
     run_level = _build_run_level_frame(
         records=records,
         contexts=contexts,
+        spec=spec,
         perplexity_by_run=_run_means(message_level=message_level, column="perplexity"),
         english_ngram_by_run=_run_means(
             message_level=message_level, column="english_ngram_surprisal"
@@ -536,10 +535,10 @@ def main() -> None:
         mcm_by_run=_run_means(message_level=message_level, column="chars"),
     )
     baseline_aggregate = _build_baseline_aggregate_frame(
-        records=records, contexts=contexts, cohort=_FRONTIER_AGGREGATE
+        records=records, contexts=contexts, spec=spec, cohort=_FRONTIER_AGGREGATE
     )
     baseline_aggregate_llama = _build_baseline_aggregate_frame(
-        records=records, contexts=contexts, cohort=_LLAMA_AGGREGATE
+        records=records, contexts=contexts, spec=spec, cohort=_LLAMA_AGGREGATE
     )
     frames = {
         "run_level": run_level,

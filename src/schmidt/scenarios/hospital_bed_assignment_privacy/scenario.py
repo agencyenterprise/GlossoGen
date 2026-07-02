@@ -35,7 +35,12 @@ from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld
-from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
+from schmidt.scenario_protocol import (
+    PrimaryChannel,
+    RoundResult,
+    ScenarioRuntimeHandle,
+    SimulationScenario,
+)
 from schmidt.scenarios.hospital_bed_assignment_privacy.events import (
     HospitalCaseStarted,
     HospitalDestinationRecord,
@@ -344,9 +349,9 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
         """Stash the runtime handle so tool executors can emit verdict events."""
         self._runtime = runtime
 
-    def get_primary_channel_id(self) -> str | None:
+    def get_primary_channels(self) -> list[PrimaryChannel]:
         """The public ops channel is the primary channel for all metrics."""
-        return PUBLIC_OPS_CHANNEL_ID
+        return [PrimaryChannel(channel_id=PUBLIC_OPS_CHANNEL_ID, team_id=None)]
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the per-round injection for one agent, or None."""

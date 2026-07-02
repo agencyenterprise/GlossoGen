@@ -38,7 +38,7 @@ from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld
-from schmidt.scenario_protocol import RoundResult, SimulationScenario
+from schmidt.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from schmidt.scenarios.salon.directives import build_directive_ids, build_directive_sequence
 from schmidt.scenarios.salon.evaluation import (
     CovertnessJudgeMetric,
@@ -305,9 +305,9 @@ class SalonScenario(SimulationScenario):
             return INQUISITOR_ROLE
         return agent_id
 
-    def get_primary_channel_id(self) -> str | None:
+    def get_primary_channels(self) -> list[PrimaryChannel]:
         """The public salon channel is the primary channel for all metrics."""
-        return SALON_CHANNEL_ID
+        return [PrimaryChannel(channel_id=SALON_CHANNEL_ID, team_id=None)]
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the round-start injection for an agent, or None."""
