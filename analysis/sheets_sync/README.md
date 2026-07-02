@@ -10,10 +10,16 @@ never touches the chart/plot tabs.
 |---|---|---|---|
 | `baseline` | `analysis/baseline_round_success/output/baseline_round_success.xlsx` | [`1xK3i…7LmE`](https://docs.google.com/spreadsheets/d/1xK3iZaziM7mg5KfIvauN-v3qORKMiT2udSWAWJe7LmE) | `run_level`, `message_level`, `round_context`, `budget_aggregate` |
 | `channel_noise` | `analysis/channel_noise_export/output/channel_noise.xlsx` | [`1iQwl…V2M`](https://docs.google.com/spreadsheets/d/1iQwlajaQxb9GNRMhxerMZXQl1-eR57xtCo3EfsgsV2M) | `run_level`, `message_level`, `round_context`, `budget_aggregate` |
+| `drive_module_repair` | `analysis/baseline_round_success/output/drive_module_repair_baseline.xlsx` | [`105fG…kOnY`](https://docs.google.com/spreadsheets/d/105fG5BbWi8UsS7CO6Kb0YRDaMO5Ff-wLbhS71qjkOnY) | `run_level`, `message_level`, `round_context`, `budget_aggregate` |
 | `protocol_learnability` | `analysis/protocol_learnability_export/output/protocol_learnability.xlsx` | [`1AY1z…Niyg`](https://docs.google.com/spreadsheets/d/1AY1z_UUOasvN1Lmow7rj18QysKoW1uOl0K65q7gNiyg) | `run_level`, `message_level`, `baseline_aggregate`, `baseline_aggregate_llama` |
+| `spot_the_difference` | `analysis/spot_the_difference_export/output/spot_the_difference.xlsx` | [`1x1F0…zKiI`](https://docs.google.com/spreadsheets/d/1x1F0YPsztudX1YwDeWJ-yMp6s3h9uHUBIGzWS79zKiI) | `run_level`, `round_level`, `message_level`, `difference_level`, `team_aggregate` |
 
 The workbook sheet name maps 1:1 to the spreadsheet tab name. Any tab not in the list above (the
 hand-built charts) is never resolved, cleared, or written.
+
+The `spot_the_difference` spreadsheet's chart tabs (`Plot: *`) are (re)built by a separate,
+idempotent tool — `analysis/spot_the_difference_export/build_spot_charts.py` (`make charts-spot`) —
+which the data sync above never touches.
 
 ## Safety
 
@@ -70,7 +76,8 @@ VIRTUAL_ENV= PYTHONPATH=. uv run --group sheets --no-sync \
   python analysis/sheets_sync/sync_to_sheets.py --target baseline
 ```
 
-`--target` is one of `baseline`, `channel_noise`, `protocol_learnability`, or `all` (default).
+`--target` is one of `baseline`, `channel_noise`, `drive_module_repair`, `protocol_learnability`,
+`spot_the_difference`, or `all` (default).
 
 ### Makefile shortcuts (export + sync in one command)
 
@@ -78,5 +85,16 @@ VIRTUAL_ENV= PYTHONPATH=. uv run --group sheets --no-sync \
 make sync-sheets-baseline   # regenerate the baseline workbook, then push it
 make sync-sheets-noise      # channel-noise
 make sync-sheets-protocol   # protocol-learnability (merged frontier + llama)
-make sync-sheets            # all three
+make sync-sheets-spot       # spot_the_difference (data tabs only)
+make sync-sheets            # all of the above
 ```
+
+### spot_the_difference chart tabs
+
+The spot spreadsheet's hand-authored `Plot: *` chart tabs are rebuilt separately (the data sync
+never touches them):
+
+```bash
+make charts-spot            # (re)build every Plot: * tab + its embedded chart, idempotently
+```
+

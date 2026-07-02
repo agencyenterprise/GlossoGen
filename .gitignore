@@ -176,6 +176,7 @@ cython_debug/
 /analysis/baseline_round_success/output/
 /analysis/protocol_learnability_export/output/
 /analysis/channel_noise_export/output/
+/analysis/spot_the_difference_export/output/
 
 # Google Sheets sync: pre-write tab snapshots + service-account credentials
 /analysis/sheets_sync/backups/
