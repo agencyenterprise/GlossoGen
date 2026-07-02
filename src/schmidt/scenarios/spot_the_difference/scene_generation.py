@@ -23,6 +23,14 @@ Each round is built from an independent per-round RNG seeded from
 ``(seed, round_number)``. Every edit targets a distinct object and reserves
 distinct cells, so applying the K edits to scene A reproduces scene B exactly;
 ``object_moved`` always crosses a region so the move is relationally visible.
+
+Reconstruction-exactness is not sufficient for a solvable round: because
+bundles are non-unique, two presence/position edits (moved, added, removed)
+that touch objects with the same bundle are interchangeable, and the same pair
+of scenes then admits more than one valid decoding (e.g. "square X moved and
+square Y was removed" versus "square Y moved and square X was removed"). Such a
+case is not uniquely identifiable, so it is re-drawn with a bumped sub-seed
+until every presence/position edit has a distinct bundle.
 """
 
 import logging
@@ -56,6 +64,15 @@ _REGION_NAMES: dict[tuple[int, int], str] = {
 }
 
 _MAX_RELATIONS = 2
+
+# Presence/position edits whose objects must have pairwise-distinct bundles for
+# the planted difference set to admit a single valid decoding.
+_PRESENCE_KINDS = frozenset(
+    {DifferenceKind.OBJECT_MOVED, DifferenceKind.OBJECT_ADDED, DifferenceKind.OBJECT_REMOVED}
+)
+
+# Cap on re-draws when a case's presence/position edits collide on a bundle.
+_MAX_IDENTIFIABILITY_ATTEMPTS = 50
 
 
 class SceneObject(NamedTuple):
@@ -226,6 +243,38 @@ def describe_difference(
     )
 
 
+def _presence_bundle(difference: PlantedDifference) -> tuple[str, str, str] | None:
+    """Return the bundle of a presence/position edit, or ``None`` for others.
+
+    ``object_added`` carries its object only on the scene-B side; ``object_moved``
+    and ``object_removed`` carry it on the scene-A side.
+    """
+    if difference.kind not in _PRESENCE_KINDS:
+        return None
+    if difference.scene_a_object is not None:
+        return difference.scene_a_object.bundle
+    assert difference.scene_b_object is not None
+    return difference.scene_b_object.bundle
+
+
+def case_is_identifiable(differences: tuple[PlantedDifference, ...]) -> bool:
+    """Return whether the planted differences admit a single valid decoding.
+
+    Two presence/position edits (moved, added, removed) touching objects with
+    the same ``shape/color/size`` bundle are interchangeable: bundles do not
+    identify an object, so an observer cannot tell which vanished object moved
+    versus was removed (or which appeared object was added versus moved). The
+    case is identifiable only when every presence/position edit has a distinct
+    bundle.
+    """
+    bundles = [
+        bundle
+        for bundle in (_presence_bundle(difference=difference) for difference in differences)
+        if bundle is not None
+    ]
+    return len(bundles) == len(set(bundles))
+
+
 def get_cases(
     seed: int,
     round_count: int,
@@ -243,7 +292,8 @@ def get_cases(
     cases: list[DiffCase] = []
     for case_index in range(round_count):
         case_number = case_index + 1
-        round_rng = random.Random(f"{seed}-{case_number}")
+        round_seed = f"{seed}-{case_number}"
+        round_rng = random.Random(round_seed)
         object_count = round_rng.choices(object_count_values, weights=object_count_weights, k=1)[0]
         if case_number in easy_round_numbers:
             difference_count = 1
@@ -254,6 +304,7 @@ def get_cases(
         cases.append(
             _build_one_case(
                 rng=round_rng,
+                round_seed=round_seed,
                 case_number=case_number,
                 grid_size=grid_size,
                 round_time_budget_seconds=round_time_budget_seconds,
@@ -266,6 +317,54 @@ def get_cases(
 
 
 def _build_one_case(
+    rng: random.Random,
+    round_seed: str,
+    case_number: int,
+    grid_size: int,
+    round_time_budget_seconds: int,
+    object_count: int,
+    difference_count: int,
+    kinds: list[DifferenceKind],
+) -> DiffCase:
+    """Build a case whose planted differences admit a single valid decoding.
+
+    The first attempt consumes ``rng`` (the round RNG already advanced past the
+    object and difference counts) so an identifiable round is byte-identical to
+    a build without the guardrail. A case whose presence/position edits collide
+    on a bundle is re-drawn with a bumped sub-seed until it is identifiable.
+    """
+    case = _attempt_case(
+        rng=rng,
+        case_number=case_number,
+        grid_size=grid_size,
+        round_time_budget_seconds=round_time_budget_seconds,
+        object_count=object_count,
+        difference_count=difference_count,
+        kinds=kinds,
+    )
+    attempt = 0
+    while not case_is_identifiable(differences=case.differences):
+        attempt += 1
+        if attempt > _MAX_IDENTIFIABILITY_ATTEMPTS:
+            logger.warning(
+                "case %d not identifiable after %d re-draws; using last attempt",
+                case_number,
+                _MAX_IDENTIFIABILITY_ATTEMPTS,
+            )
+            break
+        case = _attempt_case(
+            rng=random.Random(f"{round_seed}-retry-{attempt}"),
+            case_number=case_number,
+            grid_size=grid_size,
+            round_time_budget_seconds=round_time_budget_seconds,
+            object_count=object_count,
+            difference_count=difference_count,
+            kinds=kinds,
+        )
+    return case
+
+
+def _attempt_case(
     rng: random.Random,
     case_number: int,
     grid_size: int,

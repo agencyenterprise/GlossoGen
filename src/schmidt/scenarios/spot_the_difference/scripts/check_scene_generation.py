@@ -14,6 +14,7 @@ from schmidt.scenarios.spot_the_difference.ids import DifferenceKind
 from schmidt.scenarios.spot_the_difference.scene_generation import (
     DiffCase,
     SceneObject,
+    case_is_identifiable,
     get_cases,
     region_of,
     render_scene_relational,
@@ -105,6 +106,10 @@ def main() -> None:
         assert set(case.scene_a) != set(
             case.scene_b
         ), f"case {case.case_number}: scenes are identical"
+        assert case_is_identifiable(differences=case.differences), (
+            f"case {case.case_number}: presence/position edits share a bundle, so the "
+            f"scenes admit more than one valid decoding"
+        )
         for diff in case.differences:
             assert diff.description, f"case {case.case_number}: empty description for {diff.kind}"
         if case.case_number in {1, 2, 3}:

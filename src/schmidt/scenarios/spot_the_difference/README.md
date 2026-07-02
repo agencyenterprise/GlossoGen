@@ -13,7 +13,12 @@ than a serialize-and-diff dump:
 
 - **Duplicates.** The attribute vocabulary is small (4 shapes × 4 colors × 2
   sizes), so at the scene sizes used here identical objects recur. A bundle does
-  not identify an object — position does.
+  not identify an object — position does. Generation still guarantees the round
+  is **uniquely decodable**: no two presence/position edits (moved, added,
+  removed) may touch objects with the same bundle, since that would let the same
+  pair of scenes be read as either "X moved and Y was removed" or "Y moved and X
+  was removed". A colliding case is re-drawn until every such edit has a distinct
+  bundle.
 - **Relational positions, no coordinates.** Agents see each object only as a
   coarse 3×3 region plus relations to other objects in their own scene ("a small
   red square to its left"). The anchors are possibly-duplicate objects in a
@@ -85,4 +90,5 @@ the language-emergence family, `communication_*`, and the `protocol_*` family
   enforcement, submission locking, correctness-gate + fewest-characters scoring.
 - `difference_judge.py` / `mcp_tools.py` — the `submit_differences` naive-reader judge.
 - `scripts/check_scene_generation.py` — generation determinism/correctness check
-  (duplicates occur, moves cross regions, descriptions present).
+  (duplicates occur, moves cross regions, descriptions present, every round is
+  uniquely decodable).
