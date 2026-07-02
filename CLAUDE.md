@@ -695,11 +695,13 @@ Or embed in the `--config` JSON file under `model_overrides`:
 
 When running simulations, evaluations, or any long-running background process, **always** follow this pattern:
 
-1. Launch the process in the background (with `run_in_background` or `&`)
-2. Immediately after launch, `sleep 30` then check the log file for progress
-3. Report a brief status update to the user
-4. Repeat: `sleep 30`, check, report — until the process completes
-5. Never use `while` loops or polling constructs — use sequential sleep/check/report cycles
+**No `sleep`. Use a background heartbeat wake-up and do the checks yourself on wake.** Never run a foreground `sleep` (including any sleep→check→report loop) — it blocks the whole session so the user cannot chat. The working mode:
+
+1. Launch the process in the background (with `run_in_background` or `&`).
+2. Arm a **periodic heartbeat** monitor whose only job is to wake you every ~30–60s — the Monitor tool with `while true; do echo "$(date) tick"; sleep 45; done`, or an equivalent `run_in_background` loop that keeps emitting. Each emitted line is a notification. The internal `sleep` inside a *background* watcher is fine; only a *foreground* block is forbidden.
+3. On EACH heartbeat notification, run the real check yourself in your turn — an instant snapshot (parse the JSONL with Python/`json`, tail the log, count rounds, grep for errors) — report briefly, and stop the heartbeat (TaskStop) once done.
+4. **Do NOT gate the wake-up on a single condition** (`until grep -q '<pattern>' <file>; do sleep; done`). A condition embeds an assumption — a grep string that doesn't match the real (often compact, no-space) JSONL serialization, a guessed event field, a wrong path — and if it's wrong the monitor fires **never** and you hang silently. A heartbeat can't silently fail: a bad assumption costs one wasted tick, not an infinite hang. Only use a condition-based exit when you've *verified* the exact match string against real output first. See memory `feedback_monitor_heartbeat_not_condition`.
+5. For on-demand status, run a single instant snapshot command — never a sleep loop.
 
 **Sim runs cost money and time — actively monitor, do not just wait.** Every 1–2 minutes while a launcher or eval is running, tail its log, count running sims per model, and verify no errors / no stuck sims / no duplicate launches. Long unattended gaps are not acceptable: a launcher that's silently looping on a misconfigured spec, a sim caught in a death-spiral retry loop, or a duplicate launch can burn through hours of API spend before the user notices. If you've already launched something and have downtime, fill it with a check — don't wait for the user to ask.
 
@@ -727,7 +729,8 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
   --runs-dir ./runs \
   --knobs /tmp/replace_knobs.json
 # CLI prints new_run_id=veyru/<new_timestamp>; that subprocess is now running detached.
-# Monitor: sleep 30 → tail ./runs/veyru/<new_timestamp>/veyru_stdout.log → repeat.
+# Monitor via a background wake-up (run_in_background until-loop or Monitor tool) on
+# ./runs/veyru/<new_timestamp>/veyru_stdout.log — never a foreground sleep loop.
 ```
 
 ### Parallel Replace-Agent Orchestration

@@ -1,0 +1,33 @@
+{
+  "max_round_duration_seconds": 600,
+  "round_time_budget_seconds": -1,
+  "postmortem_enabled": true,
+  "postmortem_disabled_at_start": false,
+  "postmortem_duration_seconds": 120,
+  "round_count": 15,
+  "seed": 42,
+  "grid_size": 12,
+  "object_count_values": [12, 15, 18],
+  "object_count_weights": [1, 1, 1],
+  "difference_count_values": [2, 3, 4],
+  "difference_count_weights": [1, 1, 1],
+  "difference_kinds": [
+    "attribute_changed",
+    "object_moved",
+    "object_added",
+    "object_removed"
+  ],
+  "easy_round_numbers": [],
+  "channel_noise_level": 0.0,
+  "noise_replacement_mode": "mask",
+  "two_teams": true,
+  "all_must_submit": true,
+  "judge_model": "claude-haiku-4-5-20251001",
+  "judge_provider": "anthropic",
+  "model_overrides": {},
+  "replace_agent_default_channel_visibility": {
+    "postmortem": false,
+    "postmortem_a": false,
+    "postmortem_b": false
+  }
+}
