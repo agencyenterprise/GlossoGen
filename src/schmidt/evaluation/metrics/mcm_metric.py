@@ -64,62 +64,66 @@ class MCMMetric(Metric):
     ) -> list[Measurement]:
         """Score primary-channel messages and report per-round char-count stats."""
         _ = agent_configs, llm_provider, run_dir, options
-        primary_channel_id = scenario.get_primary_channel_id()
-        if primary_channel_id is None:
+        channels = scenario.get_primary_channels()
+        if not channels:
             logger.info("%s: skipping — scenario has no primary channel", self.name)
             return []
 
-        rounds = _collect_primary_messages_by_round(
-            events=events,
-            primary_channel_id=primary_channel_id,
-        )
-        if not rounds:
+        measurements: list[Measurement] = []
+        for channel in channels:
+            rounds = _collect_primary_messages_by_round(
+                events=events,
+                primary_channel_id=channel.channel_id,
+            )
+            if not rounds:
+                logger.info(
+                    "%s: skipping — no messages on primary channel %r",
+                    self.name,
+                    channel.channel_id,
+                )
+                continue
+
+            round_mcms = [_score_round(round_messages=rm) for rm in rounds]
+
+            all_char_counts = [
+                float(len(text)) for round_messages in rounds for text in round_messages.texts
+            ]
+            total_messages = len(all_char_counts)
+            overall_mean = _mean(values=all_char_counts)
+            overall_std = _std(values=all_char_counts, mean=overall_mean)
+
+            per_round = [
+                RoundObservation(
+                    round_number=rm.round_number,
+                    value=rm.mean_chars,
+                    note=f"{rm.message_count} messages, std={rm.std_chars:.2f}",
+                )
+                for rm in round_mcms
+            ]
+            summary = (
+                f"{total_messages} messages on {channel.channel_id} across "
+                f"{len(round_mcms)} rounds; mean {overall_mean:.2f} chars/message "
+                f"(std {overall_std:.2f})"
+            )
+
             logger.info(
-                "%s: skipping — no messages on primary channel %r",
-                self.name,
-                primary_channel_id,
+                "mcm metric: channel=%s %.2f chars/msg over %d msgs in %d rounds",
+                channel.channel_id,
+                overall_mean,
+                total_messages,
+                len(round_mcms),
             )
-            return []
-
-        round_mcms = [_score_round(round_messages=rm) for rm in rounds]
-
-        all_char_counts = [
-            float(len(text)) for round_messages in rounds for text in round_messages.texts
-        ]
-        total_messages = len(all_char_counts)
-        overall_mean = _mean(values=all_char_counts)
-        overall_std = _std(values=all_char_counts, mean=overall_mean)
-
-        per_round = [
-            RoundObservation(
-                round_number=rm.round_number,
-                value=rm.mean_chars,
-                note=f"{rm.message_count} messages, std={rm.std_chars:.2f}",
+            measurements.append(
+                Measurement(
+                    metric_name=channel.metric_name(self.name),
+                    score=overall_mean,
+                    score_unit="chars/message",
+                    summary=summary,
+                    per_round=per_round,
+                    per_agent=[],
+                )
             )
-            for rm in round_mcms
-        ]
-        summary = (
-            f"{total_messages} messages on {primary_channel_id} across "
-            f"{len(round_mcms)} rounds; mean {overall_mean:.2f} chars/message "
-            f"(std {overall_std:.2f})"
-        )
-
-        logger.info(
-            "mcm metric: %.2f chars/msg over %d msgs in %d rounds",
-            overall_mean,
-            total_messages,
-            len(round_mcms),
-        )
-        return [
-            Measurement(
-                metric_name=self.name,
-                score=overall_mean,
-                score_unit="chars/message",
-                summary=summary,
-                per_round=per_round,
-                per_agent=[],
-            )
-        ]
+        return measurements
 
 
 def _collect_primary_messages_by_round(

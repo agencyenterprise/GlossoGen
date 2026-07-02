@@ -67,7 +67,7 @@ All metrics implement the platform `Metric` abstraction and return `Measurement`
 
 - `round_success` / `round_success_after_resume` — enabled by `judge_round_result`, which returns `RoundResult(success=outcome.full_success, ...)` per round. The platform writes one `RoundResultRecorded` event per round; the generic metrics read those directly.
 
-**Other generic metrics:** `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`, `perplexity`, `mean_chars_per_round`, `mean_chars_per_message`, `round_ended_idle`, `round_ended_timeout`, `content_filter_refusal` all run unmodified against the public Salon channel (which `get_primary_channel_id` returns).
+**Other generic metrics:** `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`, `perplexity`, `mean_chars_per_round`, `mean_chars_per_message`, `round_ended_idle`, `round_ended_timeout`, `content_filter_refusal` all run unmodified against the public Salon channel (which `get_primary_channels` returns).
 
 **Generic metrics that skip on Salon:** `communication_open_coding`, `communication_feature_presence`, and `protocol_learned_after_swap` skip because Salon does not implement `build_communication_rounds`. The `protocol_probe*` family (`protocol_probe`, `protocol_probe_replica_self_similarity`, `protocol_probe_agent_pair_similarity`, `protocol_probe_cutoff_trajectory`) skips because Salon does not implement `get_protocol_probe_config`. These return `[]` (no Measurement) when invoked.
 

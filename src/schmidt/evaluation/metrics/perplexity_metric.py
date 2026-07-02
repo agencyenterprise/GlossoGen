@@ -68,69 +68,68 @@ class PerplexityMetric(Metric):
         run_dir: Path,
         options: MetricRunOptions,
     ) -> list[Measurement]:
-        """Score primary-channel messages and report per-round perplexity stats."""
+        """Score each primary channel's messages and report per-round perplexity stats."""
         _ = agent_configs, llm_provider, run_dir, options
-        primary_channel_id = scenario.get_primary_channel_id()
-        if primary_channel_id is None:
+        channels = scenario.get_primary_channels()
+        if not channels:
             logger.info("%s: skipping — scenario has no primary channel", self.name)
             return []
 
         pristine_index = build_pristine_text_index(events=events)
-        rounds = collect_primary_messages_by_round(
-            events=events,
-            primary_channel_id=primary_channel_id,
-            pristine_index=pristine_index,
-        )
-        if not rounds:
+        measurements: list[Measurement] = []
+        for channel in channels:
+            rounds = collect_primary_messages_by_round(
+                events=events,
+                primary_channel_id=channel.channel_id,
+                pristine_index=pristine_index,
+            )
+            if not rounds:
+                logger.info("%s: no messages on primary channel %r", self.name, channel.channel_id)
+                continue
+
+            round_perplexities = await asyncio.to_thread(
+                _score_all_rounds,
+                model_name=self.model_name,
+                rounds=rounds,
+            )
+
+            all_means = [rp.mean_surprisal for rp in round_perplexities]
+            total_messages = sum(rp.message_count for rp in round_perplexities)
+            overall_mean = mean(values=all_means)
+            overall_std = population_std(values=all_means, value_mean=overall_mean)
+
+            per_round = [
+                RoundObservation(
+                    round_number=rp.round_number,
+                    value=rp.mean_surprisal,
+                    note=f"{rp.message_count} messages, std={rp.std_surprisal:.3f}",
+                )
+                for rp in round_perplexities
+            ]
+            summary = (
+                f"{total_messages} messages on {channel.channel_id} across "
+                f"{len(round_perplexities)} rounds; mean per-token surprisal "
+                f"{overall_mean:.3f} nats (round-to-round std {overall_std:.3f})"
+            )
             logger.info(
-                "%s: skipping — no messages on primary channel %r",
-                self.name,
-                primary_channel_id,
+                "perplexity: channel=%s model=%s rounds=%d messages=%d overall_mean=%.3f",
+                channel.channel_id,
+                self.model_name,
+                len(round_perplexities),
+                total_messages,
+                overall_mean,
             )
-            return []
-
-        round_perplexities = await asyncio.to_thread(
-            _score_all_rounds,
-            model_name=self.model_name,
-            rounds=rounds,
-        )
-
-        all_means = [rp.mean_surprisal for rp in round_perplexities]
-        total_messages = sum(rp.message_count for rp in round_perplexities)
-        overall_mean = mean(values=all_means)
-        overall_std = population_std(values=all_means, value_mean=overall_mean)
-
-        per_round = [
-            RoundObservation(
-                round_number=rp.round_number,
-                value=rp.mean_surprisal,
-                note=f"{rp.message_count} messages, std={rp.std_surprisal:.3f}",
+            measurements.append(
+                Measurement(
+                    metric_name=channel.metric_name(self.name),
+                    score=overall_mean,
+                    score_unit=f"nats/token ({self.model_name})",
+                    summary=summary,
+                    per_round=per_round,
+                    per_agent=[],
+                )
             )
-            for rp in round_perplexities
-        ]
-        summary = (
-            f"{total_messages} messages on {primary_channel_id} across "
-            f"{len(round_perplexities)} rounds; mean per-token surprisal "
-            f"{overall_mean:.3f} nats (round-to-round std {overall_std:.3f})"
-        )
-
-        logger.info(
-            "perplexity: model=%s rounds=%d messages=%d overall_mean=%.3f",
-            self.model_name,
-            len(round_perplexities),
-            total_messages,
-            overall_mean,
-        )
-        return [
-            Measurement(
-                metric_name=self.name,
-                score=overall_mean,
-                score_unit=f"nats/token ({self.model_name})",
-                summary=summary,
-                per_round=per_round,
-                per_agent=[],
-            )
-        ]
+        return measurements
 
 
 def _score_all_rounds(

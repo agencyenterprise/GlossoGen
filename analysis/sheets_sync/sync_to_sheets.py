@@ -75,6 +75,12 @@ _TARGETS: tuple[SyncTarget, ...] = (
         data_tabs=("run_level", "message_level", "round_context", "budget_aggregate"),
     ),
     SyncTarget(
+        name="drive_module_repair",
+        spreadsheet_id="105fG5BbWi8UsS7CO6Kb0YRDaMO5Ff-wLbhS71qjkOnY",
+        xlsx=Path("analysis/baseline_round_success/output/drive_module_repair_baseline.xlsx"),
+        data_tabs=("run_level", "message_level", "round_context", "budget_aggregate"),
+    ),
+    SyncTarget(
         name="protocol_learnability",
         spreadsheet_id="1AY1z_UUOasvN1Lmow7rj18QysKoW1uOl0K65q7gNiyg",
         xlsx=Path("analysis/protocol_learnability_export/output/protocol_learnability.xlsx"),

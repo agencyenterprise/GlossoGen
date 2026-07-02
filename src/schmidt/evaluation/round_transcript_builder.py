@@ -32,7 +32,7 @@ def build_round_transcripts(
 ) -> list[RoundTranscript]:
     """Group all MessageSent events by round and format as labeled transcripts.
 
-    When the scenario declares a primary channel via ``get_primary_channel_id``,
+    When the scenario declares primary channels via ``get_primary_channels``,
     messages are split into a PRIMARY CHANNEL section and an OTHER CHANNELS
     section per round. Otherwise, all messages are listed together.
 
@@ -45,7 +45,7 @@ def build_round_transcripts(
     Returns one RoundTranscript per round that had at least one message,
     sorted by round number.
     """
-    primary_channel_id = scenario.get_primary_channel_id()
+    primary_channel_ids = {channel.channel_id for channel in scenario.get_primary_channels()}
 
     primary_by_round: dict[int, list[str]] = {}
     other_by_round: dict[int, list[str]] = {}
@@ -65,7 +65,7 @@ def build_round_transcripts(
         text = pristine_text_for(index=pristine_index, message=event)
         line = f"[{channel_name}] {sender}: {text}"
 
-        if primary_channel_id is not None and event.message.channel_id == primary_channel_id:
+        if event.message.channel_id in primary_channel_ids:
             if rn not in primary_by_round:
                 primary_by_round[rn] = []
             primary_by_round[rn].append(line)
@@ -82,7 +82,7 @@ def build_round_transcripts(
         other = other_by_round.get(rn, [])
         total_count = len(primary) + len(other)
 
-        if primary_channel_id is not None:
+        if primary_channel_ids:
             sections: list[str] = []
             if primary:
                 sections.append("PRIMARY CHANNEL (budget-constrained):\n" + "\n".join(primary))

@@ -36,7 +36,12 @@ from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld
 from schmidt.runtime.scheduled_events import ChannelVisibilityFromRound, SwapAgent
-from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
+from schmidt.scenario_protocol import (
+    PrimaryChannel,
+    RoundResult,
+    ScenarioRuntimeHandle,
+    SimulationScenario,
+)
 from schmidt.scenarios.surprise_party.friend_names import build_friend_name_order
 from schmidt.scenarios.surprise_party.ids import (
     ALICE_ID,
@@ -286,9 +291,9 @@ class SurprisePartyScenario(SimulationScenario):
                 return name
         return self.get_agent_display_name(agent_id=agent_id)
 
-    def get_primary_channel_id(self) -> str | None:
+    def get_primary_channels(self) -> list[PrimaryChannel]:
         """The single chat channel is the primary channel for generic metrics."""
-        return CHAT_CHANNEL_ID
+        return [PrimaryChannel(channel_id=CHAT_CHANNEL_ID, team_id=None)]
 
     def _previous_outcome_for_template(self) -> dict[str, str] | None:
         """Render the previous round's outcome as a template-friendly mapping."""

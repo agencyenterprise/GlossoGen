@@ -30,14 +30,31 @@ VIRTUAL_ENV= uv run --no-sync --with openpyxl \
 `--with openpyxl` is only needed for the `.xlsx`; the CSVs are written regardless.
 Re-run any time new runs land — it always reads the current `./runs` on disk.
 
+## Scenarios
+
+The exporter is scenario-generic. `--scenario` (default `veyru`) selects a
+`ScenarioExportSpec` from [`analysis/run_export/scenario_export_specs.py`](../run_export/scenario_export_specs.py),
+which names the scenario's case/judged event types, its primary (budgeted) channel, and
+its agent roles. The per-role **model columns**, the `round_context` **briefing columns**,
+and the `message_agent` values all follow the selected scenario's roles:
+
+| `--scenario` | Model columns | `message_agent` values |
+|---|---|---|
+| `veyru` | `field_observer_model`, `engineer_model` | `field_observer`, `stabilization_engineer` |
+| `drive_module_repair` | `field_technician_model`, `diagnostics_engineer_model`, `spec_engineer_model` | `field_technician`, `diagnostics_engineer`, `spec_engineer` |
+
+Adding a scenario is one `ScenarioExportSpec` entry — no exporter edits. The column
+descriptions below use the veyru role names as the running example.
+
 ## What's in the cohort
 
-Every veyru run labeled `baseline` (closed-model frontier), `baseline_oss` (open-weight),
-or `oss_frontier` (cross-family teams pairing an open-weight with a closed model) that has
-a `round_time_budget_seconds` knob and a `round_success` measurement.
+Every run of the selected `--scenario` labeled `baseline` (closed-model frontier),
+`baseline_oss` (open-weight), or `oss_frontier` (cross-family teams pairing an open-weight
+with a closed model) that has a `round_time_budget_seconds` knob and a `round_success`
+measurement.
 
-- **`model_class`** is derived from the two agents' model families: `closed` (both
-  claude/gpt), `open` (both llama/qwen), or `mixed` (one open, one closed —
+- **`model_class`** is derived from the roles' model families: `closed` (all
+  claude/gpt), `open` (all llama/qwen), or `mixed` (at least one open and one closed —
   the `oss_frontier` runs).
 - **Design.** Every seed mode is included by default and tagged with the `random_seed`
   column. Pass `--canonical-only` to keep just the fixed-`seed=42` runs.
@@ -52,7 +69,8 @@ budget) cell** (see `src/schmidt/scenarios/veyru/scripts/run_baseline_no_special
 For binomial GLMMs (`cbind(round_success_count, total_rounds - round_success_count) ~ …`)
 or a model on `round_success_fraction`.
 
-`run_id`, `scenario`, `field_observer_model`, `engineer_model`, `model_class`
+`run_id`, `scenario`, the per-role model columns (veyru: `field_observer_model`,
+`engineer_model`), `model_class`
 (closed/open/mixed), `postmortem`, `round_time_budget_seconds`, `random_seed`,
 `total_rounds`, `round_success_count`, `round_success_fraction`, `perplexity` (run-wide
 mean per-token surprisal, nats/gpt2), `english_ngram_surprisal` (run-wide mean per-char
@@ -70,9 +88,9 @@ substage it belongs to. Good for sequence/turn-level analysis of the conversatio
 
 Message columns:
 
-- `message_agent` — sender role, normalized to `field_observer` or
-  `stabilization_engineer` (the engineer's varying ids — including the legacy
-  `specialist` — all map to `stabilization_engineer`).
+- `message_agent` — sender role, normalized to the selected scenario's canonical role
+  key (veyru: `field_observer` / `stabilization_engineer`, where the engineer's varying
+  ids — including the legacy `specialist` — all map to `stabilization_engineer`).
 - `message_text` — the message body.
 - `message_index_in_substage` — 1-indexed order of the message within its substage.
 - `chars` — character count of the message (`len(message_text)`); the per-message value
@@ -108,9 +126,8 @@ next substage. Messages are walked over the substages the team reached
 traffic produce no rows.**
 
 Repeated round-level columns (identical across a round's message rows): `round_number`,
-`success` (0/1, whole-round outcome), `note`, plus all the run covariates
-(`field_observer_model`, `engineer_model`, `model_class`, `postmortem`,
-`round_time_budget_seconds`, `random_seed`).
+`success` (0/1, whole-round outcome), `note`, plus all the run covariates (the per-role
+model columns, `model_class`, `postmortem`, `round_time_budget_seconds`, `random_seed`).
 
 The round-start briefings live in the separate `round_context` sheet (below) to keep this
 sheet small — join on `run_id` + `round_number`.
@@ -122,13 +139,14 @@ message row (they were ~86% of the file otherwise). Join to `message_level` on
 `run_id` + `round_number`.
 
 - `run_id`, `round_number` — join keys.
-- `field_observer_round_event` / `engineer_round_event` — the `--- NEW VEYRU ---`
-  briefing each agent received at round start (the engineer's carries the full stellar
-  table; the observer's, the stage-1 symptoms).
+- one briefing column per role (veyru: `field_observer_round_event` /
+  `engineer_round_event`) — the `--- NEW VEYRU ---` briefing each agent received at round
+  start (the engineer's carries the full stellar table; the observer's, the stage-1
+  symptoms).
 
 ### `budget_aggregate` — one row per cell
 
-Per (model_class, field_observer_model, engineer_model, postmortem, random_seed,
+Per (model_class, the per-role model columns, postmortem, random_seed,
 budget): `n`, and mean / std (population, ddof=0) / min / max of
 `round_success_fraction`, plus `mean_success_count`. A sanity check against the
 plotted mean ± std bands.

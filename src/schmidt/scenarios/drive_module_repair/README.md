@@ -66,7 +66,7 @@ The team is kept **count-blind** so it never knows the workload in advance:
 
 ## Evaluation
 
-Opts into the platform metrics via `judge_round_result` (deterministic round success from the staged ground truth) and `get_primary_channel_id` → `bay`. Useful metrics: `round_success`, `mean_chars_per_round`, `mean_chars_per_message`, `perplexity`, `language_strangeness`/`slang_emergence`/`neologism`/`shorthand_codes`, `content_filter_refusal`, `round_ended_idle`/`round_ended_timeout`, and `protocol_explanation` (generic prompt).
+Opts into the platform metrics via `judge_round_result` (deterministic round success from the staged ground truth) and `get_primary_channels` → `bay`. Useful metrics: `round_success`, `mean_chars_per_round`, `mean_chars_per_message`, `perplexity`, `language_strangeness`/`slang_emergence`/`neologism`/`shorthand_codes`, `content_filter_refusal`, `round_ended_idle`/`round_ended_timeout`, and `protocol_explanation` (generic prompt).
 
 ```bash
 python -m schmidt run drive_module_repair \
@@ -80,7 +80,7 @@ python -m schmidt run drive_module_repair \
 All generic-metric and study hooks are wired:
 
 - `judge_round_result` → `round_success` / `round_success_after_resume`
-- `get_primary_channel_id` → `bay` (enables `perplexity`, `mean_chars_per_*`, the language-emergence judges)
+- `get_primary_channels` → `bay` (enables `perplexity`, `mean_chars_per_*`, the language-emergence judges)
 - `build_communication_rounds` → `communication_open_coding`, `communication_feature_presence`, `protocol_learned_after_swap`
 - `get_protocol_probe_config` → the `protocol_probe` family (question bank `protocol_probe_questions.json`, probe templates in `prompts/probe/`)
 - `get_protocol_explanation_config` → per-role describe templates in `prompts/describe/`

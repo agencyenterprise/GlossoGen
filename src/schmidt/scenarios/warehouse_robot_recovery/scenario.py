@@ -34,7 +34,12 @@ from schmidt.models.agent_config import AgentConfig, AgentRole
 from schmidt.models.channel import Channel, ChannelTemplateEntry
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from schmidt.runtime.scenario_world import ScenarioWorld
-from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
+from schmidt.scenario_protocol import (
+    PrimaryChannel,
+    RoundResult,
+    ScenarioRuntimeHandle,
+    SimulationScenario,
+)
 from schmidt.scenarios.channel_noise import apply_character_noise
 from schmidt.scenarios.warehouse_robot_recovery.events import (
     WarehouseCaseStarted,
@@ -476,9 +481,9 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
             rng=self._noise_rng,
         )
 
-    def get_primary_channel_id(self) -> str | None:
+    def get_primary_channels(self) -> list[PrimaryChannel]:
         """Return the radio channel where the communication budget applies."""
-        return RADIO_CHANNEL_ID
+        return [PrimaryChannel(channel_id=RADIO_CHANNEL_ID, team_id=None)]
 
     def get_world(self) -> ScenarioWorld:
         """Return the warehouse world that monitors recovery progress."""

@@ -53,58 +53,62 @@ class MCRMetric(Metric):
     ) -> list[Measurement]:
         """Score primary-channel messages and report per-round chars stats."""
         _ = agent_configs, llm_provider, run_dir, options
-        primary_channel_id = scenario.get_primary_channel_id()
-        if primary_channel_id is None:
+        channels = scenario.get_primary_channels()
+        if not channels:
             logger.info("%s: skipping — scenario has no primary channel", self.name)
             return []
 
-        round_counts = _collect_round_char_counts(
-            events=events,
-            primary_channel_id=primary_channel_id,
-        )
-        if not round_counts:
+        measurements: list[Measurement] = []
+        for channel in channels:
+            round_counts = _collect_round_char_counts(
+                events=events,
+                primary_channel_id=channel.channel_id,
+            )
+            if not round_counts:
+                logger.info(
+                    "%s: skipping — no messages on primary channel %r",
+                    self.name,
+                    channel.channel_id,
+                )
+                continue
+
+            per_round_totals = [float(rc.total_chars) for rc in round_counts]
+            total_chars = sum(rc.total_chars for rc in round_counts)
+            overall_mean = _mean(values=per_round_totals)
+            overall_std = _std(values=per_round_totals, mean=overall_mean)
+
+            per_round = [
+                RoundObservation(
+                    round_number=rc.round_number,
+                    value=float(rc.total_chars),
+                    note=f"{rc.message_count} messages",
+                )
+                for rc in round_counts
+            ]
+            summary = (
+                f"{len(round_counts)} rounds with messages on {channel.channel_id}; "
+                f"{total_chars} total chars, mean {overall_mean:.1f} chars/round "
+                f"(std {overall_std:.1f})"
+            )
+
             logger.info(
-                "%s: skipping — no messages on primary channel %r",
-                self.name,
-                primary_channel_id,
+                "mcr metric: channel=%s %.1f chars/round over %d rounds (%d total chars)",
+                channel.channel_id,
+                overall_mean,
+                len(round_counts),
+                total_chars,
             )
-            return []
-
-        per_round_totals = [float(rc.total_chars) for rc in round_counts]
-        total_chars = sum(rc.total_chars for rc in round_counts)
-        overall_mean = _mean(values=per_round_totals)
-        overall_std = _std(values=per_round_totals, mean=overall_mean)
-
-        per_round = [
-            RoundObservation(
-                round_number=rc.round_number,
-                value=float(rc.total_chars),
-                note=f"{rc.message_count} messages",
+            measurements.append(
+                Measurement(
+                    metric_name=channel.metric_name(self.name),
+                    score=overall_mean,
+                    score_unit="chars/round",
+                    summary=summary,
+                    per_round=per_round,
+                    per_agent=[],
+                )
             )
-            for rc in round_counts
-        ]
-        summary = (
-            f"{len(round_counts)} rounds with messages on {primary_channel_id}; "
-            f"{total_chars} total chars, mean {overall_mean:.1f} chars/round "
-            f"(std {overall_std:.1f})"
-        )
-
-        logger.info(
-            "mcr metric: %.1f chars/round over %d rounds (%d total chars)",
-            overall_mean,
-            len(round_counts),
-            total_chars,
-        )
-        return [
-            Measurement(
-                metric_name=self.name,
-                score=overall_mean,
-                score_unit="chars/round",
-                summary=summary,
-                per_round=per_round,
-                per_agent=[],
-            )
-        ]
+        return measurements
 
 
 def _collect_round_char_counts(

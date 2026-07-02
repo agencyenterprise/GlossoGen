@@ -44,6 +44,26 @@ class RoundResult(NamedTuple):
     reason: str
 
 
+class PrimaryChannel(NamedTuple):
+    """A channel evaluators focus on, tagged with the team it belongs to.
+
+    ``team_id`` is ``None`` for single-team scenarios (per-channel metrics emit
+    their base name, e.g. ``perplexity``) and the canonical team identifier for
+    multi-team scenarios (metrics suffix their name, e.g. ``perplexity_team_a``).
+    A scenario with two competing teams returns one entry per team's channel so
+    the char/compression metrics score each team independently.
+    """
+
+    channel_id: str
+    team_id: str | None
+
+    def metric_name(self, base: str) -> str:
+        """Return the per-channel metric name (``base`` or ``base_{team_id}``)."""
+        if self.team_id is None:
+            return base
+        return f"{base}_{self.team_id}"
+
+
 class ScenarioRuntimeHandle(Protocol):
     """Read-only view of the simulation runtime exposed to scenarios.
 
@@ -312,14 +332,16 @@ class SimulationScenario(ABC):
             "remove the InjectCase entry from scheduled_events or implement the hook."
         )
 
-    def get_primary_channel_id(self) -> str | None:
-        """Return the channel ID that evaluators should focus on.
+    def get_primary_channels(self) -> list[PrimaryChannel]:
+        """Return the channels that evaluators should focus on.
 
-        The primary channel is where the core task happens under constraints.
-        Evaluators prioritize language phenomena observed here. Returns None
-        if no single channel is primary.
+        The primary channels are where the core task happens under constraints.
+        Char/compression metrics score each returned channel and emit one
+        Measurement per channel (suffixed by ``team_id`` for multi-team
+        scenarios); the language-emergence judges treat every returned channel
+        as primary. Returns an empty list when no channel is primary.
         """
-        return None
+        return []
 
     def build_communication_rounds(
         self, events: list[SimulationEvent]

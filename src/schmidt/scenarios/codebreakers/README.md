@@ -46,7 +46,7 @@ This is essentially salon's "no-primer" ablation: same iterated referential stru
 
 ## Metrics
 
-All generic metrics apply once `get_primary_channel_id()` is set to `chat`: `round_success`, `mean_chars_per_round`, `mean_chars_per_message`, `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`, `content_filter_refusal`, `perplexity`, `round_ended_*`.
+All generic metrics apply once `get_primary_channels()` is set to `chat`: `round_success`, `mean_chars_per_round`, `mean_chars_per_message`, `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`, `content_filter_refusal`, `perplexity`, `round_ended_*`.
 
 ## Postmortem
 

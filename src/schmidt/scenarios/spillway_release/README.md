@@ -74,7 +74,7 @@ Rounds in `easy_round_numbers` are forced to `hold` as warmups.
 
 ## Evaluation
 
-Spillway opts into the platform metrics by implementing `judge_round_result` (deterministic per-round success) and `get_primary_channel_id` (the `ops` channel). It ships no scenario-private metrics. Useful metrics: `round_success`, `mean_chars_per_round`, `mean_chars_per_message`, `perplexity`, the language-emergence metrics, `shorthand_codes`, `neologism`, and `content_filter_refusal`.
+Spillway opts into the platform metrics by implementing `judge_round_result` (deterministic per-round success) and `get_primary_channels` (the `ops` channel). It ships no scenario-private metrics. Useful metrics: `round_success`, `mean_chars_per_round`, `mean_chars_per_message`, `perplexity`, the language-emergence metrics, `shorthand_codes`, `neologism`, and `content_filter_refusal`.
 
 ```bash
 python -m schmidt run spillway_release \

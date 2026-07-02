@@ -48,7 +48,12 @@ from schmidt.models.channel import Channel
 from schmidt.models.event import SimulationEvent
 from schmidt.runtime.scenario_mcp_tool import ScenarioMcpTool
 from schmidt.runtime.scenario_world import ScenarioWorld
-from schmidt.scenario_protocol import RoundResult, ScenarioRuntimeHandle, SimulationScenario
+from schmidt.scenario_protocol import (
+    PrimaryChannel,
+    RoundResult,
+    ScenarioRuntimeHandle,
+    SimulationScenario,
+)
 from schmidt.scenarios.channel_noise import apply_character_noise
 from schmidt.scenarios.spot_the_difference.agent_factory import (
     build_agent_display_names,
@@ -67,6 +72,8 @@ from schmidt.scenarios.spot_the_difference.ids import (
     POSTMORTEM_A_CHANNEL_ID,
     POSTMORTEM_B_CHANNEL_ID,
     POSTMORTEM_CHANNEL_ID,
+    TEAM_A_ID,
+    TEAM_B_ID,
     TEAM_SOLO_ID,
     VIEWER_LEFT_A_ID,
     VIEWER_LEFT_A_ROLE,
@@ -370,9 +377,14 @@ class SpotTheDifferenceScenario(SimulationScenario):
             rng=self._noise_rng,
         )
 
-    def get_primary_channel_id(self) -> str | None:
-        """Return the link channel where the communication objective applies."""
-        return LINK_CHANNEL_ID
+    def get_primary_channels(self) -> list[PrimaryChannel]:
+        """Return each team's link channel so char metrics score teams separately."""
+        if self._knobs.two_teams:
+            return [
+                PrimaryChannel(channel_id=LINK_A_CHANNEL_ID, team_id=TEAM_A_ID),
+                PrimaryChannel(channel_id=LINK_B_CHANNEL_ID, team_id=TEAM_B_ID),
+            ]
+        return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
 
     def build_communication_rounds(
         self, events: list[SimulationEvent]

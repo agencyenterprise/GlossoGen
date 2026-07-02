@@ -85,15 +85,20 @@ from analysis.results_viewer.measurement_scores import (
     retransmission_request_count_score,
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
-from analysis.veyru_run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
-from analysis.veyru_run_export.message_perplexity_scorer import MessagePerplexityScorer
-from analysis.veyru_run_export.run_context_scan import (
+from analysis.run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
+from analysis.run_export.message_perplexity_scorer import MessagePerplexityScorer
+from analysis.run_export.run_context_scan import (
     RunContext,
+    ScenarioExportSpec,
     model_class,
+    model_column_names,
+    role_event_columns,
+    role_model_columns,
     scan_run_context,
     sender_role,
 )
-from analysis.veyru_run_export.spreadsheet_writer import write_csvs, write_xlsx
+from analysis.run_export.scenario_export_specs import get_export_spec
+from analysis.run_export.spreadsheet_writer import write_csvs, write_xlsx
 from schmidt.evaluation.log_reader import load_events
 from schmidt.evaluation.metric_core.character_entropy import character_entropy_bits
 from schmidt.evaluation.metric_core.gzip_compression import gzip_compression_ratio
@@ -274,7 +279,7 @@ def _message_repetition_factors(run_dir: Path) -> dict[str, float]:
 
 
 def _build_run_level_frame(
-    runs: list[EvaluatedRun], contexts: dict[str, RunContext]
+    runs: list[EvaluatedRun], contexts: dict[str, RunContext], spec: ScenarioExportSpec
 ) -> pd.DataFrame:
     """One row per run: covariates plus the Bernoulli numerator/denominator."""
     rows: list[dict[str, object]] = []
@@ -290,12 +295,8 @@ def _build_run_level_frame(
             {
                 "run_id": record.run_id,
                 "scenario": evaluated.scenario_name,
-                "field_observer_model": context.field_observer_model,
-                "engineer_model": context.engineer_model,
-                "model_class": model_class(
-                    field_observer_model=context.field_observer_model,
-                    engineer_model=context.engineer_model,
-                ),
+                **role_model_columns(context=context, spec=spec),
+                "model_class": model_class(role_models=context.role_models),
                 "postmortem": record.postmortem_enabled,
                 "round_time_budget_seconds": record.budget,
                 "channel_noise_level": record.channel_noise_level,
@@ -320,8 +321,7 @@ def _build_run_level_frame(
         return frame
     return frame.sort_values(
         by=[
-            "field_observer_model",
-            "engineer_model",
+            *model_column_names(spec=spec),
             "channel_noise_level",
             "round_time_budget_seconds",
             "run_id",
@@ -330,7 +330,7 @@ def _build_run_level_frame(
 
 
 def _build_message_level_frame(
-    runs: list[EvaluatedRun], contexts: dict[str, RunContext]
+    runs: list[EvaluatedRun], contexts: dict[str, RunContext], spec: ScenarioExportSpec
 ) -> pd.DataFrame:
     """Long format: one row per link-channel message with pristine + transmitted text.
 
@@ -360,10 +360,8 @@ def _build_message_level_frame(
         pristine_by_id = build_pristine_text_index(events=events)
         outcomes = _round_outcomes_from_events(events=events)
         message_repetition = _message_repetition_factors(run_dir=evaluated.run_dir)
-        run_model_class = model_class(
-            field_observer_model=context.field_observer_model,
-            engineer_model=context.engineer_model,
-        )
+        run_model_class = model_class(role_models=context.role_models)
+        model_columns = role_model_columns(context=context, spec=spec)
         run_rows: list[dict[str, object]] = []
         # Iterate the rounds the scanner found (not the round_success measurement)
         # so a stale/partial measurement can't drop a round's messages. Success
@@ -393,8 +391,7 @@ def _build_message_level_frame(
                         {
                             "run_id": record.run_id,
                             "scenario": evaluated.scenario_name,
-                            "field_observer_model": context.field_observer_model,
-                            "engineer_model": context.engineer_model,
+                            **model_columns,
                             "model_class": run_model_class,
                             "postmortem": record.postmortem_enabled,
                             "round_time_budget_seconds": record.budget,
@@ -407,7 +404,7 @@ def _build_message_level_frame(
                             "actions": stage.actions,
                             "substage_stabilized": int(substage <= round_ctx.stabilized_stages),
                             "message_index_in_substage": message_index,
-                            "message_agent": sender_role(agent_id=message.agent),
+                            "message_agent": sender_role(agent_id=message.agent, spec=spec),
                             "message_text": pristine,
                             "message_text_transmitted": transmitted,
                             "chars": chars,
@@ -446,7 +443,7 @@ def _build_message_level_frame(
 
 
 def _build_round_context_frame(
-    runs: list[EvaluatedRun], contexts: dict[str, RunContext]
+    runs: list[EvaluatedRun], contexts: dict[str, RunContext], spec: ScenarioExportSpec
 ) -> pd.DataFrame:
     """One row per (run, round): the round-start briefings plus per-round outcomes.
 
@@ -489,8 +486,7 @@ def _build_round_context_frame(
                     "retransmission_request_count": _round_count(
                         by_round=retransmission_by_round, round_number=round_number
                     ),
-                    "field_observer_round_event": round_ctx.field_observer_event,
-                    "engineer_round_event": round_ctx.engineer_event,
+                    **role_event_columns(round_ctx=round_ctx, spec=spec),
                 }
             )
     frame = pd.DataFrame(rows)
@@ -499,14 +495,15 @@ def _build_round_context_frame(
     return frame.sort_values(by=["run_id", "round_number"]).reset_index(drop=True)
 
 
-def _build_budget_aggregate_frame(run_level: pd.DataFrame) -> pd.DataFrame:
+def _build_budget_aggregate_frame(
+    run_level: pd.DataFrame, spec: ScenarioExportSpec
+) -> pd.DataFrame:
     """Per (models, postmortem, seed mode, noise, budget) mean ± std of the success fraction."""
     if run_level.empty:
         return run_level
     group_keys = [
         "model_class",
-        "field_observer_model",
-        "engineer_model",
+        *model_column_names(spec=spec),
         "postmortem",
         "random_seed",
         "channel_noise_level",
@@ -544,20 +541,21 @@ def main() -> None:
     args = _parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    spec = get_export_spec(scenario_name=args.scenario)
     evaluated_runs = list_evaluated_runs(runs_dir=args.runs_dir)
     runs = _collect_runs(evaluated_runs=evaluated_runs, scenario_name=args.scenario)
     logger.info("scenario=%s: %d channel_noise runs found.", args.scenario, len(runs))
 
     contexts = {
         evaluated.run_id: scan_run_context(
-            jsonl_path=evaluated.run_dir / f"{evaluated.scenario_name}.jsonl"
+            jsonl_path=evaluated.run_dir / f"{evaluated.scenario_name}.jsonl", spec=spec
         )
         for evaluated in runs
     }
-    run_level = _build_run_level_frame(runs=runs, contexts=contexts)
-    message_level = _build_message_level_frame(runs=runs, contexts=contexts)
-    round_context = _build_round_context_frame(runs=runs, contexts=contexts)
-    budget_aggregate = _build_budget_aggregate_frame(run_level=run_level)
+    run_level = _build_run_level_frame(runs=runs, contexts=contexts, spec=spec)
+    message_level = _build_message_level_frame(runs=runs, contexts=contexts, spec=spec)
+    round_context = _build_round_context_frame(runs=runs, contexts=contexts, spec=spec)
+    budget_aggregate = _build_budget_aggregate_frame(run_level=run_level, spec=spec)
     frames = {
         "run_level": run_level,
         "message_level": message_level,

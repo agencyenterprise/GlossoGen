@@ -70,63 +70,67 @@ class EnglishNgramSurprisalMetric(Metric):
     ) -> list[Measurement]:
         """Score primary-channel messages and report per-round surprisal stats."""
         _ = agent_configs, llm_provider, run_dir, options
-        primary_channel_id = scenario.get_primary_channel_id()
-        if primary_channel_id is None:
+        channels = scenario.get_primary_channels()
+        if not channels:
             logger.info("%s: skipping — scenario has no primary channel", self.name)
             return []
 
         pristine_index = build_pristine_text_index(events=events)
-        rounds = collect_primary_messages_by_round(
-            events=events,
-            primary_channel_id=primary_channel_id,
-            pristine_index=pristine_index,
-        )
-        if not rounds:
+        measurements: list[Measurement] = []
+        for channel in channels:
+            rounds = collect_primary_messages_by_round(
+                events=events,
+                primary_channel_id=channel.channel_id,
+                pristine_index=pristine_index,
+            )
+            if not rounds:
+                logger.info(
+                    "%s: skipping — no messages on primary channel %r",
+                    self.name,
+                    channel.channel_id,
+                )
+                continue
+
+            round_surprisals = await asyncio.to_thread(_score_all_rounds, rounds=rounds)
+
+            all_means = [rs.mean_surprisal for rs in round_surprisals]
+            total_messages = sum(rs.message_count for rs in round_surprisals)
+            overall_mean = mean(values=all_means)
+            overall_std = population_std(values=all_means, value_mean=overall_mean)
+
+            per_round = [
+                RoundObservation(
+                    round_number=rs.round_number,
+                    value=rs.mean_surprisal,
+                    note=f"{rs.message_count} messages, std={rs.std_surprisal:.3f}",
+                )
+                for rs in round_surprisals
+            ]
+            summary = (
+                f"{total_messages} messages on {channel.channel_id} across "
+                f"{len(round_surprisals)} rounds; mean per-char English-trigram "
+                f"surprisal {overall_mean:.3f} nats (higher = less English-like; "
+                f"round-to-round std {overall_std:.3f})"
+            )
+
             logger.info(
-                "%s: skipping — no messages on primary channel %r",
-                self.name,
-                primary_channel_id,
+                "english_ngram_surprisal: channel=%s rounds=%d messages=%d overall_mean=%.3f",
+                channel.channel_id,
+                len(round_surprisals),
+                total_messages,
+                overall_mean,
             )
-            return []
-
-        round_surprisals = await asyncio.to_thread(_score_all_rounds, rounds=rounds)
-
-        all_means = [rs.mean_surprisal for rs in round_surprisals]
-        total_messages = sum(rs.message_count for rs in round_surprisals)
-        overall_mean = mean(values=all_means)
-        overall_std = population_std(values=all_means, value_mean=overall_mean)
-
-        per_round = [
-            RoundObservation(
-                round_number=rs.round_number,
-                value=rs.mean_surprisal,
-                note=f"{rs.message_count} messages, std={rs.std_surprisal:.3f}",
+            measurements.append(
+                Measurement(
+                    metric_name=channel.metric_name(self.name),
+                    score=overall_mean,
+                    score_unit="nats/char (english-trigram)",
+                    summary=summary,
+                    per_round=per_round,
+                    per_agent=[],
+                )
             )
-            for rs in round_surprisals
-        ]
-        summary = (
-            f"{total_messages} messages on {primary_channel_id} across "
-            f"{len(round_surprisals)} rounds; mean per-char English-trigram "
-            f"surprisal {overall_mean:.3f} nats (higher = less English-like; "
-            f"round-to-round std {overall_std:.3f})"
-        )
-
-        logger.info(
-            "english_ngram_surprisal: rounds=%d messages=%d overall_mean=%.3f",
-            len(round_surprisals),
-            total_messages,
-            overall_mean,
-        )
-        return [
-            Measurement(
-                metric_name=self.name,
-                score=overall_mean,
-                score_unit="nats/char (english-trigram)",
-                summary=summary,
-                per_round=per_round,
-                per_agent=[],
-            )
-        ]
+        return measurements
 
 
 def _score_all_rounds(rounds: list[RoundMessages]) -> list[RoundSurprisal]:
