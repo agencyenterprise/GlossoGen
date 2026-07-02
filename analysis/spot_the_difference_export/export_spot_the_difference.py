@@ -11,24 +11,18 @@ carries ``round_success_team_a`` / ``round_success_team_b``,
 per-team counterpart to the veyru/drive single-team exports.
 
 The unit of analysis is **(run, team)**: a two-team run contributes two rows to
-``run_level`` (one per team), keyed by ``team_id``. Baseline-constant columns
-(``round_time_budget_seconds`` = -1 for no budget, ``channel_noise_level`` = 0,
-seed fixed) are kept so future budget / noise / single-team cohorts concatenate
-cleanly.
+``run_level`` (one per team), keyed by ``team_id``.
 
-Five output tables:
+Four output tables:
 
 - ``run_level`` — one row per (run, team). Per-team outcome numerators
   (``round_success_count`` / ``round_count`` / fraction — the correctness gate;
   ``wins_count`` / ``wins_fraction`` — the fewest-characters competitive win;
   ``mean_found_fraction`` partial credit; ``mean_characters_used``;
-  ``budget_exceeded_count`` / ``did_not_submit_count`` / ``disagreed_count``),
+  ``budget_exceeded_count`` / ``did_not_submit_count`` / ``disagreed_count``) and
   the per-team headline language metrics (``perplexity``,
   ``english_ngram_surprisal``, ``message_entropy``, ``gzip_compression_ratio``,
-  ``language_repetition``, ``mcm``, ``mcr``), and the run-scoped judge metrics
-  (``dialog_count`` / ``retransmission_request_count`` / ``language_strangeness``
-  / ``slang_emergence`` / ``neologism`` / ``content_filter_refusal``; duplicated
-  across the run's team rows because they are not per-team).
+  ``language_repetition``, ``mcm``, ``mcr``).
 - ``round_level`` — one row per (run, round, team): the per-round-per-team
   outcome reconstructed from the event log (``success`` = eligible, ``won``,
   ``found_count`` / ``found_fraction``, ``false_positive_count``, ``found_all``,
@@ -37,21 +31,16 @@ Five output tables:
   ``found_all`` / ``eligible`` for head-to-head, and the human-readable
   ``reason``) plus the scene facts (``difference_count``, ``difference_kinds``,
   ``object_count``, ``grid_size``) and the per-round-per-team ``perplexity`` /
-  ``mcr`` / ``language_repetition`` and run-scoped ``dialog_count`` /
-  ``retransmission_request_count``.
+  ``mcr`` / ``language_repetition``.
 - ``message_level`` — one row per link-channel message: ``message_agent``
   (``viewer_left`` / ``viewer_right``), ``message_text`` (pristine), the
-  channel-delivered ``message_text_transmitted`` plus ``chars`` /
-  ``chars_dropped`` / ``drop_fraction`` (noise-ready), per-message ``perplexity``
-  / ``english_ngram_surprisal`` / ``message_entropy`` / ``gzip_compression_ratio``
-  / ``message_repetition_factor``, and the round's team ``success`` / ``won``.
-- ``difference_level`` — one row per (run, round, planted difference): the scene
-  ground truth (``kind``, ``description``, ``attribute_name``, ``scene_a_region``
-  / ``scene_b_region``) and a ``found_by_{team_id}`` flag per team, so detection
-  rate by difference kind / region is directly modellable.
-- ``team_aggregate`` — per (model_class, models, team config, budget, noise)
-  mean ± std of the success and win fractions plus mean characters / perplexity /
-  repetition; a sanity check against the run-level rows.
+  channel-delivered ``message_text_transmitted``, ``chars``, per-message
+  ``perplexity`` / ``english_ngram_surprisal`` / ``message_entropy`` /
+  ``gzip_compression_ratio`` / ``message_repetition_factor``, and the round's team
+  ``success`` / ``won``.
+- ``team_aggregate`` — per (model_class, viewer models, all_must_submit) mean ± std
+  of the success and win fractions plus mean characters / perplexity / repetition;
+  a sanity check against the run-level rows.
 
 Writes one CSV per table, and (when ``openpyxl`` is importable) a single
 multi-sheet ``.xlsx`` workbook.
@@ -77,10 +66,7 @@ from schmidt.evaluation.metric_core.character_entropy import character_entropy_b
 from schmidt.evaluation.metric_core.gzip_compression import gzip_compression_ratio
 from schmidt.evaluation.metric_core.pristine_text_index import build_pristine_text_index
 from schmidt.models.event import AgentRegistered, MessageSent, RoundResultRecorded, SimulationEvent
-from schmidt.scenarios.spot_the_difference.events import (
-    DifferenceSubmissionJudged,
-    SpotTheDifferenceCaseStarted,
-)
+from schmidt.scenarios.spot_the_difference.events import SpotTheDifferenceCaseStarted
 from schmidt.scenarios.spot_the_difference.ids import (
     TEAM_SOLO_ID,
     VIEWER_LEFT_A_ID,
@@ -126,16 +112,6 @@ _TEAM_METRIC_COLUMNS = (
     ("mean_chars_per_round", "mcr"),
 )
 
-# Run-scoped judge metrics (not per team): duplicated across a run's team rows.
-_RUN_METRIC_COLUMNS = (
-    ("dialog_count", "dialog_count"),
-    ("retransmission_request_count", "retransmission_request_count"),
-    ("language_strangeness", "language_strangeness"),
-    ("slang_emergence", "slang_emergence"),
-    ("neologism", "neologism"),
-    ("content_filter_refusal", "content_filter_refusal"),
-)
-
 
 class TeamModels(NamedTuple):
     """The two viewer models that staffed one team."""
@@ -157,10 +133,9 @@ class SpotRunContext(NamedTuple):
     """Everything one spot run's event log yields, scanned once and reused per frame.
 
     ``outcomes`` maps ``round_number -> team_id -> DiffOutcome`` (reconstructed via
-    the same scoring path the world uses). ``matched_indices`` maps
-    ``round_number -> team_id -> the 1-based planted-difference indices the team
-    identified``. ``round_result`` maps ``(round_number, result_team_id) ->
-    RoundResultRecorded`` where ``result_team_id`` is ``None`` in solo mode.
+    the same scoring path the world uses). ``round_result`` maps
+    ``(round_number, result_team_id) -> RoundResultRecorded`` where
+    ``result_team_id`` is ``None`` in solo mode.
     """
 
     two_teams: bool
@@ -169,7 +144,6 @@ class SpotRunContext(NamedTuple):
     models_by_team: dict[str, TeamModels]
     cases: dict[int, SpotTheDifferenceCaseStarted]
     outcomes: dict[int, dict[str, DiffOutcome]]
-    matched_indices: dict[int, dict[str, set[int]]]
     link_messages: dict[str, dict[int, list[LinkMsg]]]
     round_result: dict[tuple[int, str | None], RoundResultRecorded]
 
@@ -214,26 +188,6 @@ def _team_metric_per_round(
         if measurement.metric_name == target:
             return {obs.round_number: obs.value for obs in measurement.per_round}
     return {}
-
-
-def _run_metric_per_round(evaluated: EvaluatedRun, metric_name: str) -> dict[int, float] | None:
-    """Return ``round_number -> count`` for a run-scoped per-round metric, ``None`` if unscored.
-
-    ``None`` distinguishes "never judged for this metric" from "judged, and this
-    round had zero" — callers default missing rounds to ``0.0`` only when the map
-    is not ``None``.
-    """
-    for measurement in evaluated.report.measurements:
-        if measurement.metric_name == metric_name:
-            return {obs.round_number: obs.value for obs in measurement.per_round}
-    return None
-
-
-def _round_count_value(by_round: dict[int, float] | None, round_number: int) -> float | None:
-    """Per-round count: ``None`` if the metric is unscored, else the count (0 if absent)."""
-    if by_round is None:
-        return None
-    return by_round.get(round_number, 0.0)
 
 
 def _team_model_class(models: TeamModels) -> str:
@@ -319,33 +273,6 @@ def _reconstruct_outcomes(
         for outcome in team.outcomes:
             outcomes.setdefault(outcome.case_number, {})[team_id] = outcome
     return outcomes
-
-
-def _combined_matched_indices(
-    events: list[SimulationEvent], team_ids: list[str]
-) -> dict[int, dict[str, set[int]]]:
-    """Return ``round_number -> team_id -> combined matched planted-difference indices``.
-
-    The combined set is the intersection of each member's matched indices (the
-    same basis ``combine_team_verdict`` scores on), so a difference counts as
-    found by a team only when every submitting member identified it.
-    """
-    judged: dict[int, dict[str, list[DifferenceSubmissionJudged]]] = {}
-    for event in events:
-        if isinstance(event, DifferenceSubmissionJudged):
-            judged.setdefault(event.round_number, {}).setdefault(event.team_id, []).append(event)
-    matched: dict[int, dict[str, set[int]]] = {}
-    for round_number, by_team in judged.items():
-        for team_id in team_ids:
-            member_events = by_team.get(team_id, [])
-            if not member_events:
-                matched.setdefault(round_number, {})[team_id] = set()
-                continue
-            combined = set(member_events[0].matched_difference_indices)
-            for event in member_events[1:]:
-                combined = combined & set(event.matched_difference_indices)
-            matched.setdefault(round_number, {})[team_id] = combined
-    return matched
 
 
 def _team_ids_from_events(events: list[SimulationEvent]) -> list[str]:
@@ -439,7 +366,6 @@ def build_spot_context(evaluated: EvaluatedRun) -> SpotRunContext | None:
         },
         cases=cases,
         outcomes=outcomes,
-        matched_indices=_combined_matched_indices(events=events, team_ids=team_ids),
         link_messages=_link_messages(events=events, team_ids=team_ids),
         round_result=_round_results(events=events),
     )
@@ -488,14 +414,6 @@ def _config_int(evaluated: EvaluatedRun, key: str) -> int:
     return 0
 
 
-def _config_list_str(evaluated: EvaluatedRun, key: str) -> str:
-    """Read a list knob and render it pipe-joined, or empty when absent."""
-    value = evaluated.metadata.scenario_config.get(key)
-    if isinstance(value, list):
-        return "|".join(str(item) for item in value)
-    return ""
-
-
 def _build_run_level(joined_runs: list[JoinedRun]) -> pd.DataFrame:
     """One row per (run, team): covariates, per-team outcome numerators, and metrics."""
     rows: list[dict[str, object]] = []
@@ -512,7 +430,6 @@ def _build_run_level(joined_runs: list[JoinedRun]) -> pd.DataFrame:
                 "run_id": evaluated.run_id,
                 "scenario": evaluated.scenario_name,
                 "team_id": team_id,
-                "two_teams": context.two_teams,
                 "all_must_submit": context.all_must_submit,
                 "viewer_left_model": models.viewer_left_model,
                 "viewer_right_model": models.viewer_right_model,
@@ -521,17 +438,6 @@ def _build_run_level(joined_runs: list[JoinedRun]) -> pd.DataFrame:
                 "seed": _config_int(evaluated=evaluated, key="seed"),
                 "random_seed": _RANDOM_SEED_LABEL in labels,
                 "grid_size": _config_int(evaluated=evaluated, key="grid_size"),
-                "object_count_values": _config_list_str(
-                    evaluated=evaluated, key="object_count_values"
-                ),
-                "difference_count_values": _config_list_str(
-                    evaluated=evaluated, key="difference_count_values"
-                ),
-                "round_time_budget_seconds": _config_int(
-                    evaluated=evaluated, key="round_time_budget_seconds"
-                ),
-                "channel_noise_level": config.get("channel_noise_level", 0.0),
-                "noise_replacement_mode": str(config.get("noise_replacement_mode", "mask")),
                 "postmortem_enabled": bool(config.get("postmortem_enabled", False)),
                 "round_success_count": sum(1 for o in outcomes if o.eligible),
                 "wins_count": sum(1 for o in outcomes if o.won),
@@ -552,8 +458,6 @@ def _build_run_level(joined_runs: list[JoinedRun]) -> pd.DataFrame:
                 row[column] = _team_metric_score(
                     evaluated=evaluated, base=base, two_teams=context.two_teams, team_id=team_id
                 )
-            for metric_name, column in _RUN_METRIC_COLUMNS:
-                row[column] = measurement_score(evaluated=evaluated, metric_name=metric_name)
             rows.append(row)
     frame = pd.DataFrame(rows)
     if frame.empty:
@@ -588,14 +492,7 @@ def _build_round_level(joined_runs: list[JoinedRun]) -> pd.DataFrame:
     for joined in joined_runs:
         evaluated = joined.evaluated
         context = joined.context
-        budget = _config_int(evaluated=evaluated, key="round_time_budget_seconds")
         grid_size = _config_int(evaluated=evaluated, key="grid_size")
-        noise_level = evaluated.metadata.scenario_config.get("channel_noise_level", 0.0)
-        noise_mode = str(evaluated.metadata.scenario_config.get("noise_replacement_mode", "mask"))
-        dialog_by_round = _run_metric_per_round(evaluated=evaluated, metric_name="dialog_count")
-        retransmission_by_round = _run_metric_per_round(
-            evaluated=evaluated, metric_name="retransmission_request_count"
-        )
         for team_id in context.team_ids:
             models = context.models_by_team[team_id]
             perplexity_by_round = _team_metric_per_round(
@@ -635,9 +532,6 @@ def _build_round_level(joined_runs: list[JoinedRun]) -> pd.DataFrame:
                         "object_count": _object_count(case=case),
                         "difference_count": outcome.total_differences,
                         "difference_kinds": _difference_kinds(case=case),
-                        "round_time_budget_seconds": budget,
-                        "channel_noise_level": noise_level,
-                        "noise_replacement_mode": noise_mode,
                         "success": int(outcome.eligible),
                         "won": int(outcome.won),
                         "found_count": outcome.found_count,
@@ -659,12 +553,6 @@ def _build_round_level(joined_runs: list[JoinedRun]) -> pd.DataFrame:
                         "perplexity": perplexity_by_round.get(round_number),
                         "mcr": mcr_by_round.get(round_number),
                         "language_repetition": repetition_by_round.get(round_number),
-                        "dialog_count": _round_count_value(
-                            by_round=dialog_by_round, round_number=round_number
-                        ),
-                        "retransmission_request_count": _round_count_value(
-                            by_round=retransmission_by_round, round_number=round_number
-                        ),
                     }
                 )
     frame = pd.DataFrame(rows)
@@ -753,7 +641,6 @@ def _message_rows_for_run(
                 transmitted = message.transmitted_text
                 pristine = pristine_by_id.get(message.message_id, transmitted)
                 chars = len(pristine)
-                chars_dropped = sum(1 for p, t in zip(pristine, transmitted) if p != t)
                 run_rows.append(
                     {
                         "run_id": evaluated.run_id,
@@ -768,8 +655,6 @@ def _message_rows_for_run(
                         "message_text": pristine,
                         "message_text_transmitted": transmitted,
                         "chars": chars,
-                        "chars_dropped": chars_dropped,
-                        "drop_fraction": _fraction(numerator=chars_dropped, denominator=chars),
                         "message_entropy": _entropy(text=pristine),
                         "gzip_compression_ratio": _gzip(text=pristine),
                         "message_repetition_factor": message_repetition.get(message.message_id),
@@ -810,46 +695,6 @@ def _outcome_flag(outcome: DiffOutcome | None, attr: str) -> int | None:
     return int(getattr(outcome, attr))
 
 
-def _build_difference_level(joined_runs: list[JoinedRun]) -> pd.DataFrame:
-    """One row per (run, round, planted difference): scene ground truth + per-team found flags."""
-    rows: list[dict[str, object]] = []
-    for joined in joined_runs:
-        evaluated = joined.evaluated
-        context = joined.context
-        for round_number, case in context.cases.items():
-            matched_by_team = context.matched_indices.get(round_number, {})
-            for difference_index, difference in enumerate(case.differences, start=1):
-                row: dict[str, object] = {
-                    "run_id": evaluated.run_id,
-                    "scenario": evaluated.scenario_name,
-                    "round_number": round_number,
-                    "case_number": case.case_number,
-                    "difference_index": difference_index,
-                    "kind": difference.kind,
-                    "description": difference.description,
-                    "attribute_name": difference.attribute_name,
-                    "scene_a_region": _region(obj=difference.scene_a_object),
-                    "scene_b_region": _region(obj=difference.scene_b_object),
-                }
-                for team_id in context.team_ids:
-                    matched = matched_by_team.get(team_id, set())
-                    row[f"found_by_{team_id}"] = int(difference_index in matched)
-                rows.append(row)
-    frame = pd.DataFrame(rows)
-    if frame.empty:
-        return frame
-    return frame.sort_values(by=["run_id", "round_number", "difference_index"]).reset_index(
-        drop=True
-    )
-
-
-def _region(obj: object) -> str | None:
-    """Return an object's coarse region, or ``None`` when the object is absent (add/remove)."""
-    if obj is None:
-        return None
-    return getattr(obj, "region", None)
-
-
 def _build_team_aggregate(run_level: pd.DataFrame) -> pd.DataFrame:
     """Per (models, team config, budget, noise) mean ± std of success / win fractions."""
     if run_level.empty:
@@ -858,10 +703,7 @@ def _build_team_aggregate(run_level: pd.DataFrame) -> pd.DataFrame:
         "model_class",
         "viewer_left_model",
         "viewer_right_model",
-        "two_teams",
         "all_must_submit",
-        "round_time_budget_seconds",
-        "channel_noise_level",
     ]
     grouped = run_level.groupby(group_keys, as_index=False).agg(
         n=("round_success_fraction", "size"),
@@ -911,13 +753,11 @@ def main() -> None:
     run_level = _build_run_level(joined_runs=joined)
     round_level = _build_round_level(joined_runs=joined)
     message_level = _build_message_level(joined_runs=joined)
-    difference_level = _build_difference_level(joined_runs=joined)
     team_aggregate = _build_team_aggregate(run_level=run_level)
     frames = {
         "run_level": run_level,
         "round_level": round_level,
         "message_level": message_level,
-        "difference_level": difference_level,
         "team_aggregate": team_aggregate,
     }
 
@@ -925,11 +765,10 @@ def main() -> None:
     xlsx_path = write_xlsx(frames=frames, output_dir=args.output_dir, stem=args.stem)
 
     logger.info(
-        "Wrote %d run-team rows, %d round-team rows, %d messages, %d differences. CSVs: %s%s",
+        "Wrote %d run-team rows, %d round-team rows, %d messages. CSVs: %s%s",
         len(run_level),
         len(round_level),
         len(message_level),
-        len(difference_level),
         ", ".join(str(p) for p in csv_paths),
         f"; workbook: {xlsx_path}" if xlsx_path is not None else "",
     )

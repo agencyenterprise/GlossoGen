@@ -12,7 +12,7 @@ never touches the chart/plot tabs.
 | `channel_noise` | `analysis/channel_noise_export/output/channel_noise.xlsx` | [`1iQwl…V2M`](https://docs.google.com/spreadsheets/d/1iQwlajaQxb9GNRMhxerMZXQl1-eR57xtCo3EfsgsV2M) | `run_level`, `message_level`, `round_context`, `budget_aggregate` |
 | `drive_module_repair` | `analysis/baseline_round_success/output/drive_module_repair_baseline.xlsx` | [`105fG…kOnY`](https://docs.google.com/spreadsheets/d/105fG5BbWi8UsS7CO6Kb0YRDaMO5Ff-wLbhS71qjkOnY) | `run_level`, `message_level`, `round_context`, `budget_aggregate` |
 | `protocol_learnability` | `analysis/protocol_learnability_export/output/protocol_learnability.xlsx` | [`1AY1z…Niyg`](https://docs.google.com/spreadsheets/d/1AY1z_UUOasvN1Lmow7rj18QysKoW1uOl0K65q7gNiyg) | `run_level`, `message_level`, `baseline_aggregate`, `baseline_aggregate_llama` |
-| `spot_the_difference` | `analysis/spot_the_difference_export/output/spot_the_difference.xlsx` | [`1x1F0…zKiI`](https://docs.google.com/spreadsheets/d/1x1F0YPsztudX1YwDeWJ-yMp6s3h9uHUBIGzWS79zKiI) | `run_level`, `round_level`, `message_level`, `difference_level`, `team_aggregate` |
+| `spot_the_difference` | `analysis/spot_the_difference_export/output/spot_the_difference.xlsx` | [`1x1F0…zKiI`](https://docs.google.com/spreadsheets/d/1x1F0YPsztudX1YwDeWJ-yMp6s3h9uHUBIGzWS79zKiI) | `run_level`, `round_level`, `message_level`, `team_aggregate` |
 
 The workbook sheet name maps 1:1 to the spreadsheet tab name. Any tab not in the list above (the
 hand-built charts) is never resolved, cleared, or written.

@@ -95,7 +95,6 @@ _TARGETS: tuple[SyncTarget, ...] = (
             "run_level",
             "round_level",
             "message_level",
-            "difference_level",
             "team_aggregate",
         ),
     ),
