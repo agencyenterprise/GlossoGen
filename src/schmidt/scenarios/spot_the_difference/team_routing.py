@@ -51,10 +51,31 @@ CHANNEL_ID_TO_TEAM_ID: dict[str, str] = {
     LINK_B_CHANNEL_ID: TEAM_B_ID,
 }
 
+# Every channel id that carries the budgeted, character-counted communication.
+# ``LINK_CHANNEL_ID`` doubles as the shared two-team link channel under the
+# ``shared_link`` knob (all four viewers are members), so a link message is
+# attributed to its sender's team rather than to the channel.
+LINK_CHANNEL_IDS: frozenset[str] = frozenset(
+    {LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNEL_ID}
+)
+
 
 def team_id_for_agent(agent_id: str) -> str:
     """Map a known agent_id to its team_id. Raises KeyError on unknown IDs."""
     return AGENT_ID_TO_TEAM_ID[agent_id]
+
+
+def team_id_for_link_message(agent_id: str, channel_id: str) -> str | None:
+    """Team a link-channel message counts toward, or ``None`` if it is not a link message.
+
+    Attributes by the *sender's* team, so it is correct whether the link channel
+    is per-team (``link_a`` / ``link_b`` / solo ``link``) or the single shared
+    channel under ``shared_link`` (where all four viewers post to one ``link``).
+    Returns ``None`` for non-link channels (e.g. postmortem) and unknown senders.
+    """
+    if channel_id not in LINK_CHANNEL_IDS:
+        return None
+    return AGENT_ID_TO_TEAM_ID.get(agent_id)
 
 
 def scene_side_for_agent(agent_id: str) -> str:
@@ -85,8 +106,15 @@ def viewer_right_id_for_team(team_id: str) -> str:
     return VIEWER_RIGHT_ID
 
 
-def link_channel_id_for_team(team_id: str) -> str:
-    """Return the link channel ID for ``team_id``."""
+def link_channel_id_for_team(team_id: str, shared_link: bool) -> str:
+    """Return the link channel ID for ``team_id``.
+
+    When ``shared_link`` is set, every team resolves to the single shared
+    ``link`` channel; otherwise each team gets its own ``link_a`` / ``link_b``
+    (or the solo ``link``).
+    """
+    if shared_link:
+        return LINK_CHANNEL_ID
     if team_id == TEAM_A_ID:
         return LINK_A_CHANNEL_ID
     if team_id == TEAM_B_ID:

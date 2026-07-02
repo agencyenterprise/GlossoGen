@@ -43,7 +43,7 @@ from schmidt.scenarios.spot_the_difference.outcome_reconstruction import (
 )
 from schmidt.scenarios.spot_the_difference.scene_generation import DiffCase
 from schmidt.scenarios.spot_the_difference.team_routing import (
-    team_id_for_channel,
+    team_id_for_link_message,
     viewer_left_id_for_team,
     viewer_right_id_for_team,
 )
@@ -73,22 +73,34 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         cases: list[DiffCase],
         postmortem_globally_disabled: bool,
         two_teams: bool,
+        shared_link: bool,
         all_must_submit: bool,
     ) -> None:
         self._cases = cases
         self._two_teams = two_teams
+        self._shared_link = shared_link
         self._all_must_submit = all_must_submit
         self._current_case: DiffCase | None = None
         self._in_postmortem: bool = False
         self._postmortem_globally_disabled: bool = postmortem_globally_disabled
         self._teams: dict[str, TeamState] = self._build_teams(
-            two_teams=two_teams, all_must_submit=all_must_submit
+            two_teams=two_teams, shared_link=shared_link, all_must_submit=all_must_submit
         )
 
     @staticmethod
-    def _build_teams(two_teams: bool, all_must_submit: bool) -> dict[str, TeamState]:
-        """Initialize the team-state map for single or two-team mode."""
-        if two_teams:
+    def _build_teams(
+        two_teams: bool, shared_link: bool, all_must_submit: bool
+    ) -> dict[str, TeamState]:
+        """Initialize the team-state map for single or two-team mode.
+
+        Under ``shared_link`` both teams' ``link_channel_id`` is the single
+        shared channel; character totals are still per-team because messages are
+        attributed to their sender's team, not to the channel.
+        """
+        if two_teams and shared_link:
+            team_ids = [TEAM_A_ID, TEAM_B_ID]
+            link_ids = {TEAM_A_ID: LINK_CHANNEL_ID, TEAM_B_ID: LINK_CHANNEL_ID}
+        elif two_teams:
             team_ids = [TEAM_A_ID, TEAM_B_ID]
             link_ids = {TEAM_A_ID: LINK_A_CHANNEL_ID, TEAM_B_ID: LINK_B_CHANNEL_ID}
         else:
@@ -229,11 +241,25 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         team.team_agreed = agreed
         team.verdict_recorded = True
 
+    async def _notify_team(self, team: TeamState, text: str) -> None:
+        """Deliver a status update to one team, keeping it private under ``shared_link``.
+
+        In isolated / solo mode the link channel is the team's own, so the update
+        posts there. Under a shared link the channel is visible to the opposing
+        team, so the update is pushed privately to each team member instead — the
+        opponent sees the team's link messages but not its budget / lock / result.
+        """
+        if self._shared_link:
+            for member_id in team.member_agent_ids:
+                await self._context.send_update_to_agent(agent_id=member_id, text=text)
+            return
+        await self._context.send_update_to_channel(channel_id=team.link_channel_id, text=text)
+
     async def announce_submission_locked(self, team_id: str) -> None:
-        """Notify the team's link channel that its answer is locked."""
+        """Notify the team that its answer is locked for the round."""
         team = self._teams[team_id]
-        await self._context.send_update_to_channel(
-            channel_id=team.link_channel_id,
+        await self._notify_team(
+            team=team,
             text=f"{SUBMISSION_RECORDED_MARKER}. Your team's answer is locked for this round.",
         )
 
@@ -278,12 +304,12 @@ class SpotTheDifferenceWorld(ScenarioWorld):
             team.reset_for_new_round()
 
     async def emit_round_terminal_notification(self) -> None:
-        """Reveal each team's result on its link channel after the round ends."""
+        """Reveal each team's result after the round ends (private under shared_link)."""
         for team in self._teams.values():
             if len(team.outcomes) == 0:
                 continue
-            await self._context.send_update_to_channel(
-                channel_id=team.link_channel_id,
+            await self._notify_team(
+                team=team,
                 text=_render_terminal_text(outcome=team.outcomes[-1]),
             )
 
@@ -295,8 +321,8 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         token_count: int,
     ) -> None:
         """Accumulate link-channel characters and flag budget exhaustion per team."""
-        _ = agent_id, token_count
-        team_id = team_id_for_channel(channel_id=channel_id)
+        _ = token_count
+        team_id = team_id_for_link_message(agent_id=agent_id, channel_id=channel_id)
         if team_id is None:
             return
         team = self._teams.get(team_id)
@@ -321,7 +347,9 @@ class SpotTheDifferenceWorld(ScenarioWorld):
                 event = await context.next_event()
                 if isinstance(event, RoundAdvancedEvent):
                     continue
-                team_id = team_id_for_channel(channel_id=event.channel_id)
+                team_id = team_id_for_link_message(
+                    agent_id=event.agent_id, channel_id=event.channel_id
+                )
                 if team_id is None:
                     continue
                 await self._send_budget_notifications(team_id=team_id)
@@ -340,8 +368,8 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         used = team.current_round_characters
         if team.round_budget_exceeded and _THRESHOLD_EXCEEDED not in team.notified_thresholds:
             team.notified_thresholds.update([_THRESHOLD_LOW, _THRESHOLD_EXCEEDED])
-            await self._context.send_update_to_channel(
-                channel_id=team.link_channel_id,
+            await self._notify_team(
+                team=team,
                 text=(
                     f"{BUDGET_EXCEEDED_MARKER}. You have sent {used} characters; the budget was "
                     f"{budget}. This round can no longer be won — submit now if you can."
@@ -350,8 +378,8 @@ class SpotTheDifferenceWorld(ScenarioWorld):
             return
         if used >= budget * 0.75 and _THRESHOLD_LOW not in team.notified_thresholds:
             team.notified_thresholds.add(_THRESHOLD_LOW)
-            await self._context.send_update_to_channel(
-                channel_id=team.link_channel_id,
+            await self._notify_team(
+                team=team,
                 text=f"{BUDGET_LOW_MARKER}. {budget - used} of {budget} budget characters remain.",
             )
 

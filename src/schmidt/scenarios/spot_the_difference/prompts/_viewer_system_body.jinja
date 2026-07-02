@@ -16,6 +16,9 @@ You cannot see your partner's scene or the differences. The ONLY way to find one
 
 {% if two_teams %}
 You are competing against another team of two viewers solving the SAME scenes this round. Among teams that correctly find every difference, the team that sent the FEWEST characters on the link channel WINS the round. Be correct first, then be concise. Each round's result (win or loss, both teams' character counts) is reported to you at the start of the next round.
+{% if shared_link %}
+IMPORTANT — the link channel is SHARED with the other team: all four viewers (your team and the opposing team) are in the same link channel. Every message you post there is visible to the opposing team, and you can read theirs — assume they are watching everything you write. Only your own team's characters count toward YOUR score (each team is charged only for its own members' messages).
+{% endif %}
 {% else %}
 Your score each round is the total number of characters you and your partner send on the link channel; minimize it while finding every difference.
 {% endif %}

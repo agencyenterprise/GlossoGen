@@ -84,7 +84,7 @@ from schmidt.scenarios.spot_the_difference.team_routing import (
     AGENT_ID_TO_TEAM_ID,
     link_channel_id_for_team,
     team_id_for_agent,
-    team_id_for_channel,
+    team_id_for_link_message,
     viewer_left_id_for_team,
     viewer_right_id_for_team,
 )
@@ -245,6 +245,7 @@ def _reconstruct_outcomes(
     team_ids: list[str],
     all_must_submit: bool,
     two_teams: bool,
+    shared_link: bool,
     cases: dict[int, SpotTheDifferenceCaseStarted],
 ) -> dict[int, dict[str, DiffOutcome]]:
     """Rebuild ``round_number -> team_id -> DiffOutcome`` via the world's scoring path.
@@ -261,7 +262,7 @@ def _reconstruct_outcomes(
     for team_id in team_ids:
         teams[team_id] = TeamState(
             team_id=team_id,
-            link_channel_id=link_channel_id_for_team(team_id=team_id),
+            link_channel_id=link_channel_id_for_team(team_id=team_id, shared_link=shared_link),
             member_agent_ids=frozenset(members_by_team[team_id]),
             all_must_submit=all_must_submit,
         )
@@ -304,7 +305,9 @@ def _link_messages(
     for event in events:
         if not isinstance(event, MessageSent):
             continue
-        message_team_id = team_id_for_channel(channel_id=event.message.channel_id)
+        message_team_id = team_id_for_link_message(
+            agent_id=event.message.sender_agent_id, channel_id=event.message.channel_id
+        )
         if message_team_id is None or message_team_id not in by_team:
             continue
         by_team[message_team_id].setdefault(event.round_number, []).append(
@@ -347,12 +350,14 @@ def build_spot_context(evaluated: EvaluatedRun) -> SpotRunContext | None:
         return None
     two_teams = TEAM_SOLO_ID not in team_ids
     all_must_submit = bool(evaluated.metadata.scenario_config.get("all_must_submit", True))
+    shared_link = bool(evaluated.metadata.scenario_config.get("shared_link", False))
     cases = _case_events(events=events)
     outcomes = _reconstruct_outcomes(
         events=events,
         team_ids=team_ids,
         all_must_submit=all_must_submit,
         two_teams=two_teams,
+        shared_link=shared_link,
         cases=cases,
     )
     if not outcomes:

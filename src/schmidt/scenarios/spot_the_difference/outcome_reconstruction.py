@@ -18,7 +18,7 @@ from schmidt.scenarios.spot_the_difference.events import (
     SpotTheDifferenceCaseStarted,
 )
 from schmidt.scenarios.spot_the_difference.scene_generation import DiffCase
-from schmidt.scenarios.spot_the_difference.team_routing import team_id_for_channel
+from schmidt.scenarios.spot_the_difference.team_routing import team_id_for_link_message
 from schmidt.scenarios.spot_the_difference.world_state import (
     SubmissionSnapshot,
     TeamState,
@@ -49,7 +49,9 @@ def restore_outcomes_from_events(
             team_bucket = judged_by_round_team.setdefault(round_number, {})
             team_bucket.setdefault(event.team_id, []).append(event)
         elif isinstance(event, MessageSent):
-            message_team_id = team_id_for_channel(channel_id=event.message.channel_id)
+            message_team_id = team_id_for_link_message(
+                agent_id=event.message.sender_agent_id, channel_id=event.message.channel_id
+            )
             if message_team_id is None:
                 continue
             bucket = characters_by_round_team.setdefault(round_number, {})

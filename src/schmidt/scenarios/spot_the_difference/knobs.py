@@ -46,6 +46,13 @@ class SpotTheDifferenceKnobs(BaseKnobs):
     teams that found every difference) can be announced as in-context
     reinforcement.
 
+    ``shared_link`` (two-team only) puts both teams on a single shared link
+    channel instead of the isolated ``link_a`` / ``link_b`` pair, so every
+    viewer can read the other team's link messages; the postmortem channels
+    stay per-team and private. Each team's character count still totals only its
+    own members' messages (attributed by sender), and per-team language/char
+    metrics collapse to one pooled measurement over the shared channel.
+
     ``all_must_submit`` (the default) makes both teammates submit their own
     answer: a team is scored only once both members call ``submit_differences``
     (the round is lost for any team where one member never submits), both
@@ -71,6 +78,7 @@ class SpotTheDifferenceKnobs(BaseKnobs):
     channel_noise_level: float = Field(ge=0.0, le=1.0)
     noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     two_teams: bool = False
+    shared_link: bool = False
     all_must_submit: bool = True
 
     @model_validator(mode="after")
@@ -122,6 +130,14 @@ class SpotTheDifferenceKnobs(BaseKnobs):
             raise ValueError(
                 f"difference_kinds entries must be one of {sorted(_VALID_DIFFERENCE_KINDS)} "
                 f"(got invalid {invalid})"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_shared_link(self) -> Self:
+        if self.shared_link and not self.two_teams:
+            raise ValueError(
+                "shared_link requires two_teams=True (there is no other team to share with)"
             )
         return self
 

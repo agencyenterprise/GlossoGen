@@ -73,17 +73,23 @@ def build_agent_display_names(two_teams: bool) -> dict[str, str]:
     return names
 
 
-def build_channel_display_names(two_teams: bool) -> dict[str, str]:
+def build_channel_display_names(two_teams: bool, shared_link: bool) -> dict[str, str]:
     """Return ``channel_id`` -> display-name map for the current mode."""
+    if two_teams and shared_link:
+        return {
+            link_channel_id_for_team(team_id=TEAM_A_ID, shared_link=True): "link (shared)",
+            postmortem_channel_id_for_team(team_id=TEAM_A_ID): "team discussion (Team A)",
+            postmortem_channel_id_for_team(team_id=TEAM_B_ID): "team discussion (Team B)",
+        }
     if two_teams:
         return {
-            link_channel_id_for_team(team_id=TEAM_A_ID): "link (Team A)",
-            link_channel_id_for_team(team_id=TEAM_B_ID): "link (Team B)",
+            link_channel_id_for_team(team_id=TEAM_A_ID, shared_link=False): "link (Team A)",
+            link_channel_id_for_team(team_id=TEAM_B_ID, shared_link=False): "link (Team B)",
             postmortem_channel_id_for_team(team_id=TEAM_A_ID): "team discussion (Team A)",
             postmortem_channel_id_for_team(team_id=TEAM_B_ID): "team discussion (Team B)",
         }
     return {
-        link_channel_id_for_team(team_id=TEAM_SOLO_ID): "link",
+        link_channel_id_for_team(team_id=TEAM_SOLO_ID, shared_link=False): "link",
         postmortem_channel_id_for_team(team_id=TEAM_SOLO_ID): "team discussion",
     }
 
@@ -92,9 +98,10 @@ def _agent_defs_for_team(
     team_id: str,
     postmortem_initially_active: bool,
     agent_display_names: dict[str, str],
+    shared_link: bool,
 ) -> list[AgentDef]:
     """Build the two symmetric viewer definitions scoped to one team."""
-    link_id = link_channel_id_for_team(team_id=team_id)
+    link_id = link_channel_id_for_team(team_id=team_id, shared_link=shared_link)
     postmortem_id = postmortem_channel_id_for_team(team_id=team_id)
     team_channels: list[str] = [link_id]
     if postmortem_initially_active:
@@ -132,6 +139,7 @@ def build_agent_defs(
                 team_id=team_id,
                 postmortem_initially_active=postmortem_initially_active,
                 agent_display_names=agent_display_names,
+                shared_link=knobs.shared_link,
             )
         )
     return defs
@@ -182,6 +190,7 @@ def build_agents(
                         "channel_noise_level": knobs.channel_noise_level,
                         "noise_replacement_mode": knobs.noise_replacement_mode.value,
                         "two_teams": knobs.two_teams,
+                        "shared_link": knobs.shared_link,
                         "all_must_submit": knobs.all_must_submit,
                         "round_time_budget_seconds": knobs.round_time_budget_seconds,
                         "grid_size": knobs.grid_size,
@@ -198,33 +207,64 @@ def build_agents(
     return agents
 
 
+def _team_members(team_id: str) -> list[str]:
+    """Return the two viewer agent ids on one team."""
+    return [
+        viewer_left_id_for_team(team_id=team_id),
+        viewer_right_id_for_team(team_id=team_id),
+    ]
+
+
+def _postmortem_channel(team_id: str, channel_display_names: dict[str, str]) -> Channel:
+    """Build one team's private postmortem channel."""
+    postmortem_id = postmortem_channel_id_for_team(team_id=team_id)
+    return Channel(
+        channel_id=postmortem_id,
+        name=channel_display_names[postmortem_id],
+        member_agent_ids=_team_members(team_id=team_id),
+    )
+
+
 def _channels_for_team(
     team_id: str,
     postmortem_initially_active: bool,
     channel_display_names: dict[str, str],
 ) -> list[Channel]:
-    """Build link and (optional) postmortem channels scoped to one team."""
-    link_id = link_channel_id_for_team(team_id=team_id)
-    postmortem_id = postmortem_channel_id_for_team(team_id=team_id)
-    members = [
-        viewer_left_id_for_team(team_id=team_id),
-        viewer_right_id_for_team(team_id=team_id),
-    ]
+    """Build a team's own link and (optional) postmortem channels (isolated mode)."""
+    link_id = link_channel_id_for_team(team_id=team_id, shared_link=False)
     channels: list[Channel] = [
         Channel(
             channel_id=link_id,
             name=channel_display_names[link_id],
-            member_agent_ids=list(members),
+            member_agent_ids=_team_members(team_id=team_id),
         ),
     ]
     if postmortem_initially_active:
         channels.append(
-            Channel(
-                channel_id=postmortem_id,
-                name=channel_display_names[postmortem_id],
-                member_agent_ids=list(members),
-            )
+            _postmortem_channel(team_id=team_id, channel_display_names=channel_display_names)
         )
+    return channels
+
+
+def _shared_link_channels(
+    postmortem_initially_active: bool,
+    channel_display_names: dict[str, str],
+) -> list[Channel]:
+    """Build one shared link channel (all four viewers) + per-team postmortems."""
+    link_id = link_channel_id_for_team(team_id=TEAM_A_ID, shared_link=True)
+    all_viewers = _team_members(team_id=TEAM_A_ID) + _team_members(team_id=TEAM_B_ID)
+    channels: list[Channel] = [
+        Channel(
+            channel_id=link_id,
+            name=channel_display_names[link_id],
+            member_agent_ids=all_viewers,
+        ),
+    ]
+    if postmortem_initially_active:
+        for team_id in (TEAM_A_ID, TEAM_B_ID):
+            channels.append(
+                _postmortem_channel(team_id=team_id, channel_display_names=channel_display_names)
+            )
     return channels
 
 
@@ -233,7 +273,16 @@ def build_channels(
     postmortem_initially_active: bool,
     channel_display_names: dict[str, str],
 ) -> list[Channel]:
-    """Return per-team link + (optional) postmortem channels."""
+    """Return the link + (optional) postmortem channels for the current mode.
+
+    Isolated modes give each team its own link channel; ``shared_link`` gives
+    both teams a single shared link channel with per-team private postmortems.
+    """
+    if knobs.two_teams and knobs.shared_link:
+        return _shared_link_channels(
+            postmortem_initially_active=postmortem_initially_active,
+            channel_display_names=channel_display_names,
+        )
     channels: list[Channel] = []
     for team_id in _team_ids_for_mode(two_teams=knobs.two_teams):
         channels.extend(

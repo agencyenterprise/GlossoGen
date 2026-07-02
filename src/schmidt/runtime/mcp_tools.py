@@ -331,7 +331,11 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
 
     @mcp.tool(
         name="read_channel",
-        description="Read the last N messages from a channel.",
+        description=(
+            "Read the last N messages from a channel. Each message includes the name of the "
+            "agent who sent it, so you can always tell who said what without them identifying "
+            "themselves."
+        ),
     )
     async def read_channel(
         ctx: ToolContext, channel_id: str, last_n: int
@@ -376,7 +380,8 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
     @mcp.tool(
         name="send_message",
         description=(
-            "Send a message to a channel. "
+            "Send a message to a channel. Every member of the channel sees it attributed to you "
+            "by name, so you do not need to sign your messages or state who you are. "
             "If new messages arrived since your last read_channel call, "
             "the send is held and the new messages are returned so you can decide what to do. "
             "Set force=true to send regardless of new messages."
