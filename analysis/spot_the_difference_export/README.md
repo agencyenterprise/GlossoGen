@@ -36,11 +36,10 @@ multi-sheet `.xlsx` workbook.
 
 | Frame | Grain | What it holds |
 |---|---|---|
-| `run_level` | (run, team) | per-team outcome numerators (`round_success_count`/`fraction`, `wins_count`/`wins_fraction`, `mean_found_fraction`, `mean_characters_used`, `budget_exceeded_count`, `did_not_submit_count`, `disagreed_count`), per-team headline metrics (`perplexity`, `english_ngram_surprisal`, `message_entropy`, `gzip_compression_ratio`, `language_repetition`, `mcm`, `mcr`), and run-scoped judge metrics (`dialog_count`, `retransmission_request_count`, `language_strangeness`, `slang_emergence`, `neologism`, `content_filter_refusal`) |
-| `round_level` | (run, round, team) | reconstructed outcome (`success`=eligible, `won`, `found_count`/`found_fraction`, `false_positive_count`, `found_all`, `submitted`, `budget_exceeded`, `characters_used`, `members_submitted`/`members_required`/`agreed`, `opponent_characters`/`opponent_found_all`/`opponent_eligible`, `reason`), scene facts (`difference_count`, `difference_kinds`, `object_count`, `grid_size`), and per-round-per-team `perplexity`/`mcr`/`language_repetition` + run-scoped `dialog_count`/`retransmission_request_count` |
-| `message_level` | link message | `message_agent`, pristine `message_text`, `message_text_transmitted` + `chars`/`chars_dropped`/`drop_fraction` (noise-ready), per-message `perplexity`/`english_ngram_surprisal`/`message_entropy`/`gzip_compression_ratio`/`message_repetition_factor`, round team `success`/`won` |
-| `difference_level` | (run, round, planted difference) | scene ground truth (`kind`, `description`, `attribute_name`, `scene_a_region`/`scene_b_region`) and a `found_by_{team_id}` flag per team — enables detection-rate modelling by difference kind / region |
-| `team_aggregate` | (models, team config, budget, noise) | mean ± std of the success and win fractions plus mean characters / perplexity / repetition; a sanity check against `run_level` |
+| `run_level` | (run, team) | per-team outcome numerators (`round_success_count`/`fraction`, `wins_count`/`wins_fraction`, `mean_found_fraction`, `mean_characters_used`, `budget_exceeded_count`, `did_not_submit_count`, `disagreed_count`) and per-team headline metrics (`perplexity`, `english_ngram_surprisal`, `message_entropy`, `gzip_compression_ratio`, `language_repetition`, `mcm`, `mcr`) |
+| `round_level` | (run, round, team) | reconstructed outcome (`success`=eligible, `won`, `found_count`/`found_fraction`, `false_positive_count`, `found_all`, `submitted`, `budget_exceeded`, `characters_used`, `members_submitted`/`members_required`/`agreed`, `opponent_characters`/`opponent_found_all`/`opponent_eligible`, `reason`), scene facts (`difference_count`, `difference_kinds`, `object_count`, `grid_size`), and per-round-per-team `perplexity`/`mcr`/`language_repetition` |
+| `message_level` | link message | `message_agent`, pristine `message_text`, `message_text_transmitted`, `chars`, per-message `perplexity`/`english_ngram_surprisal`/`message_entropy`/`gzip_compression_ratio`/`message_repetition_factor`, round team `success`/`won` |
+| `team_aggregate` | (model_class, viewer models, all_must_submit) | mean ± std of the success and win fractions plus mean characters / perplexity / repetition; a sanity check against `run_level` |
 
 ## Google Sheets
 
@@ -52,7 +51,7 @@ make sync-sheets-spot   # regenerate the workbook, then push the 5 data tabs
 make charts-spot        # (re)build the Plot: * chart tabs + embedded charts
 ```
 
-`sync-sheets-spot` overwrites only the five data tabs (via
+`sync-sheets-spot` overwrites only the four data tabs (via
 `analysis/sheets_sync/`). `charts-spot` owns the `Plot: *` tabs and is
 idempotent — [build_spot_charts.py](build_spot_charts.py) deletes and rebuilds
 every chart tab each run. The two never touch each other's tabs. The chart set
@@ -71,9 +70,5 @@ design:
   the correctness gate and fewest-characters win match what happened live. The
   human-readable `reason` is read from the canonical `RoundResultRecorded`
   events.
-- Baseline-constant columns (`round_time_budget_seconds` = -1 for no budget,
-  `channel_noise_level` = 0, fixed seed) are kept so future budget / noise /
-  single-team cohorts concatenate cleanly.
-- Solo (single-team) runs are handled: `team_id` = `solo`, metric columns read
-  the un-suffixed metric names, and `difference_level` emits a `found_by_solo`
-  column.
+- Solo (single-team) runs are handled: `team_id` = `solo` and the per-team metric
+  columns read the un-suffixed metric names.
