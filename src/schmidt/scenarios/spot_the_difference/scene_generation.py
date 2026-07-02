@@ -25,16 +25,27 @@ distinct cells, so applying the K edits to scene A reproduces scene B exactly;
 ``object_moved`` always crosses a region so the move is relationally visible.
 
 Reconstruction-exactness is not sufficient for a solvable round: because
-bundles are non-unique, two presence/position edits (moved, added, removed)
-that touch objects with the same bundle are interchangeable, and the same pair
-of scenes then admits more than one valid decoding (e.g. "square X moved and
-square Y was removed" versus "square Y moved and square X was removed"). Such a
-case is not uniquely identifiable, so it is re-drawn with a bumped sub-seed
-until every presence/position edit has a distinct bundle.
+bundles are non-unique, the same pair of scenes can admit more than one
+minimal explanation under the difference taxonomy (e.g. "square X moved and
+square Y was removed" versus "square Y moved and square X was removed", or a
+same-bundle remove+add that also reads as a single move). The ground-truth
+judge is pinned to the planted reading, so an ambiguous case fails teams that
+pick an equally valid alternative. Each case is therefore checked for
+**solvability** and re-drawn with a bumped sub-seed until it holds:
+
+- **Unique decodability** — the residual objects (present in exactly one scene)
+  must have a single maximum matching under the move / single-attribute-change
+  edges, sized to the planted attribute-change-plus-move count.
+- **Judge attributability** — no two same-kind differences may share an
+  (attributes, region) signature. The submission judge keys on attributes,
+  coarse region, and change kind while staying lenient about which neighbor
+  relation is cited, so two near-identical ground-truth lines would let it
+  collapse a team's two correct items into one and score the round short.
 """
 
 import logging
 import random
+from itertools import combinations
 from typing import NamedTuple
 
 from schmidt.scenarios.spot_the_difference.ids import DifferenceKind
@@ -65,14 +76,12 @@ _REGION_NAMES: dict[tuple[int, int], str] = {
 
 _MAX_RELATIONS = 2
 
-# Presence/position edits whose objects must have pairwise-distinct bundles for
-# the planted difference set to admit a single valid decoding.
-_PRESENCE_KINDS = frozenset(
-    {DifferenceKind.OBJECT_MOVED, DifferenceKind.OBJECT_ADDED, DifferenceKind.OBJECT_REMOVED}
-)
+# Difference kinds that pair one scene-A object with one scene-B object; their
+# count among the planted edits is the size of the intended residual matching.
+_MATCHING_KINDS = frozenset({DifferenceKind.ATTRIBUTE_CHANGED, DifferenceKind.OBJECT_MOVED})
 
-# Cap on re-draws when a case's presence/position edits collide on a bundle.
-_MAX_IDENTIFIABILITY_ATTEMPTS = 50
+# Cap on re-draws when a case is not uniquely decodable.
+_MAX_DECODABILITY_ATTEMPTS = 50
 
 
 class SceneObject(NamedTuple):
@@ -243,36 +252,127 @@ def describe_difference(
     )
 
 
-def _presence_bundle(difference: PlantedDifference) -> tuple[str, str, str] | None:
-    """Return the bundle of a presence/position edit, or ``None`` for others.
+class _MatchingStats(NamedTuple):
+    """Size of the maximum residual matching and how many matchings achieve it."""
 
-    ``object_added`` carries its object only on the scene-B side; ``object_moved``
-    and ``object_removed`` carry it on the scene-A side.
+    max_size: int
+    matching_count: int
+
+
+def _attribute_diff_count(a: SceneObject, b: SceneObject) -> int:
+    """Return how many of shape/color/size differ between two objects."""
+    return sum((a.shape != b.shape, a.color != b.color, a.size != b.size))
+
+
+def _count_maximum_matchings(
+    residual_a: list[SceneObject], residual_b: list[SceneObject]
+) -> _MatchingStats:
+    """Return the maximum residual matching size and how many matchings reach it.
+
+    A residual-A object pairs with a residual-B object only when the pair is a
+    valid single taxonomy edit that consumes one object from each scene: a move
+    (same bundle, different cell) or a single-attribute change (same cell,
+    bundles differing in exactly one attribute).
     """
-    if difference.kind not in _PRESENCE_KINDS:
-        return None
-    if difference.scene_a_object is not None:
-        return difference.scene_a_object.bundle
-    assert difference.scene_b_object is not None
-    return difference.scene_b_object.bundle
+    adjacency: dict[int, list[int]] = {index: [] for index in range(len(residual_a))}
+    for i, a in enumerate(residual_a):
+        for j, b in enumerate(residual_b):
+            same_cell = (a.column, a.row) == (b.column, b.row)
+            if a.bundle == b.bundle and not same_cell:
+                adjacency[i].append(j)
+            elif same_cell and _attribute_diff_count(a=a, b=b) == 1:
+                adjacency[i].append(j)
+
+    best_size = -1
+    best_count = 0
+    left_count = len(residual_a)
+
+    def _search(index: int, used_right: frozenset[int], size: int) -> None:
+        nonlocal best_size, best_count
+        if index == left_count:
+            if size > best_size:
+                best_size = size
+                best_count = 1
+            elif size == best_size:
+                best_count += 1
+            return
+        _search(index=index + 1, used_right=used_right, size=size)
+        for j in adjacency[index]:
+            if j not in used_right:
+                _search(index=index + 1, used_right=used_right | {j}, size=size + 1)
+
+    _search(index=0, used_right=frozenset(), size=0)
+    return _MatchingStats(max_size=best_size, matching_count=best_count)
 
 
-def case_is_identifiable(differences: tuple[PlantedDifference, ...]) -> bool:
-    """Return whether the planted differences admit a single valid decoding.
+def case_is_uniquely_decodable(case: DiffCase) -> bool:
+    """Return whether the case admits a single minimum-edit explanation.
 
-    Two presence/position edits (moved, added, removed) touching objects with
-    the same ``shape/color/size`` bundle are interchangeable: bundles do not
-    identify an object, so an observer cannot tell which vanished object moved
-    versus was removed (or which appeared object was added versus moved). The
-    case is identifiable only when every presence/position edit has a distinct
-    bundle.
+    The residual objects (present in exactly one scene) must have a unique
+    maximum matching under the move / single-attribute-change edges, and that
+    matching size must equal the planted attribute-change-plus-move count. This
+    rules out both alternative pairings (identical-bundle objects swapping which
+    one moved versus was removed) and cheaper readings (e.g. a same-bundle
+    remove+add that also reads as one move), which the ground-truth judge would
+    otherwise reject even though the submission reproduces scene B.
     """
-    bundles = [
-        bundle
-        for bundle in (_presence_bundle(difference=difference) for difference in differences)
-        if bundle is not None
-    ]
-    return len(bundles) == len(set(bundles))
+    scene_a_set = set(case.scene_a)
+    scene_b_set = set(case.scene_b)
+    residual_a = [obj for obj in case.scene_a if obj not in scene_b_set]
+    residual_b = [obj for obj in case.scene_b if obj not in scene_a_set]
+    stats = _count_maximum_matchings(residual_a=residual_a, residual_b=residual_b)
+    planted_matching = sum(1 for diff in case.differences if diff.kind in _MATCHING_KINDS)
+    return stats.matching_count == 1 and stats.max_size == planted_matching
+
+
+def _judge_signatures(
+    difference: PlantedDifference, grid_size: int
+) -> set[tuple[str, str, str, str]]:
+    """The ``(shape, color, size, region)`` keys a difference presents to the judge.
+
+    Both scene sides are included because either viewer may describe the object
+    by the attributes it sees: an added/removed object contributes one side, a
+    move contributes its origin and destination regions, and an attribute change
+    contributes its before and after bundles at the shared cell's region.
+    """
+    signatures: set[tuple[str, str, str, str]] = set()
+    for obj in (difference.scene_a_object, difference.scene_b_object):
+        if obj is None:
+            continue
+        region = region_of(column=obj.column, row=obj.row, grid_size=grid_size)
+        signatures.add((obj.shape, obj.color, obj.size, region))
+    return signatures
+
+
+def case_is_judge_attributable(case: DiffCase) -> bool:
+    """Return whether the region+attribute+kind judge can tell the differences apart.
+
+    The submission judge matches on the object's attributes, its coarse region,
+    and the change kind, and is deliberately lenient about which neighbor
+    relation is cited. Two planted differences of the SAME kind that also share
+    an ``(attributes, region)`` signature are therefore indistinguishable to it:
+    a correct submission for one can be collapsed onto the other, scoring the
+    team short even though it reproduced scene B. Such a case is not attributable.
+    """
+    for first, second in combinations(case.differences, 2):
+        if first.kind != second.kind:
+            continue
+        first_signatures = _judge_signatures(difference=first, grid_size=case.grid_size)
+        second_signatures = _judge_signatures(difference=second, grid_size=case.grid_size)
+        if first_signatures & second_signatures:
+            return False
+    return True
+
+
+def case_is_solvable(case: DiffCase) -> bool:
+    """Return whether a round admits a single, fairly scorable correct answer.
+
+    Combines geometric unique decodability (the residual objects have one
+    minimum-edit explanation) with judge attributability (no two same-kind
+    differences share an attributes+region signature the relation-lenient judge
+    would conflate).
+    """
+    return case_is_uniquely_decodable(case=case) and case_is_judge_attributable(case=case)
 
 
 def get_cases(
@@ -326,12 +426,13 @@ def _build_one_case(
     difference_count: int,
     kinds: list[DifferenceKind],
 ) -> DiffCase:
-    """Build a case whose planted differences admit a single valid decoding.
+    """Build a case whose planted differences admit a single, fairly scorable answer.
 
     The first attempt consumes ``rng`` (the round RNG already advanced past the
-    object and difference counts) so an identifiable round is byte-identical to
-    a build without the guardrail. A case whose presence/position edits collide
-    on a bundle is re-drawn with a bumped sub-seed until it is identifiable.
+    object and difference counts) so a solvable round is byte-identical to a
+    build without the guardrail. A case that is not solvable — either not
+    uniquely decodable or not judge-attributable — is re-drawn with a bumped
+    sub-seed until it is.
     """
     case = _attempt_case(
         rng=rng,
@@ -343,13 +444,13 @@ def _build_one_case(
         kinds=kinds,
     )
     attempt = 0
-    while not case_is_identifiable(differences=case.differences):
+    while not case_is_solvable(case=case):
         attempt += 1
-        if attempt > _MAX_IDENTIFIABILITY_ATTEMPTS:
+        if attempt > _MAX_DECODABILITY_ATTEMPTS:
             logger.warning(
-                "case %d not identifiable after %d re-draws; using last attempt",
+                "case %d not solvable after %d re-draws; using last attempt",
                 case_number,
-                _MAX_IDENTIFIABILITY_ATTEMPTS,
+                _MAX_DECODABILITY_ATTEMPTS,
             )
             break
         case = _attempt_case(

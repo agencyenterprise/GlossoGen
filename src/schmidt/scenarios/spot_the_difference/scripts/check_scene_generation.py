@@ -3,8 +3,9 @@
 Asserts determinism (same seed -> identical cases), that applying the K
 planted edits to scene A reproduces scene B exactly, that duplicate bundles
 occur at the configured scene sizes, that every ``object_moved`` crosses a
-region, that each difference carries a relational description, and that easy
-rounds collapse to K=1. Run directly:
+region, that each difference carries a relational description, that every round
+is uniquely decodable and judge-attributable, and that easy rounds collapse to
+K=1. Run directly:
 
     VIRTUAL_ENV= uv run --no-sync python -m \
       schmidt.scenarios.spot_the_difference.scripts.check_scene_generation
@@ -14,7 +15,8 @@ from schmidt.scenarios.spot_the_difference.ids import DifferenceKind
 from schmidt.scenarios.spot_the_difference.scene_generation import (
     DiffCase,
     SceneObject,
-    case_is_identifiable,
+    case_is_judge_attributable,
+    case_is_uniquely_decodable,
     get_cases,
     region_of,
     render_scene_relational,
@@ -106,10 +108,12 @@ def main() -> None:
         assert set(case.scene_a) != set(
             case.scene_b
         ), f"case {case.case_number}: scenes are identical"
-        assert case_is_identifiable(differences=case.differences), (
-            f"case {case.case_number}: presence/position edits share a bundle, so the "
-            f"scenes admit more than one valid decoding"
-        )
+        assert case_is_uniquely_decodable(
+            case=case
+        ), f"case {case.case_number}: scenes admit more than one valid decoding"
+        assert case_is_judge_attributable(
+            case=case
+        ), f"case {case.case_number}: two same-kind differences share an attributes+region key"
         for diff in case.differences:
             assert diff.description, f"case {case.case_number}: empty description for {diff.kind}"
         if case.case_number in {1, 2, 3}:

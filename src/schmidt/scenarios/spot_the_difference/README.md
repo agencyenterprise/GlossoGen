@@ -13,12 +13,15 @@ than a serialize-and-diff dump:
 
 - **Duplicates.** The attribute vocabulary is small (4 shapes × 4 colors × 2
   sizes), so at the scene sizes used here identical objects recur. A bundle does
-  not identify an object — position does. Generation still guarantees the round
-  is **uniquely decodable**: no two presence/position edits (moved, added,
-  removed) may touch objects with the same bundle, since that would let the same
-  pair of scenes be read as either "X moved and Y was removed" or "Y moved and X
-  was removed". A colliding case is re-drawn until every such edit has a distinct
-  bundle.
+  not identify an object — position does. Generation still guarantees each round
+  is **solvable** and re-draws until it is:
+  - *Uniquely decodable* — the residual objects (present in exactly one scene)
+    have a single minimum-edit explanation, so the same pair of scenes can't be
+    read as either "X moved and Y was removed" or "Y moved and X was removed"
+    (nor a same-bundle remove+add re-read as one move).
+  - *Judge-attributable* — no two same-kind differences share an
+    (attributes, region) signature, which the relation-lenient submission judge
+    would otherwise collapse into one (scoring a correct team short).
 - **Relational positions, no coordinates.** Agents see each object only as a
   coarse 3×3 region plus relations to other objects in their own scene ("a small
   red square to its left"). The anchors are possibly-duplicate objects in a
