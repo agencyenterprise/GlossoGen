@@ -63,7 +63,6 @@ multi-sheet ``.xlsx`` workbook.
 
 import argparse
 import asyncio
-import json
 import logging
 from pathlib import Path
 from typing import NamedTuple
@@ -87,6 +86,7 @@ from analysis.results_viewer.measurement_scores import (
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
 from analysis.run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
 from analysis.run_export.message_perplexity_scorer import MessagePerplexityScorer
+from analysis.run_export.message_repetition_sidecar import read_message_repetition_factors
 from analysis.run_export.run_context_scan import (
     RunContext,
     ScenarioExportSpec,
@@ -252,32 +252,6 @@ def _counts_per_round(evaluated: EvaluatedRun, metric_name: str) -> dict[int, fl
     return None
 
 
-_REPETITION_SIDECAR = "language_repetition_messages.jsonl"
-
-
-def _message_repetition_factors(run_dir: Path) -> dict[str, float]:
-    """Map ``message_id -> per-message repetition factor`` from the metric's sidecar.
-
-    The ``language_repetition`` metric writes one JSONL row per primary-channel
-    message to ``language_repetition_messages.jsonl`` (an LLM judge factor, >= 1.0,
-    averaged over replicas). Empty when the sidecar is absent (the run was not
-    scored for ``language_repetition``).
-    """
-    sidecar = run_dir / _REPETITION_SIDECAR
-    if not sidecar.exists():
-        return {}
-    factors: dict[str, float] = {}
-    for line in sidecar.read_text().splitlines():
-        if not line.strip():
-            continue
-        row = json.loads(line)
-        message_id = row.get("message_id")
-        factor = row.get("repetition_factor")
-        if isinstance(message_id, str) and isinstance(factor, (int, float)):
-            factors[message_id] = float(factor)
-    return factors
-
-
 def _build_run_level_frame(
     runs: list[EvaluatedRun], contexts: dict[str, RunContext], spec: ScenarioExportSpec
 ) -> pd.DataFrame:
@@ -359,7 +333,7 @@ def _build_message_level_frame(
         events = asyncio.run(load_events(log_path=jsonl_path))
         pristine_by_id = build_pristine_text_index(events=events)
         outcomes = _round_outcomes_from_events(events=events)
-        message_repetition = _message_repetition_factors(run_dir=evaluated.run_dir)
+        message_repetition = read_message_repetition_factors(run_dir=evaluated.run_dir)
         run_model_class = model_class(role_models=context.role_models)
         model_columns = role_model_columns(context=context, spec=spec)
         run_rows: list[dict[str, object]] = []

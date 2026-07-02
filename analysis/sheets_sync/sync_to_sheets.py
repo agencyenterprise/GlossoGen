@@ -27,7 +27,6 @@ Auth is a Google service-account key (headless — no browser, no OAuth consent 
 import argparse
 import csv
 import logging
-import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -38,12 +37,14 @@ import pandas as pd
 from gspread.exceptions import APIError, WorksheetNotFound
 from gspread_dataframe import set_with_dataframe
 
+from analysis.sheets_sync.sheets_client import (
+    CREDENTIALS_ENV,
+    build_sheets_client,
+    default_credentials_path,
+)
+
 logger = logging.getLogger(__name__)
 
-_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
-_CONFIG_DIR = Path.home() / ".config" / "schmidt"
-_DEFAULT_CREDENTIALS = _CONFIG_DIR / "gcp_service_account.json"
-_CREDENTIALS_ENV = "GOOGLE_SERVICE_ACCOUNT_JSON"
 _DEFAULT_BACKUP_DIR = Path("analysis/sheets_sync/backups")
 # Rows per Sheets write. ~1M cells/request succeeds; the 194k-row message_level tab (~5M
 # cells) 500s as one request, so writes are split into slices of this many rows.
@@ -86,20 +87,20 @@ _TARGETS: tuple[SyncTarget, ...] = (
         xlsx=Path("analysis/protocol_learnability_export/output/protocol_learnability.xlsx"),
         data_tabs=("run_level", "message_level", "baseline_aggregate", "baseline_aggregate_llama"),
     ),
+    SyncTarget(
+        name="spot_the_difference",
+        spreadsheet_id="1x1F0YPsztudX1YwDeWJ-yMp6s3h9uHUBIGzWS79zKiI",
+        xlsx=Path("analysis/spot_the_difference_export/output/spot_the_difference.xlsx"),
+        data_tabs=(
+            "run_level",
+            "round_level",
+            "message_level",
+            "difference_level",
+            "team_aggregate",
+        ),
+    ),
 )
 _TARGETS_BY_NAME = {target.name: target for target in _TARGETS}
-
-
-def _build_client(credentials_path: Path) -> gspread.Client:
-    """Authenticate with a Google service-account key (headless — no browser, no consent screen)."""
-    if not credentials_path.exists():
-        raise FileNotFoundError(
-            f"Service-account key not found at {credentials_path}. In the GCP console create a "
-            f"service account and download its JSON key, share each spreadsheet with the service "
-            f"account's email (Editor), then set ${_CREDENTIALS_ENV} or pass --credentials. "
-            f"See analysis/sheets_sync/README.md."
-        )
-    return gspread.service_account(filename=str(credentials_path), scopes=[_SHEETS_SCOPE])
 
 
 def _read_frames(target: SyncTarget) -> dict[str, pd.DataFrame]:
@@ -281,8 +282,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--credentials",
         type=Path,
-        default=Path(os.environ.get(_CREDENTIALS_ENV, str(_DEFAULT_CREDENTIALS))),
-        help=f"Service-account key JSON (default ${_CREDENTIALS_ENV} or {_DEFAULT_CREDENTIALS}).",
+        default=default_credentials_path(),
+        help=f"Service-account key JSON (default ${CREDENTIALS_ENV} or ~/.config/schmidt).",
     )
     parser.add_argument(
         "--backup-dir",
@@ -303,7 +304,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = _parse_args()
     targets = _selected_targets(target_arg=args.target)
-    client = _build_client(credentials_path=args.credentials)
+    client = build_sheets_client(credentials_path=args.credentials)
     for target in targets:
         _sync_target(client=client, target=target, backup_dir=args.backup_dir, dry_run=args.dry_run)
 

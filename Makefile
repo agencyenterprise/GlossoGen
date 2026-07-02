@@ -41,7 +41,15 @@ sync-sheets-protocol:
 	VIRTUAL_ENV= uv run --no-sync --with openpyxl python -m analysis.protocol_learnability_export.export_protocol_learnability
 	VIRTUAL_ENV= PYTHONPATH=. uv run --no-sync --group sheets python analysis/sheets_sync/sync_to_sheets.py --target protocol_learnability
 
-sync-sheets: sync-sheets-baseline sync-sheets-noise sync-sheets-protocol
+sync-sheets-spot:
+	VIRTUAL_ENV= uv run --no-sync --with openpyxl python -m analysis.spot_the_difference_export.export_spot_the_difference
+	VIRTUAL_ENV= PYTHONPATH=. uv run --no-sync --group sheets python analysis/sheets_sync/sync_to_sheets.py --target spot_the_difference
+
+# Rebuild the hand-authored chart tabs in the spot_the_difference spreadsheet.
+charts-spot:
+	VIRTUAL_ENV= PYTHONPATH=. uv run --no-sync --group sheets python analysis/spot_the_difference_export/build_spot_charts.py
+
+sync-sheets: sync-sheets-baseline sync-sheets-noise sync-sheets-protocol sync-sheets-spot
 	@echo "All spreadsheets synced"
 
 lint-frontend:
@@ -75,4 +83,4 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend results-viewer sync-sheets sync-sheets-baseline sync-sheets-noise sync-sheets-protocol export-openapi gen-api-types
+.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend results-viewer sync-sheets sync-sheets-baseline sync-sheets-noise sync-sheets-protocol sync-sheets-spot charts-spot export-openapi gen-api-types
