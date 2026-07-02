@@ -63,6 +63,12 @@ design:
 - **Plot: Perplexity vs Success** — SCATTER: per-(run, team) perplexity vs round-success, one series per model.
 - **Plot: Characters per Model** — COLUMN: per-model mean characters used per round (the efficiency headline).
 
+Per-team / head-to-head (does communication behaviour predict the winner?):
+
+- **Plot: Perplexity vs Wins** — SCATTER: per-(run, team) perplexity vs win fraction, one series per model.
+- **Plot: Winner vs Loser by Model** — two COLUMN charts: winning vs losing team mean perplexity and mean repetition, per model, over every decided round.
+- **Plot: Winner vs Loser Perplexity** — SCATTER: winner perplexity (x) vs loser perplexity (y) per decided round; points below the `y = x` diagonal are rounds the lower-perplexity team won.
+
 ## Notes
 
 - Per-round-per-team outcomes are reconstructed from the JSONL event log through

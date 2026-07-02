@@ -19,6 +19,17 @@ spot_the_difference's two-team design:
   round-success fraction, one series per model.
 - ``Plot: Characters per Model`` — COLUMN chart of per-model mean link characters
   used per round (spot's efficiency headline: the fewest-characters team wins).
+
+Per-team / head-to-head plots (does communication behaviour predict the winner?):
+
+- ``Plot: Perplexity vs Wins`` — SCATTER of per-(run, team) perplexity against the
+  team's win fraction, one series per model.
+- ``Plot: Winner vs Loser by Model`` — two COLUMN charts comparing the mean
+  perplexity and mean repetition of the winning vs losing team, per model, over
+  every decided round (a round with exactly one winner).
+- ``Plot: Winner vs Loser Perplexity`` — SCATTER of the winning team's perplexity
+  (x) against the losing team's perplexity (y) for each decided round; points below
+  the ``y = x`` diagonal are rounds the lower-perplexity team won.
 """
 
 import argparse
@@ -151,6 +162,73 @@ def _perplexity_vs_success_frame(run_level: pd.DataFrame, models: list[str]) -> 
     return frame
 
 
+def _perplexity_vs_wins_frame(run_level: pd.DataFrame, models: list[str]) -> pd.DataFrame:
+    """One row per (run, team): perplexity plus win fraction in the row's model column.
+
+    Mirrors :func:`_perplexity_vs_success_frame` but with the competitive
+    ``wins_fraction`` on the y-axis, so a scatter shows whether a team's typical
+    perplexity tracks how often it beats its opponent.
+    """
+    frame = pd.DataFrame({"perplexity": run_level["perplexity"].to_numpy()})
+    for model in models:
+        column: list[float | None] = []
+        for row_model, wins in zip(run_level["model"], run_level["wins_fraction"]):
+            if row_model == model:
+                column.append(float(wins))
+            else:
+                column.append(None)
+        frame[f"wins: {model}"] = column
+    return frame
+
+
+def _head_to_head_frame(round_level: pd.DataFrame) -> pd.DataFrame:
+    """One row per decided round (exactly one winning team): winner vs loser metrics.
+
+    Restricted to rounds with a single winner and at least one loser (ties and
+    all-lose rounds are dropped), so each row pairs the winning and losing team
+    from the same run, round, and scene pair — a within-round, same-model
+    comparison of who won against how they communicated.
+    """
+    rows: list[dict[str, object]] = []
+    for _, group in round_level.groupby(["run_id", "round_number"]):
+        winners = group[group["won"] == 1]
+        losers = group[group["won"] == 0]
+        if len(winners) != 1 or losers.empty:
+            continue
+        winner = winners.iloc[0]
+        loser = losers.iloc[0]
+        rows.append(
+            {
+                "model": winner["model"],
+                "winner_perplexity": winner["perplexity"],
+                "loser_perplexity": loser["perplexity"],
+                "winner_repetition": winner["language_repetition"],
+                "loser_repetition": loser["language_repetition"],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _winner_loser_by_model_frame(head_to_head: pd.DataFrame) -> pd.DataFrame:
+    """Per-model mean winner vs loser perplexity and repetition over decided rounds."""
+    grouped = head_to_head.groupby("model", as_index=False).agg(
+        winner_perplexity=("winner_perplexity", "mean"),
+        loser_perplexity=("loser_perplexity", "mean"),
+        winner_repetition=("winner_repetition", "mean"),
+        loser_repetition=("loser_repetition", "mean"),
+    )
+    return grouped.sort_values(by="model").reset_index(drop=True)
+
+
+def _winner_loser_scatter_frame(head_to_head: pd.DataFrame) -> pd.DataFrame:
+    """One row per decided round: winner perplexity (x) vs loser perplexity (y).
+
+    Points below the ``y = x`` diagonal are rounds the lower-perplexity team won.
+    """
+    frame = head_to_head[["winner_perplexity", "loser_perplexity"]].dropna()
+    return frame.reset_index(drop=True)
+
+
 def _build_plot_specs(run_level: pd.DataFrame, round_level: pd.DataFrame) -> list[PlotSpec]:
     """Assemble every plot's helper table and chart specs from the exported frames."""
     run_level = _with_model(frame=run_level)
@@ -161,6 +239,10 @@ def _build_plot_specs(run_level: pd.DataFrame, round_level: pd.DataFrame) -> lis
     chars = _characters_per_model_frame(run_level=run_level)
     round_by_round = _round_by_round_frame(round_level=round_level, models=models)
     perplexity_success = _perplexity_vs_success_frame(run_level=run_level, models=models)
+    perplexity_wins = _perplexity_vs_wins_frame(run_level=run_level, models=models)
+    head_to_head = _head_to_head_frame(round_level=round_level)
+    winner_loser_by_model = _winner_loser_by_model_frame(head_to_head=head_to_head)
+    winner_loser_scatter = _winner_loser_scatter_frame(head_to_head=head_to_head)
 
     model_count = len(models)
     success_cols = tuple(range(1, 1 + model_count))
@@ -238,6 +320,56 @@ def _build_plot_specs(run_level: pd.DataFrame, round_level: pd.DataFrame) -> lis
                     series_cols=(1,),
                     x_title="model",
                     y_title="mean characters used",
+                ),
+            ),
+        ),
+        PlotSpec(
+            tab_title=f"{_PLOT_PREFIX}Perplexity vs Wins",
+            frame=perplexity_wins,
+            charts=(
+                ChartSpec(
+                    title="Perplexity vs win fraction (per run-team)",
+                    chart_type="SCATTER",
+                    domain_col=0,
+                    series_cols=scatter_series,
+                    x_title="perplexity (nats)",
+                    y_title="win fraction",
+                ),
+            ),
+        ),
+        PlotSpec(
+            tab_title=f"{_PLOT_PREFIX}Winner vs Loser by Model",
+            frame=winner_loser_by_model,
+            charts=(
+                ChartSpec(
+                    title="Winner vs loser perplexity by model",
+                    chart_type="COLUMN",
+                    domain_col=0,
+                    series_cols=(1, 2),
+                    x_title="model",
+                    y_title="mean perplexity (nats)",
+                ),
+                ChartSpec(
+                    title="Winner vs loser repetition by model",
+                    chart_type="COLUMN",
+                    domain_col=0,
+                    series_cols=(3, 4),
+                    x_title="model",
+                    y_title="mean repetition factor",
+                ),
+            ),
+        ),
+        PlotSpec(
+            tab_title=f"{_PLOT_PREFIX}Winner vs Loser Perplexity",
+            frame=winner_loser_scatter,
+            charts=(
+                ChartSpec(
+                    title="Winner perplexity vs loser perplexity (per decided round)",
+                    chart_type="SCATTER",
+                    domain_col=0,
+                    series_cols=(1,),
+                    x_title="winner perplexity (nats)",
+                    y_title="loser perplexity (nats)",
                 ),
             ),
         ),
