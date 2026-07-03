@@ -403,7 +403,7 @@
       },
       "put": {
         "summary": "Update Evaluation",
-        "description": "Replace the saved evaluation report for a simulation run on disk.\n\nUsed by ``schmidt sync-metadata-to-prod`` to push freshly-evaluated\nmeasurements onto runs that already exist on the remote without\nre-uploading the full bundle. The PUT is a full replace \u2014 every\nexisting measurement is overwritten with the body.",
+        "description": "Replace the saved evaluation report for a simulation run on disk.\n\nUsed by ``schmidt sync-metadata-to-prod`` to push freshly-evaluated\nmeasurements onto runs that already exist on the remote without\nre-uploading the full bundle. The PUT is a full replace \u2014 every\nexisting measurement is overwritten with the body. After writing the\nfile the row's ``evaluation_content_hash`` is refreshed so that later\nsync passes can detect drift cheaply from the paginated runs list.",
         "operationId": "update_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluation_put",
         "parameters": [
           {
@@ -3947,6 +3947,17 @@
           "current_round": {
             "type": "integer",
             "title": "Current Round"
+          },
+          "evaluation_content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Content Hash"
           }
         },
         "type": "object",
@@ -3972,7 +3983,8 @@
           "agent_models",
           "labels",
           "has_note",
-          "current_round"
+          "current_round",
+          "evaluation_content_hash"
         ],
         "title": "RunSummary",
         "description": "Summary of a single simulation run for the runs list endpoint."
