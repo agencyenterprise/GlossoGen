@@ -1696,6 +1696,9 @@ async def _run_sync_metadata_to_prod(args: argparse.Namespace) -> None:
         concurrency=concurrency,
     )
     tally = await run_metadata_sync(spec=spec)
-    print(f"Done. synced={len(tally.synced)}  failed={len(tally.failed)}")
+    print(
+        f"Done. labels={len(tally.synced_labels)}  eval={len(tally.synced_eval)}  "
+        f"unchanged={len(tally.unchanged)}  failed={len(tally.failed)}"
+    )
     if tally.failed:
         raise SystemExit(1)

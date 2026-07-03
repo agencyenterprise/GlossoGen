@@ -16,7 +16,8 @@ from schmidt.db.rows import GroupRow, RunRow, UserLastActiveGroupRow
 _GROUP_COLUMNS = "id, clerk_org_id, slug, name, created_at"
 _RUN_COLUMNS = (
     "id, group_id, scenario, run_dir_name, status, created_at, "
-    "created_by_user_id, source_run_scenario, source_run_dir_name"
+    "created_by_user_id, source_run_scenario, source_run_dir_name, "
+    "evaluation_content_hash"
 )
 
 
@@ -379,4 +380,51 @@ def _run_row_from_tuple(row: TupleRow) -> RunRow:
         created_by_user_id=row[6],
         source_run_scenario=row[7],
         source_run_dir_name=row[8],
+        evaluation_content_hash=row[9],
     )
+
+
+async def update_run_evaluation_content_hash(
+    conn: AsyncConnection[TupleRow],
+    group_id: UUID,
+    scenario: str,
+    run_dir_name: str,
+    content_hash: str,
+) -> None:
+    """Persist the digest of the last ``PUT /evaluation`` for a run.
+
+    Called by the eval PUT handler immediately after ``write_report``. The
+    ``group_id`` scope is defensive — the row's identity is already
+    ``(scenario, run_dir_name)`` unique — so an UPDATE against a row
+    belonging to another group is a no-op instead of a cross-tenant leak.
+    An UPDATE that matches zero rows (e.g. a run only present on the
+    filesystem, missed by the runs index) is not an error; the sync tool
+    will detect the mismatch on the next pass and re-PUT.
+    """
+    async with conn.cursor() as cur:
+        await cur.execute(
+            """
+            UPDATE runs SET evaluation_content_hash = %s
+             WHERE group_id = %s AND scenario = %s AND run_dir_name = %s
+            """,
+            (content_hash, group_id, scenario, run_dir_name),
+        )
+
+
+async def list_runs_missing_evaluation_content_hash(
+    conn: AsyncConnection[TupleRow],
+) -> list[RunRow]:
+    """Return every run row whose ``evaluation_content_hash`` is NULL.
+
+    Used by ``scripts/backfill_evaluation_content_hash.py`` to seed the
+    column for pre-existing rows written before migration 0004 landed.
+    Not group-scoped: the backfill script walks every group's runs.
+    """
+    async with conn.cursor() as cur:
+        await cur.execute(f"""
+            SELECT {_RUN_COLUMNS} FROM runs
+             WHERE evaluation_content_hash IS NULL
+             ORDER BY scenario, run_dir_name
+            """)
+        rows = await cur.fetchall()
+    return [_run_row_from_tuple(row) for row in rows]

@@ -14,8 +14,13 @@ import orjson
 from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
+from schmidt.db.queries import update_run_evaluation_content_hash
 from schmidt.eval_manifest import read_eval_manifest
-from schmidt.evaluation.reports.evaluation_report import EvaluationReport, write_report
+from schmidt.evaluation.reports.evaluation_report import (
+    EvaluationReport,
+    compute_measurements_hash,
+    write_report,
+)
 from schmidt.models.event import RunStatus, SimulationEnded
 from schmidt.run_archive import move_run_to_trash
 from schmidt.scenario_registry import SCENARIO_REGISTRY
@@ -569,18 +574,33 @@ async def update_evaluation(
     Used by ``schmidt sync-metadata-to-prod`` to push freshly-evaluated
     measurements onto runs that already exist on the remote without
     re-uploading the full bundle. The PUT is a full replace — every
-    existing measurement is overwritten with the body.
+    existing measurement is overwritten with the body. After writing the
+    file the row's ``evaluation_content_hash`` is refreshed so that later
+    sync passes can detect drift cheaply from the paginated runs list.
     """
     resolved = await resolve_run_or_404(
         request=request, scenario=scenario, run_dir_name=run_dir_name
     )
+    identity = get_identity(request=request)
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
     report_path = resolved.run_dir / f"{resolved.scenario_name}_report.json"
     await write_report(report=body, report_path=report_path)
+    content_hash = compute_measurements_hash(measurements=body.measurements)
+    pool = request.app.state.db_pool
+    if pool is not None:
+        async with pool.connection() as conn:
+            await update_run_evaluation_content_hash(
+                conn=conn,
+                group_id=identity.active_group_id,
+                scenario=scenario,
+                run_dir_name=run_dir_name,
+                content_hash=content_hash,
+            )
     logger.info(
-        "Updated evaluation report for run %s (%d measurements)",
+        "Updated evaluation report for run %s (%d measurements, hash=%s)",
         run_id,
         len(body.measurements),
+        content_hash,
     )
     return UpdateEvaluationResponse(
         run_id=run_id,

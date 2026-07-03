@@ -39,7 +39,7 @@ class PushSpec:
 
 
 @dataclass(frozen=True)
-class _LocalRun:
+class LocalRun:
     """A local run dir that matches the push filter, ready for upload."""
 
     run_id: str
@@ -83,14 +83,14 @@ def _load_labels(run_dir: Path) -> list[str] | None:
     return result
 
 
-def collect_local_runs(*, spec: PushSpec) -> list[_LocalRun]:
+def collect_local_runs(*, spec: PushSpec) -> list[LocalRun]:
     """Walk the local runs directory and return everything matching the spec.
 
     Filter precedence: scenario allowlist (if set) → label-set
     superset → optional report-present check. Returns runs sorted by
     ``run_id``.
     """
-    results: list[_LocalRun] = []
+    results: list[LocalRun] = []
     if not spec.runs_dir.is_dir():
         return results
     for scenario_dir in spec.runs_dir.iterdir():
@@ -114,7 +114,7 @@ def collect_local_runs(*, spec: PushSpec) -> list[_LocalRun]:
             if spec.require_report and not (run_dir / report_filename).exists():
                 continue
             results.append(
-                _LocalRun(
+                LocalRun(
                     run_id=f"{scenario_name}/{run_dir.name}",
                     scenario_name=scenario_name,
                     run_dir_name=run_dir.name,
@@ -156,7 +156,7 @@ async def fetch_remote_run_ids(
     return seen
 
 
-def _make_bundle(*, run: _LocalRun) -> bytes:
+def _make_bundle(*, run: LocalRun) -> bytes:
     """Build the tar.gz bundle for a local run (sync, runs in a worker thread)."""
     original_timestamp = int(run.run_dir_name.split("_")[0])
     return build_bundle_bytes(
@@ -171,7 +171,7 @@ async def _post_bundle(
     *,
     client: httpx.AsyncClient,
     credentials: Credentials,
-    run: _LocalRun,
+    run: LocalRun,
     bundle_bytes: bytes,
 ) -> dict[str, object]:
     """POST a built bundle to the remote import endpoint and return the JSON body."""
@@ -190,7 +190,7 @@ async def _upload_with_retry(
     *,
     client: httpx.AsyncClient,
     credentials: Credentials,
-    run: _LocalRun,
+    run: LocalRun,
 ) -> dict[str, object]:
     """Build + POST a bundle, retrying transient errors up to ``_MAX_RETRIES`` times."""
     last_error: Exception | None = None
@@ -231,7 +231,7 @@ async def _push_one(
     *,
     client: httpx.AsyncClient,
     credentials: Credentials,
-    run: _LocalRun,
+    run: LocalRun,
     semaphore: asyncio.Semaphore,
     position: int,
     total: int,
@@ -280,7 +280,7 @@ async def run_push_to_prod(*, spec: PushSpec) -> PushTally:
         remote_ids = await fetch_remote_run_ids(client=client, credentials=credentials)
         logger.info("Remote already has: %d runs", len(remote_ids))
 
-        to_upload: list[_LocalRun] = []
+        to_upload: list[LocalRun] = []
         for run in local:
             if run.run_id in remote_ids:
                 tally.skipped.append(run.run_id)

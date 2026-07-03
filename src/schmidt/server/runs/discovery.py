@@ -402,12 +402,14 @@ def _live_fields(
 async def build_summary(
     scenario_name: str,
     timestamp_dir: Path,
+    evaluation_content_hash: str | None,
 ) -> RunSummary | None:
     """Build a RunSummary for a single run directory.
 
     Returns None if the directory does not contain a valid run.
     For completed runs, reads from ``run_summary_cache.json`` when present,
-    skipping the JSONL scan entirely.
+    skipping the JSONL scan entirely. ``evaluation_content_hash`` is set by
+    the caller from the run's DB row (``None`` in no-DB local mode).
     """
     jsonl_path = timestamp_dir / f"{scenario_name}.jsonl"
     if not jsonl_path.exists():
@@ -448,6 +450,7 @@ async def build_summary(
             labels=labels,
             has_note=has_note,
             current_round=cache.current_round,
+            evaluation_content_hash=evaluation_content_hash,
         )
 
     fork_source = _read_fork_source(run_dir=timestamp_dir)
@@ -525,6 +528,7 @@ async def build_summary(
             labels=labels,
             has_note=has_note,
             current_round=scan.current_round,
+            evaluation_content_hash=evaluation_content_hash,
         )
 
     manifest = read_manifest(run_dir=timestamp_dir)
@@ -562,6 +566,7 @@ async def build_summary(
         labels=labels,
         has_note=has_note,
         current_round=scan.current_round,
+        evaluation_content_hash=evaluation_content_hash,
     )
 
 
@@ -570,12 +575,16 @@ class RunDescriptor(NamedTuple):
 
     Carries only what is needed to apply cheap filters (scenario, labels) and
     sort newest-first, so a listing can defer the expensive ``build_summary``
-    call to the page actually returned.
+    call to the page actually returned. ``evaluation_content_hash`` is
+    pre-fetched from the ``runs`` row (``None`` in no-DB local mode) so
+    ``build_summary`` can populate the sync-drift signal without a second
+    DB round-trip per enrichment.
     """
 
     scenario_name: str
     run_dir_name: str
     timestamp: datetime
+    evaluation_content_hash: str | None
 
 
 def discover_run_descriptors(runs_dir: Path) -> list[RunDescriptor]:
@@ -605,6 +614,7 @@ def discover_run_descriptors(runs_dir: Path) -> list[RunDescriptor]:
                     scenario_name=scenario_name,
                     run_dir_name=timestamp_dir.name,
                     timestamp=_timestamp_from_dir(dir_name=timestamp_dir.name),
+                    evaluation_content_hash=None,
                 )
             )
 
@@ -635,6 +645,7 @@ async def discover_runs(runs_dir: Path) -> list[RunSummary]:
                     build_summary(
                         scenario_name=scenario_name,
                         timestamp_dir=timestamp_dir,
+                        evaluation_content_hash=None,
                     )
                 )
             )
