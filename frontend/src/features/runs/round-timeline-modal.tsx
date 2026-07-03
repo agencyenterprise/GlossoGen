@@ -6,12 +6,12 @@ import { Check, Hash, X } from "lucide-react";
 import type { components } from "@/types/api.gen";
 import type { DisplayEntry } from "./display-entry";
 import { formatTime, humanize } from "./format";
+import type { ScenarioPlugin } from "./scenario-plugin";
 import { getScenarioPlugin } from "./scenario-registry";
 
 type RunDetailResponse = components["schemas"]["RunDetailResponse"];
 type ScenarioExtras = NonNullable<RunDetailResponse["scenario_extras"]>;
 type RoundEnding = components["schemas"]["RoundEnding"];
-type ContainerYardMoveMetadata = components["schemas"]["ContainerYardMoveMetadata"];
 
 interface RoundTimelineModalProps {
   roundNumber: number;
@@ -34,25 +34,12 @@ interface TimelineRow {
   explanation: string;
 }
 
-function formatMoveArgs(args: Record<string, unknown>): string {
-  const from = typeof args.from_slot === "number" ? args.from_slot : "?";
-  const to = typeof args.to_slot === "number" ? args.to_slot : "?";
-  return `slot ${from} → slot ${to}`;
-}
-
-function formatExpectedMove(metadata: ContainerYardMoveMetadata): string {
-  const from = metadata.expected_from_slot === null ? "?" : String(metadata.expected_from_slot);
-  const to = metadata.expected_to_slot === null ? "?" : String(metadata.expected_to_slot);
-  return `slot ${from} → slot ${to}`;
-}
-
-function moveVerdictAccepted(metadata: ContainerYardMoveMetadata): boolean | null {
-  if (metadata.accepted) return true;
-  if (metadata.soft_rejected) return null;
-  return false;
-}
-
-function buildTimelineRows(messages: DisplayEntry[], primaryChannelId: string): TimelineRow[] {
+function buildTimelineRows(
+  messages: DisplayEntry[],
+  primaryChannelId: string,
+  plugin: ScenarioPlugin,
+  extras: ScenarioExtras | null
+): TimelineRow[] {
   const rows: TimelineRow[] = [];
   for (const m of messages) {
     if (m.is_reasoning || m.is_run_cycle_failure || m.is_notification_result) continue;
@@ -74,21 +61,28 @@ function buildTimelineRows(messages: DisplayEntry[], primaryChannelId: string): 
       });
       continue;
     }
-    if (m.is_tool_use && m.move_metadata !== null) {
-      rows.push({
-        key: m.message_id,
-        timestamp: m.timestamp,
-        kind: "judged_tool",
-        sender: m.sender_agent_id,
-        text: formatMoveArgs(m.tool_arguments),
-        toolName: "move_container",
-        verdictAccepted: moveVerdictAccepted(m.move_metadata),
-        expected: formatExpectedMove(m.move_metadata),
-        explanation: m.move_metadata.explanation,
+    if (m.is_tool_use) {
+      const verdict = plugin.summarizeToolVerdict({
+        toolName: m.tool_name,
+        callId: m.call_id,
+        toolArguments: m.tool_arguments,
+        extras,
       });
+      if (verdict !== null) {
+        rows.push({
+          key: m.message_id,
+          timestamp: m.timestamp,
+          kind: "judged_tool",
+          sender: m.sender_agent_id,
+          text: verdict.actionText,
+          toolName: verdict.toolLabel,
+          verdictAccepted: verdict.accepted,
+          expected: verdict.expected,
+          explanation: verdict.explanation,
+        });
+      }
       continue;
     }
-    if (m.is_tool_use) continue;
     if (m.channel_id !== primaryChannelId) continue;
     rows.push({
       key: m.message_id,
@@ -160,8 +154,8 @@ export function RoundTimelineModal({
   }, [onClose]);
 
   const rows = useMemo(
-    () => buildTimelineRows(messages, primaryChannelId),
-    [messages, primaryChannelId]
+    () => buildTimelineRows(messages, primaryChannelId, plugin, scenarioExtras),
+    [messages, primaryChannelId, plugin, scenarioExtras]
   );
 
   return createPortal(

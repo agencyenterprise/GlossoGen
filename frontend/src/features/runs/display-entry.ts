@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { components } from "@/types/api.gen";
 import { parseNotificationResult, TOOL_NAME_READ_NOTIFICATIONS } from "./notification-display";
 
@@ -5,7 +6,6 @@ type ChannelMessage = components["schemas"]["ChannelMessage"];
 type ReasoningEntry = components["schemas"]["ReasoningEntry"];
 type ToolUseEntry = components["schemas"]["ToolUseEntry"];
 type AgentRunCycleFailedEntry = components["schemas"]["AgentRunCycleFailedEntry"];
-type ContainerYardMoveMetadata = components["schemas"]["ContainerYardMoveMetadata"];
 type ScenarioExtras = NonNullable<components["schemas"]["RunDetailResponse"]["scenario_extras"]>;
 
 /** Generic LLM-judge ground truth for a single judged action tool call.
@@ -13,8 +13,9 @@ type ScenarioExtras = NonNullable<components["schemas"]["RunDetailResponse"]["sc
  *  Scenarios whose executor submits a free-text action scored by an LLM
  *  judge surface the same three facts per call, normalized backend-side into
  *  the uniform ``judge_ground_truth_by_call_id`` map on their
- *  ``scenario_extras``. The richer container-yard move verdict keeps its own
- *  ``move_metadata`` channel. */
+ *  ``scenario_extras``. Bespoke per-scenario verdicts (e.g. the container-yard
+ *  move verdict) render through the scenario plug-in's ``renderToolMetadata``
+ *  hook instead, carried on ``DisplayEntry.tool_metadata``. */
 export type JudgeGroundTruthMetadata = components["schemas"]["JudgeGroundTruthMetadata"];
 
 /** Extract the per-call LLM-judge ground truth from a run's
@@ -66,7 +67,10 @@ export interface DisplayEntry {
   /** Paired entry's message_id for click-to-scroll (empty when there is no pair). */
   paired_message_id: string;
   judge_metadata: JudgeGroundTruthMetadata | null;
-  move_metadata: ContainerYardMoveMetadata | null;
+  /** Scenario-specific supplementary content for this tool call, produced by
+   *  the scenario plug-in's ``renderToolMetadata`` hook. Null for tools and
+   *  scenarios with nothing to add (e.g. the container-yard move verdict). */
+  tool_metadata: ReactNode;
   /** Exception class name for run-cycle failure entries (empty otherwise). */
   error_type: string;
   /** Retry-loop cycle index for run-cycle failure entries (0 otherwise). */
@@ -86,7 +90,7 @@ const EMPTY_ENTRY_DEFAULTS = {
   call_id: "",
   paired_message_id: "",
   judge_metadata: null as JudgeGroundTruthMetadata | null,
-  move_metadata: null as ContainerYardMoveMetadata | null,
+  tool_metadata: null as ReactNode,
   error_type: "",
   cycle: 0,
 };
@@ -96,17 +100,18 @@ const EMPTY_ENTRY_DEFAULTS = {
  *
  *  ``judgeMetadataByCallId`` carries the generic LLM-judge ground truth
  *  keyed by tool ``call_id`` (empty for scenarios with no judged action).
- *  ``moveMetadataByCallId`` carries the container-yard-only move_container
- *  verdict keyed by tool ``call_id`` (empty for non-yard runs). Plumbed in
- *  by the run-detail page from ``RunDetailResponse.scenario_extras`` and the
- *  live SSE stream. */
+ *  ``toolMetadataByCallId`` carries scenario-specific supplementary tool-call
+ *  content pre-rendered by the scenario plug-in's ``renderToolMetadata`` hook,
+ *  keyed by tool ``call_id`` (empty for scenarios/tools with nothing to add).
+ *  Both are plumbed in by the run-detail page from
+ *  ``RunDetailResponse.scenario_extras`` and the live SSE stream. */
 export function mergeEntries(
   messages: ChannelMessage[],
   reasoning: ReasoningEntry[],
   toolUse: ToolUseEntry[],
   runCycleFailures: AgentRunCycleFailedEntry[],
   judgeMetadataByCallId: Record<string, JudgeGroundTruthMetadata>,
-  moveMetadataByCallId: Record<string, ContainerYardMoveMetadata>
+  toolMetadataByCallId: Record<string, ReactNode>
 ): DisplayEntry[] {
   const channelEntries: DisplayEntry[] = messages.map(m => ({
     ...EMPTY_ENTRY_DEFAULTS,
@@ -170,7 +175,7 @@ export function mergeEntries(
       call_id: t.call_id,
       paired_message_id: split ? resultMessageId : "",
       judge_metadata: judgeMetadataByCallId[t.call_id] ?? null,
-      move_metadata: moveMetadataByCallId[t.call_id] ?? null,
+      tool_metadata: toolMetadataByCallId[t.call_id] ?? null,
     });
     if (split && t.result_timestamp !== null) {
       toolEntries.push({

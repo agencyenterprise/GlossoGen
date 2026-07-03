@@ -1242,7 +1242,7 @@ function ToolOrNotification({ entry }: { entry: DisplayEntry }) {
       arguments={entry.tool_arguments}
       result={entry.tool_result}
       judgeMetadata={entry.judge_metadata}
-      moveMetadata={entry.move_metadata}
+      toolMetadata={entry.tool_metadata}
     />
   );
 }

@@ -1,12 +1,10 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { ChevronRight, Wrench } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
-import type { components } from "@/types/api.gen";
 import type { JudgeGroundTruthMetadata } from "./display-entry";
-
-type ContainerYardMoveMetadata = components["schemas"]["ContainerYardMoveMetadata"];
 
 /** Strip the MCP prefix from tool names for display. */
 function cleanToolName(name: string): string {
@@ -35,69 +33,10 @@ interface ToolCallDisplayProps {
   arguments: Record<string, unknown>;
   result: string | null;
   judgeMetadata?: JudgeGroundTruthMetadata | null;
-  moveMetadata?: ContainerYardMoveMetadata | null;
-}
-
-function ExpectedVsSubmittedRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="font-medium text-muted-foreground">{label}:</span>{" "}
-      <span className="whitespace-pre-wrap">{value}</span>
-    </div>
-  );
-}
-
-function formatExpectedSlots(metadata: ContainerYardMoveMetadata): string {
-  const from = metadata.expected_from_slot === null ? "?" : String(metadata.expected_from_slot);
-  const to = metadata.expected_to_slot === null ? "?" : String(metadata.expected_to_slot);
-  return `slot ${from} → slot ${to}`;
-}
-
-function moveVerdictLabel(metadata: ContainerYardMoveMetadata): {
-  label: string;
-  className: string;
-} {
-  if (metadata.accepted) {
-    return { label: "accepted", className: "text-emerald-500" };
-  }
-  if (metadata.soft_rejected) {
-    return { label: "soft-rejected (retryable)", className: "text-amber-500" };
-  }
-  return { label: "rejected (round failed)", className: "text-red-500" };
-}
-
-function YardMoveMetadataBlock({ metadata }: { metadata: ContainerYardMoveMetadata }) {
-  const verdict = moveVerdictLabel(metadata);
-  return (
-    <div>
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        Move Verdict (step {metadata.step_index})
-      </div>
-      <div className="space-y-1 rounded bg-muted p-2 font-mono text-[10px]">
-        <ExpectedVsSubmittedRow label="expected" value={formatExpectedSlots(metadata)} />
-        <ExpectedVsSubmittedRow
-          label="submitted"
-          value={`slot ${metadata.submitted_from_slot} → slot ${metadata.submitted_to_slot}`}
-        />
-        <div>
-          <span className="font-medium text-muted-foreground">verdict:</span>{" "}
-          <span className={cn("font-medium", verdict.className)}>{verdict.label}</span>
-        </div>
-        <div>
-          <span className="font-medium text-muted-foreground">checks:</span>{" "}
-          <span>
-            from_occupied={String(metadata.verdict.from_slot_occupied)}, to_empty=
-            {String(metadata.verdict.to_slot_empty)}, from_correct=
-            {String(metadata.verdict.from_slot_correct)}, to_correct=
-            {String(metadata.verdict.to_slot_correct)}
-          </span>
-        </div>
-        {metadata.explanation !== "" ? (
-          <ExpectedVsSubmittedRow label="explanation" value={metadata.explanation} />
-        ) : null}
-      </div>
-    </div>
-  );
+  /** Scenario-specific supplementary content rendered by the scenario
+   *  plug-in's ``renderToolMetadata`` hook (e.g. the container-yard move
+   *  verdict). Null/undefined for tools and scenarios with nothing to add. */
+  toolMetadata?: ReactNode;
 }
 
 /** Renders a single tool call as a collapsible row. */
@@ -106,7 +45,7 @@ export function ToolCallDisplay({
   arguments: args,
   result,
   judgeMetadata,
-  moveMetadata,
+  toolMetadata,
 }: ToolCallDisplayProps) {
   const [expanded, setExpanded] = useState(false);
   const displayName = cleanToolName(toolName);
@@ -197,7 +136,7 @@ export function ToolCallDisplay({
             </div>
           ) : null}
 
-          {moveMetadata ? <YardMoveMetadataBlock metadata={moveMetadata} /> : null}
+          {toolMetadata}
         </div>
       ) : null}
     </div>

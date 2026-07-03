@@ -3,18 +3,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { components } from "@/types/api.gen";
 import type { JudgeGroundTruthMetadata } from "@/features/runs/display-entry";
+import type { LiveJudgeConfig } from "@/features/runs/scenario-plugin";
 import { buildApiUrlWithToken } from "./api-client";
 
-/** MCP tool names whose results carry an LLM-judge verdict, paired live from
- *  the matching ``*_judged`` SSE event. One per judged-action scenario;
- *  drive_module_repair lists both its current ``service_component`` name and
- *  the pre-rename ``replace_component`` recorded in older run logs. */
-const JUDGED_ACTION_TOOL_NAMES = new Set<string>([
-  "stabilize_veyru",
-  "actuate_panel",
-  "service_component",
-  "replace_component",
-]);
+/** Payload shared by every judged-action scenario's ``*_judged`` SSE event.
+ *  The expected action arrives under ``expected_actions`` (veyru,
+ *  orbital_anomaly) or ``expected_action`` (drive_module_repair); the handler
+ *  coalesces the two. Scenario-specific extra fields are ignored here. */
+interface JudgeVerdictSsePayload {
+  event_id: string;
+  agent_id: string;
+  judge_match: boolean;
+  judge_explanation: string;
+  expected_actions?: string;
+  expected_action?: string;
+}
 
 type ChannelMessage = components["schemas"]["ChannelMessage"];
 type ReasoningEntry = components["schemas"]["ReasoningEntry"];
@@ -33,9 +36,6 @@ type SSEToolResultReceived = components["schemas"]["SSEToolResultReceived"];
 type SSEAgentCostUpdated = components["schemas"]["SSEAgentCostUpdated"];
 type SSEDebugLog = components["schemas"]["SSEDebugLog"];
 type SSEAgentRunCycleFailed = components["schemas"]["SSEAgentRunCycleFailed"];
-type SSEVeyruStabilizationJudged = components["schemas"]["SSEVeyruStabilizationJudged"];
-type SSEOrbitalAnomalyActuationJudged = components["schemas"]["SSEOrbitalAnomalyActuationJudged"];
-type SSEDriveModuleReplacementJudged = components["schemas"]["SSEDriveModuleReplacementJudged"];
 type AgentRunCycleFailedEntry = components["schemas"]["AgentRunCycleFailedEntry"];
 
 /** State returned by the useEventStream hook. */
@@ -75,7 +75,8 @@ export function useEventStream(
   runId: string,
   enabled: boolean,
   knownEventIds: Set<string>,
-  retryOnFailure: boolean
+  retryOnFailure: boolean,
+  liveJudge: LiveJudgeConfig | null
 ): EventStreamState {
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [reasoning, setReasoning] = useState<ReasoningEntry[]>([]);
@@ -129,6 +130,7 @@ export function useEventStream(
     function connect() {
       if (cancelled) return;
 
+      const judgedToolNames = new Set<string>(liveJudge?.judgedToolNames ?? []);
       const url = buildApiUrlWithToken({
         path: `/api/g/{group_slug}/runs/${runId}/events`,
         searchParams: new URLSearchParams(),
@@ -251,7 +253,7 @@ export function useEventStream(
       eventSource.addEventListener("tool_result_received", (e: MessageEvent) => {
         const data: SSEToolResultReceived = JSON.parse(e.data);
         if (isDuplicate(data.event_id)) return;
-        if (JUDGED_ACTION_TOOL_NAMES.has(data.tool_name)) {
+        if (judgedToolNames.has(data.tool_name)) {
           const queue = pendingJudgeMetadataRef.current.get(data.agent_id);
           if (queue && queue.length > 0) {
             const attachedMetadata = queue.shift();
@@ -304,35 +306,28 @@ export function useEventStream(
         queueMap.set(agentId, existing);
       }
 
-      eventSource.addEventListener("veyru_stabilization_judged", (e: MessageEvent) => {
-        const data: SSEVeyruStabilizationJudged = JSON.parse(e.data);
+      /** Normalize a scenario's ``*_judged`` payload and queue it for the
+       *  next matching tool_result. Shared across every judged-action
+       *  scenario; the expected-action field name is coalesced. */
+      function handleJudgeVerdict(e: MessageEvent) {
+        const data: JudgeVerdictSsePayload = JSON.parse(e.data);
         if (isDuplicate(data.event_id)) return;
+        let expectedActions: string;
+        if (data.expected_actions !== undefined) {
+          expectedActions = data.expected_actions;
+        } else {
+          expectedActions = data.expected_action ?? "";
+        }
         enqueueJudgeMetadata(data.agent_id, {
-          expected_actions: data.expected_actions,
+          expected_actions: expectedActions,
           judge_match: data.judge_match,
           judge_explanation: data.judge_explanation,
         });
-      });
+      }
 
-      eventSource.addEventListener("orbital_anomaly_actuation_judged", (e: MessageEvent) => {
-        const data: SSEOrbitalAnomalyActuationJudged = JSON.parse(e.data);
-        if (isDuplicate(data.event_id)) return;
-        enqueueJudgeMetadata(data.agent_id, {
-          expected_actions: data.expected_actions,
-          judge_match: data.judge_match,
-          judge_explanation: data.judge_explanation,
-        });
-      });
-
-      eventSource.addEventListener("drive_module_replacement_judged", (e: MessageEvent) => {
-        const data: SSEDriveModuleReplacementJudged = JSON.parse(e.data);
-        if (isDuplicate(data.event_id)) return;
-        enqueueJudgeMetadata(data.agent_id, {
-          expected_actions: data.expected_action,
-          judge_match: data.judge_match,
-          judge_explanation: data.judge_explanation,
-        });
-      });
+      for (const eventName of liveJudge?.sseEventNames ?? []) {
+        eventSource.addEventListener(eventName, handleJudgeVerdict);
+      }
 
       eventSource.addEventListener("simulation_ended", (e: MessageEvent) => {
         const data: SSESimulationEnded = JSON.parse(e.data);
@@ -394,7 +389,7 @@ export function useEventStream(
       }
       resetState();
     };
-  }, [runId, enabled, retryOnFailure, resetState]);
+  }, [runId, enabled, retryOnFailure, resetState, liveJudge]);
 
   return {
     messages,

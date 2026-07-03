@@ -17,4 +17,6 @@ export const spotTheDifferencePlugin: ScenarioPlugin = {
   RoundDetailPanel: SpotTheDifferenceRoundDetailPanel,
   defaultReplaceAgentKnobs: { postmortem_disabled_at_start: true },
   renderToolMetadata: () => null,
+  summarizeToolVerdict: () => null,
+  liveJudge: null,
 };

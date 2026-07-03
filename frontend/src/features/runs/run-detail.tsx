@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -61,6 +61,7 @@ import {
 } from "./format";
 import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
+import { getScenarioPlugin } from "./scenario-registry";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
 import { ReplaceAgentBadge } from "./replace-agent-badge";
 import { CrossRunReplaceAgentBadge } from "./cross-run-replace-agent-badge";
@@ -73,6 +74,7 @@ import { NoteEditorModal } from "./note-editor-modal";
 export function RunDetail({ scenario, runDirName }: { scenario: string; runDirName: string }) {
   const groupPath = useGroupPath();
   const runId = `${scenario}/${runDirName}`;
+  const scenarioPlugin = getScenarioPlugin(scenario);
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
@@ -175,7 +177,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
 
   // SSE streaming for in-progress runs
   const sseEnabled = restData?.status === "in_progress" || restData?.status === "starting";
-  const sse = useEventStream(runId, sseEnabled, knownEventIds, true);
+  const sse = useEventStream(runId, sseEnabled, knownEventIds, true, scenarioPlugin.liveJudge);
 
   // When SSE reports simulation ended, refetch REST for evaluation status
   const sseStatus = sse.status;
@@ -317,18 +319,29 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
       ...judgeMetadataFromExtras(scenarioExtras),
       ...sse.judgeMetadataByCallId,
     };
-    const moveMetadataByCallId =
-      scenarioExtras !== null && scenarioExtras.scenario_name === "container_yard_stacking"
-        ? scenarioExtras.move_metadata_by_call_id
-        : {};
+    const allToolUse = [...restToolUse, ...newToolUse];
+    // Let the scenario plug-in render any bespoke per-tool-call supplement
+    // (e.g. the container-yard move verdict) from scenario_extras, keyed by
+    // call_id. Empty for scenarios/tools whose plug-in adds nothing.
+    const toolMetadataByCallId: Record<string, ReactNode> = {};
+    for (const t of allToolUse) {
+      const node = scenarioPlugin.renderToolMetadata({
+        toolName: t.tool_name,
+        callId: t.call_id,
+        extras: scenarioExtras,
+      });
+      if (node != null) {
+        toolMetadataByCallId[t.call_id] = node;
+      }
+    }
 
     return mergeEntries(
       [...restMessages, ...newMessages],
       [...restReasoning, ...newReasoning],
-      [...restToolUse, ...newToolUse],
+      allToolUse,
       [...restRunCycleFailures, ...newFailures],
       judgeMetadataByCallId,
-      moveMetadataByCallId
+      toolMetadataByCallId
     );
   }, [
     restData,
@@ -337,6 +350,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     sse.toolUse,
     sse.runCycleFailures,
     sse.judgeMetadataByCallId,
+    scenarioPlugin,
   ]);
 
   // Auto-highlight a message from ?highlight= query param (e.g. from branches viewer)
