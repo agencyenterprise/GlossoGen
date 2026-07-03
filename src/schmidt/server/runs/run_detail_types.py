@@ -35,3 +35,15 @@ class ChannelMessage(BaseModel):
     timestamp: datetime
     round_number: int
     token_count: int
+
+
+class JudgeGroundTruthMetadata(BaseModel):
+    """LLM-judge ground truth for a single judged action tool call.
+
+    Scenarios whose executor submits a free-text action scored by an LLM
+    judge surface the same three facts per call, attached by tool ``call_id``.
+    """
+
+    expected_actions: str
+    judge_match: bool
+    judge_explanation: str

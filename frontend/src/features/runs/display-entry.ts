@@ -11,44 +11,21 @@ type ScenarioExtras = NonNullable<components["schemas"]["RunDetailResponse"]["sc
 /** Generic LLM-judge ground truth for a single judged action tool call.
  *
  *  Scenarios whose executor submits a free-text action scored by an LLM
- *  judge (veyru `stabilize_veyru`, orbital_anomaly `actuate_panel`,
- *  drive_module_repair `replace_component`) all surface the same three
- *  facts per call. The run-detail page extracts whichever scenario-specific
- *  ``*_metadata_by_call_id`` map the run's ``scenario_extras`` carries into
- *  this single shape. The richer container-yard move verdict keeps its own
+ *  judge surface the same three facts per call, normalized backend-side into
+ *  the uniform ``judge_ground_truth_by_call_id`` map on their
+ *  ``scenario_extras``. The richer container-yard move verdict keeps its own
  *  ``move_metadata`` channel. */
-export interface JudgeGroundTruthMetadata {
-  expected_actions: string;
-  judge_match: boolean;
-  judge_explanation: string;
-}
+export type JudgeGroundTruthMetadata = components["schemas"]["JudgeGroundTruthMetadata"];
 
 /** Extract the per-call LLM-judge ground truth from a run's
- *  ``scenario_extras``, normalizing each judged-action scenario's
- *  scenario-specific ``*_metadata_by_call_id`` map into the common
- *  :class:`JudgeGroundTruthMetadata` shape. Returns an empty map for
- *  scenarios with no judged action. */
+ *  ``scenario_extras``. Every judged-action scenario exposes the same
+ *  ``judge_ground_truth_by_call_id`` field (built by its backend run-detail
+ *  extension); scenarios with no judged action omit it, yielding an empty map. */
 export function judgeMetadataFromExtras(
   extras: ScenarioExtras | null
 ): Record<string, JudgeGroundTruthMetadata> {
-  if (extras === null) return {};
-  if (extras.scenario_name === "veyru") return extras.stabilize_metadata_by_call_id;
-  if (extras.scenario_name === "orbital_anomaly") return extras.actuation_metadata_by_call_id;
-  if (extras.scenario_name === "drive_module_repair") {
-    return extras.replacement_metadata_by_call_id;
-  }
-  if (extras.scenario_name === "spot_the_difference") {
-    const differencesByRound = new Map(extras.cases.map(c => [c.round_number, c.differences]));
-    const result: Record<string, JudgeGroundTruthMetadata> = {};
-    for (const [callId, meta] of Object.entries(extras.submission_metadata_by_call_id)) {
-      const differences = differencesByRound.get(meta.round_number) ?? [];
-      result[callId] = {
-        expected_actions: differences.map((d, i) => `${i + 1}. ${d.description}`).join("\n"),
-        judge_match: meta.found_all,
-        judge_explanation: meta.explanation,
-      };
-    }
-    return result;
+  if (extras !== null && "judge_ground_truth_by_call_id" in extras) {
+    return extras.judge_ground_truth_by_call_id;
   }
   return {};
 }

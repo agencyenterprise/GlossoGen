@@ -28,25 +28,16 @@ from schmidt.scenarios.veyru.ids import (
     INTERN_TAKEOVER_REASON,
     OBSERVER_SWAP_REASON,
 )
-from schmidt.server.runs.run_detail_types import AgentDetail, ChannelMessage
+from schmidt.server.runs.run_detail_types import (
+    AgentDetail,
+    ChannelMessage,
+    JudgeGroundTruthMetadata,
+)
 from schmidt.server.runs.scenario_extension import ScenarioRunDetailExtension, ScenarioRunExtrasBase
 
 OBSERVER_A_ID = "observer_a"
 OBSERVER_B_ID = "observer_b"
 STABILIZE_TOOL_NAME = "stabilize_veyru"
-
-
-class VeyruStabilizeMetadata(BaseModel):
-    """Judge context captured for a single ``stabilize_veyru`` call.
-
-    Attached to the corresponding ``ToolUseEntry`` so the frontend can show
-    the expected procedure and the LLM judge's verdict alongside the raw
-    tool call.
-    """
-
-    expected_actions: str
-    judge_match: bool
-    judge_explanation: str
 
 
 class VeyruStellarReadingDTO(BaseModel):
@@ -129,7 +120,7 @@ class VeyruRunExtras(ScenarioRunExtrasBase):
     swap_point: VeyruSwapPoint | None
     intern_join: VeyruInternAnchor | None
     intern_takeover: VeyruInternAnchor | None
-    stabilize_metadata_by_call_id: dict[str, VeyruStabilizeMetadata]
+    judge_ground_truth_by_call_id: dict[str, JudgeGroundTruthMetadata]
 
 
 def _first_link_message_id_after(
@@ -177,21 +168,21 @@ def _build_cases(events: list[SimulationEvent]) -> list[VeyruCaseSummary]:
     return cases
 
 
-def _build_stabilize_metadata_by_call_id(
+def _build_judge_ground_truth_by_call_id(
     events: list[SimulationEvent],
-) -> dict[str, VeyruStabilizeMetadata]:
+) -> dict[str, JudgeGroundTruthMetadata]:
     """Match each ``VeyruStabilizationJudged`` to its ``stabilize_veyru`` tool call.
 
     The Veyru world emits judged events in the same FIFO order as the
     corresponding tool results, scoped per agent. Walks both event types
     in chronological order and pairs them by (agent_id, FIFO position).
     """
-    pending_by_agent: dict[str, list[VeyruStabilizeMetadata]] = {}
-    metadata_by_call_id: dict[str, VeyruStabilizeMetadata] = {}
+    pending_by_agent: dict[str, list[JudgeGroundTruthMetadata]] = {}
+    metadata_by_call_id: dict[str, JudgeGroundTruthMetadata] = {}
     for event in events:
         if isinstance(event, VeyruStabilizationJudged):
             pending_by_agent.setdefault(event.agent_id, []).append(
-                VeyruStabilizeMetadata(
+                JudgeGroundTruthMetadata(
                     expected_actions=event.expected_actions,
                     judge_match=event.judge_match,
                     judge_explanation=event.judge_explanation,
@@ -289,5 +280,5 @@ class VeyruRunDetailExtension(ScenarioRunDetailExtension):
             intern_takeover=_build_intern_anchor(
                 events=events, messages=messages, reason=INTERN_TAKEOVER_REASON
             ),
-            stabilize_metadata_by_call_id=_build_stabilize_metadata_by_call_id(events=events),
+            judge_ground_truth_by_call_id=_build_judge_ground_truth_by_call_id(events=events),
         )

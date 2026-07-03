@@ -1077,25 +1077,10 @@ export interface components {
             scenario_name: "drive_module_repair";
             /** Cases */
             cases: components["schemas"]["DriveModuleCaseSummary"][];
-            /** Replacement Metadata By Call Id */
-            replacement_metadata_by_call_id: {
-                [key: string]: components["schemas"]["DriveModuleReplacementMetadata"];
+            /** Judge Ground Truth By Call Id */
+            judge_ground_truth_by_call_id: {
+                [key: string]: components["schemas"]["JudgeGroundTruthMetadata"];
             };
-        };
-        /**
-         * DriveModuleReplacementMetadata
-         * @description Judge context captured for a single ``service_component`` call.
-         *
-         *     Attached to the corresponding tool-use entry so the frontend can show
-         *     the expected replacement and the LLM judge's verdict alongside the call.
-         */
-        DriveModuleReplacementMetadata: {
-            /** Expected Actions */
-            expected_actions: string;
-            /** Judge Match */
-            judge_match: boolean;
-            /** Judge Explanation */
-            judge_explanation: string;
         };
         /**
          * EvalCostResponse
@@ -1248,6 +1233,21 @@ export interface components {
             scenario_name: string;
             /** Run Dir */
             run_dir: string;
+        };
+        /**
+         * JudgeGroundTruthMetadata
+         * @description LLM-judge ground truth for a single judged action tool call.
+         *
+         *     Scenarios whose executor submits a free-text action scored by an LLM
+         *     judge surface the same three facts per call, attached by tool ``call_id``.
+         */
+        JudgeGroundTruthMetadata: {
+            /** Expected Actions */
+            expected_actions: string;
+            /** Judge Match */
+            judge_match: boolean;
+            /** Judge Explanation */
+            judge_explanation: string;
         };
         /**
          * KnobsContentResponse
@@ -1411,21 +1411,6 @@ export interface components {
             content: string;
         };
         /**
-         * OrbitalAnomalyActuationMetadata
-         * @description Judge context captured for a single ``actuate_panel`` call.
-         *
-         *     Attached to the corresponding tool-use entry so the frontend can show
-         *     the expected procedure and the LLM judge's verdict alongside the call.
-         */
-        OrbitalAnomalyActuationMetadata: {
-            /** Expected Actions */
-            expected_actions: string;
-            /** Judge Match */
-            judge_match: boolean;
-            /** Judge Explanation */
-            judge_explanation: string;
-        };
-        /**
          * OrbitalAnomalyCaseStageDTO
          * @description One stage of an anomaly: the three agent views plus the expected fix.
          */
@@ -1474,9 +1459,9 @@ export interface components {
             scenario_name: "orbital_anomaly";
             /** Cases */
             cases: components["schemas"]["OrbitalAnomalyCaseSummary"][];
-            /** Actuation Metadata By Call Id */
-            actuation_metadata_by_call_id: {
-                [key: string]: components["schemas"]["OrbitalAnomalyActuationMetadata"];
+            /** Judge Ground Truth By Call Id */
+            judge_ground_truth_by_call_id: {
+                [key: string]: components["schemas"]["JudgeGroundTruthMetadata"];
             };
         };
         /**
@@ -2369,6 +2354,10 @@ export interface components {
             };
             /** Team Results */
             team_results: components["schemas"]["SpotTeamRoundResult"][];
+            /** Judge Ground Truth By Call Id */
+            judge_ground_truth_by_call_id: {
+                [key: string]: components["schemas"]["JudgeGroundTruthMetadata"];
+            };
         };
         /**
          * StartEvaluationRequest
@@ -2593,26 +2582,10 @@ export interface components {
             swap_point: components["schemas"]["VeyruSwapPoint"] | null;
             intern_join: components["schemas"]["VeyruInternAnchor"] | null;
             intern_takeover: components["schemas"]["VeyruInternAnchor"] | null;
-            /** Stabilize Metadata By Call Id */
-            stabilize_metadata_by_call_id: {
-                [key: string]: components["schemas"]["VeyruStabilizeMetadata"];
+            /** Judge Ground Truth By Call Id */
+            judge_ground_truth_by_call_id: {
+                [key: string]: components["schemas"]["JudgeGroundTruthMetadata"];
             };
-        };
-        /**
-         * VeyruStabilizeMetadata
-         * @description Judge context captured for a single ``stabilize_veyru`` call.
-         *
-         *     Attached to the corresponding ``ToolUseEntry`` so the frontend can show
-         *     the expected procedure and the LLM judge's verdict alongside the raw
-         *     tool call.
-         */
-        VeyruStabilizeMetadata: {
-            /** Expected Actions */
-            expected_actions: string;
-            /** Judge Match */
-            judge_match: boolean;
-            /** Judge Explanation */
-            judge_explanation: string;
         };
         /**
          * VeyruStellarReadingDTO

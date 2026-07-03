@@ -21,20 +21,12 @@ from schmidt.scenarios.orbital_anomaly.events import (
     OrbitalAnomalyCaseStarted,
 )
 from schmidt.scenarios.orbital_anomaly.ids import ACTUATE_PANEL_TOOL
-from schmidt.server.runs.run_detail_types import AgentDetail, ChannelMessage
+from schmidt.server.runs.run_detail_types import (
+    AgentDetail,
+    ChannelMessage,
+    JudgeGroundTruthMetadata,
+)
 from schmidt.server.runs.scenario_extension import ScenarioRunDetailExtension, ScenarioRunExtrasBase
-
-
-class OrbitalAnomalyActuationMetadata(BaseModel):
-    """Judge context captured for a single ``actuate_panel`` call.
-
-    Attached to the corresponding tool-use entry so the frontend can show
-    the expected procedure and the LLM judge's verdict alongside the call.
-    """
-
-    expected_actions: str
-    judge_match: bool
-    judge_explanation: str
 
 
 class OrbitalAnomalyCaseStageDTO(BaseModel):
@@ -80,7 +72,7 @@ class OrbitalAnomalyRunExtras(ScenarioRunExtrasBase):
 
     scenario_name: Literal["orbital_anomaly"] = "orbital_anomaly"
     cases: list[OrbitalAnomalyCaseSummary]
-    actuation_metadata_by_call_id: dict[str, OrbitalAnomalyActuationMetadata]
+    judge_ground_truth_by_call_id: dict[str, JudgeGroundTruthMetadata]
 
 
 def _build_cases(events: list[SimulationEvent]) -> list[OrbitalAnomalyCaseSummary]:
@@ -110,21 +102,21 @@ def _build_cases(events: list[SimulationEvent]) -> list[OrbitalAnomalyCaseSummar
     return cases
 
 
-def _build_actuation_metadata_by_call_id(
+def _build_judge_ground_truth_by_call_id(
     events: list[SimulationEvent],
-) -> dict[str, OrbitalAnomalyActuationMetadata]:
+) -> dict[str, JudgeGroundTruthMetadata]:
     """Pair each ``OrbitalAnomalyActuationJudged`` with its ``actuate_panel`` tool result.
 
     The judged events are emitted in the same FIFO order as the
     corresponding tool results, scoped per agent; walks both event types
     chronologically and pairs them by (agent_id, FIFO position).
     """
-    pending_by_agent: dict[str, list[OrbitalAnomalyActuationMetadata]] = {}
-    metadata_by_call_id: dict[str, OrbitalAnomalyActuationMetadata] = {}
+    pending_by_agent: dict[str, list[JudgeGroundTruthMetadata]] = {}
+    metadata_by_call_id: dict[str, JudgeGroundTruthMetadata] = {}
     for event in events:
         if isinstance(event, OrbitalAnomalyActuationJudged):
             pending_by_agent.setdefault(event.agent_id, []).append(
-                OrbitalAnomalyActuationMetadata(
+                JudgeGroundTruthMetadata(
                     expected_actions=event.expected_actions,
                     judge_match=event.judge_match,
                     judge_explanation=event.judge_explanation,
@@ -156,5 +148,5 @@ class OrbitalAnomalyRunDetailExtension(ScenarioRunDetailExtension):
         _ = agents_by_id, messages
         return OrbitalAnomalyRunExtras(
             cases=_build_cases(events=events),
-            actuation_metadata_by_call_id=_build_actuation_metadata_by_call_id(events=events),
+            judge_ground_truth_by_call_id=_build_judge_ground_truth_by_call_id(events=events),
         )
