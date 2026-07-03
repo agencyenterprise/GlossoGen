@@ -105,7 +105,7 @@ async def run_structured_probe(
     )
     return StructuredProbeResult(
         output=result.output,
-        usage=_run_usage_to_evaluation_token_usage(run_usage=result.usage()),
+        usage=_run_usage_to_evaluation_token_usage(run_usage=result.usage),
     )
 
 

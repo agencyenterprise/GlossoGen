@@ -15,7 +15,7 @@ from typing import Any, cast
 from pydantic_ai import Agent, _agent_graph
 from pydantic_ai.agent import AgentRunResult as PydanticAIAgentRunResult
 from pydantic_ai.agent.abstract import EventStreamHandler
-from pydantic_ai.mcp import MCPServerStreamableHTTP
+from pydantic_ai.mcp import MCPToolset
 from pydantic_ai.messages import (
     AgentStreamEvent,
     FunctionToolCallEvent,
@@ -177,7 +177,7 @@ async def _run_agent_call(
             assert agent_run.result is not None
             return agent_run.result
         finally:
-            record_usage(agent_run.usage())
+            record_usage(agent_run.usage)
 
 
 class PydanticAIRunner(AgentRunner):
@@ -213,7 +213,7 @@ class PydanticAIRunner(AgentRunner):
         )
 
         mcp_url = f"{mcp_server_url}?agent_id={agent_id}"
-        mcp_server = MCPServerStreamableHTTP(mcp_url)
+        mcp_toolset = MCPToolset(mcp_url)
 
         full_system_prompt = build_full_system_prompt(
             base_prompt=agent_config.system_prompt,
@@ -223,7 +223,7 @@ class PydanticAIRunner(AgentRunner):
         agent: Agent[None, str] = Agent(
             model=build_pydantic_ai_model(model=agent_config.model, provider=provider),
             system_prompt=full_system_prompt,
-            toolsets=[mcp_server],
+            toolsets=[mcp_toolset],
             model_settings=default_pydantic_ai_settings(provider=provider),
         )
 
@@ -249,7 +249,7 @@ class PydanticAIRunner(AgentRunner):
         last_recorded_usage: RunUsage = RunUsage()
 
         try:
-            async with mcp_server:
+            async with mcp_toolset:
                 while total_turns < self._max_turns:
                     state = _StreamingState()
                     captured_state = state
@@ -597,14 +597,14 @@ class PydanticAIRunner(AgentRunner):
             )
 
         elif isinstance(event, FunctionToolResultEvent):
-            result_content = _serialize_tool_result(content=event.result.content)
+            result_content = _serialize_tool_result(content=event.part.content)
             logger.debug(
                 "Agent %s FunctionToolResult call_id=%s content=%.200s",
                 agent_id,
-                event.result.tool_call_id,
+                event.tool_call_id,
                 result_content,
             )
-            matched = state.pending_tool_calls.pop(event.result.tool_call_id, None)
+            matched = state.pending_tool_calls.pop(event.tool_call_id, None)
             if matched is not None:
                 state.spawn_log_task(
                     event_logger.log(
