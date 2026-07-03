@@ -2493,45 +2493,21 @@
             "type": "array",
             "title": "Cases"
           },
-          "replacement_metadata_by_call_id": {
+          "judge_ground_truth_by_call_id": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/DriveModuleReplacementMetadata"
+              "$ref": "#/components/schemas/JudgeGroundTruthMetadata"
             },
             "type": "object",
-            "title": "Replacement Metadata By Call Id"
+            "title": "Judge Ground Truth By Call Id"
           }
         },
         "type": "object",
         "required": [
           "cases",
-          "replacement_metadata_by_call_id"
+          "judge_ground_truth_by_call_id"
         ],
         "title": "DriveModuleRepairRunExtras",
         "description": "Scenario-specific run-detail payload surfaced for drive_module_repair runs."
-      },
-      "DriveModuleReplacementMetadata": {
-        "properties": {
-          "expected_actions": {
-            "type": "string",
-            "title": "Expected Actions"
-          },
-          "judge_match": {
-            "type": "boolean",
-            "title": "Judge Match"
-          },
-          "judge_explanation": {
-            "type": "string",
-            "title": "Judge Explanation"
-          }
-        },
-        "type": "object",
-        "required": [
-          "expected_actions",
-          "judge_match",
-          "judge_explanation"
-        ],
-        "title": "DriveModuleReplacementMetadata",
-        "description": "Judge context captured for a single ``service_component`` call.\n\nAttached to the corresponding tool-use entry so the frontend can show\nthe expected replacement and the LLM judge's verdict alongside the call."
       },
       "EvalCostResponse": {
         "properties": {
@@ -2840,6 +2816,30 @@
         ],
         "title": "ImportBundleResponse",
         "description": "Response after successfully importing a run bundle."
+      },
+      "JudgeGroundTruthMetadata": {
+        "properties": {
+          "expected_actions": {
+            "type": "string",
+            "title": "Expected Actions"
+          },
+          "judge_match": {
+            "type": "boolean",
+            "title": "Judge Match"
+          },
+          "judge_explanation": {
+            "type": "string",
+            "title": "Judge Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_actions",
+          "judge_match",
+          "judge_explanation"
+        ],
+        "title": "JudgeGroundTruthMetadata",
+        "description": "LLM-judge ground truth for a single judged action tool call.\n\nScenarios whose executor submits a free-text action scored by an LLM\njudge surface the same three facts per call, attached by tool ``call_id``."
       },
       "KnobsContentResponse": {
         "properties": {
@@ -3150,30 +3150,6 @@
         "title": "OpenAIUserMessage",
         "description": "OpenAI ``user`` message."
       },
-      "OrbitalAnomalyActuationMetadata": {
-        "properties": {
-          "expected_actions": {
-            "type": "string",
-            "title": "Expected Actions"
-          },
-          "judge_match": {
-            "type": "boolean",
-            "title": "Judge Match"
-          },
-          "judge_explanation": {
-            "type": "string",
-            "title": "Judge Explanation"
-          }
-        },
-        "type": "object",
-        "required": [
-          "expected_actions",
-          "judge_match",
-          "judge_explanation"
-        ],
-        "title": "OrbitalAnomalyActuationMetadata",
-        "description": "Judge context captured for a single ``actuate_panel`` call.\n\nAttached to the corresponding tool-use entry so the frontend can show\nthe expected procedure and the LLM judge's verdict alongside the call."
-      },
       "OrbitalAnomalyCaseStageDTO": {
         "properties": {
           "fault_name": {
@@ -3265,18 +3241,18 @@
             "type": "array",
             "title": "Cases"
           },
-          "actuation_metadata_by_call_id": {
+          "judge_ground_truth_by_call_id": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/OrbitalAnomalyActuationMetadata"
+              "$ref": "#/components/schemas/JudgeGroundTruthMetadata"
             },
             "type": "object",
-            "title": "Actuation Metadata By Call Id"
+            "title": "Judge Ground Truth By Call Id"
           }
         },
         "type": "object",
         "required": [
           "cases",
-          "actuation_metadata_by_call_id"
+          "judge_ground_truth_by_call_id"
         ],
         "title": "OrbitalAnomalyRunExtras",
         "description": "Scenario-specific run-detail payload surfaced for orbital_anomaly runs."
@@ -5123,13 +5099,21 @@
             },
             "type": "array",
             "title": "Team Results"
+          },
+          "judge_ground_truth_by_call_id": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JudgeGroundTruthMetadata"
+            },
+            "type": "object",
+            "title": "Judge Ground Truth By Call Id"
           }
         },
         "type": "object",
         "required": [
           "cases",
           "submission_metadata_by_call_id",
-          "team_results"
+          "team_results",
+          "judge_ground_truth_by_call_id"
         ],
         "title": "SpotTheDifferenceRunExtras",
         "description": "Scenario-specific run-detail payload surfaced for spot_the_difference runs."
@@ -5618,12 +5602,12 @@
               }
             ]
           },
-          "stabilize_metadata_by_call_id": {
+          "judge_ground_truth_by_call_id": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/VeyruStabilizeMetadata"
+              "$ref": "#/components/schemas/JudgeGroundTruthMetadata"
             },
             "type": "object",
-            "title": "Stabilize Metadata By Call Id"
+            "title": "Judge Ground Truth By Call Id"
           }
         },
         "type": "object",
@@ -5632,34 +5616,10 @@
           "swap_point",
           "intern_join",
           "intern_takeover",
-          "stabilize_metadata_by_call_id"
+          "judge_ground_truth_by_call_id"
         ],
         "title": "VeyruRunExtras",
         "description": "Scenario-specific run-detail payload surfaced for Veyru runs."
-      },
-      "VeyruStabilizeMetadata": {
-        "properties": {
-          "expected_actions": {
-            "type": "string",
-            "title": "Expected Actions"
-          },
-          "judge_match": {
-            "type": "boolean",
-            "title": "Judge Match"
-          },
-          "judge_explanation": {
-            "type": "string",
-            "title": "Judge Explanation"
-          }
-        },
-        "type": "object",
-        "required": [
-          "expected_actions",
-          "judge_match",
-          "judge_explanation"
-        ],
-        "title": "VeyruStabilizeMetadata",
-        "description": "Judge context captured for a single ``stabilize_veyru`` call.\n\nAttached to the corresponding ``ToolUseEntry`` so the frontend can show\nthe expected procedure and the LLM judge's verdict alongside the raw\ntool call."
       },
       "VeyruStellarReadingDTO": {
         "properties": {

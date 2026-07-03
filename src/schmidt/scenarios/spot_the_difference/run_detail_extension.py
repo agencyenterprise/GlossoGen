@@ -24,7 +24,11 @@ from schmidt.scenarios.spot_the_difference.ids import (
     SUBMISSION_WAITING_MARKER,
     SUBMIT_DIFFERENCES_TOOL,
 )
-from schmidt.server.runs.run_detail_types import AgentDetail, ChannelMessage
+from schmidt.server.runs.run_detail_types import (
+    AgentDetail,
+    ChannelMessage,
+    JudgeGroundTruthMetadata,
+)
 from schmidt.server.runs.scenario_extension import ScenarioRunDetailExtension, ScenarioRunExtrasBase
 
 
@@ -78,6 +82,7 @@ class SpotTheDifferenceRunExtras(ScenarioRunExtrasBase):
     cases: list[SpotTheDifferenceCaseSummary]
     submission_metadata_by_call_id: dict[str, SpotSubmissionMetadata]
     team_results: list[SpotTeamRoundResult]
+    judge_ground_truth_by_call_id: dict[str, JudgeGroundTruthMetadata]
 
 
 def _build_case(event: SpotTheDifferenceCaseStarted) -> SpotTheDifferenceCaseSummary:
@@ -163,6 +168,31 @@ def _build_call_id_map(events: list[SimulationEvent]) -> dict[str, SpotSubmissio
     return by_call_id
 
 
+def _build_judge_ground_truth_by_call_id(
+    cases: list[SpotTheDifferenceCaseSummary],
+    submission_metadata_by_call_id: dict[str, SpotSubmissionMetadata],
+) -> dict[str, JudgeGroundTruthMetadata]:
+    """Normalize each accepted ``submit_differences`` verdict into the platform-wide
+    judge ground-truth shape, pairing the submission's round with that round's
+    planted-difference descriptions to render the enumerated expected-actions text.
+    """
+    differences_by_round: dict[int, list[SpotPlantedDifference]] = {
+        case.round_number: case.differences for case in cases
+    }
+    judge_ground_truth_by_call_id: dict[str, JudgeGroundTruthMetadata] = {}
+    for call_id, submission in submission_metadata_by_call_id.items():
+        differences = differences_by_round.get(submission.round_number, [])
+        expected_actions = "\n".join(
+            f"{index + 1}. {difference.description}" for index, difference in enumerate(differences)
+        )
+        judge_ground_truth_by_call_id[call_id] = JudgeGroundTruthMetadata(
+            expected_actions=expected_actions,
+            judge_match=submission.found_all,
+            judge_explanation=submission.explanation,
+        )
+    return judge_ground_truth_by_call_id
+
+
 class SpotTheDifferenceRunDetailExtension(ScenarioRunDetailExtension):
     """spot_the_difference hook into :class:`RunDetailResponse.scenario_extras`."""
 
@@ -176,8 +206,14 @@ class SpotTheDifferenceRunDetailExtension(ScenarioRunDetailExtension):
         agents_by_id: dict[str, AgentDetail],  # noqa: ARG002 — protocol-required
         messages: list[ChannelMessage],  # noqa: ARG002 — protocol-required
     ) -> SpotTheDifferenceRunExtras:
+        cases = _build_cases(events=events)
+        submission_metadata_by_call_id = _build_call_id_map(events=events)
         return SpotTheDifferenceRunExtras(
-            cases=_build_cases(events=events),
-            submission_metadata_by_call_id=_build_call_id_map(events=events),
+            cases=cases,
+            submission_metadata_by_call_id=submission_metadata_by_call_id,
             team_results=_build_team_results(events=events),
+            judge_ground_truth_by_call_id=_build_judge_ground_truth_by_call_id(
+                cases=cases,
+                submission_metadata_by_call_id=submission_metadata_by_call_id,
+            ),
         )

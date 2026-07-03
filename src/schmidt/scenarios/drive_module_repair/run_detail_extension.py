@@ -22,25 +22,17 @@ from schmidt.scenarios.drive_module_repair.events import (
     DriveModuleReplacementJudged,
 )
 from schmidt.scenarios.drive_module_repair.ids import SERVICE_COMPONENT_TOOL
-from schmidt.server.runs.run_detail_types import AgentDetail, ChannelMessage
+from schmidt.server.runs.run_detail_types import (
+    AgentDetail,
+    ChannelMessage,
+    JudgeGroundTruthMetadata,
+)
 from schmidt.server.runs.scenario_extension import ScenarioRunDetailExtension, ScenarioRunExtrasBase
 
 # The field technician's action tool. ``service_component`` is the current name;
 # ``replace_component`` is the name recorded in run logs created before the rename,
 # so both are accepted when pairing judge verdicts to tool results.
 ACTION_TOOL_NAMES = frozenset({SERVICE_COMPONENT_TOOL, "replace_component"})
-
-
-class DriveModuleReplacementMetadata(BaseModel):
-    """Judge context captured for a single ``service_component`` call.
-
-    Attached to the corresponding tool-use entry so the frontend can show
-    the expected replacement and the LLM judge's verdict alongside the call.
-    """
-
-    expected_actions: str
-    judge_match: bool
-    judge_explanation: str
 
 
 class DriveModuleCaseStageDTO(BaseModel):
@@ -103,7 +95,7 @@ class DriveModuleRepairRunExtras(ScenarioRunExtrasBase):
 
     scenario_name: Literal["drive_module_repair"] = "drive_module_repair"
     cases: list[DriveModuleCaseSummary]
-    replacement_metadata_by_call_id: dict[str, DriveModuleReplacementMetadata]
+    judge_ground_truth_by_call_id: dict[str, JudgeGroundTruthMetadata]
 
 
 def _build_cases(events: list[SimulationEvent]) -> list[DriveModuleCaseSummary]:
@@ -139,21 +131,21 @@ def _build_cases(events: list[SimulationEvent]) -> list[DriveModuleCaseSummary]:
     return cases
 
 
-def _build_replacement_metadata_by_call_id(
+def _build_judge_ground_truth_by_call_id(
     events: list[SimulationEvent],
-) -> dict[str, DriveModuleReplacementMetadata]:
+) -> dict[str, JudgeGroundTruthMetadata]:
     """Pair each ``DriveModuleReplacementJudged`` with its ``service_component`` tool result.
 
     The judged events are emitted in the same FIFO order as the corresponding
     tool results, scoped per agent; walks both event types chronologically and
     pairs them by (agent_id, FIFO position).
     """
-    pending_by_agent: dict[str, list[DriveModuleReplacementMetadata]] = {}
-    metadata_by_call_id: dict[str, DriveModuleReplacementMetadata] = {}
+    pending_by_agent: dict[str, list[JudgeGroundTruthMetadata]] = {}
+    metadata_by_call_id: dict[str, JudgeGroundTruthMetadata] = {}
     for event in events:
         if isinstance(event, DriveModuleReplacementJudged):
             pending_by_agent.setdefault(event.agent_id, []).append(
-                DriveModuleReplacementMetadata(
+                JudgeGroundTruthMetadata(
                     expected_actions=event.expected_action,
                     judge_match=event.judge_match,
                     judge_explanation=event.judge_explanation,
@@ -185,5 +177,5 @@ class DriveModuleRepairRunDetailExtension(ScenarioRunDetailExtension):
         _ = agents_by_id, messages
         return DriveModuleRepairRunExtras(
             cases=_build_cases(events=events),
-            replacement_metadata_by_call_id=_build_replacement_metadata_by_call_id(events=events),
+            judge_ground_truth_by_call_id=_build_judge_ground_truth_by_call_id(events=events),
         )
