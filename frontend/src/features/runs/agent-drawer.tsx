@@ -341,6 +341,7 @@ export function AgentDrawer({
                             arguments={entry.tool_arguments}
                             result={entry.tool_result}
                             judgeMetadata={entry.judge_metadata}
+                            toolMetadata={entry.tool_metadata}
                           />
                         ) : (
                           <ProseMarkdown className={cn(!entry.is_reasoning && "text-foreground")}>

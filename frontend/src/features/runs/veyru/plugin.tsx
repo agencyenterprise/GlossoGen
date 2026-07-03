@@ -57,4 +57,9 @@ export const veyruPlugin: ScenarioPlugin = {
   RoundDetailPanel: VeyruRoundDetailPanel,
   defaultReplaceAgentKnobs: { postmortem_disabled_at_start: true },
   renderToolMetadata: () => null,
+  summarizeToolVerdict: () => null,
+  liveJudge: {
+    sseEventNames: ["veyru_stabilization_judged"],
+    judgedToolNames: ["stabilize_veyru"],
+  },
 };

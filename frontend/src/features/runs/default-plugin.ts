@@ -14,4 +14,6 @@ export const DEFAULT_SCENARIO_PLUGIN: ScenarioPlugin = {
   RoundDetailPanel: null,
   defaultReplaceAgentKnobs: {},
   renderToolMetadata: () => null,
+  summarizeToolVerdict: () => null,
+  liveJudge: null,
 };

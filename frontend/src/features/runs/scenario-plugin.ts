@@ -28,6 +28,33 @@ export interface KnobsFormError {
 }
 
 /**
+ * Compact verdict for one tool call, rendered as a row in the round-timeline
+ * modal. `accepted` is true/false, or null for a retryable soft-reject.
+ * `toolLabel` is the display name for the row and `actionText` the one-line
+ * action summary.
+ */
+export interface ToolVerdictSummary {
+  accepted: boolean | null;
+  expected: string;
+  explanation: string;
+  toolLabel: string;
+  actionText: string;
+}
+
+/**
+ * Live-stream wiring for a scenario whose executor emits an LLM-judge verdict.
+ *
+ * `sseEventNames` are the `*_judged` SSE event names the run stream emits for
+ * this scenario; `judgedToolNames` are the tool names whose results carry a
+ * verdict, used to attach each queued verdict to its tool call by `call_id`.
+ * A scenario with no judged action leaves this `null`.
+ */
+export interface LiveJudgeConfig {
+  sseEventNames: string[];
+  judgedToolNames: string[];
+}
+
+/**
  * Adapter wrapping a scenario's bespoke knobs form.
  *
  * The form is expected to self-bootstrap (e.g. load defaults from a
@@ -92,4 +119,22 @@ export interface ScenarioPlugin {
    * narrows it internally to its own variant.
    */
   renderToolMetadata: (args: { toolName: string; callId: string; extras: unknown }) => ReactNode;
+  /**
+   * Compact tool-call verdict for the round-timeline summary row, or null when
+   * the plug-in has no bespoke verdict for this tool. LLM-judged scenarios
+   * surface their verdict through the uniform judge metadata instead and
+   * return null here. `extras` is `unknown`, narrowed internally.
+   */
+  summarizeToolVerdict: (args: {
+    toolName: string;
+    callId: string;
+    toolArguments: Record<string, unknown>;
+    extras: unknown;
+  }) => ToolVerdictSummary | null;
+  /**
+   * Live-stream judge wiring, or null when the scenario has no judged action.
+   * Drives generic `*_judged` SSE listener registration and verdict-to-tool
+   * attachment in the event stream, so no scenario names are hardcoded there.
+   */
+  liveJudge: LiveJudgeConfig | null;
 }
