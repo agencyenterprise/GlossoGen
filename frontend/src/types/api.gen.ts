@@ -109,7 +109,9 @@ export interface paths {
          *     Used by ``schmidt sync-metadata-to-prod`` to push freshly-evaluated
          *     measurements onto runs that already exist on the remote without
          *     re-uploading the full bundle. The PUT is a full replace — every
-         *     existing measurement is overwritten with the body.
+         *     existing measurement is overwritten with the body. After writing the
+         *     file the row's ``evaluation_content_hash`` is refreshed so that later
+         *     sync passes can detect drift cheaply from the paginated runs list.
          */
         put: operations["update_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluation_put"];
         post?: never;
@@ -1763,6 +1765,8 @@ export interface components {
             has_note: boolean;
             /** Current Round */
             current_round: number;
+            /** Evaluation Content Hash */
+            evaluation_content_hash: string | null;
         };
         /**
          * SSEAgentConnected
