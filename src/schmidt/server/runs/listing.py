@@ -77,6 +77,7 @@ async def enumerate_run_descriptors(
             scenario_name=row.scenario,
             run_dir_name=row.run_dir_name,
             timestamp=row.created_at,
+            evaluation_content_hash=row.evaluation_content_hash,
         )
         for row in rows
     ]
@@ -92,6 +93,7 @@ async def _build_summaries(
             build_summary(
                 scenario_name=descriptor.scenario_name,
                 timestamp_dir=runs_dir / descriptor.scenario_name / descriptor.run_dir_name,
+                evaluation_content_hash=descriptor.evaluation_content_hash,
             )
         )
         for descriptor in descriptors

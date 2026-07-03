@@ -154,6 +154,7 @@ async def _build_reference(
     summary = await build_summary(
         scenario_name=scenario,
         timestamp_dir=timestamp_dir,
+        evaluation_content_hash=None,
     )
     if summary is None:
         logger.warning(

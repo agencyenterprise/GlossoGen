@@ -6,9 +6,10 @@ and for every local run that already exists on the remote:
 
 * PUTs the local labels onto ``/runs/{scenario}/{run_dir_name}/labels``
   when the lists differ.
-* PUTs the local evaluation report onto ``/runs/{scenario}/{run_dir_name}/evaluation``
-  unconditionally — local is the source of truth, every PUT replaces the
-  saved report on disk.
+* PUTs the local evaluation report onto
+  ``/runs/{scenario}/{run_dir_name}/evaluation`` when the local
+  ``compute_measurements_hash`` differs from the remote's cached
+  ``evaluation_content_hash`` (from the paginated ``/runs`` listing).
 
 Runs that are missing from the remote entirely are ignored here;
 ``push-to-prod`` is the right tool for those.
@@ -17,15 +18,15 @@ Runs that are missing from the remote entirely are ignored here;
 import asyncio
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import cast
+from typing import NamedTuple, cast
 
 import httpx
 
-from schmidt.evaluation.reports.evaluation_report import load_report
+from schmidt.evaluation.reports.evaluation_report import compute_measurements_hash, load_report
 from schmidt.oauth_client import Credentials, load_or_refresh_credentials
-from schmidt.prod_push import HTTP_TIMEOUT, PushSpec, collect_local_runs
+from schmidt.prod_push import HTTP_TIMEOUT, LocalRun, PushSpec, collect_local_runs
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,13 @@ _TRANSIENT_STATUS = frozenset({500, 502, 503, 504})
 _RETRY_BASE_DELAY_SECONDS = 2.0
 _MAX_RETRIES = 3
 _PAGE_SIZE = 500
+
+
+class RemoteMetadata(NamedTuple):
+    """Sync-relevant fields returned by the paginated ``/runs`` list endpoint."""
+
+    labels: list[str]
+    evaluation_content_hash: str | None
 
 
 @dataclass(frozen=True)
@@ -45,12 +53,33 @@ class MetadataSyncSpec:
     concurrency: int
 
 
-@dataclass(frozen=True)
+@dataclass
 class MetadataSyncTally:
-    """Per-invocation outcome reported back to the CLI driver."""
+    """Per-invocation outcome reported back to the CLI driver.
 
-    synced: list[str]
-    failed: list[tuple[str, str]]
+    ``synced_labels``: runs where a labels PUT fired.
+    ``synced_eval``: runs where an eval PUT fired (hash mismatch or no
+    remote hash).
+    ``unchanged``: runs already on prod with matching labels + eval hash.
+    ``failed``: (run_id, error) pairs.
+    """
+
+    synced_labels: list[str] = field(default_factory=lambda: [])
+    synced_eval: list[str] = field(default_factory=lambda: [])
+    unchanged: list[str] = field(default_factory=lambda: [])
+    failed: list[tuple[str, str]] = field(default_factory=lambda: [])
+
+
+class _SyncPlan(NamedTuple):
+    """Per-run decision derived from local vs. remote diff."""
+
+    run_id: str
+    scenario_name: str
+    run_dir_name: str
+    run_dir: Path
+    new_labels: list[str] | None
+    push_eval: bool
+    eval_reason: str
 
 
 def _local_labels(run_dir: Path) -> list[str]:
@@ -73,18 +102,18 @@ def _local_labels(run_dir: Path) -> list[str]:
     return out
 
 
-async def fetch_remote_run_labels(
+async def fetch_remote_run_metadata(
     *,
     client: httpx.AsyncClient,
     credentials: Credentials,
-) -> dict[str, list[str]]:
-    """Return ``{run_id: labels}`` for every run the remote group owns.
+) -> dict[str, RemoteMetadata]:
+    """Return ``{run_id: RemoteMetadata}`` for every run the remote group owns.
 
     Uses the same ``/runs`` listing endpoint as ``push-to-prod`` but keeps
-    the ``labels`` field so the caller can compute per-run drift without
-    a second round-trip.
+    both ``labels`` and ``evaluation_content_hash`` so per-run drift can be
+    computed locally without a second round-trip.
     """
-    out: dict[str, list[str]] = {}
+    out: dict[str, RemoteMetadata] = {}
     offset = 0
     while True:
         response = await client.get(
@@ -97,12 +126,23 @@ async def fetch_remote_run_labels(
         payload = response.json()
         page = payload["runs"]
         for entry in page:
-            out[entry["run_id"]] = entry["labels"]
+            out[entry["run_id"]] = RemoteMetadata(
+                labels=entry["labels"],
+                evaluation_content_hash=entry.get("evaluation_content_hash"),
+            )
         total = payload["total"]
         if len(out) >= total or not page:
             break
         offset += len(page)
     return out
+
+
+async def _local_report_hash(*, run_dir: Path, scenario: str) -> str | None:
+    """Return the digest of the local report's measurements, or ``None`` if absent."""
+    report = await load_report(report_path=run_dir / f"{scenario}_report.json")
+    if report is None:
+        return None
+    return compute_measurements_hash(measurements=report.measurements)
 
 
 async def _put_with_retry(
@@ -169,7 +209,7 @@ async def _put_evaluation(
 
     Returns ``False`` (silently) when no local report exists. The PUT body
     is the full ``EvaluationReport`` JSON; the remote endpoint replaces
-    its on-disk copy.
+    its on-disk copy and updates its ``evaluation_content_hash`` row.
     """
     report = await load_report(report_path=run_dir / f"{scenario}_report.json")
     if report is None:
@@ -187,47 +227,126 @@ async def _sync_one(
     *,
     client: httpx.AsyncClient,
     credentials: Credentials,
-    scenario: str,
-    run_dir_name: str,
-    run_id: str,
-    run_dir: Path,
-    new_labels: list[str] | None,
+    plan: _SyncPlan,
     semaphore: asyncio.Semaphore,
     position: int,
     total: int,
     tally: MetadataSyncTally,
 ) -> None:
-    """PUT labels (when drifted) + evaluation report for one run."""
+    """PUT labels (when drifted) + evaluation report (when drifted) for one run."""
     async with semaphore:
         try:
-            if new_labels is not None:
+            if plan.new_labels is not None:
                 await _put_labels(
                     client=client,
                     credentials=credentials,
-                    scenario=scenario,
-                    run_dir_name=run_dir_name,
-                    labels=new_labels,
+                    scenario=plan.scenario_name,
+                    run_dir_name=plan.run_dir_name,
+                    labels=plan.new_labels,
                 )
-            await _put_evaluation(
-                client=client,
-                credentials=credentials,
-                scenario=scenario,
-                run_dir_name=run_dir_name,
-                run_dir=run_dir,
-            )
+            if plan.push_eval:
+                await _put_evaluation(
+                    client=client,
+                    credentials=credentials,
+                    scenario=plan.scenario_name,
+                    run_dir_name=plan.run_dir_name,
+                    run_dir=plan.run_dir,
+                )
         except Exception as exc:
-            logger.exception("[%d/%d] failed %s", position, total, run_id)
-            tally.failed.append((run_id, str(exc)))
+            logger.exception("[%d/%d] failed %s", position, total, plan.run_id)
+            tally.failed.append((plan.run_id, str(exc)))
             return
-        if new_labels is not None:
-            logger.info("[%d/%d] synced %s labels=%s + eval", position, total, run_id, new_labels)
-        else:
-            logger.info("[%d/%d] synced %s eval-only", position, total, run_id)
-        tally.synced.append(run_id)
+        if plan.new_labels is not None:
+            logger.info(
+                "[%d/%d] synced %s labels=%s",
+                position,
+                total,
+                plan.run_id,
+                plan.new_labels,
+            )
+            tally.synced_labels.append(plan.run_id)
+        if plan.push_eval:
+            logger.info(
+                "[%d/%d] synced %s eval (%s)",
+                position,
+                total,
+                plan.run_id,
+                plan.eval_reason,
+            )
+            tally.synced_eval.append(plan.run_id)
+
+
+def _plan_run_sync(
+    *,
+    run_id: str,
+    scenario_name: str,
+    run_dir_name: str,
+    run_dir: Path,
+    local_labels: list[str],
+    local_hash: str | None,
+    remote: RemoteMetadata,
+) -> _SyncPlan:
+    """Decide labels + eval PUTs for one run from the local + remote diff."""
+    new_labels: list[str] | None
+    if sorted(local_labels) != sorted(remote.labels):
+        new_labels = local_labels
+    else:
+        new_labels = None
+
+    push_eval = False
+    eval_reason = "unchanged"
+    if local_hash is None:
+        # Nothing to push (no local report) — treat as unchanged.
+        pass
+    elif remote.evaluation_content_hash is None:
+        push_eval = True
+        eval_reason = "no-remote-hash"
+    elif remote.evaluation_content_hash != local_hash:
+        push_eval = True
+        eval_reason = "drifted"
+
+    return _SyncPlan(
+        run_id=run_id,
+        scenario_name=scenario_name,
+        run_dir_name=run_dir_name,
+        run_dir=run_dir,
+        new_labels=new_labels,
+        push_eval=push_eval,
+        eval_reason=eval_reason,
+    )
+
+
+async def _build_plans(
+    *,
+    local: list[LocalRun],
+    remote: dict[str, RemoteMetadata],
+) -> list[_SyncPlan]:
+    """Build one ``_SyncPlan`` per local run that also exists on remote."""
+    plans: list[_SyncPlan] = []
+    for run in local:
+        remote_meta = remote.get(run.run_id)
+        if remote_meta is None:
+            continue
+        local_hash = await _local_report_hash(
+            run_dir=run.run_dir,
+            scenario=run.scenario_name,
+        )
+        plans.append(
+            _plan_run_sync(
+                run_id=run.run_id,
+                scenario_name=run.scenario_name,
+                run_dir_name=run.run_dir_name,
+                run_dir=run.run_dir,
+                local_labels=_local_labels(run_dir=run.run_dir),
+                local_hash=local_hash,
+                remote=remote_meta,
+            )
+        )
+    return plans
 
 
 async def run_metadata_sync(*, spec: MetadataSyncSpec) -> MetadataSyncTally:
-    """Drive the full discover → diff → PUT flow for label sync.
+    """Drive the full discover → diff → PUT flow for metadata sync.
 
     Returns a :class:`MetadataSyncTally` summarizing what happened so the
     CLI driver can print it and exit with an appropriate code.
@@ -245,69 +364,68 @@ async def run_metadata_sync(*, spec: MetadataSyncSpec) -> MetadataSyncTally:
     local = collect_local_runs(spec=push_spec)
     logger.info("Local eligible: %d", len(local))
 
-    tally = MetadataSyncTally(synced=[], failed=[])
+    tally = MetadataSyncTally()
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-        remote = await fetch_remote_run_labels(client=client, credentials=credentials)
+        remote = await fetch_remote_run_metadata(client=client, credentials=credentials)
         logger.info("Remote total: %d", len(remote))
 
-        # For every local run that exists on prod, schedule a sync. Labels
-        # are pushed only when they differ; eval reports are always pushed
-        # (local is the source of truth, prod has no cheap way to detect
-        # measurement-level drift).
-        targets: list[tuple[str, str, str, Path, list[str] | None]] = []
-        drift_count = 0
-        for run in local:
-            remote_labels = remote.get(run.run_id)
-            if remote_labels is None:
-                continue
-            local_lbl = _local_labels(run_dir=run.run_dir)
-            new_labels: list[str] | None
-            if sorted(local_lbl) != sorted(remote_labels):
-                new_labels = local_lbl
-                drift_count += 1
-            else:
-                new_labels = None
-            targets.append(
-                (run.run_id, run.scenario_name, run.run_dir_name, run.run_dir, new_labels)
-            )
+        plans = await _build_plans(local=local, remote=remote)
 
+        label_drift = sum(1 for p in plans if p.new_labels is not None)
+        eval_drift = sum(1 for p in plans if p.push_eval and p.eval_reason == "drifted")
+        eval_missing_hash = sum(1 for p in plans if p.eval_reason == "no-remote-hash")
+        unchanged = sum(1 for p in plans if p.new_labels is None and not p.push_eval)
         logger.info(
-            "On-prod targets: %d (label-drift: %d, eval-only: %d)",
-            len(targets),
-            drift_count,
-            len(targets) - drift_count,
+            "On-prod targets: %d (label-drift: %d, eval-drift: %d, "
+            "eval-no-remote-hash: %d, unchanged: %d)",
+            len(plans),
+            label_drift,
+            eval_drift,
+            eval_missing_hash,
+            unchanged,
         )
 
         if spec.dry_run:
-            for run_id, _, _, _, new_labels in targets:
-                if new_labels is not None:
-                    logger.info("[dry-run] %s labels=%s + eval", run_id, new_labels)
-                else:
-                    logger.info("[dry-run] %s eval-only", run_id)
+            for plan in plans:
+                if plan.new_labels is None and not plan.push_eval:
+                    logger.info("[dry-run] %s unchanged", plan.run_id)
+                    tally.unchanged.append(plan.run_id)
+                    continue
+                actions: list[str] = []
+                if plan.new_labels is not None:
+                    actions.append(f"labels={plan.new_labels}")
+                if plan.push_eval:
+                    actions.append(f"eval ({plan.eval_reason})")
+                logger.info("[dry-run] %s %s", plan.run_id, " + ".join(actions))
             return tally
 
+        for plan in plans:
+            if plan.new_labels is None and not plan.push_eval:
+                tally.unchanged.append(plan.run_id)
+
+        actionable = [p for p in plans if p.new_labels is not None or p.push_eval]
         semaphore = asyncio.Semaphore(spec.concurrency)
         tasks = [
             _sync_one(
                 client=client,
                 credentials=credentials,
-                scenario=scenario,
-                run_dir_name=run_dir_name,
-                run_id=run_id,
-                run_dir=run_dir,
-                new_labels=new_labels,
+                plan=plan,
                 semaphore=semaphore,
                 position=position,
-                total=len(targets),
+                total=len(actionable),
                 tally=tally,
             )
-            for position, (run_id, scenario, run_dir_name, run_dir, new_labels) in enumerate(
-                targets, start=1
-            )
+            for position, plan in enumerate(actionable, start=1)
         ]
         await asyncio.gather(*tasks)
 
-    logger.info("Finished. synced=%d failed=%d", len(tally.synced), len(tally.failed))
+    logger.info(
+        "Finished. labels=%d eval=%d unchanged=%d failed=%d",
+        len(tally.synced_labels),
+        len(tally.synced_eval),
+        len(tally.unchanged),
+        len(tally.failed),
+    )
     if tally.failed:
         for run_id, err in tally.failed:
             logger.error("FAILED %s — %s", run_id, err)

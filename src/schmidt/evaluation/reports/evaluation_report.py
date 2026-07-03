@@ -2,6 +2,7 @@
 and report serialization.
 """
 
+import hashlib
 import logging
 from pathlib import Path
 
@@ -124,3 +125,19 @@ def merge_evaluation_costs(
         model=new.model,
         provider_name=new.provider_name,
     )
+
+
+def compute_measurements_hash(measurements: list[Measurement]) -> str:
+    """Return a stable 32-char hex digest of an evaluation report's measurements.
+
+    Serializes the measurements list as canonical JSON (sorted keys, list
+    order preserved) and hashes with blake2b, so a byte-identical report
+    always maps to the same digest. Excludes ``evaluation_cost`` because
+    that field changes on every re-eval (token usage, dollar cost) even
+    when the measurements are semantically unchanged — the hash needs to
+    survive cost drift to be useful as a drift-detection signal for
+    ``schmidt sync-metadata-to-prod``.
+    """
+    payload = [m.model_dump(mode="json") for m in measurements]
+    canonical = orjson.dumps(payload, option=orjson.OPT_SORT_KEYS)
+    return hashlib.blake2b(canonical, digest_size=16).hexdigest()

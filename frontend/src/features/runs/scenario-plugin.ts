@@ -111,12 +111,11 @@ export interface ScenarioPlugin {
    */
   defaultReplaceAgentKnobs: KnobsMap;
   /**
-   * Render scenario-specific supplementary content for a tool-use entry
-   * (e.g. judge verdict for veyru's stabilize_veyru, truck/crane verdicts
-   * for container_yard_stacking). Returns null when the plug-in has
-   * nothing to add for this tool. ``extras`` is the run's
-   * ``scenario_extras`` payload typed as ``unknown`` — each plug-in
-   * narrows it internally to its own variant.
+   * Render a scenario's bespoke supplementary block for a tool-use entry
+   * (e.g. the container-yard move verdict). LLM-judged scenarios surface
+   * their verdict through the uniform judge metadata instead and return null
+   * here. ``extras`` is the run's ``scenario_extras`` payload typed as
+   * ``unknown`` — each plug-in narrows it internally to its own variant.
    */
   renderToolMetadata: (args: { toolName: string; callId: string; extras: unknown }) => ReactNode;
   /**

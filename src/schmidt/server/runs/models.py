@@ -166,6 +166,7 @@ class RunSummary(BaseModel):
     labels: list[str]
     has_note: bool
     current_round: int
+    evaluation_content_hash: str | None
 
 
 class RunListResponse(BaseModel):
