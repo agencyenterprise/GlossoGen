@@ -23,6 +23,7 @@ from pydantic_ai.messages import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,
     ModelMessage,
+    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPart,
@@ -407,6 +408,14 @@ class PydanticAIRunner(AgentRunner):
                     message_history = result.all_messages()
                     total_turns += 1
 
+                    self._log_compaction_summaries(
+                        new_messages=result.new_messages(),
+                        agent_id=agent_id,
+                        round_number=runtime.current_round,
+                        event_logger=event_logger,
+                        state=state,
+                    )
+
                     logger.info(
                         "Agent %s cycle %d complete: in=%d out=%d "
                         "cache_read=%d cache_write=%d tokens",
@@ -477,6 +486,56 @@ class PydanticAIRunner(AgentRunner):
             total_cost_usd=cumulative_cost,
             total_turns=total_turns,
         )
+
+    def _log_compaction_summaries(
+        self,
+        new_messages: list[ModelMessage],
+        agent_id: str,
+        round_number: int,
+        event_logger: EventLogger,
+        state: _StreamingState,
+    ) -> None:
+        """Log a ContextCompacted event for each CompactionPart produced this cycle.
+
+        The full provider summary is only assembled on the completed message; the
+        streaming events deliver it in per-delta fragments. Reading from
+        ``result.new_messages()`` captures each summary once, whole. Anthropic
+        returns readable text; OpenAI returns ``None`` (encrypted server-side).
+        """
+        for message in new_messages:
+            if not isinstance(message, ModelResponse):
+                continue
+            for part in message.parts:
+                if not isinstance(part, CompactionPart):
+                    continue
+                summary = part.content
+                if isinstance(summary, str):
+                    summary_char_count = len(summary)
+                    summary_text = summary
+                else:
+                    summary_char_count = 0
+                    summary_text = ""
+                provider_name = part.provider_name
+                if provider_name is None:
+                    provider_name = "unknown"
+                logger.info(
+                    "Agent %s context compacted by %s: %d-char summary: %.200s",
+                    agent_id,
+                    provider_name,
+                    summary_char_count,
+                    summary_text,
+                )
+                state.spawn_log_task(
+                    event_logger.log(
+                        event=ContextCompacted(
+                            agent_id=agent_id,
+                            round_number=round_number,
+                            provider_name=provider_name,
+                            summary_char_count=summary_char_count,
+                            summary_text=summary_text,
+                        )
+                    )
+                )
 
     def _flush_response_block(
         self,
@@ -569,35 +628,6 @@ class PydanticAIRunner(AgentRunner):
                         state.accumulated_thinking += event.part.content
                     else:
                         state.accumulated_text += event.part.content
-            elif isinstance(event.part, CompactionPart):
-                summary = event.part.content
-                if isinstance(summary, str):
-                    summary_char_count = len(summary)
-                    summary_text = summary
-                else:
-                    summary_char_count = 0
-                    summary_text = ""
-                provider_name = event.part.provider_name
-                if provider_name is None:
-                    provider_name = "unknown"
-                logger.info(
-                    "Agent %s context compacted by %s: %d-char summary: %.200s",
-                    agent_id,
-                    provider_name,
-                    summary_char_count,
-                    summary_text,
-                )
-                state.spawn_log_task(
-                    event_logger.log(
-                        event=ContextCompacted(
-                            agent_id=agent_id,
-                            round_number=round_number,
-                            provider_name=provider_name,
-                            summary_char_count=summary_char_count,
-                            summary_text=summary_text,
-                        )
-                    )
-                )
 
         elif isinstance(event, PartDeltaEvent):
             if isinstance(event.delta, TextPartDelta):
