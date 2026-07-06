@@ -8,6 +8,7 @@ Does not define MCP tools — those live in ``mcp_tools``.
 import asyncio
 import logging
 from collections.abc import Callable
+from datetime import datetime
 
 from schmidt.channel_router import ChannelRouter
 from schmidt.event_logger import EventLogger
@@ -38,6 +39,7 @@ class SimulationRuntime:
         world_context: WorldContext,
         agent_configs: list[AgentConfig],
         scheduler: RoundBoundaryScheduler,
+        simulation_start_time: datetime,
     ) -> None:
         self._scenario = scenario
         self._channel_router = ChannelRouter(channels=channels)
@@ -46,6 +48,7 @@ class SimulationRuntime:
         self._agent_tool_allowlists = agent_tool_allowlists
         self._world_context = world_context
         self._current_round = 1
+        self._simulation_start_time = simulation_start_time
         world_context.channel_router = self._channel_router
         world_context.get_current_round = lambda: self._current_round
         self._agent_configs_by_id = {c.agent_id: c for c in agent_configs}
@@ -97,6 +100,16 @@ class SimulationRuntime:
     def set_current_round(self, round_number: int) -> None:
         """Update the active round number. Called by the game clock and the supervisor."""
         self._current_round = round_number
+
+    @property
+    def simulation_start_time(self) -> datetime:
+        """UTC time the simulation began, used to express message times as elapsed seconds.
+
+        Set once at construction — to ``now`` on a fresh run, or to the original
+        run's ``SimulationStarted`` timestamp on resume — so elapsed values stay
+        anchored to the same origin across a resume boundary.
+        """
+        return self._simulation_start_time
 
     @property
     def agent_sessions(self) -> dict[str, AgentSession]:

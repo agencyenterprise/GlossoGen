@@ -24,6 +24,7 @@ from typing import Any, NamedTuple
 
 from pydantic_ai.messages import ModelMessage
 
+from schmidt.elapsed_time import find_simulation_start_time
 from schmidt.message_history_builder import build_message_history
 from schmidt.models.event import (
     AgentRegistered,
@@ -129,6 +130,7 @@ class RewindState(NamedTuple):
     replaced_agent_channel_visibility: dict[str, dict[str, ChannelVisibility]]
     channel_message_count_at_round_start: dict[int, dict[str, int]]
     rounds_with_fired_scheduler_events: frozenset[int]
+    simulation_start_time: datetime
 
 
 def build_rewind_state(
@@ -314,6 +316,7 @@ def _build_rewind_state_at_timestamp(
         replaced_agent_channel_visibility={},
         channel_message_count_at_round_start=channel_count_at_round_start,
         rounds_with_fired_scheduler_events=frozenset(rounds_with_fired_scheduler_events),
+        simulation_start_time=find_simulation_start_time(events=events),
     )
 
 

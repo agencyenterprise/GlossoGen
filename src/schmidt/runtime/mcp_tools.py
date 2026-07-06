@@ -23,6 +23,7 @@ from uuid import uuid4
 
 from mcp.server.fastmcp import FastMCP
 
+from schmidt.elapsed_time import elapsed_seconds_since_start
 from schmidt.models.event import MessageSent
 from schmidt.models.mcp_responses import ChannelMessage, ReadChannelResult, SendMessageResult
 from schmidt.models.message import SimulationMessage
@@ -334,7 +335,8 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
         description=(
             "Read the last N messages from a channel. Each message includes the name of the "
             "agent who sent it, so you can always tell who said what without them identifying "
-            "themselves."
+            "themselves, and an elapsed_seconds value giving the time it was sent as seconds "
+            "since the simulation began."
         ),
     )
     async def read_channel(
@@ -371,7 +373,10 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                         round=msg.round_number,
                         sender=msg.sender_display_name,
                         text=msg.text,
-                        timestamp=msg.timestamp.isoformat(),
+                        elapsed_seconds=elapsed_seconds_since_start(
+                            when=msg.timestamp,
+                            start=runtime.simulation_start_time,
+                        ),
                     )
                     for msg in recent
                 ],
@@ -433,7 +438,10 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
                             round=msg.round_number,
                             sender=msg.sender_display_name,
                             text=msg.text,
-                            timestamp=msg.timestamp.isoformat(),
+                            elapsed_seconds=elapsed_seconds_since_start(
+                                when=msg.timestamp,
+                                start=runtime.simulation_start_time,
+                            ),
                         )
                         for msg in unseen
                     ]

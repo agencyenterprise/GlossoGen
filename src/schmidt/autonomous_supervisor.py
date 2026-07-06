@@ -7,6 +7,7 @@ autonomously via MCP tools.
 import asyncio
 import logging
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -276,6 +277,13 @@ class AutonomousSupervisor:
         )
 
         # Build the simulation runtime (shared state) and store for error-path access.
+        # Anchor elapsed-time reporting: a fresh run starts now; a resumed run
+        # reuses the original run's start so elapsed values stay continuous.
+        if self._resume_state is not None:
+            simulation_start_time = self._resume_state.simulation_start_time
+        else:
+            simulation_start_time = datetime.now(tz=UTC)
+
         runtime = SimulationRuntime(
             scenario=self._scenario,
             channels=channels,
@@ -285,6 +293,7 @@ class AutonomousSupervisor:
             world_context=world_context,
             agent_configs=self._agent_configs,
             scheduler=self._scheduler,
+            simulation_start_time=simulation_start_time,
         )
         self._runtime = runtime
 
@@ -383,6 +392,7 @@ class AutonomousSupervisor:
                     scenario_config=self._scenario.get_scenario_config(),
                     provider=self._provider,
                     round_number=0,
+                    timestamp=simulation_start_time,
                 )
             )
         for config in self._agent_configs:

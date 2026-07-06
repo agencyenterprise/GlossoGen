@@ -15,9 +15,10 @@ event to filter individual calls, so pre-cutoff calls survive even when
 their parent batch finished post-cutoff.
 """
 
+import json
 import logging
 from datetime import datetime, timezone
-from typing import NamedTuple
+from typing import Any, NamedTuple, cast
 
 from pydantic_ai.messages import (
     ModelMessage,
@@ -31,6 +32,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
+from schmidt.elapsed_time import elapsed_seconds_since_start, find_simulation_start_time
 from schmidt.models.event import (
     LLMResponseReceived,
     SimulationEvent,
@@ -185,11 +187,66 @@ def _drop_call_without_result(
     return call_id not in tool_results_by_call_id
 
 
+def _read_channel_content_as_elapsed(
+    content: str,
+    simulation_start_time: datetime,
+) -> str:
+    """Rewrite a read_channel result's message times to elapsed seconds.
+
+    Older JSONL logs stored each message with an ISO ``timestamp``; convert
+    those to the ``elapsed_seconds`` float that agents now receive. Results
+    already in the new format (or unparseable) are returned unchanged, so this
+    is safe and idempotent across log generations.
+    """
+    try:
+        payload = json.loads(content)
+    except (json.JSONDecodeError, TypeError):
+        return content
+    if not isinstance(payload, dict):
+        return content
+    payload_dict = cast(dict[str, Any], payload)
+    raw_messages = payload_dict.get("messages")
+    if not isinstance(raw_messages, list):
+        return content
+    messages = cast(list[Any], raw_messages)
+    converted = False
+    for entry in messages:
+        if not isinstance(entry, dict):
+            continue
+        message = cast(dict[str, Any], entry)
+        iso_timestamp = message.get("timestamp")
+        if not isinstance(iso_timestamp, str):
+            continue
+        del message["timestamp"]
+        message["elapsed_seconds"] = elapsed_seconds_since_start(
+            when=datetime.fromisoformat(iso_timestamp),
+            start=simulation_start_time,
+        )
+        converted = True
+    if not converted:
+        return content
+    return json.dumps(payload_dict)
+
+
+def _tool_return_content(
+    result: ToolResultReceived,
+    simulation_start_time: datetime,
+) -> str:
+    """Return a tool result's content, converting read_channel times to elapsed seconds."""
+    if result.tool_name.endswith("read_channel"):
+        return _read_channel_content_as_elapsed(
+            content=result.result,
+            simulation_start_time=simulation_start_time,
+        )
+    return result.result
+
+
 def _build_orphan_cycle(
     orphan_invoked: list[ToolCallInvoked],
     tool_results_by_call_id: dict[str, ToolResultReceived],
     channel_visibility: dict[str, ChannelVisibility],
     nonchannel_round_floor: int | None,
+    simulation_start_time: datetime,
 ) -> _KeptCycle | None:
     """Synthesise a ``_KeptCycle`` for ``ToolCallInvoked`` events with no parent.
 
@@ -244,7 +301,10 @@ def _build_orphan_cycle(
         tool_return_parts.append(
             ToolReturnPart(
                 tool_name=result.tool_name,
-                content=result.result,
+                content=_tool_return_content(
+                    result=result,
+                    simulation_start_time=simulation_start_time,
+                ),
                 tool_call_id=result.call_id,
                 timestamp=result.timestamp,
             )
@@ -405,6 +465,7 @@ def build_message_history(
     if not llm_responses and not orphan_invoked:
         return []
 
+    simulation_start_time = find_simulation_start_time(events=events)
     nonchannel_round_floor = _derive_nonchannel_round_floor(
         channel_visibility=channel_visibility,
     )
@@ -474,7 +535,10 @@ def build_message_history(
                 tool_return_parts.append(
                     ToolReturnPart(
                         tool_name=result_event.tool_name,
-                        content=result_event.result,
+                        content=_tool_return_content(
+                            result=result_event,
+                            simulation_start_time=simulation_start_time,
+                        ),
                         tool_call_id=result_event.call_id,
                         timestamp=result_event.timestamp,
                     )
@@ -495,6 +559,7 @@ def build_message_history(
         tool_results_by_call_id=tool_results_by_call_id,
         channel_visibility=channel_visibility,
         nonchannel_round_floor=nonchannel_round_floor,
+        simulation_start_time=simulation_start_time,
     )
     if orphan_cycle is not None:
         kept_cycles.append(orphan_cycle)

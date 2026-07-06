@@ -15,6 +15,7 @@ from typing import Any, cast
 from pydantic_ai import Agent, _agent_graph
 from pydantic_ai.agent import AgentRunResult as PydanticAIAgentRunResult
 from pydantic_ai.agent.abstract import EventStreamHandler
+from pydantic_ai.capabilities import ProcessHistory
 from pydantic_ai.mcp import MCPToolset
 from pydantic_ai.messages import (
     AgentStreamEvent,
@@ -52,6 +53,7 @@ from schmidt.runners.communication_protocol import (
     INITIAL_PROMPT,
     build_full_system_prompt,
 )
+from schmidt.runners.history_cleanup_processor import clean_history
 from schmidt.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
@@ -225,6 +227,7 @@ class PydanticAIRunner(AgentRunner):
             system_prompt=full_system_prompt,
             toolsets=[mcp_toolset],
             model_settings=default_pydantic_ai_settings(provider=provider),
+            capabilities=[ProcessHistory(clean_history)],
         )
 
         # vLLM's hermes tool parser drops <tool_call> XML on the floor when

@@ -12,13 +12,16 @@ class ChannelMessage(BaseModel):
 
     ``round`` is the simulation round in which the message was sent, so an
     agent reading the channel can tell whether an instruction was issued for
-    the current round or carried over from a previous one.
+    the current round or carried over from a previous one. ``elapsed_seconds``
+    is the time the message was sent expressed as seconds since the simulation
+    began (millisecond precision), so agents reason about relative timing
+    without a verbose wall-clock timestamp.
     """
 
     round: int
     sender: str
     text: str
-    timestamp: str
+    elapsed_seconds: float
 
 
 class ReadChannelResult(BaseModel):
