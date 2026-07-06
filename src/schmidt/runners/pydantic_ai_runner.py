@@ -573,10 +573,10 @@ class PydanticAIRunner(AgentRunner):
                 summary = event.part.content
                 if isinstance(summary, str):
                     summary_char_count = len(summary)
-                    summary_preview = summary[:200]
+                    summary_text = summary
                 else:
                     summary_char_count = 0
-                    summary_preview = ""
+                    summary_text = ""
                 provider_name = event.part.provider_name
                 if provider_name is None:
                     provider_name = "unknown"
@@ -585,7 +585,7 @@ class PydanticAIRunner(AgentRunner):
                     agent_id,
                     provider_name,
                     summary_char_count,
-                    summary_preview,
+                    summary_text,
                 )
                 state.spawn_log_task(
                     event_logger.log(
@@ -594,7 +594,7 @@ class PydanticAIRunner(AgentRunner):
                             round_number=round_number,
                             provider_name=provider_name,
                             summary_char_count=summary_char_count,
-                            summary_preview=summary_preview,
+                            summary_text=summary_text,
                         )
                     )
                 )

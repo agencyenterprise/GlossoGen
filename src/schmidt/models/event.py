@@ -116,15 +116,16 @@ class ContextCompacted(EventBase):
 
     Surfaced from a ``CompactionPart`` in the model response when the
     ``compaction`` knob is enabled. Anthropic returns a readable text summary
-    (captured in ``summary_preview``); OpenAI stores an encrypted summary
-    server-side and returns no text, so ``summary_char_count`` is 0.
+    (captured in full in ``summary_text``); OpenAI stores an encrypted summary
+    server-side and returns no text, so ``summary_char_count`` is 0 and
+    ``summary_text`` is empty.
     """
 
     event_type: Literal["context_compacted"] = "context_compacted"
     agent_id: str
     provider_name: str
     summary_char_count: int
-    summary_preview: str
+    summary_text: str
 
 
 class RoundAdvanced(EventBase):
