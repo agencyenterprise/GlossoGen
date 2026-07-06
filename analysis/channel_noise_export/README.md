@@ -75,7 +75,9 @@ or a model on `round_success_fraction`.
 `total_rounds`, `round_success_count`, `round_success_fraction`, `perplexity` (run-wide
 mean per-token surprisal, nats/gpt2, **pristine text**), `english_ngram_surprisal`
 (run-wide mean per-char surprisal under an English character trigram, nats, **pristine
-text** — higher = less English-like), `message_entropy` (run-wide mean within-message
+text** — higher = less English-like), `english_ngram_backoff_surprisal` (same, richer
+variant: case-sensitive, digits + punctuation kept, stupid-backoff smoothing — higher = less
+English-like), `message_entropy` (run-wide mean within-message
 character Shannon entropy, bits/char, **pristine text** — lower = more
 repetitive/compressible), `gzip_compression_ratio` (run-wide mean per-message raw-DEFLATE
 compressed/original with the constant gzip framing excluded, **pristine text** — lower = more
@@ -110,6 +112,11 @@ Message columns:
   character trigram, on the pristine text, same method as the `english_ngram_surprisal`
   metric. Higher = less English-like (degenerate repetition, codes, digit runs score high).
   Blank for empty messages.
+- `english_ngram_backoff_surprisal` — per-message mean per-char surprisal (nats) under the
+  backoff English trigram (case-sensitive, digits + punctuation kept, stupid-backoff
+  smoothing), same method as the `english_ngram_backoff_surprisal` metric. Higher = less
+  English-like; scores digit/symbol-heavy text more faithfully than the plain variant. Blank
+  for empty messages.
 - `message_entropy` — per-message within-message character Shannon entropy (bits/char), on
   the pristine text, same method as the `message_entropy` metric. Lower = more
   repetitive/compressible (`LLLLLLL` → 0). Blank for empty messages.

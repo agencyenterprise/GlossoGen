@@ -14,6 +14,7 @@ from analysis.results_viewer.run_catalog import EvaluatedRun
 
 PERPLEXITY_METRIC = "perplexity"
 ENGLISH_NGRAM_SURPRISAL_METRIC = "english_ngram_surprisal"
+ENGLISH_NGRAM_BACKOFF_SURPRISAL_METRIC = "english_ngram_backoff_surprisal"
 MESSAGE_ENTROPY_METRIC = "message_entropy"
 GZIP_COMPRESSION_RATIO_METRIC = "gzip_compression_ratio"
 DIALOG_COUNT_METRIC = "dialog_count"
@@ -55,6 +56,17 @@ def english_ngram_surprisal_score(evaluated: EvaluatedRun) -> float | None:
     Higher means less English-like (the inverse intuition of ``perplexity``).
     """
     return measurement_score(evaluated=evaluated, metric_name=ENGLISH_NGRAM_SURPRISAL_METRIC)
+
+
+def english_ngram_backoff_surprisal_score(evaluated: EvaluatedRun) -> float | None:
+    """Mean per-char surprisal in nats under the English backoff trigram; ``None`` if unscored.
+
+    Case-sensitive, digits + punctuation retained, stupid-backoff smoothing. Higher means
+    less English-like.
+    """
+    return measurement_score(
+        evaluated=evaluated, metric_name=ENGLISH_NGRAM_BACKOFF_SURPRISAL_METRIC
+    )
 
 
 def message_entropy_score(evaluated: EvaluatedRun) -> float | None:

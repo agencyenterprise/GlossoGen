@@ -22,7 +22,7 @@ Four output tables:
   ``budget_exceeded_count`` / ``did_not_submit_count`` / ``disagreed_count``) and
   the per-team headline language metrics (``perplexity``,
   ``english_ngram_surprisal``, ``message_entropy``, ``gzip_compression_ratio``,
-  ``language_repetition``, ``mcm``, ``mcr``).
+  ``language_repetition``, ``mcm``, ``mcr``, ``english_ngram_backoff_surprisal``).
 - ``round_level`` — one row per (run, round, team): the per-round-per-team
   outcome reconstructed from the event log (``success`` = eligible, ``won``,
   ``found_count`` / ``found_fraction``, ``false_positive_count``, ``found_all``,
@@ -35,9 +35,9 @@ Four output tables:
 - ``message_level`` — one row per link-channel message: ``message_agent``
   (``viewer_left`` / ``viewer_right``), ``message_text`` (pristine), the
   channel-delivered ``message_text_transmitted``, ``chars``, per-message
-  ``perplexity`` / ``english_ngram_surprisal`` / ``message_entropy`` /
-  ``gzip_compression_ratio`` / ``message_repetition_factor``, and the round's team
-  ``success`` / ``won``.
+  ``perplexity`` / ``english_ngram_surprisal`` / ``english_ngram_backoff_surprisal`` /
+  ``message_entropy`` / ``gzip_compression_ratio`` / ``message_repetition_factor``, and the
+  round's team ``success`` / ``won``.
 - ``team_aggregate`` — per (model_class, viewer models, all_must_submit) mean ± std
   of the success and win fractions plus mean characters / perplexity / repetition;
   a sanity check against the run-level rows.
@@ -56,6 +56,7 @@ import pandas as pd
 
 from analysis.results_viewer.measurement_scores import measurement_score, read_labels
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
+from analysis.run_export.message_backoff_ngram_scorer import MessageBackoffNgramScorer
 from analysis.run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
 from analysis.run_export.message_perplexity_scorer import MessagePerplexityScorer
 from analysis.run_export.message_repetition_sidecar import read_message_repetition_factors
@@ -110,6 +111,8 @@ _TEAM_METRIC_COLUMNS = (
     ("language_repetition", "language_repetition"),
     ("mean_chars_per_message", "mcm"),
     ("mean_chars_per_round", "mcr"),
+    # Appended last so it never shifts pre-existing columns (charts reference by position).
+    ("english_ngram_backoff_surprisal", "english_ngram_backoff_surprisal"),
 )
 
 
@@ -598,6 +601,7 @@ def _build_message_level(joined_runs: list[JoinedRun]) -> pd.DataFrame:
     """One row per link-channel message with per-message language features + round outcome."""
     perplexity_scorer = MessagePerplexityScorer()
     english_ngram_scorer = MessageEnglishNgramScorer()
+    backoff_ngram_scorer = MessageBackoffNgramScorer()
     rows: list[dict[str, object]] = []
     for joined in joined_runs:
         evaluated = joined.evaluated
@@ -617,9 +621,16 @@ def _build_message_level(joined_runs: list[JoinedRun]) -> pd.DataFrame:
         english_ngram_surprisals = english_ngram_scorer.score_run(
             jsonl_path=jsonl_path, texts=pristine_texts
         )
-        for row, perplexity, english_ngram in zip(run_rows, perplexities, english_ngram_surprisals):
+        backoff_ngram_surprisals = backoff_ngram_scorer.score_run(
+            jsonl_path=jsonl_path, texts=pristine_texts
+        )
+        for row, perplexity, english_ngram, backoff_ngram in zip(
+            run_rows, perplexities, english_ngram_surprisals, backoff_ngram_surprisals
+        ):
             row["perplexity"] = perplexity
             row["english_ngram_surprisal"] = english_ngram
+            # Appended last so it never shifts pre-existing columns (charts reference by position).
+            row["english_ngram_backoff_surprisal"] = backoff_ngram
         rows.extend(run_rows)
     frame = pd.DataFrame(rows)
     if frame.empty:

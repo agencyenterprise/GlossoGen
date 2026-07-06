@@ -32,7 +32,9 @@ Four output tables:
   ``random_seed``, the Bernoulli numerator/denominator
   (``round_success_count`` / ``total_rounds``) and fraction, plus the run's
   headline ``perplexity`` (pristine), ``english_ngram_surprisal`` (pristine; English
-  char trigram, higher = less English-like), ``message_entropy`` (pristine; within-message
+  char trigram, higher = less English-like), ``english_ngram_backoff_surprisal`` (pristine;
+  richer variant: case-sensitive, digits + punctuation kept, stupid-backoff smoothing),
+  ``message_entropy`` (pristine; within-message
   character Shannon entropy in bits/char, lower = more repetitive/compressible),
   ``gzip_compression_ratio`` (pristine; per-message raw-DEFLATE compressed/original with the
   constant gzip framing excluded, lower = more compressible/repetitive),
@@ -42,8 +44,8 @@ Four output tables:
   per information unit).
 - ``message_level`` — one row per link-channel message with its substage / round
   context, the pristine and transmitted text, character-loss stats, per-message
-  pristine ``perplexity``, ``english_ngram_surprisal``, ``message_entropy``,
-  ``gzip_compression_ratio``, and
+  pristine ``perplexity``, ``english_ngram_surprisal``, ``english_ngram_backoff_surprisal``,
+  ``message_entropy``, ``gzip_compression_ratio``, and
   ``message_repetition_factor`` (the per-message ``language_repetition`` LLM-judge
   factor, read from the run's ``language_repetition_messages.jsonl`` sidecar by
   ``message_id``).
@@ -74,6 +76,7 @@ from analysis.results_viewer.measurement_scores import (
     LANGUAGE_REPETITION_METRIC,
     RETRANSMISSION_REQUEST_COUNT_METRIC,
     dialog_count_score,
+    english_ngram_backoff_surprisal_score,
     english_ngram_surprisal_score,
     gzip_compression_ratio_score,
     language_repetition_score,
@@ -84,6 +87,7 @@ from analysis.results_viewer.measurement_scores import (
     retransmission_request_count_score,
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
+from analysis.run_export.message_backoff_ngram_scorer import MessageBackoffNgramScorer
 from analysis.run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
 from analysis.run_export.message_perplexity_scorer import MessagePerplexityScorer
 from analysis.run_export.message_repetition_sidecar import read_message_repetition_factors
@@ -152,6 +156,7 @@ class RunRecord(NamedTuple):
     round_success: int
     perplexity_score: float | None
     english_ngram_score: float | None
+    english_ngram_backoff_score: float | None
     message_entropy_score: float | None
     gzip_compression_ratio_score: float | None
     dialog_count_score: float | None
@@ -189,6 +194,7 @@ def _build_record(evaluated: EvaluatedRun) -> RunRecord | None:
         round_success=round_success,
         perplexity_score=perplexity_score(evaluated=evaluated),
         english_ngram_score=english_ngram_surprisal_score(evaluated=evaluated),
+        english_ngram_backoff_score=english_ngram_backoff_surprisal_score(evaluated=evaluated),
         message_entropy_score=message_entropy_score(evaluated=evaluated),
         gzip_compression_ratio_score=gzip_compression_ratio_score(evaluated=evaluated),
         dialog_count_score=dialog_count_score(evaluated=evaluated),
@@ -288,6 +294,9 @@ def _build_run_level_frame(
                 "mcm": record.mcm_score,
                 "repetition": record.repetition_score,
                 "labels": "|".join(record.labels),
+                # Appended last so it never shifts pre-existing columns (spreadsheet charts
+                # reference data columns by position).
+                "english_ngram_backoff_surprisal": record.english_ngram_backoff_score,
             }
         )
     frame = pd.DataFrame(rows)
@@ -323,6 +332,7 @@ def _build_message_level_frame(
     """
     perplexity_scorer = MessagePerplexityScorer()
     english_ngram_scorer = MessageEnglishNgramScorer()
+    backoff_ngram_scorer = MessageBackoffNgramScorer()
     rows: list[dict[str, object]] = []
     for evaluated in runs:
         record = _build_record(evaluated=evaluated)
@@ -394,19 +404,29 @@ def _build_message_level_frame(
         english_ngram_surprisals = english_ngram_scorer.score_run(
             jsonl_path=jsonl_path, texts=pristine_texts
         )
+        backoff_ngram_surprisals = backoff_ngram_scorer.score_run(
+            jsonl_path=jsonl_path, texts=pristine_texts
+        )
         message_entropies = [
             character_entropy_bits(text=text) if text.strip() else None for text in pristine_texts
         ]
         gzip_ratios = [
             gzip_compression_ratio(text=text) if text.strip() else None for text in pristine_texts
         ]
-        for row, perplexity, english_ngram, entropy, gzip_ratio in zip(
-            run_rows, perplexities, english_ngram_surprisals, message_entropies, gzip_ratios
+        for row, perplexity, english_ngram, backoff_ngram, entropy, gzip_ratio in zip(
+            run_rows,
+            perplexities,
+            english_ngram_surprisals,
+            backoff_ngram_surprisals,
+            message_entropies,
+            gzip_ratios,
         ):
             row["perplexity"] = perplexity
             row["english_ngram_surprisal"] = english_ngram
             row["message_entropy"] = entropy
             row["gzip_compression_ratio"] = gzip_ratio
+            # Appended last so it never shifts pre-existing columns (charts reference by position).
+            row["english_ngram_backoff_surprisal"] = backoff_ngram
         rows.extend(run_rows)
     frame = pd.DataFrame(rows)
     if frame.empty:

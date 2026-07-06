@@ -31,7 +31,8 @@ their column sets differ):
 - ``run_level`` — one row per cohort run.
 - ``message_level`` — one row per link-channel message across every round the run played, with
   substage ground truth + per-message gpt2 ``perplexity``, English-char-trigram
-  ``english_ngram_surprisal`` (higher = less English-like), ``message_entropy``
+  ``english_ngram_surprisal`` (higher = less English-like), ``english_ngram_backoff_surprisal``
+  (backoff variant: case-sensitive, digits + punctuation kept), ``message_entropy``
   (within-message character Shannon entropy, bits/char; lower = more repetitive), and
   ``gzip_compression_ratio`` (per-message raw-DEFLATE compressed/original, gzip framing
   excluded; lower = more compressible/repetitive).
@@ -57,6 +58,7 @@ import pandas as pd
 
 from analysis.results_viewer.measurement_scores import read_labels, round_success_after_resume_score
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
+from analysis.run_export.message_backoff_ngram_scorer import MessageBackoffNgramScorer
 from analysis.run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
 from analysis.run_export.message_perplexity_scorer import MessagePerplexityScorer
 from analysis.run_export.run_context_scan import (
@@ -256,6 +258,7 @@ def _build_run_level_frame(
     spec: ScenarioExportSpec,
     perplexity_by_run: dict[str, float | None],
     english_ngram_by_run: dict[str, float | None],
+    english_ngram_backoff_by_run: dict[str, float | None],
     message_entropy_by_run: dict[str, float | None],
     gzip_compression_ratio_by_run: dict[str, float | None],
     mcm_by_run: dict[str, float | None],
@@ -264,7 +267,9 @@ def _build_run_level_frame(
 
     ``perplexity`` (run-wide mean per-message surprisal, nats/gpt2),
     ``english_ngram_surprisal`` (run-wide mean per-message per-char surprisal under an
-    English char trigram; higher = less English-like), ``message_entropy`` (run-wide mean
+    English char trigram; higher = less English-like), ``english_ngram_backoff_surprisal``
+    (richer variant: case-sensitive, digits + punctuation kept, stupid-backoff smoothing),
+    ``message_entropy`` (run-wide mean
     within-message character Shannon entropy, bits/char; lower = more
     repetitive/compressible), ``gzip_compression_ratio`` (run-wide mean per-message raw-DEFLATE
     compressed/original with the constant gzip framing excluded; lower = more
@@ -298,6 +303,8 @@ def _build_run_level_frame(
                 "gzip_compression_ratio": gzip_compression_ratio_by_run.get(record.run_id),
                 "mcm": mcm_by_run.get(record.run_id),
                 "labels": "|".join(record.labels),
+                # Appended last so pre-existing columns don't shift (charts read by position).
+                "english_ngram_backoff_surprisal": english_ngram_backoff_by_run.get(record.run_id),
             }
         )
     frame = pd.DataFrame(rows)
@@ -317,6 +324,7 @@ def _build_message_level_frame(
     """
     perplexity_scorer = MessagePerplexityScorer()
     english_ngram_scorer = MessageEnglishNgramScorer()
+    backoff_ngram_scorer = MessageBackoffNgramScorer()
     rows: list[dict[str, object]] = []
     for record in records:
         context = contexts[record.run_id]
@@ -362,19 +370,29 @@ def _build_message_level_frame(
         english_ngram_surprisals = english_ngram_scorer.score_run(
             jsonl_path=jsonl_path, texts=message_texts
         )
+        backoff_ngram_surprisals = backoff_ngram_scorer.score_run(
+            jsonl_path=jsonl_path, texts=message_texts
+        )
         message_entropies = [
             character_entropy_bits(text=text) if text.strip() else None for text in message_texts
         ]
         gzip_ratios = [
             gzip_compression_ratio(text=text) if text.strip() else None for text in message_texts
         ]
-        for row, perplexity, english_ngram, entropy, gzip_ratio in zip(
-            run_rows, perplexities, english_ngram_surprisals, message_entropies, gzip_ratios
+        for row, perplexity, english_ngram, backoff_ngram, entropy, gzip_ratio in zip(
+            run_rows,
+            perplexities,
+            english_ngram_surprisals,
+            backoff_ngram_surprisals,
+            message_entropies,
+            gzip_ratios,
         ):
             row["perplexity"] = perplexity
             row["english_ngram_surprisal"] = english_ngram
             row["message_entropy"] = entropy
             row["gzip_compression_ratio"] = gzip_ratio
+            # Appended last so it never shifts pre-existing columns (charts reference by position).
+            row["english_ngram_backoff_surprisal"] = backoff_ngram
         rows.extend(run_rows)
     frame = pd.DataFrame(rows)
     if frame.empty:
@@ -527,6 +545,9 @@ def main() -> None:
         perplexity_by_run=_run_means(message_level=message_level, column="perplexity"),
         english_ngram_by_run=_run_means(
             message_level=message_level, column="english_ngram_surprisal"
+        ),
+        english_ngram_backoff_by_run=_run_means(
+            message_level=message_level, column="english_ngram_backoff_surprisal"
         ),
         message_entropy_by_run=_run_means(message_level=message_level, column="message_entropy"),
         gzip_compression_ratio_by_run=_run_means(

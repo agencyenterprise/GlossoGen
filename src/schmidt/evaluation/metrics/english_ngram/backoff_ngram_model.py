@@ -43,6 +43,11 @@ _END_MARKER = "$"
 _OOV_CHAR = "\x00"
 _BACKOFF_ALPHA = 0.4
 
+# The padding markers also land in ``vocab`` (added by ``vocab.update(padded)`` at train
+# time), so an agent-authored ``^``/``$`` would otherwise test as in-vocabulary and collide
+# with the start/end padding. Score-time mapping treats these as out-of-vocabulary instead.
+_RESERVED_MARKERS = frozenset((_START_CONTEXT[0], _END_MARKER))
+
 # Punctuation kept in the trained vocabulary. Excludes the reserved ``^`` start
 # and ``$`` end markers so agent-authored carets/dollar signs fall through to the
 # out-of-vocabulary sentinel rather than colliding with padding.
@@ -125,16 +130,20 @@ def _normalize(text: str, case_sensitive: bool) -> str:
 def _map_to_vocab(word: str, vocab_set: set[str], keep_punctuation: bool) -> str:
     """Keep trained characters, drop unwanted ones, map unknown to the sentinel.
 
-    Characters in the trained vocabulary pass through. Characters that would be
-    kept during training but are simply unseen map to the out-of-vocabulary
-    sentinel. When ``keep_punctuation`` is false, punctuation is dropped entirely
-    so it is neither modeled nor scored.
+    Characters in the trained vocabulary pass through, except the reserved ``^``/``$``
+    padding markers, which map to the out-of-vocabulary sentinel so an agent-authored
+    caret or dollar sign cannot collide with the padding. Characters that would be kept
+    during training but are simply unseen also map to the sentinel. When
+    ``keep_punctuation`` is false, punctuation is dropped entirely so it is neither
+    modeled nor scored.
     """
     kept: list[str] = []
     for char in word:
-        if not keep_punctuation and char in _PUNCTUATION:
+        if char in _RESERVED_MARKERS:
+            kept.append(_OOV_CHAR)
+        elif not keep_punctuation and char in _PUNCTUATION:
             continue
-        if char in vocab_set:
+        elif char in vocab_set:
             kept.append(char)
         else:
             kept.append(_OOV_CHAR)

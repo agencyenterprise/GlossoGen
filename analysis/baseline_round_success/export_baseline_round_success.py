@@ -26,7 +26,9 @@ Four output tables:
   binomial GLMM ``cbind(successes, failures) ~ ...`` and the fraction supports a
   beta/linear model. Also carries the run's headline ``perplexity`` (overall mean
   per-token surprisal), ``english_ngram_surprisal`` (overall mean per-char surprisal
-  under an English char trigram; higher = less English-like), ``message_entropy`` (overall
+  under an English char trigram; higher = less English-like), ``english_ngram_backoff_surprisal``
+  (richer variant: case-sensitive, digits + punctuation kept, stupid-backoff smoothing),
+  ``message_entropy`` (overall
   mean within-message character Shannon entropy in bits/char; lower = more
   repetitive/compressible), ``gzip_compression_ratio`` (overall mean per-message raw-DEFLATE
   compressed/original with the constant gzip framing excluded; lower = more
@@ -38,7 +40,9 @@ Four output tables:
   (``len(message_text)``), ``perplexity`` (per-message mean per-token surprisal in nats
   under gpt2; blank for empty/single-token messages), ``english_ngram_surprisal``
   (per-message mean per-char surprisal under an English char trigram; higher = less
-  English-like; blank for empty messages), ``message_entropy`` (per-message within-message
+  English-like; blank for empty messages), ``english_ngram_backoff_surprisal`` (backoff
+  variant: case-sensitive, digits + punctuation kept), ``message_entropy`` (per-message
+  within-message
   character Shannon entropy in bits/char; lower = more repetitive; blank for empty
   messages), ``gzip_compression_ratio`` (per-message raw-DEFLATE compressed/original, gzip
   framing excluded; lower = more compressible; blank for empty messages), and the round-level
@@ -64,6 +68,7 @@ from typing import NamedTuple
 import pandas as pd
 
 from analysis.results_viewer.measurement_scores import (
+    english_ngram_backoff_surprisal_score,
     english_ngram_surprisal_score,
     gzip_compression_ratio_score,
     mcm_score,
@@ -72,6 +77,7 @@ from analysis.results_viewer.measurement_scores import (
     read_labels,
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun, list_evaluated_runs
+from analysis.run_export.message_backoff_ngram_scorer import MessageBackoffNgramScorer
 from analysis.run_export.message_english_ngram_scorer import MessageEnglishNgramScorer
 from analysis.run_export.message_perplexity_scorer import MessagePerplexityScorer
 from analysis.run_export.run_context_scan import (
@@ -118,6 +124,7 @@ class RunRecord(NamedTuple):
     round_success: int
     perplexity_score: float | None
     english_ngram_score: float | None
+    english_ngram_backoff_score: float | None
     message_entropy_score: float | None
     gzip_compression_ratio_score: float | None
     mcm_score: float | None
@@ -150,6 +157,7 @@ def _build_record(evaluated: EvaluatedRun) -> RunRecord | None:
         round_success=round_success,
         perplexity_score=perplexity_score(evaluated=evaluated),
         english_ngram_score=english_ngram_surprisal_score(evaluated=evaluated),
+        english_ngram_backoff_score=english_ngram_backoff_surprisal_score(evaluated=evaluated),
         message_entropy_score=message_entropy_score(evaluated=evaluated),
         gzip_compression_ratio_score=gzip_compression_ratio_score(evaluated=evaluated),
         mcm_score=mcm_score(evaluated=evaluated),
@@ -236,6 +244,8 @@ def _build_run_level_frame(
                 "gzip_compression_ratio": record.gzip_compression_ratio_score,
                 "mcm": record.mcm_score,
                 "labels": "|".join(record.labels),
+                # Appended last so pre-existing columns don't shift (charts read by position).
+                "english_ngram_backoff_surprisal": record.english_ngram_backoff_score,
             }
         )
     frame = pd.DataFrame(rows)
@@ -265,6 +275,7 @@ def _build_message_level_frame(
     """
     perplexity_scorer = MessagePerplexityScorer()
     english_ngram_scorer = MessageEnglishNgramScorer()
+    backoff_ngram_scorer = MessageBackoffNgramScorer()
     rows: list[dict[str, object]] = []
     for joined in joined_runs:
         record = _build_record(evaluated=joined.evaluated)
@@ -310,19 +321,29 @@ def _build_message_level_frame(
         english_ngram_surprisals = english_ngram_scorer.score_run(
             jsonl_path=jsonl_path, texts=message_texts
         )
+        backoff_ngram_surprisals = backoff_ngram_scorer.score_run(
+            jsonl_path=jsonl_path, texts=message_texts
+        )
         message_entropies = [
             character_entropy_bits(text=text) if text.strip() else None for text in message_texts
         ]
         gzip_ratios = [
             gzip_compression_ratio(text=text) if text.strip() else None for text in message_texts
         ]
-        for row, perplexity, english_ngram, entropy, gzip_ratio in zip(
-            run_rows, perplexities, english_ngram_surprisals, message_entropies, gzip_ratios
+        for row, perplexity, english_ngram, backoff_ngram, entropy, gzip_ratio in zip(
+            run_rows,
+            perplexities,
+            english_ngram_surprisals,
+            backoff_ngram_surprisals,
+            message_entropies,
+            gzip_ratios,
         ):
             row["perplexity"] = perplexity
             row["english_ngram_surprisal"] = english_ngram
             row["message_entropy"] = entropy
             row["gzip_compression_ratio"] = gzip_ratio
+            # Appended last so it never shifts pre-existing columns (charts reference by position).
+            row["english_ngram_backoff_surprisal"] = backoff_ngram
         rows.extend(run_rows)
     frame = pd.DataFrame(rows)
     if frame.empty:

@@ -48,6 +48,7 @@ Read these once; they explain choices common to every column.
 | ------------------------------- | --------------------------------------------- | ----------------------------- | ---------------------------- | ------------- |
 | `perplexity`                    | How surprising the text is to GPT-2           | nats / token                  | higher = more surprising     | deterministic |
 | `english_ngram_surprisal`       | How un-English-like the characters are        | nats / char                   | higher = less English-like   | deterministic |
+| `english_ngram_backoff_surprisal` | Un-English-likeness, richer variant         | nats / char                   | higher = less English-like   | deterministic |
 | `message_entropy`               | Character variety within a message            | bits / char                   | lower = more repetitive      | deterministic |
 | `gzip_compression_ratio`        | How compressible the text is                  | ratio (compressed ÷ original) | lower = more compressible    | deterministic |
 | `dialog_count`                  | Clarification/coordination messages per round | messages / round              | higher = more back-and-forth | LLM judge     |
@@ -160,6 +161,41 @@ English, so each extra `l` stays surprising — which is why `LLLLLLL` scores _h
   characters. Per-message → per-round mean → run mean.
 - Deterministic; uses only character-frequency statistics, no large neural network.
 - Source: `src/schmidt/evaluation/metrics/english_ngram/`.
+
+**Where to find it.** `run_level` and `message_level`.
+
+---
+
+## `english_ngram_backoff_surprisal`
+
+**What it is.** The same idea as `english_ngram_surprisal` — mean per-**character** surprisal
+(**nats**) against an English character trigram — but a more faithful variant. Higher = less
+English-like.
+
+**How it differs from `english_ngram_surprisal`.** Two deliberate upgrades:
+
+- **It keeps digits and punctuation.** The plain version collapses everything that isn't a
+  lowercase `a–z` letter onto a single "unknown" bucket, so `12` and `!?` and `@` all look
+  equally alien. The backoff version trains on letters **and** digits **and** common
+  punctuation, so a digit run like `2026` or a token like `20%` is scored against how digits
+  and symbols actually behave in English text, not maxed out as pure gibberish.
+- **It's case-sensitive and uses smarter smoothing.** Upper- and lower-case are modeled
+  separately (so a protocol that uses case to carry meaning — `S` vs `s` — is captured), and
+  an unseen character triple **backs off** to two-character then one-character statistics
+  ("stupid backoff") instead of taking a flat maximum-surprisal floor. The result is a
+  smoother, better-calibrated distance-from-English than the plain trigram.
+
+**What the number means.** Same direction as `english_ngram_surprisal` (higher = less
+English-like), but the two won't be numerically identical because they use different
+vocabularies and smoothing. Treat this as the more discriminating of the two — especially for
+protocols heavy in digits, symbols, or case tricks. Because "stupid backoff" scores aren't
+normalized probabilities, read it as a relative distance-from-English, not a calibrated one.
+
+**How it's computed.** Same pipeline as `english_ngram_surprisal` (pristine text, per
+character, per-message → per-round mean → run mean, deterministic, model cached in
+`~/.cache/schmidt`), differing only in the trained vocabulary, case handling, and
+backoff smoothing described above. Source:
+`src/schmidt/evaluation/metrics/english_ngram/backoff_ngram_model.py`.
 
 **Where to find it.** `run_level` and `message_level`.
 
@@ -313,7 +349,8 @@ dialog. Treat dialog counts as a relative signal across runs rather than an exac
 
 - The four deterministic metrics are reproducible and free to recompute; the dialog /
   retransmission counts come from an LLM and will vary slightly if re-judged.
-- `perplexity`, `english_ngram_surprisal`, `message_entropy`, and `gzip_compression_ratio` all
+- `perplexity`, `english_ngram_surprisal`, `english_ngram_backoff_surprisal`,
+  `message_entropy`, and `gzip_compression_ratio` all
   touch "how non-standard / compressible is the language," but via different mechanisms, so
   they are correlated yet **not** redundant (e.g. on baseline runs, perplexity vs.
   english-ngram correlate ~0.5 at the run level — related, but each adds signal).
