@@ -1,5 +1,5 @@
 {
-  "max_round_duration_seconds": 900,
+  "max_round_duration_seconds": 2700,
   "judge_model": "claude-haiku-4-5-20251001",
   "judge_provider": "anthropic",
   "postmortem_enabled": true,
