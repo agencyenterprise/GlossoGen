@@ -19,6 +19,7 @@ from pydantic_ai.capabilities import AgentCapability, ProcessHistory
 from pydantic_ai.mcp import MCPToolset
 from pydantic_ai.messages import (
     AgentStreamEvent,
+    CompactionPart,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
     ModelMessage,
@@ -42,6 +43,7 @@ from schmidt.event_logger import EventLogger
 from schmidt.models.agent_config import AgentConfig
 from schmidt.models.event import (
     AgentRunCycleFailed,
+    ContextCompacted,
     LLMResponseReceived,
     ToolCallInvoked,
     ToolResultReceived,
@@ -567,6 +569,35 @@ class PydanticAIRunner(AgentRunner):
                         state.accumulated_thinking += event.part.content
                     else:
                         state.accumulated_text += event.part.content
+            elif isinstance(event.part, CompactionPart):
+                summary = event.part.content
+                if isinstance(summary, str):
+                    summary_char_count = len(summary)
+                    summary_preview = summary[:200]
+                else:
+                    summary_char_count = 0
+                    summary_preview = ""
+                provider_name = event.part.provider_name
+                if provider_name is None:
+                    provider_name = "unknown"
+                logger.info(
+                    "Agent %s context compacted by %s: %d-char summary: %.200s",
+                    agent_id,
+                    provider_name,
+                    summary_char_count,
+                    summary_preview,
+                )
+                state.spawn_log_task(
+                    event_logger.log(
+                        event=ContextCompacted(
+                            agent_id=agent_id,
+                            round_number=round_number,
+                            provider_name=provider_name,
+                            summary_char_count=summary_char_count,
+                            summary_preview=summary_preview,
+                        )
+                    )
+                )
 
         elif isinstance(event, PartDeltaEvent):
             if isinstance(event.delta, TextPartDelta):

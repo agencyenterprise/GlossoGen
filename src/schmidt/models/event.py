@@ -111,6 +111,22 @@ class ToolResultReceived(EventBase):
     result: str
 
 
+class ContextCompacted(EventBase):
+    """Emitted when the provider compacts an agent's message history into a summary.
+
+    Surfaced from a ``CompactionPart`` in the model response when the
+    ``compaction`` knob is enabled. Anthropic returns a readable text summary
+    (captured in ``summary_preview``); OpenAI stores an encrypted summary
+    server-side and returns no text, so ``summary_char_count`` is 0.
+    """
+
+    event_type: Literal["context_compacted"] = "context_compacted"
+    agent_id: str
+    provider_name: str
+    summary_char_count: int
+    summary_preview: str
+
+
 class RoundAdvanced(EventBase):
     """Emitted when the game clock advances to a new round in autonomous mode."""
 
@@ -288,6 +304,7 @@ _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
     LLMResponseReceived,
     ToolCallInvoked,
     ToolResultReceived,
+    ContextCompacted,
     RoundAdvanced,
     AgentRunCycleFailed,
     RoundEnded,
