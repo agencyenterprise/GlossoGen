@@ -31,6 +31,7 @@ This is essentially salon's "no-primer" ablation: same iterated referential stru
 | Knob | Default | Notes |
 |---|---|---|
 | `round_count` | 60 | Number of rounds |
+| `compaction.enabled` / `compaction.token_threshold` | off | Opt-in provider-native history compaction (Anthropic/OpenAI); the provider summarizes older messages once input tokens exceed the threshold, default 50000 (inherited from base) |
 | `max_round_duration_seconds` | 90 | Per-round wall-clock cap |
 | `seed` | 42 | Drives the per-round target sampler |
 | `postmortem_enabled` | `true` | If false, the `chat_postmortem` channel is not created and no postmortem phase runs between rounds |

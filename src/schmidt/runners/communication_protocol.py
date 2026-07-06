@@ -23,6 +23,11 @@ CONTINUE_PROMPT = _renderer.render(
     template_variables={},
 )
 
+COMPACTION_INSTRUCTIONS = _renderer.render(
+    template_name="compaction_instructions.jinja",
+    template_variables={},
+)
+
 
 def build_full_system_prompt(base_prompt: str, role_name: str) -> str:
     """Combine an agent's base system prompt with the communication protocol instructions."""

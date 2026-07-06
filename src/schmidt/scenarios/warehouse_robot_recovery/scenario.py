@@ -250,6 +250,7 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
                     model=default_model,
                     provider=default_provider,
                     max_tokens=self._knobs.agent_max_tokens,
+                    compaction=self._knobs.compaction,
                 )
             )
         return agents

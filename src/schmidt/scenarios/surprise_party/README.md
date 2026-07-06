@@ -28,6 +28,7 @@ Per-round friend names are drawn deterministically from a seeded shuffle of `FRI
 |---|---|---|
 | `judge_model` / `judge_provider` | str / str | LLM judge for `submit_guess` |
 | `round_count` | int | Total number of rounds |
+| `compaction.enabled` / `compaction.token_threshold` | bool / int | Opt-in provider-native history compaction (Anthropic/OpenAI), off by default; summarizes older messages once input tokens exceed the threshold (inherited from base) |
 | `seed` | int | Drives `(where, when)` draw and friend-name shuffle |
 | `friend_model` / `friend_provider` | str / str | Pins the Friend slot's model across initial spawn + every swap |
 | (inherited) `max_round_duration_seconds` | float | Per-round wall-clock timeout |

@@ -252,6 +252,7 @@ Failure auditing: every non-zero exit row in `STATUS_LOG` corresponds to a `/tmp
 | Knob | Description |
 |------|-------------|
 | `round_time_budget_seconds` | Fixed per-round time budget (one character = one simulated second) |
+| `compaction.enabled` / `compaction.token_threshold` | Opt-in provider-native history compaction (Anthropic/OpenAI), off by default; the provider summarizes older messages once an agent's input tokens exceed the threshold (inherited from base) |
 | `seed` | Controls case shuffling and motif selection |
 | `round_count` | Number of rounds |
 | `postmortem_enabled` | Whether the discussion phase is active |

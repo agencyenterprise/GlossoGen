@@ -77,6 +77,7 @@ All metrics implement the platform `Metric` abstraction and return `Measurement`
 | `restricted_vocabulary_size` | Restricted words flagged per round (0 disables) |
 | `observer_intercept_attempts` | Max `submit_intercept` calls per round (≥ 1) |
 | `round_time_budget_seconds` | Per-round communication budget (1 char = 1 sec on `public_ops`) |
+| `compaction.enabled` / `compaction.token_threshold` | Opt-in provider-native history compaction (Anthropic/OpenAI), off by default; the provider summarizes older messages once an agent's input tokens exceed the threshold (inherited from base) |
 | `postmortem_enabled` | Whether the pair-only postmortem channel is active after each round |
 | `postmortem_disabled_at_start` | Disable postmortem from round 1 (used by replace-agent flow) |
 | `postmortem_duration_seconds` | Time limit for the postmortem phase (inherited from base) |

@@ -5,6 +5,8 @@ from typing import NamedTuple
 from pydantic import BaseModel, ConfigDict
 from pydantic_ai.messages import ModelMessage
 
+from schmidt.models.compaction_config import CompactionConfig
+
 
 class AgentRole(NamedTuple):
     """Lightweight agent identity returned by scenario discovery endpoints."""
@@ -30,4 +32,5 @@ class AgentConfig(BaseModel):
     model: str
     provider: str
     max_tokens: int
+    compaction: CompactionConfig
     initial_message_history: list[ModelMessage] | None = None

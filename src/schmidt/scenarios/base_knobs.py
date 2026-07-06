@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from schmidt.models.compaction_config import CompactionConfig
 from schmidt.runtime.scheduled_events import ScheduledEvent
 
 
@@ -48,6 +49,11 @@ class BaseKnobs(BaseModel):
     simulated second, and the round fails when the running total exceeds
     the budget. ``None`` means the scenario has no per-round budget (e.g.
     Salon, whose pressure axis is the Inquisitor's guess count instead).
+
+    ``compaction`` enables provider-native history compaction (off by
+    default). When enabled, the runner attaches the provider's compaction
+    capability so older messages are summarized once an agent's input
+    tokens exceed ``compaction.token_threshold``.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -59,3 +65,4 @@ class BaseKnobs(BaseModel):
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list[ScheduledEvent])
     agent_max_tokens: int = 16384
     round_time_budget_seconds: int | None
+    compaction: CompactionConfig = CompactionConfig()

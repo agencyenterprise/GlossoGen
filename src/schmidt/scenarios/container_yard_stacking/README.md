@@ -108,6 +108,7 @@ Useful platform metrics: `round_success`, `mean_chars_per_round`, `mean_chars_pe
 |---|---|
 | `round_count` | Number of rounds |
 | `round_time_budget_seconds` | Per-round inspection window (one link-channel character = one simulated second) |
+| `compaction.enabled` / `compaction.token_threshold` | Opt-in provider-native history compaction (Anthropic/OpenAI), off by default; the provider summarizes older messages once an agent's input tokens exceed the threshold (inherited from base) |
 | `seed` | Controls case generation (batch, containers, intake slots, target bays, assignment) |
 | `batch_size_values` | Candidate per-round batch sizes. Same non-empty length as `batch_size_weights`; all ≥ 1 |
 | `batch_size_weights` | Sampling weights paired positionally with `batch_size_values`. All > 0 |

@@ -13,6 +13,7 @@ import orjson
 
 from schmidt.event_parsing import parse_event
 from schmidt.models.agent_config import AgentConfig
+from schmidt.models.compaction_config import CompactionConfig
 from schmidt.models.event import AgentRegistered, SimulationEvent, SimulationStarted
 from schmidt.run_archive import strip_legacy_git_dir
 
@@ -68,6 +69,7 @@ def extract_agent_configs(events: list[SimulationEvent]) -> list[AgentConfig]:
                     model=event.model,
                     provider=event.provider,
                     max_tokens=event.max_tokens,
+                    compaction=CompactionConfig(),
                 )
             )
     return configs

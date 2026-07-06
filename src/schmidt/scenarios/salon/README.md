@@ -77,6 +77,7 @@ All metrics implement the platform `Metric` abstraction and return `Measurement`
 |------|-------------|
 | `seed` | Seed for both primer generation and the per-round directive sequence |
 | `round_count` | Number of rounds |
+| `compaction.enabled` / `compaction.token_threshold` | Opt-in provider-native history compaction (Anthropic/OpenAI), off by default; the provider summarizes older messages once an agent's input tokens exceed the threshold (inherited from base) |
 | `directive_space_size` | Size of the directive catalogue (`DIR_01`..`DIR_N`) |
 | `primer_figure_count` | Number of invented figures in the pair primer and the decoy primer (must be ≥ `directive_space_size`) |
 | `inquisitor_guesses_per_round` | Maximum intercept submissions per round (adversarial pressure knob) |

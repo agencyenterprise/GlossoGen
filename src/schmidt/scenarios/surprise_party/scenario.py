@@ -252,6 +252,7 @@ class SurprisePartyScenario(SimulationScenario):
                     model=model,
                     provider=provider,
                     max_tokens=self._knobs.agent_max_tokens,
+                    compaction=self._knobs.compaction,
                 )
             )
         return agents

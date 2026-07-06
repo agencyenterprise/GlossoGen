@@ -63,6 +63,7 @@ Rounds in `easy_round_numbers` are forced to `hold` as warmups.
 |---|---|
 | `round_count` | Number of rounds |
 | `round_time_budget_seconds` | Per-round character budget on the ops channel |
+| `compaction.enabled` / `compaction.token_threshold` | Opt-in provider-native history compaction (Anthropic/OpenAI), off by default; the provider summarizes older messages once an agent's input tokens exceed the threshold (inherited from base) |
 | `seed` | Case-generation seed |
 | `postmortem_enabled` / `postmortem_disabled_at_start` / `postmortem_duration_seconds` | Discussion phase controls |
 | `channel_noise_level` / `noise_replacement_mode` | Per-character ops-channel noise (`mask` erasure / `random_letter` substitution) |

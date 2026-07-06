@@ -202,6 +202,7 @@ def build_agents(
                 model=default_model,
                 provider=default_provider,
                 max_tokens=knobs.agent_max_tokens,
+                compaction=knobs.compaction,
             )
         )
     return agents

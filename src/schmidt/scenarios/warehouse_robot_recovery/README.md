@@ -100,6 +100,7 @@ Configured via `knobs_default.json` (and any custom `--config` JSON file):
 |---|---|---|
 | `round_count` | 15 | Total rounds. |
 | `round_time_budget_seconds` | 200 | Per-round character budget on radio. |
+| `compaction.enabled` / `compaction.token_threshold` | off | Opt-in provider-native history compaction (Anthropic/OpenAI); the provider summarizes older messages once input tokens exceed the threshold, default 50000 (inherited from base). |
 | `seed` | 42 | Deterministic seed for case generation. |
 | `fault_count_min` / `fault_count_max` | 1 / 3 | Per-round fault count bounds. |
 | `postmortem_enabled` | true | Whether the postmortem channel opens between rounds. |

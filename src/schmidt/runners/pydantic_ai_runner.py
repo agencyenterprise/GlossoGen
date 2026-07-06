@@ -15,7 +15,7 @@ from typing import Any, cast
 from pydantic_ai import Agent, _agent_graph
 from pydantic_ai.agent import AgentRunResult as PydanticAIAgentRunResult
 from pydantic_ai.agent.abstract import EventStreamHandler
-from pydantic_ai.capabilities import ProcessHistory
+from pydantic_ai.capabilities import AgentCapability, ProcessHistory
 from pydantic_ai.mcp import MCPToolset
 from pydantic_ai.messages import (
     AgentStreamEvent,
@@ -29,6 +29,8 @@ from pydantic_ai.messages import (
     ThinkingPart,
     ThinkingPartDelta,
 )
+from pydantic_ai.models.anthropic import AnthropicCompaction
+from pydantic_ai.models.openai import OpenAICompaction
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage, UsageLimits
@@ -49,6 +51,7 @@ from schmidt.models.tool_definition import ToolCallRequest
 from schmidt.runners.agent_run_result import AgentRunResult
 from schmidt.runners.agent_runner_base import AgentRunner
 from schmidt.runners.communication_protocol import (
+    COMPACTION_INSTRUCTIONS,
     CONTINUE_PROMPT,
     INITIAL_PROMPT,
     build_full_system_prompt,
@@ -222,12 +225,29 @@ class PydanticAIRunner(AgentRunner):
             role_name=agent_config.role_name,
         )
 
+        capabilities: list[AgentCapability[None]] = [ProcessHistory(clean_history)]
+        if agent_config.compaction.enabled:
+            if provider == "anthropic":
+                capabilities.append(
+                    AnthropicCompaction(
+                        token_threshold=agent_config.compaction.token_threshold,
+                        instructions=COMPACTION_INSTRUCTIONS,
+                    )
+                )
+            elif provider == "openai":
+                capabilities.append(
+                    OpenAICompaction(
+                        token_threshold=agent_config.compaction.token_threshold,
+                    )
+                )
+
         agent: Agent[None, str] = Agent(
             model=build_pydantic_ai_model(model=agent_config.model, provider=provider),
+            deps_type=type(None),
             system_prompt=full_system_prompt,
             toolsets=[mcp_toolset],
             model_settings=default_pydantic_ai_settings(provider=provider),
-            capabilities=[ProcessHistory(clean_history)],
+            capabilities=capabilities,
         )
 
         # vLLM's hermes tool parser drops <tool_call> XML on the floor when
