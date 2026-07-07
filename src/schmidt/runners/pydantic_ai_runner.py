@@ -23,7 +23,6 @@ from pydantic_ai.messages import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,
     ModelMessage,
-    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPart,
@@ -113,6 +112,9 @@ class _StreamingState:
         self.accumulated_thinking = ""
         self.accumulated_text = ""
         self.accumulated_tool_calls: list[ToolCallRequest] = []
+        self.accumulated_compaction = ""
+        self.compaction_occurred = False
+        self.compaction_provider_name = "unknown"
         self.background_tasks: list[asyncio.Task[None]] = []
 
     def spawn_log_task(self, coro: object) -> None:
@@ -408,8 +410,7 @@ class PydanticAIRunner(AgentRunner):
                     message_history = result.all_messages()
                     total_turns += 1
 
-                    self._log_compaction_summaries(
-                        new_messages=result.new_messages(),
+                    self._flush_compaction_summary(
                         agent_id=agent_id,
                         round_number=runtime.current_round,
                         event_logger=event_logger,
@@ -487,55 +488,42 @@ class PydanticAIRunner(AgentRunner):
             total_turns=total_turns,
         )
 
-    def _log_compaction_summaries(
+    def _flush_compaction_summary(
         self,
-        new_messages: list[ModelMessage],
         agent_id: str,
         round_number: int,
         event_logger: EventLogger,
         state: _StreamingState,
     ) -> None:
-        """Log a ContextCompacted event for each CompactionPart produced this cycle.
+        """Log a ContextCompacted event for a compaction that occurred this cycle.
 
-        The full provider summary is only assembled on the completed message; the
-        streaming events deliver it in per-delta fragments. Reading from
-        ``result.new_messages()`` captures each summary once, whole. Anthropic
-        returns readable text; OpenAI returns ``None`` (encrypted server-side).
+        The summary text is accumulated across the per-delta CompactionPart events
+        in ``_process_stream_event`` (the parts manager overwrites rather than
+        accumulates, so the assembled summary lives nowhere else). ``state`` is
+        recreated each cycle, so the accumulator holds exactly this cycle's summary.
         """
-        for message in new_messages:
-            if not isinstance(message, ModelResponse):
-                continue
-            for part in message.parts:
-                if not isinstance(part, CompactionPart):
-                    continue
-                summary = part.content
-                if isinstance(summary, str):
-                    summary_char_count = len(summary)
-                    summary_text = summary
-                else:
-                    summary_char_count = 0
-                    summary_text = ""
-                provider_name = part.provider_name
-                if provider_name is None:
-                    provider_name = "unknown"
-                logger.info(
-                    "Agent %s context compacted by %s: %d-char summary: %.200s",
-                    agent_id,
-                    provider_name,
-                    summary_char_count,
-                    summary_text,
+        if not state.compaction_occurred:
+            return
+        summary_text = state.accumulated_compaction
+        summary_char_count = len(summary_text)
+        logger.info(
+            "Agent %s context compacted by %s: %d-char summary: %.200s",
+            agent_id,
+            state.compaction_provider_name,
+            summary_char_count,
+            summary_text,
+        )
+        state.spawn_log_task(
+            event_logger.log(
+                event=ContextCompacted(
+                    agent_id=agent_id,
+                    round_number=round_number,
+                    provider_name=state.compaction_provider_name,
+                    summary_char_count=summary_char_count,
+                    summary_text=summary_text,
                 )
-                state.spawn_log_task(
-                    event_logger.log(
-                        event=ContextCompacted(
-                            agent_id=agent_id,
-                            round_number=round_number,
-                            provider_name=provider_name,
-                            summary_char_count=summary_char_count,
-                            summary_text=summary_text,
-                        )
-                    )
-                )
+            )
+        )
 
     def _flush_response_block(
         self,
@@ -628,6 +616,18 @@ class PydanticAIRunner(AgentRunner):
                         state.accumulated_thinking += event.part.content
                     else:
                         state.accumulated_text += event.part.content
+            elif isinstance(event.part, CompactionPart):
+                # Anthropic streams the compaction summary as multiple deltas, each
+                # re-emitted here as a fresh CompactionPart carrying only that delta's
+                # slice (the parts manager overwrites, never accumulates). Accumulate
+                # the slices ourselves so the whole summary is captured. OpenAI keeps
+                # content encrypted server-side (content is None), so the text stays
+                # empty while compaction_occurred still records that it happened.
+                state.compaction_occurred = True
+                if isinstance(event.part.content, str):
+                    state.accumulated_compaction += event.part.content
+                if event.part.provider_name is not None:
+                    state.compaction_provider_name = event.part.provider_name
 
         elif isinstance(event, PartDeltaEvent):
             if isinstance(event.delta, TextPartDelta):
