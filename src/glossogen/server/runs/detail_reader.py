@@ -15,6 +15,7 @@ from glossogen.models.event import (
     AgentRegistered,
     AgentRunCycleFailed,
     AgentSwappedMidRun,
+    ContextCompacted,
     InjectionDelivered,
     LLMResponseReceived,
     MessageSent,
@@ -33,6 +34,7 @@ from glossogen.server.runs.models import (
     AgentObservationResponse,
     AgentRunCycleFailedEntry,
     AgentSwapEventDTO,
+    ContextCompactionEventDTO,
     CrossRunReplaceAgentSource,
     DebugLogEntry,
     DerivedRunReference,
@@ -216,6 +218,7 @@ async def load_run_detail(
     channel_ids: list[str] = []
     agents_by_id: dict[str, AgentDetail] = {}
     agent_swap_events: list[AgentSwapEventDTO] = []
+    context_compaction_events: list[ContextCompactionEventDTO] = []
     messages: list[ChannelMessage] = []
     reasoning: list[ReasoningEntry] = []
     tool_use: list[ToolUseEntry] = []
@@ -276,6 +279,18 @@ async def load_run_detail(
                 )
             )
             pricing_by_agent[event.agent_id] = find_pricing(model=event.new_model)
+
+        elif isinstance(event, ContextCompacted):
+            context_compaction_events.append(
+                ContextCompactionEventDTO(
+                    agent_id=event.agent_id,
+                    round_number=event.round_number,
+                    timestamp=event.timestamp,
+                    provider_name=event.provider_name,
+                    summary_char_count=event.summary_char_count,
+                    summary_text=event.summary_text,
+                )
+            )
 
         elif isinstance(event, ToolCallInvoked):
             total_messages += 1
@@ -513,6 +528,7 @@ async def load_run_detail(
         provider=provider,
         agents=agents,
         agent_swap_events=agent_swap_events,
+        context_compaction_events=context_compaction_events,
         messages=messages,
         reasoning=reasoning,
         tool_use=tool_use,

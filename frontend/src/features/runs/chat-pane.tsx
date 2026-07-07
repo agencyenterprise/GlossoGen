@@ -10,6 +10,7 @@ import {
   type RefObject,
 } from "react";
 import {
+  Archive,
   ArrowLeftRight,
   ChevronDown,
   Download,
@@ -96,6 +97,13 @@ interface ChatPaneProps {
    */
   agentSwapDividers: AgentSwapDivider[];
   /**
+   * Provider-native history compactions. Each entry renders a marker at the top
+   * of its ``round_number`` showing that the agent's context was compacted, with
+   * an expandable summary when the provider returned readable text (Anthropic).
+   * Empty for runs with no compaction.
+   */
+  contextCompactionMarkers: ContextCompactionMarker[];
+  /**
    * Round range of the currently-selected agent instance (drawer open).
    * When set, the round timeline badge and jump-to-round dropdown clamp to
    * this range so the user can't navigate to rounds outside the active
@@ -114,6 +122,16 @@ export interface AgentSwapDivider {
   new_model: string;
   /** Synthetic instance_key for the post-swap generation; clicking the divider opens its drawer tab. */
   post_swap_instance_key: string;
+}
+
+export interface ContextCompactionMarker {
+  agent_id: string;
+  role_name: string;
+  round_number: number;
+  provider_name: string;
+  summary_char_count: number;
+  /** Provider's readable summary, or "" when stored encrypted server-side (OpenAI). */
+  summary_text: string;
 }
 
 interface TurnGroup {
@@ -202,6 +220,7 @@ export function ChatPane({
   roundInjections,
   resumeCutoffTimestamp,
   agentSwapDividers,
+  contextCompactionMarkers,
   activeInstanceRoundRange,
 }: ChatPaneProps) {
   const groupPath = useGroupPath();
@@ -821,6 +840,37 @@ export function ChatPane({
                       {swap.generation}.
                     </div>
                   </button>
+                ))}
+              {contextCompactionMarkers
+                .filter(marker => marker.round_number === round.roundNumber)
+                .map(marker => (
+                  <div
+                    key={`context-compaction-r${marker.round_number}-${marker.agent_id}`}
+                    id={`context-compaction-divider-r${marker.round_number}-${marker.agent_id}`}
+                    className="mx-4 my-4 rounded-md border-2 border-dashed border-amber-400/80 bg-amber-50 px-4 py-3 dark:border-amber-600/70 dark:bg-amber-950/50"
+                  >
+                    <div className="flex items-center justify-center gap-2 text-amber-800 dark:text-amber-200">
+                      <Archive className="h-4 w-4" />
+                      <span className="text-sm font-semibold">
+                        {marker.role_name} — context compacted ({marker.provider_name})
+                      </span>
+                    </div>
+                    <div className="mt-1 text-center text-[11px] text-amber-700/80 dark:text-amber-300/80">
+                      {marker.summary_text
+                        ? `Message history summarized into ${marker.summary_char_count.toLocaleString()} characters at round ${round.roundNumber}.`
+                        : `Message history compacted at round ${round.roundNumber}. ${marker.provider_name} stores the summary encrypted server-side, so its text is not available.`}
+                    </div>
+                    {marker.summary_text ? (
+                      <details className="mt-2 text-[11px] text-amber-800 dark:text-amber-200">
+                        <summary className="cursor-pointer text-center font-medium">
+                          Show summary
+                        </summary>
+                        <p className="mt-2 whitespace-pre-wrap rounded bg-amber-100/60 p-2 dark:bg-amber-900/30">
+                          {marker.summary_text}
+                        </p>
+                      </details>
+                    ) : null}
+                  </div>
                 ))}
               {internTakeoverRoundNumber !== null &&
               round.roundNumber === internTakeoverRoundNumber ? (

@@ -2073,6 +2073,46 @@
         "title": "ContainerYardSlot",
         "description": "One slot in the yard and the container in it (or empty)."
       },
+      "ContextCompactionEventDTO": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "provider_name": {
+            "type": "string",
+            "title": "Provider Name"
+          },
+          "summary_char_count": {
+            "type": "integer",
+            "title": "Summary Char Count"
+          },
+          "summary_text": {
+            "type": "string",
+            "title": "Summary Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "round_number",
+          "timestamp",
+          "provider_name",
+          "summary_char_count",
+          "summary_text"
+        ],
+        "title": "ContextCompactionEventDTO",
+        "description": "One provider-native history compaction, surfaced for the run viewer.\n\nEach ``ContextCompacted`` event in the run's JSONL becomes one DTO. The FE\nrenders a per-agent marker at ``round_number``. ``summary_text`` carries the\nprovider's readable summary when available (Anthropic); it is empty when the\nprovider stores the summary encrypted server-side (OpenAI), in which case\n``summary_char_count`` is 0."
+      },
       "CrossRunReplaceAgentSource": {
         "properties": {
           "source_a_run_id": {
@@ -3583,6 +3623,13 @@
             "type": "array",
             "title": "Agent Swap Events"
           },
+          "context_compaction_events": {
+            "items": {
+              "$ref": "#/components/schemas/ContextCompactionEventDTO"
+            },
+            "type": "array",
+            "title": "Context Compaction Events"
+          },
           "messages": {
             "items": {
               "$ref": "#/components/schemas/ChannelMessage"
@@ -3768,6 +3815,7 @@
           "provider",
           "agents",
           "agent_swap_events",
+          "context_compaction_events",
           "messages",
           "reasoning",
           "tool_use",

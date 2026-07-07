@@ -506,6 +506,9 @@ async def _tool_get_run(
             channel_ids=detail.channel_ids,
             provider=detail.provider,
             agent_swap_events=[s for s in detail.agent_swap_events if s.agent_id == agent_id],
+            context_compaction_events=[
+                c for c in detail.context_compaction_events if c.agent_id == agent_id
+            ],
             agents=[a for a in detail.agents if a.agent_id == agent_id],
             messages=[m for m in detail.messages if m.sender_agent_id == agent_id],
             reasoning=[r for r in detail.reasoning if r.sender_agent_id == agent_id],

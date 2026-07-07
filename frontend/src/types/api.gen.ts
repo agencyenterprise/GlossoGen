@@ -902,6 +902,33 @@ export interface components {
             container: components["schemas"]["ContainerYardContainer"] | null;
         };
         /**
+         * ContextCompactionEventDTO
+         * @description One provider-native history compaction, surfaced for the run viewer.
+         *
+         *     Each ``ContextCompacted`` event in the run's JSONL becomes one DTO. The FE
+         *     renders a per-agent marker at ``round_number``. ``summary_text`` carries the
+         *     provider's readable summary when available (Anthropic); it is empty when the
+         *     provider stores the summary encrypted server-side (OpenAI), in which case
+         *     ``summary_char_count`` is 0.
+         */
+        ContextCompactionEventDTO: {
+            /** Agent Id */
+            agent_id: string;
+            /** Round Number */
+            round_number: number;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Provider Name */
+            provider_name: string;
+            /** Summary Char Count */
+            summary_char_count: number;
+            /** Summary Text */
+            summary_text: string;
+        };
+        /**
          * CrossRunReplaceAgentSource
          * @description Provenance for a run created via the cross-run replace-agent endpoint.
          *
@@ -1665,6 +1692,8 @@ export interface components {
             agents: components["schemas"]["AgentDetail"][];
             /** Agent Swap Events */
             agent_swap_events: components["schemas"]["AgentSwapEventDTO"][];
+            /** Context Compaction Events */
+            context_compaction_events: components["schemas"]["ContextCompactionEventDTO"][];
             /** Messages */
             messages: components["schemas"]["ChannelMessage"][];
             /** Reasoning */

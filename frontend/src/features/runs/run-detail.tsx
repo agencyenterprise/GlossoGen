@@ -32,7 +32,7 @@ import {
   resolveSelectedInstance,
   type AgentInstance,
 } from "./agent-instance";
-import { ChatPane, type AgentSwapDivider } from "./chat-pane";
+import { ChatPane, type AgentSwapDivider, type ContextCompactionMarker } from "./chat-pane";
 import { CollapsibleConfigBadges } from "./collapsible-config-badges";
 import { judgeMetadataFromExtras, mergeEntries } from "./display-entry";
 import { LabelBadges } from "./eval-label-group";
@@ -285,6 +285,21 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     }
     return dividers;
   }, [allAgents, swapEvents]);
+
+  const contextCompactionMarkers = useMemo<ContextCompactionMarker[]>(() => {
+    const roleNameByAgent = new Map<string, string>();
+    for (const a of allAgents) {
+      roleNameByAgent.set(a.agent_id, a.role_name);
+    }
+    return (restData?.context_compaction_events ?? []).map(event => ({
+      agent_id: event.agent_id,
+      role_name: roleNameByAgent.get(event.agent_id) ?? event.agent_id,
+      round_number: event.round_number,
+      provider_name: event.provider_name,
+      summary_char_count: event.summary_char_count,
+      summary_text: event.summary_text,
+    }));
+  }, [allAgents, restData?.context_compaction_events]);
 
   // Merge REST + SSE channel IDs
   const allChannelIds = useMemo(() => {
@@ -722,6 +737,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
               restData.replace_agent_source?.replaced_at ?? restData.fork_source?.forked_at ?? null
             }
             agentSwapDividers={agentSwapDividers}
+            contextCompactionMarkers={contextCompactionMarkers}
             activeInstanceRoundRange={
               activeInstance
                 ? { start: activeInstance.round_start, end: activeInstance.round_end }

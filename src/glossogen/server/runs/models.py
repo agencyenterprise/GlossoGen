@@ -197,6 +197,24 @@ class AgentSwapEventDTO(BaseModel):
     system_prompt: str
 
 
+class ContextCompactionEventDTO(BaseModel):
+    """One provider-native history compaction, surfaced for the run viewer.
+
+    Each ``ContextCompacted`` event in the run's JSONL becomes one DTO. The FE
+    renders a per-agent marker at ``round_number``. ``summary_text`` carries the
+    provider's readable summary when available (Anthropic); it is empty when the
+    provider stores the summary encrypted server-side (OpenAI), in which case
+    ``summary_char_count`` is 0.
+    """
+
+    agent_id: str
+    round_number: int
+    timestamp: datetime
+    provider_name: str
+    summary_char_count: int
+    summary_text: str
+
+
 class RoundEnding(BaseModel):
     """Reason a round's main phase ended.
 
@@ -366,6 +384,7 @@ class RunDetailResponse(BaseModel):
     provider: str
     agents: list[AgentDetail]
     agent_swap_events: list[AgentSwapEventDTO]
+    context_compaction_events: list[ContextCompactionEventDTO]
     messages: list[ChannelMessage]
     reasoning: list[ReasoningEntry]
     tool_use: list[ToolUseEntry]
