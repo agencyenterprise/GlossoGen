@@ -117,6 +117,7 @@ class _StreamingState:
         self.accumulated_tool_calls: list[ToolCallRequest] = []
         self.accumulated_compaction = ""
         self.compaction_occurred = False
+        self.compaction_has_details = False
         self.compaction_provider_name = "unknown"
         self.compaction_round = 0
         self.background_tasks: list[asyncio.Task[None]] = []
@@ -547,20 +548,21 @@ class PydanticAIRunner(AgentRunner):
         mis-attribute it. The summary text is accumulated across the block's
         per-delta ``CompactionPart`` events (which the parts manager overwrites
         rather than accumulates, and which can span multiple streams); it may be
-        empty when a compaction fired without readable text (e.g. OpenAI's
-        encrypted server-side summary). Each block emits exactly one event.
+        empty when a real compaction returns no readable text — e.g. OpenAI, which
+        fires compaction but keeps the summary encrypted server-side (content None)
+        while carrying the compaction payload in ``provider_details``. Such a block
+        is still recorded (empty ``summary_text``) because it did compact; only a
+        genuine no-op (no text AND no provider_details, e.g. Anthropic reporting a
+        compaction attempt that produced nothing) is dropped. Each block emits at
+        most one event.
         """
         if not state.compaction_occurred:
             return
         summary_text = state.accumulated_compaction
-        if not summary_text:
-            # Empty block: Anthropic emits a CompactionPart with content=None when a
-            # compaction attempt produces no valid summary (a server-side no-op), so
-            # there is nothing to record. Reset and skip. (OpenAI's encrypted
-            # server-side compaction also yields no text, but it does not flow through
-            # this streaming path in the stateless configuration used here.)
-            state.compaction_occurred = False
-            state.compaction_provider_name = "unknown"
+        if not summary_text and not state.compaction_has_details:
+            # Genuine no-op: a compaction attempt that produced neither a summary nor
+            # round-trippable payload. Nothing happened, so record nothing.
+            self._reset_compaction(state)
             return
         summary_char_count = len(summary_text)
         logger.info(
@@ -582,7 +584,13 @@ class PydanticAIRunner(AgentRunner):
                 )
             )
         )
+        self._reset_compaction(state)
+
+    @staticmethod
+    def _reset_compaction(state: _StreamingState) -> None:
+        """Clear the per-compaction-block accumulator after a block is handled."""
         state.compaction_occurred = False
+        state.compaction_has_details = False
         state.accumulated_compaction = ""
         state.compaction_provider_name = "unknown"
 
@@ -690,13 +698,18 @@ class PydanticAIRunner(AgentRunner):
                 # part follows (below) or the cycle ends — never at stream end, which
                 # would split the block. Record the round at block start so the event
                 # reflects when compaction fired (agent cycles span many rounds).
-                # OpenAI keeps content encrypted server-side (content is None), so the
-                # text stays empty while compaction_occurred still records it happened.
+                # OpenAI keeps the summary encrypted server-side (content is None) but
+                # carries the compaction data in provider_details, so a real OpenAI
+                # compaction has no text yet must still be recorded; track
+                # provider_details so the flush can distinguish it from a genuine
+                # Anthropic no-op (content None, no data).
                 if not state.compaction_occurred:
                     state.compaction_occurred = True
                     state.compaction_round = round_number
                 if isinstance(event.part.content, str):
                     state.accumulated_compaction += event.part.content
+                if event.part.provider_details:
+                    state.compaction_has_details = True
                 if event.part.provider_name is not None:
                     state.compaction_provider_name = event.part.provider_name
 
