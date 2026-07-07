@@ -80,6 +80,17 @@ Agent runners launch and manage external agent processes that connect to the MCP
 
 The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and exits when a done notification arrives via `read_notifications`. The supervisor creates a new `PydanticAIRunner` per agent.
 
+## Telemetry & Observability (Langfuse)
+
+Agent LLM calls are traced to a local, self-hosted Langfuse via pydantic-ai's OpenTelemetry instrumentation. This is a distinct output channel from the JSONL Event Log (which remains the canonical state ledger); telemetry is for human-facing debugging/inspection, not simulation state.
+
+- **Settings** — `telemetry_settings.py` reads `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST`; `enabled` is true only when both keys are present.
+- **Bootstrap** — `telemetry_bootstrap.py`'s `init_langfuse_telemetry` is called once per process, only in the `schmidt run` path (`cli._run_simulation`). It calls `langfuse.get_client()` (which installs a global OpenTelemetry `TracerProvider` wired to Langfuse's OTLP endpoint), verifies connectivity with `auth_check()`, then `Agent.instrument_all(InstrumentationSettings(include_content=True))`. Bootstrapping only in the run path is what scopes tracing to live simulation agents — `schmidt evaluate`'s probe/judge agents run in a separate process and stay untraced. Any failure (keys absent, stack down, unexpected error) degrades to an untraced run; telemetry never raises into the simulation.
+- **Trace grouping** — `PydanticAIRunner._agent_trace_context` wraps each agent cycle in `langfuse.propagate_attributes(session_id=run_id, metadata={agent_id, role_name, model, provider, scenario}, tags=[...])`, so all agents of one run group under a single Langfuse session and each span carries the agent's identity. When telemetry is disabled it returns a `nullcontext`, adding no overhead.
+- **Round attribution** — because a trace spans every round and rounds advance on a wall-clock timer mid-cycle, round is a per-model-request property. `telemetry_round_processor.py`'s `RoundStampingSpanProcessor` (added to the global tracer provider at bootstrap) stamps `round_number` on each `chat {model}` generation span at span-start, reading the live round via `current_round_source` — which the runner points at `runtime.current_round`. The value surfaces as `langfuse.observation.metadata.round_number`, so generations are filterable by simulation round. The agent-run / tool spans are intentionally left unstamped.
+- **Flush** — short-lived run subprocesses flush buffered spans before exit via `flush_telemetry` in `_run_simulation`'s `finally`, plus an `atexit` backstop registered at init.
+- **Stack** — `docker-compose.langfuse.yml` (repo root) vendors the Langfuse v3 stack (web, worker, postgres, clickhouse, redis, minio), started with `make langfuse-up`. Host ports are shifted off upstream defaults (web 3001, internal postgres 5433) to avoid colliding with the frontend dev server (3000) and a local Postgres (5432). `LANGFUSE_INIT_*` seed a deterministic org/project/user/key pair on first boot.
+
 ## Game Clock
 
 The `GameClock` runs as an asyncio task and manages two responsibilities:

@@ -79,6 +79,8 @@ from schmidt.scenario_loader import get_scenario_class
 from schmidt.scenario_protocol import SimulationScenario
 from schmidt.scenario_registry import SCENARIO_REGISTRY
 from schmidt.simulation_server import start_simulation_server, stop_simulation_server
+from schmidt.telemetry_bootstrap import flush_telemetry, init_langfuse_telemetry
+from schmidt.telemetry_settings import load_telemetry_settings
 from schmidt.thread_export.export_agent_thread import (
     ThreadExportFormat,
     export_agent_thread_from_run_dir,
@@ -1154,11 +1156,17 @@ async def _run_simulation(
 
     max_turns = args.max_agent_turns
     run_id = f"{scenario.name()}/{run_dir.name}"
+    scenario_name = scenario.name()
+
+    telemetry_handle = init_langfuse_telemetry(settings=load_telemetry_settings())
 
     def _make_runner() -> PydanticAIRunner:
         return PydanticAIRunner(
             max_turns=max_turns,
             event_bus=event_bus,
+            run_id=run_id,
+            scenario_name=scenario_name,
+            telemetry_enabled=telemetry_handle is not None,
         )
 
     mcp_port = find_free_port()
@@ -1201,6 +1209,8 @@ async def _run_simulation(
     finally:
         _teardown_logging(json_handler=json_handler, bus_log_handler=bus_log_handler)
         await stop_simulation_server(server=server, run_dir=run_dir)
+        if telemetry_handle is not None:
+            flush_telemetry(handle=telemetry_handle)
 
     logger.info("Simulation complete. Run directory: %s", run_dir)
 

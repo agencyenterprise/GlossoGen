@@ -14,6 +14,7 @@ A platform for testing agent communication through real-life simulations. Agents
 - **make**, **git**
 - **Postgres ≥ 14** — *optional for local dev.* Leave `DATABASE_URL` unset to run in zero-setup no-database local mode (the runs index is derived from the filesystem and OAuth state is held in memory). Postgres is required only for Clerk multi-tenant auth / production. On macOS: `brew install postgresql@16 && brew services start postgresql@16`. On Debian/Ubuntu: `apt-get install postgresql`.
 - **System libraries for weasyprint** (PDF export). On macOS: `brew install pango cairo gdk-pixbuf libffi`. On Debian/Ubuntu: `apt-get install libpango-1.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0`.
+- **Docker + Docker Compose** — *optional.* Only needed to run the local [Langfuse observability](#observability-langfuse) stack (`make langfuse-up`).
 
 ### Install dependencies
 
@@ -61,6 +62,8 @@ cp .env.example .env
 ```
 
 See `.env.example` for all available variables (API keys, authentication, CORS). At minimum, set `ANTHROPIC_API_KEY`. Leave `DATABASE_URL` unset for no-database local mode, or set it to the Postgres database you created above (including the role's credentials if you set a password) to use the Postgres-backed runs index.
+
+`.env.example` also pre-fills `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST` for local [Langfuse observability](#observability-langfuse). Copying it as-is enables tracing once you run `make langfuse-up`; if the stack isn't running, simulations just log one warning and proceed untraced. Blank both keys to disable telemetry entirely.
 
 ## Running a Simulation
 
@@ -192,6 +195,21 @@ Configure via the `scheduled_events` knob in the scenario config. Two event type
 `channel_visibility` is a per-channel discriminated union: `{"kind":"full"}` keeps all predecessor history visible; `{"kind":"none"}` hides the channel entirely; `{"kind":"from_round","round_floor":R}` windows the channel to round `R` onward. Channels not listed default to `Full`. Globally disabled channels (e.g. veyru's postmortem after `set_postmortem`) are forced to `none` by the runtime regardless of the swap config.
 
 Each swap emits an `AgentSwappedMidRun` event into the JSONL, writes a `resume_context_<agent_id>_round_<R>.json` file capturing the swapped-in agent's seed history, and invokes `ScenarioWorld.on_agent_swapped_mid_run` so the scenario can suppress prior-round injection content for the swapped-in agent's first turn. The frontend renders one tab per `(agent_id, generation)` and a dashed indigo divider in the chat pane between adjacent rounds that straddle a swap. The `round_success_after_resume` metric emits one Measurement per swap (named `round_success_after_resume_round_<R>_<agent_id>`) with the previous phase as the baseline. The Streamlit Multi-swap tab visualises per-phase round-success with Δ pp annotations between phases.
+
+## Observability (Langfuse)
+
+Simulation agents are instrumented with [pydantic-ai](https://ai.pydantic.dev/)'s OpenTelemetry support, exporting every LLM call (prompts, completions, tool calls, token usage, latency, cost) to a **local, self-hosted [Langfuse](https://langfuse.com/)** — never a cloud endpoint.
+
+```bash
+make langfuse-up      # start the local stack (web, worker, postgres, clickhouse, redis, minio)
+make langfuse-down    # stop it
+make langfuse-logs    # tail langfuse-web
+```
+
+- UI at **http://localhost:3001** (3001 because the frontend dev server owns 3000). First boot takes ~2-3 min while migrations run. Log in with `local@schmidt.dev` / `local-dev-password`.
+- The `schmidt` org/project and the API keys (`pk-lf-local-dev` / `sk-lf-local-dev`) are seeded headlessly on first boot via `LANGFUSE_INIT_*` in [docker-compose.langfuse.yml](docker-compose.langfuse.yml). Those keys are pre-filled in `.env.example`, so `schmidt run` traces to this instance out of the box. Langfuse's internal Postgres is mapped to host port 5433 to avoid clashing with a local 5432 Postgres.
+- Each run is one Langfuse **session** keyed by `run_id`; every agent's cycles trace under it, tagged with `agent_id` / `role_name` / `model` / `provider` / `scenario`. Each generation also carries `round_number` in its metadata, so observations are filterable by simulation round.
+- Telemetry is enabled only when both `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set, and only in the `schmidt run` path — `schmidt evaluate`'s probe/judge LLM calls are not traced. If the stack is down or keys are unset, the run logs one warning and proceeds untraced; telemetry never blocks a simulation. Docker Desktop needs adequate resources for the full stack (Langfuse suggests ~4 cores / 16 GiB).
 
 ## Run Output Directory Structure
 
@@ -480,6 +498,9 @@ src/schmidt/
   event_logger.py              # JSONL event writer
   event_bus.py                 # In-process pub/sub for SSE streaming
   simulation_server.py         # Embedded SSE server per simulation
+  telemetry_settings.py        # Langfuse env config (LANGFUSE_* keys → enabled flag)
+  telemetry_bootstrap.py       # Langfuse OTEL bootstrap + pydantic-ai instrumentation (run path only)
+  telemetry_round_processor.py # Span processor stamping round_number onto generation spans
 
   runtime/                     # MCP server + coordination
     simulation_state.py        # Shared state: channels, sessions, locks, current round, injection delivery

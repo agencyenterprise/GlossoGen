@@ -75,6 +75,21 @@ dev:
 dev-frontend:
 	cd frontend && npm run dev
 
+# Local self-hosted Langfuse observability stack (traces from `schmidt run`).
+# --env-file /dev/null keeps schmidt's own .env from leaking into the Langfuse
+# stack's variable substitution. First boot takes ~2-3 min; UI at :3001
+# (3000 is the frontend dev server).
+langfuse-up:
+	docker compose --env-file /dev/null -f docker-compose.langfuse.yml up -d
+	@echo "Langfuse starting at http://localhost:3001 (first boot ~2-3 min)."
+	@echo "Login: local@schmidt.dev / local-dev-password  |  keys pre-seeded in .env.example"
+
+langfuse-down:
+	docker compose --env-file /dev/null -f docker-compose.langfuse.yml down
+
+langfuse-logs:
+	docker compose --env-file /dev/null -f docker-compose.langfuse.yml logs -f langfuse-web
+
 # API types
 export-openapi:
 	VIRTUAL_ENV= uv run python scripts/export_openapi.py > frontend/openapi.json
@@ -83,4 +98,4 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend results-viewer sync-sheets sync-sheets-baseline sync-sheets-noise sync-sheets-protocol sync-sheets-spot charts-spot export-openapi gen-api-types
+.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend results-viewer sync-sheets sync-sheets-baseline sync-sheets-noise sync-sheets-protocol sync-sheets-spot charts-spot langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types

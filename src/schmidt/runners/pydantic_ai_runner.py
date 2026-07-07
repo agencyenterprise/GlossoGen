@@ -10,8 +10,10 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterable, Callable
+from contextlib import AbstractContextManager, nullcontext
 from typing import Any, cast
 
+from langfuse import propagate_attributes
 from pydantic_ai import Agent, _agent_graph
 from pydantic_ai.agent import AgentRunResult as PydanticAIAgentRunResult
 from pydantic_ai.agent.abstract import EventStreamHandler
@@ -65,6 +67,7 @@ from schmidt.runners.pydantic_ai_model_factory import (
 )
 from schmidt.runtime.simulation_state import SimulationRuntime
 from schmidt.server.runs.streaming_event import AgentCostUpdated
+from schmidt.telemetry_round_processor import current_round_source
 from schmidt.token_pricing import find_pricing
 
 logger = logging.getLogger(__name__)
@@ -115,6 +118,7 @@ class _StreamingState:
         self.accumulated_compaction = ""
         self.compaction_occurred = False
         self.compaction_provider_name = "unknown"
+        self.compaction_round = 0
         self.background_tasks: list[asyncio.Task[None]] = []
 
     def spawn_log_task(self, coro: object) -> None:
@@ -198,9 +202,41 @@ class PydanticAIRunner(AgentRunner):
     text and tool results for JSONL logging.
     """
 
-    def __init__(self, max_turns: int, event_bus: EventBus) -> None:
+    def __init__(
+        self,
+        max_turns: int,
+        event_bus: EventBus,
+        run_id: str,
+        scenario_name: str,
+        telemetry_enabled: bool,
+    ) -> None:
         self._max_turns = max_turns
         self._event_bus = event_bus
+        self._run_id = run_id
+        self._scenario_name = scenario_name
+        self._telemetry_enabled = telemetry_enabled
+
+    def _agent_trace_context(self, agent_config: AgentConfig) -> AbstractContextManager[Any]:
+        """Return a Langfuse attribute-propagation context for this agent's spans.
+
+        Groups every agent in the simulation under one Langfuse session
+        (``session_id`` = run id) and tags each span with the agent's identity.
+        Returns a no-op context when telemetry is disabled so the run path adds
+        no overhead.
+        """
+        if not self._telemetry_enabled:
+            return nullcontext()
+        return propagate_attributes(
+            session_id=self._run_id,
+            metadata={
+                "agent_id": agent_config.agent_id,
+                "role_name": agent_config.role_name,
+                "model": agent_config.model,
+                "provider": agent_config.provider,
+                "scenario": self._scenario_name,
+            },
+            tags=[self._scenario_name, agent_config.provider, agent_config.model, "schmidt"],
+        )
 
     async def start(
         self,
@@ -213,6 +249,11 @@ class PydanticAIRunner(AgentRunner):
         event_logger = runtime.event_logger
         agent_id = agent_config.agent_id
         provider = agent_config.provider
+        if self._telemetry_enabled:
+            # Round is global across agents; every runner points the telemetry
+            # round source at the same live runtime value. The span processor
+            # reads it when each generation span opens.
+            current_round_source.set_provider(provider=lambda: runtime.current_round)
         logger.info(
             "Starting Pydantic AI agent %s (%s) max_turns=%d provider=%s model=%s",
             agent_id,
@@ -338,17 +379,18 @@ class PydanticAIRunner(AgentRunner):
                     cycle_succeeded = False
                     result: PydanticAIAgentRunResult[str] | None = None
                     try:
-                        result = await _run_agent_call(
-                            agent=agent,
-                            prompt=prompt,
-                            message_history=message_history,
-                            event_stream_handler=_handle_events,
-                            max_tokens=agent_config.max_tokens,
-                            record_usage=_record_usage,
-                            non_streaming_model_requests=non_streaming_model_requests,
-                            state=captured_state,
-                            flush_inter_call_response=_flush_inter_call_response,
-                        )
+                        with self._agent_trace_context(agent_config=agent_config):
+                            result = await _run_agent_call(
+                                agent=agent,
+                                prompt=prompt,
+                                message_history=message_history,
+                                event_stream_handler=_handle_events,
+                                max_tokens=agent_config.max_tokens,
+                                record_usage=_record_usage,
+                                non_streaming_model_requests=non_streaming_model_requests,
+                                state=captured_state,
+                                flush_inter_call_response=_flush_inter_call_response,
+                            )
                         cycle_succeeded = True
                     except Exception as exc:
                         logger.exception(
@@ -410,11 +452,11 @@ class PydanticAIRunner(AgentRunner):
                     message_history = result.all_messages()
                     total_turns += 1
 
+                    # Safety net: flush a compaction block that had no following
+                    # generation part this cycle (it normally closes when the response
+                    # part after the compaction starts, in _process_stream_event).
                     self._flush_compaction_summary(
-                        agent_id=agent_id,
-                        round_number=runtime.current_round,
-                        event_logger=event_logger,
-                        state=state,
+                        agent_id=agent_id, event_logger=event_logger, state=state
                     )
 
                     logger.info(
@@ -491,25 +533,41 @@ class PydanticAIRunner(AgentRunner):
     def _flush_compaction_summary(
         self,
         agent_id: str,
-        round_number: int,
         event_logger: EventLogger,
         state: _StreamingState,
     ) -> None:
-        """Log a ContextCompacted event for a compaction that occurred this cycle.
+        """Emit a ContextCompacted for a completed compaction block, then reset it.
 
-        The summary text is accumulated across the per-delta CompactionPart events
-        in ``_process_stream_event`` (the parts manager overwrites rather than
-        accumulates, so the assembled summary lives nowhere else). ``state`` is
-        recreated each cycle, so the accumulator holds exactly this cycle's summary.
+        No-op unless a compaction block is currently open. Called when the block
+        ends — i.e. when the generated response (text/thinking/tool call) that
+        follows the compaction starts, or at agent-cycle end for a trailing block.
+        The event's round is ``state.compaction_round`` (recorded when the block
+        started), so it reflects when compaction actually fired — agent cycles span
+        many rounds, so flushing at cycle end with the current round would
+        mis-attribute it. The summary text is accumulated across the block's
+        per-delta ``CompactionPart`` events (which the parts manager overwrites
+        rather than accumulates, and which can span multiple streams); it may be
+        empty when a compaction fired without readable text (e.g. OpenAI's
+        encrypted server-side summary). Each block emits exactly one event.
         """
         if not state.compaction_occurred:
             return
         summary_text = state.accumulated_compaction
+        if not summary_text:
+            # Empty block: Anthropic emits a CompactionPart with content=None when a
+            # compaction attempt produces no valid summary (a server-side no-op), so
+            # there is nothing to record. Reset and skip. (OpenAI's encrypted
+            # server-side compaction also yields no text, but it does not flow through
+            # this streaming path in the stateless configuration used here.)
+            state.compaction_occurred = False
+            state.compaction_provider_name = "unknown"
+            return
         summary_char_count = len(summary_text)
         logger.info(
-            "Agent %s context compacted by %s: %d-char summary: %.200s",
+            "Agent %s context compacted by %s in round %d: %d-char summary: %.200s",
             agent_id,
             state.compaction_provider_name,
+            state.compaction_round,
             summary_char_count,
             summary_text,
         )
@@ -517,13 +575,16 @@ class PydanticAIRunner(AgentRunner):
             event_logger.log(
                 event=ContextCompacted(
                     agent_id=agent_id,
-                    round_number=round_number,
+                    round_number=state.compaction_round,
                     provider_name=state.compaction_provider_name,
                     summary_char_count=summary_char_count,
                     summary_text=summary_text,
                 )
             )
         )
+        state.compaction_occurred = False
+        state.accumulated_compaction = ""
+        state.compaction_provider_name = "unknown"
 
     def _flush_response_block(
         self,
@@ -600,6 +661,10 @@ class PydanticAIRunner(AgentRunner):
                 type(event.part).__name__,
             )
             if isinstance(event.part, (TextPart, ThinkingPart)):
+                # Real generated content follows the compaction block, so close it now.
+                self._flush_compaction_summary(
+                    agent_id=agent_id, event_logger=event_logger, state=state
+                )
                 # A new text/thinking part is starting. If we have accumulated
                 # tool calls from a previous response, flush them now so each
                 # model response is logged as one thinking+text+tools block.
@@ -619,11 +684,17 @@ class PydanticAIRunner(AgentRunner):
             elif isinstance(event.part, CompactionPart):
                 # Anthropic streams the compaction summary as multiple deltas, each
                 # re-emitted here as a fresh CompactionPart carrying only that delta's
-                # slice (the parts manager overwrites, never accumulates). Accumulate
-                # the slices ourselves so the whole summary is captured. OpenAI keeps
-                # content encrypted server-side (content is None), so the text stays
-                # empty while compaction_occurred still records that it happened.
-                state.compaction_occurred = True
+                # slice (the parts manager overwrites, never accumulates), and the
+                # block can span more than one model-request stream. Accumulate the
+                # slices across the whole block and flush it only when a non-compaction
+                # part follows (below) or the cycle ends — never at stream end, which
+                # would split the block. Record the round at block start so the event
+                # reflects when compaction fired (agent cycles span many rounds).
+                # OpenAI keeps content encrypted server-side (content is None), so the
+                # text stays empty while compaction_occurred still records it happened.
+                if not state.compaction_occurred:
+                    state.compaction_occurred = True
+                    state.compaction_round = round_number
                 if isinstance(event.part.content, str):
                     state.accumulated_compaction += event.part.content
                 if event.part.provider_name is not None:
@@ -637,6 +708,11 @@ class PydanticAIRunner(AgentRunner):
                     state.accumulated_thinking += event.delta.content_delta
 
         elif isinstance(event, FunctionToolCallEvent):
+            # A tool call is the generated response following a compaction block;
+            # close the block now (case where the response has no text part).
+            self._flush_compaction_summary(
+                agent_id=agent_id, event_logger=event_logger, state=state
+            )
             logger.debug(
                 "Agent %s FunctionToolCall: %s (call_id=%s)",
                 agent_id,

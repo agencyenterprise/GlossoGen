@@ -211,6 +211,9 @@ cp .env.example .env
 | `SELF_HOSTED_API_KEY` | Required for `--provider self-hosted` | Bearer token shared across all entries in `SELF_HOSTED_BASE_URLS` (matches each server's `--api-key`) |
 | `LOG_LEVEL` | Optional | Stdlib logging level for `schmidt` CLI commands and analysis scripts (`DEBUG`/`INFO`/`WARNING`/`ERROR`). Set to `DEBUG` to capture verbatim LLM-judge system prompt, user prompt, and structured-output JSON in stderr. Defaults to `INFO`. |
 | `LLM_MAX_TOKENS` | Optional | Per-call output-token cap applied uniformly to the Claude (`max_tokens`), OpenAI (`max_output_tokens`), and HuggingFace (`max_tokens`) providers. Defaults to `16384`; bump higher if structured-output JSON truncates. Note: this does **not** cap the simulation agents — those use the `agent_max_tokens` knob (see below). |
+| `LANGFUSE_PUBLIC_KEY` | Optional | Langfuse project public key. When both this and `LANGFUSE_SECRET_KEY` are set, `schmidt run` exports every simulation agent's LLM calls (prompts, completions, tool calls, token usage) to Langfuse as OpenTelemetry traces. `.env.example` pre-fills `pk-lf-local-dev` to match the local Docker stack. Only the `run` path is instrumented — `schmidt evaluate` stays untraced. |
+| `LANGFUSE_SECRET_KEY` | Optional | Langfuse project secret key. Pre-filled `sk-lf-local-dev`. Blank both keys to disable telemetry. |
+| `LANGFUSE_HOST` | Optional | Langfuse base URL. Defaults to `http://localhost:3001` (the local `make langfuse-up` stack; 3001 because the frontend dev server owns 3000). If the stack isn't running, the run logs one `auth_check` warning and proceeds untraced — telemetry never blocks a simulation. |
 
 Frontend environment variables go in `frontend/.env.local` (see `frontend/.env.local.example`):
 
@@ -226,6 +229,34 @@ Frontend environment variables go in `frontend/.env.local` (see `frontend/.env.l
 make dev            # start FastAPI backend on port 8000 (reads from ./runs/)
 make dev-frontend   # start Next.js dev server on port 3000
 ```
+
+## Local Langfuse (observability)
+
+Simulation agents' LLM calls are traced to a **local, self-hosted Langfuse** (never cloud)
+via pydantic-ai's OpenTelemetry instrumentation. The stack runs from a vendored compose file.
+
+```bash
+make langfuse-up     # start the full Langfuse stack (web, worker, postgres, clickhouse, redis, minio)
+make langfuse-down   # stop it
+make langfuse-logs   # tail the langfuse-web logs
+```
+
+- UI at **http://localhost:3001** (3001 because the Next.js frontend owns 3000); first boot
+  takes ~2-3 min. Log in with `local@schmidt.dev` / `local-dev-password` (seeded via
+  `LANGFUSE_INIT_*` in `docker-compose.langfuse.yml`). Langfuse's internal postgres is mapped
+  to host 5433 to avoid clashing with a local 5432 Postgres.
+- The `schmidt` org + project and the API keys (`pk-lf-local-dev` / `sk-lf-local-dev`) are
+  headlessly seeded on first boot — no UI setup needed. Those keys are pre-filled in
+  `.env.example`, so `schmidt run` traces to this instance out of the box.
+- Each run is one Langfuse **session** keyed by `run_id`; every agent's cycles trace under it,
+  tagged with `agent_id` / `role_name` / `model` / `provider` / `scenario`.
+- Telemetry is initialized only in the `schmidt run` path (`init_langfuse_telemetry` in
+  [telemetry_bootstrap.py](src/schmidt/telemetry_bootstrap.py)), so `schmidt evaluate`'s
+  probe/judge LLM calls are not traced. If the stack is down or keys are unset, the run logs
+  one warning and proceeds untraced — telemetry never blocks a simulation.
+- Docker Desktop needs adequate resources for the full stack (Langfuse suggests ~4 cores /
+  16 GiB). The stack exposes `langfuse-web` on host :3001 and `minio` on :9090; the other
+  services (postgres :5433, redis, clickhouse) bind to localhost only.
 
 ## Authentication
 

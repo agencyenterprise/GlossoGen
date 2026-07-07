@@ -224,3 +224,8 @@ rounds_covered  # unused variable (src/schmidt/thread_export/thread_export_model
 thinking_included  # unused variable (src/schmidt/thread_export/thread_export_models.py:163)
 tools_flattened  # unused variable (src/schmidt/thread_export/thread_export_models.py:164)
 exported_at  # unused variable (src/schmidt/thread_export/thread_export_models.py:165)
+_.on_start  # unused method (src/schmidt/telemetry_round_processor.py:52)
+parent_context  # unused variable (src/schmidt/telemetry_round_processor.py:52)
+_.on_end  # unused method (src/schmidt/telemetry_round_processor.py:62)
+_.force_flush  # unused method (src/schmidt/telemetry_round_processor.py:68)
+timeout_millis  # unused variable (src/schmidt/telemetry_round_processor.py:68)
