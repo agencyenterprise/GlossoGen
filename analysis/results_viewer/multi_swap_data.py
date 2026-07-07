@@ -32,11 +32,11 @@ import orjson
 from pydantic import BaseModel
 
 from analysis.results_viewer.run_catalog import EvaluatedRun
-from schmidt.evaluation.log_reader import extract_agent_configs, load_events
-from schmidt.evaluation.metric_core.resume_anchors import collect_advanced_round_numbers
-from schmidt.evaluation.metric_core.round_result_index import per_round_joint_success
-from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import AgentSwappedMidRun, SimulationEvent
+from glossogen.evaluation.log_reader import extract_agent_configs, load_events
+from glossogen.evaluation.metric_core.resume_anchors import collect_advanced_round_numbers
+from glossogen.evaluation.metric_core.round_result_index import per_round_joint_success
+from glossogen.models.agent_config import AgentConfig
+from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
 
 logger = logging.getLogger(__name__)
 

@@ -24,7 +24,7 @@ from typing import NamedTuple
 import orjson
 
 from analysis.results_viewer.run_catalog import EvaluatedRun
-from schmidt.evaluation.metrics.communication.label_models import (
+from glossogen.evaluation.metrics.communication.label_models import (
     CommunicationFeaturePresenceSidecar,
     CommunicationOntology,
     OntologyCategory,

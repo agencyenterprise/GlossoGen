@@ -56,7 +56,7 @@ declare -a SONNET_SPECS=(
 )
 
 count_running_for_model() {
-  pgrep -f "Python -m schmidt run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
+  pgrep -f "Python -m glossogen run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
 }
 
 launch_resume() {
@@ -66,7 +66,7 @@ launch_resume() {
   local budget_label=$4
   echo "$(date) launching source=$source_id knobs=$knobs variant=$variant_label budget=$budget_label" >> "$LOG"
   local out
-  out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt resume-at-round veyru \
+  out=$(VIRTUAL_ENV= uv run --no-sync python -m glossogen resume-at-round veyru \
     --source-run-dir "runs/veyru/$source_id" \
     --round-start 16 \
     --runs-dir runs \

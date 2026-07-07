@@ -1,8 +1,8 @@
 # Creating a new scenario
 
-This guide walks through adding a new scenario to schmidt end-to-end. By the end you'll have a registered scenario, a working smoke run, and (optionally) bespoke run-detail data on the API and bespoke UI on the frontend — every extension surface that exists today, all opt-in.
+This guide walks through adding a new scenario to glossogen end-to-end. By the end you'll have a registered scenario, a working smoke run, and (optionally) bespoke run-detail data on the API and bespoke UI on the frontend — every extension surface that exists today, all opt-in.
 
-If you just want to copy an existing scenario as a starting point, [container_yard_stacking](../src/schmidt/scenarios/container_yard_stacking/) is the freshest 3-agent reference — its file list and shape is what this guide aims at.
+If you just want to copy an existing scenario as a starting point, [container_yard_stacking](../src/glossogen/scenarios/container_yard_stacking/) is the freshest 3-agent reference — its file list and shape is what this guide aims at.
 
 ## What a scenario is
 
@@ -18,12 +18,12 @@ A scenario is one self-contained 3-agent (or 2-agent, or N-agent) coordination t
 - **Optional frontend plug-in** — a bespoke knobs form, per-round detail panel, or replace-agent default knobs.
 - **Optional per-scenario scripts** — one-off runners and ontology builders that import the scenario directly.
 
-The platform discovers events, run-detail extensions, and frontend plug-ins automatically. The only file you have to *register* in is [scenario_registry.py](../src/schmidt/scenario_registry.py).
+The platform discovers events, run-detail extensions, and frontend plug-ins automatically. The only file you have to *register* in is [scenario_registry.py](../src/glossogen/scenario_registry.py).
 
 ## Package layout
 
 ```
-src/schmidt/scenarios/<your_scenario>/
+src/glossogen/scenarios/<your_scenario>/
 ├── __init__.py                  # MUST stay empty (see "Why empty inits" below)
 ├── README.md                    # scenario-specific docs
 ├── ids.py                       # agent IDs, channel IDs, tool names, world markers
@@ -50,17 +50,17 @@ Frontend plug-in (optional) lives separately at `frontend/src/features/runs/<you
 
 ### Why empty inits
 
-The scenario package's `__init__.py` MUST stay empty. The platform's event-discovery walker (`schmidt.models.event._discover_scenario_event_types`) imports `schmidt.scenarios.<name>.events` directly via `pkgutil`. If `__init__.py` re-exported anything from `scenario.py`, importing the events module would cascade into `scenario.py`, which imports back from `schmidt.models.event` — and that module is mid-import when discovery runs. Empty inits break that cycle.
+The scenario package's `__init__.py` MUST stay empty. The platform's event-discovery walker (`glossogen.models.event._discover_scenario_event_types`) imports `glossogen.scenarios.<name>.events` directly via `pkgutil`. If `__init__.py` re-exported anything from `scenario.py`, importing the events module would cascade into `scenario.py`, which imports back from `glossogen.models.event` — and that module is mid-import when discovery runs. Empty inits break that cycle.
 
-For the same reason, `events.py` must import only from [`schmidt.models.event_base`](../src/schmidt/models/event_base.py) (which defines `EventBase` and `TokenUsage`), never from `schmidt.models.event`.
+For the same reason, `events.py` must import only from [`glossogen.models.event_base`](../src/glossogen/models/event_base.py) (which defines `EventBase` and `TokenUsage`), never from `glossogen.models.event`.
 
 ## Step-by-step
 
 ### 1. Create the package skeleton
 
 ```bash
-mkdir -p src/schmidt/scenarios/<your_scenario>/prompts
-touch src/schmidt/scenarios/<your_scenario>/__init__.py
+mkdir -p src/glossogen/scenarios/<your_scenario>/prompts
+touch src/glossogen/scenarios/<your_scenario>/__init__.py
 ```
 
 Leave `__init__.py` empty.
@@ -69,7 +69,7 @@ Leave `__init__.py` empty.
 
 Centralize every literal string the scenario uses — agent IDs, channel IDs, tool names, world-event marker strings, and per-agent tool lists. Keeps the rest of the package free of magic strings.
 
-See [container_yard_stacking/ids.py](../src/schmidt/scenarios/container_yard_stacking/ids.py) for a worked example. Typical contents:
+See [container_yard_stacking/ids.py](../src/glossogen/scenarios/container_yard_stacking/ids.py) for a worked example. Typical contents:
 
 ```python
 YARD_OPERATOR_ID = "yard_operator"
@@ -96,7 +96,7 @@ ROUND_FAILED_MARKER = "[round_failed]"
 Define a `ScenarioKnobs` Pydantic model that extends `BaseKnobs`. Every field MUST be required (no defaults — per the project's "no default parameter values" rule); presets supply values via `knobs_default.json`.
 
 ```python
-from schmidt.knobs_base import BaseKnobs
+from glossogen.knobs_base import BaseKnobs
 from pydantic import Field, model_validator
 
 class ContainerYardStackingKnobs(BaseKnobs):
@@ -130,12 +130,12 @@ The canonical preset. Always use:
 
 ### 5. Write `events.py`
 
-Declare each scenario-specific event class as an `EventBase` subclass with a unique `event_type` discriminator. The platform's discovered-union JSONL parser picks them up automatically; you don't edit `schmidt/models/event.py`.
+Declare each scenario-specific event class as an `EventBase` subclass with a unique `event_type` discriminator. The platform's discovered-union JSONL parser picks them up automatically; you don't edit `glossogen/models/event.py`.
 
 ```python
 from typing import Literal
 from pydantic import BaseModel
-from schmidt.models.event_base import EventBase
+from glossogen.models.event_base import EventBase
 
 
 class YardCaseStarted(EventBase):
@@ -146,13 +146,13 @@ class YardCaseStarted(EventBase):
     # ...
 ```
 
-**Critical**: import only from `schmidt.models.event_base`, never from `schmidt.models.event`.
+**Critical**: import only from `glossogen.models.event_base`, never from `glossogen.models.event`.
 
 ### 6. Write `world.py`
 
-Subclass `ScenarioWorld` (defined in [scenario_world.py](../src/schmidt/runtime/scenario_world.py)). The world is the live simulated environment — it consumes inbound messages, mutates internal state, emits notifications to agents via `world_context.deliver_world_event(...)`, and decides when a round succeeds or fails.
+Subclass `ScenarioWorld` (defined in [scenario_world.py](../src/glossogen/runtime/scenario_world.py)). The world is the live simulated environment — it consumes inbound messages, mutates internal state, emits notifications to agents via `world_context.deliver_world_event(...)`, and decides when a round succeeds or fails.
 
-The shape to mimic is [`WarehouseWorld`](../src/schmidt/scenarios/warehouse_robot_recovery/world.py) (single-tool scenarios) or [`ContainerYardWorld`](../src/schmidt/scenarios/container_yard_stacking/world.py) (multi-tool scenarios with sequenced action state).
+The shape to mimic is [`WarehouseWorld`](../src/glossogen/scenarios/warehouse_robot_recovery/world.py) (single-tool scenarios) or [`ContainerYardWorld`](../src/glossogen/scenarios/container_yard_stacking/world.py) (multi-tool scenarios with sequenced action state).
 
 The world is also the place where:
 - **Per-character budget mechanics** live (subtract message length from a budget; emit `BUDGET_EXCEEDED_MARKER` notification when exhausted).
@@ -161,7 +161,7 @@ The world is also the place where:
 
 ### 7. Write `scenario.py`
 
-The `SimulationScenario` subclass — the entry point the registry hands to the CLI, MCP `start_run` tool, and run-detail UI. Required classmethods and methods are spelled out in [scenario_protocol.py](../src/schmidt/scenario_protocol.py). The key ones:
+The `SimulationScenario` subclass — the entry point the registry hands to the CLI, MCP `start_run` tool, and run-detail UI. Required classmethods and methods are spelled out in [scenario_protocol.py](../src/glossogen/scenario_protocol.py). The key ones:
 
 - `name()` → the registry key (string).
 - `description()` → a short human-readable description.
@@ -179,7 +179,7 @@ The `SimulationScenario` subclass — the entry point the registry hands to the 
 - `judge_round_result(round_number, trigger)` → return a list of `RoundResult(success, team_id, reason)`. The game clock writes one `RoundResultRecorded` event per element; the platform `round_success` metric reads these directly and emits one Measurement per `team_id` (single-team scenarios pass `team_id=None` and get one Measurement named `round_success`). Scenarios that don't override this hook get no round-success measurement.
 - `restore_state_from_events(events)` → optional. Called after a fork/resume rewind has been built and before the runtime starts. Walk the event list and seed any per-round outcomes you need so the first post-resume injection renders accurate "previous result" context (most scenarios need this only if their injection templates surface prior-round state).
 
-For scenarios with custom tools (anything beyond `send_message`), `get_mcp_tools()` returns one [`ScenarioMcpTool`](../src/schmidt/runtime/scenario_mcp_tool.py) per tool — that's where you wire up freetext-argument LLM judges, world state mutations, and the marker strings the tool result returns.
+For scenarios with custom tools (anything beyond `send_message`), `get_mcp_tools()` returns one [`ScenarioMcpTool`](../src/glossogen/runtime/scenario_mcp_tool.py) per tool — that's where you wire up freetext-argument LLM judges, world state mutations, and the marker strings the tool result returns.
 
 ### Optional platform hooks (post-simulation analysis)
 
@@ -187,7 +187,7 @@ These are opt-in: implement them only if you want the corresponding platform met
 
 - `build_communication_rounds(events) -> list[CommunicationRoundView]` → opt the scenario into the `communication_open_coding` + `communication_feature_presence` pipeline. Each view joins one round's primary-channel messages with a scenario-rendered ground-truth block. Returning `[]` (default) skips both metrics.
 - `detect_protocol_boundary_window(events, agent_configs) -> ProtocolBoundaryWindow | None` → drives `protocol_learned_after_swap`. The default returns the first `AgentSwappedMidRun` boundary (scheduled in-run swaps). Override to detect scenario-specific boundaries first (intern takeover, two-team observer swap) and fall back to `super().detect_protocol_boundary_window(...)` for scheduled swaps.
-- `get_protocol_probe_config() -> ProtocolProbeConfig | None` → opts into the four-metric `protocol_probe` family. Returns a NamedTuple of (`questions_path`, `prompts_dir`, `role_groups`, `role_templates`). Ship the question bank as `<scenario>/protocol_probe_questions.json` and probe-prompt templates under `<scenario>/prompts/`. See [veyru/scenario.py](../src/schmidt/scenarios/veyru/scenario.py) for the canonical wiring and [veyru/scripts/build_probe_questions.py](../src/schmidt/scenarios/veyru/scripts/build_probe_questions.py) for a generator pattern.
+- `get_protocol_probe_config() -> ProtocolProbeConfig | None` → opts into the four-metric `protocol_probe` family. Returns a NamedTuple of (`questions_path`, `prompts_dir`, `role_groups`, `role_templates`). Ship the question bank as `<scenario>/protocol_probe_questions.json` and probe-prompt templates under `<scenario>/prompts/`. See [veyru/scenario.py](../src/glossogen/scenarios/veyru/scenario.py) for the canonical wiring and [veyru/scripts/build_probe_questions.py](../src/glossogen/scenarios/veyru/scripts/build_probe_questions.py) for a generator pattern.
 - `get_replace_agent_blocked_tool_call_channels() -> frozenset[str]` → channel IDs whose `send_message` / `read_channel` calls should be stripped from a replaced agent's reconstructed history (typically your postmortem / discussion channel).
 
 ### 8. Write `prompts/`
@@ -219,18 +219,18 @@ Add a scenario-specific metric under `evaluation/` only when the platform doesn'
 
 ### 10. (Optional) Add a run-detail extension
 
-If you want per-round case ground truth, judge metadata keyed by tool `call_id`, or custom SSE events to appear on the run-detail API (and thence on the frontend), add `src/schmidt/scenarios/<your_scenario>/run_detail_extension.py`. The platform auto-discovers it at startup.
+If you want per-round case ground truth, judge metadata keyed by tool `call_id`, or custom SSE events to appear on the run-detail API (and thence on the frontend), add `src/glossogen/scenarios/<your_scenario>/run_detail_extension.py`. The platform auto-discovers it at startup.
 
-The full contract is in [scenario_extension.py](../src/schmidt/server/runs/scenario_extension.py); the canonical example is [veyru/run_detail_extension.py](../src/schmidt/scenarios/veyru/run_detail_extension.py).
+The full contract is in [scenario_extension.py](../src/glossogen/server/runs/scenario_extension.py); the canonical example is [veyru/run_detail_extension.py](../src/glossogen/scenarios/veyru/run_detail_extension.py).
 
 Minimal shape:
 
 ```python
 from typing import ClassVar, Literal
 from pydantic import BaseModel
-from schmidt.models.event import SimulationEvent
-from schmidt.server.runs.run_detail_types import AgentDetail, ChannelMessage
-from schmidt.server.runs.scenario_extension import (
+from glossogen.models.event import SimulationEvent
+from glossogen.server.runs.run_detail_types import AgentDetail, ChannelMessage
+from glossogen.server.runs.scenario_extension import (
     ScenarioRunDetailExtension,
     ScenarioRunExtrasBase,
 )
@@ -286,10 +286,10 @@ The plug-in contract is in [scenario-plugin.ts](../frontend/src/features/runs/sc
 
 ### 12. Register the scenario
 
-Add one line to [src/schmidt/scenario_registry.py](../src/schmidt/scenario_registry.py):
+Add one line to [src/glossogen/scenario_registry.py](../src/glossogen/scenario_registry.py):
 
 ```python
-from schmidt.scenarios.your_scenario.scenario import YourScenario
+from glossogen.scenarios.your_scenario.scenario import YourScenario
 
 SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     ...,
@@ -304,9 +304,9 @@ This is the only file outside your scenario package you have to touch for the sc
 Run a short simulation end-to-end before claiming the scenario works:
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run your_scenario \
+VIRTUAL_ENV= uv run --no-sync python -m glossogen run your_scenario \
   --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/your_scenario/knobs_default.json \
+  --config src/glossogen/scenarios/your_scenario/knobs_default.json \
   round_count=3 \
   > ./runs/your_scenario_smoke.log 2>&1 &
 ```
@@ -320,7 +320,7 @@ Monitor per the CLAUDE.md sleep-30-tail pattern. Pass criteria:
 Then evaluate:
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate your_scenario \
+VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate your_scenario \
   --run-dir ./runs/your_scenario/<timestamp> \
   --metrics round_success,mean_chars_per_round,mean_chars_per_message \
   --model claude-haiku-4-5-20251001 --provider anthropic
@@ -333,7 +333,7 @@ The report should contain one Measurement per metric with sensible `score` and `
 Before opening a PR:
 
 - [ ] `__init__.py` files (namespace + scenario) are empty.
-- [ ] `events.py` imports only from `schmidt.models.event_base`.
+- [ ] `events.py` imports only from `glossogen.models.event_base`.
 - [ ] Every knobs field is required (no defaults); preset values live in `knobs_default.json`.
 - [ ] `judge_model = "claude-haiku-4-5-20251001"`, `judge_provider = "anthropic"`, `seed = 42` in the preset.
 - [ ] Prompts live in `prompts/*.jinja`, not in Python string literals.
@@ -345,7 +345,7 @@ Before opening a PR:
 
 ## Common pitfalls
 
-**Circular import on event discovery.** If you see `ImportError` mentioning your scenario at platform startup, check that (a) `__init__.py` is empty and (b) `events.py` doesn't import from `schmidt.models.event`.
+**Circular import on event discovery.** If you see `ImportError` mentioning your scenario at platform startup, check that (a) `__init__.py` is empty and (b) `events.py` doesn't import from `glossogen.models.event`.
 
 **Vulture flags scenario classes as unused.** Pydantic fields, auto-discovered extension classes, and metric classes can look unused. Regenerate the whitelist as shown above.
 
@@ -353,13 +353,13 @@ Before opening a PR:
 
 **Frontend types out of sync.** The OpenAPI types in `frontend/src/types/api.gen.ts` are generated. After any backend schema change (e.g. adding a `ScenarioRunExtrasBase` subclass), run `make gen-api-types`. CI fails if the file drifts from the backend schema.
 
-**Per-scenario script paths.** One-off scripts that import your scenario directly belong under `src/schmidt/scenarios/<your_scenario>/scripts/`, not the repo-root `scripts/` folder. Cross-scenario tools (the OpenAPI exporter, generic diagnostic tools) stay in `scripts/`.
+**Per-scenario script paths.** One-off scripts that import your scenario directly belong under `src/glossogen/scenarios/<your_scenario>/scripts/`, not the repo-root `scripts/` folder. Cross-scenario tools (the OpenAPI exporter, generic diagnostic tools) stay in `scripts/`.
 
 ## Reference scenarios
 
 When in doubt, mirror an existing scenario:
 
-- [container_yard_stacking](../src/schmidt/scenarios/container_yard_stacking/) — most recent 3-agent build; freetext tool args with LLM judges, multi-call sequenced actions, per-round changing geometry. Cleanest "follow this layout" template.
-- [warehouse_robot_recovery](../src/schmidt/scenarios/warehouse_robot_recovery/) — 3-agent, single-tool recovery with per-character budget. Simplest "single judged action" pattern.
-- [satellite_contact_window](../src/schmidt/scenarios/satellite_contact_window/) — 3-agent, sequenced command submission judged in one call against an authorization envelope.
-- [veyru](../src/schmidt/scenarios/veyru/) — 2-agent baseline scenario; the most heavily extended scenario, including a run-detail extension, a frontend plug-in, per-scenario scripts, and many bespoke metrics. The canonical example for every optional extension surface.
+- [container_yard_stacking](../src/glossogen/scenarios/container_yard_stacking/) — most recent 3-agent build; freetext tool args with LLM judges, multi-call sequenced actions, per-round changing geometry. Cleanest "follow this layout" template.
+- [warehouse_robot_recovery](../src/glossogen/scenarios/warehouse_robot_recovery/) — 3-agent, single-tool recovery with per-character budget. Simplest "single judged action" pattern.
+- [satellite_contact_window](../src/glossogen/scenarios/satellite_contact_window/) — 3-agent, sequenced command submission judged in one call against an authorization envelope.
+- [veyru](../src/glossogen/scenarios/veyru/) — 2-agent baseline scenario; the most heavily extended scenario, including a run-detail extension, a frontend plug-in, per-scenario scripts, and many bespoke metrics. The canonical example for every optional extension surface.

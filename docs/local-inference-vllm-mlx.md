@@ -34,7 +34,7 @@ Run all simulation agents against a single locally-hosted model on your Mac. Thr
 
 ## Option 1: Ollama (Recommended)
 
-Ollama has mature tool calling support and works with schmidt simulations today. Inference is serial (agents queue up), so rounds are slower with many agents.
+Ollama has mature tool calling support and works with glossogen simulations today. Inference is serial (agents queue up), so rounds are slower with many agents.
 
 ### Install and Setup
 
@@ -49,7 +49,7 @@ ollama pull qwen2.5:14b
 ollama serve
 ```
 
-### Configure schmidt
+### Configure glossogen
 
 Add to your `.env` file:
 
@@ -62,9 +62,9 @@ The `/v1` suffix is required — Pydantic AI uses the OpenAI-compatible endpoint
 ### Run a Simulation
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
+VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model qwen2.5:14b --provider ollama --runs-dir ./runs \
-  --config src/schmidt/scenarios/veyru/knobs_default.json \
+  --config src/glossogen/scenarios/veyru/knobs_default.json \
   > ./runs/veyru_stdout.log 2>&1 &
 ```
 
@@ -98,7 +98,7 @@ vllm serve mlx-community/Qwen2.5-14B-Instruct-4bit \
 - **Double-brace tool calls**: MLX 4-bit quantized models produce `{{"name": ...}}` instead of `{"name": ...}` in tool call output. The hermes parser fails to parse this as valid JSON and returns empty `tool_calls`. A workaround is to patch `vllm/tool_parsers/hermes_tool_parser.py` to strip double braces before JSON parsing.
 - **Inconsistent tool formatting**: The quantized model sometimes outputs tool calls as plain text without `<tool_call>` tags, which the parser cannot detect.
 
-### Configure schmidt (Evaluation Only)
+### Configure glossogen (Evaluation Only)
 
 ```bash
 OPENAI_BASE_URL=http://localhost:8010/v1
@@ -121,7 +121,7 @@ uv tool install vllm-mlx
 vllm-mlx serve mlx-community/Qwen2.5-14B-Instruct-4bit --port 8010 --continuous-batching
 ```
 
-Port 8010 avoids conflicting with the schmidt FastAPI backend (port 8000).
+Port 8010 avoids conflicting with the glossogen FastAPI backend (port 8000).
 
 ### Known Issues (v0.2.7)
 
@@ -129,7 +129,7 @@ Port 8010 avoids conflicting with the schmidt FastAPI backend (port 8000).
 - **Tool calling broken**: `--enable-auto-tool-choice --tool-call-parser hermes` does not populate the `tool_calls` field in the API response. The parser fails to extract tool calls from model output.
 - **Qwen3 not supported**: Qwen3 model architecture is not supported by mlx_lm 0.31.1 / vllm-mlx 0.2.7.
 
-### Configure schmidt (Evaluation Only)
+### Configure glossogen (Evaluation Only)
 
 ```bash
 OPENAI_BASE_URL=http://localhost:8010/v1
@@ -139,7 +139,7 @@ OPENAI_API_KEY=dummy
 ### Run Evaluation
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
   --run-dir ./runs/veyru/<timestamp> \
   --metrics language_strangeness,shorthand_codes \
   --model mlx-community/Qwen2.5-14B-Instruct-4bit --provider openai

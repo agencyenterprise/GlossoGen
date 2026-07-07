@@ -30,7 +30,7 @@ Each run dir also gets a `judge_replay.json` sidecar (see schema below).
 
 ## `judge_replay.json` sidecar schema
 
-Written into every run dir that had at least one `veyru_stabilization_judged` event with `judge_match=true`. Read by `src/schmidt/server/runs/discovery.py:_read_judge_replay` and exposed as `RunSummary.judge_replay` (Pydantic model `JudgeReplaySummary` in `src/schmidt/server/runs/models.py`).
+Written into every run dir that had at least one `veyru_stabilization_judged` event with `judge_match=true`. Read by `src/glossogen/server/runs/discovery.py:_read_judge_replay` and exposed as `RunSummary.judge_replay` (Pydantic model `JudgeReplaySummary` in `src/glossogen/server/runs/models.py`).
 
 ```json
 {
@@ -113,7 +113,7 @@ Key state transitions, persisted to `rerun_state.json` after every step:
 
 - `queued` → `launched` (sim dir claimed, judge_replay.json cleaned)
 - `launched` → `sim_ended` (simulation_ended event seen)
-- `sim_ended` → `evaluated` (`schmidt evaluate` ran with the predecessor's metric set)
+- `sim_ended` → `evaluated` (`glossogen evaluate` ran with the predecessor's metric set)
 - `evaluated` → `archived` (predecessor moved to `_superseded/`, labels cloned + `supersedes:<old>` written)
 
 Common per-spec flags worth knowing:
@@ -196,14 +196,14 @@ The rerun orchestrator deliberately skips the expensive metric families (`SKIP_M
 
 ```bash
 # protocol probe (requires --probe-replicas N, optionally --probe-round R)
-schmidt evaluate veyru --run-dir runs/veyru/<id> --metrics protocol_probe \
+glossogen evaluate veyru --run-dir runs/veyru/<id> --metrics protocol_probe \
   --probe-replicas 3 --model claude-haiku-4-5-20251001 --provider anthropic
 
 # communication open coding → consolidate → feature presence
-schmidt evaluate veyru --run-dir runs/veyru/<id> --metrics communication_open_coding \
+glossogen evaluate veyru --run-dir runs/veyru/<id> --metrics communication_open_coding \
   --model claude-haiku-4-5-20251001 --provider anthropic
 VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.py
-schmidt evaluate veyru --run-dir runs/veyru/<id> --metrics communication_feature_presence \
+glossogen evaluate veyru --run-dir runs/veyru/<id> --metrics communication_feature_presence \
   --ontology-path runs/veyru/_ontology/<version>.json \
   --model claude-haiku-4-5-20251001 --provider anthropic
 ```
@@ -244,7 +244,7 @@ In `scripts/run_rerun_plan.py`:
 
 - `PER_PROVIDER_CONCURRENCY` — anthropic + openai each get this many concurrent slots. Default 10. Comfortable up to 12 per provider for current accounts.
 - `SIM_WAIT_TIMEOUT_SEC` — how long to wait for `simulation_ended` before giving up. Default 180 min. Multi-swap 60-round opus specs can take 2–3 hours; bump if you see widespread `sim_wait_timeout` errors.
-- `EVAL_TIMEOUT_SEC` — per-spec `schmidt evaluate` cap. Default 20 min.
+- `EVAL_TIMEOUT_SEC` — per-spec `glossogen evaluate` cap. Default 20 min.
 - `SKIP_METRICS` — metric names dropped from the predecessor's metric set during the rerun pass to keep cost bounded.
 - `REMOVED_METRICS` — metric names that were renamed in the codebase but still appear in older reports.
 - `SCHEMA_EVOLUTION_DEFAULTS` — knob fields added to scenarios after older runs were created. Filled in to make old configs validate against current code.

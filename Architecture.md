@@ -1,4 +1,4 @@
-# Schmidt-POC Architecture
+# GlossoGen Architecture
 
 A platform for testing agent communication through real-life simulations. LLM-based agents interact via MCP tools exposed by a central runtime. Agents are processes launched via the Pydantic AI framework that connect to a shared MCP server. A game clock manages round progression and injection delivery. No centralized turn control.
 
@@ -21,7 +21,7 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 | Observability       | Structured JSONL log (one file per run)                      |
 | Run Storage         | Filesystem: `runs/{scenario}/{unix_timestamp}/`              |
 | End Conditions      | Scenario-defined round count + max round duration            |
-| Entrypoint          | CLI (`python -m schmidt run|evaluate|serve|replace-agent|cross-run-replace-agent|resume-at-round`)   |
+| Entrypoint          | CLI (`python -m glossogen run|evaluate|serve|replace-agent|cross-run-replace-agent|resume-at-round`)   |
 | Metrics             | Post-hoc LLM-as-judge, user-selected metrics, JSON report   |
 | Web Server          | FastAPI with structured Pydantic response models             |
 | Frontend            | Next.js 16, React 19, TypeScript (strict), Tailwind CSS v4   |
@@ -85,7 +85,7 @@ The runner uses `agent.run()` with an `event_stream_handler` to stream token del
 Agent LLM calls are traced to a local, self-hosted Langfuse via pydantic-ai's OpenTelemetry instrumentation. This is a distinct output channel from the JSONL Event Log (which remains the canonical state ledger); telemetry is for human-facing debugging/inspection, not simulation state.
 
 - **Settings** — `telemetry_settings.py` reads `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST`; `enabled` is true only when both keys are present.
-- **Bootstrap** — `telemetry_bootstrap.py`'s `init_langfuse_telemetry` is called once per process, only in the `schmidt run` path (`cli._run_simulation`). It calls `langfuse.get_client()` (which installs a global OpenTelemetry `TracerProvider` wired to Langfuse's OTLP endpoint), verifies connectivity with `auth_check()`, then `Agent.instrument_all(InstrumentationSettings(include_content=True))`. Bootstrapping only in the run path is what scopes tracing to live simulation agents — `schmidt evaluate`'s probe/judge agents run in a separate process and stay untraced. Any failure (keys absent, stack down, unexpected error) degrades to an untraced run; telemetry never raises into the simulation.
+- **Bootstrap** — `telemetry_bootstrap.py`'s `init_langfuse_telemetry` is called once per process, only in the `glossogen run` path (`cli._run_simulation`). It calls `langfuse.get_client()` (which installs a global OpenTelemetry `TracerProvider` wired to Langfuse's OTLP endpoint), verifies connectivity with `auth_check()`, then `Agent.instrument_all(InstrumentationSettings(include_content=True))`. Bootstrapping only in the run path is what scopes tracing to live simulation agents — `glossogen evaluate`'s probe/judge agents run in a separate process and stay untraced. Any failure (keys absent, stack down, unexpected error) degrades to an untraced run; telemetry never raises into the simulation.
 - **Trace grouping** — `PydanticAIRunner._agent_trace_context` wraps each agent cycle in `langfuse.propagate_attributes(session_id=run_id, metadata={agent_id, role_name, model, provider, scenario}, tags=[...])`, so all agents of one run group under a single Langfuse session and each span carries the agent's identity. When telemetry is disabled it returns a `nullcontext`, adding no overhead.
 - **Round attribution** — because a trace spans every round and rounds advance on a wall-clock timer mid-cycle, round is a per-model-request property. `telemetry_round_processor.py`'s `RoundStampingSpanProcessor` (added to the global tracer provider at bootstrap) stamps `round_number` on each `chat {model}` generation span at span-start, reading the live round via `current_round_source` — which the runner points at `runtime.current_round`. The value surfaces as `langfuse.observation.metadata.round_number`, so generations are filterable by simulation round. The agent-run / tool spans are intentionally left unstamped.
 - **Flush** — short-lived run subprocesses flush buffered spans before exit via `flush_telemetry` in `_run_simulation`'s `finally`, plus an `atexit` backstop registered at init.
@@ -159,10 +159,10 @@ The game clock uses the timing methods to manage round progression and terminati
 
 ### Scenario Package Layout
 
-Each scenario is a Python sub-package under `schmidt/scenarios/<name>/` with intentionally-empty `__init__.py` files at the namespace and scenario-package levels. The empty inits matter — see "Scenario Event Discovery" below.
+Each scenario is a Python sub-package under `glossogen/scenarios/<name>/` with intentionally-empty `__init__.py` files at the namespace and scenario-package levels. The empty inits matter — see "Scenario Event Discovery" below.
 
 ```
-src/schmidt/scenarios/<scenario_name>/
+src/glossogen/scenarios/<scenario_name>/
 ├── __init__.py              # empty (avoids eager-load circular import)
 ├── scenario.py              # the SimulationScenario subclass
 ├── ids.py                   # agent IDs, channel IDs, tool names, markers
@@ -174,27 +174,27 @@ src/schmidt/scenarios/<scenario_name>/
 └── evaluation/              # scenario-specific Metric subclasses
 ```
 
-`SCENARIO_REGISTRY` lives in `schmidt/scenario_registry.py` (not in `schmidt/scenarios/__init__.py`) so importing event-related modules doesn't trigger eager loading of every scenario.
+`SCENARIO_REGISTRY` lives in `glossogen/scenario_registry.py` (not in `glossogen/scenarios/__init__.py`) so importing event-related modules doesn't trigger eager loading of every scenario.
 
 ### Scenario Event Discovery
 
-Scenarios register new event types by adding them to their `events.py` — no edit to `schmidt/models/event.py` is required.
+Scenarios register new event types by adding them to their `events.py` — no edit to `glossogen/models/event.py` is required.
 
-At module load time, `schmidt.models.event._discover_scenario_event_types()` walks the `schmidt.scenarios` namespace package via `pkgutil.iter_modules`, imports every `<scenario_pkg>.events` submodule when present, and collects every module member that subclasses `EventBase`. The discovered classes are combined with the core platform events into `_ALL_EVENT_TYPES`, which is then wrapped in a discriminated-union `TypeAdapter` exposed as `SIMULATION_EVENT_ADAPTER` for the JSONL parser.
+At module load time, `glossogen.models.event._discover_scenario_event_types()` walks the `glossogen.scenarios` namespace package via `pkgutil.iter_modules`, imports every `<scenario_pkg>.events` submodule when present, and collects every module member that subclasses `EventBase`. The discovered classes are combined with the core platform events into `_ALL_EVENT_TYPES`, which is then wrapped in a discriminated-union `TypeAdapter` exposed as `SIMULATION_EVENT_ADAPTER` for the JSONL parser.
 
 The auto-discovery works because:
 
-1. **Scenario `events.py` modules only import from `schmidt.models.event_base`** (where `EventBase` and `TokenUsage` live), never from `schmidt.models.event`. This breaks the would-be cycle.
-2. **Scenario package `__init__.py` files are empty**, so importing `schmidt.scenarios.<name>.events` does NOT cascade into loading `scenario.py` (which imports `schmidt.models.event` and would re-enter the partial module).
+1. **Scenario `events.py` modules only import from `glossogen.models.event_base`** (where `EventBase` and `TokenUsage` live), never from `glossogen.models.event`. This breaks the would-be cycle.
+2. **Scenario package `__init__.py` files are empty**, so importing `glossogen.scenarios.<name>.events` does NOT cascade into loading `scenario.py` (which imports `glossogen.models.event` and would re-enter the partial module).
 3. **`SimulationEvent` is typed as `EventBase`** statically — the runtime-built discriminated union cannot be expressed as a static type. Concrete subclass attributes still require `isinstance(event, ConcreteEvent)` narrowing at use sites. The discriminator field `event_type: str` is declared on `EventBase` with `model_config = ConfigDict(frozen=True)` so subclasses can override it with `Literal[...]` covariantly.
 
 ### Scenario Run-Detail Extensions
 
-Scenarios that want to surface custom data on the run-detail API (per-round case ground truth, judge metadata keyed by tool `call_id`, scenario-specific SSE events) ship an optional `schmidt/scenarios/<name>/run_detail_extension.py` exporting a `ScenarioRunDetailExtension` subclass plus a `ScenarioRunExtrasBase` payload class.
+Scenarios that want to surface custom data on the run-detail API (per-round case ground truth, judge metadata keyed by tool `call_id`, scenario-specific SSE events) ship an optional `glossogen/scenarios/<name>/run_detail_extension.py` exporting a `ScenarioRunDetailExtension` subclass plus a `ScenarioRunExtrasBase` payload class.
 
-The discovery pipeline at `schmidt/server/runs/scenario_extension.py` walks `schmidt.scenarios.*` at module load, imports each `run_detail_extension` submodule when present, and instantiates every `ScenarioRunDetailExtension` it finds. The platform's [server/runs/models.py](src/schmidt/server/runs/models.py) builds `RunDetailResponse.scenario_extras` as a discriminated union over every discovered `ScenarioRunExtrasBase` subclass (discriminated by `scenario_name`), and the SSE event union is similarly extended by every extension's `sse_event_classes`. After the generic event walk, [server/runs/detail_reader.py](src/schmidt/server/runs/detail_reader.py) calls `extension.build_extras(events, agents_by_id, messages)` for the run's scenario and attaches the result.
+The discovery pipeline at `glossogen/server/runs/scenario_extension.py` walks `glossogen.scenarios.*` at module load, imports each `run_detail_extension` submodule when present, and instantiates every `ScenarioRunDetailExtension` it finds. The platform's [server/runs/models.py](src/glossogen/server/runs/models.py) builds `RunDetailResponse.scenario_extras` as a discriminated union over every discovered `ScenarioRunExtrasBase` subclass (discriminated by `scenario_name`), and the SSE event union is similarly extended by every extension's `sse_event_classes`. After the generic event walk, [server/runs/detail_reader.py](src/glossogen/server/runs/detail_reader.py) calls `extension.build_extras(events, agents_by_id, messages)` for the run's scenario and attaches the result.
 
-Veyru is the canonical example — see [scenarios/veyru/run_detail_extension.py](src/schmidt/scenarios/veyru/run_detail_extension.py) for `VeyruRunExtras`, the FIFO `(agent_id, call_id)` matcher that builds `stabilize_metadata_by_call_id`, the observer-swap / intern-join / intern-takeover anchors, and the per-round `VeyruCaseSummary` projection.
+Veyru is the canonical example — see [scenarios/veyru/run_detail_extension.py](src/glossogen/scenarios/veyru/run_detail_extension.py) for `VeyruRunExtras`, the FIFO `(agent_id, call_id)` matcher that builds `stabilize_metadata_by_call_id`, the observer-swap / intern-join / intern-takeover anchors, and the per-round `VeyruCaseSummary` projection.
 
 ### Scenario Frontend Plug-ins
 
@@ -259,13 +259,13 @@ The user picks a **round number**; the system resolves it to the last `MessageSe
 
 ### Replace-Agent Flow
 
-1. **Entry**: User invokes `python -m schmidt replace-agent <scenario> --source-run-dir <dir> --round-start <N> --replaced-agent-id <id> --model <model> --provider <provider> --runs-dir <dir>`. The CLI calls the shared core helper `replace_agent.replace_agent_in_run`.
+1. **Entry**: User invokes `python -m glossogen replace-agent <scenario> --source-run-dir <dir> --round-start <N> --replaced-agent-id <id> --model <model> --provider <provider> --runs-dir <dir>`. The CLI calls the shared core helper `replace_agent.replace_agent_in_run`.
 2. **Round resolution**: `resolve_round_start_message(events, round_start)` finds the last `MessageSent` whose `round_number < round_start`. Round 1 is rejected (no prior message to anchor to).
 3. **Clone + checkout**: `find_commit_for_message` → SHA, `clone_to` + `checkout`.
 4. **JSONL rewrite**: `run_jsonl_rewriter.rewrite_run_jsonl` walks the cloned log once with predicate `drop_single_agent_history(event_dict, agent_id=replaced_agent_id)` — only the chosen agent's LLM history events are dropped.
 5. **Per-agent model overrides**: An explicit `model_overrides` dict is built that pins every source agent to its original `(model, provider)` pair (read from `AgentRegistered` events) and overwrites just the replaced agent's entry with the new model/provider. This guarantees non-replaced agents stay on their exact original models even if the top-level CLI defaults differ.
 6. **Manifest + commit**: `replace_manifest.json` records `source_run_id`, `round_start`, `target_message_id` (the resolved anchor, kept for traceability), `replaced_agent_id`, `replacement_model`, `replacement_provider`, `channels_with_visible_history`, `replaced_at`. Committed as `replace: agent <id> → <model>/<provider>`.
-7. **Resume**: Launches `schmidt run --resume <new_dir> --config replace_config.json` as a background subprocess.
+7. **Resume**: Launches `glossogen run --resume <new_dir> --config replace_config.json` as a background subprocess.
 8. **Supervisor resume**: When the resumed simulation rebuilds `RewindState`, the replaced agent's `agent_message_histories[agent_id]` comes back empty (no LLM history events left for it), while every other agent's history is fully reconstructed. The supervisor calls `ChannelRouter.apply_replacement_visibility(agent_id, channels_with_visible_history)` so `read_channel` returns prior messages only for whitelisted channels; all others have the agent's `member_join_index` bumped to the current message count, hiding pre-resume history without affecting any other agent's view.
 
 ### Per-Channel History Visibility (Platform Feature)
@@ -298,13 +298,13 @@ This shares replace-agent's primitives (git clone of Sim A + checkout, JSONL rew
 
 ### Cross-Run Flow
 
-1. **Entry**: `python -m schmidt cross-run-replace-agent <scenario> --source-a-run-dir <dir> --source-b-run-dir <dir> --round-start <N> --replaced-agent-id <id> --runs-dir <dir>`. The CLI calls the shared core helper `cross_run_replace_agent.cross_run_replace_agent_in_run`.
+1. **Entry**: `python -m glossogen cross-run-replace-agent <scenario> --source-a-run-dir <dir> --source-b-run-dir <dir> --round-start <N> --replaced-agent-id <id> --runs-dir <dir>`. The CLI calls the shared core helper `cross_run_replace_agent.cross_run_replace_agent_in_run`.
 2. **Validate**: Sim A and Sim B exist, scenarios match, `replaced_agent_id` exists in both, `round_start > 1`, Sim B reached at least `source_b_round_end`. Default `source_b_round_end = min(round_start - 1, B_max_round)` so the imported agent gets the largest temporally-aligned slice of B's history without exceeding what B reached.
 3. **Resolve model**: when `--model` / `--provider` are absent, read Sim B's `AgentRegistered` for `replaced_agent_id` and use those values. Both must be passed together to override.
 4. **Clone Sim A** at the `RoundAdvanced(round_start)` commit (same as replace-agent), rewrite the JSONL run-id, copy Sim B's full JSONL to `<new_dir>/imported_history_source.jsonl`, build merged scenario_config (knobs + `model_overrides` pinning every Sim A agent to its Sim A model and the replaced agent to the imported model), write `replace_config.json`.
 5. **Compute blocked tool-call channels**: scenario default (`get_replace_agent_blocked_tool_call_channels`) ∪ Sim-B-only channels (channel IDs the imported agent had in Sim B but doesn't exist in Sim A — necessary to avoid pydantic-ai schema validation rejecting reconstructed tool calls referencing dead channel IDs).
 6. **Manifest**: write `cross_run_replace_manifest.json` with both `source_a_run_id` and `source_b_run_id`, the imported model/provider, `round_start`, `source_b_round_end`, `rounds_after_swap`, `replaced_agent_id`, `channels_with_visible_history`, `blocked_tool_call_channels`. Single git commit covers manifest + config + copied source-B JSONL.
-7. **Resume**: launches `schmidt run --resume <new_dir> --config replace_config.json` as a background subprocess.
+7. **Resume**: launches `glossogen run --resume <new_dir> --config replace_config.json` as a background subprocess.
 8. **Supervisor resume**: the CLI's resume path detects `cross_run_replace_manifest.json` (in addition to the existing `replace_manifest.json` detection) and builds an `AgentHistoryFilter` for the replaced agent with an `imported: ImportedHistory` slot containing Sim B's events, target_timestamp, and cutoff_round. The history reconstruction loop in `_build_rewind_state_at_timestamp` dispatches per-agent: when `filter.imported is not None`, that agent's history is built from Sim B's events and its system prompt is taken from Sim B's `AgentRegistered`; otherwise the agent's history is built from Sim A's events as usual. Channel visibility on Sim A's channels is applied identically to replace-agent.
 
 ### Dual-Event-Stream History Reconstruction
@@ -347,14 +347,14 @@ Resume-at-round is the simplest sibling of replace-agent: it clones a finished r
 
 ### Resume-at-Round Flow
 
-1. **Entry**: `python -m schmidt resume-at-round <scenario> --source-run-dir <dir> --round-start <N> --runs-dir <dir> [--knobs <file>] [--rounds-after-resume K]`. The CLI builds a `ReplaceAgentRequest` with `replaced_agent_id=None`, `model=None`, `provider=None`, `channels_with_visible_history=None` and calls `replace_agent.replace_agent_in_run`.
+1. **Entry**: `python -m glossogen resume-at-round <scenario> --source-run-dir <dir> --round-start <N> --runs-dir <dir> [--knobs <file>] [--rounds-after-resume K]`. The CLI builds a `ReplaceAgentRequest` with `replaced_agent_id=None`, `model=None`, `provider=None`, `channels_with_visible_history=None` and calls `replace_agent.replace_agent_in_run`.
 2. **Anchor resolution**: `resolve_round_start_anchor` finds the source's `RoundAdvanced(round_start)` event id; `find_round_start_timestamp` recovers the timestamp.
 3. **Source agent collection**: `_collect_source_agents` filters `AgentRegistered` events to those at or before the boundary timestamp — so resuming a multi-swap source picks up each agent's *current* model/system_prompt at `round_start`, not a later swap registration.
 4. **Clone + checkout**: Same as replace-agent — `find_commit_for_event_id` → SHA, `clone_to` + `checkout`.
 5. **JSONL rewrite**: Only the `run_id` is rewritten; no message edits, no events dropped.
 6. **Merged config**: `request.knobs` is shallow-merged onto the source's `scenario_config`. `round_count` is set to `round_start + effective_rounds_after_swap`. `model_overrides` pins every agent to its source-active registration. The merged config is written to `replace_config.json` and patched into the cloned JSONL's `SimulationStarted` event.
 7. **Manifest**: Written as `replace_manifest.json` with `replaced_agent_id`, `replacement_model`, `replacement_provider` all `null`; `channels_with_visible_history` and `blocked_tool_call_channels` empty. Commit message: `resume-at-round: r<N>`.
-8. **Subprocess launch**: `_pick_subprocess_default_model` picks the first source-active registration as the `--model`/`--provider` defaults (every agent has an explicit `model_overrides` entry, so these defaults are never read but `schmidt run` requires the flags). Subprocess runs detached.
+8. **Subprocess launch**: `_pick_subprocess_default_model` picks the first source-active registration as the `--model`/`--provider` defaults (every agent has an explicit `model_overrides` entry, so these defaults are never read but `glossogen run` requires the flags). Subprocess runs detached.
 9. **Resume-side reconstruction**: `cli._run_simulation` reads `replace_manifest.json`; when `replaced_agent_id is None`, calls `build_rewind_state_at_event(events, target_event_id, cutoff_round=None, agent_filters={})` and skips populating `replaced_agent_ids` / `replaced_agent_channel_visibility`. Every agent gets a full pass-through history.
 
 ### Boundary-Round Event Ordering
@@ -468,7 +468,7 @@ In-run swap runs carry no manifest file — the `AgentSwappedMidRun` events in t
 
 After a simulation completes, the evaluation system analyzes the JSONL log via a uniform `Metric` abstraction. Both deterministic metrics and LLM-as-judge metrics implement `Metric.compute(...)` and return one or more `Measurement` instances.
 
-**CLI**: `python -m schmidt evaluate <scenario> --run-dir ./runs/<scenario>/<timestamp> --metrics language_strangeness,perplexity --model MODEL`
+**CLI**: `python -m glossogen evaluate <scenario> --run-dir ./runs/<scenario>/<timestamp> --metrics language_strangeness,perplexity --model MODEL`
 
 The user selects which metrics to run — they are not automatically applied.
 
@@ -535,9 +535,9 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 
 ### Architecture
 
-- Postgres holds tenancy + the runs index (`groups`, `runs`, `user_last_active_group`, OAuth tables). Run bodies (JSONL event log, manifests, eval reports) stay on disk under `SCHMIDT_RUNS_DIR`. A request resolves a run via the DB lookup keyed on `(group_id, scenario, run_dir_name)` and only then opens files on disk; cross-tenant access is structurally impossible because the DB query is the gate.
+- Postgres holds tenancy + the runs index (`groups`, `runs`, `user_last_active_group`, OAuth tables). Run bodies (JSONL event log, manifests, eval reports) stay on disk under `GLOSSOGEN_RUNS_DIR`. A request resolves a run via the DB lookup keyed on `(group_id, scenario, run_dir_name)` and only then opens files on disk; cross-tenant access is structurally impossible because the DB query is the gate.
 - `DATABASE_URL` is required; the backend will not boot without it. Migrations run via `alembic upgrade head` at container start (Railway start command) before the server begins accepting requests.
-- `SCHMIDT_RUNS_DIR` configures the on-disk runs root.
+- `GLOSSOGEN_RUNS_DIR` configures the on-disk runs root.
 - CORS origins are read from `ALLOWED_ORIGINS` (comma-separated). Defaults to `http://localhost:3000`.
 - Authentication is handled by `ClerkIdentityMiddleware` (pure ASGI, so SSE streams pass through without buffering). It accepts either a Clerk JWT or — as a fallback — an MCP OAuth access token, then attaches an `Identity(user_id, active_group_id, active_group_slug, ...)` to `request.state`. See [Multi-Tenancy & Authentication](#multi-tenancy--authentication).
 - Every endpoint declares a `response_model` and returns a Pydantic model instance. No dicts or strings are returned.
@@ -546,7 +546,7 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 
 ### Multi-Tenancy & Authentication
 
-One Clerk organization corresponds to one schmidt **group**. Every run is owned by exactly one group; runs are never visible across groups except via the export/import bundle flow (`schmidt push-to-prod`).
+One Clerk organization corresponds to one glossogen **group**. Every run is owned by exactly one group; runs are never visible across groups except via the export/import bundle flow (`glossogen push-to-prod`).
 
 #### Two operating modes
 
@@ -559,7 +559,7 @@ REST routes are prefixed `/api/g/{group_slug}/...`. Frontend pages live under `/
 
 #### `ClerkIdentityMiddleware`
 
-Pure ASGI (not `BaseHTTPMiddleware`, so SSE streams pass through unbuffered). Lives in [`src/schmidt/server/identity/middleware.py`](src/schmidt/server/identity/middleware.py). Per request:
+Pure ASGI (not `BaseHTTPMiddleware`, so SSE streams pass through unbuffered). Lives in [`src/glossogen/server/identity/middleware.py`](src/glossogen/server/identity/middleware.py). Per request:
 
 1. Unauthenticated paths (`/api/health`, `/api/clerk/webhook`, `/.well-known/oauth-*`, `/mcp/...`) skip the check.
 2. Local mode: attach the synthetic local `Identity`.
@@ -571,7 +571,7 @@ The JWT verifier reads both Clerk session-token v2 (org claims nested under `o.i
 
 #### Postgres schema
 
-Tooling: alembic for migration scheduling, raw SQL via `op.execute("""...""")` inside each revision, psycopg3 async in application code. Connection pool via `psycopg_pool.AsyncConnectionPool`. Query helpers in [`src/schmidt/db/queries.py`](src/schmidt/db/queries.py) return Pydantic rows (`GroupRow`, `RunRow`, `UserLastActiveGroupRow`, `PendingConsentRow`); no raw dicts cross the boundary.
+Tooling: alembic for migration scheduling, raw SQL via `op.execute("""...""")` inside each revision, psycopg3 async in application code. Connection pool via `psycopg_pool.AsyncConnectionPool`. Query helpers in [`src/glossogen/db/queries.py`](src/glossogen/db/queries.py) return Pydantic rows (`GroupRow`, `RunRow`, `UserLastActiveGroupRow`, `PendingConsentRow`); no raw dicts cross the boundary.
 
 | Table | Purpose |
 | --- | --- |
@@ -585,22 +585,22 @@ Memberships are deliberately *not* mirrored — the JWT's active `org_slug` clai
 
 #### Clerk → DB sync
 
-A Svix-verified webhook receiver at `POST /api/clerk/webhook` ([`identity/webhook_router.py`](src/schmidt/server/identity/webhook_router.py)) handles `organization.created` / `.updated` (upserts `groups`) and `organization.deleted` (soft-delete — does not cascade-delete runs). Membership events are accepted and ignored.
+A Svix-verified webhook receiver at `POST /api/clerk/webhook` ([`identity/webhook_router.py`](src/glossogen/server/identity/webhook_router.py)) handles `organization.created` / `.updated` (upserts `groups`) and `organization.deleted` (soft-delete — does not cascade-delete runs). Membership events are accepted and ignored.
 
 #### Lookup + listing
 
-- [`server/runs/lookup.py`](src/schmidt/server/runs/lookup.py): `get_identity(request)`, `resolve_run_or_404(request, scenario, run_dir_name)` (DB lookup keyed on `(group_id, scenario, run_dir_name)` before touching disk), and `register_new_run(request, scenario, run_dir_name, status, source_*)` (called from every place that creates a new run on disk — fork, replace-agent, cross-run, resume-at-round, import, CLI).
-- [`server/runs/listing.py`](src/schmidt/server/runs/listing.py): `list_runs_for_group(request, scenario_filter)` queries Postgres for the group's runs, then enriches each row by reading the on-disk summary cache (or scanning the JSONL on a miss).
+- [`server/runs/lookup.py`](src/glossogen/server/runs/lookup.py): `get_identity(request)`, `resolve_run_or_404(request, scenario, run_dir_name)` (DB lookup keyed on `(group_id, scenario, run_dir_name)` before touching disk), and `register_new_run(request, scenario, run_dir_name, status, source_*)` (called from every place that creates a new run on disk — fork, replace-agent, cross-run, resume-at-round, import, CLI).
+- [`server/runs/listing.py`](src/glossogen/server/runs/listing.py): `list_runs_for_group(request, scenario_filter)` queries Postgres for the group's runs, then enriches each row by reading the on-disk summary cache (or scanning the JSONL on a miss).
 
 #### CLI tenancy surface
 
-- `schmidt run` accepts `--group-slug` (default `local`); the launcher inserts a `runs` row with that ownership after `claim_run_dir`.
-- `schmidt login --url <remote>` ([`oauth_client.py`](src/schmidt/oauth_client.py)) walks the OAuth flow against a remote backend, opening the user's browser to the Clerk-gated consent page; the loopback HTTP server collects the authorization code, exchanges it for tokens, calls `/mcp/whoami` to discover the bound group, and writes `~/.schmidt/credentials.json` (mode 0600).
-- `schmidt push-to-prod` ([`prod_push.py`](src/schmidt/prod_push.py)) bulk-uploads matching local runs to the configured remote via `/api/g/<slug>/runs/import`. Supports `--label` (AND), `--scenario`, `--include-incomplete`, `--dry-run`, `--concurrency` (default 1; the import endpoint is idempotent on `run_id` so re-running is safe).
+- `glossogen run` accepts `--group-slug` (default `local`); the launcher inserts a `runs` row with that ownership after `claim_run_dir`.
+- `glossogen login --url <remote>` ([`oauth_client.py`](src/glossogen/oauth_client.py)) walks the OAuth flow against a remote backend, opening the user's browser to the Clerk-gated consent page; the loopback HTTP server collects the authorization code, exchanges it for tokens, calls `/mcp/whoami` to discover the bound group, and writes `~/.glossogen/credentials.json` (mode 0600).
+- `glossogen push-to-prod` ([`prod_push.py`](src/glossogen/prod_push.py)) bulk-uploads matching local runs to the configured remote via `/api/g/<slug>/runs/import`. Supports `--label` (AND), `--scenario`, `--include-incomplete`, `--dry-run`, `--concurrency` (default 1; the import endpoint is idempotent on `run_id` so re-running is safe).
 
 ### MCP Runs Browser
 
-An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data and run launch flows for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport; the sub-app is wrapped by `McpRunContextMiddleware` ([`server/mcp/asgi_context.py`](src/schmidt/server/mcp/asgi_context.py)) which reads the bearer token, recovers the bound `group_id` from the OAuth storage, and primes a `RunContext` contextvar so every tool runs scoped to that group. Requires `OAUTH_ISSUER_URL` to be set; the MCP endpoint is disabled if unset.
+An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data and run launch flows for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport; the sub-app is wrapped by `McpRunContextMiddleware` ([`server/mcp/asgi_context.py`](src/glossogen/server/mcp/asgi_context.py)) which reads the bearer token, recovers the bound `group_id` from the OAuth storage, and primes a `RunContext` contextvar so every tool runs scoped to that group. Requires `OAUTH_ISSUER_URL` to be set; the MCP endpoint is disabled if unset.
 
 The MCP server exposes ten tools:
 
@@ -643,12 +643,12 @@ The OAuth flow:
 `ClerkIdentityMiddleware` also accepts MCP OAuth tokens as a Bearer fallback on `/api/g/<slug>/...` REST routes, so the same token issued to the CLI works for both MCP tool calls and REST imports.
 
 Implementation:
-- [`server/mcp/oauth_provider.py`](src/schmidt/server/mcp/oauth_provider.py) — `SchmidtOAuthProvider` implementing `OAuthAuthorizationServerProvider`; parks Clerk-mode consents and materialises codes via `approve_pending_consent`.
-- [`server/mcp/consent_router.py`](src/schmidt/server/mcp/consent_router.py) — `POST /mcp/consent/approve` (Clerk JWT auth) and `GET /mcp/whoami` (OAuth token auth, used by the CLI to discover its bound group).
-- [`server/mcp/oauth_storage.py`](src/schmidt/server/mcp/oauth_storage.py) — psycopg3 async Postgres storage for clients, codes, tokens, and pending consents.
-- [`server/mcp/asgi_context.py`](src/schmidt/server/mcp/asgi_context.py) — primes `RunContext`.
+- [`server/mcp/oauth_provider.py`](src/glossogen/server/mcp/oauth_provider.py) — `GlossoGenOAuthProvider` implementing `OAuthAuthorizationServerProvider`; parks Clerk-mode consents and materialises codes via `approve_pending_consent`.
+- [`server/mcp/consent_router.py`](src/glossogen/server/mcp/consent_router.py) — `POST /mcp/consent/approve` (Clerk JWT auth) and `GET /mcp/whoami` (OAuth token auth, used by the CLI to discover its bound group).
+- [`server/mcp/oauth_storage.py`](src/glossogen/server/mcp/oauth_storage.py) — psycopg3 async Postgres storage for clients, codes, tokens, and pending consents.
+- [`server/mcp/asgi_context.py`](src/glossogen/server/mcp/asgi_context.py) — primes `RunContext`.
 - [`frontend/src/app/mcp-consent/`](frontend/src/app/mcp-consent/) — the consent page (Clerk-gated by `proxy.ts`); `consent-client.tsx` carries the picker + Approve button. Loaded via `next/dynamic` with `ssr: false` so production builds without `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` don't fail on the `<OrganizationList>` server-render.
-- CLI surface ([`src/schmidt/oauth_client.py`](src/schmidt/oauth_client.py) + [`src/schmidt/prod_push.py`](src/schmidt/prod_push.py)): `schmidt login` walks the OAuth flow against a remote and stores `{access_token, refresh_token, group_slug}` in `~/.schmidt/credentials.json`; `schmidt whoami` round-trips through `/mcp/whoami`; `schmidt push-to-prod` bulk-uploads local runs to `/api/g/<slug>/runs/import` using the stored token.
+- CLI surface ([`src/glossogen/oauth_client.py`](src/glossogen/oauth_client.py) + [`src/glossogen/prod_push.py`](src/glossogen/prod_push.py)): `glossogen login` walks the OAuth flow against a remote and stores `{access_token, refresh_token, group_slug}` in `~/.glossogen/credentials.json`; `glossogen whoami` round-trips through `/mcp/whoami`; `glossogen push-to-prod` bulk-uploads local runs to `/api/g/<slug>/runs/import` using the stored token.
 
 The frontend includes an MCP integration modal (accessible via the **MCP** button on the runs page) that shows connection instructions for Claude Code and Cursor.
 
@@ -675,6 +675,6 @@ A separate Streamlit app at [analysis/results_viewer/](analysis/results_viewer/)
 - `timeline_plot.py` — builds a Plotly figure overlaying multiple runs' metric scores per round.
 - `multi_swap_data.py` / `multi_swap_tab.py` — per-phase round-success visualisation for runs with one or more `AgentSwappedMidRun` events. Renders one bar per phase plus Δ pp annotations between adjacent phases. Loads runs concurrently via `asyncio.gather` + `asyncio.to_thread`, skips non-multi-swap runs through a byte-level pre-scan for the swap-event marker, and persists per-run results to `multi_swap_cache.json` keyed on JSONL size + mtime.
 - `probe_similarity_data.py` / `probe_similarity_tab.py` — Levenshtein-based comparisons over the per-run `protocol_probe_*.json` artifacts and the raw `protocol_probe_responses.jsonl`. A single multi-select at the top of the tab drives four sub-views: replica self-similarity (per-run consistency across replicas), agent-pair similarity (cross-agent agreement in two-team runs), cross-run model-vs-model (live pairwise matrix on a user-chosen `(question_id, role)` slice — the only place this tab does live Levenshtein), and cutoff trajectory (adjacent-cutoff drift). The data layer is cache-free — the per-run metric classes already cached the heavy work to disk.
-- `app.py` — Streamlit entrypoint; reads `SCHMIDT_RUNS_DIR`, lets the user multiselect runs.
+- `app.py` — Streamlit entrypoint; reads `GLOSSOGEN_RUNS_DIR`, lets the user multiselect runs.
 
 Streamlit and Plotly live behind the optional `analysis` uv dependency group so a server-only install (`uv sync`) does not pull them in. Launched with `make results-viewer`.

@@ -1144,7 +1144,7 @@ def render(
     if source_evaluated is None:
         st.warning(
             f"Source run `{chosen_source}` is not in the evaluated catalog. "
-            "Run `schmidt evaluate` on it so its phase scores can be loaded."
+            "Run `glossogen evaluate` on it so its phase scores can be loaded."
         )
         return
     source_run = build_multi_swap_run(evaluated=source_evaluated)
@@ -1175,7 +1175,7 @@ def render(
     if not replica_runs:
         st.info(
             "No evaluated **baseline** replicas (no knob overrides) for the chosen source. "
-            "Run `schmidt evaluate` on its baseline resume runs so their phase scores load."
+            "Run `glossogen evaluate` on its baseline resume runs so their phase scores load."
         )
         return
     display_names = [opt.display_name for opt in _METRIC_OPTIONS]

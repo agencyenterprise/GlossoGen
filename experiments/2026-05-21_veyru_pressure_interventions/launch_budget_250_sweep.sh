@@ -65,7 +65,7 @@ declare -a SPECS=(
 )
 
 count_running_for_model() {
-  pgrep -f "Python -m schmidt run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
+  pgrep -f "Python -m glossogen run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
 }
 
 echo "=== Phase 6 launcher started $(date) ===" >> "$LOG"
@@ -75,7 +75,7 @@ for spec in "${SPECS[@]}"; do
     sleep 30
   done
   echo "$(date) launching source=$src knobs=$knobs variant=$variant_label budget=$budget_label" >> "$LOG"
-  out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt resume-at-round veyru \
+  out=$(VIRTUAL_ENV= uv run --no-sync python -m glossogen resume-at-round veyru \
     --source-run-dir "runs/veyru/$src" \
     --round-start 16 \
     --runs-dir runs \

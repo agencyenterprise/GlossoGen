@@ -18,7 +18,7 @@ JUDGE_PROVIDER=anthropic
 METRICS=round_success,perplexity,mean_chars_per_round,mean_chars_per_message,content_filter_refusal,round_ended_idle,round_ended_timeout,language_strangeness,slang_emergence,neologism,shorthand_codes,language_repetition,english_ngram_surprisal,communication_open_coding,protocol_explanation
 
 count_running_evals() {
-  ps -axo command 2>/dev/null | grep "Python -m schmidt evaluate veyru" | grep -v grep | wc -l | tr -d ' '
+  ps -axo command 2>/dev/null | grep "Python -m glossogen evaluate veyru" | grep -v grep | wc -l | tr -d ' '
 }
 
 echo "=== budget=150 full-match eval started $(date) ===" >> "$LOG"
@@ -26,7 +26,7 @@ for d in "$RUNS_DIR"/veyru/*/; do
   [ -f "$d/labels.json" ] && grep -q '"channel_noise"' "$d/labels.json" && grep -q '"budget=150"' "$d/labels.json" || continue
   while [ "$(count_running_evals)" -ge "$CAP" ]; do sleep 10; done
   echo "$(date) eval $d" >> "$LOG"
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
     --run-dir "$d" --metrics "$METRICS" \
     --model "$JUDGE_MODEL" --provider "$JUDGE_PROVIDER" \
     > "$d/eval_b150_stdout.log" 2>&1 &

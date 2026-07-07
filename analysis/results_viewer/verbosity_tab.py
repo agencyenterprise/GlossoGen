@@ -624,7 +624,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         st.info(
             f"No baseline, channel_noise, or resume runs in scenario `{scenario_name}` "
             "evaluated yet. Add the 'baseline', 'channel_noise', or 'resume' label and run "
-            "`schmidt evaluate` with the language metrics."
+            "`glossogen evaluate` with the language metrics."
         )
         return
     metric = _render_metric_selector()
@@ -662,7 +662,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     if not metric_runs:
         st.info(
             f"No selected runs have a value for `{metric.display_name}`. "
-            f"Run `schmidt evaluate <scenario> --metrics {metric.display_name} ...` first."
+            f"Run `glossogen evaluate <scenario> --metrics {metric.display_name} ...` first."
         )
         return
     colour_by_series = series_color_map(series_keys=[_COMBINED_SERIES_KEY])
@@ -718,7 +718,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     if vs_ppl_fig is None:
         st.info(
             "No selected runs have both per-round verbosity and per-round "
-            "perplexity. Run `schmidt evaluate <scenario> --metrics "
+            "perplexity. Run `glossogen evaluate <scenario> --metrics "
             f"{x_metric.display_name},perplexity ...` first."
         )
         return

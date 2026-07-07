@@ -21,11 +21,11 @@ import orjson
 
 from analysis.results_viewer.multi_swap_data import jsonl_has_in_run_swaps
 from analysis.results_viewer.run_catalog import EvaluatedRun
-from schmidt.evaluation.log_reader import extract_agent_configs, load_events
-from schmidt.evaluation.metric_core.resume_anchors import collect_advanced_round_numbers
-from schmidt.evaluation.metric_core.round_result_index import per_round_joint_success
-from schmidt.models.agent_config import AgentConfig
-from schmidt.models.event import SimulationEvent
+from glossogen.evaluation.log_reader import extract_agent_configs, load_events
+from glossogen.evaluation.metric_core.resume_anchors import collect_advanced_round_numbers
+from glossogen.evaluation.metric_core.round_result_index import per_round_joint_success
+from glossogen.models.agent_config import AgentConfig
+from glossogen.models.event import SimulationEvent
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ _NO_AGENT_REPLACED_LABEL = "no-agent-replaced"
 class _ManifestSummary(NamedTuple):
     """Subset of ``replace_manifest.json`` the tab needs.
 
-    Read directly from JSON rather than via ``schmidt.replace_manifest`` so the
+    Read directly from JSON rather than via ``glossogen.replace_manifest`` so the
     tab keeps working when the source schema renames or adds fields the tab
     does not consume (e.g. ``target_event_id`` was renamed from
     ``target_message_id``; both still appear in older runs).

@@ -139,7 +139,7 @@ nohup bash experiments/2026-05-27_protocol_learnability_budget250/launch_cross_f
 ```
 
 **NEVER pin or modify the judge prompt.**
-`src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja` must always be at **HEAD**
+`src/glossogen/scenarios/veyru/prompts/stabilization_judge.jinja` must always be at **HEAD**
 when running simulations. veyru judges stabilization **live during the simulation**, so
 checking the prompt out to an older commit (or editing it) silently changes round outcomes
 and corrupts every run launched against it. Do not `git checkout` or alter this file for a
@@ -155,14 +155,14 @@ Labels first, then (judge = haiku):
 
 ```bash
 # round_success on every run (baselines score 1-15; derived score 15-25)
-schmidt evaluate veyru --run-dir runs/veyru/<id> --metrics round_success,round_success_after_resume \
+glossogen evaluate veyru --run-dir runs/veyru/<id> --metrics round_success,round_success_after_resume \
   --model claude-haiku-4-5-20251001 --provider anthropic
 
 # feature extraction on the 30 baselines (the protocol lives in their link rounds 1-15)
-schmidt evaluate veyru --run-dir runs/veyru/<baseline> --metrics communication_open_coding \
+glossogen evaluate veyru --run-dir runs/veyru/<baseline> --metrics communication_open_coding \
   --model claude-haiku-4-5-20251001 --provider anthropic
 python scripts/consolidate_communication_ontology.py ...   # one ontology across the 30
-schmidt evaluate veyru --run-dir runs/veyru/<baseline> --metrics communication_feature_presence \
+glossogen evaluate veyru --run-dir runs/veyru/<baseline> --metrics communication_feature_presence \
   --model claude-haiku-4-5-20251001 --provider anthropic
 ```
 

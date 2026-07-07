@@ -1,4 +1,4 @@
-# Project Schmidt — Learnings & Observations
+# Project GlossoGen — Learnings & Observations
 
 > A living document capturing what we've tried, what we learned, and why we pivoted. Append new entries at the bottom of the "Learnings" section with the date, so entries stay in chronological order.
 

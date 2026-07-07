@@ -274,12 +274,12 @@ def _render_included_runs(runs: list[ResumeRun], frontend_base: str) -> None:
                 "url": st.column_config.LinkColumn(
                     label="open",
                     display_text="↗",
-                    help="Open this resumed run in the schmidt frontend",
+                    help="Open this resumed run in the glossogen frontend",
                 ),
                 "source_url": st.column_config.LinkColumn(
                     label="open source",
                     display_text="↗",
-                    help="Open the matched source run in the schmidt frontend",
+                    help="Open the matched source run in the glossogen frontend",
                 ),
             },
         )
@@ -318,8 +318,8 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     if not all_resume:
         st.info(
             "No runs with a `replace_manifest.json` found. "
-            "Launch `schmidt replace-agent`, `schmidt cross-run-replace-agent`, "
-            "or `schmidt resume-at-round` to populate this tab."
+            "Launch `glossogen replace-agent`, `glossogen cross-run-replace-agent`, "
+            "or `glossogen resume-at-round` to populate this tab."
         )
         return
     scenario_name = _render_scenario_selector(runs=all_resume)

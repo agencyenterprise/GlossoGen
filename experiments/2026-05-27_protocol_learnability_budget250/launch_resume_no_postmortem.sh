@@ -26,7 +26,7 @@ PHASE_LABEL="phase=resume_expected_no_postmortem"
 
 count_running_derived_for_provider() {
   ps -axo command 2>/dev/null \
-    | grep "Python -m schmidt run veyru" \
+    | grep "Python -m glossogen run veyru" \
     | grep -- "--provider $1" \
     | grep -- "--resume" \
     | grep -v grep \
@@ -66,7 +66,7 @@ launch_resume_no_pm() {
   if [ "$kind" = "legacy" ]; then
     knobs="$RESUME_KNOBS_LEGACY"
   fi
-  out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt resume-at-round veyru \
+  out=$(VIRTUAL_ENV= uv run --no-sync python -m glossogen resume-at-round veyru \
         --source-run-dir "$src_dir" --round-start "$ROUND_START" \
         --rounds-after-resume "$ROUNDS_AFTER" --runs-dir "./$RUNS_DIR" \
         --knobs "$knobs" 2>>"$LOG")

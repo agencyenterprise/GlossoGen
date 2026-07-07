@@ -23,7 +23,7 @@ METRICS=round_success,round_ended_idle,round_ended_timeout,mean_chars_per_round,
 
 count_running_evals() {
   ps -axo command 2>/dev/null \
-    | grep "Python -m schmidt evaluate spot_the_difference" \
+    | grep "Python -m glossogen evaluate spot_the_difference" \
     | grep -v grep | wc -l | tr -d ' '
 }
 
@@ -37,7 +37,7 @@ for d in "$RUNS_DIR"/spot_the_difference/*/; do
     && { echo "$(date) SKIP (already evaluated) $d" >> "$LOG"; continue; }
   while [ "$(count_running_evals)" -ge "$CAP" ]; do sleep 10; done
   echo "$(date) eval $d" >> "$LOG"
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate spot_the_difference \
+  VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate spot_the_difference \
     --run-dir "$d" --metrics "$METRICS" \
     --model "$JUDGE_MODEL" --provider "$JUDGE_PROVIDER" \
     > "$d/eval_rerun_stdout.log" 2>&1 &

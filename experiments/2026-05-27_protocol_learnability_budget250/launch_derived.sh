@@ -29,7 +29,7 @@ HISTORY_FROM=5   # round_start - 10 -> previous 10 rounds (5..14)
 
 count_running_derived_for_provider() {
   ps -axo command 2>/dev/null \
-    | grep "Python -m schmidt run veyru" \
+    | grep "Python -m glossogen run veyru" \
     | grep -- "--provider $1" \
     | grep -- "--resume" \
     | grep -v grep \
@@ -71,7 +71,7 @@ launch_resume() {
     extra="--knobs $RESUME_KNOBS_LEGACY"
   fi
   # shellcheck disable=SC2086
-  out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt resume-at-round veyru \
+  out=$(VIRTUAL_ENV= uv run --no-sync python -m glossogen resume-at-round veyru \
         --source-run-dir "$src_dir" --round-start "$ROUND_START" \
         --rounds-after-resume "$ROUNDS_AFTER" --runs-dir "./$RUNS_DIR" $extra 2>>"$LOG")
   rid=$(echo "$out" | grep -oE 'new_run_id=[^ ]+' | head -1 | cut -d= -f2)
@@ -87,7 +87,7 @@ launch_replace() {
   if [ "$kind" = "legacy" ]; then
     knobs="$REPLACE_KNOBS_LEGACY"
   fi
-  out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
+  out=$(VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
         --source-run-dir "$src_dir" --round-start "$ROUND_START" \
         --replaced-agent-id field_observer \
         --model "$model" --provider "$provider" \

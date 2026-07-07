@@ -36,7 +36,7 @@ rounds 11/21/31 are unchanged.
 | D | 31–40 | 10 | **on** | field_observer@31 | link from round 21 |
 
 ## Cohort
-- 10 fully independent `schmidt run` invocations, seed=42, cap=6 concurrent
+- 10 fully independent `glossogen run` invocations, seed=42, cap=6 concurrent
 - Labels: `["multi_swap_baseline_postmortem_on", "budget=450", "phases=A10-B10-C10-D10", "history=10"]`
 
 ## Launch
@@ -51,7 +51,7 @@ disown
 Launcher log: `/tmp/multi_swap_baseline_postmortem_on_sonnet.log`.
 
 ## Evaluation pipeline
-Identical to the sibling cohort — same `schmidt evaluate` invocations with
+Identical to the sibling cohort — same `glossogen evaluate` invocations with
 the same metric set, same 4 probe cutoffs (11, 21, 31, 41).
 
 ## Analysis

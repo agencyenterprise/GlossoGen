@@ -7,7 +7,7 @@ render as two distinct traces. The user picks which metric is on the Y axis
 ``postmortem_ended_timeout`` / ``content_filter_refusal`` / ``perplexity`` /
 ``mcr`` / ``mcm``); the same chart adapts its Y range
 and tick spacing to the selected metric. Clicking a replica dot opens the
-corresponding run in the schmidt frontend (URL is attached to each point as
+corresponding run in the glossogen frontend (URL is attached to each point as
 ``customdata`` and read back from the chart's selection event).
 """
 
@@ -290,7 +290,7 @@ def _render_included_runs(
     """Per-replica audit listing inside an expander.
 
     The ``url`` column is rendered as a clickable LinkColumn so users can
-    open a specific replica in the schmidt frontend to investigate a high or
+    open a specific replica in the glossogen frontend to investigate a high or
     low ``perplexity`` (or any other metric) outlier.
     """
     rows = [
@@ -319,7 +319,7 @@ def _render_included_runs(
                 "url": st.column_config.LinkColumn(
                     label="open",
                     display_text="↗",
-                    help="Open this replica in the schmidt frontend",
+                    help="Open this replica in the glossogen frontend",
                 ),
             },
         )
@@ -372,7 +372,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     if not metric_runs:
         st.info(
             f"No selected baseline runs have a value for `{metric.display_name}`. "
-            "For perplexity, run `python -m schmidt evaluate <scenario> "
+            "For perplexity, run `python -m glossogen evaluate <scenario> "
             "--metrics perplexity ...` on the runs you want included."
         )
         return

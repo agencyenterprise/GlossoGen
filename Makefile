@@ -70,19 +70,19 @@ check-frontend:
 
 # Development
 dev:
-	SCHMIDT_RUNS_DIR=./runs VIRTUAL_ENV= uv run -m uvicorn schmidt.server.app:app --reload --reload-dir src
+	GLOSSOGEN_RUNS_DIR=./runs VIRTUAL_ENV= uv run -m uvicorn glossogen.server.app:app --reload --reload-dir src
 
 dev-frontend:
 	cd frontend && npm run dev
 
-# Local self-hosted Langfuse observability stack (traces from `schmidt run`).
-# --env-file /dev/null keeps schmidt's own .env from leaking into the Langfuse
+# Local self-hosted Langfuse observability stack (traces from `glossogen run`).
+# --env-file /dev/null keeps glossogen's own .env from leaking into the Langfuse
 # stack's variable substitution. First boot takes ~2-3 min; UI at :3001
 # (3000 is the frontend dev server).
 langfuse-up:
 	docker compose --env-file /dev/null -f docker-compose.langfuse.yml up -d
 	@echo "Langfuse starting at http://localhost:3001 (first boot ~2-3 min)."
-	@echo "Login: local@schmidt.dev / local-dev-password  |  keys pre-seeded in .env.example"
+	@echo "Login: local@glossogen.dev / local-dev-password  |  keys pre-seeded in .env.example"
 
 langfuse-down:
 	docker compose --env-file /dev/null -f docker-compose.langfuse.yml down

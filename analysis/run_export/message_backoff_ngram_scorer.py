@@ -14,7 +14,7 @@ from typing import NamedTuple
 
 import orjson
 
-from schmidt.evaluation.metrics.english_ngram.backoff_ngram_model import (
+from glossogen.evaluation.metrics.english_ngram.backoff_ngram_model import (
     BackoffTrigramModel,
     load_backoff_ngram_model,
 )

@@ -3,7 +3,7 @@
 # 10 fully independent veyru runs at budget=450, phases=A10-B10-C10-D10.
 # Single-provider sonnet workload: cap=6 concurrent.
 #
-# Each `schmidt run` is a foreground process (no resume / no detached spawn),
+# Each `glossogen run` is a foreground process (no resume / no detached spawn),
 # so we background each invocation with nohup and poll its per-replica stdout
 # log for the "Run directory: ..." line (emitted seconds after launch) so we
 # can label the new run dir.
@@ -21,7 +21,7 @@ TOTAL_RUNS=10
 
 count_running_sonnet() {
   ps -axo command 2>/dev/null \
-    | grep "Python -m schmidt run veyru --model claude-sonnet-4-6" \
+    | grep "Python -m glossogen run veyru --model claude-sonnet-4-6" \
     | grep -v grep \
     | wc -l \
     | tr -d ' '
@@ -37,7 +37,7 @@ for rep in $(seq "$START_REP" "$TOTAL_RUNS"); do
   : > "$rep_log"
   echo "$(date) launching replica $rep/$TOTAL_RUNS" >> "$LOG"
 
-  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
+  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
       --model claude-sonnet-4-6 --provider anthropic \
       --runs-dir ./runs \
       --config '$CONFIG' >>'$rep_log' 2>&1" >/dev/null 2>&1 &

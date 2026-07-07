@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Schmidt Simulation Server",
+    "title": "GlossoGen Simulation Server",
     "version": "0.1.0"
   },
   "paths": {
@@ -403,7 +403,7 @@
       },
       "put": {
         "summary": "Update Evaluation",
-        "description": "Replace the saved evaluation report for a simulation run on disk.\n\nUsed by ``schmidt sync-metadata-to-prod`` to push freshly-evaluated\nmeasurements onto runs that already exist on the remote without\nre-uploading the full bundle. The PUT is a full replace \u2014 every\nexisting measurement is overwritten with the body. After writing the\nfile the row's ``evaluation_content_hash`` is refreshed so that later\nsync passes can detect drift cheaply from the paginated runs list.",
+        "description": "Replace the saved evaluation report for a simulation run on disk.\n\nUsed by ``glossogen sync-metadata-to-prod`` to push freshly-evaluated\nmeasurements onto runs that already exist on the remote without\nre-uploading the full bundle. The PUT is a full replace \u2014 every\nexisting measurement is overwritten with the body. After writing the\nfile the row's ``evaluation_content_hash`` is refreshed so that later\nsync passes can detect drift cheaply from the paginated runs list.",
         "operationId": "update_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluation_put",
         "parameters": [
           {
@@ -602,7 +602,7 @@
     "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/evaluate": {
       "post": {
         "summary": "Start Evaluation",
-        "description": "Launch an evaluation subprocess for a completed simulation run.\n\nValidates that the run exists and is complete, that no evaluation is\nalready in progress, and that the requested metrics and provider\nare valid. Launches ``python -m schmidt evaluate`` as a detached\nbackground process. Rejected with 403 when evaluations are disabled\nvia the ``ENABLE_EVALUATIONS`` env var.",
+        "description": "Launch an evaluation subprocess for a completed simulation run.\n\nValidates that the run exists and is complete, that no evaluation is\nalready in progress, and that the requested metrics and provider\nare valid. Launches ``python -m glossogen evaluate`` as a detached\nbackground process. Rejected with 403 when evaluations are disabled\nvia the ``ENABLE_EVALUATIONS`` env var.",
         "operationId": "start_evaluation_api_g__group_slug__runs__scenario___run_dir_name__evaluate_post",
         "parameters": [
           {
@@ -1286,7 +1286,7 @@
     "/mcp/whoami": {
       "get": {
         "summary": "Whoami",
-        "description": "Return the group bound to the calling OAuth access token.\n\nLets the CLI learn its ``group_slug`` after the OAuth exchange so it\ncan store it in ``~/.schmidt/credentials.json`` and address per-group\nREST endpoints without prompting the user.",
+        "description": "Return the group bound to the calling OAuth access token.\n\nLets the CLI learn its ``group_slug`` after the OAuth exchange so it\ncan store it in ``~/.glossogen/credentials.json`` and address per-group\nREST endpoints without prompting the user.",
         "operationId": "whoami_mcp_whoami_get",
         "responses": {
           "200": {

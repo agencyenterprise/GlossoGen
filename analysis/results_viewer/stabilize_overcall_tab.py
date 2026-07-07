@@ -6,7 +6,7 @@ perfectly calibrated run and ``> 1.0`` is over-calling. The aggregation radio
 switches the headline metric between the whole-simulation ratio and the worst
 single round, so a run that over-calls in just one round is not hidden by a
 calibrated average. Each dot in the scatter is one run; clicking it opens that
-run in the schmidt frontend in a new tab.
+run in the glossogen frontend in a new tab.
 """
 
 from typing import NamedTuple
@@ -119,7 +119,7 @@ def _render_scatter(
 ) -> None:
     """One clickable dot per run (x = problems, y = selected ratio), coloured by model.
 
-    Clicking a dot opens that run in the schmidt frontend via the URL stamped
+    Clicking a dot opens that run in the glossogen frontend via the URL stamped
     into each point's ``customdata``.
     """
     models = sorted({run.model for run in runs})
@@ -257,7 +257,7 @@ def _render_table(
             "url": st.column_config.LinkColumn(
                 label="open",
                 display_text="↗",
-                help="Open this run in the schmidt frontend",
+                help="Open this run in the glossogen frontend",
             ),
         },
     )

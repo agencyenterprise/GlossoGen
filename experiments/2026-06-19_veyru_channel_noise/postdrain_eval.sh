@@ -27,12 +27,12 @@ channel_noise_dirs() {
 }
 
 count_running_evals() {
-  ps -axo command 2>/dev/null | grep "Python -m schmidt evaluate veyru" | grep -v grep | wc -l | tr -d ' '
+  ps -axo command 2>/dev/null | grep "Python -m glossogen evaluate veyru" | grep -v grep | wc -l | tr -d ' '
 }
 
 eval_metrics() {
   local d="$1" metrics="$2" extra_log="$3"
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
     --run-dir "$d" --metrics "$metrics" \
     --model "$JUDGE_MODEL" --provider "$JUDGE_PROVIDER" \
     >> "$d/$extra_log" 2>&1
@@ -64,7 +64,7 @@ echo "$(date) STAGE 3: communication_feature_presence (ontology pinned)" >> "$LO
 for d in $(channel_noise_dirs); do
   while [ "$(count_running_evals)" -ge "$CAP" ]; do sleep 15; done
   echo "$(date) [s3] $d" >> "$LOG"
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
     --run-dir "$d" --metrics communication_feature_presence \
     --model "$JUDGE_MODEL" --provider "$JUDGE_PROVIDER" \
     --ontology-path "$ONTOLOGY_PATH" \

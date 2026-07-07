@@ -196,7 +196,7 @@ disown
 Or single-launch (per source × 3 replicas):
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt resume-at-round veyru \
+VIRTUAL_ENV= uv run --no-sync python -m glossogen resume-at-round veyru \
   --source-run-dir runs/veyru/<source_id> \
   --round-start 16 \
   --runs-dir runs \

@@ -22,7 +22,7 @@ JUDGE_PROVIDER=anthropic
 METRICS=round_success,perplexity,mean_chars_per_round,mean_chars_per_message,content_filter_refusal,round_ended_idle,round_ended_timeout,language_strangeness,slang_emergence,neologism,shorthand_codes
 
 count_running_evals() {
-  ps -axo command 2>/dev/null | grep "Python -m schmidt evaluate veyru" | grep -v grep | wc -l | tr -d ' '
+  ps -axo command 2>/dev/null | grep "Python -m glossogen evaluate veyru" | grep -v grep | wc -l | tr -d ' '
 }
 
 is_channel_noise_run() {
@@ -47,7 +47,7 @@ has_report() {
 evaluate_one() {
   local d="$1" rid; rid="veyru/$(basename "$d")"
   echo "$(date) evaluating $rid" >> "$LOG"
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
     --run-dir "$d" --metrics "$METRICS" \
     --model "$JUDGE_MODEL" --provider "$JUDGE_PROVIDER" \
     > "$d/eval_stdout.log" 2>&1
@@ -67,7 +67,7 @@ while true; do
   done
   # stop condition: orchestrator drained and nothing left pending/running
   if grep -q "all launches complete" /tmp/veyru_noise.log 2>/dev/null; then
-    sims=$(ps -axo command | grep "Python -m schmidt run veyru" | grep -v grep | wc -l | tr -d ' ')
+    sims=$(ps -axo command | grep "Python -m glossogen run veyru" | grep -v grep | wc -l | tr -d ' ')
     evals=$(count_running_evals)
     if [ "$sims" -eq 0 ] && [ "$evals" -eq 0 ] && [ "$pending" -eq 0 ]; then
       wait

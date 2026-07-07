@@ -103,11 +103,11 @@ from analysis.run_export.run_context_scan import (
 )
 from analysis.run_export.scenario_export_specs import get_export_spec
 from analysis.run_export.spreadsheet_writer import write_csvs, write_xlsx
-from schmidt.evaluation.log_reader import load_events
-from schmidt.evaluation.metric_core.character_entropy import character_entropy_bits
-from schmidt.evaluation.metric_core.gzip_compression import gzip_compression_ratio
-from schmidt.evaluation.metric_core.pristine_text_index import build_pristine_text_index
-from schmidt.models.event import RoundResultRecorded, SimulationEvent
+from glossogen.evaluation.log_reader import load_events
+from glossogen.evaluation.metric_core.character_entropy import character_entropy_bits
+from glossogen.evaluation.metric_core.gzip_compression import gzip_compression_ratio
+from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
+from glossogen.models.event import RoundResultRecorded, SimulationEvent
 
 logger = logging.getLogger(__name__)
 

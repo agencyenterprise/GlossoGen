@@ -79,7 +79,7 @@ function ConsentBody({ requestId }: { requestId: string }) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm">
-        The schmidt CLI is requesting access to your <strong>{organization.name}</strong>{" "}
+        The glossogen CLI is requesting access to your <strong>{organization.name}</strong>{" "}
         organization (<code>{organization.slug}</code>). It will be able to read and write
         simulation runs in that group.
       </p>

@@ -1,19 +1,19 @@
 # `modal/` — Self-Hosted LLM Endpoint on Modal
 
-This folder packages a self-hosted, OpenAI-compatible LLM endpoint that the schmidt simulation runner consumes through the `--provider self-hosted` path.
+This folder packages a self-hosted, OpenAI-compatible LLM endpoint that the glossogen simulation runner consumes through the `--provider self-hosted` path.
 
 The current deployment serves **`meta-llama/Llama-3.3-70B-Instruct`** at bf16 on `H100:2` via [vLLM](https://docs.vllm.ai/), with native tool calling enabled (`--enable-auto-tool-choice --tool-call-parser llama3_json`). Modal is one possible host for this pattern — the same `serve_llama.py` skeleton works on RunPod, fly.io GPU, or any environment that runs vLLM behind an HTTP server.
 
 ## Available deployments
 
-Two Modal apps are defined here, each serving a different model. They run in parallel under separate URLs sharing the same `vllm-api-key` and `huggingface-schmidt` secrets and the same `huggingface-cache` / `vllm-cache` Modal Volumes.
+Two Modal apps are defined here, each serving a different model. They run in parallel under separate URLs sharing the same `vllm-api-key` and `huggingface-glossogen` secrets and the same `huggingface-cache` / `vllm-cache` Modal Volumes.
 
 | Modal app | Model | GPU | Tool-call parser | URL |
 | --- | --- | --- | --- | --- |
 | `llama-3-3-70b-instruct` | `meta-llama/Llama-3.3-70B-Instruct` (dense, gated) | `H100:2` bf16 | `llama3_json` | `https://<workspace>--llama-3-3-70b-instruct-serve.modal.run/v1` |
 | `qwen-3-32b` | `Qwen/Qwen3-32B` (dense, ungated) | `H100:1` bf16 | `hermes` | `https://<workspace>--qwen-3-32b-serve.modal.run/v1` |
 
-Schmidt's `--provider self-hosted` reads `SELF_HOSTED_BASE_URLS` (a JSON object mapping model name → `/v1` URL) and looks up the URL for the model the run is launched with. List the entries you want available in `.env` to switch from the UI without redeploying.
+GlossoGen's `--provider self-hosted` reads `SELF_HOSTED_BASE_URLS` (a JSON object mapping model name → `/v1` URL) and looks up the URL for the model the run is launched with. List the entries you want available in `.env` to switch from the UI without redeploying.
 
 The simulation runner forces `stream=False` on the OpenAI-compatible endpoint for `--provider self-hosted` to work around [vLLM issue #31871](https://github.com/vllm-project/vllm/issues/31871) — vLLM's `hermes` tool parser drops `<tool_call>` XML on the floor in streaming mode. Tool execution events still stream from pydantic-ai's `CallToolsNode`, so logging is unaffected.
 
@@ -38,9 +38,9 @@ Create the two Modal Secrets the app depends on:
 
 ```bash
 # 1. HuggingFace token for downloading the gated Llama 3.3 weights.
-modal secret create huggingface-schmidt HF_TOKEN=hf_xxx
+modal secret create huggingface-glossogen HF_TOKEN=hf_xxx
 
-# 2. The bearer token clients (including schmidt) use to authenticate.
+# 2. The bearer token clients (including glossogen) use to authenticate.
 modal secret create vllm-api-key VLLM_API_KEY=$(openssl rand -hex 32)
 ```
 
@@ -63,11 +63,11 @@ The first deploy downloads ~140 GB of weights into the `huggingface-cache` Modal
 
 ## Wire to a local client
 
-Schmidt's `--provider self-hosted` reads two environment variables:
+GlossoGen's `--provider self-hosted` reads two environment variables:
 
 ### `SELF_HOSTED_BASE_URLS` (required)
 
-A **JSON object** mapping each served model name to its OpenAI-compatible `/v1` base URL. Schmidt looks the model up by exact name (the same string passed as `--model` or chosen in the frontend) and routes the request to the matching URL.
+A **JSON object** mapping each served model name to its OpenAI-compatible `/v1` base URL. GlossoGen looks the model up by exact name (the same string passed as `--model` or chosen in the frontend) and routes the request to the matching URL.
 
 | Field | Value |
 | --- | --- |
@@ -78,7 +78,7 @@ The frontend reads this map to populate the model dropdown — to add a new self
 
 ### `SELF_HOSTED_API_KEY` (required)
 
-A single bearer token shared across **every** entry in `SELF_HOSTED_BASE_URLS`. Schmidt sends it as `Authorization: Bearer $SELF_HOSTED_API_KEY` on every request. Each Modal app reads the same value from the `vllm-api-key` Modal Secret, so all deployments here naturally share one token. If you wire in a deployment with a different key, you currently need to align the two (one shared key per environment).
+A single bearer token shared across **every** entry in `SELF_HOSTED_BASE_URLS`. GlossoGen sends it as `Authorization: Bearer $SELF_HOSTED_API_KEY` on every request. Each Modal app reads the same value from the `vllm-api-key` Modal Secret, so all deployments here naturally share one token. If you wire in a deployment with a different key, you currently need to align the two (one shared key per environment).
 
 ### Example `.env`
 
@@ -87,15 +87,15 @@ SELF_HOSTED_BASE_URLS={"meta-llama/Llama-3.3-70B-Instruct":"https://<workspace>-
 SELF_HOSTED_API_KEY=<the VLLM_API_KEY value you generated above>
 ```
 
-The JSON value must be on a single line — `.env` files do not support multi-line strings without escaping. If schmidt can't parse the JSON it logs a warning and treats the map as empty (no self-hosted models will appear in the frontend).
+The JSON value must be on a single line — `.env` files do not support multi-line strings without escaping. If glossogen can't parse the JSON it logs a warning and treats the map as empty (no self-hosted models will appear in the frontend).
 
 ### Launch a simulation
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
+VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model meta-llama/Llama-3.3-70B-Instruct --provider self-hosted \
   --runs-dir ./runs \
-  --config src/schmidt/scenarios/veyru/knobs_default.json \
+  --config src/glossogen/scenarios/veyru/knobs_default.json \
   > ./runs/veyru_stdout.log 2>&1 &
 ```
 
@@ -124,7 +124,7 @@ To confirm:
 modal app list | grep -E 'llama-3-3|qwen-3-32b'   # status should read "stopped"
 ```
 
-The `huggingface-cache` and `vllm-cache` Modal Volumes survive `app stop`, so the next `modal deploy` cold-starts in ~30–90 s instead of re-downloading 140–160 GB of weights. Stopping does not delete the Modal Secrets either — `huggingface-schmidt` and `vllm-api-key` persist in the workspace.
+The `huggingface-cache` and `vllm-cache` Modal Volumes survive `app stop`, so the next `modal deploy` cold-starts in ~30–90 s instead of re-downloading 140–160 GB of weights. Stopping does not delete the Modal Secrets either — `huggingface-glossogen` and `vllm-api-key` persist in the workspace.
 
 ## Operating notes
 

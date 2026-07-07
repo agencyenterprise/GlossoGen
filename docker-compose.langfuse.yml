@@ -1,15 +1,15 @@
-# Local self-hosted Langfuse observability stack for schmidt.
+# Local self-hosted Langfuse observability stack for glossogen.
 #
 # Adapted from the official Langfuse docker-compose (github.com/langfuse/langfuse).
 # Start it with `make langfuse-up`; the web UI is served at http://localhost:3001.
 #
-# Ports are shifted off the upstream defaults to avoid collisions with schmidt's
+# Ports are shifted off the upstream defaults to avoid collisions with glossogen's
 # own dev processes: langfuse-web is on host 3001 (the Next.js frontend owns 3000)
-# and Langfuse's internal postgres is on host 5433 (schmidt / a local Postgres may
+# and Langfuse's internal postgres is on host 5433 (glossogen / a local Postgres may
 # use 5432). All services still talk to each other over the compose network by
 # service name; the host mappings are only for browser/debug access.
 #
-# On first boot the langfuse-web service headlessly seeds a `schmidt` org/project,
+# On first boot the langfuse-web service headlessly seeds a `glossogen` org/project,
 # a local user, and a deterministic API key pair (pk-lf-local-dev / sk-lf-local-dev)
 # via the LANGFUSE_INIT_* vars below — the same keys shipped in .env.example, so a
 # fresh clone traces to this local instance with no manual UI setup. Log in to the
@@ -35,11 +35,11 @@ services:
       - 127.0.0.1:3030:3030
     environment: &langfuse-worker-env
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3001}
-      # Hardcoded (not ${DATABASE_URL:-...}) so schmidt's own DATABASE_URL in .env can
+      # Hardcoded (not ${DATABASE_URL:-...}) so glossogen's own DATABASE_URL in .env can
       # never leak in and point Langfuse at the wrong database. This is Langfuse's
-      # internal postgres service, unrelated to schmidt's runs-index Postgres.
+      # internal postgres service, unrelated to glossogen's runs-index Postgres.
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
-      SALT: ${SALT:-schmidt-local-dev-salt}
+      SALT: ${SALT:-glossogen-local-dev-salt}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
       TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-false}
       LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: ${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES:-false}
@@ -95,16 +95,16 @@ services:
       - 3001:3000
     environment:
       <<: *langfuse-worker-env
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-schmidt-local-dev-nextauth-secret}
-      # Headless bootstrap: seed a schmidt org/project/user + deterministic keys on
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-glossogen-local-dev-nextauth-secret}
+      # Headless bootstrap: seed a glossogen org/project/user + deterministic keys on
       # first boot so local dev needs zero UI setup. Do NOT double-quote these.
       LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-local}
-      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-schmidt}
-      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-schmidt}
-      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-schmidt}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-glossogen}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-glossogen}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-glossogen}
       LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:-pk-lf-local-dev}
       LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY:-sk-lf-local-dev}
-      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-local@schmidt.dev}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-local@glossogen.dev}
       LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-local}
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-local-dev-password}
 

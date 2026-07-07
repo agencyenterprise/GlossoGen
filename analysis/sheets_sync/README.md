@@ -49,7 +49,7 @@ A service account is a headless robot identity — no browser, no OAuth consent 
    **enable the Google Sheets API**.
 2. **APIs & Services → Credentials → Create credentials → Service account.** Create it, then on its
    **Keys** tab choose **Add key → Create new key → JSON** and download the key file.
-3. Save the key to `~/.config/schmidt/gcp_service_account.json` (or set `GOOGLE_SERVICE_ACCOUNT_JSON` /
+3. Save the key to `~/.config/glossogen/gcp_service_account.json` (or set `GOOGLE_SERVICE_ACCOUNT_JSON` /
    pass `--credentials`).
 4. **Share each of the three spreadsheets with the service account's email** (the `client_email` field
    in the key JSON, e.g. `…@<project>.iam.gserviceaccount.com`) as **Editor**. That share is what grants

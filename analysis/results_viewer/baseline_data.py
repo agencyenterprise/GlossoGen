@@ -224,7 +224,7 @@ METRIC_OPTIONS: list[MetricOption] = [
             "**content_filter_refusal** — total number of `ContentFilterError` "
             "refusals logged by the agent runner during the run.\n\n"
             "Deterministic (no LLM): reads `{scenario}_debug.jsonl` for ERROR "
-            "entries from `schmidt.runners.pydantic_ai_runner` whose message "
+            "entries from `glossogen.runners.pydantic_ai_runner` whose message "
             "contains `ContentFilterError`. The runner retries on refusal, so "
             "a single round can accumulate many."
         ),

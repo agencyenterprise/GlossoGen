@@ -41,5 +41,5 @@ Per-provider parallel queues, cap **10** each. Runs are labelled on launch:
 
 ```bash
 tail -20 /tmp/veyru_noise.log
-ps -axo command | grep "Python -m schmidt run veyru" | grep -v grep | wc -l
+ps -axo command | grep "Python -m glossogen run veyru" | grep -v grep | wc -l
 ```

@@ -18,7 +18,7 @@ CAP=10
 
 count_running_provider() {
   ps -axo command 2>/dev/null \
-    | grep "Python -m schmidt run spot_the_difference --model $1" \
+    | grep "Python -m glossogen run spot_the_difference --model $1" \
     | grep -v grep | wc -l | tr -d ' '
 }
 
@@ -27,7 +27,7 @@ launch_one() {
   local rep_log="/tmp/spot_baseline_relaunch_${short}_rep${rep}.log"
   : > "$rep_log"
   echo "$(date) [relaunch $short] launching rep $rep" >> "$LOG"
-  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m schmidt run spot_the_difference \
+  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m glossogen run spot_the_difference \
       --model '$model' --provider anthropic --runs-dir ./$RUNS_DIR --config '$CONFIG' \
       >>'$rep_log' 2>&1" >/dev/null 2>&1 &
   disown

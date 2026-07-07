@@ -6,13 +6,13 @@ the ``--scenario`` flag of every exporter to one of these.
 """
 
 from analysis.run_export.run_context_scan import RoleSpec, ScenarioExportSpec
-from schmidt.scenarios.drive_module_repair.ids import (
+from glossogen.scenarios.drive_module_repair.ids import (
     BAY_CHANNEL_ID,
     DIAGNOSTICS_ENGINEER_ID,
     FIELD_TECHNICIAN_ID,
     SPEC_ENGINEER_ID,
 )
-from schmidt.scenarios.veyru.ids import (
+from glossogen.scenarios.veyru.ids import (
     FIELD_OBSERVER_ID,
     LINK_CHANNEL_IDS,
     OBSERVER_A_ID,

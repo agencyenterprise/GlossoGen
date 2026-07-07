@@ -213,7 +213,7 @@ def _render_protocol_table(
             "url": st.column_config.LinkColumn(
                 label="open",
                 display_text="↗",
-                help="Open this run in the schmidt frontend",
+                help="Open this run in the glossogen frontend",
             ),
             **{
                 f"r{n} first 3 messages": st.column_config.TextColumn(width="large")
@@ -233,7 +233,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
         st.info(
             "No evaluated `container_yard_stacking` runs with a `round_success` "
             "measurement and a `round_time_budget_seconds` budget found. Run "
-            "`schmidt evaluate container_yard_stacking --metrics round_success ...` "
+            "`glossogen evaluate container_yard_stacking --metrics round_success ...` "
             "on the runs you want included."
         )
         return

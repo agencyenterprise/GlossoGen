@@ -34,26 +34,26 @@ Set up Postgres only if you want the Postgres-backed runs index locally, or to r
 # 1. Create a Postgres role (one-time). On macOS/Homebrew a superuser role
 #    named after your OS user already exists, so you can skip this and connect
 #    without credentials. On Debian/Ubuntu (peer auth), create a role first:
-sudo -u postgres createuser --createdb --pwprompt schmidt   # prompts for a password
+sudo -u postgres createuser --createdb --pwprompt glossogen   # prompts for a password
 
 # 2. Create the database owned by that role (one-time).
-createdb -O schmidt schmidt_dev
-# Homebrew default-role shortcut (role == your OS user, no password): createdb schmidt_dev
+createdb -O glossogen glossogen_dev
+# Homebrew default-role shortcut (role == your OS user, no password): createdb glossogen_dev
 
 # 3. Apply the migrations (creates groups, runs, user_last_active_group,
 #    schema_migrations, and the OAuth tables).
-DATABASE_URL=postgresql://schmidt:<password>@localhost:5432/schmidt_dev \
+DATABASE_URL=postgresql://glossogen:<password>@localhost:5432/glossogen_dev \
   VIRTUAL_ENV= uv run --no-sync alembic upgrade head
 
 # 4. Verify the schema.
-psql -d schmidt_dev -c "\dt"
+psql -d glossogen_dev -c "\dt"
 ```
 
-The `DATABASE_URL` format is `postgresql://<user>:<password>@<host>:<port>/<db>`. On a Homebrew install where the role matches your OS user and local connections use `trust`/`peer` auth, you can drop the credentials entirely: `postgresql://localhost:5432/schmidt_dev`.
+The `DATABASE_URL` format is `postgresql://<user>:<password>@<host>:<port>/<db>`. On a Homebrew install where the role matches your OS user and local connections use `trust`/`peer` auth, you can drop the credentials entirely: `postgresql://localhost:5432/glossogen_dev`.
 
 The first time the backend boots it will also auto-create the synthetic `local` group used in single-tenant local mode. There's nothing else to do — leave `CLERK_SECRET_KEY` unset and every request runs as `local-user` inside the `local` group.
 
-To reset the database, drop and recreate it: `dropdb schmidt_dev && createdb -O schmidt schmidt_dev && alembic upgrade head`.
+To reset the database, drop and recreate it: `dropdb glossogen_dev && createdb -O glossogen glossogen_dev && alembic upgrade head`.
 
 ### Configure environment
 
@@ -70,9 +70,9 @@ See `.env.example` for all available variables (API keys, authentication, CORS).
 The CLI auto-generates a timestamped subdirectory under `--runs-dir`. Each round, agents communicate freely until all are idle or the round duration expires.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
+VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
-  --config src/schmidt/scenarios/veyru/knobs_default.json \
+  --config src/glossogen/scenarios/veyru/knobs_default.json \
   > ./runs/veyru_stdout.log 2>&1 &
 ```
 
@@ -88,7 +88,7 @@ Check progress by reading the stdout log or the JSONL event log in the run direc
 If a simulation crashes or is killed, resume using the `--resume` flag pointing at the existing run directory.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt run <scenario> \
+VIRTUAL_ENV= uv run --no-sync python -m glossogen run <scenario> \
   --model <model> --provider <provider> --runs-dir ./runs \
   --resume ./runs/<scenario>/<timestamp> \
   --config <original-config.json> \
@@ -102,7 +102,7 @@ The simulation picks up from where it left off, preserving channel messages and 
 Replay a finished run from the start of a chosen round with one specific agent restarted on a fresh history while every other agent keeps its full reconstructed history. Useful for asking "could a fresh agent follow the engineer from here on?" — a direct, empirical alternative to a judge.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
+VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
   --source-run-dir ./runs/veyru/<timestamp> \
   --round-start 5 \
   --replaced-agent-id field_observer \
@@ -125,10 +125,10 @@ Derived runs appear in the run list with a "Replaced" badge linking to the sourc
 
 ## Cross-Run Replacing an Agent (Round-Level Rewind, Different Source for the Imported Agent)
 
-`schmidt cross-run-replace-agent` is a sibling of `replace-agent` that imports an agent from a *different* completed run (Sim B) into a target run (Sim A) at a chosen round boundary. Same scenario and same `agent_id` only. The imported agent retains its **full** pydantic-ai history (text + thinking + tool calls) from Sim B; non-replaced agents in Sim A continue with their full Sim A history. Useful for asking "how does an agent that learned its protocol with one team perform when dropped into another team that learned a different protocol?".
+`glossogen cross-run-replace-agent` is a sibling of `replace-agent` that imports an agent from a *different* completed run (Sim B) into a target run (Sim A) at a chosen round boundary. Same scenario and same `agent_id` only. The imported agent retains its **full** pydantic-ai history (text + thinking + tool calls) from Sim B; non-replaced agents in Sim A continue with their full Sim A history. Useful for asking "how does an agent that learned its protocol with one team perform when dropped into another team that learned a different protocol?".
 
 ```bash
-schmidt cross-run-replace-agent veyru \
+glossogen cross-run-replace-agent veyru \
   --source-a-run-dir ./runs/veyru/<sim_a_timestamp> \
   --source-b-run-dir ./runs/veyru/<sim_b_timestamp> \
   --replaced-agent-id field_observer \
@@ -151,10 +151,10 @@ The same `round_success_after_resume` metric works for both replace-agent and cr
 
 ## Resume at a Round (Post-Hoc, No Agent Replacement)
 
-`schmidt resume-at-round` clones a finished run at the start of a chosen round and continues execution without restarting any agent. Every agent keeps its full reconstructed history; the resumed simulation differs from the source only through merged knob overrides. Useful for post-hoc multi-swap studies (inject new `scheduled_events`), toggling `postmortem_enabled` mid-experiment, extending `round_count` past where the source stopped, or just replaying a finished run with a different configuration.
+`glossogen resume-at-round` clones a finished run at the start of a chosen round and continues execution without restarting any agent. Every agent keeps its full reconstructed history; the resumed simulation differs from the source only through merged knob overrides. Useful for post-hoc multi-swap studies (inject new `scheduled_events`), toggling `postmortem_enabled` mid-experiment, extending `round_count` past where the source stopped, or just replaying a finished run with a different configuration.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt resume-at-round veyru \
+VIRTUAL_ENV= uv run --no-sync python -m glossogen resume-at-round veyru \
   --source-run-dir ./runs/veyru/<source_timestamp> \
   --round-start 16 \
   --runs-dir ./runs \
@@ -164,7 +164,7 @@ VIRTUAL_ENV= uv run --no-sync python -m schmidt resume-at-round veyru \
 
 `--rounds-after-resume` defaults to `source_round_count - round_start` (the remaining rounds in the original after the boundary). The resumed simulation's `round_count` is set to `round_start + rounds_after_resume`.
 
-Internals: the flow reuses the `replace-agent` machinery with `replaced_agent_id=None`. Clones the source's git repo at the `RoundAdvanced(round_start)` commit, pins every agent to its source-active model via `model_overrides` (so resuming a multi-swap source picks up each agent's per-phase model), writes `replace_manifest.json` with `replaced_agent_id` / `replacement_model` / `replacement_provider` all `null`, and launches `schmidt run --resume`. The game clock's resume branch defers `deliver_round_injections` until after agent runners are launched and the boundary hook fires, so `scheduled_events` bucketed at `round_start` execute against a fully-wired runtime and the resulting round-start injection lands in the post-swap session.
+Internals: the flow reuses the `replace-agent` machinery with `replaced_agent_id=None`. Clones the source's git repo at the `RoundAdvanced(round_start)` commit, pins every agent to its source-active model via `model_overrides` (so resuming a multi-swap source picks up each agent's per-phase model), writes `replace_manifest.json` with `replaced_agent_id` / `replacement_model` / `replacement_provider` all `null`, and launches `glossogen run --resume`. The game clock's resume branch defers `deliver_round_injections` until after agent runners are launched and the boundary hook fires, so `scheduled_events` bucketed at `round_start` execute against a fully-wired runtime and the resulting round-start injection lands in the post-swap session.
 
 `--knobs` accepts a JSON file shallow-merged onto the source's `scenario_config`. Use it to flip `postmortem_enabled`, append new `scheduled_events` for post-hoc multi-swap studies, extend `round_count` beyond what the source ran, or override `model_overrides`. When the scenario's knobs schema gained a required field after the source was created, pass that field via `--knobs` so validation passes (example: veyru's `easy_round_numbers` was added later — older runs need `--knobs '{"easy_round_numbers": [1, 2, 3, 6, 13]}'`).
 
@@ -206,10 +206,10 @@ make langfuse-down    # stop it
 make langfuse-logs    # tail langfuse-web
 ```
 
-- UI at **http://localhost:3001** (3001 because the frontend dev server owns 3000). First boot takes ~2-3 min while migrations run. Log in with `local@schmidt.dev` / `local-dev-password`.
-- The `schmidt` org/project and the API keys (`pk-lf-local-dev` / `sk-lf-local-dev`) are seeded headlessly on first boot via `LANGFUSE_INIT_*` in [docker-compose.langfuse.yml](docker-compose.langfuse.yml). Those keys are pre-filled in `.env.example`, so `schmidt run` traces to this instance out of the box. Langfuse's internal Postgres is mapped to host port 5433 to avoid clashing with a local 5432 Postgres.
+- UI at **http://localhost:3001** (3001 because the frontend dev server owns 3000). First boot takes ~2-3 min while migrations run. Log in with `local@glossogen.dev` / `local-dev-password`.
+- The `glossogen` org/project and the API keys (`pk-lf-local-dev` / `sk-lf-local-dev`) are seeded headlessly on first boot via `LANGFUSE_INIT_*` in [docker-compose.langfuse.yml](docker-compose.langfuse.yml). Those keys are pre-filled in `.env.example`, so `glossogen run` traces to this instance out of the box. Langfuse's internal Postgres is mapped to host port 5433 to avoid clashing with a local 5432 Postgres.
 - Each run is one Langfuse **session** keyed by `run_id`; every agent's cycles trace under it, tagged with `agent_id` / `role_name` / `model` / `provider` / `scenario`. Each generation also carries `round_number` in its metadata, so observations are filterable by simulation round.
-- Telemetry is enabled only when both `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set, and only in the `schmidt run` path — `schmidt evaluate`'s probe/judge LLM calls are not traced. If the stack is down or keys are unset, the run logs one warning and proceeds untraced; telemetry never blocks a simulation. Docker Desktop needs adequate resources for the full stack (Langfuse suggests ~4 cores / 16 GiB).
+- Telemetry is enabled only when both `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set, and only in the `glossogen run` path — `glossogen evaluate`'s probe/judge LLM calls are not traced. If the stack is down or keys are unset, the run logs one warning and proceeds untraced; telemetry never blocks a simulation. Docker Desktop needs adequate resources for the full stack (Langfuse suggests ~4 cores / 16 GiB).
 
 ## Run Output Directory Structure
 
@@ -238,7 +238,7 @@ runs/{scenario_name}/{unix_timestamp}/
 After a simulation completes, point `--run-dir` at the specific run directory. Evaluation uses `--provider` to select the LLM judge.
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
   --run-dir ./runs/veyru/1742234567 \
   --metrics language_strangeness,shorthand_codes \
   --model claude-sonnet-4-6 --provider anthropic
@@ -279,14 +279,14 @@ Output is a JSON report under the `measurements` field; metrics no longer write 
 LLM-judge metrics emit their full system prompt, user prompt, and structured output via stdlib `logger.debug`. Set `LOG_LEVEL=DEBUG` in the environment and pipe stderr to a file to capture the exact text the judge saw and returned. The capture is the source of truth for "did the metric get all the data it needed and nothing else" — review it whenever a metric's output looks surprising.
 
 ```bash
-LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
   --run-dir ./runs/veyru/1742234567 \
   --metrics communication_open_coding \
   --model claude-haiku-4-5-20251001 --provider anthropic \
   2> /tmp/veyru_eval_debug.log
 ```
 
-The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth blocks) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `schmidt evaluate` and by `scripts/consolidate_communication_ontology.py` (see below). Without it the harness defaults to `INFO`. Both are dotenv-friendly — set them in `.env` for a persistent default or inline as shown above.
+The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth blocks) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `glossogen evaluate` and by `scripts/consolidate_communication_ontology.py` (see below). Without it the harness defaults to `INFO`. Both are dotenv-friendly — set them in `.env` for a persistent default or inline as shown above.
 
 If the judge's structured output truncates (you'll see a `Field required ... input_value={}` validation warning followed by a metric failure), bump the per-call output-token cap by setting `LLM_MAX_TOKENS=32768` (or higher) in `.env` or inline. The default of `16384` covers the verbose communication-feature outputs but pathological runs with many labels × many evidence citations can still exceed it.
 
@@ -298,7 +298,7 @@ A two-phase LLM-judge pipeline that surfaces and scores emergent communication-p
 # 1. Open-coding pass: per run, one LLM call. Writes
 #    runs/<scenario>/<id>/communication_open_coding.json with free-form labels +
 #    multi-round evidence citations.
-LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate <scenario> \
   --run-dir ./runs/<scenario>/<id> \
   --metrics communication_open_coding \
   --model claude-haiku-4-5-20251001 --provider anthropic \
@@ -317,7 +317,7 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communi
 # 3. Relabel pass: per run, one LLM call against the ontology. Writes
 #    runs/<scenario>/<id>/communication_feature_presence.json with a 0-1
 #    confidence per ontology category.
-LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate <scenario> \
   --run-dir ./runs/<scenario>/<id> \
   --metrics communication_feature_presence \
   --ontology-path runs/<scenario>/_ontology/<version>.json \
@@ -338,7 +338,7 @@ uv sync --group analysis    # one-time, installs streamlit + plotly
 make results-viewer         # opens the viewer in a browser
 ```
 
-It reads from `SCHMIDT_RUNS_DIR` (defaults to `./runs`) and lists all runs that have a `{scenario}_report.json`.
+It reads from `GLOSSOGEN_RUNS_DIR` (defaults to `./runs`) and lists all runs that have a `{scenario}_report.json`.
 
 ## Web UI
 
@@ -359,7 +359,7 @@ The frontend `middleware.ts` wires Clerk's `organizationSyncOptions.organization
 
 If the user is not a member of the URL's org, Clerk leaves the previously active org in place; the backend then sees `claims.org_slug != url_slug` and returns 403.
 
-**Tab caveat.** Clerk's session cookie is a singleton per browser, so only one tab's active org is reflected in the cookie at a time. Each tab still activates its own org server-side on navigation (so initial page loads and Server-Component fetches are correct), and the API client uses `getToken()` per request (not the cookie), so foreground tab requests get a token aligned to that tab's URL. Background fetches (cron, service workers) that don't pass through the focused tab can race — there are none in schmidt today.
+**Tab caveat.** Clerk's session cookie is a singleton per browser, so only one tab's active org is reflected in the cookie at a time. Each tab still activates its own org server-side on navigation (so initial page loads and Server-Component fetches are correct), and the API client uses `getToken()` per request (not the cookie), so foreground tab requests get a token aligned to that tab's URL. Background fetches (cron, service workers) that don't pass through the focused tab can race — there are none in glossogen today.
 
 The MCP endpoint at `/mcp` uses OAuth 2.0 with PKCE (see MCP Integration below). MCP tokens are bound to a specific group at consent time — in local mode the synthetic `local` group, in Clerk mode the user's active org picked on the consent page — so every tool call is automatically scoped.
 
@@ -378,7 +378,7 @@ The frontend displays a list of all simulation runs with scenario name, timestam
 
 ### Live Token Streaming
 
-Every `schmidt run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` discovery file to the run directory. When `schmidt serve` detects a live simulation (via `stream.json`), it proxies the simulation's SSE stream — including token-by-token text deltas from the LLM streaming API — to connected frontends. The frontend shows text appearing character-by-character as agents generate responses. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing.
+Every `glossogen run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` discovery file to the run directory. When `glossogen serve` detects a live simulation (via `stream.json`), it proxies the simulation's SSE stream — including token-by-token text deltas from the LLM streaming API — to connected frontends. The frontend shows text appearing character-by-character as agents generate responses. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing.
 
 ### API Type Safety
 
@@ -397,7 +397,7 @@ The backend exposes an MCP (Model Context Protocol) server at `/mcp` for program
 Click the **MCP** button on the runs page for connection instructions, or configure manually:
 
 ```bash
-claude mcp add-json schmidt-runs '{"type":"http","url":"http://localhost:8000/mcp"}'
+claude mcp add-json glossogen-runs '{"type":"http","url":"http://localhost:8000/mcp"}'
 ```
 
 No auth headers needed — the client discovers OAuth metadata and handles registration, authorization, and token refresh automatically. In local mode the consent step auto-approves to the synthetic `local` group; in Clerk mode the backend parks the authorization request and redirects the browser to the frontend at `/mcp-consent?request_id=...`, where Clerk forces sign-in and the user picks which organization to authorize. The frontend POSTs back to `/mcp/consent/approve` with a fresh Clerk JWT; the backend resolves the active org to a group, mints the authorization code bound to that `group_id`, and redirects the browser to the OAuth client's callback. Every subsequent MCP tool call is automatically scoped to the chosen group.
@@ -419,20 +419,20 @@ Typical MCP run-start workflow:
 2. `get_knobs_preset` to load a baseline config.
 3. `start_run` with the selected model/provider and final knobs payload.
 
-### Pushing local runs to a remote schmidt server
+### Pushing local runs to a remote glossogen server
 
 The same OAuth flow that issues MCP tokens also gives the CLI a way to push local run bundles to a deployed (Clerk-protected) backend. The CLI calls the remote's existing `/api/g/{slug}/runs/import` REST endpoint — there's no separate prod-upload server-side feature.
 
 ```bash
 # 1. One-time: sign in to the deployed backend. Opens your browser to the
 #    Clerk-gated consent page; pick your org, approve, the CLI's loopback
-#    server collects the code and writes ~/.schmidt/credentials.json (0600).
-schmidt login --url https://schmidtsciencesapi.up.railway.app
+#    server collects the code and writes ~/.glossogen/credentials.json (0600).
+glossogen login --url https://schmidtsciencesapi.up.railway.app
 
 # 2. Diff local runs against prod and upload anything missing. Filters by
 #    label (AND) and by report-present (so crashed runs are skipped). The
 #    remote import endpoint is idempotent on run_id, so re-running is safe.
-schmidt push-to-prod --label baseline --runs-dir ./runs
+glossogen push-to-prod --label baseline --runs-dir ./runs
 ```
 
 Useful flags:
@@ -450,7 +450,7 @@ For runs that **already exist on prod** but whose local labels or evaluation rep
 # evaluation report (unconditionally — local is the source of truth).
 # Use this when you only need to push metadata edits without
 # re-uploading bundles.
-schmidt sync-metadata-to-prod --runs-dir ./runs
+glossogen sync-metadata-to-prod --runs-dir ./runs
 ```
 
 Useful flags:
@@ -464,21 +464,21 @@ The middleware accepts the MCP OAuth Bearer for both `/mcp/*` tool calls and `/a
 
 ### Veyru
 
-Two agents (Field Observer, Stabilization Engineer) stabilize failing Veyru entities — fictional box-shaped entities with internal wave-patterns — across a series of budget-constrained rounds. Every character sent on the comm link costs one simulated second against a fixed per-round time budget; a Veyru collapses when total communication time exceeds that budget. Selected early/mid rounds (1, 2, 3, 6, 13) are forced to a single priority-≤2 motif so pressure ramps up gradually over the run. The position of reference star SAGWE392 remaps the symptom→treatment mapping each round and varies physical parameters (hold duration, starting face, pressure level), forcing per-round communication even if agents develop shorthand. See the [scenario README](src/schmidt/scenarios/veyru/README.md).
+Two agents (Field Observer, Stabilization Engineer) stabilize failing Veyru entities — fictional box-shaped entities with internal wave-patterns — across a series of budget-constrained rounds. Every character sent on the comm link costs one simulated second against a fixed per-round time budget; a Veyru collapses when total communication time exceeds that budget. Selected early/mid rounds (1, 2, 3, 6, 13) are forced to a single priority-≤2 motif so pressure ramps up gradually over the run. The position of reference star SAGWE392 remaps the symptom→treatment mapping each round and varies physical parameters (hold duration, starting face, pressure level), forcing per-round communication even if agents develop shorthand. See the [scenario README](src/glossogen/scenarios/veyru/README.md).
 
 ![Veyru scenario overview](images/veyru_overview.webp)
 
 ### Warehouse Robot Recovery
 
-Three agents (Floor Associate, Robotics Engineer, Fleet Safety Coordinator) coordinate over a shared radio channel to recover stopped warehouse robots. Per-character communication budget; recovery procedures rotate per round with random wait times, intensities, and surfaces drawn from rotating parameter pools. See the [scenario README](src/schmidt/scenarios/warehouse_robot_recovery/README.md).
+Three agents (Floor Associate, Robotics Engineer, Fleet Safety Coordinator) coordinate over a shared radio channel to recover stopped warehouse robots. Per-character communication budget; recovery procedures rotate per round with random wait times, intensities, and surfaces drawn from rotating parameter pools. See the [scenario README](src/glossogen/scenarios/warehouse_robot_recovery/README.md).
 
 ### Satellite Contact Window
 
-Three agents (Telemetry Operator, Subsystem Engineer, Flight Director) submit ordered command sequences during a limited satellite contact window. Per-character budget on the comm link; the operator submits the sequence in a single judged call against the engineer's resolver and the flight director's authorization envelope. See the [scenario README](src/schmidt/scenarios/satellite_contact_window/README.md).
+Three agents (Telemetry Operator, Subsystem Engineer, Flight Director) submit ordered command sequences during a limited satellite contact window. Per-character budget on the comm link; the operator submits the sequence in a single judged call against the engineer's resolver and the flight director's authorization envelope. See the [scenario README](src/glossogen/scenarios/satellite_contact_window/README.md).
 
 ### Container Yard Stacking
 
-Three agents (Yard Operator, Logistics Planner, Crane Operator) place one incoming container per round into its correct stack slot. Per-round changing yard map prevents postmortem memorization: the planner alone sees the active crane stations and stack layout, the yard operator alone sees the incoming container's manifest, the crane operator executes one physical move per `crane_move` call. See the [scenario README](src/schmidt/scenarios/container_yard_stacking/README.md).
+Three agents (Yard Operator, Logistics Planner, Crane Operator) place one incoming container per round into its correct stack slot. Per-round changing yard map prevents postmortem memorization: the planner alone sees the active crane stations and stack layout, the yard operator alone sees the incoming container's manifest, the crane operator executes one physical move per `crane_move` call. See the [scenario README](src/glossogen/scenarios/container_yard_stacking/README.md).
 
 ### Adding a New Scenario
 
@@ -487,7 +487,7 @@ See [docs/creating-a-scenario.md](docs/creating-a-scenario.md) for the full step
 ## Project Structure
 
 ```
-src/schmidt/
+src/glossogen/
   cli.py                       # CLI: run, evaluate, serve, replace-agent
   autonomous_supervisor.py     # Round progression, event injection, resume
   channel_router.py            # Message storage + membership validation
@@ -528,7 +528,7 @@ modal/                         # Self-hosted LLM endpoint deployable to Modal (v
   smoke_test_llama.py          # End-to-end smoke test for the deployed endpoint
   README.md                    # Deploy + integration instructions
 
-  server/                      # FastAPI web server (schmidt serve)
+  server/                      # FastAPI web server (glossogen serve)
     identity/middleware.py     # Clerk-aware identity middleware: parses /g/{slug}, validates JWT
     identity/clerk_verifier.py # Networkless Clerk JWT verification (v2 nested o claim + v1 flat)
     identity/webhook_router.py # Svix-verified POST /api/clerk/webhook (groups sync)
@@ -572,7 +572,7 @@ Railway environment variables for the backend:
 - `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`, etc.) — provider keys for running simulations.
 - `ALLOWED_ORIGINS` — comma-separated frontend URLs for CORS.
 - `OAUTH_ISSUER_URL` — public backend URL to enable MCP OAuth.
-- `ENABLE_EVALUATIONS` — set to `false` to disable the REST evaluate endpoint (the frontend "Run Eval" button): the endpoint returns 403 and the frontend hides the button. Defaults to enabled. Does not affect the CLI `schmidt evaluate` command.
+- `ENABLE_EVALUATIONS` — set to `false` to disable the REST evaluate endpoint (the frontend "Run Eval" button): the endpoint returns 403 and the frontend hides the button. Defaults to enabled. Does not affect the CLI `glossogen evaluate` command.
 
 The frontend requires `NEXT_PUBLIC_API_URL` as a build arg pointing to the backend URL, plus `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` for Clerk-mode operation.
 

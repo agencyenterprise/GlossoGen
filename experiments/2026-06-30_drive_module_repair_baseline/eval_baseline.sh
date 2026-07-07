@@ -28,7 +28,7 @@ JUDGE_PROVIDER=anthropic
 METRICS=round_success,round_ended_idle,round_ended_timeout,mean_chars_per_round,mean_chars_per_message,perplexity,content_filter_refusal,shorthand_codes,slang_emergence,neologism,language_strangeness,language_repetition,protocol_explanation
 
 count_running_evals() {
-  ps -axo command 2>/dev/null | grep "Python -m schmidt evaluate drive_module_repair" | grep -v grep | wc -l | tr -d ' '
+  ps -axo command 2>/dev/null | grep "Python -m glossogen evaluate drive_module_repair" | grep -v grep | wc -l | tr -d ' '
 }
 
 echo "=== drive baseline eval started $(date) ===" >> "$LOG"
@@ -42,7 +42,7 @@ for d in "$RUNS_DIR"/drive_module_repair/*/; do
     && { echo "$(date) SKIP (already evaluated) $d" >> "$LOG"; continue; }
   while [ "$(count_running_evals)" -ge "$CAP" ]; do sleep 10; done
   echo "$(date) eval $d" >> "$LOG"
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate drive_module_repair \
+  VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate drive_module_repair \
     --run-dir "$d" --metrics "$METRICS" \
     --model "$JUDGE_MODEL" --provider "$JUDGE_PROVIDER" \
     > "$d/eval_baseline_stdout.log" 2>&1 &

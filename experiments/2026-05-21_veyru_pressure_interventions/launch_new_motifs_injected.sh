@@ -7,7 +7,7 @@
 # six-per-model limit applied during Phase 1).
 set -euo pipefail
 # Script lives at experiments/<exp_folder>/launch_new_motifs_injected.sh;
-# go up two levels to reach the repo root so the schmidt CLI can resolve
+# go up two levels to reach the repo root so the glossogen CLI can resolve
 # runs/ and the knob paths below.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/../.."
@@ -25,7 +25,7 @@ declare -a SPECS=(
 )
 
 count_running_for_model() {
-  pgrep -f "Python -m schmidt run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
+  pgrep -f "Python -m glossogen run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
 }
 
 echo "=== Phase 3 launcher started $(date) ===" >> "$LOG"
@@ -35,7 +35,7 @@ for spec in "${SPECS[@]}"; do
     sleep 30
   done
   echo "$(date) launching source=$src knobs=$knobs" >> "$LOG"
-  out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt resume-at-round veyru \
+  out=$(VIRTUAL_ENV= uv run --no-sync python -m glossogen resume-at-round veyru \
     --source-run-dir "runs/veyru/$src" \
     --round-start 16 \
     --runs-dir runs \

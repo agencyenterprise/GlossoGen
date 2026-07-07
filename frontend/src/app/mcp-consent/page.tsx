@@ -7,7 +7,7 @@ import { Suspense } from "react";
 /**
  * Clerk-gated consent page for MCP OAuth flows.
  *
- * The backend's ``SchmidtOAuthProvider.authorize()`` parks the request and
+ * The backend's ``GlossoGenOAuthProvider.authorize()`` parks the request and
  * redirects the user-agent here with ``?request_id=<uuid>``. Clerk's
  * ``<SignedOut><RedirectToSignIn/></SignedOut>`` forces sign-in first.
  * The user picks (or confirms) which organization to authorize; on

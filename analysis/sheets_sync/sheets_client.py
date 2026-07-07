@@ -12,7 +12,7 @@ from pathlib import Path
 import gspread
 
 SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
-_CONFIG_DIR = Path.home() / ".config" / "schmidt"
+_CONFIG_DIR = Path.home() / ".config" / "glossogen"
 DEFAULT_CREDENTIALS = _CONFIG_DIR / "gcp_service_account.json"
 CREDENTIALS_ENV = "GOOGLE_SERVICE_ACCOUNT_JSON"
 

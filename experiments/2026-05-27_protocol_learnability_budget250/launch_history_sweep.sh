@@ -10,7 +10,7 @@
 # => 45 baselines x 3 windows x 3 replicas = 405 runs. Labelled phase=replace_learned with
 # history=<h> so they are distinct from the existing history=10 learned runs.
 #
-# NEVER check out or modify src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja.
+# NEVER check out or modify src/glossogen/scenarios/veyru/prompts/stabilization_judge.jinja.
 # veyru judges stabilization LIVE during the simulation, so the judge prompt must always be
 # at HEAD when running sims — pinning/altering it corrupts every run.
 #
@@ -33,7 +33,7 @@ HISTORY_WINDOWS=(5 1 0)
 
 count_running_for_provider() {
   ps -axo command 2>/dev/null \
-    | grep "Python -m schmidt run veyru" \
+    | grep "Python -m glossogen run veyru" \
     | grep -- "--provider $1" \
     | grep -- "--resume" \
     | grep -v grep \
@@ -75,7 +75,7 @@ launch_replace() {
   echo "$(date) [$short] replace src=$src_id hist=$hist from=$from kind=$kind" >> "$LOG"
   local out rid knobs="$REPLACE_KNOBS_CANON"
   if [ "$kind" = "legacy" ]; then knobs="$REPLACE_KNOBS_LEGACY"; fi
-  out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
+  out=$(VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
         --source-run-dir "$src_dir" --round-start "$ROUND_START" \
         --replaced-agent-id field_observer \
         --model "$model" --provider "$provider" \
@@ -108,7 +108,7 @@ run_provider_queue() {
 }
 
 # Guard: never run with a non-HEAD judge prompt.
-JP="src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja"
+JP="src/glossogen/scenarios/veyru/prompts/stabilization_judge.jinja"
 if [ "$(git hash-object $JP)" != "$(git rev-parse HEAD:$JP)" ]; then
   echo "ABORT: $JP is not at HEAD. The judge prompt must never be pinned/edited for a run." >&2
   exit 1

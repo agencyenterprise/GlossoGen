@@ -88,7 +88,7 @@ run_one_eval() {
 
   local cmd=(
     env "VIRTUAL_ENV="
-    uv run --no-sync python -m schmidt evaluate "$SCENARIO"
+    uv run --no-sync python -m glossogen evaluate "$SCENARIO"
     --run-dir "$run_dir"
     --metrics "$metric"
     --model "$JUDGE_MODEL"

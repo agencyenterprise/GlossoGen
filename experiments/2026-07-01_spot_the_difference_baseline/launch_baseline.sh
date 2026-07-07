@@ -33,7 +33,7 @@ count_running_provider() {
   # cap); "gpt-5.4" matches the openai sims. Capital "Python" matches the
   # homebrew sim interpreter, never the "uv run python" wrapper nor the grep.
   ps -axo command 2>/dev/null \
-    | grep "Python -m schmidt run spot_the_difference --model $1" \
+    | grep "Python -m glossogen run spot_the_difference --model $1" \
     | grep -v grep | wc -l | tr -d ' '
 }
 
@@ -42,7 +42,7 @@ launch_one() {
   local rep_log="/tmp/spot_baseline_${short}_rep${rep}.log"
   : > "$rep_log"
   echo "$(date) [$short] launching rep $rep/$REPLICAS" >> "$LOG"
-  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m schmidt run spot_the_difference \
+  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m glossogen run spot_the_difference \
       --model '$model' --provider '$provider' --runs-dir ./$RUNS_DIR --config '$CONFIG' \
       >>'$rep_log' 2>&1" >/dev/null 2>&1 &
   disown

@@ -25,7 +25,7 @@
 # Each queue counts only the runs IT launched that are still live (tracked by run id), since
 # every subprocess shares --provider self-hosted and cannot be told apart by ps.
 #
-# NEVER check out or modify src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja.
+# NEVER check out or modify src/glossogen/scenarios/veyru/prompts/stabilization_judge.jinja.
 # veyru judges stabilization LIVE during the simulation, so the judge prompt must always be
 # at HEAD when running sims -- pinning/altering it corrupts every run.
 set -uo pipefail
@@ -56,7 +56,7 @@ count_active() {
   # Count, among the run ids passed as args, how many still have a live --resume subprocess.
   local n=0 rid
   for rid in "$@"; do
-    if ps -axo command 2>/dev/null | grep "Python -m schmidt run veyru" | grep -- "--resume" \
+    if ps -axo command 2>/dev/null | grep "Python -m glossogen run veyru" | grep -- "--resume" \
        | grep -v grep | grep -qE "/${rid}( |/)"; then
       n=$((n + 1))
     fi
@@ -95,7 +95,7 @@ launch_replace() {
   echo "$(date) [$short->llama] replace src=$src_id hist=$hist from=$from kind=$kind" >> "$LOG"
   local out rid knobs="$REPLACE_KNOBS_CANON"
   if [ "$kind" = "legacy" ]; then knobs="$REPLACE_KNOBS_LEGACY"; fi
-  out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
+  out=$(VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
         --source-run-dir "$src_dir" --round-start "$ROUND_START" \
         --replaced-agent-id field_observer \
         --model "$OBS_MODEL" --provider "$OBS_PROVIDER" \
@@ -140,7 +140,7 @@ run_engine_queue() {
 }
 
 # Guard: never run with a non-HEAD judge prompt.
-JP="src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja"
+JP="src/glossogen/scenarios/veyru/prompts/stabilization_judge.jinja"
 if [ "$(git hash-object $JP)" != "$(git rev-parse HEAD:$JP)" ]; then
   echo "ABORT: $JP is not at HEAD. The judge prompt must never be pinned/edited for a run." >&2
   exit 1

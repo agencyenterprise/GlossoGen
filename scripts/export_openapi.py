@@ -7,14 +7,14 @@ import json
 import os
 
 # The MCP consent/whoami routes are only mounted when OAUTH_ISSUER_URL is set
-# (see schmidt.server.app). Pin it here so the exported schema always includes
+# (see glossogen.server.app). Pin it here so the exported schema always includes
 # the full MCP surface regardless of the caller's environment, keeping the
 # generated frontend types deterministic. app.py reads OAUTH_ISSUER_URL at
 # import time, so this must run before importing app.
 os.environ.setdefault("OAUTH_ISSUER_URL", "http://localhost:8000")
-os.environ.setdefault("SCHMIDT_RUNS_DIR", "./runs")
+os.environ.setdefault("GLOSSOGEN_RUNS_DIR", "./runs")
 
-from schmidt.server.app import app
+from glossogen.server.app import app
 
 if __name__ == "__main__":
     schema = app.openapi()

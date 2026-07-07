@@ -50,7 +50,7 @@ from analysis.results_viewer.natural_sort import natural_sort_key
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
 from analysis.results_viewer.series_plot import render_horizontal_checkboxes, series_color_map
-from schmidt.evaluation.metrics.communication.label_models import ontology_dir_for_scenario
+from glossogen.evaluation.metrics.communication.label_models import ontology_dir_for_scenario
 
 logger = logging.getLogger(__name__)
 

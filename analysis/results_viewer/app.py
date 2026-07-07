@@ -26,7 +26,7 @@ st.set_page_config(page_title="Analysis Results Viewer", layout="wide")
 
 def main() -> None:
     """Render twelve tabs: Timeline, Baseline, Verbosity, Container-yard budget, Resume, Cross-swap, Multi-swap, OSS-vs-Frontier, Probe similarity, Language features, Protocol learnability, Stabilize over-calling."""  # noqa: E501
-    runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", "./runs")).resolve()
+    runs_dir = Path(os.environ.get("GLOSSOGEN_RUNS_DIR", "./runs")).resolve()
     st.sidebar.markdown(f"**Runs directory**: `{runs_dir}`")
     evaluated = list_evaluated_runs(runs_dir=runs_dir)
     st.sidebar.markdown(f"**Evaluated runs**: {len(evaluated)}")

@@ -60,7 +60,7 @@ measurement.
   column. Pass `--canonical-only` to keep just the fixed-`seed=42` runs.
 
 Design target for the homogeneous baselines is **5 replicas per (model × postmortem ×
-budget) cell** (see `src/schmidt/scenarios/veyru/scripts/run_baseline_no_specialist.py`).
+budget) cell** (see `src/glossogen/scenarios/veyru/scripts/run_baseline_no_specialist.py`).
 
 ## Sheets
 

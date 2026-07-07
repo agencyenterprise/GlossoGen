@@ -54,7 +54,7 @@ Per-provider parallel queues, cap **10** each. Runs labelled on launch:
 
 ```bash
 tail -20 /tmp/drive_baseline.log
-ps -axo command | grep "Python -m schmidt run drive_module_repair" | grep -v grep | wc -l
+ps -axo command | grep "Python -m glossogen run drive_module_repair" | grep -v grep | wc -l
 ```
 
 ## Evaluate (ONLY after every run has emitted `simulation_ended`)

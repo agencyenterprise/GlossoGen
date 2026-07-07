@@ -40,7 +40,7 @@ count_running_for_model() {
   # lowercase "python" uv wrapper nor the grep itself. Anchored on the exact
   # model so the two queues never count each other's sims.
   ps -axo command 2>/dev/null \
-    | grep "Python -m schmidt run veyru --model $1" \
+    | grep "Python -m glossogen run veyru --model $1" \
     | grep -v grep \
     | wc -l | tr -d ' '
 }
@@ -51,7 +51,7 @@ launch_one() {
   local rep_log="/tmp/veyru_random_letter_${short}_n${noise}_b${budget}_rep${rep}.log"
   : > "$rep_log"
   echo "$(date) [$short] launching noise=$noise budget=$budget rep $rep/$REPLICAS" >> "$LOG"
-  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
+  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
       --model '$model' --provider '$provider' --runs-dir ./$RUNS_DIR \
       --config '$CONFIG' \
       channel_noise_level=$noise round_time_budget_seconds=$budget \

@@ -282,7 +282,7 @@ def _parse_args() -> argparse.Namespace:
         "--credentials",
         type=Path,
         default=default_credentials_path(),
-        help=f"Service-account key JSON (default ${CREDENTIALS_ENV} or ~/.config/schmidt).",
+        help=f"Service-account key JSON (default ${CREDENTIALS_ENV} or ~/.config/glossogen).",
     )
     parser.add_argument(
         "--backup-dir",

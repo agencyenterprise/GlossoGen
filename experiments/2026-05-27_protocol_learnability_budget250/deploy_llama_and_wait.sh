@@ -6,7 +6,7 @@
 # GET <url>/models with the bearer token until 200, up to a 15-minute deadline.
 # Exit 0 = endpoint ready; exit 1 = timeout. NEVER launch sims until this exits 0.
 set -uo pipefail
-cd /Users/nsander/workspace/schmidt-poc
+cd "$(git rev-parse --show-toplevel)"
 LOG=/tmp/llama_deploy.log
 URL=$(grep -oE '"meta-llama/Llama-3.3-70B-Instruct":"[^"]+"' .env | sed 's/.*:"//;s/"$//')
 KEY=$(grep -E '^SELF_HOSTED_API_KEY=' .env | head -1 | cut -d= -f2-)

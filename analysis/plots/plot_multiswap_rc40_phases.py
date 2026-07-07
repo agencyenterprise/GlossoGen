@@ -112,7 +112,7 @@ def _resolve_cohorts(
 
 def main() -> None:
     """Resolve the fixed cohort config, compute pooled per-phase stats, save PNG."""
-    runs_dir = Path(os.environ.get("SCHMIDT_RUNS_DIR", REPO_ROOT / "runs")).resolve()
+    runs_dir = Path(os.environ.get("GLOSSOGEN_RUNS_DIR", REPO_ROOT / "runs")).resolve()
     evaluated = [
         run for run in list_evaluated_runs(runs_dir=runs_dir) if run.scenario_name == "veyru"
     ]

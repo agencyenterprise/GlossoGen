@@ -11,7 +11,7 @@
 #   gpt54  -> opus47    (cross-family read of gpt's protocol by anthropic)
 #
 # Concurrency is capped PER PROVIDER at 6, where provider is the OBSERVER
-# family (the one schmidt run will hit) — not the baseline's family. With the
+# family (the one glossogen run will hit) — not the baseline's family. With the
 # rules above:
 #   anthropic queue (opus47 observer) handles 15 gpt54 sources    -> 45 runs
 #   openai    queue (gpt-5.4 observer) handles 30 sonnet+opus sources -> 90 runs
@@ -19,7 +19,7 @@
 # `model=<baseline_short>` and `observer=<observer_short>` so the streamlit tab
 # can identify both ends of the swap.
 #
-# NEVER check out or modify src/schmidt/scenarios/veyru/prompts/stabilization_judge.jinja
+# NEVER check out or modify src/glossogen/scenarios/veyru/prompts/stabilization_judge.jinja
 # to an older version. veyru judges stabilization LIVE during the simulation, so the judge
 # prompt must always be at HEAD when running sims — pinning/altering it silently changes
 # round outcomes and corrupts every run launched against it.
@@ -54,7 +54,7 @@ observer_for() {
 
 count_running_derived_for_provider() {
   ps -axo command 2>/dev/null \
-    | grep "Python -m schmidt run veyru" \
+    | grep "Python -m glossogen run veyru" \
     | grep -- "--provider $1" \
     | grep -- "--resume" \
     | grep -v grep \
@@ -98,7 +98,7 @@ launch_cross_family() {
   if [ "$kind" = "legacy" ]; then
     knobs="$REPLACE_KNOBS_LEGACY"
   fi
-  out=$(VIRTUAL_ENV= uv run --no-sync python -m schmidt replace-agent veyru \
+  out=$(VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
         --source-run-dir "$src_dir" --round-start "$ROUND_START" \
         --replaced-agent-id field_observer \
         --model "$observer_model" --provider "$observer_provider" \

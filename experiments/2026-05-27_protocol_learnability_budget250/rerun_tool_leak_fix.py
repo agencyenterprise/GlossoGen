@@ -1,7 +1,7 @@
 """Re-run tool_leak-affected replace-agent runs with the fixed history builder.
 
 Reads a spec list (produced from the affected runs' manifests) and re-executes
-each as a fresh ``schmidt replace-agent`` run on the current (fixed) code, which
+each as a fresh ``glossogen replace-agent`` run on the current (fixed) code, which
 no longer leaks the predecessor's pre-floor ``stabilize_veyru`` history. Each new
 run is labelled with the original run's labels (minus ``tool_leak``) plus
 ``rerun=tool_leak_fix``, and the old→new mapping is recorded.
@@ -26,7 +26,7 @@ import time
 from pathlib import Path
 from typing import NamedTuple
 
-_REPO = Path("/Users/nsander/workspace/schmidt-poc")
+_REPO = Path(__file__).resolve().parents[2]
 _RUNS_DIR = _REPO / "runs"
 _KNOBS_PATH = Path("/tmp/rerun_tool_leak_pm_off_knobs.json")
 _LOG_PATH = Path("/tmp/rerun_tool_leak_fix.log")
@@ -75,9 +75,9 @@ def _load_specs(spec_file: Path) -> list[RerunSpec]:
 
 
 def _count_running(model_pattern: str) -> int:
-    """Count live ``schmidt run veyru --resume`` sims for a model pattern."""
+    """Count live ``glossogen run veyru --resume`` sims for a model pattern."""
     result = subprocess.run(
-        ["pgrep", "-f", f"-m schmidt run veyru --model {model_pattern}"],
+        ["pgrep", "-f", f"-m glossogen run veyru --model {model_pattern}"],
         capture_output=True,
         text=True,
         check=False,
@@ -118,7 +118,7 @@ def _launch_one(spec: RerunSpec, mapping_path: Path, lock: threading.Lock) -> No
             "--no-sync",
             "python",
             "-m",
-            "schmidt",
+            "glossogen",
             "replace-agent",
             "veyru",
             "--source-run-dir",

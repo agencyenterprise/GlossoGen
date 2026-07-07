@@ -52,9 +52,13 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
 
   const mcpUrl = `${API_URL}/mcp`;
 
-  const claudeCommand = `claude mcp add-json schmidt-runs '${JSON.stringify({ type: "http", url: mcpUrl })}'`;
+  const claudeCommand = `claude mcp add-json glossogen-runs '${JSON.stringify({ type: "http", url: mcpUrl })}'`;
 
-  const cursorConfig = JSON.stringify({ mcpServers: { "schmidt-runs": { url: mcpUrl } } }, null, 2);
+  const cursorConfig = JSON.stringify(
+    { mcpServers: { "glossogen-runs": { url: mcpUrl } } },
+    null,
+    2
+  );
 
   return createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50" onClick={onClose}>

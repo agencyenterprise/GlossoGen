@@ -55,7 +55,7 @@ def _bank_path(scenario_name: str) -> Path:
     return (
         Path(__file__).resolve().parents[2]
         / "src"
-        / "schmidt"
+        / "glossogen"
         / "scenarios"
         / scenario_name
         / "protocol_probe_questions.json"

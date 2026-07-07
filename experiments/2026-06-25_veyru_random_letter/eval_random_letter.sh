@@ -26,7 +26,7 @@ count_running_evals() {
   # the lowercase "uv run ... python" wrapper, so each eval counts once. The
   # trailing "grep -v grep" also drops any monitor process whose command string
   # embeds this pattern (those lines contain "grep").
-  ps -axo command 2>/dev/null | grep "Python -m schmidt evaluate veyru" | grep -v grep | wc -l | tr -d ' '
+  ps -axo command 2>/dev/null | grep "Python -m glossogen evaluate veyru" | grep -v grep | wc -l | tr -d ' '
 }
 
 echo "=== random_letter eval started $(date) ===" >> "$LOG"
@@ -40,7 +40,7 @@ for d in "$RUNS_DIR"/veyru/*/; do
   [ -f "$d/veyru_report.json" ] && grep -q '"round_success"' "$d/veyru_report.json" && { echo "$(date) SKIP (already fully evaluated) $d" >> "$LOG"; continue; }
   while [ "$(count_running_evals)" -ge "$CAP" ]; do sleep 10; done
   echo "$(date) eval $d" >> "$LOG"
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate veyru \
+  VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
     --run-dir "$d" --metrics "$METRICS" \
     --model "$JUDGE_MODEL" --provider "$JUDGE_PROVIDER" \
     > "$d/eval_random_letter_stdout.log" 2>&1 &

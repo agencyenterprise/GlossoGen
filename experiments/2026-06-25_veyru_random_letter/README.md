@@ -49,7 +49,7 @@ Run a single budget tier with `NOISE_BUDGETS="800" bash .../launch_random_letter
 
 ```bash
 tail -20 /tmp/veyru_random_letter.log
-ps -axo command | grep "Python -m schmidt run veyru" | grep -v grep | wc -l
+ps -axo command | grep "Python -m glossogen run veyru" | grep -v grep | wc -l
 ```
 
 ## Evaluate (after drain)

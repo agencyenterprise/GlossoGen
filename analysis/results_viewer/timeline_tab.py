@@ -19,8 +19,8 @@ from analysis.results_viewer.timeline_plot import (
     collect_value_metrics,
     palette_color_for_index,
 )
-from schmidt.evaluation.metric_core.measurement import Measurement
-from schmidt.evaluation.reports.evaluation_report import EvaluationReport
+from glossogen.evaluation.metric_core.measurement import Measurement
+from glossogen.evaluation.reports.evaluation_report import EvaluationReport
 
 _METRIC_CHECKBOXES_PER_ROW = 4
 
@@ -258,7 +258,7 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     run_filter = seed_mode_filter.render_filters(key_prefix="timeline")
     evaluated = seed_mode_filter.apply(evaluated=evaluated, run_filter=run_filter)
     if not evaluated:
-        st.info("No evaluated runs found. Run `schmidt evaluate <scenario> --run-dir ...` first.")
+        st.info("No evaluated runs found. Run `glossogen evaluate <scenario> --run-dir ...` first.")
         return
 
     scenario_name = _render_scenario_selector(evaluated=evaluated)

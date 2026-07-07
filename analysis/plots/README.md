@@ -89,7 +89,7 @@ To regenerate the feature-presence sidecars for one scenario against a specific
 ontology:
 
 ```bash
-VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate <scenario> \
+VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate <scenario> \
   --run-dir runs/<scenario>/<timestamp> \
   --metrics communication_feature_presence \
   --model claude-haiku-4-5-20251001 --provider anthropic \
@@ -105,5 +105,5 @@ into `runs/<scenario>/_ontology/` so the tab can still load.
 ## `plot_multiswap_rc40_phases.py`
 
 Per-phase round-success bars for a 40-round multi-swap run, reusing the Streamlit
-multi-swap tab's phase computation. Honours `SCHMIDT_RUNS_DIR`; defaults to
+multi-swap tab's phase computation. Honours `GLOSSOGEN_RUNS_DIR`; defaults to
 `<repo>/runs`. Writes `multiswap_rc40_phases.png`.

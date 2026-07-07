@@ -39,7 +39,7 @@ strips it from B/C/D regardless of visibility config).
 - Judge: `claude-haiku-4-5-20251001`
 - Seed: 42 across all 10 replicas (canonical — identical case set, measures
   pure LLM stochasticity on identical workload)
-- 10 fully independent `schmidt run` invocations (no fork, no resume)
+- 10 fully independent `glossogen run` invocations (no fork, no resume)
 - Concurrency cap: 6 sonnet sims at a time
 - Labels: `["multi_swap_baseline", "budget=450", "phases=A10-B10-C10-D10", "history=10"]`
 
@@ -56,7 +56,7 @@ Per-replica stdout: `/tmp/multi_swap_baseline_rep{1..10}.log`.
 ## Evaluation pipeline (per run, after sim ends)
 1. **Standard metrics** — judge `claude-haiku-4-5-20251001`:
    ```
-   schmidt evaluate veyru --run-dir <dir> \
+   glossogen evaluate veyru --run-dir <dir> \
      --metrics round_success,perplexity,mean_chars_per_round,mean_chars_per_message,language_strangeness,neologism,slang_emergence,shorthand_codes,communication_open_coding,communication_feature_presence \
      --model claude-haiku-4-5-20251001 --provider anthropic
    ```
@@ -64,7 +64,7 @@ Per-replica stdout: `/tmp/multi_swap_baseline_rep{1..10}.log`.
    appends rows to `protocol_probe_responses.jsonl`:
    ```
    for cutoff in 11 21 31 41; do
-     schmidt evaluate veyru --run-dir <dir> \
+     glossogen evaluate veyru --run-dir <dir> \
        --metrics protocol_probe --probe-replicas 3 --probe-round $cutoff \
        --model claude-sonnet-4-6 --provider anthropic
    done
@@ -72,7 +72,7 @@ Per-replica stdout: `/tmp/multi_swap_baseline_rep{1..10}.log`.
    Cutoffs map to end-of-phase: 11→A, 21→B, 31→C, 41→D.
 3. **Probe similarity summaries** — reads the accumulated JSONL:
    ```
-   schmidt evaluate veyru --run-dir <dir> \
+   glossogen evaluate veyru --run-dir <dir> \
      --metrics protocol_probe_replica_self_similarity,protocol_probe_agent_pair_similarity,protocol_probe_cutoff_trajectory \
      --model claude-haiku-4-5-20251001 --provider anthropic
    ```

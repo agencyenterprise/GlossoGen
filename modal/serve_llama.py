@@ -31,7 +31,7 @@ app = modal.App("llama-3-3-70b-instruct")
     image=vllm_image,
     gpu=f"H100:{N_GPU}",
     secrets=[
-        modal.Secret.from_name("huggingface-schmidt"),
+        modal.Secret.from_name("huggingface-glossogen"),
         modal.Secret.from_name("vllm-api-key"),
     ],
     volumes={

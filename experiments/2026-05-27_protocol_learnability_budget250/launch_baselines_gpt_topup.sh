@@ -17,7 +17,7 @@ PROVIDER=openai
 
 count_running_for_provider() {
   ps -axo command 2>/dev/null \
-    | grep "Python -m schmidt run veyru" \
+    | grep "Python -m glossogen run veyru" \
     | grep -- "--provider $1" \
     | grep -v grep \
     | wc -l | tr -d ' '
@@ -29,7 +29,7 @@ launch_one() {
   local rep_log="/tmp/protolearn_baseline_${SHORT}_topup_rep${rep}.log"
   : > "$rep_log"
   echo "$(date) [${SHORT}] launching topup rep $rep/$PER_MODEL" >> "$LOG"
-  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
+  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
       --model '$MODEL' --provider '$PROVIDER' --runs-dir ./$RUNS_DIR \
       --config '$CONFIG' >>'$rep_log' 2>&1" >/dev/null 2>&1 &
   disown

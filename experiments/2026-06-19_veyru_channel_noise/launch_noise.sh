@@ -39,7 +39,7 @@ count_running_for_provider() {
   # Capital "Python" matches the homebrew-framework sim process, never the
   # lowercase "python" uv wrapper nor the grep itself.
   ps -axo command 2>/dev/null \
-    | grep "Python -m schmidt run veyru" \
+    | grep "Python -m glossogen run veyru" \
     | grep -- "--provider $1" \
     | grep -v grep \
     | wc -l | tr -d ' '
@@ -51,7 +51,7 @@ launch_one() {
   local rep_log="/tmp/veyru_noise_${short}_n${noise}_b${budget}_rep${rep}.log"
   : > "$rep_log"
   echo "$(date) [$short] launching noise=$noise budget=$budget rep $rep/$REPLICAS" >> "$LOG"
-  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m schmidt run veyru \
+  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
       --model '$model' --provider '$provider' --runs-dir ./$RUNS_DIR \
       --config '$CONFIG' \
       channel_noise_level=$noise round_time_budget_seconds=$budget \

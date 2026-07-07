@@ -106,7 +106,7 @@ export interface paths {
          * Update Evaluation
          * @description Replace the saved evaluation report for a simulation run on disk.
          *
-         *     Used by ``schmidt sync-metadata-to-prod`` to push freshly-evaluated
+         *     Used by ``glossogen sync-metadata-to-prod`` to push freshly-evaluated
          *     measurements onto runs that already exist on the remote without
          *     re-uploading the full bundle. The PUT is a full replace — every
          *     existing measurement is overwritten with the body. After writing the
@@ -196,7 +196,7 @@ export interface paths {
          *
          *     Validates that the run exists and is complete, that no evaluation is
          *     already in progress, and that the requested metrics and provider
-         *     are valid. Launches ``python -m schmidt evaluate`` as a detached
+         *     are valid. Launches ``python -m glossogen evaluate`` as a detached
          *     background process. Rejected with 403 when evaluations are disabled
          *     via the ``ENABLE_EVALUATIONS`` env var.
          */
@@ -482,7 +482,7 @@ export interface paths {
          * @description Return the group bound to the calling OAuth access token.
          *
          *     Lets the CLI learn its ``group_slug`` after the OAuth exchange so it
-         *     can store it in ``~/.schmidt/credentials.json`` and address per-group
+         *     can store it in ``~/.glossogen/credentials.json`` and address per-group
          *     REST endpoints without prompting the user.
          */
         get: operations["whoami_mcp_whoami_get"];

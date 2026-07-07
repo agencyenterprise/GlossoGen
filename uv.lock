@@ -4385,7 +4385,7 @@ wheels = [
 ]
 
 [[package]]
-name = "schmidt-poc"
+name = "glossogen"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

@@ -117,7 +117,7 @@ is "cheap" to GPT-2 even though it is obviously not normal English).
 - _Naming note:_ the column reports mean surprisal in nats (lower = more predictable), which
   is the natural log of the textbook "perplexity" (`perplexity = e^surprisal`). We report the
   log form; the ranking of runs is identical either way.
-- Source: `src/schmidt/evaluation/metrics/perplexity_metric.py`.
+- Source: `src/glossogen/evaluation/metrics/perplexity_metric.py`.
 
 **Where to find it.** `run_level` (run mean) and `message_level` (per message).
 
@@ -155,12 +155,12 @@ English, so each extra `l` stays surprising — which is why `LLLLLLL` scores _h
 **How it's computed.**
 
 - Model: a character-level **trigram** (each character predicted from the previous two),
-  add-1 smoothed, trained once on `wikitext-2-raw-v1` and cached locally (`~/.cache/schmidt`).
+  add-1 smoothed, trained once on `wikitext-2-raw-v1` and cached locally (`~/.cache/glossogen`).
   Words are lowercased and padded with start/end markers.
 - Each link message's pristine text is scored character-by-character and averaged over its
   characters. Per-message → per-round mean → run mean.
 - Deterministic; uses only character-frequency statistics, no large neural network.
-- Source: `src/schmidt/evaluation/metrics/english_ngram/`.
+- Source: `src/glossogen/evaluation/metrics/english_ngram/`.
 
 **Where to find it.** `run_level` and `message_level`.
 
@@ -193,9 +193,9 @@ normalized probabilities, read it as a relative distance-from-English, not a cal
 
 **How it's computed.** Same pipeline as `english_ngram_surprisal` (pristine text, per
 character, per-message → per-round mean → run mean, deterministic, model cached in
-`~/.cache/schmidt`), differing only in the trained vocabulary, case handling, and
+`~/.cache/glossogen`), differing only in the trained vocabulary, case handling, and
 backoff smoothing described above. Source:
-`src/schmidt/evaluation/metrics/english_ngram/backoff_ngram_model.py`.
+`src/glossogen/evaluation/metrics/english_ngram/backoff_ngram_model.py`.
 
 **Where to find it.** `run_level` and `message_level`.
 
@@ -229,7 +229,7 @@ message" measure.
 - For each link message: count its character frequencies and compute `−Σ p(c)·log₂ p(c)`.
 - Pristine text, scored per message, then per-round mean → run mean.
 - Fully deterministic, model-free (no corpus, no network).
-- Source: `src/schmidt/evaluation/metric_core/character_entropy.py` +
+- Source: `src/glossogen/evaluation/metric_core/character_entropy.py` +
   `metrics/message_entropy_metric.py`.
 
 **Where to find it.** `run_level` and `message_level`.
@@ -286,7 +286,7 @@ per-message figure.
   message compresses to ~3 bytes, giving ratios of 2–3 — while longer incompressible messages
   settle near 1.0.)
 - Deterministic, model-free.
-- Source: `src/schmidt/evaluation/metric_core/gzip_compression.py` +
+- Source: `src/glossogen/evaluation/metric_core/gzip_compression.py` +
   `metrics/gzip_compression_ratio_metric.py`.
 
 **Where to find it.** `run_level` and `message_level`.
@@ -332,7 +332,7 @@ for each individual round; in `run_level` you see the per-round average for the 
 - **3 replicas, averaged.** To smooth the judge's run-to-run variability, the whole judging
   pass is run **three times** and the per-round counts are **averaged** across the three. This
   is why round-level counts can be fractional (e.g. `2.33` = the three passes saw 2, 3, 2).
-- Source: `src/schmidt/evaluation/metrics/dialog_retransmission_metric.py` +
+- Source: `src/glossogen/evaluation/metrics/dialog_retransmission_metric.py` +
   `prompts/dialog_retransmission_user.jinja`.
 
 **Where to find them.** `run_level` (run-average per round) and `round_context` (the per-round

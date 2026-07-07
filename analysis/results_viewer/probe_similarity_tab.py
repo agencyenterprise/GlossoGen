@@ -41,7 +41,7 @@ from analysis.results_viewer.probe_similarity_data import (
 )
 from analysis.results_viewer.run_catalog import EvaluatedRun
 from analysis.results_viewer.run_link import render_frontend_base, run_url
-from schmidt.evaluation.metrics.protocol_probe.response_models import ProtocolProbeResponse
+from glossogen.evaluation.metrics.protocol_probe.response_models import ProtocolProbeResponse
 
 logger = logging.getLogger(__name__)
 
@@ -341,7 +341,7 @@ _CROSS_TEAM_HELP_BODY = (
     "moment the agent was lifted out.\n\n"
     "Two row-groups are rendered: the imported agent and every other "
     "probed agent. All three runs must have probe data — re-run "
-    "`schmidt evaluate ... --metrics protocol_probe` on any missing source "
+    "`glossogen evaluate ... --metrics protocol_probe` on any missing source "
     "if the warning fires."
 )
 
@@ -423,7 +423,7 @@ _MULTI_SWAP_HELP_BODY = (
     "number per phase transition. High median = the protocol persisted "
     "across the swap; low = the swap disrupted it.\n\n"
     "Probe data must exist at each phase boundary cutoff — re-run "
-    "`schmidt evaluate ... --metrics protocol_probe --probe-round R "
+    "`glossogen evaluate ... --metrics protocol_probe --probe-round R "
     "--probe-replicas N` for any cutoff the banner flags as missing."
 )
 
@@ -1022,7 +1022,7 @@ def _render_multi_swap_subtab(
     if not eligible:
         st.info(
             "No runs found that have both an in-run agent swap and probe "
-            "rows. Run `schmidt evaluate ... --metrics protocol_probe` on "
+            "rows. Run `glossogen evaluate ... --metrics protocol_probe` on "
             "a multi-swap run first."
         )
         return
@@ -1055,7 +1055,7 @@ def _render_multi_swap_subtab(
         st.info(
             f"Phase boundaries probed: {len(phase_columns)}/{len(multi_swap.phases)}. "
             f"Missing: {missing_summary}. Re-run "
-            "`schmidt evaluate ... --metrics protocol_probe --probe-round R --probe-replicas N` "
+            "`glossogen evaluate ... --metrics protocol_probe --probe-round R --probe-replicas N` "
             "for each missing round to populate this view."
         )
     if not phase_columns:
@@ -1131,7 +1131,7 @@ def _resolve_cross_team_context(
         st.warning(
             "Cannot render the cross-team comparison: missing probe data for "
             + ", ".join(missing or ["unknown"])
-            + ". Run `schmidt evaluate ... --metrics protocol_probe` on the "
+            + ". Run `glossogen evaluate ... --metrics protocol_probe` on the "
             "missing source run(s) first."
         )
         return None
@@ -1265,7 +1265,7 @@ def _render_cross_team_subtab(
     if not eligible:
         st.info(
             "No cross-team runs with probe data available. "
-            "Run `schmidt evaluate ... --metrics protocol_probe` on the "
+            "Run `glossogen evaluate ... --metrics protocol_probe` on the "
             "cross-team target run first."
         )
         return
@@ -1384,7 +1384,8 @@ def render(evaluated: list[EvaluatedRun]) -> None:
     probe_runs = list_probe_similarity_runs(evaluated_runs=evaluated)
     if not probe_runs:
         st.info(
-            "No runs have probe data. Run " "`schmidt evaluate ... --metrics protocol_probe` first."
+            "No runs have probe data. Run "
+            "`glossogen evaluate ... --metrics protocol_probe` first."
         )
         return
     multi_swap_runs = list_multi_swap_runs(evaluated_runs=evaluated)

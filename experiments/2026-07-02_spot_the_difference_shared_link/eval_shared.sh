@@ -20,7 +20,7 @@ for r in 1783016451 1783016458 1783016466 1783016473; do
   grep -q '"simulation_ended"' "$d/spot_the_difference.jsonl" 2>/dev/null \
     || { echo "$(date) SKIP not-finished $r" >> "$LOG"; continue; }
   echo "$(date) eval $r" >> "$LOG"
-  VIRTUAL_ENV= uv run --no-sync python -m schmidt evaluate spot_the_difference \
+  VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate spot_the_difference \
     --run-dir "$d" --metrics "$METRICS" \
     --model "$JUDGE_MODEL" --provider "$JUDGE_PROVIDER" \
     > "$d/eval_shared_stdout.log" 2>&1 &

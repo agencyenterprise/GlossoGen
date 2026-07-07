@@ -13,7 +13,7 @@ from typing import NamedTuple
 
 import orjson
 
-from schmidt.evaluation.metrics.english_ngram.english_ngram_model import (
+from glossogen.evaluation.metrics.english_ngram.english_ngram_model import (
     EnglishTrigramModel,
     load_english_trigram_model,
 )

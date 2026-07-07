@@ -73,8 +73,8 @@ from analysis.run_export.run_context_scan import (
 )
 from analysis.run_export.scenario_export_specs import get_export_spec
 from analysis.run_export.spreadsheet_writer import write_csvs, write_xlsx
-from schmidt.evaluation.metric_core.character_entropy import character_entropy_bits
-from schmidt.evaluation.metric_core.gzip_compression import gzip_compression_ratio
+from glossogen.evaluation.metric_core.character_entropy import character_entropy_bits
+from glossogen.evaluation.metric_core.gzip_compression import gzip_compression_ratio
 
 logger = logging.getLogger(__name__)
 

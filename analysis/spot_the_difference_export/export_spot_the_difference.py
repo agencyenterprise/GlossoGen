@@ -62,13 +62,18 @@ from analysis.run_export.message_perplexity_scorer import MessagePerplexityScore
 from analysis.run_export.message_repetition_sidecar import read_message_repetition_factors
 from analysis.run_export.run_context_scan import model_class
 from analysis.run_export.spreadsheet_writer import write_csvs, write_xlsx
-from schmidt.evaluation.log_reader import load_events
-from schmidt.evaluation.metric_core.character_entropy import character_entropy_bits
-from schmidt.evaluation.metric_core.gzip_compression import gzip_compression_ratio
-from schmidt.evaluation.metric_core.pristine_text_index import build_pristine_text_index
-from schmidt.models.event import AgentRegistered, MessageSent, RoundResultRecorded, SimulationEvent
-from schmidt.scenarios.spot_the_difference.events import SpotTheDifferenceCaseStarted
-from schmidt.scenarios.spot_the_difference.ids import (
+from glossogen.evaluation.log_reader import load_events
+from glossogen.evaluation.metric_core.character_entropy import character_entropy_bits
+from glossogen.evaluation.metric_core.gzip_compression import gzip_compression_ratio
+from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
+from glossogen.models.event import (
+    AgentRegistered,
+    MessageSent,
+    RoundResultRecorded,
+    SimulationEvent,
+)
+from glossogen.scenarios.spot_the_difference.events import SpotTheDifferenceCaseStarted
+from glossogen.scenarios.spot_the_difference.ids import (
     TEAM_SOLO_ID,
     VIEWER_LEFT_A_ID,
     VIEWER_LEFT_B_ID,
@@ -77,11 +82,11 @@ from schmidt.scenarios.spot_the_difference.ids import (
     VIEWER_RIGHT_B_ID,
     VIEWER_RIGHT_ID,
 )
-from schmidt.scenarios.spot_the_difference.outcome_reconstruction import (
+from glossogen.scenarios.spot_the_difference.outcome_reconstruction import (
     restore_outcomes_from_events,
 )
-from schmidt.scenarios.spot_the_difference.scene_generation import DiffCase
-from schmidt.scenarios.spot_the_difference.team_routing import (
+from glossogen.scenarios.spot_the_difference.scene_generation import DiffCase
+from glossogen.scenarios.spot_the_difference.team_routing import (
     AGENT_ID_TO_TEAM_ID,
     link_channel_id_for_team,
     team_id_for_agent,
@@ -89,7 +94,7 @@ from schmidt.scenarios.spot_the_difference.team_routing import (
     viewer_left_id_for_team,
     viewer_right_id_for_team,
 )
-from schmidt.scenarios.spot_the_difference.world_state import DiffOutcome, TeamState
+from glossogen.scenarios.spot_the_difference.world_state import DiffOutcome, TeamState
 
 logger = logging.getLogger(__name__)
 

@@ -34,7 +34,7 @@ count_running_for_model() {
   # "uv run python" wrapper nor the grep itself. Anchored on the exact model so
   # the two queues never count each other's sims.
   ps -axo command 2>/dev/null \
-    | grep "Python -m schmidt run drive_module_repair --model $1" \
+    | grep "Python -m glossogen run drive_module_repair --model $1" \
     | grep -v grep | wc -l | tr -d ' '
 }
 
@@ -62,7 +62,7 @@ launch_one() {
   local rep_log="/tmp/drive_baseline_${short}_b${budget}_rep${rep}.log"
   : > "$rep_log"
   echo "$(date) [$short] launching budget=$budget rep=$rep" >> "$LOG"
-  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m schmidt run drive_module_repair \
+  nohup bash -c "VIRTUAL_ENV= uv run --no-sync python -m glossogen run drive_module_repair \
       --model '$model' --provider '$provider' --runs-dir ./$RUNS_DIR --config '$CONFIG' \
       round_time_budget_seconds=$budget \
       >>'$rep_log' 2>&1" >/dev/null 2>&1 &

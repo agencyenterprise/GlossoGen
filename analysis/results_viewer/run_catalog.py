@@ -18,7 +18,7 @@ from typing import Any, NamedTuple
 
 import orjson
 
-from schmidt.evaluation.reports.evaluation_report import EvaluationReport
+from glossogen.evaluation.reports.evaluation_report import EvaluationReport
 
 logger = logging.getLogger(__name__)
 
