@@ -1,4 +1,4 @@
-# Emergent Comms
+# GlossoGen
 
 A platform for testing agent communication through real-life simulations. Agents decide when to speak; a game clock manages round progression and injects scenario events. All interactions are logged for post-hoc evaluation. A web UI displays simulation runs and evaluation results.
 

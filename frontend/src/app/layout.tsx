@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Emergent Comms",
+  title: "GlossoGen",
   description: "View and explore multi-agent simulation runs",
 };
 
