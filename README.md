@@ -427,7 +427,7 @@ The same OAuth flow that issues MCP tokens also gives the CLI a way to push loca
 # 1. One-time: sign in to the deployed backend. Opens your browser to the
 #    Clerk-gated consent page; pick your org, approve, the CLI's loopback
 #    server collects the code and writes ~/.glossogen/credentials.json (0600).
-glossogen login --url https://schmidtsciencesapi.up.railway.app
+glossogen login --url https://gnossogenapi.up.railway.app
 
 # 2. Diff local runs against prod and upload anything missing. Filters by
 #    label (AND) and by report-present (so crashed runs are skipped). The

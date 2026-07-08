@@ -593,7 +593,7 @@ def _build_parser() -> argparse.ArgumentParser:
         required=True,
         help=(
             "Base URL of the glossogen backend to authenticate against "
-            "(e.g. https://schmidtsciencesapi.up.railway.app)."
+            "(e.g. https://gnossogenapi.up.railway.app)."
         ),
     )
     login_parser.add_argument(
