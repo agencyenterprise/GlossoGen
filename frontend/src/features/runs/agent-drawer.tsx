@@ -147,7 +147,10 @@ export function AgentDrawer({
   };
 
   return (
-    <div className="absolute inset-y-0 right-0 z-10 flex w-[calc(100%-192px)] flex-col border-l border-border bg-background">
+    <div
+      id="agent-thread-drawer"
+      className="absolute inset-y-0 right-0 z-10 flex w-[calc(100%-192px)] flex-col border-l border-border bg-background"
+    >
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-3">
         <div

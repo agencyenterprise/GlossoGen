@@ -7,9 +7,11 @@ import {
   ArrowLeft,
   Check,
   Copy,
+  Download,
   FlaskConical,
   HelpCircle,
   Loader2,
+  Package,
   PanelRightOpen,
   Pencil,
   Radio,
@@ -20,8 +22,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { api } from "@/shared/lib/api-client";
+import { Tooltip } from "@/shared/components/ui/tooltip";
+import { api, downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
+import { splitRunId } from "@/shared/lib/run-id";
 import { useEventStream } from "@/shared/lib/use-event-stream";
 import { useServerConfig } from "@/shared/lib/use-server-config";
 import { useGroupPath } from "@/features/auth/group-context";
@@ -703,7 +707,47 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
           <EvalLogPanel runId={runId} evaluationInProgress={evaluationInProgress} />
         ) : (
           <ChatPane
-            runId={runId}
+            exportSlot={
+              <>
+                <span className="group/pdf relative">
+                  <button
+                    aria-label="Export PDF"
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={() => {
+                      const params = new URLSearchParams();
+                      if (selectedChannel !== null) {
+                        params.set("channel_id", selectedChannel);
+                      }
+                      void downloadAuthenticatedFile({
+                        path: `/api/g/{group_slug}/runs/${runId}/export/pdf`,
+                        searchParams: params,
+                        fallbackFilename: `${runId.slice(0, 8)}_transcript.pdf`,
+                      });
+                    }}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/pdf:block">
+                    Export PDF
+                  </span>
+                </span>
+                <Tooltip label="Export run bundle">
+                  <button
+                    aria-label="Export bundle"
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={() => {
+                      void downloadAuthenticatedFile({
+                        path: `/api/g/{group_slug}/runs/${runId}/export/zip`,
+                        searchParams: new URLSearchParams(),
+                        fallbackFilename: `${splitRunId(runId).run_dir_name}.zip`,
+                      });
+                    }}
+                  >
+                    <Package className="h-3.5 w-3.5" />
+                  </button>
+                </Tooltip>
+              </>
+            }
             messages={displayEntries}
             agents={allAgents}
             selectedChannel={selectedChannel}

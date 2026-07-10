@@ -7,23 +7,13 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
   type RefObject,
 } from "react";
-import {
-  Archive,
-  ArrowLeftRight,
-  ChevronDown,
-  Download,
-  Hash,
-  Package,
-  UserCog,
-  UserPlus,
-} from "lucide-react";
+import { Archive, ArrowLeftRight, ChevronDown, Hash, UserCog, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { Tooltip } from "@/shared/components/ui/tooltip";
-import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
-import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
 import { useGroupPath } from "@/features/auth/group-context";
 import { deriveInitials, type AgentColor } from "./agent-colors";
@@ -44,7 +34,10 @@ type RoundResult = components["schemas"]["RoundResult"];
 type RoundInjection = components["schemas"]["RoundInjection"];
 
 interface ChatPaneProps {
-  runId: string;
+  /** Export controls rendered in the channel header. The authenticated viewer
+   *  passes its PDF + zip download buttons; the public demo viewer passes a
+   *  static download link. Keeps ChatPane decoupled from the API client. */
+  exportSlot: ReactNode;
   messages: DisplayEntry[];
   agents: AgentDetail[];
   selectedChannel: string | null;
@@ -192,7 +185,7 @@ function groupByRoundAndTurn(messages: DisplayEntry[]): RoundGroup[] {
 const SCROLL_BOTTOM_THRESHOLD = 80;
 
 export function ChatPane({
-  runId,
+  exportSlot,
   messages,
   agents,
   selectedChannel,
@@ -533,7 +526,10 @@ export function ChatPane({
 
   return (
     <div className="relative flex min-h-0 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
+      <div
+        id="chat-channel-header"
+        className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5"
+      >
         <span className="text-sm text-muted-foreground">#</span>
         <span className="text-[13px] font-medium">{headerName}</span>
         <span className="text-xs text-muted-foreground">{headerDesc}</span>
@@ -584,43 +580,7 @@ export function ChatPane({
           />
           Tools
         </label>
-        <span className="group/pdf relative">
-          <button
-            aria-label="Export PDF"
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            onClick={() => {
-              const params = new URLSearchParams();
-              if (selectedChannel !== null) {
-                params.set("channel_id", selectedChannel);
-              }
-              void downloadAuthenticatedFile({
-                path: `/api/g/{group_slug}/runs/${runId}/export/pdf`,
-                searchParams: params,
-                fallbackFilename: `${runId.slice(0, 8)}_transcript.pdf`,
-              });
-            }}
-          >
-            <Download className="h-3.5 w-3.5" />
-          </button>
-          <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[11px] shadow-lg group-hover/pdf:block">
-            Export PDF
-          </span>
-        </span>
-        <Tooltip label="Export run bundle">
-          <button
-            aria-label="Export bundle"
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            onClick={() => {
-              void downloadAuthenticatedFile({
-                path: `/api/g/{group_slug}/runs/${runId}/export/zip`,
-                searchParams: new URLSearchParams(),
-                fallbackFilename: `${splitRunId(runId).run_dir_name}.zip`,
-              });
-            }}
-          >
-            <Package className="h-3.5 w-3.5" />
-          </button>
-        </Tooltip>
+        {exportSlot}
       </div>
 
       {/* Hide the chat-pane round badge while an agent drawer is open

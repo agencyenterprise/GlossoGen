@@ -164,6 +164,7 @@ export function RoundTimelineModal({
       onClick={onClose}
     >
       <div
+        id="round-timeline-modal"
         className="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-background shadow-xl"
         onClick={e => e.stopPropagation()}
       >

@@ -136,3 +136,244 @@
 .animate-highlight {
   animation: msg-highlight 1.5s ease-out;
 }
+
+/* Landing-page comms animation: a looping mini-conversation on a shared
+   channel that ends in a judged tool call. Each item appears at its own beat
+   within a shared 9s cycle, holds, then fades so the loop restarts cleanly. */
+@keyframes comms-item-1 {
+  0%,
+  3% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+
+  7%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+
+  96%,
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes comms-item-2 {
+  0%,
+  15% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+
+  19%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+
+  96%,
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes comms-item-3 {
+  0%,
+  31% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+
+  35%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+
+  96%,
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes comms-item-4 {
+  0%,
+  43% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+
+  47%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+
+  96%,
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes comms-item-5 {
+  0%,
+  59% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+
+  63%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+
+  96%,
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes comms-item-6 {
+  0%,
+  73% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  78%,
+  90% {
+    opacity: 1;
+    transform: none;
+  }
+
+  96%,
+  100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.comms-1 {
+  animation: comms-item-1 9s ease-in-out infinite;
+}
+
+.comms-2 {
+  animation: comms-item-2 9s ease-in-out infinite;
+}
+
+.comms-3 {
+  animation: comms-item-3 9s ease-in-out infinite;
+}
+
+.comms-4 {
+  animation: comms-item-4 9s ease-in-out infinite;
+}
+
+.comms-5 {
+  animation: comms-item-5 9s ease-in-out infinite;
+}
+
+.comms-6 {
+  animation: comms-item-6 9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comms-1,
+  .comms-2,
+  .comms-3,
+  .comms-4,
+  .comms-5,
+  .comms-6 {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Landing-page agent-loop animation. The choreography (which tool each agent
+   is calling, when read_notifications resolves) is JS-driven in
+   agent-loop-animation.tsx; these keyframes are the small flourishes: a
+   bubble/badge enter fade and the flowing dot on an active channel connector. */
+@keyframes agent-loop-appear {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes agent-loop-conn-flow {
+  0% {
+    left: 0%;
+    opacity: 0;
+  }
+
+  25%,
+  75% {
+    opacity: 1;
+  }
+
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+/* A message just sent lands with a brief emerald ring; messages being read by
+   read_channel pulse a sky ring while the call is active. */
+@keyframes agent-loop-msg-arrive {
+  from {
+    box-shadow: 0 0 0 3px rgb(16 185 129 / 55%);
+  }
+
+  to {
+    box-shadow: 0 0 0 0 rgb(16 185 129 / 0%);
+  }
+}
+
+@keyframes agent-loop-msg-read {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(14 165 233 / 0%);
+  }
+
+  50% {
+    box-shadow: 0 0 0 2px rgb(14 165 233 / 55%);
+  }
+}
+
+.agent-loop-appear {
+  animation: agent-loop-appear 0.4s ease-out;
+}
+
+.agent-loop-conn-dot {
+  animation: agent-loop-conn-flow 1.2s linear infinite;
+}
+
+.agent-loop-msg-arrive {
+  animation: agent-loop-msg-arrive 0.9s ease-out;
+}
+
+.agent-loop-msg-read {
+  animation: agent-loop-msg-read 1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-loop-appear,
+  .agent-loop-conn-dot,
+  .agent-loop-msg-arrive,
+  .agent-loop-msg-read {
+    animation: none;
+  }
+}
