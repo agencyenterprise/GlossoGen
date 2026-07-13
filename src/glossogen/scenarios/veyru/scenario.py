@@ -35,12 +35,7 @@ from glossogen.models.channel import Channel
 from glossogen.models.event import SimulationEvent
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
-from glossogen.scenario_protocol import (
-    PrimaryChannel,
-    RoundResult,
-    ScenarioRuntimeHandle,
-    SimulationScenario,
-)
+from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.veyru.agent_factory import (
     build_agent_display_names,
@@ -150,10 +145,13 @@ class VeyruScenario(SimulationScenario):
         return roles
 
     @classmethod
-    @classmethod
     def knobs_model(cls) -> type[VeyruKnobs]:
         """Return the knobs model class for this scenario."""
         return VeyruKnobs
+
+    def get_knobs(self) -> VeyruKnobs:
+        """Return this scenario's validated knobs instance."""
+        return self._knobs
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
@@ -163,7 +161,6 @@ class VeyruScenario(SimulationScenario):
 
     def __init__(self, knobs: VeyruKnobs) -> None:
         self._knobs = knobs
-        self._runtime: ScenarioRuntimeHandle | None = None
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
         self._postmortem_active: bool = (
             knobs.postmortem_enabled and not knobs.postmortem_disabled_at_start
@@ -203,10 +200,6 @@ class VeyruScenario(SimulationScenario):
     def name(self) -> str:
         """Return the scenario identifier."""
         return "veyru"
-
-    def get_scenario_config(self) -> dict[str, object]:
-        """Return Veyru knobs as a config dict."""
-        return self._knobs.model_dump()
 
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""
@@ -258,10 +251,6 @@ class VeyruScenario(SimulationScenario):
         if display is None:
             return agent_id
         return display
-
-    def bind_runtime(self, runtime: ScenarioRuntimeHandle) -> None:
-        """Stash the runtime handle so stabilize_veyru can emit judge verdicts."""
-        self._runtime = runtime
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the injection message for an agent at a given round, or None."""
@@ -440,14 +429,13 @@ class VeyruScenario(SimulationScenario):
             case=bundle.case,
             engineer_addendum=bundle.engineer_addendum,
         )
-        if self._runtime is not None:
-            await self._runtime.event_logger.log(
-                event=VeyruCaseOverridden(
-                    round_number=round_number,
-                    case_number=bundle.case.case_number,
-                    failure_name=bundle.case.failure_name,
-                )
+        await self.runtime.event_logger.log(
+            event=VeyruCaseOverridden(
+                round_number=round_number,
+                case_number=bundle.case.case_number,
+                failure_name=bundle.case.failure_name,
             )
+        )
         logger.info(
             "Veyru case override staged at round %d: %s (%d stage(s), %d addendum entr%s)",
             round_number,
@@ -459,11 +447,9 @@ class VeyruScenario(SimulationScenario):
 
     async def _emit_case_started_event(self, round_number: int) -> None:
         """Log a VeyruCaseStarted event carrying the full ground-truth case data."""
-        if self._runtime is None:
-            return
         case = self._world.current_case
         assert case is not None, "finalize_round_sync must populate current_case"
-        await self._runtime.event_logger.log(
+        await self.runtime.event_logger.log(
             event=case_started_event(round_number=round_number, case=case)
         )
 
@@ -537,14 +523,6 @@ class VeyruScenario(SimulationScenario):
             agent_display_names=self._agent_display_names,
             get_runtime=lambda: self._runtime,
         )
-
-    def get_round_count(self) -> int:
-        """Return the configured number of rounds."""
-        return self._knobs.round_count
-
-    def get_max_round_duration_seconds(self) -> float:
-        """Return the maximum wall-clock seconds a round may last."""
-        return self._knobs.max_round_duration_seconds
 
     @classmethod
     def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:

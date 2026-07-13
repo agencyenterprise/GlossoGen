@@ -21,12 +21,7 @@ from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from glossogen.runtime.scenario_world import ScenarioWorld
-from glossogen.scenario_protocol import (
-    PrimaryChannel,
-    RoundResult,
-    ScenarioRuntimeHandle,
-    SimulationScenario,
-)
+from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.warehouse_robot_recovery.events import (
     WarehouseCaseStarted,
@@ -103,10 +98,13 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
         ]
 
     @classmethod
-    @classmethod
     def knobs_model(cls) -> type[WarehouseRobotRecoveryKnobs]:
         """Return the knobs model class for this scenario."""
         return WarehouseRobotRecoveryKnobs
+
+    def get_knobs(self) -> WarehouseRobotRecoveryKnobs:
+        """Return this scenario's validated knobs instance."""
+        return self._knobs
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
@@ -116,7 +114,6 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
 
     def __init__(self, knobs: WarehouseRobotRecoveryKnobs) -> None:
         self._knobs = knobs
-        self._runtime: ScenarioRuntimeHandle | None = None
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
         self._postmortem_active: bool = (
             knobs.postmortem_enabled and not knobs.postmortem_disabled_at_start
@@ -153,10 +150,6 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
     def name(self) -> str:
         """Return the scenario identifier."""
         return "warehouse_robot_recovery"
-
-    def get_scenario_config(self) -> dict[str, object]:
-        """Return warehouse knobs as a config dict for the JSONL log."""
-        return self._knobs.model_dump()
 
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""
@@ -271,10 +264,6 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
     def get_agent_display_name(self, agent_id: str) -> str:
         """Return the human-readable display name for an agent."""
         return self._agent_display_names.get(agent_id, agent_id)
-
-    def bind_runtime(self, runtime: ScenarioRuntimeHandle) -> None:
-        """Stash the runtime handle so perform_recovery can emit judge verdicts."""
-        self._runtime = runtime
 
     def _previous_outcome(self) -> RecoveryOutcome | None:
         """Return the most recent round outcome, or None on round 1."""
@@ -409,11 +398,9 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
 
     async def _emit_case_started_event(self, round_number: int) -> None:
         """Log a WarehouseCaseStarted event carrying the full ground-truth case."""
-        if self._runtime is None:
-            return
         case = self._world.current_case
         assert case is not None, "finalize_round_sync must populate current_case"
-        await self._runtime.event_logger.log(
+        await self.runtime.event_logger.log(
             event=WarehouseCaseStarted(
                 round_number=round_number,
                 case_number=case.case_number,
@@ -532,20 +519,19 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
             budget_exceeded = self._world.round_budget_exceeded
             success = overall_success and not budget_exceeded
 
-            if self._runtime is not None:
-                await self._runtime.event_logger.log(
-                    event=WarehouseRecoveryJudged(
-                        agent_id=agent_id,
-                        round_number=self._runtime.current_round,
-                        robot_id=case.robot_id,
-                        expected_procedure=expected_procedure,
-                        safety_constraints=safety_constraints,
-                        judgment=judgment,
-                        overall_success=success,
-                        budget_exceeded=budget_exceeded,
-                        judge_explanation=judge_result.explanation,
-                    )
+            await self.runtime.event_logger.log(
+                event=WarehouseRecoveryJudged(
+                    agent_id=agent_id,
+                    round_number=self.runtime.current_round,
+                    robot_id=case.robot_id,
+                    expected_procedure=expected_procedure,
+                    safety_constraints=safety_constraints,
+                    judgment=judgment,
+                    overall_success=success,
+                    budget_exceeded=budget_exceeded,
+                    judge_explanation=judge_result.explanation,
                 )
+            )
 
             await self._world.record_recovery_judgment(
                 judge_passed=overall_success,
@@ -575,14 +561,6 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
                 executor=perform_recovery,
             ),
         ]
-
-    def get_round_count(self) -> int:
-        """Return the configured number of rounds."""
-        return self._knobs.round_count
-
-    def get_max_round_duration_seconds(self) -> float:
-        """Return the maximum wall-clock seconds a round may last."""
-        return self._knobs.max_round_duration_seconds
 
     @classmethod
     def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:

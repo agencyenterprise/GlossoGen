@@ -58,6 +58,7 @@ class BaseKnobs(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
+    round_count: int
     max_round_duration_seconds: float
     model_overrides: dict[str, AgentModelOverride]
     postmortem_duration_seconds: float = 120.0

@@ -87,6 +87,8 @@ class SimulationScenario(ABC):
     scenario.
     """
 
+    _runtime: ScenarioRuntimeHandle | None = None
+
     @classmethod
     def get_available_metric_names(cls) -> list[str]:
         """Return the names of all metrics available for this scenario.
@@ -160,6 +162,7 @@ class SimulationScenario(ABC):
         return config
 
     @classmethod
+    @abstractmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
         """Reconstruct a scenario from its serialized config dict.
 
@@ -167,13 +170,8 @@ class SimulationScenario(ABC):
         - ``run`` preflight (CLI and API) to validate prepared config payloads
         - ``evaluate`` to rebuild the scenario from JSONL-stored config
         - fork/resume flows to reconstruct scenarios from persisted state
-
-        Subclasses that support forking must override this method.
         """
-        raise NotImplementedError(
-            f"{cls.__name__} does not implement create_from_config. "
-            "Override this method to support simulation forking."
-        )
+        ...
 
     @abstractmethod
     def name(self) -> str:
@@ -218,13 +216,20 @@ class SimulationScenario(ABC):
         _ = round_number
         return self.get_agent_display_name(agent_id=agent_id)
 
-    def get_scenario_config(self) -> dict[str, object]:
-        """Return scenario configuration as a JSON-serializable dict for logging and display.
+    @abstractmethod
+    def get_knobs(self) -> BaseKnobs:
+        """Return this scenario's validated knobs instance.
 
-        Subclasses override this to expose their knobs. The default returns
-        an empty dict, so scenarios without configuration need no changes.
+        The single source of truth for runtime configuration values: the
+        platform reads timing and config off this, so scenarios expose their
+        stored knobs here rather than re-implementing each getter. Overrides
+        may narrow the return type to their concrete knobs model.
         """
-        return {}
+        ...
+
+    def get_scenario_config(self) -> dict[str, object]:
+        """Return scenario configuration as a JSON-serializable dict for logging and display."""
+        return self.get_knobs().model_dump()
 
     @abstractmethod
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
@@ -236,15 +241,13 @@ class SimulationScenario(ABC):
 
     # --- Autonomous agent timing configuration ---
 
-    @abstractmethod
     def get_round_count(self) -> int:
         """Return the total number of rounds in this scenario."""
-        ...
+        return self.get_knobs().round_count
 
-    @abstractmethod
     def get_max_round_duration_seconds(self) -> float:
         """Return the maximum wall-clock seconds a round may last before force-advancing."""
-        ...
+        return self.get_knobs().max_round_duration_seconds
 
     @abstractmethod
     def get_world(self) -> ScenarioWorld:
@@ -275,14 +278,25 @@ class SimulationScenario(ABC):
         _ = run_dir
 
     def bind_runtime(self, runtime: ScenarioRuntimeHandle) -> None:
-        """Called before the simulation starts, giving the scenario a runtime handle.
+        """Store the runtime handle. Called once before the simulation starts.
 
-        Scenarios that want to emit custom events (e.g. judge verdicts,
-        world-state transitions) from inside their MCP tool executors or
-        read the active round number store the handle here and use it at
-        runtime. The default is a no-op.
+        Scenarios read the bound handle via the ``runtime`` property to emit
+        custom events (judge verdicts, world-state transitions) from inside
+        their MCP tool executors or to read the active round number.
         """
-        _ = runtime
+        self._runtime = runtime
+
+    @property
+    def runtime(self) -> ScenarioRuntimeHandle:
+        """Return the bound runtime handle.
+
+        Raises ``RuntimeError`` if accessed before ``bind_runtime``. The
+        supervisor binds it before the simulation starts, so tool executors
+        and round hooks can rely on it being present.
+        """
+        if self._runtime is None:
+            raise RuntimeError(f"{type(self).__name__}: runtime accessed before bind_runtime")
+        return self._runtime
 
     def is_finished_early(self) -> bool:
         """Return True if the scenario has reached a natural conclusion before max rounds.

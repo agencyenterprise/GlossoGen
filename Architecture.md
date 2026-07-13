@@ -139,23 +139,19 @@ The ChannelRouter stores messages and validates membership.
 The `SimulationScenario` ABC defines a contract for scenario plug-ins.
 
 **Core methods (required by all scenarios):**
-- `get_agent_roles(knobs)` — return agent IDs and display names for a knobs/config payload
-- `knobs_json_schema()` — return the JSON Schema for the scenario knobs model
-- `prepare_config(config)` — normalize raw config before validation/instantiation
+- `knobs_model()` — return the knobs Pydantic model class. The JSON Schema (`knobs_json_schema()`) and per-field defaults derive from it on the base, so scenarios declare the model here rather than reimplementing schema/default accessors.
+- `get_knobs()` — return the validated knobs instance. The base derives `get_round_count()`, `get_max_round_duration_seconds()`, and `get_scenario_config()` from it, so scenarios no longer implement those getters.
+- `get_agent_roles(knobs)` — return agent IDs and display names for a (possibly partial or `None`) knobs/config payload; read role-determining flags via `resolve_bool_knob`
 - `create_from_config(config)` — reconstruct a scenario from its serialized config dict (used by fork/resume)
 - `name()`, `scenario_description()`, `get_agents()`, `get_channels()`
 - `get_channel_display_name()`, `get_agent_display_name()`, `get_injection()`
-- `run_evaluation(log_path, metric_names, report_path, model, provider_name, inference_provider, reasoning_effort)`
-
-**Timing and round structure:**
-- `get_round_count()` — total number of rounds
-- `get_max_round_duration_seconds()` — max wall-clock seconds per round
 
 **Runtime extensions:**
-- `get_world()` — scenario world (state, world-event delivery, tool handlers)
+- `get_world()` — scenario world (state, per-message async reactions via `on_message_async`, tool handlers). The `run` event loop is provided by the base `ScenarioWorld`.
 - `get_mcp_tools()` — scenario-specific MCP tools (agent_id injected automatically)
+- `bind_runtime(runtime)` and the `runtime` property are provided by the base; scenarios that emit custom events read `self.runtime` (raises if accessed before binding).
 
-The game clock uses the timing methods to manage round progression and termination; injection delivery is triggered by the clock and performed by the runtime via `deliver_round_injections` / `deliver_postmortem_injections`, which read scenario-defined injection content and push it onto agent sessions.
+Scoring is not a scenario method: `run_scenario_evaluation(...)` ([scenario_evaluation_runner.py](src/glossogen/evaluation/scenario_evaluation_runner.py)) is platform code that runs the requested metrics against a run's log. The game clock uses the timing getters to manage round progression and termination; injection delivery is triggered by the clock and performed by the runtime via `deliver_round_injections` / `deliver_postmortem_injections`, which read scenario-defined injection content and push it onto agent sessions.
 
 ### Scenario Package Layout
 
@@ -480,7 +476,7 @@ The user selects which metrics to run — they are not automatically applied.
 - `shorthand_codes` — abbreviation systems, symbol-to-meaning mappings, systematic encoding (LLM judge)
 - `round_ended_idle` / `round_ended_timeout` — count rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger (deterministic, reads `RoundEnded.trigger`)
 - `content_filter_refusal` — counts LLM content-filter refusals across the run with per-round + per-agent breakdowns (deterministic, scans `AgentRunCycleFailed` events)
-- `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model loaded via `minicons.IncrementalLMScorer`. Scoping uses `scenario.get_primary_channel_id()` so the metric stays scenario-agnostic (Veyru returns `#link`; scenarios without a primary channel get a no-op result). The score is the overall mean nats; `per_round` carries mean+std+message_count per round. No LLM judge.
+- `perplexity` — mean per-token surprisal (in nats) of primary-channel messages under a fixed `gpt2` language model loaded via `minicons.IncrementalLMScorer`. Scoping uses `scenario.get_primary_channels()` so the metric stays scenario-agnostic (Veyru returns `#link`; scenarios without a primary channel get a no-op result). The score is the overall mean nats; `per_round` carries mean+std+message_count per round. No LLM judge.
 - `mean_chars_per_round` — total characters of all primary-channel messages summed per round, then averaged across rounds with at least one message. Same scoping rule as `perplexity`. The score is the mean of per-round totals; `per_round` lists each round's total chars + message count. The headline channel-utilization number; in Veyru this is exactly the unit that ``time_budget_seconds`` is denominated in. No LLM judge.
 - `mean_chars_per_message` — characters per individual primary-channel message, averaged across all messages in the run (flattened, not mean of round means). Same scoping rule as `perplexity`. The score is the overall mean chars/message; `per_round` carries per-round mean+std+message_count. Normalizes MCR by message count, isolating per-message verbosity from message density — MCR is biased upward by rounds that simply need more back-and-forth. No LLM judge.
 

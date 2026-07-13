@@ -47,7 +47,6 @@ class SpillwayReleaseKnobs(BaseKnobs):
 
     postmortem_enabled: bool
     postmortem_disabled_at_start: bool
-    round_count: int
     round_time_budget_seconds: int  # pyright: ignore[reportIncompatibleVariableOverride]
     seed: int
     channel_noise_level: float

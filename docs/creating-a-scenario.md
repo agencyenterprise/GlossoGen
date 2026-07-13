@@ -30,7 +30,7 @@ src/glossogen/scenarios/<your_scenario>/
 ├── knobs.py                     # ScenarioKnobs Pydantic model extending BaseKnobs
 ├── knobs_default.json           # canonical preset (referenced by the CLI's --config)
 ├── events.py                    # scenario-specific EventBase subclasses (auto-discovered)
-├── world.py                     # ScenarioWorld subclass: state + on_message + run loop
+├── world.py                     # ScenarioWorld subclass: state + on_message / on_message_async
 ├── scenario.py                  # SimulationScenario subclass: tools, channels, injections
 ├── prompts/
 │   ├── description.jinja
@@ -93,7 +93,7 @@ ROUND_FAILED_MARKER = "[round_failed]"
 
 ### 3. Write `knobs.py`
 
-Define a `ScenarioKnobs` Pydantic model that extends `BaseKnobs`. Every field MUST be required (no defaults — per the project's "no default parameter values" rule); presets supply values via `knobs_default.json`.
+Define a `ScenarioKnobs` Pydantic model that extends `BaseKnobs`. Every field MUST be required (no defaults — per the project's "no default parameter values" rule); presets supply values via `knobs_default.json`. `BaseKnobs` already provides `round_count`, `max_round_duration_seconds`, `model_overrides`, `scheduled_events`, and the other shared fields — declare only your scenario-specific knobs here.
 
 ```python
 from glossogen.knobs_base import BaseKnobs
@@ -104,7 +104,6 @@ class ContainerYardStackingKnobs(BaseKnobs):
     judge_provider: str
     postmortem_enabled: bool
     postmortem_disabled_at_start: bool
-    round_count: int
     time_budget_seconds: int
     seed: int
     hard_case_fraction: float = Field(ge=0.0, le=1.0)
@@ -150,7 +149,7 @@ class YardCaseStarted(EventBase):
 
 ### 6. Write `world.py`
 
-Subclass `ScenarioWorld` (defined in [scenario_world.py](../src/glossogen/runtime/scenario_world.py)). The world is the live simulated environment — it consumes inbound messages, mutates internal state, emits notifications to agents via `world_context.deliver_world_event(...)`, and decides when a round succeeds or fails.
+Subclass `ScenarioWorld` (defined in [scenario_world.py](../src/glossogen/runtime/scenario_world.py)). The world is the live simulated environment — it mutates internal state synchronously in `on_message`, reacts asynchronously (pushing notifications to agents via `context.send_update_to_channel(...)`) in `on_message_async`, and tracks the state the scenario reads to decide when a round succeeds or fails. The base class provides the `run` event loop; you override the message hooks, not `run`.
 
 The shape to mimic is [`WarehouseWorld`](../src/glossogen/scenarios/warehouse_robot_recovery/world.py) (single-tool scenarios) or [`ContainerYardWorld`](../src/glossogen/scenarios/container_yard_stacking/world.py) (multi-tool scenarios with sequenced action state).
 
@@ -164,17 +163,18 @@ The world is also the place where:
 The `SimulationScenario` subclass — the entry point the registry hands to the CLI, MCP `start_run` tool, and run-detail UI. Required classmethods and methods are spelled out in [scenario_protocol.py](../src/glossogen/scenario_protocol.py). The key ones:
 
 - `name()` → the registry key (string).
-- `description()` → a short human-readable description.
-- `knobs_json_schema()` → returns `<YourKnobs>.model_json_schema()`.
-- `create_from_config(config, model, provider, ...)` → factory that validates the dict against `<YourKnobs>` and constructs the scenario.
-- `get_agent_roles(knobs)` → classmethod returning `(agent_id, role_name)` pairs used for agent-model override validation in CLI run-config preflight.
+- `scenario_description()` → a short human-readable description.
+- `knobs_model()` → classmethod returning your `<YourKnobs>` class. The base derives `knobs_json_schema()` from it — you no longer write the schema accessor.
+- `get_knobs()` → return `self._knobs`. The base derives `get_round_count()`, `get_max_round_duration_seconds()`, and `get_scenario_config()` from it — you no longer write those getters.
+- `create_from_config(config)` → classmethod factory that validates the dict against `<YourKnobs>` and constructs the scenario.
+- `get_agent_roles(knobs)` → classmethod returning `(agent_id, role_name)` pairs used for agent-model override validation in CLI run-config preflight. Receives a possibly-partial `dict | None`; read role-determining flags with `self.resolve_bool_knob(knobs=knobs, field_name=...)`.
 - `get_agents()`, `get_channels()`, `get_world()`, `get_mcp_tools()` — wire up the world plus the per-agent role configs (system prompt path, channels, tools, MCP).
 - `get_injection(round_number, agent_id, previous_outcome, current_case)` → renders the per-round Jinja injection for an agent.
 - `get_postmortem_injection(round_number, agent_id, previous_outcome)` → optional postmortem-phase injection.
 - `on_round_advanced(round_number, world_context, event_logger)` → emit your `<Scenario>CaseStarted` event so metrics can read per-round ground truth.
 - `on_round_ended(round_number, world_context, event_logger)` → settle round-end state.
 - `validate_outgoing_message(...)`, `transform_outgoing_message(...)` → enforce / mutate messages (budget enforcement, noise injection).
-- `get_primary_channel_id()` → tells generic metrics (perplexity, mean-chars-per-round, mean-chars-per-message) which channel to score.
+- `get_primary_channels()` → tells generic metrics (perplexity, mean-chars-per-round, mean-chars-per-message) which channel(s) to score.
 - `get_early_round_end_trigger()` → optional; returns a trigger string when the round should end early (e.g. once a `target_placed` flag and `executed_moves` count match the expected sequence).
 - `judge_round_result(round_number, trigger)` → return a list of `RoundResult(success, team_id, reason)`. The game clock writes one `RoundResultRecorded` event per element; the platform `round_success` metric reads these directly and emits one Measurement per `team_id` (single-team scenarios pass `team_id=None` and get one Measurement named `round_success`). Scenarios that don't override this hook get no round-success measurement.
 - `restore_state_from_events(events)` → optional. Called after a fork/resume rewind has been built and before the runtime starts. Walk the event list and seed any per-round outcomes you need so the first post-resume injection renders accurate "previous result" context (most scenarios need this only if their injection templates surface prior-round state).
@@ -203,11 +203,11 @@ For scenarios with LLM judges, one `<judge_name>.jinja` per judge — these are 
 
 ### 9. (Optional) Write `evaluation/`
 
-Most scoring is now scenario-agnostic. As soon as your scenario implements `get_primary_channel_id()` you get every generic metric for free:
+Most scoring is now scenario-agnostic. As soon as your scenario implements `get_primary_channels()` you get every generic metric for free:
 
 | Metric | Hook the scenario must implement |
 |---|---|
-| `perplexity`, `mean_chars_per_round`, `mean_chars_per_message`, `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes` | `get_primary_channel_id()` |
+| `perplexity`, `mean_chars_per_round`, `mean_chars_per_message`, `language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes` | `get_primary_channels()` |
 | `round_ended_idle`, `round_ended_timeout`, `content_filter_refusal` | (nothing — read straight from `RoundEnded` / `AgentRunCycleFailed`) |
 | `round_success` | `judge_round_result(round_number, trigger)` |
 | `round_success_after_resume` | `judge_round_result(...)` + the run was launched via replace-agent / cross-run / scheduled swap / resume-at-round |
@@ -338,7 +338,7 @@ Before opening a PR:
 - [ ] `judge_model = "claude-haiku-4-5-20251001"`, `judge_provider = "anthropic"`, `seed = 42` in the preset.
 - [ ] Prompts live in `prompts/*.jinja`, not in Python string literals.
 - [ ] `judge_round_result(round_number, trigger)` returns at least one `RoundResult` per round (single-team scenarios: one with `team_id=None`; multi-team: one per team). The game clock writes `RoundResultRecorded` events from these; the platform `round_success` metric reads them directly.
-- [ ] `get_primary_channel_id()` returns the comm-link channel (or `None` for two-team scenarios where the metric should no-op).
+- [ ] `get_primary_channels()` returns the comm-link channel (or `None` for two-team scenarios where the metric should no-op).
 - [ ] If you added a run-detail extension, re-run `make gen-api-types` so `frontend/src/types/api.gen.ts` includes your `XxxRunExtras` variant.
 - [ ] `make lint` is clean. Regenerate the vulture whitelist (`VIRTUAL_ENV= uv run --no-sync vulture src/ --min-confidence 60 --make-whitelist > vulture_whitelist.py`) if Pydantic fields or auto-discovered classes get flagged.
 - [ ] At least one end-to-end smoke run completes and the `round_success` metric returns a non-empty per-round list.

@@ -33,12 +33,7 @@ from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
-from glossogen.scenario_protocol import (
-    PrimaryChannel,
-    RoundResult,
-    ScenarioRuntimeHandle,
-    SimulationScenario,
-)
+from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.orbital_anomaly.agent_factory import (
     build_agent_display_names,
@@ -89,10 +84,13 @@ class OrbitalAnomalyScenario(SimulationScenario):
         ]
 
     @classmethod
-    @classmethod
     def knobs_model(cls) -> type[OrbitalAnomalyKnobs]:
         """Return the knobs model class for this scenario."""
         return OrbitalAnomalyKnobs
+
+    def get_knobs(self) -> OrbitalAnomalyKnobs:
+        """Return this scenario's validated knobs instance."""
+        return self._knobs
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
@@ -102,7 +100,6 @@ class OrbitalAnomalyScenario(SimulationScenario):
 
     def __init__(self, knobs: OrbitalAnomalyKnobs) -> None:
         self._knobs = knobs
-        self._runtime: ScenarioRuntimeHandle | None = None
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
         self._postmortem_active: bool = (
             knobs.postmortem_enabled and not knobs.postmortem_disabled_at_start
@@ -133,10 +130,6 @@ class OrbitalAnomalyScenario(SimulationScenario):
     def name(self) -> str:
         """Return the scenario identifier."""
         return "orbital_anomaly"
-
-    def get_scenario_config(self) -> dict[str, object]:
-        """Return orbital anomaly knobs as a config dict for the JSONL log."""
-        return self._knobs.model_dump()
 
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""
@@ -175,10 +168,6 @@ class OrbitalAnomalyScenario(SimulationScenario):
     def get_agent_display_name(self, agent_id: str) -> str:
         """Return the human-readable display name for an agent."""
         return self._agent_display_names.get(agent_id, agent_id)
-
-    def bind_runtime(self, runtime: ScenarioRuntimeHandle) -> None:
-        """Stash the runtime handle so actuate_panel can emit judge verdicts."""
-        self._runtime = runtime
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the per-round injection for one agent, or None."""
@@ -251,12 +240,10 @@ class OrbitalAnomalyScenario(SimulationScenario):
 
     async def _emit_case_started_event(self, round_number: int) -> None:
         """Log an OrbitalAnomalyCaseStarted event carrying the full ground-truth case."""
-        if self._runtime is None:
-            return
         case = self._world.current_case
         if case is None:
             return
-        await self._runtime.event_logger.log(
+        await self.runtime.event_logger.log(
             event=OrbitalAnomalyCaseStarted(
                 round_number=round_number,
                 case_number=case.case_number,
@@ -320,14 +307,6 @@ class OrbitalAnomalyScenario(SimulationScenario):
             judge_provider=self._judge_provider,
             get_runtime=lambda: self._runtime,
         )
-
-    def get_round_count(self) -> int:
-        """Return the configured number of rounds."""
-        return self._knobs.round_count
-
-    def get_max_round_duration_seconds(self) -> float:
-        """Return the maximum wall-clock seconds a round may last."""
-        return self._knobs.max_round_duration_seconds
 
     @classmethod
     def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:

@@ -23,12 +23,7 @@ from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool, ToolContext, resolve_agent_id
 from glossogen.runtime.scenario_world import ScenarioWorld
-from glossogen.scenario_protocol import (
-    PrimaryChannel,
-    RoundResult,
-    ScenarioRuntimeHandle,
-    SimulationScenario,
-)
+from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.satellite_contact_window.cases import CommandStep, SatelliteCase, get_cases
 from glossogen.scenarios.satellite_contact_window.command_judge import judge_command_sequence
@@ -111,10 +106,13 @@ class SatelliteContactWindowScenario(SimulationScenario):
         ]
 
     @classmethod
-    @classmethod
     def knobs_model(cls) -> type[SatelliteContactWindowKnobs]:
         """Return the knobs model class for this scenario."""
         return SatelliteContactWindowKnobs
+
+    def get_knobs(self) -> SatelliteContactWindowKnobs:
+        """Return this scenario's validated knobs instance."""
+        return self._knobs
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
@@ -124,7 +122,6 @@ class SatelliteContactWindowScenario(SimulationScenario):
 
     def __init__(self, knobs: SatelliteContactWindowKnobs) -> None:
         self._knobs = knobs
-        self._runtime: ScenarioRuntimeHandle | None = None
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
         self._postmortem_active: bool = (
             knobs.postmortem_enabled and not knobs.postmortem_disabled_at_start
@@ -161,10 +158,6 @@ class SatelliteContactWindowScenario(SimulationScenario):
     def name(self) -> str:
         """Return the scenario identifier."""
         return "satellite_contact_window"
-
-    def get_scenario_config(self) -> dict[str, object]:
-        """Return satellite knobs as a config dict for the JSONL log."""
-        return self._knobs.model_dump()
 
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""
@@ -284,10 +277,6 @@ class SatelliteContactWindowScenario(SimulationScenario):
         if display is None:
             return agent_id
         return display
-
-    def bind_runtime(self, runtime: ScenarioRuntimeHandle) -> None:
-        """Stash the runtime handle so send_command_sequence can emit judge verdicts."""
-        self._runtime = runtime
 
     def _previous_outcome(self) -> SatelliteOutcome | None:
         """Return the most recent round outcome, or None on round 1."""
@@ -427,12 +416,10 @@ class SatelliteContactWindowScenario(SimulationScenario):
 
     async def _emit_case_started_event(self, round_number: int) -> None:
         """Log a SatelliteCaseStarted event carrying the full ground-truth case."""
-        if self._runtime is None:
-            return
         case = self._world.current_case
         assert case is not None, "finalize_round_sync must populate current_case"
         envelope = case.authorization_envelope
-        await self._runtime.event_logger.log(
+        await self.runtime.event_logger.log(
             event=SatelliteCaseStarted(
                 round_number=round_number,
                 case_number=case.case_number,
@@ -557,46 +544,45 @@ class SatelliteContactWindowScenario(SimulationScenario):
             window_closed = self._world.round_window_closed
             success = overall_success and not window_closed
 
-            if self._runtime is not None:
-                envelope = case.authorization_envelope
-                await self._runtime.event_logger.log(
-                    event=SatelliteCommandSequenceJudged(
-                        agent_id=agent_id,
-                        round_number=self._runtime.current_round,
-                        expected_sequence=[
-                            SatelliteCommandStep(
-                                action=step.action,
-                                wait_seconds=step.wait_seconds,
+            envelope = case.authorization_envelope
+            await self.runtime.event_logger.log(
+                event=SatelliteCommandSequenceJudged(
+                    agent_id=agent_id,
+                    round_number=self.runtime.current_round,
+                    expected_sequence=[
+                        SatelliteCommandStep(
+                            action=step.action,
+                            wait_seconds=step.wait_seconds,
+                        )
+                        for step in case.expected_sequence
+                    ],
+                    authorization_envelope=SatelliteAuthorizationEnvelope(
+                        authorized_actions=list(envelope.authorized_actions),
+                        forbidden_actions=list(envelope.forbidden_actions),
+                        dependencies=[
+                            SatelliteActionDependency(
+                                action=dep.action,
+                                requires_prior_action=dep.requires_prior_action,
                             )
-                            for step in case.expected_sequence
+                            for dep in envelope.dependencies
                         ],
-                        authorization_envelope=SatelliteAuthorizationEnvelope(
-                            authorized_actions=list(envelope.authorized_actions),
-                            forbidden_actions=list(envelope.forbidden_actions),
-                            dependencies=[
-                                SatelliteActionDependency(
-                                    action=dep.action,
-                                    requires_prior_action=dep.requires_prior_action,
-                                )
-                                for dep in envelope.dependencies
-                            ],
-                            remaining_window_seconds=envelope.remaining_window_seconds,
-                            notes=envelope.notes,
-                        ),
-                        submitted_sequence=[
-                            SatelliteCommandStep(
-                                action=step.action,
-                                wait_seconds=step.wait_seconds,
-                            )
-                            for step in submitted
-                        ],
-                        judgment=judgment,
-                        overall_success=success,
-                        budget_exceeded=window_closed,
-                        violations=list(judge_result.violations),
-                        judge_explanation=judge_result.explanation,
-                    )
+                        remaining_window_seconds=envelope.remaining_window_seconds,
+                        notes=envelope.notes,
+                    ),
+                    submitted_sequence=[
+                        SatelliteCommandStep(
+                            action=step.action,
+                            wait_seconds=step.wait_seconds,
+                        )
+                        for step in submitted
+                    ],
+                    judgment=judgment,
+                    overall_success=success,
+                    budget_exceeded=window_closed,
+                    violations=list(judge_result.violations),
+                    judge_explanation=judge_result.explanation,
                 )
+            )
 
             await self._world.record_command_judgment(
                 judge_passed=overall_success,
@@ -631,14 +617,6 @@ class SatelliteContactWindowScenario(SimulationScenario):
                 executor=send_command_sequence,
             ),
         ]
-
-    def get_round_count(self) -> int:
-        """Return the configured number of rounds."""
-        return self._knobs.round_count
-
-    def get_max_round_duration_seconds(self) -> float:
-        """Return the maximum wall-clock seconds a round may last."""
-        return self._knobs.max_round_duration_seconds
 
     @classmethod
     def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:

@@ -57,7 +57,6 @@ class VeyruKnobs(BaseKnobs):
     judge_model: str
     judge_provider: str
     postmortem_enabled: bool
-    round_count: int
     round_time_budget_seconds: int  # pyright: ignore[reportIncompatibleVariableOverride]
     seed: int
     two_teams: bool
