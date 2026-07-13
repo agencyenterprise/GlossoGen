@@ -350,6 +350,7 @@ class SimulationScenario(ABC):
             "remove the InjectCase entry from scheduled_events or implement the hook."
         )
 
+    @abstractmethod
     def get_primary_channels(self) -> list[PrimaryChannel]:
         """Return the channels that evaluators should focus on.
 
@@ -357,9 +358,11 @@ class SimulationScenario(ABC):
         Char/compression metrics score each returned channel and emit one
         Measurement per channel (suffixed by ``team_id`` for multi-team
         scenarios); the language-emergence judges treat every returned channel
-        as primary. Returns an empty list when no channel is primary.
+        as primary. Return an empty list only when the scenario genuinely has
+        no channel evaluators should score — that silently skips every
+        primary-channel metric.
         """
-        return []
+        ...
 
     def build_communication_rounds(
         self, events: list[SimulationEvent]
@@ -452,6 +455,7 @@ class SimulationScenario(ABC):
         """
         _ = events
 
+    @abstractmethod
     def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
         """Return per-team (or single-side) result verdicts for the round.
 
@@ -464,12 +468,12 @@ class SimulationScenario(ABC):
 
         Single-team scenarios return a one-element list with
         ``team_id=None``. Multi-team scenarios return one result per
-        team. The default returns ``[]``, which opts the scenario out
-        — no ``RoundResultRecorded`` events are emitted and the generic
-        metrics return no Measurement for that run.
+        team. Return an empty list only when the scenario genuinely has
+        no per-round success criterion — that emits no
+        ``RoundResultRecorded`` events and the generic metrics produce no
+        Measurement for the run.
         """
-        _ = round_number, trigger
-        return []
+        ...
 
     def detect_protocol_boundary_window(
         self,

@@ -174,9 +174,9 @@ The `SimulationScenario` subclass — the entry point the registry hands to the 
 - `on_round_advanced(round_number, world_context, event_logger)` → emit your `<Scenario>CaseStarted` event so metrics can read per-round ground truth.
 - `on_round_ended(round_number, world_context, event_logger)` → settle round-end state.
 - `validate_outgoing_message(...)`, `transform_outgoing_message(...)` → enforce / mutate messages (budget enforcement, noise injection).
-- `get_primary_channels()` → tells generic metrics (perplexity, mean-chars-per-round, mean-chars-per-message) which channel(s) to score.
+- `get_primary_channels()` → **required** — return the `PrimaryChannel` list telling generic metrics (perplexity, mean-chars-per-round, mean-chars-per-message, language judges) which channel(s) to score. Two-team scenarios return one entry per team's channel; return `[]` only if the scenario has no channel worth scoring.
 - `get_early_round_end_trigger()` → optional; returns a trigger string when the round should end early (e.g. once a `target_placed` flag and `executed_moves` count match the expected sequence).
-- `judge_round_result(round_number, trigger)` → return a list of `RoundResult(success, team_id, reason)`. The game clock writes one `RoundResultRecorded` event per element; the platform `round_success` metric reads these directly and emits one Measurement per `team_id` (single-team scenarios pass `team_id=None` and get one Measurement named `round_success`). Scenarios that don't override this hook get no round-success measurement.
+- `judge_round_result(round_number, trigger)` → **required** — return a list of `RoundResult(success, team_id, reason)`. The game clock writes one `RoundResultRecorded` event per element; the platform `round_success` metric reads these directly and emits one Measurement per `team_id` (single-team scenarios pass `team_id=None` and get one Measurement named `round_success`). Return `[]` only if the scenario genuinely has no per-round success criterion.
 - `restore_state_from_events(events)` → optional. Called after a fork/resume rewind has been built and before the runtime starts. Walk the event list and seed any per-round outcomes you need so the first post-resume injection renders accurate "previous result" context (most scenarios need this only if their injection templates surface prior-round state).
 
 For scenarios with custom tools (anything beyond `send_message`), `get_mcp_tools()` returns one [`ScenarioMcpTool`](../src/glossogen/runtime/scenario_mcp_tool.py) per tool — that's where you wire up freetext-argument LLM judges, world state mutations, and the marker strings the tool result returns.
@@ -203,7 +203,7 @@ For scenarios with LLM judges, one `<judge_name>.jinja` per judge — these are 
 
 ### 9. (Optional) Write `evaluation/`
 
-Most scoring is now scenario-agnostic. As soon as your scenario implements `get_primary_channels()` you get every generic metric for free:
+Most scoring is now scenario-agnostic. Because `get_primary_channels()` is required, you get every generic primary-channel metric for free:
 
 | Metric | Hook the scenario must implement |
 |---|---|
@@ -338,7 +338,7 @@ Before opening a PR:
 - [ ] `judge_model = "claude-haiku-4-5-20251001"`, `judge_provider = "anthropic"`, `seed = 42` in the preset.
 - [ ] Prompts live in `prompts/*.jinja`, not in Python string literals.
 - [ ] `judge_round_result(round_number, trigger)` returns at least one `RoundResult` per round (single-team scenarios: one with `team_id=None`; multi-team: one per team). The game clock writes `RoundResultRecorded` events from these; the platform `round_success` metric reads them directly.
-- [ ] `get_primary_channels()` returns the comm-link channel (or `None` for two-team scenarios where the metric should no-op).
+- [ ] `get_primary_channels()` (required) returns a non-empty `PrimaryChannel` list — the comm-link channel for single-team, one entry per team's channel for two-team.
 - [ ] If you added a run-detail extension, re-run `make gen-api-types` so `frontend/src/types/api.gen.ts` includes your `XxxRunExtras` variant.
 - [ ] `make lint` is clean. Regenerate the vulture whitelist (`VIRTUAL_ENV= uv run --no-sync vulture src/ --min-confidence 60 --make-whitelist > vulture_whitelist.py`) if Pydantic fields or auto-discovered classes get flagged.
 - [ ] At least one end-to-end smoke run completes and the `round_success` metric returns a non-empty per-round list.

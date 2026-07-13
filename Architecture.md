@@ -145,6 +145,8 @@ The `SimulationScenario` ABC defines a contract for scenario plug-ins.
 - `create_from_config(config)` — reconstruct a scenario from its serialized config dict (used by fork/resume)
 - `name()`, `scenario_description()`, `get_agents()`, `get_channels()`
 - `get_channel_display_name()`, `get_agent_display_name()`, `get_injection()`
+- `get_primary_channels()` — the channels evaluators score (throughput/language metrics); required so the choice is explicit
+- `judge_round_result(round_number, trigger)` — per-team round verdicts that power `round_success` / `round_success_after_resume`
 
 **Runtime extensions:**
 - `get_world()` — scenario world (state, per-message async reactions via `on_message_async`, tool handlers). The `run` event loop is provided by the base `ScenarioWorld`.
