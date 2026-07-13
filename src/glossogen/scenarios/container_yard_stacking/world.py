@@ -19,11 +19,10 @@ event log on resume), and :mod:`world_state` (the ``TeamState`` /
 ``YardOutcome`` types).
 """
 
-import asyncio
 import logging
 from typing import Any
 
-from glossogen.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
+from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
 from glossogen.scenarios.container_yard_stacking.case_rendering import render_container
 from glossogen.scenarios.container_yard_stacking.ids import (
     BUDGET_EXCEEDED_MARKER,
@@ -333,20 +332,12 @@ class ContainerYardWorld(ScenarioWorld):
             if team.failure_reason == "":
                 team.failure_reason = "Communication budget exhausted."
 
-    async def run(self, context: WorldContext) -> None:
-        """Process events and send async notifications for threshold crossings."""
-        self._context = context
-        try:
-            while True:
-                event = await context.next_event()
-                if isinstance(event, RoundAdvancedEvent):
-                    continue
-                team_id = team_id_for_channel(channel_id=event.channel_id)
-                if team_id is None:
-                    continue
-                await self._send_threshold_notifications(context=context, team_id=team_id)
-        except asyncio.CancelledError:
+    async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
+        """React to an agent message: push budget/threshold notifications when relevant."""
+        team_id = team_id_for_channel(channel_id=event.channel_id)
+        if team_id is None:
             return
+        await self._send_threshold_notifications(context=context, team_id=team_id)
 
     async def _send_threshold_notifications(self, context: WorldContext, team_id: str) -> None:
         """Send status notifications for ``team_id`` when budget thresholds are crossed."""

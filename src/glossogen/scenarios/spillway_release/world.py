@@ -12,10 +12,9 @@ Every character sent on it costs one simulated second against the round's
 budget, and the round fails when the running total reaches the budget.
 """
 
-import asyncio
 import logging
 
-from glossogen.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
+from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
 from glossogen.scenarios.spillway_release.ids import (
     BUDGET_EXCEEDED_MARKER,
     OPS_CHANNEL_ID,
@@ -217,19 +216,11 @@ class SpillwayWorld(ScenarioWorld):
             budget_exceeded=self._round_budget_exceeded,
         )
 
-    async def run(self, context: WorldContext) -> None:
-        """Process events and push budget-threshold notifications to the ops channel."""
-        self._context = context
-        try:
-            while True:
-                event = await context.next_event()
-                if isinstance(event, RoundAdvancedEvent):
-                    continue
-                if event.channel_id != OPS_CHANNEL_ID:
-                    continue
-                await self._send_threshold_notifications(context=context)
-        except asyncio.CancelledError:
+    async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
+        """React to an agent message: push budget/threshold notifications when relevant."""
+        if event.channel_id != OPS_CHANNEL_ID:
             return
+        await self._send_threshold_notifications(context=context)
 
     async def _send_threshold_notifications(self, context: WorldContext) -> None:
         """Notify the ops channel when the communication budget crosses 75% / 100%."""

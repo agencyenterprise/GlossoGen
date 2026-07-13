@@ -85,9 +85,10 @@ class SpillwayReleaseScenario(SimulationScenario):
         ]
 
     @classmethod
-    def knobs_json_schema(cls) -> dict[str, Any]:
-        """Return the JSON Schema for SpillwayReleaseKnobs."""
-        return SpillwayReleaseKnobs.model_json_schema()
+    @classmethod
+    def knobs_model(cls) -> type[SpillwayReleaseKnobs]:
+        """Return the knobs model class for this scenario."""
+        return SpillwayReleaseKnobs
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:

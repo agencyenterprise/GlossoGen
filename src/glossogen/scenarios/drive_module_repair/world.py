@@ -12,11 +12,10 @@ Every character sent on it costs one simulated second against the round's
 budget.
 """
 
-import asyncio
 import logging
 
 from glossogen.models.event import MessageSent, RoundResultRecorded, SimulationEvent
-from glossogen.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
+from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
 from glossogen.scenarios.drive_module_repair.drive_module_cases import (
     DriveModuleCase,
     ModuleFaultTree,
@@ -350,19 +349,11 @@ class DriveModuleWorld(ScenarioWorld):
             return None
         return self._resolve()
 
-    async def run(self, context: WorldContext) -> None:
-        """Process events and push budget-threshold notifications to the bay channel."""
-        self._context = context
-        try:
-            while True:
-                event = await context.next_event()
-                if isinstance(event, RoundAdvancedEvent):
-                    continue
-                if event.channel_id != BAY_CHANNEL_ID:
-                    continue
-                await self._send_threshold_notifications(context=context)
-        except asyncio.CancelledError:
+    async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
+        """React to an agent message: push budget/threshold notifications when relevant."""
+        if event.channel_id != BAY_CHANNEL_ID:
             return
+        await self._send_threshold_notifications(context=context)
 
     async def _send_threshold_notifications(self, context: WorldContext) -> None:
         """Notify the bay channel when the communication budget crosses 75% / 100%."""

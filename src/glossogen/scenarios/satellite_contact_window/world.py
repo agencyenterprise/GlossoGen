@@ -7,11 +7,10 @@ closes or the operator never calls ``send_command_sequence`` with a
 sequence the judge approves.
 """
 
-import asyncio
 import logging
 from typing import NamedTuple
 
-from glossogen.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
+from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
 from glossogen.scenarios.satellite_contact_window.cases import CommandStep, SatelliteCase
 from glossogen.scenarios.satellite_contact_window.ids import (
     COMMAND_ACCEPTED_MARKER,
@@ -272,19 +271,11 @@ class SatelliteWorld(ScenarioWorld):
         if self._current_round_characters > self._current_case.round_time_budget_seconds:
             self._round_window_closed = True
 
-    async def run(self, context: WorldContext) -> None:
-        """Process events and send async notifications for window thresholds."""
-        self._context = context
-        try:
-            while True:
-                event = await context.next_event()
-                if isinstance(event, RoundAdvancedEvent):
-                    continue
-                if event.channel_id != LINK_CHANNEL_ID:
-                    continue
-                await self._send_threshold_notifications(context=context)
-        except asyncio.CancelledError:
+    async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
+        """React to an agent message: push budget/threshold notifications when relevant."""
+        if event.channel_id != LINK_CHANNEL_ID:
             return
+        await self._send_threshold_notifications(context=context)
 
     async def _send_threshold_notifications(self, context: WorldContext) -> None:
         """Send status notifications when contact-window thresholds are crossed."""

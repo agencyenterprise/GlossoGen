@@ -9,6 +9,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, NamedTuple, Protocol, Self
 
+from pydantic_core import PydanticUndefined
+
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
 from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
@@ -20,7 +22,7 @@ from glossogen.models.channel import Channel
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
-from glossogen.runtime.scheduled_events import ScheduledEvent
+from glossogen.scenarios.base_knobs import BaseKnobs
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +68,8 @@ class ScenarioRuntimeHandle(Protocol):
     """Read-only view of the simulation runtime exposed to scenarios.
 
     Scenarios receive this handle via ``bind_runtime`` and use it to log
-    custom events, read the current round number, and schedule
-    round-boundary interventions in response to in-simulation state.
-    Defined as a Protocol to avoid an import cycle with
-    ``SimulationRuntime``.
+    custom events and read the current round number. Defined as a Protocol
+    to avoid an import cycle with ``SimulationRuntime``.
     """
 
     @property
@@ -77,16 +77,6 @@ class ScenarioRuntimeHandle(Protocol):
 
     @property
     def current_round(self) -> int: ...
-
-    def schedule_event(self, event: ScheduledEvent) -> None:
-        """Schedule a round-boundary intervention at runtime.
-
-        ``event.at_round`` must be a round whose boundary has not yet
-        fired (typically ``current_round + 1`` or later). Used by
-        scenarios that need conditional swaps or postmortem toggles
-        triggered by what just happened in the round that's ending.
-        """
-        ...
 
 
 class SimulationScenario(ABC):
@@ -108,23 +98,54 @@ class SimulationScenario(ABC):
 
     @classmethod
     @abstractmethod
-    def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
-        """Return agent IDs and display names for the given knobs configuration.
+    def knobs_model(cls) -> type[BaseKnobs]:
+        """Return this scenario's knobs Pydantic model class.
 
-        Used by the web API to populate the per-agent model override UI
-        before a simulation starts. Must not require a scenario instance.
+        The single source of truth for the scenario's configuration: the JSON
+        Schema and per-field defaults both derive from it, so scenarios declare
+        the model here rather than re-implementing schema/default accessors.
         """
         ...
 
     @classmethod
     @abstractmethod
-    def knobs_json_schema(cls) -> dict[str, Any]:
-        """Return the JSON Schema for this scenario's knobs Pydantic model.
+    def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
+        """Return agent IDs and display names for the given knobs configuration.
 
-        Used by the MCP server to expose available configuration fields,
-        their types, enum values, and descriptions to LLM clients.
+        Used by the web API to populate the per-agent model override UI
+        before a simulation starts. Must not require a scenario instance, and
+        may receive a partial (or ``None``) knobs dict — read role-determining
+        flags via ``resolve_bool_knob`` so missing values fall back to the
+        model's declared defaults.
         """
         ...
+
+    @classmethod
+    def knobs_json_schema(cls) -> dict[str, Any]:
+        """Return the JSON Schema for this scenario's knobs model.
+
+        Used by the MCP server to expose available configuration fields, their
+        types, enum values, and descriptions to LLM clients.
+        """
+        return cls.knobs_model().model_json_schema()
+
+    @classmethod
+    def resolve_bool_knob(cls, knobs: dict[str, Any] | None, field_name: str) -> bool:
+        """Resolve a boolean knob from a partial config dict.
+
+        Reads ``field_name`` from ``knobs`` when present, otherwise falls back
+        to the knobs model's declared default. When the field is required (no
+        declared default), falls back to ``False`` — the baseline layout shown
+        before a run is configured. Lets ``get_agent_roles`` branch on
+        role-determining flags without hardcoding a default that could drift
+        from the model.
+        """
+        if knobs is not None and field_name in knobs:
+            return bool(knobs[field_name])
+        default = cls.knobs_model().model_fields[field_name].get_default()
+        if default is PydanticUndefined:
+            return False
+        return bool(default)
 
     @classmethod
     def prepare_config(cls, config: dict[str, Any]) -> dict[str, Any]:

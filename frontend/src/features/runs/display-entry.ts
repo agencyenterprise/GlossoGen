@@ -41,9 +41,9 @@ export interface DisplayEntry {
   sender_agent_id: string;
   /** Display name resolved at message-send time. Populated server-side for
    *  channel messages so historical messages from a rotating-identity slot
-   *  (e.g. surprise_party's friend) render under the name the slot held in
-   *  the message's round. Empty string on reasoning, tool, and run-cycle
-   *  failure entries — callers fall back to the agent's static role name. */
+   *  render under the name the slot held in the message's round. Empty string
+   *  on reasoning, tool, and run-cycle failure entries — callers fall back to
+   *  the agent's static role name. */
   sender_display_name: string;
   text: string;
   timestamp: string;

@@ -292,7 +292,6 @@ class AutonomousSupervisor:
             agent_tool_allowlists=agent_tool_allowlists,
             world_context=world_context,
             agent_configs=self._agent_configs,
-            scheduler=self._scheduler,
             simulation_start_time=simulation_start_time,
         )
         self._runtime = runtime

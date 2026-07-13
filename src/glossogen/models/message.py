@@ -12,8 +12,7 @@ class SimulationMessage(BaseModel):
     ``sender_display_name`` is captured at send time using the scenario's
     ``get_agent_display_name_at_round`` so historical messages render under
     the display name the slot held when they were sent (relevant for
-    scenarios that rotate identity behind a single ``agent_id``, e.g.
-    surprise_party's friend slot).
+    scenarios that rotate identity behind a single ``agent_id``).
     """
 
     message_id: str

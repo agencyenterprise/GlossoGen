@@ -18,10 +18,9 @@ Heavy logic lives in dedicated sibling modules: :mod:`world_state` (the
 (both live outcome compute and event-log replay).
 """
 
-import asyncio
 import logging
 
-from glossogen.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
+from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
 from glossogen.scenarios.veyru.ids import (
     POSTMORTEM_A_CHANNEL_ID,
     POSTMORTEM_B_CHANNEL_ID,
@@ -399,23 +398,15 @@ class VeyruWorld(ScenarioWorld):
         if time_elapsed > budget:
             team.veyru_alive = False
 
-    async def run(self, context: WorldContext) -> None:
-        """Process events and send async notifications for threshold crossings."""
-        self._context = context
-        try:
-            while True:
-                event = await context.next_event()
-                if isinstance(event, RoundAdvancedEvent):
-                    continue
-                team_id = self._channels_by_team.get(event.channel_id)
-                if team_id is None:
-                    continue
-                await self._send_threshold_notifications(
-                    context=context,
-                    team_id=team_id,
-                )
-        except asyncio.CancelledError:
+    async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
+        """React to an agent message: push budget/threshold notifications when relevant."""
+        team_id = self._channels_by_team.get(event.channel_id)
+        if team_id is None:
             return
+        await self._send_threshold_notifications(
+            context=context,
+            team_id=team_id,
+        )
 
     async def _send_threshold_notifications(self, context: WorldContext, team_id: TeamId) -> None:
         """Send Veyru status notifications for a specific team when thresholds are crossed.

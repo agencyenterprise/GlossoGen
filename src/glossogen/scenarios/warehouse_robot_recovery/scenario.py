@@ -103,9 +103,10 @@ class WarehouseRobotRecoveryScenario(SimulationScenario):
         ]
 
     @classmethod
-    def knobs_json_schema(cls) -> dict[str, Any]:
-        """Return the JSON Schema for WarehouseRobotRecoveryKnobs."""
-        return WarehouseRobotRecoveryKnobs.model_json_schema()
+    @classmethod
+    def knobs_model(cls) -> type[WarehouseRobotRecoveryKnobs]:
+        """Return the knobs model class for this scenario."""
+        return WarehouseRobotRecoveryKnobs
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:

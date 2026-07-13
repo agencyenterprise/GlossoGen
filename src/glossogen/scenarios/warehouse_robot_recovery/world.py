@@ -7,11 +7,10 @@ exceeded or the floor associate never calls ``perform_recovery`` with
 an action the judge approves.
 """
 
-import asyncio
 import logging
 from typing import NamedTuple
 
-from glossogen.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
+from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
 from glossogen.scenarios.warehouse_robot_recovery.ids import (
     BUDGET_EXCEEDED_MARKER,
     POSTMORTEM_CHANNEL_ID,
@@ -243,19 +242,11 @@ class WarehouseWorld(ScenarioWorld):
         if self._current_round_characters > self._current_case.time_budget_seconds:
             self._round_budget_exceeded = True
 
-    async def run(self, context: WorldContext) -> None:
-        """Process events and send async notifications for threshold crossings."""
-        self._context = context
-        try:
-            while True:
-                event = await context.next_event()
-                if isinstance(event, RoundAdvancedEvent):
-                    continue
-                if event.channel_id != RADIO_CHANNEL_ID:
-                    continue
-                await self._send_threshold_notifications(context=context)
-        except asyncio.CancelledError:
+    async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
+        """React to an agent message: push budget/threshold notifications when relevant."""
+        if event.channel_id != RADIO_CHANNEL_ID:
             return
+        await self._send_threshold_notifications(context=context)
 
     async def _send_threshold_notifications(self, context: WorldContext) -> None:
         """Send status notifications when budget thresholds are crossed."""

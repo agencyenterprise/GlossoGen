@@ -107,9 +107,10 @@ class DriveModuleRepairScenario(SimulationScenario):
         ]
 
     @classmethod
-    def knobs_json_schema(cls) -> dict[str, Any]:
-        """Return the JSON Schema for DriveModuleRepairKnobs."""
-        return DriveModuleRepairKnobs.model_json_schema()
+    @classmethod
+    def knobs_model(cls) -> type[DriveModuleRepairKnobs]:
+        """Return the knobs model class for this scenario."""
+        return DriveModuleRepairKnobs
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:

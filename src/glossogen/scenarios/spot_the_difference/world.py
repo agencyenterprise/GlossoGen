@@ -16,11 +16,10 @@ Heavy logic lives in dedicated sibling modules: :mod:`world_state` (the
 resume).
 """
 
-import asyncio
 import logging
 from typing import Any
 
-from glossogen.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
+from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
 from glossogen.scenarios.spot_the_difference.ids import (
     BUDGET_EXCEEDED_MARKER,
     BUDGET_LOW_MARKER,
@@ -339,22 +338,13 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         if budget > 0 and team.current_round_characters >= budget:
             team.round_budget_exceeded = True
 
-    async def run(self, context: WorldContext) -> None:
-        """Process messages and warn each team as it nears / exceeds its budget."""
-        self._context = context
-        try:
-            while True:
-                event = await context.next_event()
-                if isinstance(event, RoundAdvancedEvent):
-                    continue
-                team_id = team_id_for_link_message(
-                    agent_id=event.agent_id, channel_id=event.channel_id
-                )
-                if team_id is None:
-                    continue
-                await self._send_budget_notifications(team_id=team_id)
-        except asyncio.CancelledError:
+    async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
+        """React to an agent message: push budget/threshold notifications when relevant."""
+        _ = context
+        team_id = team_id_for_link_message(agent_id=event.agent_id, channel_id=event.channel_id)
+        if team_id is None:
             return
+        await self._send_budget_notifications(team_id=team_id)
 
     async def _send_budget_notifications(self, team_id: str) -> None:
         """Emit a one-time budget-low and budget-exceeded notice for a team."""

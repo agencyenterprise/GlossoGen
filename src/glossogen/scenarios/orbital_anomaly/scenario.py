@@ -89,9 +89,10 @@ class OrbitalAnomalyScenario(SimulationScenario):
         ]
 
     @classmethod
-    def knobs_json_schema(cls) -> dict[str, Any]:
-        """Return the JSON Schema for OrbitalAnomalyKnobs."""
-        return OrbitalAnomalyKnobs.model_json_schema()
+    @classmethod
+    def knobs_model(cls) -> type[OrbitalAnomalyKnobs]:
+        """Return the knobs model class for this scenario."""
+        return OrbitalAnomalyKnobs
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:

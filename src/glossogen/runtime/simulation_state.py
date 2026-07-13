@@ -19,8 +19,6 @@ from glossogen.models.event import InjectionDelivered, PostmortemStarted
 from glossogen.runtime.activity_notification import DoneNotification, NewInfoNotification
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scenario_world import WorldContext
-from glossogen.runtime.scheduled_events import ScheduledEvent
-from glossogen.runtime.scheduler import RoundBoundaryScheduler
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -38,7 +36,6 @@ class SimulationRuntime:
         agent_tool_allowlists: dict[str, frozenset[str]],
         world_context: WorldContext,
         agent_configs: list[AgentConfig],
-        scheduler: RoundBoundaryScheduler,
         simulation_start_time: datetime,
     ) -> None:
         self._scenario = scenario
@@ -59,18 +56,6 @@ class SimulationRuntime:
         self._on_message_callbacks: list[Callable[[], None]] = []
         self._channel_message_count_at_round_start: dict[int, dict[str, int]] = {}
         self._last_injected_rounds: dict[str, int] = {}
-        self._scheduler = scheduler
-
-    def schedule_event(self, event: ScheduledEvent) -> None:
-        """Add a scheduled intervention at runtime.
-
-        Scenarios call this from ``on_round_ended`` (or any hook running
-        before the next round's boundary dispatch) to schedule an agent
-        swap or postmortem toggle conditionally based on in-simulation
-        state. ``event.at_round`` must be strictly greater than the
-        current round.
-        """
-        self._scheduler.add_event(event=event)
 
     @property
     def scenario(self) -> SimulationScenario:

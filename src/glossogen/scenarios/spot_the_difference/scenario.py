@@ -117,7 +117,7 @@ class SpotTheDifferenceScenario(SimulationScenario):
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
         """Return the role list: 2 for single-team, 4 for two-team."""
-        two_teams = bool(knobs.get("two_teams", False)) if knobs is not None else False
+        two_teams = cls.resolve_bool_knob(knobs=knobs, field_name="two_teams")
         if two_teams:
             return [
                 AgentRole(agent_id=VIEWER_LEFT_A_ID, role_name=VIEWER_LEFT_A_ROLE),
@@ -131,9 +131,10 @@ class SpotTheDifferenceScenario(SimulationScenario):
         ]
 
     @classmethod
-    def knobs_json_schema(cls) -> dict[str, Any]:
-        """Return the JSON Schema for SpotTheDifferenceKnobs."""
-        return SpotTheDifferenceKnobs.model_json_schema()
+    @classmethod
+    def knobs_model(cls) -> type[SpotTheDifferenceKnobs]:
+        """Return the knobs model class for this scenario."""
+        return SpotTheDifferenceKnobs
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:

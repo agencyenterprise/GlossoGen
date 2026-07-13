@@ -7,7 +7,7 @@ and can push channel-scoped notifications via ``send_update_to_channel``.
 
 import asyncio
 import logging
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Callable
 from typing import NamedTuple
 
@@ -202,19 +202,36 @@ class WorldContext:
 class ScenarioWorld(ABC):
     """A living world simulation that runs alongside agents as its own asyncio task.
 
-    Every scenario implements this to define dynamic world behavior: real-time
-    state changes, environmental updates, and reactive events based on agent
-    communication. The ``run`` method is started as an asyncio task by the
-    supervisor and cancelled when the simulation ends.
+    Scenarios subclass this to define dynamic world behavior: real-time state
+    changes, environmental updates, and reactive events based on agent
+    communication. Message handling is split in two: ``on_message`` runs
+    synchronously for immediate state mutation, and ``on_message_async`` runs
+    from the world event loop for asynchronous side-effects (notifications).
+    Both default to no-ops, so a world that only tracks state accessed via
+    other methods needs to override neither.
+
+    The ``run`` event loop is provided by the platform; it is started as an
+    asyncio task by the supervisor and cancelled when the simulation ends.
     """
 
-    @abstractmethod
+    _context: WorldContext
+
     async def run(self, context: WorldContext) -> None:
-        """Main world loop. Process events from ``context.next_event()`` and
-        send updates via ``context.send_update_to_channel()``. Handle
-        ``CancelledError`` for cleanup.
+        """Drain world events and dispatch each message to ``on_message_async``.
+
+        Round-advance events are drained without action (scenarios handle
+        round transitions via ``SimulationScenario.on_round_advanced``).
+        Started as an asyncio task by the supervisor and cancelled at
+        simulation end.
         """
-        ...
+        self._context = context
+        try:
+            while True:
+                event = await context.next_event()
+                if isinstance(event, MessageEvent):
+                    await self.on_message_async(event=event, context=context)
+        except asyncio.CancelledError:
+            return
 
     def on_message(
         self,
@@ -227,9 +244,18 @@ class ScenarioWorld(ABC):
 
         Override this to update world state that must be visible immediately
         (e.g. token accumulation, patient death). The default is a no-op.
-        Async notifications should be sent from the ``run`` loop instead.
+        Asynchronous side-effects belong in ``on_message_async`` instead.
         """
         _ = agent_id, channel_id, text, token_count
+
+    async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
+        """React asynchronously to an agent message from the world event loop.
+
+        Called once per message. Override to push channel- or agent-scoped
+        notifications via ``context`` (e.g. budget-threshold warnings). The
+        default is a no-op. Synchronous state updates belong in ``on_message``.
+        """
+        _ = event, context
 
     def get_globally_disabled_channels(self) -> frozenset[str]:
         """Return channel IDs that have been globally disabled for the rest of the run.

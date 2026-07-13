@@ -100,12 +100,8 @@ class ContainerYardStackingScenario(SimulationScenario):
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
         """Return the role list: 3 for single-team, 4 with intern, 6 for two-team."""
-        if knobs is None:
-            two_teams = False
-            intern_enabled = False
-        else:
-            two_teams = bool(knobs.get("two_teams", False))
-            intern_enabled = bool(knobs.get("intern_enabled", False))
+        two_teams = cls.resolve_bool_knob(knobs=knobs, field_name="two_teams")
+        intern_enabled = cls.resolve_bool_knob(knobs=knobs, field_name="intern_enabled")
         if two_teams:
             return [
                 AgentRole(agent_id=YARD_OPERATOR_A_ID, role_name=YARD_OPERATOR_A_ROLE),
@@ -125,9 +121,10 @@ class ContainerYardStackingScenario(SimulationScenario):
         return roles
 
     @classmethod
-    def knobs_json_schema(cls) -> dict[str, Any]:
-        """Return the JSON Schema for ContainerYardStackingKnobs."""
-        return ContainerYardStackingKnobs.model_json_schema()
+    @classmethod
+    def knobs_model(cls) -> type[ContainerYardStackingKnobs]:
+        """Return the knobs model class for this scenario."""
+        return ContainerYardStackingKnobs
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:

@@ -8,11 +8,10 @@ by the Bed Manager, and the resolved per-round outcomes. Outcomes are
 finalized in ``finalize_round_sync`` at round advance.
 """
 
-import asyncio
 import logging
 from typing import NamedTuple
 
-from glossogen.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
+from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
 from glossogen.scenarios.hospital_bed_assignment_privacy.hospital_cases import HospitalCase
 from glossogen.scenarios.hospital_bed_assignment_privacy.ids import (
     BED_MANAGER_ID,
@@ -209,19 +208,11 @@ class HospitalWorld(ScenarioWorld):
                 if word.lower() in lowered_text:
                     self._privacy_violations.append(word)
 
-    async def run(self, context: WorldContext) -> None:
-        """Process events and emit budget-threshold notifications."""
-        self._context = context
-        try:
-            while True:
-                event = await context.next_event()
-                if isinstance(event, RoundAdvancedEvent):
-                    continue
-                if event.channel_id != PUBLIC_OPS_CHANNEL_ID:
-                    continue
-                await self._send_threshold_notifications(context=context)
-        except asyncio.CancelledError:
+    async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
+        """React to an agent message: push budget/threshold notifications when relevant."""
+        if event.channel_id != PUBLIC_OPS_CHANNEL_ID:
             return
+        await self._send_threshold_notifications(context=context)
 
     async def _send_threshold_notifications(self, context: WorldContext) -> None:
         """Send status notifications when budget thresholds are first crossed."""

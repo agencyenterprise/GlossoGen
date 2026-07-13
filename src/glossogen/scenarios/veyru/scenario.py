@@ -128,18 +128,8 @@ class VeyruScenario(SimulationScenario):
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
         """Return agent roles: 2 for single-team, 3 with intern mode, 4 for two-team."""
-        if knobs is None:
-            two_teams = False
-            intern_enabled = False
-        else:
-            if "two_teams" in knobs:
-                two_teams = bool(knobs["two_teams"])
-            else:
-                two_teams = False
-            if "intern_enabled" in knobs:
-                intern_enabled = bool(knobs["intern_enabled"])
-            else:
-                intern_enabled = False
+        two_teams = cls.resolve_bool_knob(knobs=knobs, field_name="two_teams")
+        intern_enabled = cls.resolve_bool_knob(knobs=knobs, field_name="intern_enabled")
         if two_teams:
             return [
                 AgentRole(agent_id=OBSERVER_A_ID, role_name=FIELD_OBSERVER_A_ROLE),
@@ -160,9 +150,10 @@ class VeyruScenario(SimulationScenario):
         return roles
 
     @classmethod
-    def knobs_json_schema(cls) -> dict[str, Any]:
-        """Return the JSON Schema for VeyruKnobs."""
-        return VeyruKnobs.model_json_schema()
+    @classmethod
+    def knobs_model(cls) -> type[VeyruKnobs]:
+        """Return the knobs model class for this scenario."""
+        return VeyruKnobs
 
     @classmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:

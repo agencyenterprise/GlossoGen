@@ -13,11 +13,10 @@ stage's telemetry readout is delivered privately to the Telemetry Officer
 and a generic notice is broadcast to the comm loop.
 """
 
-import asyncio
 import logging
 from typing import NamedTuple
 
-from glossogen.runtime.scenario_world import RoundAdvancedEvent, ScenarioWorld, WorldContext
+from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
 from glossogen.scenarios.orbital_anomaly.ids import (
     LINK_CHANNEL_ID,
     NEW_ANOMALY_MARKER,
@@ -167,19 +166,12 @@ class OrbitalAnomalyWorld(ScenarioWorld):
         if self._current_round_characters > self._current_case.time_budget_seconds:
             self._vehicle_alive = False
 
-    async def run(self, context: WorldContext) -> None:
-        """Process events and send async notifications for threshold crossings."""
-        self._context = context
-        try:
-            while True:
-                event = await context.next_event()
-                if isinstance(event, RoundAdvancedEvent):
-                    continue
-                if event.channel_id != LINK_CHANNEL_ID:
-                    continue
-                await self._send_threshold_notifications()
-        except asyncio.CancelledError:
+    async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
+        """React to an agent message: push budget/threshold notifications when relevant."""
+        _ = context
+        if event.channel_id != LINK_CHANNEL_ID:
             return
+        await self._send_threshold_notifications()
 
     async def _send_threshold_notifications(self) -> None:
         """Broadcast a critical or loss notification when a budget threshold is crossed."""
