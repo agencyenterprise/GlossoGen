@@ -18,7 +18,7 @@ class AgentModelOverride(BaseModel):
 class BaseKnobs(BaseModel):
     """Base knobs shared by all scenarios.
 
-    ``postmortem_duration_seconds`` defaults to 120 and is only meaningful
+    ``postmortem_duration_seconds`` defaults to 120.0 and is only meaningful
     when a scenario enables postmortem. Scenarios that do not use postmortem
     can ignore it entirely.
 
