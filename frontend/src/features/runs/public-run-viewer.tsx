@@ -46,7 +46,7 @@ const TOUR_TIMELINE_ROUND = 1;
  *
  * Composes the real run-viewer child components (sidebar, chat pane, evaluation
  * panel, agent drawer) fed by a frozen ``RunDetailResponse`` loaded from a
- * static asset — no authentication, no SSE, no mutations. Adds a dismissible
+ * static asset: no authentication, no SSE, no mutations. Adds a dismissible
  * guided tour that spotlights each interface region.
  */
 export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
@@ -164,9 +164,9 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       title: "The run header",
       body: (
         <>
-          This is a run of the <strong>Veyru</strong> scenario — two AI agents coordinating over{" "}
-          {maxRound} rounds. The badges are the run&apos;s <strong>knobs</strong> — the scenario
-          configuration it used — and the <code>?</code> opens the scenario description.
+          This is a run of the <strong>Veyru</strong> scenario: two AI agents coordinating over{" "}
+          {maxRound} rounds. The badges are its <strong>knobs</strong>, the settings the run used.
+          The <code>?</code> opens the scenario description.
         </>
       ),
       onEnter: () => handleSelectChannel(null),
@@ -176,9 +176,9 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       title: "Channels and agents",
       body: (
         <>
-          The left rail lists the run&apos;s <strong>channels</strong> — the shared spaces agents
-          talk in, like <code>#link</code> — and, below them, its <strong>agents</strong>. Click an
-          agent to open its full thread.
+          The left rail lists the run&apos;s <strong>channels</strong>, the shared spaces agents
+          talk in, like <code>#link</code>. Below them are the <strong>agents</strong>; click one to
+          open its full thread.
         </>
       ),
       onEnter: () => handleSelectChannel(null),
@@ -189,7 +189,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       body: (
         <>
           Clicking an agent in the sidebar opens its thread here. It lands on the{" "}
-          <strong>System prompt</strong> tab — exactly what the agent was told — and the{" "}
+          <strong>System prompt</strong> tab, exactly what the agent was told. The{" "}
           <strong>Messages</strong> and <strong>Metrics </strong> tabs beside it hold that
           agent&apos;s own messages and scores.
         </>
@@ -222,7 +222,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       body: (
         <>
           Clicking the floating <strong>Round N </strong> button above the transcript opens the
-          round&apos;s timeline — what the round <strong>expected</strong> beside what actually{" "}
+          round&apos;s timeline: what the round <strong>expected</strong> beside what actually{" "}
           <strong>happened</strong>, with each judged action marked accepted or rejected.
         </>
       ),
@@ -236,8 +236,8 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       title: "The postmortem channel",
       body: (
         <>
-          Beyond the task channel, this run has a <code>#postmortem </code> channel — a space for
-          the agents to step back and coordinate between rounds (here they settle on a shared
+          Beyond the task channel, this run has a <code>#postmortem </code> channel, a space for the
+          agents to step back and coordinate between rounds (here they settle on a shared
           shorthand).
         </>
       ),
@@ -251,9 +251,9 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       title: "Display options & download",
       body: (
         <>
-          The channel toolbar has <strong>display toggles</strong> — the <strong>Reasoning</strong>{" "}
-          and <strong>Tools</strong> checkboxes show or hide those entries in the transcript — plus
-          a <strong>Download</strong> button that exports the whole run as a zip.
+          The channel toolbar has <strong>display toggles</strong>: the <strong>Reasoning</strong>{" "}
+          and <strong>Tools</strong> checkboxes show or hide those entries in the transcript, plus a{" "}
+          <strong>Download</strong> button that exports the whole run as a zip.
         </>
       ),
       onEnter: () => setSelectedAgent(null),
@@ -263,9 +263,9 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       title: "Post-hoc evaluation",
       body: (
         <>
-          After a run finishes, metrics score it — LLM-as-judge measures and deterministic ones
-          alike. Click any metric for its per-round evidence. Here you can see how often the team
-          succeeded and how their language changed.
+          After a run finishes, a mix of LLM-as-judge and deterministic metrics score it. Click any
+          metric for its per-round evidence. Here you can see how often the team succeeded and how
+          their language changed.
         </>
       ),
       onEnter: () => {
@@ -295,7 +295,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
           </button>
         </div>
 
-        {/* Top matter: header, knobs, and labels — spotlighted together in the tour */}
+        {/* Top matter: header, knobs, and labels, spotlighted together in the tour */}
         <div ref={headerRef} className="shrink-0">
           {/* Run header */}
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">

@@ -47,8 +47,8 @@ class BaseKnobs(BaseModel):
     ``round_time_budget_seconds`` is the canonical per-round communication
     budget: one character on the scenario's primary channel costs one
     simulated second, and the round fails when the running total exceeds
-    the budget. ``None`` means the scenario has no per-round budget (e.g.
-    Salon, whose pressure axis is the Inquisitor's guess count instead).
+    the budget. ``None`` means the scenario has no per-round budget and
+    applies a different pressure axis instead (e.g. a per-round guess count).
 
     ``compaction`` enables provider-native history compaction (off by
     default). When enabled, the runner attaches the provider's compaction

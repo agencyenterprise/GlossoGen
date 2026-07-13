@@ -270,7 +270,7 @@ Protocol metrics (powered by `build_communication_rounds`, `detect_protocol_boun
 - `protocol_probe_replica_self_similarity` / `protocol_probe_agent_pair_similarity` / `protocol_probe_cutoff_trajectory` — Levenshtein-based similarity over the probe responses; each writes its own matrix artifact for the streamlit "Probe similarity" tab
 - `communication_open_coding` / `communication_feature_presence` — the open-coding → ontology → relabel pipeline (see below)
 
-Scenarios opt in by implementing the corresponding hook on `SimulationScenario`; a scenario without the hook returns `[]` for that metric and the measurement is simply absent from the report. Both Veyru and Salon currently implement every hook except `get_protocol_probe_config` (Salon does not yet ship a probe bank).
+Scenarios opt in by implementing the corresponding hook on `SimulationScenario`; a scenario without the hook returns `[]` for that metric and the measurement is simply absent from the report.
 
 Output is a JSON report under the `measurements` field; metrics no longer write `eval:*` labels to `labels.json`. Filter on `score` or on the `per_round` / `per_agent` lists directly.
 

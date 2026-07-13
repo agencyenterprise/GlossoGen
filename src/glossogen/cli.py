@@ -40,6 +40,7 @@ from glossogen.db.run_registry import register_run_standalone
 from glossogen.eval_manifest import delete_eval_manifest, write_eval_manifest
 from glossogen.evaluation.log_reader import extract_scenario_config, load_events
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.scenario_evaluation_runner import run_scenario_evaluation
 from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
 from glossogen.logging_format import EventBusLogHandler, JsonLineFormatter
@@ -1255,7 +1256,8 @@ async def _run_evaluation(
     write_eval_manifest(run_dir=run_dir, pid=os.getpid())
     try:
         logger.info("Evaluating %s with metrics: %s", args.scenario_name, args.metrics)
-        await scenario.run_evaluation(
+        await run_scenario_evaluation(
+            scenario=scenario,
             log_path=log_path,
             metric_names=metric_names,
             report_path=report_path,

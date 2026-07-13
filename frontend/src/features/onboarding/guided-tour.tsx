@@ -80,7 +80,7 @@ function cardPosition(rect: TargetRect | null, cardHeight: number): { top: numbe
 /**
  * A dismissible step-through overlay that dims the page, spotlights one element
  * at a time, and shows an explanatory callout beside it. Rendered into a portal
- * so it floats above the app. Generic — the caller supplies the steps.
+ * so it floats above the app. Generic: the caller supplies the steps.
  *
  * Mounted only while the tour is active (the caller conditionally renders it),
  * so each opening starts fresh at the first step.
@@ -156,7 +156,7 @@ export function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () 
   }, [onClose, goNext, goBack]);
 
   // Position the callout from its real measured height so it never spills off
-  // screen — important when the target is a large centered element (the
+  // screen; important when the target is a large centered element (the
   // round-timeline modal), which would otherwise push a fixed-estimate card
   // partly below the viewport.
   useLayoutEffect(() => {

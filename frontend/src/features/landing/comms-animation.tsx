@@ -3,8 +3,8 @@ import { cn } from "@/shared/lib/cn";
 
 /**
  * Looping hero illustration of the core loop: two agents exchanging messages on
- * a shared, budget-constrained channel — their language compressing from full
- * sentences to terse codes — ending in a judged tool call. Pure CSS animation
+ * a shared, budget-constrained channel, their language compressing from full
+ * sentences to terse codes, ending in a judged tool call. Pure CSS animation
  * (keyframes in globals.css); respects prefers-reduced-motion.
  */
 export function CommsAnimation() {
@@ -30,7 +30,7 @@ export function CommsAnimation() {
             <Lock className="h-2.5 w-2.5" /> private · only A1
           </div>
           <div className="text-[11px] leading-snug">
-            <span className="font-medium">New task — save the alien being.</span> What you observe:
+            <span className="font-medium">New task: save the alien being.</span> What you observe:
             the corners are dim, several edges are fading, the perimeter is losing light, and the
             hum sounds thin and hollow at the edges.
           </div>

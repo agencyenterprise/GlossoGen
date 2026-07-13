@@ -6,7 +6,7 @@ import { cn } from "@/shared/lib/cn";
 
 /**
  * Looping story of how a compact protocol emerges, played as a single live,
- * append-only transcript that scrolls — like the real run viewer. Round 1: the
+ * append-only transcript that scrolls, like the real run viewer. Round 1: the
  * agents are verbose on the budgeted comm link and fail. In the off-the-clock
  * postmortem they agree on short codes. Round 2: tiny messages, patient
  * stabilizes. Content only ever grows within a cycle (then the "session"
@@ -25,7 +25,7 @@ const STEP_MS = 1400;
 
 const EVENTS: Event[] = [
   { kind: "divider", label: "Round 1", tone: "round" },
-  { kind: "inject", text: "New patient — dim faces, faint hum, washed-out patterns" },
+  { kind: "inject", text: "New patient: dim faces, faint hum, washed-out patterns" },
   {
     kind: "message",
     who: "FO",
@@ -40,28 +40,28 @@ const EVENTS: Event[] = [
     text: "At each corner of the back face, chime a bell at gentle tone, then warm the two edges with a heated stone for 8 seconds.",
     cost: "151c",
   },
-  { kind: "outcome", ok: false, text: "Budget exceeded — round failed" },
+  { kind: "outcome", ok: false, text: "Budget exceeded, round failed" },
   { kind: "divider", label: "Postmortem · off the clock", tone: "postmortem" },
   {
     kind: "message",
     who: "FO",
     channel: "postmortem",
-    text: "We blew the budget — let's switch to short codes.",
+    text: "We blew the budget. Let's switch to short codes.",
   },
   {
     kind: "message",
     who: "SE",
     channel: "postmortem",
-    text: "Agreed. 14 motifs, fixed templates — I send CODE + params.",
+    text: "Agreed. 14 motifs, fixed templates. I send CODE + params.",
   },
   { kind: "divider", label: "Round 2", tone: "round" },
-  { kind: "inject", text: "New patient — dim faces, wobbling edges" },
+  { kind: "inject", text: "New patient: dim faces, wobbling edges" },
   { kind: "message", who: "FO", channel: "link", text: "DIM", cost: "3c" },
   { kind: "message", who: "SE", channel: "link", text: "TONE6lg12 bell-ring", cost: "19c" },
   { kind: "message", who: "FO", channel: "link", text: "WOBBLE", cost: "6c" },
   { kind: "message", who: "SE", channel: "link", text: "COOL2", cost: "5c" },
   { kind: "tool", name: "stabilize_patient", arg: "chime bell, warm edges 8s, cool back face" },
-  { kind: "outcome", ok: true, text: "Stabilized — round passed" },
+  { kind: "outcome", ok: true, text: "Stabilized, round passed" },
 ];
 
 /** Beats to hold the completed transcript before the session restarts. */
@@ -81,7 +81,7 @@ export function EmergenceAnimation() {
 
   useEffect(() => {
     if (prefersReducedMotion()) {
-      // No autoplay for reduced motion — reveal the whole transcript at once.
+      // No autoplay for reduced motion; reveal the whole transcript at once.
       const timer = setTimeout(() => setShown(EVENTS.length), 0);
       return () => clearTimeout(timer);
     }

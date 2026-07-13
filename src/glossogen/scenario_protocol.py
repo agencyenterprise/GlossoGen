@@ -10,12 +10,10 @@ from pathlib import Path
 from typing import Any, NamedTuple, Protocol, Self
 
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
-from glossogen.evaluation.reports.evaluation_report import EvaluationReport
 from glossogen.event_logger import EventLogger
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
@@ -107,21 +105,6 @@ class SimulationScenario(ABC):
         Scenarios with scenario-specific metrics override this method.
         """
         return sorted(GENERIC_METRIC_NAMES)
-
-    @abstractmethod
-    async def run_evaluation(
-        self,
-        log_path: Path,
-        metric_names: list[str],
-        report_path: Path,
-        model: str,
-        provider_name: str,
-        inference_provider: str | None,
-        reasoning_effort: str | None,
-        options: MetricRunOptions,
-    ) -> EvaluationReport:
-        """Run metrics against a simulation log and write the report."""
-        ...
 
     @classmethod
     @abstractmethod

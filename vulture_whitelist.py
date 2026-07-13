@@ -102,7 +102,6 @@ _._validate_fault_count_distribution  # unused method (src/glossogen/scenarios/o
 procedure_template  # unused variable (src/glossogen/scenarios/orbital_anomaly/orbital_anomaly_cases.py:81)
 OrbitalAnomalyRunDetailExtension  # unused class (src/glossogen/scenarios/orbital_anomaly/run_detail_extension.py:135)
 time_elapsed_seconds  # unused variable (src/glossogen/scenarios/orbital_anomaly/world.py:44)
-_._validate_salon_knobs  # unused method (src/glossogen/scenarios/salon/knobs.py:38)
 _._backfill_round_time_budget_seconds  # unused method (src/glossogen/scenarios/satellite_contact_window/events.py:58)
 _._validate_channel_noise_level  # unused method (src/glossogen/scenarios/satellite_contact_window/knobs.py:51)
 _._validate_round_time_budget_seconds  # unused method (src/glossogen/scenarios/satellite_contact_window/knobs.py:59)

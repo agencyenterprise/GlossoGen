@@ -13,9 +13,9 @@ Friend and Chris each submit exactly one guess per round. The round ends as soon
 
 ## Why this exists
 
-`surprise_party` rotates Friend every round, which prevents any code from forming on the receiver side. `codebreakers` keeps all three agents persistent across many trials so a code *can* accumulate, and the pair-only postmortem gives Alice + Friend a feedback loop to refine that code. The remaining open question — and the one this scenario is designed to answer — is whether a covert signaling protocol emerges purely from iterative postmortem refinement, without the pre-shared primer that `salon` hands its cooperating pair.
+`surprise_party` rotates Friend every round, which prevents any code from forming on the receiver side. `codebreakers` keeps all three agents persistent across many trials so a code *can* accumulate, and the pair-only postmortem gives Alice + Friend a feedback loop to refine that code. The question this scenario is designed to answer is whether a covert signaling protocol emerges purely from iterative postmortem refinement, with no pre-shared primer or asymmetric trait vocabulary handed to the cooperating pair.
 
-This is essentially salon's "no-primer" ablation: same iterated referential structure, same pair-only postmortem, but no asymmetric trait vocabulary, plus Friend is allowed to chat publicly and Chris only gets one guess per round.
+Friend is allowed to chat publicly and Chris only gets one guess per round.
 
 ## Mechanics
 
@@ -67,6 +67,6 @@ It does **not** disclose the actual target word — Alice has to tell Friend tha
 ## Things deferred to a follow-up
 
 - LLM-judged guess matching (currently exact pool match).
-- Pre-shared primer / asymmetric vocabulary (intentionally not present — that's what makes this a harder test than salon).
+- Pre-shared primer / asymmetric vocabulary (intentionally not present — that's what makes this a harder test).
 - Compositional referents (multi-attribute objects).
 - `build_communication_rounds` + protocol-probe / boundary hooks.

@@ -70,7 +70,7 @@ def _budget_of(run: FeaturePresenceRun) -> int | None:
 
     ``round_time_budget_seconds`` is the canonical knob on ``BaseKnobs``
     surfaced by every budget-bearing scenario. Returns ``None`` when the
-    scenario has no per-round budget (e.g. Salon).
+    scenario has no per-round budget.
     """
     value = run.scenario_config.get("round_time_budget_seconds")
     if isinstance(value, (int, float)):

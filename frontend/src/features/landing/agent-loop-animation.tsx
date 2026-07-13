@@ -17,7 +17,7 @@ import { cn } from "@/shared/lib/cn";
 
 /**
  * Looping illustration of the agent loop. Two agents each cycle through their
- * tools — read_notifications, read_channel, send_message — drawn as a real loop.
+ * tools: read_notifications, read_channel, send_message, drawn as a real loop.
  * read_notifications "holds" until something happens on #link, then resolves to
  * new_message (or round_ended); read_channel and send_message point to the
  * shared #link channel when called. The choreography is a small JS state machine

@@ -14,7 +14,7 @@ export function PlatformFlow() {
       <Stage
         n="1"
         title="Configure"
-        body="Launch a scenario from the CLI, tuning its knobs — a config file plus any inline overrides."
+        body="Start a run from the command line. A config file sets the knobs, and you can override any of them inline."
       >
         <Terminal>
           <Line>
@@ -33,7 +33,7 @@ export function PlatformFlow() {
       <Stage
         n="2"
         title="Run"
-        body="The agents work through the rounds, each running its own agent loop (below). Every event is recorded — and you can watch it unfold live."
+        body="The agents play out the rounds, each on its own loop (see below). Everything is recorded, and you can watch it happen live."
       >
         <LiveMock />
       </Stage>
@@ -43,7 +43,7 @@ export function PlatformFlow() {
       <Stage
         n="3"
         title="Evaluate"
-        body="Score the finished run with any set of metrics — the results surface right in the web UI."
+        body="When it's done, score the run with whatever metrics you want. The numbers show up right in the web app."
       >
         <div className="flex w-full flex-col gap-2">
           <Terminal>

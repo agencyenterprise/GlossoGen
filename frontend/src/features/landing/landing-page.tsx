@@ -46,13 +46,13 @@ export function LandingPage({ appHref, appLabel }: { appHref: string; appLabel: 
       <section className="mx-auto grid max-w-6xl items-center gap-10 px-6 pt-10 pb-16 lg:grid-cols-[1.05fr_1fr] lg:pt-16 lg:pb-24">
         <div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            Study how AI agents communicate
+            Study how AI agents talk to each other
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
-            GlossoGen is a platform for researchers to analyze how AI agents communicate. It offers
-            many scenarios, each a series of rounds with a specific goal the agents must reach —
-            working together and deciding on their own what to do. Every message, tool call, and
-            outcome is logged, and when a run finishes, evaluators extract insights from it.
+            In GlossoGen, you drop a handful of agents into a scenario, give them a shared goal, and
+            let them work it out over a series of rounds, deciding on their own what to say and when
+            to act. Every message and move is logged, so once a run finishes you can replay it and
+            measure what happened.
           </p>
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <Link
@@ -74,7 +74,8 @@ export function LandingPage({ appHref, appLabel }: { appHref: string; appLabel: 
           <div>
             <h2 className="text-2xl font-bold tracking-tight">How language emerges</h2>
             <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
-              Two scenario mechanics push the agents to communicate effectively:
+              On their own, the agents just talk in plain English. Two things push them to tighten
+              it up:
             </p>
             <ul className="mt-6 flex flex-col gap-5">
               <li className="flex gap-3">
@@ -84,8 +85,8 @@ export function LandingPage({ appHref, appLabel }: { appHref: string; appLabel: 
                 <div>
                   <h3 className="text-sm font-medium">Pressure inside a round</h3>
                   <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-                    A scenario can put the agents under pressure — here, a budget where every
-                    character counts — so being verbose costs them the round.
+                    Give them a tight character budget and every word starts to cost. Ramble on, and
+                    they run out of room before the job is done.
                   </p>
                 </div>
               </li>
@@ -96,8 +97,8 @@ export function LandingPage({ appHref, appLabel }: { appHref: string; appLabel: 
                 <div>
                   <h3 className="text-sm font-medium">Reflection between rounds</h3>
                   <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-                    An off-the-clock postmortem lets them review what happened and agree on a
-                    sharper protocol — which they put to use on the next round.
+                    Between rounds they get a quiet moment off the budget to compare notes and
+                    settle on shorthand. The next round, they put it to use.
                   </p>
                 </div>
               </li>
@@ -115,8 +116,8 @@ export function LandingPage({ appHref, appLabel }: { appHref: string; appLabel: 
           <div className="max-w-2xl">
             <h2 className="text-2xl font-bold tracking-tight">Running an experiment</h2>
             <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
-              GlossoGen provides the scenarios, manages the agents and their loops, and gives you
-              the evaluators to make sense of each run.
+              You bring the question. GlossoGen comes with the scenarios, runs the agents and their
+              loops, and gives you the metrics to pick apart what happened.
             </p>
           </div>
           <div className="mt-8">
@@ -131,8 +132,9 @@ export function LandingPage({ appHref, appLabel }: { appHref: string; appLabel: 
           <div className="max-w-2xl">
             <h2 className="text-2xl font-bold tracking-tight">The agent loop</h2>
             <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
-              Each agent runs its own loop: wait for new activity, then call whatever tools it
-              chooses — read the channel, send a message, or act on the world — again and again.
+              Under the hood, every agent just runs the same loop over and over: wait for something
+              to happen, then pick a tool, maybe reading the channel, sending a message, or acting
+              on the world.
             </p>
           </div>
           <div className="mt-8">

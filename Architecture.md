@@ -497,11 +497,6 @@ The LLM-judge metrics (`language_strangeness`, `slang_emergence`, `neologism`, `
 
 A scenario that does not implement a given hook returns `[]` from the corresponding metric and the measurement is simply absent from the report — there is no zero-score sentinel.
 
-**Salon-specific metrics:**
-- `covert_success_rate` (deterministic; full-success rate from `submit_decode` / `submit_intercept` events compared against the seeded directive sequence)
-- `covertness_judge` (LLM judge on public-only transcripts; verdict ∈ {PASS, PARTIAL, FAIL} → `score` ∈ {1.0, 0.5, 0.0})
-- `protocol_stability` (LLM judge on primer + public transcripts; same verdict mapping)
-
 **No automatic labels**: Metrics no longer write `eval:*` labels into `labels.json`. Filter on `score` or on the `per_round` / `per_agent` lists directly.
 
 **Output**: A JSON report with structured measurements:

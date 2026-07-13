@@ -81,7 +81,7 @@ class HospitalWorld(ScenarioWorld):
     routing submission, the Observer's intercept submissions, and the
     Bed Manager's restricted-vocabulary leakage on the public channel.
     Outcomes are resolved in ``finalize_round_sync`` at the start of the
-    next round (mirrors the Salon world).
+    next round.
     """
 
     _context: WorldContext

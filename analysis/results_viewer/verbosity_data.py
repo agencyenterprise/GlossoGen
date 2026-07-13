@@ -254,7 +254,7 @@ def _resolve_budget(evaluated: EvaluatedRun) -> int | None:
     in the ``scenario_config`` written into the JSONL at simulation
     start; one character on the primary channel costs one second against
     that budget. Returns ``None`` when the scenario has no per-round
-    budget (e.g. Salon).
+    budget.
     """
     value = evaluated.metadata.scenario_config.get("round_time_budget_seconds")
     if isinstance(value, (int, float)):
