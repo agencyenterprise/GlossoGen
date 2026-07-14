@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { components } from "@/types/api.gen";
 import type { JudgeGroundTruthMetadata } from "@/features/runs/display-entry";
 import type { LiveJudgeConfig } from "@/features/runs/scenario-plugin";
-import { buildApiUrlWithToken } from "./api-client";
+import { buildEventStreamUrl } from "./api-client";
 
 /** Payload shared by every judged-action scenario's ``*_judged`` SSE event.
  *  The expected action arrives under ``expected_actions`` (veyru,
@@ -127,14 +127,24 @@ export function useEventStream(
     let activeSource: EventSource | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    function connect() {
+    async function connect() {
       if (cancelled) return;
 
       const judgedToolNames = new Set<string>(liveJudge?.judgedToolNames ?? []);
-      const url = buildApiUrlWithToken({
-        path: `/api/g/{group_slug}/runs/${runId}/events`,
-        searchParams: new URLSearchParams(),
-      });
+      let url: string;
+      try {
+        url = await buildEventStreamUrl({
+          path: `/api/g/{group_slug}/runs/${runId}/events`,
+          searchParams: new URLSearchParams(),
+        });
+      } catch {
+        // Group slug not primed yet, or token fetch failed. Retry shortly.
+        if (retryOnFailure && !cancelled) {
+          retryTimer = setTimeout(connect, 2000);
+        }
+        return;
+      }
+      if (cancelled) return;
       const eventSource = new EventSource(url);
       activeSource = eventSource;
       let hasConnected = false;

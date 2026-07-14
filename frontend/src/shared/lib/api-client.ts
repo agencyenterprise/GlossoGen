@@ -91,15 +91,28 @@ function assertGroupSlugSubstituted(url: string): void {
   }
 }
 
-export function buildApiUrlWithToken({
+/**
+ * Build a fully-qualified URL for an SSE (`EventSource`) connection.
+ *
+ * `EventSource` cannot set an `Authorization` header, so the Clerk session
+ * token (when present) is appended as a `?token=` query parameter, which the
+ * backend identity middleware accepts as a bearer fallback. Returns the URL
+ * with no token in local mode (the backend supplies the synthetic local
+ * identity). Async because fetching a fresh Clerk token is async.
+ */
+export async function buildEventStreamUrl({
   path,
   searchParams,
 }: {
   path: string;
   searchParams: URLSearchParams;
-}): string {
+}): Promise<string> {
   const substituted = substituteGroupSlug(path);
   assertGroupSlugSubstituted(substituted);
+  const token = await getClerkSessionToken();
+  if (token) {
+    searchParams.set("token", token);
+  }
   const query = searchParams.toString();
   if (query.length > 0) {
     return `${API_URL}${substituted}?${query}`;

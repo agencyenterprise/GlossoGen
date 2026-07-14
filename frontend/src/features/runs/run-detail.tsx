@@ -138,6 +138,15 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     refetchInterval: query => {
       const status = query.state.data?.status;
       if (status === "in_progress") {
+        // SSE delivers messages, cost, and the terminal transition live, so a
+        // full-detail re-pull is only needed as a fallback when the stream is
+        // down. `simulation_ended` invalidates this query directly. Reading
+        // `sse.isConnected` here makes the interval reactive: when the stream
+        // drops, the re-render rebuilds this closure and the fallback poll
+        // resumes.
+        if (sseConnected) {
+          return false;
+        }
         return 10_000;
       }
       if (status === "starting") {
@@ -180,6 +189,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   // SSE streaming for in-progress runs
   const sseEnabled = restData?.status === "in_progress" || restData?.status === "starting";
   const sse = useEventStream(runId, sseEnabled, knownEventIds, true, scenarioPlugin.liveJudge);
+  const sseConnected = sse.isConnected;
 
   // When SSE reports simulation ended, refetch REST for evaluation status
   const sseStatus = sse.status;

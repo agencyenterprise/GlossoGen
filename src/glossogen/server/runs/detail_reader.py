@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from datetime import UTC, datetime
 from pathlib import Path
 
 import aiofiles
@@ -30,21 +29,23 @@ from glossogen.models.event import (
     ToolCallInvoked,
     ToolResultReceived,
 )
+from glossogen.server.runs.manifest_sources import (
+    read_cross_run_replace_agent_source,
+    read_fork_source,
+    read_replace_agent_source,
+    read_resume_at_round_source,
+)
 from glossogen.server.runs.models import (
     AgentObservationResponse,
     AgentRunCycleFailedEntry,
     AgentSwapEventDTO,
     ContextCompactionEventDTO,
-    CrossRunReplaceAgentSource,
     DebugLogEntry,
     DerivedRunReference,
     EvalCostResponse,
     EvalReportResponse,
-    ForkSource,
     MeasurementResponse,
     ReasoningEntry,
-    ReplaceAgentSource,
-    ResumeAtRoundSource,
     RoundEnding,
     RoundInjection,
     RoundObservationResponse,
@@ -204,10 +205,10 @@ async def load_run_detail(
     events: list[SimulationEvent] = await load_events(log_path=log_path)
 
     run_dir = log_path.parent
-    fork_source = _read_fork_source(run_dir=run_dir)
-    replace_agent_source = _read_replace_agent_source(run_dir=run_dir)
-    cross_run_replace_agent_source = _read_cross_run_replace_agent_source(run_dir=run_dir)
-    resume_at_round_source = _read_resume_at_round_source(run_dir=run_dir)
+    fork_source = read_fork_source(run_dir=run_dir)
+    replace_agent_source = read_replace_agent_source(run_dir=run_dir)
+    cross_run_replace_agent_source = read_cross_run_replace_agent_source(run_dir=run_dir)
+    resume_at_round_source = read_resume_at_round_source(run_dir=run_dir)
 
     run_id = ""
     scenario_name = ""
@@ -331,10 +332,8 @@ async def load_run_detail(
                 cost_from_tokens += (
                     non_cached_input * event_pricing.input_per_mtok
                     + event.usage.output_tokens * event_pricing.output_per_mtok
-                    + event.usage.cache_read_input_tokens
-                    * event_pricing.cache_read_per_mtok
-                    + event.usage.cache_creation_input_tokens
-                    * event_pricing.cache_write_per_mtok
+                    + event.usage.cache_read_input_tokens * event_pricing.cache_read_per_mtok
+                    + event.usage.cache_creation_input_tokens * event_pricing.cache_write_per_mtok
                 ) / 1_000_000
 
             # Create reasoning entry for text content
@@ -577,88 +576,3 @@ async def _read_labels_async(run_dir: Path) -> list[str]:
     except Exception:
         logger.exception("Failed to read labels from %s", labels_path)
         return []
-
-
-def _read_fork_source(run_dir: Path) -> ForkSource | None:
-    """Read fork provenance from fork_manifest.json if it exists."""
-    manifest_path = run_dir / "fork_manifest.json"
-    if not manifest_path.exists():
-        return None
-    raw = orjson.loads(manifest_path.read_bytes())
-    forked_at = datetime.fromtimestamp(raw["forked_at"], tz=UTC)
-    return ForkSource(
-        source_run_id=raw["source_run_id"],
-        target_message_id=raw["target_message_id"],
-        forked_at=forked_at,
-    )
-
-
-def _read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:
-    """Read replace-agent provenance from replace_manifest.json if it exists.
-
-    Returns ``None`` when the manifest is absent or when ``replaced_agent_id``
-    is null (a round-anchored resume; surfaced via
-    :func:`_read_resume_at_round_source`).
-    """
-    manifest_path = run_dir / "replace_manifest.json"
-    if not manifest_path.exists():
-        return None
-    raw = orjson.loads(manifest_path.read_bytes())
-    if raw.get("replaced_agent_id") is None:
-        return None
-    replaced_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
-    target_event_id = raw.get("target_event_id") or raw.get("target_message_id", "")
-    return ReplaceAgentSource(
-        source_run_id=raw["source_run_id"],
-        round_start=raw["round_start"],
-        target_event_id=target_event_id,
-        replaced_agent_id=raw["replaced_agent_id"],
-        replacement_model=raw["replacement_model"],
-        replacement_provider=raw["replacement_provider"],
-        replaced_at=replaced_at,
-    )
-
-
-def _read_resume_at_round_source(run_dir: Path) -> ResumeAtRoundSource | None:
-    """Read round-anchored-resume provenance from replace_manifest.json.
-
-    Returns ``None`` when the manifest is absent or when ``replaced_agent_id``
-    is set (a replace-agent run; surfaced via
-    :func:`_read_replace_agent_source`).
-    """
-    manifest_path = run_dir / "replace_manifest.json"
-    if not manifest_path.exists():
-        return None
-    raw = orjson.loads(manifest_path.read_bytes())
-    if raw.get("replaced_agent_id") is not None:
-        return None
-    resumed_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
-    return ResumeAtRoundSource(
-        source_run_id=raw["source_run_id"],
-        round_start=raw["round_start"],
-        rounds_after_resume=raw["rounds_after_swap"],
-        target_event_id=raw["target_event_id"],
-        resumed_at=resumed_at,
-    )
-
-
-def _read_cross_run_replace_agent_source(
-    run_dir: Path,
-) -> CrossRunReplaceAgentSource | None:
-    """Read cross-run provenance from cross_run_replace_manifest.json if it exists."""
-    manifest_path = run_dir / "cross_run_replace_manifest.json"
-    if not manifest_path.exists():
-        return None
-    raw = orjson.loads(manifest_path.read_bytes())
-    replaced_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
-    return CrossRunReplaceAgentSource(
-        source_a_run_id=raw["source_a_run_id"],
-        source_b_run_id=raw["source_b_run_id"],
-        round_start=raw["round_start"],
-        source_b_round_end=raw["source_b_round_end"],
-        target_event_id=raw["target_event_id"],
-        replaced_agent_id=raw["replaced_agent_id"],
-        imported_model=raw["imported_model"],
-        imported_provider=raw["imported_provider"],
-        replaced_at=replaced_at,
-    )

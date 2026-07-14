@@ -85,14 +85,21 @@ def _extract_group_slug(path: str) -> str | None:
 
 
 def _bearer_token(request: Request) -> str | None:
-    """Extract a JWT from the ``Authorization: Bearer ...`` header."""
+    """Extract a JWT from the ``Authorization`` header or the ``token`` query param.
+
+    SSE endpoints are consumed via ``EventSource``, which cannot set an
+    ``Authorization`` header, so those requests carry the JWT as a ``?token=``
+    query parameter instead. The header takes precedence when both are present.
+    """
     header = request.headers.get("authorization", "")
-    if not header.startswith("Bearer "):
-        return None
-    token = header[len("Bearer ") :].strip()
-    if not token:
-        return None
-    return token
+    if header.startswith("Bearer "):
+        token = header[len("Bearer ") :].strip()
+        if token:
+            return token
+    query_token = request.query_params.get("token", "").strip()
+    if query_token:
+        return query_token
+    return None
 
 
 def _unauthorized(scope: Scope, detail: str) -> JSONResponse:

@@ -16,6 +16,12 @@ from pydantic import BaseModel
 from glossogen.eval_manifest import read_eval_manifest
 from glossogen.event_parsing import parse_event_bytes
 from glossogen.models.event import RunStatus, SimulationEnded, SimulationStarted
+from glossogen.server.runs.manifest_sources import (
+    read_cross_run_replace_agent_source,
+    read_fork_source,
+    read_replace_agent_source,
+    read_resume_at_round_source,
+)
 from glossogen.server.runs.models import (
     AgentModelSummary,
     CrossRunReplaceAgentSource,
@@ -278,91 +284,6 @@ def _has_note(run_dir: Path) -> bool:
     return (run_dir / "note.md").exists()
 
 
-def _read_fork_source(run_dir: Path) -> ForkSource | None:
-    """Read fork provenance from fork_manifest.json if it exists."""
-    manifest_path = run_dir / "fork_manifest.json"
-    if not manifest_path.exists():
-        return None
-    raw = orjson.loads(manifest_path.read_bytes())
-    forked_at = datetime.fromtimestamp(raw["forked_at"], tz=UTC)
-    return ForkSource(
-        source_run_id=raw["source_run_id"],
-        target_message_id=raw["target_message_id"],
-        forked_at=forked_at,
-    )
-
-
-def _read_replace_agent_source(run_dir: Path) -> ReplaceAgentSource | None:
-    """Read replace-agent provenance from replace_manifest.json if it exists.
-
-    Returns ``None`` when the manifest is absent or when ``replaced_agent_id``
-    is null (a round-anchored resume; surfaced separately via
-    :func:`_read_resume_at_round_source`).
-    """
-    manifest_path = run_dir / "replace_manifest.json"
-    if not manifest_path.exists():
-        return None
-    raw = orjson.loads(manifest_path.read_bytes())
-    if raw.get("replaced_agent_id") is None:
-        return None
-    replaced_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
-    target_event_id = raw.get("target_event_id") or raw.get("target_message_id", "")
-    return ReplaceAgentSource(
-        source_run_id=raw["source_run_id"],
-        round_start=raw["round_start"],
-        target_event_id=target_event_id,
-        replaced_agent_id=raw["replaced_agent_id"],
-        replacement_model=raw["replacement_model"],
-        replacement_provider=raw["replacement_provider"],
-        replaced_at=replaced_at,
-    )
-
-
-def _read_resume_at_round_source(run_dir: Path) -> ResumeAtRoundSource | None:
-    """Read round-anchored-resume provenance from replace_manifest.json.
-
-    Returns ``None`` when the manifest is absent or when ``replaced_agent_id``
-    is set (a replace-agent run; surfaced separately via
-    :func:`_read_replace_agent_source`).
-    """
-    manifest_path = run_dir / "replace_manifest.json"
-    if not manifest_path.exists():
-        return None
-    raw = orjson.loads(manifest_path.read_bytes())
-    if raw.get("replaced_agent_id") is not None:
-        return None
-    resumed_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
-    return ResumeAtRoundSource(
-        source_run_id=raw["source_run_id"],
-        round_start=raw["round_start"],
-        rounds_after_resume=raw["rounds_after_swap"],
-        target_event_id=raw["target_event_id"],
-        resumed_at=resumed_at,
-    )
-
-
-def _read_cross_run_replace_agent_source(
-    run_dir: Path,
-) -> CrossRunReplaceAgentSource | None:
-    """Read cross-run provenance from cross_run_replace_manifest.json if it exists."""
-    manifest_path = run_dir / "cross_run_replace_manifest.json"
-    if not manifest_path.exists():
-        return None
-    raw = orjson.loads(manifest_path.read_bytes())
-    replaced_at = datetime.fromtimestamp(raw["replaced_at"], tz=UTC)
-    return CrossRunReplaceAgentSource(
-        source_a_run_id=raw["source_a_run_id"],
-        source_b_run_id=raw["source_b_run_id"],
-        round_start=raw["round_start"],
-        source_b_round_end=raw["source_b_round_end"],
-        target_event_id=raw["target_event_id"],
-        replaced_agent_id=raw["replaced_agent_id"],
-        imported_model=raw["imported_model"],
-        imported_provider=raw["imported_provider"],
-        replaced_at=replaced_at,
-    )
-
-
 def _resolve_scenario_config(
     run_dir: Path,
     base_config: dict[str, Any],
@@ -453,12 +374,12 @@ async def build_summary(
             evaluation_content_hash=evaluation_content_hash,
         )
 
-    fork_source = _read_fork_source(run_dir=timestamp_dir)
-    replace_agent_source = _read_replace_agent_source(run_dir=timestamp_dir)
-    cross_run_replace_agent_source = _read_cross_run_replace_agent_source(
+    fork_source = read_fork_source(run_dir=timestamp_dir)
+    replace_agent_source = read_replace_agent_source(run_dir=timestamp_dir)
+    cross_run_replace_agent_source = read_cross_run_replace_agent_source(
         run_dir=timestamp_dir,
     )
-    resume_at_round_source = _read_resume_at_round_source(run_dir=timestamp_dir)
+    resume_at_round_source = read_resume_at_round_source(run_dir=timestamp_dir)
 
     try:
         scan = await scan_jsonl(file_path=jsonl_path)

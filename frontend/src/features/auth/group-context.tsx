@@ -25,6 +25,11 @@ const GroupContext = createContext<GroupContextValue | null>(null);
 
 export function GroupProvider({ slug, children }: { slug: string; children: ReactNode }) {
   const value = useMemo(() => ({ slug }), [slug]);
+  // Prime the module-level mirror synchronously during render — before any
+  // child effect or query fires — so no request can go out with an
+  // unsubstituted `{group_slug}` placeholder. The effect only handles the
+  // clear-on-unmount cleanup.
+  setActiveGroupSlug(slug);
   useEffect(() => {
     setActiveGroupSlug(slug);
     return () => {
