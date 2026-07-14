@@ -11,6 +11,10 @@ Two entry points share the same ``VeyruOutcome`` shape:
   after resume would render a blank "previous round" block.
 """
 
+from typing import Any
+
+from glossogen.models.event import MessageSent, RoundEnded
+from glossogen.scenarios.veyru.events import VeyruStabilizationJudged
 from glossogen.scenarios.veyru.ids import TeamId
 from glossogen.scenarios.veyru.veyru_cases import VeyruCase
 from glossogen.scenarios.veyru.world_state import StageOutcome, TeamState, VeyruOutcome
@@ -72,7 +76,7 @@ def restore_outcomes_from_events(
     teams: dict[TeamId, TeamState],
     veyru_cases: list[VeyruCase],
     channels_by_team: dict[str, TeamId],
-    events: list[object],
+    events: list[Any],
 ) -> None:
     """Seed per-team ``outcomes`` from a JSONL event list.
 
@@ -86,33 +90,25 @@ def restore_outcomes_from_events(
     matched_stages_by_round_team: dict[int, dict[TeamId, int]] = {}
     round_ended_trigger: dict[int, str] = {}
     for event in events:
-        event_type = getattr(event, "event_type", None)
-        round_number = getattr(event, "round_number", None)
-        if not isinstance(round_number, int) or round_number < 1:
+        round_number = event.round_number
+        if round_number < 1:
             continue
-        if event_type == "message_sent":
-            message = getattr(event, "message", None)
-            channel_id = getattr(message, "channel_id", None)
-            text = getattr(message, "text", "")
-            if isinstance(channel_id, str) and channel_id in channels_by_team:
+        if isinstance(event, MessageSent):
+            channel_id = event.message.channel_id
+            if channel_id in channels_by_team:
                 team_id = channels_by_team[channel_id]
                 bucket = characters_by_round_team.setdefault(round_number, {})
-                bucket[team_id] = bucket.get(team_id, 0) + len(text)
-        elif event_type == "veyru_stabilization_judged":
-            if not getattr(event, "judge_match", False):
+                bucket[team_id] = bucket.get(team_id, 0) + len(event.message.text)
+        elif isinstance(event, VeyruStabilizationJudged):
+            if not event.judge_match:
                 continue
-            agent_id = getattr(event, "agent_id", "")
-            if not isinstance(agent_id, str):
-                continue
-            resolved_team_id = _team_for_agent_id_lookup(teams=teams, agent_id=agent_id)
+            resolved_team_id = _team_for_agent_id_lookup(teams=teams, agent_id=event.agent_id)
             if resolved_team_id is None:
                 continue
             bucket = matched_stages_by_round_team.setdefault(round_number, {})
             bucket[resolved_team_id] = bucket.get(resolved_team_id, 0) + 1
-        elif event_type == "round_ended":
-            trigger = getattr(event, "trigger", None)
-            if isinstance(trigger, str):
-                round_ended_trigger[round_number] = trigger
+        elif isinstance(event, RoundEnded):
+            round_ended_trigger[round_number] = event.trigger
 
     for round_number in sorted(round_ended_trigger.keys()):
         trigger = round_ended_trigger[round_number]

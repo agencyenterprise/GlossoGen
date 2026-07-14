@@ -37,8 +37,8 @@ def restore_outcomes_from_events(
     characters_by_round_team: dict[int, dict[str, int]] = {}
     completed_rounds: set[int] = set()
     for event in events:
-        round_number = getattr(event, "round_number", None)
-        if not isinstance(round_number, int) or round_number < 1:
+        round_number = event.round_number
+        if round_number < 1:
             continue
         if isinstance(event, ContainerYardMoveJudged):
             team_id = _team_id_for_agent(agent_id=event.agent_id, two_teams=two_teams)

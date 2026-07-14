@@ -39,8 +39,8 @@ def restore_outcomes_from_events(
     characters_by_round_team: dict[int, dict[str, int]] = {}
     completed_rounds: set[int] = set()
     for event in events:
-        round_number = getattr(event, "round_number", None)
-        if not isinstance(round_number, int) or round_number < 1:
+        round_number = event.round_number
+        if round_number < 1:
             continue
         if isinstance(event, SpotTheDifferenceCaseStarted):
             difference_count_by_round[round_number] = event.difference_count
