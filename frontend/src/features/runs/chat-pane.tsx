@@ -548,7 +548,7 @@ export function ChatPane({
 
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-0 py-1"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-0 py-1"
         onScroll={handleScroll}
       >
         <div
