@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "GlossoGen",
   description: "View and explore multi-agent simulation runs",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
