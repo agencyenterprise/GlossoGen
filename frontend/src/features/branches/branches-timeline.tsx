@@ -187,7 +187,7 @@ export function BranchesTimeline({ runId }: { runId: string }) {
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-10">
+    <main className="w-full px-6 py-10 lg:px-10 2xl:px-16">
       {/* Header */}
       <div className="mb-8 flex items-center gap-3">
         <Link

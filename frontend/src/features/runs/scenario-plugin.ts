@@ -21,6 +21,31 @@ import type { AgentModelOverride } from "./agent-model-overrides";
 type KnobsMap = Record<string, unknown>;
 type ModelOption = { model_prefix: string; provider: string };
 
+/** Color palette for a scenario timeline marker's FAB and divider. */
+export type ScenarioMarkerTone = "amber" | "emerald" | "violet";
+
+/** Outcome a scenario assigns to one of its `RoundEnded.trigger` values. */
+export type RoundTriggerOutcome = "success" | "failure";
+
+/**
+ * A round-anchored, scenario-specific event on the run timeline (e.g. veyru's
+ * observer swap or intern takeover). The platform renders each marker twice:
+ * as a floating jump-to button on the run-detail page and as an inline divider
+ * in the chat pane at `roundNumber`. `id` is the shared DOM id linking the two.
+ */
+export interface ScenarioTimelineMarker {
+  id: string;
+  roundNumber: number;
+  tone: ScenarioMarkerTone;
+  icon: ComponentType<{ className?: string }>;
+  /** Rendered as "Go to {fabLabel} (round N)" on the floating button. */
+  fabLabel: string;
+  /** Bold heading on the inline divider. */
+  dividerTitle: ReactNode;
+  /** Secondary line on the inline divider. */
+  dividerSubtitle: ReactNode;
+}
+
 /** Validation error attached to a scenario-specific knobs form field. */
 export interface KnobsFormError {
   field: string;
@@ -136,4 +161,17 @@ export interface ScenarioPlugin {
    * attachment in the event stream, so no scenario names are hardcoded there.
    */
   liveJudge: LiveJudgeConfig | null;
+  /**
+   * Round-anchored scenario-specific timeline markers derived from the run's
+   * `scenario_extras`. Each becomes a jump-to FAB on the run-detail page and a
+   * divider in the chat pane. `extras` is `unknown`, narrowed internally to the
+   * scenario's own variant. Default plug-in returns `[]`.
+   */
+  getTimelineMarkers: (args: { extras: unknown }) => ScenarioTimelineMarker[];
+  /**
+   * Classify a scenario-specific `RoundEnded.trigger` as success or failure so
+   * the round-timeline badge can tone it, or null to fall back to the generic
+   * `round_completed` / `round_failed` handling. Default plug-in returns null.
+   */
+  classifyRoundTrigger: (trigger: string) => RoundTriggerOutcome | null;
 }

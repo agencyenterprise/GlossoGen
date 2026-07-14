@@ -24,4 +24,6 @@ export const driveModuleRepairPlugin: ScenarioPlugin = {
     sseEventNames: ["drive_module_replacement_judged"],
     judgedToolNames: ["service_component", "replace_component"],
   },
+  getTimelineMarkers: () => [],
+  classifyRoundTrigger: () => null,
 };

@@ -10,7 +10,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { Archive, ArrowLeftRight, ChevronDown, Hash, UserCog, UserPlus } from "lucide-react";
+import { Archive, ChevronDown, Hash, UserCog } from "lucide-react";
 import Link from "next/link";
 import { Tooltip } from "@/shared/components/ui/tooltip";
 import { cn } from "@/shared/lib/cn";
@@ -25,6 +25,8 @@ import { ToolCallDisplay } from "./tool-call-display";
 import { RunCycleFailureDisplay } from "./run-cycle-failure-display";
 import { RoundTimelineModal } from "./round-timeline-modal";
 import { RoundInjectionRow, RoundOutcomeRow } from "./round-event-row";
+import type { ScenarioTimelineMarker } from "./scenario-plugin";
+import { ScenarioMarkerDivider } from "./scenario-timeline-marker";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
 type RunDetailResponse = components["schemas"]["RunDetailResponse"];
@@ -48,14 +50,8 @@ interface ChatPaneProps {
   highlightNonce: number;
   /** The message_id that was the fork point, if this is a forked run. */
   forkPointMessageId: string | null;
-  /** Round number where the first post-swap messages appear (if the run had an observer swap). */
-  swapRoundNumber: number | null;
-  /** Display names of the two observers that swapped teams. */
-  swappedObserverDisplayNames: string[];
-  /** Round number where the intern joined the link (if intern mode was enabled). */
-  internJoinRoundNumber: number | null;
-  /** Round number where the intern replaced the field observer (if intern mode was enabled). */
-  internTakeoverRoundNumber: number | null;
+  /** Round-anchored scenario-specific markers (from the scenario plug-in), rendered as dividers at their round. */
+  scenarioMarkers: ScenarioTimelineMarker[];
   /** Round at which an agent was replaced via replace-agent (if this run was derived). */
   replaceAgentRoundStart: number | null;
   /** Agent ID that was replaced (only set when replaceAgentRoundStart is set). */
@@ -72,7 +68,7 @@ interface ChatPaneProps {
   crossRunSourceBRunId: string | null;
   /** Scenario name, used to dispatch to the scenario plug-in for the round-detail modal. */
   scenarioName: string;
-  /** Scenario-specific run extras (e.g. veyru per-round case metadata). Null for scenarios with no extras. */
+  /** Scenario-specific run extras, dispatched to the scenario plug-in for the round-detail modal. Null for scenarios with no extras. */
   scenarioExtras: ScenarioExtras | null;
   /** One entry per completed round describing why its main phase ended. */
   roundEndings: RoundEnding[];
@@ -195,10 +191,7 @@ export function ChatPane({
   highlightedMessageId,
   highlightNonce,
   forkPointMessageId,
-  swapRoundNumber,
-  swappedObserverDisplayNames,
-  internJoinRoundNumber,
-  internTakeoverRoundNumber,
+  scenarioMarkers,
   replaceAgentRoundStart,
   replaceAgentReplacedAgentId,
   replaceAgentReplacementModel,
@@ -672,47 +665,11 @@ export function ChatPane({
           />
           {rounds.map((round, roundIdx) => (
             <div key={`round-${roundIdx}-${round.roundNumber}`}>
-              {swapRoundNumber !== null && round.roundNumber === swapRoundNumber ? (
-                <div
-                  id="swap-divider"
-                  className="mx-4 my-4 rounded-md border-2 border-dashed border-amber-400/80 bg-amber-50 px-4 py-3 dark:border-amber-600/70 dark:bg-amber-950/50"
-                >
-                  <div className="flex items-center justify-center gap-2 text-amber-800 dark:text-amber-200">
-                    <ArrowLeftRight className="h-4 w-4" />
-                    <span className="text-sm font-semibold">
-                      {swappedObserverDisplayNames.length === 2 ? (
-                        <>
-                          {swappedObserverDisplayNames[0]} <span aria-hidden="true">⇄</span>{" "}
-                          {swappedObserverDisplayNames[1]} — swapped teams
-                        </>
-                      ) : (
-                        <>Observers swapped between teams</>
-                      )}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-center text-[11px] text-amber-700/80 dark:text-amber-300/80">
-                    Channel history was wiped. Round {round.roundNumber} begins with the new
-                    pairings.
-                  </div>
-                </div>
-              ) : null}
-              {internJoinRoundNumber !== null && round.roundNumber === internJoinRoundNumber ? (
-                <div
-                  id="intern-join-divider"
-                  className="mx-4 my-4 rounded-md border-2 border-dashed border-emerald-400/80 bg-emerald-50 px-4 py-3 dark:border-emerald-600/70 dark:bg-emerald-950/50"
-                >
-                  <div className="flex items-center justify-center gap-2 text-emerald-800 dark:text-emerald-200">
-                    <UserPlus className="h-4 w-4" />
-                    <span className="text-sm font-semibold">
-                      Intern Observer joined the comm link
-                    </span>
-                  </div>
-                  <div className="mt-1 text-center text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
-                    Silent observation begins at round {round.roundNumber}. The intern cannot see
-                    messages from earlier rounds.
-                  </div>
-                </div>
-              ) : null}
+              {scenarioMarkers
+                .filter(marker => marker.roundNumber === round.roundNumber)
+                .map(marker => (
+                  <ScenarioMarkerDivider key={marker.id} marker={marker} />
+                ))}
               {replaceAgentRoundStart !== null && round.roundNumber === replaceAgentRoundStart ? (
                 <div
                   id="replace-agent-divider"
@@ -832,24 +789,6 @@ export function ChatPane({
                     ) : null}
                   </div>
                 ))}
-              {internTakeoverRoundNumber !== null &&
-              round.roundNumber === internTakeoverRoundNumber ? (
-                <div
-                  id="intern-takeover-divider"
-                  className="mx-4 my-4 rounded-md border-2 border-dashed border-violet-400/80 bg-violet-50 px-4 py-3 dark:border-violet-600/70 dark:bg-violet-950/50"
-                >
-                  <div className="flex items-center justify-center gap-2 text-violet-800 dark:text-violet-200">
-                    <UserCog className="h-4 w-4" />
-                    <span className="text-sm font-semibold">
-                      Intern Observer took over as Field Observer
-                    </span>
-                  </div>
-                  <div className="mt-1 text-center text-[11px] text-violet-700/80 dark:text-violet-300/80">
-                    The previous Field Observer left the comm link. Round {round.roundNumber} begins
-                    with the new pairing.
-                  </div>
-                </div>
-              ) : null}
               <div
                 ref={el => {
                   if (el === null) {

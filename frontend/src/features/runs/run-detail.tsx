@@ -47,11 +47,9 @@ import {
   CrossRunReplaceAgentPointFab,
   ForkBadge,
   ForkPointFab,
-  InternJoinFab,
-  InternTakeoverFab,
   ReplaceAgentPointFab,
-  SwapPointFab,
 } from "./fork-badge";
+import { ScenarioMarkerFab } from "./scenario-timeline-marker";
 import { StartEvaluationModal } from "./start-evaluation-modal";
 import {
   elapsedSince,
@@ -427,10 +425,9 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   }
 
   const maxRound = displayEntries.reduce((max, m) => Math.max(max, m.round_number), 0);
-  const veyruExtrasForChat =
-    restData.scenario_extras !== null && restData.scenario_extras.scenario_name === "veyru"
-      ? restData.scenario_extras
-      : null;
+  const scenarioMarkers = scenarioPlugin.getTimelineMarkers({
+    extras: restData.scenario_extras ?? null,
+  });
   const uniqueModelKeys = [...new Set(allAgents.map(a => `${a.provider}:${a.model}`))];
   let modelLabel: string;
   if (uniqueModelKeys.length === 1) {
@@ -453,7 +450,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     effectiveStatus === "killed";
 
   return (
-    <div className="mx-auto flex h-dvh max-w-7xl min-h-0 flex-col px-4 py-4">
+    <div className="flex h-dvh min-h-0 w-full flex-col px-4 py-4 lg:px-8 2xl:px-12">
       {/* Back link */}
       <Link
         href={groupPath("/runs")}
@@ -671,8 +668,8 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
         className={cn(
           "relative grid min-h-0 flex-1 rounded-xl border border-border bg-background *:min-h-0",
           evaluation !== null && showEvalPanel
-            ? "grid-cols-[192px_1fr_280px]"
-            : "grid-cols-[192px_1fr]"
+            ? "grid-cols-[240px_1fr_280px]"
+            : "grid-cols-[240px_1fr]"
         )}
       >
         <RunSidebar
@@ -757,12 +754,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             highlightedMessageId={highlightedMessageId}
             highlightNonce={highlightNonce}
             forkPointMessageId={restData.fork_source?.target_message_id ?? null}
-            swapRoundNumber={veyruExtrasForChat?.swap_point?.round_number ?? null}
-            swappedObserverDisplayNames={
-              veyruExtrasForChat?.swap_point?.swapped_observer_display_names ?? []
-            }
-            internJoinRoundNumber={veyruExtrasForChat?.intern_join?.round_number ?? null}
-            internTakeoverRoundNumber={veyruExtrasForChat?.intern_takeover?.round_number ?? null}
+            scenarioMarkers={scenarioMarkers}
             replaceAgentRoundStart={restData.replace_agent_source?.round_start ?? null}
             replaceAgentReplacedAgentId={restData.replace_agent_source?.replaced_agent_id ?? null}
             replaceAgentReplacementModel={restData.replace_agent_source?.replacement_model ?? null}
@@ -863,15 +855,10 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
       ) : null}
 
       {(() => {
-        const veyruExtras = veyruExtrasForChat;
-        const swapPoint = veyruExtras?.swap_point ?? null;
-        const internJoin = veyruExtras?.intern_join ?? null;
-        const internTakeover = veyruExtras?.intern_takeover ?? null;
         let nextStackIndex = 0;
         const forkStackIndex = restData.fork_source !== null ? nextStackIndex++ : null;
-        const swapStackIndex = swapPoint !== null ? nextStackIndex++ : null;
-        const internJoinStackIndex = internJoin !== null ? nextStackIndex++ : null;
-        const internTakeoverStackIndex = internTakeover !== null ? nextStackIndex++ : null;
+        const scenarioMarkerStackStart = nextStackIndex;
+        nextStackIndex += scenarioMarkers.length;
         const replaceAgentStackIndex =
           restData.replace_agent_source !== null ? nextStackIndex++ : null;
         const crossRunReplaceStackIndex =
@@ -924,29 +911,14 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
               />
             ) : null}
 
-            {swapPoint && swapStackIndex !== null ? (
-              <SwapPointFab
-                stackIndex={swapStackIndex}
-                roundNumber={swapPoint.round_number}
-                onClick={() => scrollToDivider("swap-divider")}
+            {scenarioMarkers.map((marker, i) => (
+              <ScenarioMarkerFab
+                key={marker.id}
+                marker={marker}
+                stackIndex={scenarioMarkerStackStart + i}
+                onClick={() => scrollToDivider(marker.id)}
               />
-            ) : null}
-
-            {internJoin && internJoinStackIndex !== null ? (
-              <InternJoinFab
-                stackIndex={internJoinStackIndex}
-                roundNumber={internJoin.round_number}
-                onClick={() => scrollToDivider("intern-join-divider")}
-              />
-            ) : null}
-
-            {internTakeover && internTakeoverStackIndex !== null ? (
-              <InternTakeoverFab
-                stackIndex={internTakeoverStackIndex}
-                roundNumber={internTakeover.round_number}
-                onClick={() => scrollToDivider("intern-takeover-divider")}
-              />
-            ) : null}
+            ))}
 
             {restData.replace_agent_source && replaceAgentStackIndex !== null ? (
               <ReplaceAgentPointFab

@@ -24,4 +24,6 @@ export const orbitalAnomalyPlugin: ScenarioPlugin = {
     sseEventNames: ["orbital_anomaly_actuation_judged"],
     judgedToolNames: ["actuate_panel"],
   },
+  getTimelineMarkers: () => [],
+  classifyRoundTrigger: () => null,
 };

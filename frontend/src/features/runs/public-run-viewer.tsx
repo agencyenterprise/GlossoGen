@@ -277,7 +277,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
 
   return (
     <GroupProvider slug="demo">
-      <div className="mx-auto flex h-dvh max-w-7xl min-h-0 flex-col px-4 py-4">
+      <div className="flex h-dvh min-h-0 w-full flex-col px-4 py-4 lg:px-8 2xl:px-12">
         {/* Demo chrome */}
         <div className="mb-2 flex shrink-0 items-center justify-between">
           <Link
@@ -377,8 +377,8 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
           className={cn(
             "relative grid min-h-0 flex-1 rounded-xl border border-border bg-background",
             evaluation !== null && showEvalPanel
-              ? "grid-cols-[192px_1fr_280px]"
-              : "grid-cols-[192px_1fr]"
+              ? "grid-cols-[240px_1fr_280px]"
+              : "grid-cols-[240px_1fr]"
           )}
         >
           <div ref={sidebarRef} className="flex min-h-0 flex-col *:min-h-0 *:flex-1">
@@ -423,10 +423,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
               highlightedMessageId={highlightedMessageId}
               highlightNonce={highlightNonce}
               forkPointMessageId={null}
-              swapRoundNumber={null}
-              swappedObserverDisplayNames={[]}
-              internJoinRoundNumber={null}
-              internTakeoverRoundNumber={null}
+              scenarioMarkers={scenarioPlugin.getTimelineMarkers({ extras: run.scenario_extras })}
               replaceAgentRoundStart={null}
               replaceAgentReplacedAgentId={null}
               replaceAgentReplacementModel={null}

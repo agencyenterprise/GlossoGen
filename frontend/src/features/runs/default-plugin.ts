@@ -16,4 +16,6 @@ export const DEFAULT_SCENARIO_PLUGIN: ScenarioPlugin = {
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,
   liveJudge: null,
+  getTimelineMarkers: () => [],
+  classifyRoundTrigger: () => null,
 };

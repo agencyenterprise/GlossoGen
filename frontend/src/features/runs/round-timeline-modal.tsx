@@ -99,11 +99,19 @@ function buildTimelineRows(
   return rows;
 }
 
-function TriggerBadge({ trigger }: { trigger: string }) {
+function TriggerBadge({ trigger, plugin }: { trigger: string; plugin: ScenarioPlugin }) {
+  let outcome: "success" | "failure" | "neutral";
+  if (trigger === "round_completed") {
+    outcome = "success";
+  } else if (trigger === "round_failed") {
+    outcome = "failure";
+  } else {
+    outcome = plugin.classifyRoundTrigger(trigger) ?? "neutral";
+  }
   let tone: string;
-  if (trigger === "veyru_stabilized" || trigger === "round_completed") {
+  if (outcome === "success") {
     tone = "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
-  } else if (trigger === "veyru_collapsed" || trigger === "round_failed") {
+  } else if (outcome === "failure") {
     tone = "bg-rose-500/15 text-rose-600 dark:text-rose-400";
   } else {
     tone = "bg-amber-500/15 text-amber-600 dark:text-amber-400";
@@ -172,7 +180,9 @@ export function RoundTimelineModal({
           <div className="flex items-center gap-2">
             <Hash className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">Round {roundNumber} timeline</span>
-            {roundEnding !== null ? <TriggerBadge trigger={roundEnding.trigger} /> : null}
+            {roundEnding !== null ? (
+              <TriggerBadge trigger={roundEnding.trigger} plugin={plugin} />
+            ) : null}
           </div>
           <button
             aria-label="Close"

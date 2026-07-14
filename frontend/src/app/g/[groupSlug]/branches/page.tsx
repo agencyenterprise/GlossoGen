@@ -8,7 +8,7 @@ import { useGroupPath } from "@/features/auth/group-context";
 export default function BranchesPage() {
   const groupPath = useGroupPath();
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="w-full px-6 py-10 lg:px-10 2xl:px-16">
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Branches</h1>
         <Link
