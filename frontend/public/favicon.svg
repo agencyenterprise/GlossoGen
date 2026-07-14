@@ -1,49 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">GlossoGen favicon</title>
-  <desc id="desc">Three colorful speech bubbles encircled by a dotted gradient ring.</desc>
+  <desc id="desc">A single speech bubble.</desc>
 
   <defs>
-    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#2DD4BF"/>
-      <stop offset="100%" stop-color="#22C1D6"/>
-    </linearGradient>
-    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#38BDF8"/>
-      <stop offset="100%" stop-color="#2563EB"/>
-    </linearGradient>
-    <linearGradient id="purple" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#8B5CF6"/>
-      <stop offset="100%" stop-color="#C026D3"/>
-    </linearGradient>
-    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="bubble" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#2DD4BF"/>
       <stop offset="50%" stop-color="#3B82F6"/>
       <stop offset="100%" stop-color="#A855F7"/>
     </linearGradient>
   </defs>
 
-  <g fill="none" stroke="url(#ring)" stroke-width="14" stroke-linecap="round"
-     stroke-dasharray="1 24">
-    <circle cx="256" cy="256" r="207"/>
-  </g>
-
   <g>
-    <path d="M164 112h184a34 34 0 0 1 34 34v70a34 34 0 0 1-34 34h-38l-34 28v-28H164a34 34 0 0 1-34-34v-70a34 34 0 0 1 34-34z"
-          fill="url(#teal)"/>
-    <circle cx="216" cy="181" r="10" fill="#fff"/>
-    <circle cx="256" cy="181" r="10" fill="#fff"/>
-    <circle cx="296" cy="181" r="10" fill="#fff"/>
-
-    <path d="M88 278h146a30 30 0 0 1 30 30v58a30 30 0 0 1-30 30h-30l-30 24v-24H88a30 30 0 0 1-30-30v-58a30 30 0 0 1 30-30z"
-          fill="url(#blue)"/>
-    <circle cx="128" cy="337" r="9" fill="#fff"/>
-    <circle cx="162" cy="337" r="9" fill="#fff"/>
-    <circle cx="196" cy="337" r="9" fill="#fff"/>
-
-    <path d="M278 278h146a30 30 0 0 1 30 30v58a30 30 0 0 1-30 30h-86l-30 24v-24h-30a30 30 0 0 1-30-30v-58a30 30 0 0 1 30-30z"
-          fill="url(#purple)"/>
-    <circle cx="318" cy="337" r="9" fill="#fff"/>
-    <circle cx="352" cy="337" r="9" fill="#fff"/>
-    <circle cx="386" cy="337" r="9" fill="#fff"/>
+    <path d="M96 64h320a56 56 0 0 1 56 56v168a56 56 0 0 1-56 56H236l-72 64v-64H96a56 56 0 0 1-56-56V120a56 56 0 0 1 56-56z"
+          fill="url(#bubble)"/>
+    <circle cx="176" cy="204" r="28" fill="#fff"/>
+    <circle cx="256" cy="204" r="28" fill="#fff"/>
+    <circle cx="336" cy="204" r="28" fill="#fff"/>
   </g>
 </svg>
