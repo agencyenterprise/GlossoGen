@@ -1,7 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { Inbox, Loader2, Package, Search, Tag, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/shared/lib/api-client";
@@ -271,6 +280,31 @@ export function RunList() {
   const hasActiveFilters =
     selectedLabels.size > 0 || selectedScenarios.size > 0 || idSearchDebounced.length > 0;
 
+  // Window-scroll virtualization of the day-group cards. The page itself
+  // scrolls (no inner scroll container), so off-screen day cards unmount while
+  // the whole run table/card markup is otherwise untouched. `scrollMargin` is
+  // the distance from the document top to the list, remeasured when the filter
+  // area above it changes height or the window resizes.
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [listScrollMargin, setListScrollMargin] = useState(0);
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (listRef.current !== null) {
+        setListScrollMargin(listRef.current.getBoundingClientRect().top + window.scrollY);
+      }
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [allScenarios.length, regularFilterLabels.length, selectedScenarios.size, selectedLabels.size]);
+
+  const groupVirtualizer = useWindowVirtualizer({
+    count: groups.length,
+    estimateSize: () => 320,
+    overscan: 3,
+    scrollMargin: listScrollMargin,
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -451,32 +485,58 @@ export function RunList() {
         </div>
       ) : null}
 
-      {groups.map(group => (
-        <div key={group.label}>
-          <h2 className="mb-2 text-sm font-medium text-muted-foreground">{group.label}</h2>
-          <div className="rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <tbody>
-                {group.runs.map((run, idx) => (
-                  <RunRow
-                    key={run.run_id}
-                    run={run}
-                    showTopBorder={idx > 0}
-                    onNavigate={navigateToRun}
-                    onShowDescription={setModalRun}
-                    onModelsEnter={openModelsPopover}
-                    onModelsLeave={queueModelsPopoverClose}
-                    onStop={stopMutation.mutate}
-                    onDelete={deleteMutation.mutate}
-                    onShowNote={setNoteModalRunId}
-                    onConfigPreview={setConfigPreview}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <div
+        ref={listRef}
+        style={{ height: `${groupVirtualizer.getTotalSize()}px`, position: "relative" }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            transform: `translateY(${(groupVirtualizer.getVirtualItems()[0]?.start ?? 0) - listScrollMargin}px)`,
+          }}
+        >
+          {groupVirtualizer.getVirtualItems().map(virtualItem => {
+            const group = groups[virtualItem.index];
+            if (group === undefined) {
+              return null;
+            }
+            return (
+              <div
+                key={group.label}
+                data-index={virtualItem.index}
+                ref={groupVirtualizer.measureElement}
+                className="pb-6"
+              >
+                <h2 className="mb-2 text-sm font-medium text-muted-foreground">{group.label}</h2>
+                <div className="rounded-lg border border-border">
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {group.runs.map((run, idx) => (
+                        <RunRow
+                          key={run.run_id}
+                          run={run}
+                          showTopBorder={idx > 0}
+                          onNavigate={navigateToRun}
+                          onShowDescription={setModalRun}
+                          onModelsEnter={openModelsPopover}
+                          onModelsLeave={queueModelsPopoverClose}
+                          onStop={stopMutation.mutate}
+                          onDelete={deleteMutation.mutate}
+                          onShowNote={setNoteModalRunId}
+                          onConfigPreview={setConfigPreview}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      ))}
+      </div>
 
       {runs.length > 0 ? (
         <div className="flex flex-col items-center gap-2 pt-2">
