@@ -296,7 +296,12 @@ export function RunList() {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [allScenarios.length, regularFilterLabels.length, selectedScenarios.size, selectedLabels.size]);
+  }, [
+    allScenarios.length,
+    regularFilterLabels.length,
+    selectedScenarios.size,
+    selectedLabels.size,
+  ]);
 
   const groupVirtualizer = useWindowVirtualizer({
     count: groups.length,
