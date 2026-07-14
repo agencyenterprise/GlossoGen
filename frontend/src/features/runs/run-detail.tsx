@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { flushSync } from "react-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Check,
@@ -23,33 +22,20 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Tooltip } from "@/shared/components/ui/tooltip";
-import { api, downloadAuthenticatedFile } from "@/shared/lib/api-client";
+import { downloadAuthenticatedFile } from "@/shared/lib/api-client";
 import { cn } from "@/shared/lib/cn";
 import { splitRunId } from "@/shared/lib/run-id";
-import { useEventStream } from "@/shared/lib/use-event-stream";
 import { useServerConfig } from "@/shared/lib/use-server-config";
 import { useGroupPath } from "@/features/auth/group-context";
-import { buildAgentColorMap, buildChannelColorMap } from "./agent-colors";
 import { AgentDrawer } from "./agent-drawer";
-import {
-  deriveAgentInstances,
-  resolveSelectedInstance,
-  type AgentInstance,
-} from "./agent-instance";
-import { ChatPane, type AgentSwapDivider, type ContextCompactionMarker } from "./chat-pane";
+import { resolveSelectedInstance } from "./agent-instance";
+import { ChatPane } from "./chat-pane";
 import { CollapsibleConfigBadges } from "./collapsible-config-badges";
-import { judgeMetadataFromExtras, mergeEntries } from "./display-entry";
 import { LabelBadges } from "./eval-label-group";
 import { EvalLogPanel } from "./eval-log-panel";
 import { EvalPanel } from "./eval-panel";
-import {
-  AgentSwapPointFab,
-  CrossRunReplaceAgentPointFab,
-  ForkBadge,
-  ForkPointFab,
-  ReplaceAgentPointFab,
-} from "./fork-badge";
-import { ScenarioMarkerFab } from "./scenario-timeline-marker";
+import { ForkBadge } from "./fork-badge";
+import { RunTimelineFabs } from "./run-timeline-fabs";
 import { StartEvaluationModal } from "./start-evaluation-modal";
 import {
   elapsedSince,
@@ -64,6 +50,7 @@ import {
 import { LogPanel } from "./log-panel";
 import { RunSidebar } from "./run-sidebar";
 import { getScenarioPlugin } from "./scenario-registry";
+import { useRunDetailData } from "./use-run-detail-data";
 import { ScenarioDescriptionModal } from "./scenario-description-modal";
 import { ReplaceAgentBadge } from "./replace-agent-badge";
 import { CrossRunReplaceAgentBadge } from "./cross-run-replace-agent-badge";
@@ -75,7 +62,6 @@ import { NoteEditorModal } from "./note-editor-modal";
 
 export function RunDetail({ scenario, runDirName }: { scenario: string; runDirName: string }) {
   const groupPath = useGroupPath();
-  const runId = `${scenario}/${runDirName}`;
   const scenarioPlugin = getScenarioPlugin(scenario);
   const [configPreview, setConfigPreview] = useState<{ key: string; value: string } | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
@@ -98,7 +84,35 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const evaluationsEnabled = serverConfig?.evaluations_enabled !== false;
 
   const searchParams = useSearchParams();
-  const queryClient = useQueryClient();
+
+  const {
+    runId,
+    restData,
+    isLoading,
+    error,
+    sseConnected,
+    effectiveStatus,
+    isInProgress,
+    runCompleted,
+    displayEntries,
+    allAgents,
+    allChannelIds,
+    agentInstances,
+    agentSwapDividers,
+    contextCompactionMarkers,
+    agentColorMap,
+    channelColorMap,
+    allDebugLogs,
+    scenarioMarkers,
+    swapEvents,
+    maxRound,
+    modelLabel,
+    channelMessages,
+    timelineEntries,
+    totalCostUsd,
+    durationSeconds,
+    stopMutation,
+  } = useRunDetailData({ scenario, runDirName, scenarioPlugin, evalJustLaunched });
 
   const handleSelectChannel = useCallback((ch: string | null) => {
     setSelectedChannel(ch);
@@ -119,267 +133,6 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     setHighlightedMessageId(messageId);
   }
 
-  // REST fetch — polls every 10s while in-progress to keep cost/messages current
-  const {
-    data: restData,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ["run", runId],
-    queryFn: async () => {
-      const { data, error } = await api.GET("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}", {
-        params: { path: { scenario, run_dir_name: runDirName } },
-      });
-      if (error) {
-        throw new Error("Failed to fetch run detail");
-      }
-      return data;
-    },
-    refetchInterval: query => {
-      const status = query.state.data?.status;
-      if (status === "in_progress") {
-        // SSE delivers messages, cost, and the terminal transition live, so a
-        // full-detail re-pull is only needed as a fallback when the stream is
-        // down. `simulation_ended` invalidates this query directly. Reading
-        // `sse.isConnected` here makes the interval reactive: when the stream
-        // drops, the re-render rebuilds this closure and the fallback poll
-        // resumes.
-        if (sseConnected) {
-          return false;
-        }
-        return 10_000;
-      }
-      if (status === "starting") {
-        return 2_000;
-      }
-      if (query.state.data?.evaluation_in_progress || evalJustLaunched) {
-        return 5_000;
-      }
-      return false;
-    },
-  });
-
-  const stopMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await api.POST("/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/stop", {
-        params: { path: { scenario, run_dir_name: runDirName } },
-      });
-      if (error) {
-        throw new Error("Failed to stop simulation");
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["run", runId] });
-    },
-  });
-
-  // Collect known event IDs from the REST snapshot for SSE deduplication
-  const knownEventIds = useMemo(() => {
-    if (!restData) return new Set<string>();
-    const ids = new Set<string>();
-    for (const m of restData.messages) {
-      ids.add(m.message_id);
-    }
-    for (const r of restData.reasoning) {
-      ids.add(r.message_id);
-    }
-    return ids;
-  }, [restData]);
-
-  // SSE streaming for in-progress runs
-  const sseEnabled = restData?.status === "in_progress" || restData?.status === "starting";
-  const sse = useEventStream(runId, sseEnabled, knownEventIds, true, scenarioPlugin.liveJudge);
-  const sseConnected = sse.isConnected;
-
-  // When SSE reports simulation ended, refetch REST for evaluation status
-  const sseStatus = sse.status;
-  const hasSimEnded =
-    sseStatus === "scenario_complete" || sseStatus === "error" || sseStatus === "killed";
-  useEffect(() => {
-    if (hasSimEnded) {
-      queryClient.invalidateQueries({ queryKey: ["run", runId] });
-      queryClient.invalidateQueries({ queryKey: ["run-debug-logs", runId] });
-    }
-  }, [hasSimEnded, queryClient, runId]);
-
-  // Debug logs fetched separately to keep the main response small
-  const { data: debugLogsData } = useQuery({
-    queryKey: ["run-debug-logs", runId],
-    queryFn: async () => {
-      const { data, error } = await api.GET(
-        "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/debug-logs",
-        {
-          params: { path: { scenario, run_dir_name: runDirName } },
-        }
-      );
-      if (error) {
-        throw new Error("Failed to fetch debug logs");
-      }
-      return data;
-    },
-    refetchInterval: false,
-  });
-
-  // If SSE was enabled (REST said in_progress) but failed to connect,
-  // the simulation likely ended between the REST fetch and SSE attempt.
-  // Refetch REST to get the updated status.
-  const sseFailedToConnect = sseEnabled && !sse.isConnected && sseStatus === null;
-  useEffect(() => {
-    if (!sseFailedToConnect) return undefined;
-    const timer = setTimeout(() => {
-      queryClient.invalidateQueries({ queryKey: ["run", runId] });
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [sseFailedToConnect, queryClient, runId]);
-
-  // Determine effective status: SSE overrides REST when streaming
-  const effectiveStatus = sseStatus ?? restData?.status ?? null;
-  const isInProgress = effectiveStatus === "in_progress" || effectiveStatus === "starting";
-
-  // Merge REST + SSE agents (SSE agents are deduplicated by agent_id)
-  const allAgents = useMemo(() => {
-    if (!restData) return sse.agents;
-    const restAgents = restData.agents;
-    if (sse.agents.length === 0) return restAgents;
-    const seen = new Set(restAgents.map(a => a.agent_id));
-    const extra = sse.agents.filter(a => !seen.has(a.agent_id));
-    return [...restAgents, ...extra];
-  }, [restData, sse.agents]);
-
-  const swapEvents = useMemo(
-    () => restData?.agent_swap_events ?? [],
-    [restData?.agent_swap_events]
-  );
-
-  const observedMaxRound = useMemo(() => {
-    let max = 0;
-    for (const m of restData?.messages ?? []) {
-      if (m.round_number > max) max = m.round_number;
-    }
-    for (const m of sse.messages) {
-      if (m.round_number > max) max = m.round_number;
-    }
-    return max > 0 ? max : null;
-  }, [restData?.messages, sse.messages]);
-
-  const agentInstances = useMemo<AgentInstance[]>(
-    () => deriveAgentInstances(allAgents, swapEvents, observedMaxRound, isInProgress),
-    [allAgents, swapEvents, observedMaxRound, isInProgress]
-  );
-
-  const agentSwapDividers = useMemo(() => {
-    const previousModelByAgent = new Map<string, string>();
-    for (const a of allAgents) {
-      previousModelByAgent.set(a.agent_id, a.model);
-    }
-    const dividers: AgentSwapDivider[] = [];
-    const sorted = [...swapEvents].sort((a, b) => {
-      if (a.round_number !== b.round_number) return a.round_number - b.round_number;
-      return a.agent_id.localeCompare(b.agent_id);
-    });
-    const generationsByAgent = new Map<string, number>();
-    for (const event of sorted) {
-      const previousGeneration = generationsByAgent.get(event.agent_id) ?? 1;
-      const generation = previousGeneration + 1;
-      generationsByAgent.set(event.agent_id, generation);
-      const oldModel = previousModelByAgent.get(event.agent_id) ?? "?";
-      const role = allAgents.find(a => a.agent_id === event.agent_id)?.role_name ?? event.agent_id;
-      dividers.push({
-        agent_id: event.agent_id,
-        role_name: role,
-        round_number: event.round_number,
-        generation,
-        old_model: oldModel,
-        new_model: event.new_model,
-        post_swap_instance_key: `${event.agent_id}:${generation}`,
-      });
-      previousModelByAgent.set(event.agent_id, event.new_model);
-    }
-    return dividers;
-  }, [allAgents, swapEvents]);
-
-  const contextCompactionMarkers = useMemo<ContextCompactionMarker[]>(() => {
-    const roleNameByAgent = new Map<string, string>();
-    for (const a of allAgents) {
-      roleNameByAgent.set(a.agent_id, a.role_name);
-    }
-    return (restData?.context_compaction_events ?? []).map(event => ({
-      agent_id: event.agent_id,
-      role_name: roleNameByAgent.get(event.agent_id) ?? event.agent_id,
-      round_number: event.round_number,
-      provider_name: event.provider_name,
-      summary_char_count: event.summary_char_count,
-      summary_text: event.summary_text,
-    }));
-  }, [allAgents, restData?.context_compaction_events]);
-
-  // Merge REST + SSE channel IDs
-  const allChannelIds = useMemo(() => {
-    const restChannels = restData?.channel_ids ?? [];
-    if (sse.channelIds.length === 0) return restChannels;
-    const set = new Set([...restChannels, ...sse.channelIds]);
-    return [...set];
-  }, [restData, sse.channelIds]);
-
-  // Merge REST + SSE messages and reasoning, deduplicating by message_id
-  const displayEntries = useMemo(() => {
-    const restMessages = restData?.messages ?? [];
-    const restReasoning = restData?.reasoning ?? [];
-    const restToolUse = restData?.tool_use ?? [];
-    const restRunCycleFailures = restData?.run_cycle_failures ?? [];
-
-    // Dedup messages by message_id (REST and SSE may overlap)
-    const seenMessageIds = new Set(restMessages.map(m => m.message_id));
-    const newMessages = sse.messages.filter(m => !seenMessageIds.has(m.message_id));
-
-    const seenReasoningIds = new Set(restReasoning.map(r => r.message_id));
-    const newReasoning = sse.reasoning.filter(r => !seenReasoningIds.has(r.message_id));
-
-    const seenToolCallIds = new Set(restToolUse.map(t => t.call_id));
-    const newToolUse = sse.toolUse.filter(t => !seenToolCallIds.has(t.call_id));
-
-    const seenFailureIds = new Set(restRunCycleFailures.map(f => f.message_id));
-    const newFailures = sse.runCycleFailures.filter(f => !seenFailureIds.has(f.message_id));
-
-    const scenarioExtras = restData?.scenario_extras ?? null;
-    const judgeMetadataByCallId = {
-      ...judgeMetadataFromExtras(scenarioExtras),
-      ...sse.judgeMetadataByCallId,
-    };
-    const allToolUse = [...restToolUse, ...newToolUse];
-    // Let the scenario plug-in render any bespoke per-tool-call supplement
-    // (e.g. the container-yard move verdict) from scenario_extras, keyed by
-    // call_id. Empty for scenarios/tools whose plug-in adds nothing.
-    const toolMetadataByCallId: Record<string, ReactNode> = {};
-    for (const t of allToolUse) {
-      const node = scenarioPlugin.renderToolMetadata({
-        toolName: t.tool_name,
-        callId: t.call_id,
-        extras: scenarioExtras,
-      });
-      if (node != null) {
-        toolMetadataByCallId[t.call_id] = node;
-      }
-    }
-
-    return mergeEntries(
-      [...restMessages, ...newMessages],
-      [...restReasoning, ...newReasoning],
-      allToolUse,
-      [...restRunCycleFailures, ...newFailures],
-      judgeMetadataByCallId,
-      toolMetadataByCallId
-    );
-  }, [
-    restData,
-    sse.messages,
-    sse.reasoning,
-    sse.toolUse,
-    sse.runCycleFailures,
-    sse.judgeMetadataByCallId,
-    scenarioPlugin,
-  ]);
-
   // Auto-highlight a message from ?highlight= query param (e.g. from branches viewer)
   const highlightParam = searchParams.get("highlight");
   const [didAutoHighlight, setDidAutoHighlight] = useState(false);
@@ -393,29 +146,6 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
       setHighlightedMessageId(highlightParam);
     });
   }, [highlightParam, didAutoHighlight, displayEntries.length]);
-
-  const channelMessages = displayEntries.filter(
-    e => !e.is_reasoning && !e.is_tool_use && !e.is_notification_result
-  ).length;
-  const timelineEntries = displayEntries.length;
-  const restCost = restData?.total_cost_usd ?? 0;
-  const totalCostUsd = Math.max(sse.totalCostUsd, restCost);
-  const durationSeconds =
-    sse.durationSeconds > 0 ? sse.durationSeconds : (restData?.duration_seconds ?? 0);
-
-  const agentColorMap = useMemo(
-    () => buildAgentColorMap(allAgents.map(a => a.agent_id)),
-    [allAgents]
-  );
-  const channelColorMap = useMemo(() => buildChannelColorMap(allChannelIds), [allChannelIds]);
-
-  const allDebugLogs = useMemo(() => {
-    const restLogs = debugLogsData?.entries ?? [];
-    if (sse.debugLogs.length === 0) return restLogs;
-    const seen = new Set(restLogs.map(l => `${l.timestamp}|${l.message}`));
-    const newLogs = sse.debugLogs.filter(l => !seen.has(`${l.timestamp}|${l.message}`));
-    return [...restLogs, ...newLogs];
-  }, [debugLogsData?.entries, sse.debugLogs]);
 
   if (isLoading) {
     return (
@@ -434,30 +164,46 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     );
   }
 
-  const maxRound = displayEntries.reduce((max, m) => Math.max(max, m.round_number), 0);
-  const scenarioMarkers = scenarioPlugin.getTimelineMarkers({
-    extras: restData.scenario_extras ?? null,
-  });
-  const uniqueModelKeys = [...new Set(allAgents.map(a => `${a.provider}:${a.model}`))];
-  let modelLabel: string;
-  if (uniqueModelKeys.length === 1) {
-    modelLabel = uniqueModelKeys[0] ?? "unknown";
-  } else if (uniqueModelKeys.length === 0) {
-    modelLabel = "unknown";
-  } else {
-    modelLabel = `${uniqueModelKeys.length} models`;
-  }
-
   const evaluation = restData.evaluation;
   const evaluationInProgress = restData.evaluation_in_progress || evalJustLaunched;
   const hasLogs = allDebugLogs.length > 0;
   const hasEvalLogs = evaluationInProgress || evaluation !== null || restData.has_eval_log_file;
   const activeInstance = resolveSelectedInstance(selectedAgent, agentInstances);
   const activeAgentColor = activeInstance ? agentColorMap.get(activeInstance.agent_id) : undefined;
-  const runCompleted =
-    effectiveStatus === "scenario_complete" ||
-    effectiveStatus === "error" ||
-    effectiveStatus === "killed";
+
+  const scrollToDivider = (elementId: string) => {
+    flushSync(() => {
+      setSelectedAgent(null);
+      setShowLogs(false);
+      setSelectedChannel(null);
+      setHighlightedMessageId(null);
+    });
+    requestAnimationFrame(() => {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("animate-highlight");
+      setTimeout(() => {
+        el.classList.remove("animate-highlight");
+      }, 1500);
+    });
+  };
+
+  const handleNavigateToForkPoint = (targetMessageId: string) => {
+    const entry = displayEntries.find(e => e.message_id === targetMessageId);
+    if (!entry) return;
+    const needsChannelSwitch = selectedChannel !== null && selectedChannel !== entry.channel_id;
+    flushSync(() => {
+      setSelectedAgent(null);
+      setShowLogs(false);
+      if (needsChannelSwitch) {
+        setSelectedChannel(null);
+      }
+      setHighlightedMessageId(null);
+    });
+    setHighlightNonce(n => n + 1);
+    setHighlightedMessageId(targetMessageId);
+  };
 
   return (
     <div className="flex h-dvh min-h-0 w-full flex-col px-4 py-4 lg:px-8 2xl:px-12">
@@ -638,14 +384,14 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
       {/* Live streaming banner */}
       {isInProgress ? (
         <div className="mb-2 flex shrink-0 items-center gap-2 rounded-lg border border-yellow-300/50 bg-yellow-50 px-3 py-1.5 text-xs text-yellow-800 dark:border-yellow-700/50 dark:bg-yellow-950/30 dark:text-yellow-300">
-          {sse.isConnected ? (
+          {sseConnected ? (
             <Radio className="h-3 w-3 text-green-600 dark:text-green-400" />
           ) : (
             <Loader2 className="h-3 w-3 animate-spin" />
           )}
           <span>
             Simulation in progress
-            {sse.isConnected ? " — streaming live" : " — connecting..."}
+            {sseConnected ? " — streaming live" : " — connecting..."}
             {restData ? <> · {formatDuration(elapsedSince(restData.timestamp))}</> : null}
           </span>
           {effectiveStatus !== "starting" ? (
@@ -765,15 +511,8 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             highlightNonce={highlightNonce}
             forkPointMessageId={restData.fork_source?.target_message_id ?? null}
             scenarioMarkers={scenarioMarkers}
-            replaceAgentRoundStart={restData.replace_agent_source?.round_start ?? null}
-            replaceAgentReplacedAgentId={restData.replace_agent_source?.replaced_agent_id ?? null}
-            replaceAgentReplacementModel={restData.replace_agent_source?.replacement_model ?? null}
-            crossRunReplaceRoundStart={restData.cross_run_replace_agent_source?.round_start ?? null}
-            crossRunReplacedAgentId={
-              restData.cross_run_replace_agent_source?.replaced_agent_id ?? null
-            }
-            crossRunSourceARunId={restData.cross_run_replace_agent_source?.source_a_run_id ?? null}
-            crossRunSourceBRunId={restData.cross_run_replace_agent_source?.source_b_run_id ?? null}
+            replaceAgentSource={restData.replace_agent_source}
+            crossRunReplaceAgentSource={restData.cross_run_replace_agent_source}
             scenarioName={restData.scenario_name}
             scenarioExtras={restData.scenario_extras ?? null}
             roundEndings={restData.round_endings}
@@ -864,102 +603,15 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
         />
       ) : null}
 
-      {(() => {
-        let nextStackIndex = 0;
-        const forkStackIndex = restData.fork_source !== null ? nextStackIndex++ : null;
-        const scenarioMarkerStackStart = nextStackIndex;
-        nextStackIndex += scenarioMarkers.length;
-        const replaceAgentStackIndex =
-          restData.replace_agent_source !== null ? nextStackIndex++ : null;
-        const crossRunReplaceStackIndex =
-          restData.cross_run_replace_agent_source !== null ? nextStackIndex++ : null;
-
-        const scrollToDivider = (elementId: string) => {
-          flushSync(() => {
-            setSelectedAgent(null);
-            setShowLogs(false);
-            setSelectedChannel(null);
-            setHighlightedMessageId(null);
-          });
-          requestAnimationFrame(() => {
-            const el = document.getElementById(elementId);
-            if (!el) return;
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-            el.classList.add("animate-highlight");
-            setTimeout(() => {
-              el.classList.remove("animate-highlight");
-            }, 1500);
-          });
-        };
-
-        return (
-          <>
-            {restData.fork_source && forkStackIndex !== null ? (
-              <ForkPointFab
-                stackIndex={forkStackIndex}
-                onClick={() => {
-                  const forkMsgId = restData.fork_source?.target_message_id;
-                  if (!forkMsgId) return;
-                  const entry = displayEntries.find(e => e.message_id === forkMsgId);
-                  if (!entry) return;
-
-                  const messageChannel = entry.channel_id;
-                  const needsChannelSwitch =
-                    selectedChannel !== null && selectedChannel !== messageChannel;
-
-                  flushSync(() => {
-                    setSelectedAgent(null);
-                    setShowLogs(false);
-                    if (needsChannelSwitch) {
-                      setSelectedChannel(null);
-                    }
-                    setHighlightedMessageId(null);
-                  });
-                  setHighlightNonce(n => n + 1);
-                  setHighlightedMessageId(forkMsgId);
-                }}
-              />
-            ) : null}
-
-            {scenarioMarkers.map((marker, i) => (
-              <ScenarioMarkerFab
-                key={marker.id}
-                marker={marker}
-                stackIndex={scenarioMarkerStackStart + i}
-                onClick={() => scrollToDivider(marker.id)}
-              />
-            ))}
-
-            {restData.replace_agent_source && replaceAgentStackIndex !== null ? (
-              <ReplaceAgentPointFab
-                stackIndex={replaceAgentStackIndex}
-                roundNumber={restData.replace_agent_source.round_start}
-                onClick={() => scrollToDivider("replace-agent-divider")}
-              />
-            ) : null}
-
-            {restData.cross_run_replace_agent_source && crossRunReplaceStackIndex !== null ? (
-              <CrossRunReplaceAgentPointFab
-                stackIndex={crossRunReplaceStackIndex}
-                roundNumber={restData.cross_run_replace_agent_source.round_start}
-                onClick={() => scrollToDivider("cross-run-replace-agent-divider")}
-              />
-            ) : null}
-
-            {swapEvents.map(swap => (
-              <AgentSwapPointFab
-                key={`agent-swap-${swap.round_number}-${swap.agent_id}`}
-                stackIndex={nextStackIndex++}
-                roundNumber={swap.round_number}
-                agentId={swap.agent_id}
-                onClick={() =>
-                  scrollToDivider(`agent-swap-divider-r${swap.round_number}-${swap.agent_id}`)
-                }
-              />
-            ))}
-          </>
-        );
-      })()}
+      <RunTimelineFabs
+        forkSource={restData.fork_source}
+        replaceAgentSource={restData.replace_agent_source}
+        crossRunReplaceAgentSource={restData.cross_run_replace_agent_source}
+        scenarioMarkers={scenarioMarkers}
+        swapEvents={swapEvents}
+        onScrollToDivider={scrollToDivider}
+        onNavigateToForkPoint={handleNavigateToForkPoint}
+      />
     </div>
   );
 }

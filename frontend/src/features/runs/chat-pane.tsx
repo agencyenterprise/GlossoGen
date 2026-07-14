@@ -1,18 +1,8 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-  type RefObject,
-} from "react";
-import { Archive, ChevronDown, Hash, UserCog } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Archive, ChevronDown, UserCog } from "lucide-react";
 import Link from "next/link";
-import { Tooltip } from "@/shared/components/ui/tooltip";
 import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { useGroupPath } from "@/features/auth/group-context";
@@ -27,6 +17,9 @@ import { RoundTimelineModal } from "./round-timeline-modal";
 import { RoundInjectionRow, RoundOutcomeRow } from "./round-event-row";
 import type { ScenarioTimelineMarker } from "./scenario-plugin";
 import { ScenarioMarkerDivider } from "./scenario-timeline-marker";
+import { ChatHeader } from "./chat-header";
+import { ChatRoundBadge } from "./chat-round-badge";
+import { ConnectionWires } from "./connection-wires";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
 type RunDetailResponse = components["schemas"]["RunDetailResponse"];
@@ -34,6 +27,8 @@ type ScenarioExtras = NonNullable<RunDetailResponse["scenario_extras"]>;
 type RoundEnding = components["schemas"]["RoundEnding"];
 type RoundResult = components["schemas"]["RoundResult"];
 type RoundInjection = components["schemas"]["RoundInjection"];
+type ReplaceAgentSource = components["schemas"]["ReplaceAgentSource"];
+type CrossRunReplaceAgentSource = components["schemas"]["CrossRunReplaceAgentSource"];
 
 interface ChatPaneProps {
   /** Export controls rendered in the channel header. The authenticated viewer
@@ -52,20 +47,12 @@ interface ChatPaneProps {
   forkPointMessageId: string | null;
   /** Round-anchored scenario-specific markers (from the scenario plug-in), rendered as dividers at their round. */
   scenarioMarkers: ScenarioTimelineMarker[];
-  /** Round at which an agent was replaced via replace-agent (if this run was derived). */
-  replaceAgentRoundStart: number | null;
-  /** Agent ID that was replaced (only set when replaceAgentRoundStart is set). */
-  replaceAgentReplacedAgentId: string | null;
-  /** Replacement model identifier (only set when replaceAgentRoundStart is set). */
-  replaceAgentReplacementModel: string | null;
-  /** Round at which an agent was imported via cross-run replace (if this run was derived). */
-  crossRunReplaceRoundStart: number | null;
-  /** Agent ID slot filled by the imported agent (only set when crossRunReplaceRoundStart is set). */
-  crossRunReplacedAgentId: string | null;
-  /** Source A run id (target timeline) (only set when crossRunReplaceRoundStart is set). */
-  crossRunSourceARunId: string | null;
-  /** Source B run id the imported agent came from (only set when crossRunReplaceRoundStart is set). */
-  crossRunSourceBRunId: string | null;
+  /** Replace-agent provenance (round, replaced agent, replacement model), or
+   *  null when this run is not a replace-agent derivation. */
+  replaceAgentSource: ReplaceAgentSource | null;
+  /** Cross-run replace-agent provenance (round, imported agent, source runs),
+   *  or null when this run is not a cross-run derivation. */
+  crossRunReplaceAgentSource: CrossRunReplaceAgentSource | null;
   /** Scenario name, used to dispatch to the scenario plug-in for the round-detail modal. */
   scenarioName: string;
   /** Scenario-specific run extras, dispatched to the scenario plug-in for the round-detail modal. Null for scenarios with no extras. */
@@ -192,13 +179,8 @@ export function ChatPane({
   highlightNonce,
   forkPointMessageId,
   scenarioMarkers,
-  replaceAgentRoundStart,
-  replaceAgentReplacedAgentId,
-  replaceAgentReplacementModel,
-  crossRunReplaceRoundStart,
-  crossRunReplacedAgentId,
-  crossRunSourceARunId,
-  crossRunSourceBRunId,
+  replaceAgentSource,
+  crossRunReplaceAgentSource,
   scenarioName,
   scenarioExtras,
   roundEndings,
@@ -220,8 +202,6 @@ export function ChatPane({
   const prevScrollHeightRef = useRef(0);
   const [hoveredCallId, setHoveredCallId] = useState<string | null>(null);
   const [timelineRound, setTimelineRound] = useState<number | null>(null);
-  const [showRoundJumper, setShowRoundJumper] = useState(false);
-  const roundJumperRef = useRef<HTMLDivElement>(null);
 
   const messagesByRound = useMemo(() => {
     const byRound = new Map<number, DisplayEntry[]>();
@@ -316,27 +296,7 @@ export function ChatPane({
     if (el) {
       el.scrollIntoView({ behavior: "instant", block: "start" });
     }
-    setShowRoundJumper(false);
   }, []);
-
-  // Close the round jumper on outside click or Escape.
-  useEffect(() => {
-    if (!showRoundJumper) return;
-    function handleMouseDown(e: MouseEvent) {
-      if (roundJumperRef.current && !roundJumperRef.current.contains(e.target as Node)) {
-        setShowRoundJumper(false);
-      }
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setShowRoundJumper(false);
-    }
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [showRoundJumper]);
 
   // Track scroll position to determine if user is at the bottom.
   // When the user scrolls up to read history we stop auto-scrolling;
@@ -519,62 +479,19 @@ export function ChatPane({
 
   return (
     <div className="relative flex min-h-0 flex-col overflow-hidden">
-      <div
-        id="chat-channel-header"
-        className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5"
-      >
-        <span className="text-sm text-muted-foreground">#</span>
-        <span className="text-[13px] font-medium">{headerName}</span>
-        <span className="text-xs text-muted-foreground">{headerDesc}</span>
-        {channelMembers.length > 0 ? (
-          <div className="ml-auto flex flex-wrap items-center gap-1">
-            {channelMembers.map(member => {
-              const isFocused = focusedAgentIds.has(member.agent_id);
-              const color = agentColorMap.get(member.agent_id);
-              return (
-                <button
-                  key={member.agent_id}
-                  type="button"
-                  aria-pressed={isFocused}
-                  title={
-                    isFocused
-                      ? `Showing only ${member.role_name} — click to clear`
-                      : `Show only ${member.role_name}`
-                  }
-                  onClick={() => toggleFocusedAgent(member.agent_id)}
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors",
-                    isFocused
-                      ? cn("border-transparent font-medium", color?.bg, color?.fg)
-                      : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
-                  )}
-                >
-                  {member.role_name}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-        <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground select-none">
-          <input
-            type="checkbox"
-            checked={showReasoning}
-            onChange={e => setShowReasoning(e.target.checked)}
-            className="h-3 w-3 rounded border-border accent-foreground"
-          />
-          Reasoning
-        </label>
-        <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground select-none">
-          <input
-            type="checkbox"
-            checked={showTools}
-            onChange={e => setShowTools(e.target.checked)}
-            className="h-3 w-3 rounded border-border accent-foreground"
-          />
-          Tools
-        </label>
-        {exportSlot}
-      </div>
+      <ChatHeader
+        headerName={headerName}
+        headerDesc={headerDesc}
+        channelMembers={channelMembers}
+        focusedAgentIds={focusedAgentIds}
+        onToggleFocusedAgent={toggleFocusedAgent}
+        agentColorMap={agentColorMap}
+        showReasoning={showReasoning}
+        onShowReasoningChange={setShowReasoning}
+        showTools={showTools}
+        onShowToolsChange={setShowTools}
+        exportSlot={exportSlot}
+      />
 
       {/* Hide the chat-pane round badge while an agent drawer is open
           (activeInstanceRoundRange !== null). The drawer renders its own
@@ -584,60 +501,12 @@ export function ChatPane({
           confusing "Round N" that's tied to the chat-pane's scroll
           position rather than the active agent instance. */}
       {currentVisibleRound !== null && activeInstanceRoundRange === null ? (
-        <div className="absolute left-1/2 top-12 z-30 flex -translate-x-1/2 items-center gap-1.5">
-          <button
-            type="button"
-            aria-label={`Open round ${currentVisibleRound} timeline`}
-            onClick={() => setTimelineRound(currentVisibleRound)}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-border bg-background/90 px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur transition-colors hover:border-foreground/30 hover:bg-background hover:text-foreground"
-          >
-            <Hash className="h-3 w-3" />
-            Round {currentVisibleRound}
-          </button>
-          {sortedRoundNumbers.length > 1 ? (
-            <div ref={roundJumperRef} className="relative">
-              <Tooltip label="Jump to round">
-                <button
-                  type="button"
-                  aria-haspopup="listbox"
-                  aria-expanded={showRoundJumper}
-                  aria-label="Jump to round"
-                  onClick={() => setShowRoundJumper(v => !v)}
-                  className="inline-flex cursor-pointer items-center justify-center rounded-full border border-border bg-background/90 p-1 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:border-foreground/30 hover:bg-background hover:text-foreground"
-                >
-                  <ChevronDown className="h-3 w-3" />
-                </button>
-              </Tooltip>
-              {showRoundJumper ? (
-                <div
-                  role="listbox"
-                  aria-label="Rounds"
-                  className="absolute right-0 top-full z-40 mt-1 w-32 overflow-hidden rounded-md border border-border bg-background shadow-lg"
-                >
-                  <div className="max-h-64 overflow-y-auto py-1">
-                    {sortedRoundNumbers.map(n => (
-                      <button
-                        key={n}
-                        type="button"
-                        role="option"
-                        aria-selected={n === currentVisibleRound}
-                        onClick={() => jumpToRound(n)}
-                        className={cn(
-                          "block w-full px-3 py-1 text-left text-[11px] transition-colors hover:bg-muted",
-                          n === currentVisibleRound
-                            ? "font-medium text-foreground"
-                            : "text-muted-foreground"
-                        )}
-                      >
-                        Round {n}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+        <ChatRoundBadge
+          currentVisibleRound={currentVisibleRound}
+          sortedRoundNumbers={sortedRoundNumbers}
+          onOpenTimeline={setTimelineRound}
+          onScrollToRound={jumpToRound}
+        />
       ) : null}
 
       {timelineRound !== null ? (
@@ -670,7 +539,8 @@ export function ChatPane({
                 .map(marker => (
                   <ScenarioMarkerDivider key={marker.id} marker={marker} />
                 ))}
-              {replaceAgentRoundStart !== null && round.roundNumber === replaceAgentRoundStart ? (
+              {replaceAgentSource !== null &&
+              round.roundNumber === replaceAgentSource.round_start ? (
                 <div
                   id="replace-agent-divider"
                   className="mx-4 my-4 rounded-md border-2 border-dashed border-sky-400/80 bg-sky-50 px-4 py-3 dark:border-sky-600/70 dark:bg-sky-950/50"
@@ -678,14 +548,8 @@ export function ChatPane({
                   <div className="flex items-center justify-center gap-2 text-sky-800 dark:text-sky-200">
                     <UserCog className="h-4 w-4" />
                     <span className="text-sm font-semibold">
-                      {replaceAgentReplacedAgentId !== null &&
-                      replaceAgentReplacementModel !== null ? (
-                        <>
-                          {replaceAgentReplacedAgentId} replaced with {replaceAgentReplacementModel}
-                        </>
-                      ) : (
-                        <>Agent replaced</>
-                      )}
+                      {replaceAgentSource.replaced_agent_id} replaced with{" "}
+                      {replaceAgentSource.replacement_model}
                     </span>
                   </div>
                   <div className="mt-1 text-center text-[11px] text-sky-700/80 dark:text-sky-300/80">
@@ -694,8 +558,8 @@ export function ChatPane({
                   </div>
                 </div>
               ) : null}
-              {crossRunReplaceRoundStart !== null &&
-              round.roundNumber === crossRunReplaceRoundStart ? (
+              {crossRunReplaceAgentSource !== null &&
+              round.roundNumber === crossRunReplaceAgentSource.round_start ? (
                 <div
                   id="cross-run-replace-agent-divider"
                   className="mx-4 my-4 rounded-md border-2 border-dashed border-violet-400/80 bg-violet-50 px-4 py-3 dark:border-violet-600/70 dark:bg-violet-950/50"
@@ -703,35 +567,24 @@ export function ChatPane({
                   <div className="flex items-center justify-center gap-2 text-violet-800 dark:text-violet-200">
                     <UserCog className="h-4 w-4" />
                     <span className="text-sm font-semibold">
-                      {crossRunReplacedAgentId !== null && crossRunSourceBRunId !== null ? (
-                        <>
-                          {crossRunReplacedAgentId} imported from{" "}
-                          <Link
-                            href={groupPath(`/runs/${crossRunSourceBRunId}`)}
-                            className="underline-offset-2 hover:underline"
-                          >
-                            {crossRunSourceBRunId}
-                          </Link>
-                        </>
-                      ) : (
-                        <>Agent imported from another run</>
-                      )}
+                      {crossRunReplaceAgentSource.replaced_agent_id} imported from{" "}
+                      <Link
+                        href={groupPath(`/runs/${crossRunReplaceAgentSource.source_b_run_id}`)}
+                        className="underline-offset-2 hover:underline"
+                      >
+                        {crossRunReplaceAgentSource.source_b_run_id}
+                      </Link>
                     </span>
                   </div>
                   <div className="mt-1 text-center text-[11px] text-violet-700/80 dark:text-violet-300/80">
                     Round {round.roundNumber} begins with the imported agent carrying its full
-                    history from source B
-                    {crossRunSourceARunId !== null ? (
-                      <>
-                        ; this timeline derives from source A{" "}
-                        <Link
-                          href={groupPath(`/runs/${crossRunSourceARunId}`)}
-                          className="underline-offset-2 hover:underline"
-                        >
-                          {crossRunSourceARunId}
-                        </Link>
-                      </>
-                    ) : null}
+                    history from source B; this timeline derives from source A{" "}
+                    <Link
+                      href={groupPath(`/runs/${crossRunReplaceAgentSource.source_a_run_id}`)}
+                      className="underline-offset-2 hover:underline"
+                    >
+                      {crossRunReplaceAgentSource.source_a_run_id}
+                    </Link>
                     . Other agents continue from this run.
                   </div>
                 </div>
@@ -1010,171 +863,6 @@ export function ChatPane({
         )}
       </div>
     </div>
-  );
-}
-
-interface NotificationPair {
-  callMessageId: string;
-  resultMessageId: string;
-  callId: string;
-}
-
-interface WireShape {
-  callId: string;
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-  color: string;
-}
-
-/** Deterministic hue from a call_id so each wire gets a stable unique color. */
-function hueFromCallId(callId: string): number {
-  let h = 0;
-  for (let i = 0; i < callId.length; i += 1) {
-    h = (h * 31 + callId.charCodeAt(i)) >>> 0;
-  }
-  return h % 360;
-}
-
-/** Renders curved SVG wires inside the scrollable content connecting each
- *  read_notifications call pill to its response chip. Each wire is a cubic
- *  bezier that bulges out to the left of the column. Wires re-measure on
- *  layout changes via ResizeObserver + MutationObserver so they stay aligned
- *  as entries expand or new messages arrive. */
-function ConnectionWires({
-  pairs,
-  messageRefs,
-  containerRef,
-  hoveredCallId,
-}: {
-  pairs: NotificationPair[];
-  messageRefs: RefObject<Map<string, HTMLDivElement>>;
-  containerRef: RefObject<HTMLDivElement | null>;
-  hoveredCallId: string | null;
-}) {
-  const [wires, setWires] = useState<WireShape[]>([]);
-
-  useLayoutEffect(() => {
-    let rafId: number | null = null;
-    let attemptsLeft = 60;
-    let ro: ResizeObserver | null = null;
-    let mo: MutationObserver | null = null;
-
-    function schedule() {
-      if (rafId !== null) return;
-      rafId = requestAnimationFrame(recompute);
-    }
-
-    function recompute() {
-      rafId = null;
-      const containerEl = containerRef.current;
-      if (containerEl === null) {
-        // Container not yet mounted — retry next frame.
-        if (attemptsLeft > 0) {
-          attemptsLeft -= 1;
-          rafId = requestAnimationFrame(recompute);
-        }
-        return;
-      }
-      // Attach observers once, as soon as the container exists. The
-      // ResizeObserver catches layout shifts (entry expansion, window resize).
-      // The MutationObserver catches late-mounting entries on huge runs
-      // streamed in after our initial rAF retry budget is exhausted.
-      if (ro === null) {
-        ro = new ResizeObserver(schedule);
-        ro.observe(containerEl);
-      }
-      if (mo === null) {
-        mo = new MutationObserver(schedule);
-        mo.observe(containerEl, { childList: true, subtree: true });
-      }
-      const containerRect = containerEl.getBoundingClientRect();
-      const next: WireShape[] = [];
-      for (const pair of pairs) {
-        const callEl = messageRefs.current.get(pair.callMessageId);
-        const resultEl = messageRefs.current.get(pair.resultMessageId);
-        if (callEl === undefined || resultEl === undefined) continue;
-        const callRect = callEl.getBoundingClientRect();
-        const resultRect = resultEl.getBoundingClientRect();
-        const callMid = callRect.top + callRect.height / 2 - containerRect.top;
-        const resultMid = resultRect.top + resultRect.height / 2 - containerRect.top;
-        const callX = callRect.left - containerRect.left;
-        const resultX = resultRect.left - containerRect.left;
-        next.push({
-          callId: pair.callId,
-          startX: callX,
-          startY: callMid,
-          endX: resultX,
-          endY: resultMid,
-          color: `hsl(${hueFromCallId(pair.callId)}, 72%, 55%)`,
-        });
-      }
-      setWires(prev => {
-        if (prev.length !== next.length) return next;
-        for (let i = 0; i < prev.length; i += 1) {
-          const a = prev[i];
-          const b = next[i];
-          if (a === undefined || b === undefined) return next;
-          if (
-            a.callId !== b.callId ||
-            Math.abs(a.startY - b.startY) > 0.5 ||
-            Math.abs(a.endY - b.endY) > 0.5 ||
-            Math.abs(a.startX - b.startX) > 0.5 ||
-            Math.abs(a.endX - b.endX) > 0.5
-          ) {
-            return next;
-          }
-        }
-        return prev;
-      });
-      // Refs on large runs can attach across many paints. Keep retrying on
-      // animation frames until every pair is measured, then stop. Further
-      // updates come from the ResizeObserver for layout shifts.
-      if (next.length < pairs.length && attemptsLeft > 0) {
-        attemptsLeft -= 1;
-        rafId = requestAnimationFrame(recompute);
-      }
-    }
-
-    recompute();
-    return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      if (ro !== null) ro.disconnect();
-      if (mo !== null) mo.disconnect();
-    };
-  }, [pairs, messageRefs, containerRef]);
-
-  return (
-    <svg
-      className="pointer-events-none absolute inset-0 h-full w-full"
-      style={{ overflow: "visible" }}
-      aria-hidden="true"
-    >
-      {wires.map(w => {
-        const dy = Math.abs(w.endY - w.startY);
-        // Bulge leftward; proportional to vertical distance, capped.
-        const bulge = Math.min(80, Math.max(24, dy * 0.25));
-        const c1x = w.startX - bulge;
-        const c2x = w.endX - bulge;
-        const d = `M ${w.startX} ${w.startY} C ${c1x} ${w.startY}, ${c2x} ${w.endY}, ${w.endX} ${w.endY}`;
-        const isHovered = hoveredCallId === w.callId;
-        return (
-          <g key={w.callId}>
-            <path
-              d={d}
-              stroke={w.color}
-              strokeWidth={isHovered ? 2.5 : 1.5}
-              strokeOpacity={isHovered ? 0.95 : 0.55}
-              strokeLinecap="round"
-              fill="none"
-            />
-            <circle cx={w.startX} cy={w.startY} r={isHovered ? 3.5 : 2.5} fill={w.color} />
-            <circle cx={w.endX} cy={w.endY} r={isHovered ? 3.5 : 2.5} fill={w.color} />
-          </g>
-        );
-      })}
-    </svg>
   );
 }
 

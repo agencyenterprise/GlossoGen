@@ -424,13 +424,8 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
               highlightNonce={highlightNonce}
               forkPointMessageId={null}
               scenarioMarkers={scenarioPlugin.getTimelineMarkers({ extras: run.scenario_extras })}
-              replaceAgentRoundStart={null}
-              replaceAgentReplacedAgentId={null}
-              replaceAgentReplacementModel={null}
-              crossRunReplaceRoundStart={null}
-              crossRunReplacedAgentId={null}
-              crossRunSourceARunId={null}
-              crossRunSourceBRunId={null}
+              replaceAgentSource={null}
+              crossRunReplaceAgentSource={null}
               scenarioName={run.scenario_name}
               scenarioExtras={run.scenario_extras}
               roundEndings={run.round_endings}
