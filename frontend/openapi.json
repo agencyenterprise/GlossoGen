@@ -142,6 +142,25 @@
         }
       }
     },
+    "/api/g/{group_slug}/branches": {
+      "get": {
+        "summary": "List Branches",
+        "description": "List every run that has derived children, newest parent first.\n\nPowers the branches view. Only the parent runs are enriched into summaries\n(there are far fewer parents than derivations), so this never enumerates\nthe whole run set. Each entry carries the source run and its child count.",
+        "operationId": "list_branches_api_g__group_slug__branches_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}": {
       "get": {
         "summary": "Get Run Detail",
@@ -1766,6 +1785,41 @@
           "file"
         ],
         "title": "Body_import_run_bundle_api_g__group_slug__runs_import_post"
+      },
+      "BranchListResponse": {
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/BranchSourceSummary"
+            },
+            "type": "array",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sources"
+        ],
+        "title": "BranchListResponse",
+        "description": "Response model for the branches endpoint.\n\nEvery entry is a run that has at least one derived child, newest parent\nfirst. Enriches only the parent runs (there are far fewer parents than\nderivations), so the branches view never fetches the whole run set."
+      },
+      "BranchSourceSummary": {
+        "properties": {
+          "source_run": {
+            "$ref": "#/components/schemas/RunSummary"
+          },
+          "derived_count": {
+            "type": "integer",
+            "title": "Derived Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_run",
+          "derived_count"
+        ],
+        "title": "BranchSourceSummary",
+        "description": "One source run that has been used as a derivation parent.\n\n``source_run`` is the parent's full summary; ``derived_count`` is how many\nruns (replace-agent, resume-at-round, cross-run-replace-agent source A)\nbranch from it."
       },
       "ChannelMessage": {
         "properties": {

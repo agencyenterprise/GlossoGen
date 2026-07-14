@@ -11,9 +11,10 @@ import type { components } from "@/types/api.gen";
 import { useGroupPath } from "@/features/auth/group-context";
 import { buildAgentColorMap, buildChannelColorMap, deriveInitials } from "../runs/agent-colors";
 import { formatTime, humanize } from "../runs/format";
-import { type ForkInfo, ForkBranchCard } from "./fork-branch-card";
+import { BranchChildCard } from "./branch-child-card";
 
 type ChannelMessage = components["schemas"]["ChannelMessage"];
+type DerivedRunReference = components["schemas"]["DerivedRunReference"];
 
 const TRUNCATE_LENGTH = 120;
 
@@ -71,47 +72,23 @@ export function BranchesTimeline({ runId }: { runId: string }) {
     },
   });
 
-  const { data: allRuns } = useQuery({
-    queryKey: ["runs", "all"],
-    queryFn: async () => {
-      const { data, error } = await api.GET("/api/g/{group_slug}/runs", {
-        params: { query: { limit: 10000 } },
-      });
-      if (error) {
-        throw new Error("Failed to fetch runs");
-      }
-      return data;
-    },
-  });
-
-  const forksByMessageId = useMemo(() => {
-    const map = new Map<string, ForkInfo[]>();
-    if (!allRuns) {
+  const childrenByRound = useMemo(() => {
+    const map = new Map<number, DerivedRunReference[]>();
+    if (!runDetail) {
       return map;
     }
-    for (const run of allRuns.runs) {
-      if (!run.fork_source) {
-        continue;
-      }
-      if (run.fork_source.source_run_id !== runId) {
-        continue;
-      }
-      const info: ForkInfo = {
-        runId: run.run_id,
-        status: run.status,
-        timestamp: run.timestamp,
-        models: run.models,
-      };
-      const targetId = run.fork_source.target_message_id;
-      const existing = map.get(targetId);
+    for (const child of runDetail.children) {
+      const existing = map.get(child.round_start);
       if (existing) {
-        existing.push(info);
+        existing.push(child);
       } else {
-        map.set(targetId, [info]);
+        map.set(child.round_start, [child]);
       }
     }
     return map;
-  }, [allRuns, runId]);
+  }, [runDetail]);
+
+  const childCount = runDetail?.children.length ?? 0;
 
   const agentColorMap = useMemo(() => {
     if (!runDetail) {
@@ -145,6 +122,14 @@ export function BranchesTimeline({ runId }: { runId: string }) {
     const sorted = [...runDetail.messages].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
     return groupMessagesByRound(sorted);
   }, [runDetail]);
+
+  const orphanChildren = useMemo(() => {
+    if (!runDetail) {
+      return [];
+    }
+    const roundsWithMessages = new Set(roundGroups.map(group => group.roundNumber));
+    return runDetail.children.filter(child => !roundsWithMessages.has(child.round_start));
+  }, [runDetail, roundGroups]);
 
   const searchLower = searchQuery.toLowerCase().trim();
 
@@ -200,9 +185,7 @@ export function BranchesTimeline({ runId }: { runId: string }) {
           <h1 className="text-2xl font-bold tracking-tight">{humanize(runDetail.scenario_name)}</h1>
           <p className="text-sm text-muted-foreground">
             {runDetail.agents.length} agents &middot;{" "}
-            {forksByMessageId.size > 0
-              ? `${Array.from(forksByMessageId.values()).reduce((sum, f) => sum + f.length, 0)} forks`
-              : "No forks"}
+            {childCount > 0 ? `${childCount} branches` : "No branches"}
           </p>
         </div>
       </div>
@@ -227,115 +210,131 @@ export function BranchesTimeline({ runId }: { runId: string }) {
         ) : null}
       </div>
 
-      {/* Two-column timeline: messages (left) | trunk | forks (right) */}
+      {/* Timeline: messages (left) | trunk | branch children (right) */}
       <div className="grid grid-cols-[3fr_24px_1fr]">
-        {filteredRoundGroups.map(group => (
-          <div key={group.roundNumber} className="contents">
-            {/* Round separator */}
+        {filteredRoundGroups.map(group => {
+          const roundChildren = childrenByRound.get(group.roundNumber);
+          return (
+            <div key={group.roundNumber} className="contents">
+              {/* Round separator */}
+              <div className="mb-3 flex items-center justify-end">
+                <div className="h-px flex-1 bg-border" />
+                <span className="ml-3 shrink-0 text-xs font-medium text-muted-foreground">
+                  Round {group.roundNumber}
+                </span>
+              </div>
+              <div className="relative mb-3 flex justify-center">
+                <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border" />
+                <div
+                  className={cn(
+                    "relative z-10 h-3 w-3 rounded-full border-2 bg-background",
+                    roundChildren ? "border-violet-500 dark:border-violet-400" : "border-border"
+                  )}
+                />
+              </div>
+              <div className="mb-3 flex items-center pl-2">
+                {roundChildren ? (
+                  <BranchChildCard runs={roundChildren} />
+                ) : (
+                  <div className="h-px flex-1 bg-border" />
+                )}
+              </div>
+
+              {/* Messages */}
+              {group.messages.map(msg => {
+                const roleName = agentNameMap.get(msg.sender_agent_id) ?? msg.sender_agent_id;
+                const color = agentColorMap.get(msg.sender_agent_id);
+                const channelColor = channelColorMap.get(msg.channel_id);
+                const isExpanded = expandedMessages.has(msg.message_id);
+                const needsTruncation = msg.text.length > TRUNCATE_LENGTH;
+
+                return (
+                  <div key={msg.message_id} className="contents">
+                    {/* Left column — message card */}
+                    <div className="mb-2 pr-2">
+                      <div className="rounded-md border border-border px-3 py-2 transition-colors">
+                        {/* Agent + channel + time */}
+                        <div className="mb-1 flex items-center gap-2 text-xs">
+                          <span
+                            className={cn(
+                              "inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold",
+                              color?.bg ?? "bg-gray-100",
+                              color?.fg ?? "text-gray-600"
+                            )}
+                          >
+                            {deriveInitials(roleName)}
+                          </span>
+                          <span className="font-medium">{humanize(roleName)}</span>
+                          <span
+                            className={cn(
+                              "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                              channelColor?.bg ?? "bg-gray-50",
+                              channelColor?.fg ?? "text-gray-600"
+                            )}
+                          >
+                            #{humanize(msg.channel_id)}
+                          </span>
+                          <span className="ml-auto text-muted-foreground">
+                            {formatTime(msg.timestamp)}
+                          </span>
+                        </div>
+
+                        {/* Message text */}
+                        <button
+                          className="w-full text-left text-sm text-foreground/80"
+                          onClick={() => {
+                            if (needsTruncation) {
+                              toggleExpanded(msg.message_id);
+                            }
+                          }}
+                          disabled={!needsTruncation}
+                        >
+                          {needsTruncation && !isExpanded ? (
+                            <span>
+                              {msg.text.slice(0, TRUNCATE_LENGTH)}
+                              <span className="text-muted-foreground">…</span>
+                            </span>
+                          ) : (
+                            <span className="whitespace-pre-wrap">{msg.text}</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Center column — trunk line + dot */}
+                    <div className="relative mb-2 flex justify-center">
+                      {/* Continuous vertical line behind the dot */}
+                      <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border" />
+                      <div className="relative z-10 mt-2.5 h-2.5 w-2.5 rounded-full bg-border" />
+                    </div>
+
+                    {/* Right column — branches attach at round separators, not messages */}
+                    <div className="mb-2 pl-2" />
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+
+        {/* Branches whose start round has no messages in this run */}
+        {orphanChildren.length > 0 ? (
+          <div className="contents">
             <div className="mb-3 flex items-center justify-end">
               <div className="h-px flex-1 bg-border" />
               <span className="ml-3 shrink-0 text-xs font-medium text-muted-foreground">
-                Round {group.roundNumber}
+                Other branches
               </span>
             </div>
             <div className="relative mb-3 flex justify-center">
               <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border" />
-              <div className="relative z-10 h-3 w-3 rounded-full border-2 border-border bg-background" />
+              <div className="relative z-10 h-3 w-3 rounded-full border-2 border-violet-500 bg-background dark:border-violet-400" />
             </div>
-            <div className="mb-3 flex items-center">
-              <div className="h-px flex-1 bg-border" />
+            <div className="mb-3 flex items-center pl-2">
+              <BranchChildCard runs={orphanChildren} />
             </div>
-
-            {/* Messages */}
-            {group.messages.map(msg => {
-              const roleName = agentNameMap.get(msg.sender_agent_id) ?? msg.sender_agent_id;
-              const color = agentColorMap.get(msg.sender_agent_id);
-              const channelColor = channelColorMap.get(msg.channel_id);
-              const isExpanded = expandedMessages.has(msg.message_id);
-              const needsTruncation = msg.text.length > TRUNCATE_LENGTH;
-              const forks = forksByMessageId.get(msg.message_id);
-
-              return (
-                <div key={msg.message_id} className="contents">
-                  {/* Left column — message card */}
-                  <div className="mb-2 pr-2">
-                    <div
-                      className={cn(
-                        "rounded-md border border-border px-3 py-2 transition-colors",
-                        forks ? "border-violet-200 dark:border-violet-800/50" : ""
-                      )}
-                    >
-                      {/* Agent + channel + time */}
-                      <div className="mb-1 flex items-center gap-2 text-xs">
-                        <span
-                          className={cn(
-                            "inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold",
-                            color?.bg ?? "bg-gray-100",
-                            color?.fg ?? "text-gray-600"
-                          )}
-                        >
-                          {deriveInitials(roleName)}
-                        </span>
-                        <span className="font-medium">{humanize(roleName)}</span>
-                        <span
-                          className={cn(
-                            "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-                            channelColor?.bg ?? "bg-gray-50",
-                            channelColor?.fg ?? "text-gray-600"
-                          )}
-                        >
-                          #{humanize(msg.channel_id)}
-                        </span>
-                        <span className="ml-auto text-muted-foreground">
-                          {formatTime(msg.timestamp)}
-                        </span>
-                      </div>
-
-                      {/* Message text */}
-                      <button
-                        className="w-full text-left text-sm text-foreground/80"
-                        onClick={() => {
-                          if (needsTruncation) {
-                            toggleExpanded(msg.message_id);
-                          }
-                        }}
-                        disabled={!needsTruncation}
-                      >
-                        {needsTruncation && !isExpanded ? (
-                          <span>
-                            {msg.text.slice(0, TRUNCATE_LENGTH)}
-                            <span className="text-muted-foreground">…</span>
-                          </span>
-                        ) : (
-                          <span className="whitespace-pre-wrap">{msg.text}</span>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Center column — trunk line + dot */}
-                  <div className="relative mb-2 flex justify-center">
-                    {/* Continuous vertical line behind the dot */}
-                    <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border" />
-                    <div
-                      className={cn(
-                        "relative z-10 mt-2.5 h-2.5 w-2.5 rounded-full",
-                        forks ? "bg-violet-500 dark:bg-violet-400" : "bg-border"
-                      )}
-                    />
-                  </div>
-
-                  {/* Right column — fork cards (or empty) */}
-                  <div className="mb-2 pl-2">
-                    {forks ? (
-                      <ForkBranchCard forks={forks} targetMessageId={msg.message_id} />
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
           </div>
-        ))}
+        ) : null}
 
         {/* End marker */}
         <div className="flex items-center justify-end pt-2">

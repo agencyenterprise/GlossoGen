@@ -180,6 +180,29 @@ class RunListResponse(BaseModel):
     total: int
 
 
+class BranchSourceSummary(BaseModel):
+    """One source run that has been used as a derivation parent.
+
+    ``source_run`` is the parent's full summary; ``derived_count`` is how many
+    runs (replace-agent, resume-at-round, cross-run-replace-agent source A)
+    branch from it.
+    """
+
+    source_run: RunSummary
+    derived_count: int
+
+
+class BranchListResponse(BaseModel):
+    """Response model for the branches endpoint.
+
+    Every entry is a run that has at least one derived child, newest parent
+    first. Enriches only the parent runs (there are far fewer parents than
+    derivations), so the branches view never fetches the whole run set.
+    """
+
+    sources: list[BranchSourceSummary]
+
+
 class AgentSwapEventDTO(BaseModel):
     """One in-run agent swap, surfaced for per-instance tab rendering on the FE.
 

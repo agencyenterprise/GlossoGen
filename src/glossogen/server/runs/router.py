@@ -25,6 +25,7 @@ from glossogen.models.event import RunStatus, SimulationEnded
 from glossogen.run_archive import move_run_to_trash
 from glossogen.scenario_registry import SCENARIO_REGISTRY
 from glossogen.server.response_models import LaunchStatus
+from glossogen.server.runs.branch_sources import list_branch_sources_for_group
 from glossogen.server.runs.derived_run_references import build_derived_run_references
 from glossogen.server.runs.detail_reader import (
     debug_log_path_for,
@@ -37,6 +38,7 @@ from glossogen.server.runs.listing import list_all_labels_for_group, list_runs_p
 from glossogen.server.runs.lookup import deregister_run, get_identity, resolve_run_or_404
 from glossogen.server.runs.models import (
     AllLabelsResponse,
+    BranchListResponse,
     DebugLogsResponse,
     EvalLogLine,
     EvalLogsResponse,
@@ -98,6 +100,18 @@ async def list_runs(
         limit=limit,
     )
     return RunListResponse(runs=page.runs, total=page.total)
+
+
+@router.get("/branches", response_model=BranchListResponse)
+async def list_branches(request: Request) -> BranchListResponse:
+    """List every run that has derived children, newest parent first.
+
+    Powers the branches view. Only the parent runs are enriched into summaries
+    (there are far fewer parents than derivations), so this never enumerates
+    the whole run set. Each entry carries the source run and its child count.
+    """
+    sources = await list_branch_sources_for_group(request=request)
+    return BranchListResponse(sources=sources)
 
 
 @router.get("/runs/{scenario}/{run_dir_name}", response_model=RunDetailResponse)

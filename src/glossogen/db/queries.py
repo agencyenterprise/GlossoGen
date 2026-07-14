@@ -11,7 +11,7 @@ from uuid import UUID
 from psycopg import AsyncConnection
 from psycopg.rows import TupleRow
 
-from glossogen.db.rows import GroupRow, RunRow, UserLastActiveGroupRow
+from glossogen.db.rows import DerivedSourceCountRow, GroupRow, RunRow, UserLastActiveGroupRow
 
 _GROUP_COLUMNS = "id, clerk_org_id, slug, name, created_at"
 _RUN_COLUMNS = (
@@ -213,6 +213,41 @@ async def list_children_of_run(
         )
         rows = await cur.fetchall()
     return [_run_row_from_tuple(row) for row in rows]
+
+
+async def list_derived_source_counts(
+    conn: AsyncConnection[TupleRow],
+    group_id: UUID,
+) -> list[DerivedSourceCountRow]:
+    """Return every run that is the timeline parent of ≥1 derived run, with its child count.
+
+    Aggregates the ``runs`` table by ``(source_run_scenario,
+    source_run_dir_name)``; a row is emitted only for parents that have at
+    least one derivation (replace-agent, resume-at-round, or
+    cross-run-replace-agent source A). Newest parent first.
+    """
+    async with conn.cursor() as cur:
+        await cur.execute(
+            """
+            SELECT source_run_scenario, source_run_dir_name, count(*)
+            FROM runs
+            WHERE group_id = %s
+              AND source_run_scenario IS NOT NULL
+              AND source_run_dir_name IS NOT NULL
+            GROUP BY source_run_scenario, source_run_dir_name
+            ORDER BY split_part(source_run_dir_name, '_', 1)::bigint DESC, source_run_dir_name DESC
+            """,
+            (group_id,),
+        )
+        rows = await cur.fetchall()
+    return [
+        DerivedSourceCountRow(
+            scenario=row[0],
+            run_dir_name=row[1],
+            derived_count=row[2],
+        )
+        for row in rows
+    ]
 
 
 async def insert_run(

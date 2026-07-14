@@ -44,3 +44,16 @@ class UserLastActiveGroupRow(BaseModel):
     user_id: str
     group_id: UUID
     updated_at: datetime
+
+
+class DerivedSourceCountRow(BaseModel):
+    """One source run that has derived children, with the child count.
+
+    Aggregates the ``runs`` table by ``(source_run_scenario,
+    source_run_dir_name)`` — the timeline parent recorded for every
+    replace-agent, resume-at-round, and cross-run-replace-agent derivation.
+    """
+
+    scenario: str
+    run_dir_name: str
+    derived_count: int

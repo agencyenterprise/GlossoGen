@@ -32,6 +32,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/g/{group_slug}/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Branches
+         * @description List every run that has derived children, newest parent first.
+         *
+         *     Powers the branches view. Only the parent runs are enriched into summaries
+         *     (there are far fewer parents than derivations), so this never enumerates
+         *     the whole run set. Each entry carries the source run and its child count.
+         */
+        get: operations["list_branches_api_g__group_slug__branches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}": {
         parameters: {
             query?: never;
@@ -753,6 +777,31 @@ export interface components {
         Body_import_run_bundle_api_g__group_slug__runs_import_post: {
             /** File */
             file: string;
+        };
+        /**
+         * BranchListResponse
+         * @description Response model for the branches endpoint.
+         *
+         *     Every entry is a run that has at least one derived child, newest parent
+         *     first. Enriches only the parent runs (there are far fewer parents than
+         *     derivations), so the branches view never fetches the whole run set.
+         */
+        BranchListResponse: {
+            /** Sources */
+            sources: components["schemas"]["BranchSourceSummary"][];
+        };
+        /**
+         * BranchSourceSummary
+         * @description One source run that has been used as a derivation parent.
+         *
+         *     ``source_run`` is the parent's full summary; ``derived_count`` is how many
+         *     runs (replace-agent, resume-at-round, cross-run-replace-agent source A)
+         *     branch from it.
+         */
+        BranchSourceSummary: {
+            source_run: components["schemas"]["RunSummary"];
+            /** Derived Count */
+            derived_count: number;
         };
         /**
          * ChannelMessage
@@ -2713,6 +2762,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_branches_api_g__group_slug__branches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchListResponse"];
                 };
             };
         };

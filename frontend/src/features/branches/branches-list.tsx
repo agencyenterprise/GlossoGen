@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { GitFork, Inbox, Loader2, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -9,7 +8,6 @@ import type { components } from "@/types/api.gen";
 import { useGroupPath } from "@/features/auth/group-context";
 import { formatCost, formatDuration, formatTime, humanize } from "../runs/format";
 
-type RunSummary = components["schemas"]["RunSummary"];
 type RunStatus = components["schemas"]["RunStatus"];
 
 const STATUS_LABELS: Record<RunStatus, string> = {
@@ -20,63 +18,22 @@ const STATUS_LABELS: Record<RunStatus, string> = {
   killed: "Killed",
 };
 
-interface SourceRunEntry {
-  sourceRun: RunSummary;
-  forks: RunSummary[];
-}
-
 export function BranchesList() {
   const router = useRouter();
   const groupPath = useGroupPath();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["runs", "all"],
+    queryKey: ["branches"],
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/g/{group_slug}/runs", {
-        params: { query: { limit: 10000 } },
-      });
+      const { data, error } = await api.GET("/api/g/{group_slug}/branches", {});
       if (error) {
-        throw new Error("Failed to fetch runs");
+        throw new Error("Failed to fetch branches");
       }
       return data;
     },
   });
 
-  const sourceEntries = useMemo(() => {
-    if (!data) {
-      return [];
-    }
-    const runsById = new Map<string, RunSummary>();
-    for (const run of data.runs) {
-      runsById.set(run.run_id, run);
-    }
-
-    const forksBySource = new Map<string, RunSummary[]>();
-    for (const run of data.runs) {
-      if (!run.fork_source) {
-        continue;
-      }
-      const sourceId = run.fork_source.source_run_id;
-      const existing = forksBySource.get(sourceId);
-      if (existing) {
-        existing.push(run);
-      } else {
-        forksBySource.set(sourceId, [run]);
-      }
-    }
-
-    const entries: SourceRunEntry[] = [];
-    for (const [sourceId, forks] of forksBySource) {
-      const sourceRun = runsById.get(sourceId);
-      if (!sourceRun) {
-        continue;
-      }
-      entries.push({ sourceRun, forks });
-    }
-
-    entries.sort((a, b) => b.sourceRun.timestamp.localeCompare(a.sourceRun.timestamp));
-    return entries;
-  }, [data]);
+  const sourceEntries = data?.sources ?? [];
 
   if (isLoading) {
     return (
@@ -121,7 +78,7 @@ export function BranchesList() {
         </thead>
         <tbody>
           {sourceEntries.map((entry, idx) => {
-            const run = entry.sourceRun;
+            const run = entry.source_run;
             const borderClass = idx > 0 ? "border-t border-border" : "";
             return (
               <tr
@@ -168,7 +125,7 @@ export function BranchesList() {
                 <td className="whitespace-nowrap px-3 py-2 pr-4 text-right">
                   <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
                     <GitFork className="h-3 w-3" />
-                    {entry.forks.length}
+                    {entry.derived_count}
                   </span>
                 </td>
               </tr>
