@@ -12,7 +12,10 @@ filtering reads the filesystem identically with and without a database.
 """
 
 import asyncio
+import base64
+import binascii
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
 from uuid import UUID
@@ -37,12 +40,71 @@ logger = logging.getLogger(__name__)
 # Cap for one listing call; the Postgres index keeps the ordered scan cheap.
 _LIST_LIMIT = 10_000
 
+# Field separator inside the encoded keyset cursor (a control char that cannot
+# appear in an ISO timestamp, run dir name, or scenario name).
+_CURSOR_SEP = "\x1f"
+
+
+class _KeysetKey(NamedTuple):
+    """Total-order key for keyset pagination over the newest-first run list.
+
+    Ordering is ``(timestamp, run_dir_name, scenario_name)`` descending. The
+    ``scenario_name`` tiebreak makes the order total even when two scenarios
+    have a run directory named for the same unix second.
+    """
+
+    timestamp: datetime
+    run_dir_name: str
+    scenario_name: str
+
+
+def _descriptor_key(descriptor: RunDescriptor) -> _KeysetKey:
+    """Build the keyset key for a run descriptor."""
+    return _KeysetKey(
+        timestamp=descriptor.timestamp,
+        run_dir_name=descriptor.run_dir_name,
+        scenario_name=descriptor.scenario_name,
+    )
+
+
+def _summary_key(summary: RunSummary) -> _KeysetKey:
+    """Build the keyset key for an enriched run summary."""
+    run_dir_name = summary.run_id.split("/", 1)[1]
+    return _KeysetKey(
+        timestamp=summary.timestamp,
+        run_dir_name=run_dir_name,
+        scenario_name=summary.scenario_name,
+    )
+
+
+def _encode_cursor(key: _KeysetKey) -> str:
+    """Encode a keyset key into an opaque URL-safe cursor string."""
+    raw = _CURSOR_SEP.join([key.timestamp.isoformat(), key.run_dir_name, key.scenario_name])
+    return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii")
+
+
+def _decode_cursor(cursor: str) -> _KeysetKey | None:
+    """Decode an opaque cursor back into a keyset key, or None if malformed."""
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode("ascii")).decode("utf-8")
+        timestamp_iso, run_dir_name, scenario_name = raw.split(_CURSOR_SEP)
+        return _KeysetKey(
+            timestamp=datetime.fromisoformat(timestamp_iso),
+            run_dir_name=run_dir_name,
+            scenario_name=scenario_name,
+        )
+    except (binascii.Error, UnicodeDecodeError, ValueError):
+        logger.warning("Ignoring malformed runs-list cursor: %r", cursor)
+        return None
+
 
 class PaginatedRuns(NamedTuple):
-    """One page of run summaries plus the total matching the active filters."""
+    """One page of run summaries, the total matching the filters, and the
+    keyset cursor for the following page (``None`` when this is the last page)."""
 
     runs: list[RunSummary]
     total: int
+    next_cursor: str | None
 
 
 async def enumerate_run_descriptors(
@@ -116,10 +178,14 @@ async def list_runs_page(
     run_id_contains: str | None,
     status: RunStatus | None,
     contains_agent_id: str | None,
-    offset: int,
+    cursor: str | None,
     limit: int,
 ) -> PaginatedRuns:
-    """Return one page of run summaries plus the total matching the filters.
+    """Return one keyset page of run summaries plus the total matching the filters.
+
+    Pages are anchored by an opaque ``cursor`` (the keyset key of the previous
+    page's last item) rather than an offset, so newly-created runs at the top of
+    the newest-first list never shift an already-fetched page's window.
 
     Scenario, run-id, and label filters are applied to descriptors before
     enrichment, so the common path (no ``status`` / ``contains_agent_id``
@@ -158,12 +224,20 @@ async def list_runs_page(
             )
         ]
 
+    after_key = _decode_cursor(cursor) if cursor is not None else None
+
     if status is None and contains_agent_id is None:
-        page = await _build_summaries(
-            runs_dir=runs_dir,
-            descriptors=descriptors[offset : offset + limit],
-        )
-        return PaginatedRuns(runs=page, total=len(descriptors))
+        # Enforce the total order explicitly so keyset slicing is deterministic
+        # regardless of the descriptor source (DB rows or filesystem walk).
+        descriptors = sorted(descriptors, key=_descriptor_key, reverse=True)
+        total = len(descriptors)
+        if after_key is not None:
+            descriptors = [d for d in descriptors if _descriptor_key(d) < after_key]
+        window = descriptors[:limit]
+        has_more = len(descriptors) > limit
+        next_cursor = _encode_cursor(_descriptor_key(window[-1])) if has_more and window else None
+        page = await _build_summaries(runs_dir=runs_dir, descriptors=window)
+        return PaginatedRuns(runs=page, total=total, next_cursor=next_cursor)
 
     summaries = await _build_summaries(runs_dir=runs_dir, descriptors=descriptors)
     if contains_agent_id is not None:
@@ -174,7 +248,18 @@ async def list_runs_page(
         ]
     if status is not None:
         summaries = [summary for summary in summaries if summary.status == status]
-    return PaginatedRuns(runs=summaries[offset : offset + limit], total=len(summaries))
+    summaries = sorted(summaries, key=_summary_key, reverse=True)
+    total = len(summaries)
+    if after_key is not None:
+        summaries = [s for s in summaries if _summary_key(s) < after_key]
+    window_summaries = summaries[:limit]
+    has_more = len(summaries) > limit
+    next_cursor = (
+        _encode_cursor(_summary_key(window_summaries[-1]))
+        if has_more and window_summaries
+        else None
+    )
+    return PaginatedRuns(runs=window_summaries, total=total, next_cursor=next_cursor)
 
 
 async def list_runs_owned_by_group(
@@ -218,7 +303,7 @@ async def list_runs_page_for_group(
     run_id_contains: str | None,
     status: RunStatus | None,
     contains_agent_id: str | None,
-    offset: int,
+    cursor: str | None,
     limit: int,
 ) -> PaginatedRuns:
     """REST-layer wrapper around :func:`list_runs_page`."""
@@ -232,7 +317,7 @@ async def list_runs_page_for_group(
         run_id_contains=run_id_contains,
         status=status,
         contains_agent_id=contains_agent_id,
-        offset=offset,
+        cursor=cursor,
         limit=limit,
     )
 

@@ -76,18 +76,20 @@ async def list_runs(
     status: RunStatus | None = None,
     labels: list[str] | None = Query(default=None),
     run_id_contains: str | None = None,
-    offset: int = 0,
+    cursor: str | None = None,
     limit: int = 50,
 ) -> RunListResponse:
-    """List one page of simulation runs owned by the active group, newest-first.
+    """List one keyset page of simulation runs owned by the active group, newest-first.
 
     Filters: ``scenario`` keeps runs in any of the listed scenarios (OR
     semantics); ``labels`` keeps runs carrying every listed label (AND
     semantics); ``run_id_contains`` keeps runs whose ``scenario/run_dir_name``
     id contains the substring (case-insensitive); ``status`` restricts to a
     final status; ``contains_agent_id`` keeps runs that registered that agent
-    (used by the cross-run replace-agent picker). ``offset``/``limit`` page the
-    result; ``total`` is the count matching the filters before paging.
+    (used by the cross-run replace-agent picker). Paging is keyset: pass the
+    previous response's ``next_cursor`` as ``cursor`` for the next page (omit
+    for the first page); ``limit`` caps the page size and ``total`` is the count
+    matching the filters before paging.
     """
     page = await list_runs_page_for_group(
         request=request,
@@ -96,10 +98,10 @@ async def list_runs(
         run_id_contains=run_id_contains,
         status=status,
         contains_agent_id=contains_agent_id,
-        offset=offset,
+        cursor=cursor,
         limit=limit,
     )
-    return RunListResponse(runs=page.runs, total=page.total)
+    return RunListResponse(runs=page.runs, total=page.total, next_cursor=page.next_cursor)
 
 
 @router.get("/branches", response_model=BranchListResponse)

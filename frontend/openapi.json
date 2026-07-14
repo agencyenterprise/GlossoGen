@@ -8,7 +8,7 @@
     "/api/g/{group_slug}/runs": {
       "get": {
         "summary": "List Runs",
-        "description": "List one page of simulation runs owned by the active group, newest-first.\n\nFilters: ``scenario`` keeps runs in any of the listed scenarios (OR\nsemantics); ``labels`` keeps runs carrying every listed label (AND\nsemantics); ``run_id_contains`` keeps runs whose ``scenario/run_dir_name``\nid contains the substring (case-insensitive); ``status`` restricts to a\nfinal status; ``contains_agent_id`` keeps runs that registered that agent\n(used by the cross-run replace-agent picker). ``offset``/``limit`` page the\nresult; ``total`` is the count matching the filters before paging.",
+        "description": "List one keyset page of simulation runs owned by the active group, newest-first.\n\nFilters: ``scenario`` keeps runs in any of the listed scenarios (OR\nsemantics); ``labels`` keeps runs carrying every listed label (AND\nsemantics); ``run_id_contains`` keeps runs whose ``scenario/run_dir_name``\nid contains the substring (case-insensitive); ``status`` restricts to a\nfinal status; ``contains_agent_id`` keeps runs that registered that agent\n(used by the cross-run replace-agent picker). Paging is keyset: pass the\nprevious response's ``next_cursor`` as ``cursor`` for the next page (omit\nfor the first page); ``limit`` caps the page size and ``total`` is the count\nmatching the filters before paging.",
         "operationId": "list_runs_api_g__group_slug__runs_get",
         "parameters": [
           {
@@ -98,13 +98,19 @@
             }
           },
           {
-            "name": "offset",
+            "name": "cursor",
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "default": 0,
-              "title": "Offset"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
             }
           },
           {
@@ -3904,15 +3910,27 @@
           "total": {
             "type": "integer",
             "title": "Total"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
           }
         },
         "type": "object",
         "required": [
           "runs",
-          "total"
+          "total",
+          "next_cursor"
         ],
         "title": "RunListResponse",
-        "description": "Response model for the paginated runs endpoint.\n\n``runs`` is one page (newest-first); ``total`` is the number of runs\nmatching the request's filters before paging, for the load-more UI."
+        "description": "Response model for the paginated runs endpoint.\n\n``runs`` is one page (newest-first); ``total`` is the number of runs\nmatching the request's filters before paging, for the load-more UI.\n``next_cursor`` is the opaque keyset cursor to pass back for the following\npage, or ``None`` when the returned page is the last one."
       },
       "RunStatus": {
         "type": "string",

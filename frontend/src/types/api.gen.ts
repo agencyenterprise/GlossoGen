@@ -13,15 +13,17 @@ export interface paths {
         };
         /**
          * List Runs
-         * @description List one page of simulation runs owned by the active group, newest-first.
+         * @description List one keyset page of simulation runs owned by the active group, newest-first.
          *
          *     Filters: ``scenario`` keeps runs in any of the listed scenarios (OR
          *     semantics); ``labels`` keeps runs carrying every listed label (AND
          *     semantics); ``run_id_contains`` keeps runs whose ``scenario/run_dir_name``
          *     id contains the substring (case-insensitive); ``status`` restricts to a
          *     final status; ``contains_agent_id`` keeps runs that registered that agent
-         *     (used by the cross-run replace-agent picker). ``offset``/``limit`` page the
-         *     result; ``total`` is the count matching the filters before paging.
+         *     (used by the cross-run replace-agent picker). Paging is keyset: pass the
+         *     previous response's ``next_cursor`` as ``cursor`` for the next page (omit
+         *     for the first page); ``limit`` caps the page size and ``total`` is the count
+         *     matching the filters before paging.
          */
         get: operations["list_runs_api_g__group_slug__runs_get"];
         put?: never;
@@ -1781,12 +1783,16 @@ export interface components {
          *
          *     ``runs`` is one page (newest-first); ``total`` is the number of runs
          *     matching the request's filters before paging, for the load-more UI.
+         *     ``next_cursor`` is the opaque keyset cursor to pass back for the following
+         *     page, or ``None`` when the returned page is the last one.
          */
         RunListResponse: {
             /** Runs */
             runs: components["schemas"]["RunSummary"][];
             /** Total */
             total: number;
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /**
          * RunStatus
@@ -2737,7 +2743,7 @@ export interface operations {
                 status?: components["schemas"]["RunStatus"] | null;
                 labels?: string[] | null;
                 run_id_contains?: string | null;
-                offset?: number;
+                cursor?: string | null;
                 limit?: number;
             };
             header?: never;

@@ -174,10 +174,13 @@ class RunListResponse(BaseModel):
 
     ``runs`` is one page (newest-first); ``total`` is the number of runs
     matching the request's filters before paging, for the load-more UI.
+    ``next_cursor`` is the opaque keyset cursor to pass back for the following
+    page, or ``None`` when the returned page is the last one.
     """
 
     runs: list[RunSummary]
     total: int
+    next_cursor: str | None
 
 
 class BranchSourceSummary(BaseModel):

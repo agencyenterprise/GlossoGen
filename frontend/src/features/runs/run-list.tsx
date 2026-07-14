@@ -208,12 +208,12 @@ export function RunList() {
         { scenarios: scenarioFilter, labels: labelFilter, runId: idSearchDebounced },
       ],
       refetchOnMount: "always",
-      initialPageParam: 0,
+      initialPageParam: null as string | null,
       queryFn: async ({ pageParam }) => {
         const { data, error } = await api.GET("/api/g/{group_slug}/runs", {
           params: {
             query: {
-              offset: pageParam,
+              cursor: pageParam ?? undefined,
               limit: PAGE_SIZE,
               scenario: scenarioFilter.length > 0 ? scenarioFilter : undefined,
               labels: labelFilter.length > 0 ? labelFilter : undefined,
@@ -226,28 +226,27 @@ export function RunList() {
         }
         return data;
       },
-      getNextPageParam: (lastPage, allPages) => {
-        const loaded = allPages.reduce((sum, page) => sum + page.runs.length, 0);
-        if (loaded < lastPage.total) {
-          return loaded;
-        }
-        return undefined;
-      },
+      // Keyset paging: the server returns the cursor for the next page directly,
+      // so pages stay stable even as new runs appear at the top of the list.
+      getNextPageParam: lastPage => lastPage.next_cursor ?? undefined,
       refetchInterval: query => {
         const hasActiveRun = query.state.data?.pages.some(page =>
           page.runs.some(r => r.status === "in_progress" || r.status === "starting")
         );
+        // Only poll while something is live. A fully-settled historical list
+        // does not change, so idle polling (which refetches every loaded page)
+        // is pure waste.
         if (hasActiveRun) {
           return 5000;
         }
-        return 10000;
+        return false;
       },
     });
 
   const runs = useMemo(() => {
-    // Offset pagination can surface a boundary run on two adjacent pages when
-    // new runs are created between fetches (active polling + in-progress runs
-    // shift every offset). Dedupe by run_id, keeping the newest occurrence.
+    // Keyset pages are stable, but a boundary run can still appear twice if it
+    // is created between the fetches of two adjacent pages. Dedupe by run_id as
+    // a cheap safety net, keeping the first (newest-page) occurrence.
     const byId = new Map<string, RunSummary>();
     for (const page of data?.pages ?? []) {
       for (const run of page.runs) {
