@@ -156,18 +156,12 @@ class AutonomousSupervisor:
 
         Only ``enabled=False`` is supported (validated upstream by
         ``SetPostmortem``). Calls the world's ``disable_postmortem_globally``
-        and emits ``PostmortemDisabledMidRun``.
+        (declared on ``ScenarioWorld``) and emits ``PostmortemDisabledMidRun``.
         """
         if enabled:
             raise ValueError("Re-enabling postmortem mid-run is not supported")
         world = self._scenario.get_world()
-        disable = getattr(world, "disable_postmortem_globally", None)
-        if disable is None:
-            raise ValueError(
-                "Scenario world does not support disable_postmortem_globally; "
-                "set_postmortem cannot be scheduled for this scenario"
-            )
-        disable()
+        world.disable_postmortem_globally()
         await self._event_logger.log(event=PostmortemDisabledMidRun(round_number=round_number))
         logger.info("Postmortem disabled mid-run at round %d", round_number)
 

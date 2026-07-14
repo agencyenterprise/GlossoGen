@@ -168,10 +168,6 @@ class VeyruWorld(ScenarioWorld):
         """Mark the end of a postmortem discussion phase."""
         self._in_postmortem = False
 
-    def disable_postmortem_globally(self) -> None:
-        """Close the postmortem channel for the rest of the simulation."""
-        self._postmortem_globally_disabled = True
-
     def get_globally_disabled_channels(self) -> frozenset[str]:
         """Postmortem channels (single-team and two-team variants) when disabled."""
         if not self._postmortem_globally_disabled:

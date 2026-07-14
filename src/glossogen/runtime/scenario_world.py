@@ -267,9 +267,22 @@ class ScenarioWorld(ABC):
         notification so the new agent does not get spurious "you have
         new messages" alerts on a channel they shouldn't be reading.
         Default returns the empty set; scenarios that disable channels
-        mid-run (e.g. veyru's ``disable_postmortem_globally``) override.
+        mid-run (via ``disable_postmortem_globally``) override to return
+        their postmortem channel IDs while the flag is set.
         """
         return frozenset()
+
+    def disable_postmortem_globally(self) -> None:
+        """Close the postmortem channel(s) for the rest of the simulation.
+
+        Sets the ``_postmortem_globally_disabled`` flag that
+        ``get_globally_disabled_channels`` reads. Invoked by the
+        autonomous supervisor when a ``set_postmortem`` scheduled event
+        fires. Scenarios without a postmortem channel inherit this no-op
+        effect (the flag is set but their ``get_globally_disabled_channels``
+        override returns nothing).
+        """
+        self._postmortem_globally_disabled = True
 
     def on_agent_swapped_mid_run(self, agent_id: str, round_number: int) -> None:
         """Notify the world that an in-run agent swap has fired.
