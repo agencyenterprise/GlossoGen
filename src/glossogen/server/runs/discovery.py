@@ -320,17 +320,17 @@ def _live_fields(
     return labels, has_note, has_evaluation, eval_in_progress
 
 
-async def build_summary(
+def _build_summary_sync(
     scenario_name: str,
     timestamp_dir: Path,
     evaluation_content_hash: str | None,
 ) -> RunSummary | None:
-    """Build a RunSummary for a single run directory.
+    """Synchronous core of :func:`build_summary`.
 
-    Returns None if the directory does not contain a valid run.
-    For completed runs, reads from ``run_summary_cache.json`` when present,
-    skipping the JSONL scan entirely. ``evaluation_content_hash`` is set by
-    the caller from the run's DB row (``None`` in no-DB local mode).
+    Every branch here is filesystem-bound (summary-cache read, live-field
+    stats, manifest reads, JSONL scan), so the whole thing runs in one worker
+    thread via :func:`build_summary`. That lets a page of runs enrich with true
+    IO parallelism instead of serializing sync reads on the event loop.
     """
     jsonl_path = timestamp_dir / f"{scenario_name}.jsonl"
     if not jsonl_path.exists():
@@ -382,7 +382,7 @@ async def build_summary(
     resume_at_round_source = read_resume_at_round_source(run_dir=timestamp_dir)
 
     try:
-        scan = await scan_jsonl(file_path=jsonl_path)
+        scan = _scan_jsonl_sync(file_path=jsonl_path)
     except Exception:
         logger.exception("Failed to parse run at %s", timestamp_dir)
         return None
@@ -488,6 +488,30 @@ async def build_summary(
         has_note=has_note,
         current_round=scan.current_round,
         evaluation_content_hash=evaluation_content_hash,
+    )
+
+
+async def build_summary(
+    scenario_name: str,
+    timestamp_dir: Path,
+    evaluation_content_hash: str | None,
+) -> RunSummary | None:
+    """Build a RunSummary for a single run directory.
+
+    Returns None if the directory does not contain a valid run. For completed
+    runs, reads from ``run_summary_cache.json`` when present, skipping the
+    JSONL scan entirely. ``evaluation_content_hash`` is set by the caller from
+    the run's DB row (``None`` in no-DB local mode).
+
+    Runs all filesystem work in a worker thread so concurrent ``build_summary``
+    calls (one page of runs) enrich in parallel instead of serializing their
+    sync reads on the event loop.
+    """
+    return await asyncio.to_thread(
+        _build_summary_sync,
+        scenario_name,
+        timestamp_dir,
+        evaluation_content_hash,
     )
 
 

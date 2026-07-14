@@ -15,6 +15,7 @@ import asyncio
 import base64
 import binascii
 import logging
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -164,9 +165,23 @@ async def _build_summaries(
     return [summary for summary in results if summary is not None]
 
 
-def _matches_labels(run_dir: Path, required: frozenset[str]) -> bool:
-    """True when the run carries every required label (AND semantics)."""
-    return required.issubset(read_run_labels(run_dir=run_dir))
+def _filter_descriptors_by_labels(
+    descriptors: list[RunDescriptor],
+    runs_dir: Path,
+    required: frozenset[str],
+) -> list[RunDescriptor]:
+    """Keep descriptors whose run carries every required label (AND semantics).
+
+    Reads one ``labels.json`` per candidate; run in a worker thread so the
+    per-run reads never block the event loop.
+    """
+    return [
+        descriptor
+        for descriptor in descriptors
+        if required.issubset(
+            read_run_labels(run_dir=runs_dir / descriptor.scenario_name / descriptor.run_dir_name)
+        )
+    ]
 
 
 async def list_runs_page(
@@ -214,15 +229,12 @@ async def list_runs_page(
             in compose_run_id(scenario_name=d.scenario_name, run_dir_name=d.run_dir_name).lower()
         ]
     if labels:
-        required = frozenset(labels)
-        descriptors = [
-            descriptor
-            for descriptor in descriptors
-            if _matches_labels(
-                run_dir=runs_dir / descriptor.scenario_name / descriptor.run_dir_name,
-                required=required,
-            )
-        ]
+        descriptors = await asyncio.to_thread(
+            _filter_descriptors_by_labels,
+            descriptors,
+            runs_dir,
+            frozenset(labels),
+        )
 
     after_key = _decode_cursor(cursor) if cursor is not None else None
 
@@ -322,23 +334,64 @@ async def list_runs_page_for_group(
     )
 
 
+class _LabelsCacheEntry(NamedTuple):
+    """A cached label union with its monotonic expiry timestamp."""
+
+    expires_at: float
+    labels: list[str]
+
+
+# Per-group cache of the label union. The union is derived from one
+# ``labels.json`` per run, so computing it is O(runs) filesystem reads; caching
+# keeps the (frequently-polled) filter dropdown from re-reading every run's
+# labels on each call. Entries are invalidated explicitly on label writes and
+# otherwise expire after the TTL.
+_LABELS_CACHE: dict[UUID, _LabelsCacheEntry] = {}
+_LABELS_CACHE_TTL_SECONDS = 30.0
+
+
+def invalidate_labels_cache(group_id: UUID) -> None:
+    """Drop the cached label union for a group after its labels change."""
+    _LABELS_CACHE.pop(group_id, None)
+
+
+def _read_labels_union_sync(run_dirs: list[Path]) -> list[str]:
+    """Read every run's labels.json and return their sorted union (blocking)."""
+    seen: set[str] = set()
+    for run_dir in run_dirs:
+        seen.update(read_run_labels(run_dir=run_dir))
+    return sorted(seen)
+
+
 async def list_all_labels_for_group(request: Request) -> list[str]:
     """Return the sorted union of labels across the active group's runs.
 
-    Reads only ``labels.json`` per run — never builds summaries — so the label
-    filter UI stays cheap regardless of run count.
+    Reads only ``labels.json`` per run — never builds summaries. The per-run
+    reads run in a worker thread (never blocking the event loop) and the union
+    is cached per group with a short TTL, so the frequently-polled filter
+    dropdown does not re-scan every run on each call.
     """
     identity = get_identity(request=request)
+    group_id = identity.active_group_id
+    now = time.monotonic()
+    cached = _LABELS_CACHE.get(group_id)
+    if cached is not None and cached.expires_at > now:
+        return cached.labels
+
     pool = request.app.state.db_pool
     runs_dir: Path = request.app.state.runs_dir
     descriptors = await enumerate_run_descriptors(
         pool=pool,
         runs_dir=runs_dir,
-        group_id=identity.active_group_id,
+        group_id=group_id,
         scenario_filter=None,
     )
-    seen: set[str] = set()
-    for descriptor in descriptors:
-        run_dir = runs_dir / descriptor.scenario_name / descriptor.run_dir_name
-        seen.update(read_run_labels(run_dir=run_dir))
-    return sorted(seen)
+    run_dirs = [
+        runs_dir / descriptor.scenario_name / descriptor.run_dir_name for descriptor in descriptors
+    ]
+    labels = await asyncio.to_thread(_read_labels_union_sync, run_dirs)
+    _LABELS_CACHE[group_id] = _LabelsCacheEntry(
+        expires_at=now + _LABELS_CACHE_TTL_SECONDS,
+        labels=labels,
+    )
+    return labels

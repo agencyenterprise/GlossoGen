@@ -34,7 +34,11 @@ from glossogen.server.runs.detail_reader import (
     load_run_detail,
 )
 from glossogen.server.runs.discovery import compose_run_id, scan_jsonl
-from glossogen.server.runs.listing import list_all_labels_for_group, list_runs_page_for_group
+from glossogen.server.runs.listing import (
+    invalidate_labels_cache,
+    list_all_labels_for_group,
+    list_runs_page_for_group,
+)
 from glossogen.server.runs.lookup import deregister_run, get_identity, resolve_run_or_404
 from glossogen.server.runs.models import (
     AllLabelsResponse,
@@ -540,6 +544,8 @@ async def update_labels(
     run_id = compose_run_id(scenario_name=scenario, run_dir_name=run_dir_name)
     labels_path = resolved.run_dir / "labels.json"
     labels_path.write_bytes(orjson.dumps(body.labels))
+    identity = get_identity(request=request)
+    invalidate_labels_cache(group_id=identity.active_group_id)
     logger.info("Updated labels for run %s: %s", run_id, body.labels)
     return UpdateLabelsResponse(labels=body.labels)
 
