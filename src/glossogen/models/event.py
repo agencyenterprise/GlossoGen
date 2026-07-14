@@ -14,18 +14,16 @@ so scenario event modules can subclass ``EventBase`` without a circular
 dependency on this module.
 """
 
-import importlib
-import pkgutil
 from enum import Enum
 from typing import Annotated, Any, Literal, TypeAlias, Union
 
 from pydantic import Discriminator, TypeAdapter
 
-import glossogen.scenarios
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.message import SimulationMessage
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.runtime.scheduled_events import ChannelVisibility
+from glossogen.scenario_submodule_discovery import concrete_subclasses, import_scenario_submodules
 
 
 class SimulationStarted(EventBase):
@@ -326,31 +324,15 @@ _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
 def _discover_scenario_event_types() -> tuple[type[EventBase], ...]:
     """Discover every ``EventBase`` subclass exported by a scenario ``events`` module.
 
-    Walks the ``glossogen.scenarios`` namespace package, imports each
-    ``<scenario_pkg>.events`` submodule when present, and collects every
-    module member that subclasses ``EventBase``. Scenario authors register
-    new event types by adding them to their scenario's ``events.py`` —
-    no edit to this module is required.
+    Imports each scenario's ``events`` submodule (registering its classes in
+    ``EventBase.__subclasses__``), then returns every concrete ``EventBase``
+    subclass that is not one of the core types. Scenario authors register new
+    event types by adding them to their scenario's ``events.py`` — no edit to
+    this module is required.
     """
-    collected: list[type[EventBase]] = []
-    for module_info in pkgutil.iter_modules(glossogen.scenarios.__path__):
-        if not module_info.ispkg:
-            continue
-        events_module_name = f"glossogen.scenarios.{module_info.name}.events"
-        try:
-            events_module = importlib.import_module(events_module_name)
-        except ModuleNotFoundError:
-            continue
-        for attr_name in dir(events_module):
-            attr = getattr(events_module, attr_name)
-            if (
-                isinstance(attr, type)
-                and issubclass(attr, EventBase)
-                and attr is not EventBase
-                and attr not in collected
-            ):
-                collected.append(attr)
-    return tuple(collected)
+    import_scenario_submodules(submodule_name="events")
+    core = frozenset(_CORE_EVENT_TYPES)
+    return tuple(cls for cls in concrete_subclasses(base=EventBase) if cls not in core)
 
 
 _SCENARIO_EVENT_TYPES: tuple[type[EventBase], ...] = _discover_scenario_event_types()

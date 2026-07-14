@@ -16,16 +16,14 @@ The platform's :mod:`glossogen.server.runs.models` builds the
 ``build_extras`` after the generic event walk.
 """
 
-import importlib
 import logging
-import pkgutil
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
 from pydantic import BaseModel
 
-import glossogen.scenarios
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_submodule_discovery import concrete_subclasses, import_scenario_submodules
 from glossogen.server.runs.run_detail_types import AgentDetail, ChannelMessage
 
 logger = logging.getLogger(__name__)
@@ -81,29 +79,18 @@ def discover_scenario_extensions() -> dict[str, ScenarioRunDetailExtension]:
     subclass it finds. Scenarios without a ``run_detail_extension``
     module are silently skipped — extensions are opt-in.
     """
+    import_scenario_submodules(submodule_name="run_detail_extension")
     collected: dict[str, ScenarioRunDetailExtension] = {}
-    for module_info in pkgutil.iter_modules(glossogen.scenarios.__path__):
-        if not module_info.ispkg:
-            continue
-        module_name = f"glossogen.scenarios.{module_info.name}.run_detail_extension"
-        try:
-            module = importlib.import_module(module_name)
-        except ModuleNotFoundError:
-            continue
-        for attr_name in dir(module):
-            attr = getattr(module, attr_name)
-            if (
-                isinstance(attr, type)
-                and issubclass(attr, ScenarioRunDetailExtension)
-                and attr is not ScenarioRunDetailExtension
-            ):
-                instance = attr()
-                if instance.scenario_name in collected:
-                    raise RuntimeError(
-                        f"Duplicate ScenarioRunDetailExtension for scenario "
-                        f"{instance.scenario_name!r}: {attr.__qualname__}"
-                    )
-                collected[instance.scenario_name] = instance
+    for extension_type in concrete_subclasses(base=ScenarioRunDetailExtension):
+        # concrete_subclasses drops abstract classes, so this is always instantiable;
+        # pyright cannot prove the runtime concreteness of a discovered subclass.
+        instance = extension_type()  # pyright: ignore[reportAbstractUsage]
+        if instance.scenario_name in collected:
+            raise RuntimeError(
+                f"Duplicate ScenarioRunDetailExtension for scenario "
+                f"{instance.scenario_name!r}: {extension_type.__qualname__}"
+            )
+        collected[instance.scenario_name] = instance
     return collected
 
 
