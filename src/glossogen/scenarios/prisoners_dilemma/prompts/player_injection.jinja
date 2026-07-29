@@ -1,0 +1,21 @@
+Round {{ round_number }} of {{ round_count }} has begun.
+
+{% if previous_outcome is none -%}
+This is the first round. No prior history yet.
+{%- else -%}
+Previous round ({{ previous_outcome.round_number }}) outcome:
+- You chose: {{ previous_outcome.own_decision }}
+- {{ opponent_label }} chose: {{ previous_outcome.opponent_decision }}
+- Your payoff: {{ previous_outcome.own_payoff }}
+- {{ opponent_label }}'s payoff: {{ previous_outcome.opponent_payoff }}
+{%- if previous_outcome.resolved_early %}
+- Note: that round ended before both decisions were confirmed; any
+  missing decision was treated as a defection.
+{%- endif %}
+
+Cumulative totals so far — you: {{ own_cumulative_score }},
+{{ opponent_label }}: {{ opponent_cumulative_score }}.
+{%- endif %}
+
+You may talk on `link` before deciding, and must call `submit_decision`
+once this round to lock in your move.
