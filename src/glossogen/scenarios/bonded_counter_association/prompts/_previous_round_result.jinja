@@ -1,0 +1,5 @@
+{% if previous_outcome is not none %}
+--- PREVIOUS ROUND ---
+Round {{ previous_outcome.round_number }} ({{ previous_previous_contract_label }}): {% if previous_outcome.completed %}a figure of {{ previous_outcome.signed_count }} units was signed off and delivered{% else %}no figure was delivered — {{ previous_outcome.incomplete_reason }}{% endif %}.
+Whether that figure matched the shelf is not disclosed unless an audit resolves it.
+{% endif %}

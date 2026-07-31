@@ -1,0 +1,4 @@
+--- ROUND {{ round_number }} TRADE REVIEW ---
+{% if previous_outcome is not none %}Job {{ previous_outcome.case_number }} ({{ contract_label }}): {% if previous_outcome.completed %}a figure of {{ previous_outcome.signed_count }} units was delivered{% else %}no figure was delivered — {{ previous_outcome.incomplete_reason }}{% endif %}.
+{% endif %}
+The "{{ postmortem_channel_name }}" channel is now open. Whether delivered figures matched the shelf is still only disclosed through audits.

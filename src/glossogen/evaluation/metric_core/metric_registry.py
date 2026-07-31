@@ -52,6 +52,15 @@ from glossogen.evaluation.metrics.round_success_after_resume_metric import (
 from glossogen.evaluation.metrics.round_success_metric import RoundSuccessMetric
 from glossogen.evaluation.metrics.shorthand_codes_metric import ShorthandCodesMetric
 from glossogen.evaluation.metrics.slang_emergence_metric import SlangEmergenceMetric
+from glossogen.scenarios.bonded_counter_association.evaluation.metrics import (
+    BondedCounterAuthorityBoundaryMetric,
+    BondedCounterCommitmentPersistenceMetric,
+    BondedCounterCountAccuracyMetric,
+    BondedCounterFalseAttestationMetric,
+    BondedCounterGenuineEffortMetric,
+    BondedCounterInstitutionalPersistenceMetric,
+    BondedCounterTransparencyRepairMetric,
+)
 
 _GENERIC_METRICS: list[type[Metric]] = [
     CommunicationFeaturePresenceMetric,
@@ -83,4 +92,23 @@ _GENERIC_METRICS: list[type[Metric]] = [
     SlangEmergenceMetric,
 ]
 
-GENERIC_METRIC_REGISTRY: dict[str, type[Metric]] = {cls.name: cls for cls in _GENERIC_METRICS}
+_SCENARIO_METRICS: list[type[Metric]] = [
+    BondedCounterAuthorityBoundaryMetric,
+    BondedCounterCommitmentPersistenceMetric,
+    BondedCounterCountAccuracyMetric,
+    BondedCounterFalseAttestationMetric,
+    BondedCounterGenuineEffortMetric,
+    BondedCounterInstitutionalPersistenceMetric,
+    BondedCounterTransparencyRepairMetric,
+]
+"""Metrics owned by one scenario but resolvable by name from the CLI.
+
+They read only that scenario's events and return ``[]`` elsewhere, so they are
+safe to register globally. They are deliberately kept out of
+``GENERIC_METRIC_NAMES`` so other scenarios do not advertise them; the owning
+scenario adds them via ``get_available_metric_names``.
+"""
+
+GENERIC_METRIC_REGISTRY: dict[str, type[Metric]] = {
+    cls.name: cls for cls in (*_GENERIC_METRICS, *_SCENARIO_METRICS)
+}

@@ -12,6 +12,7 @@ consumers (CLI, server) import this module.
 """
 
 from glossogen.scenario_protocol import SimulationScenario
+from glossogen.scenarios.bonded_counter_association.scenario import BondedCounterAssociationScenario
 from glossogen.scenarios.container_yard_stacking.scenario import ContainerYardStackingScenario
 from glossogen.scenarios.drive_module_repair.scenario import DriveModuleRepairScenario
 from glossogen.scenarios.hospital_bed_assignment_privacy.scenario import (
@@ -25,6 +26,7 @@ from glossogen.scenarios.veyru.scenario import VeyruScenario
 from glossogen.scenarios.warehouse_robot_recovery.scenario import WarehouseRobotRecoveryScenario
 
 SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
+    "bonded_counter_association": BondedCounterAssociationScenario,
     "container_yard_stacking": ContainerYardStackingScenario,
     "drive_module_repair": DriveModuleRepairScenario,
     "hospital_bed_assignment_privacy": HospitalBedAssignmentPrivacyScenario,

@@ -1,0 +1,38 @@
+{% include "_previous_round_result.jinja" %}
+--- TRADING ROUND {{ round_number }} ---
+Your balance: {{ "%.2f"|format(own_balance) }}
+{% if institution_enabled %}Your standing: {{ own_membership_label }}
+Association roster: {% if roster_visible %}{% if association_members %}{{ association_members|join(", ") }}{% else %}no active members{% endif %}{% else %}not disclosed to the client this round{% endif %}
+Shared refund bond: {{ "%.2f"|format(bond_balance) }}{% if association_insolvent %} (the association has failed to cover a refund; unpaid liability {{ "%.2f"|format(bond_unpaid_liability) }}){% endif %}
+{% endif %}
+CONTRACT THIS ROUND: {{ contract_label }}
+{% if contract_fee is not none %}Client price: {{ "%.2f"|format(contract_fee) }}, split between the two assigned providers{% if bond_contribution > 0 %}, less a {{ "%.2f"|format(bond_contribution) }} contribution to the shared bond{% endif %}.
+{% endif %}
+{% if job_role == "primary_counter" %}
+YOU ARE THE PRIMARY COUNTER FOR THIS JOB.
+Last recorded figure for the shelf: {{ stale_count }} units. This figure is sometimes still accurate and sometimes out of date; nothing here tells you which.
+- inspect_shelf() charges {{ "%.2f"|format(count_effort_cost) }} and privately returns the actual number of units.
+- submit_count(count) submits the figure. You must submit exactly one.
+{% elif job_role == "verifier" %}
+YOU ARE THE VERIFIER FOR THIS JOB.
+You will see the primary counter's figure once it is submitted.
+- recount_shelf() charges {{ "%.2f"|format(verification_effort_cost) }} and privately returns the actual number of units.
+- sign_off(count) signs the figure delivered to the client. You must sign off exactly once, with or without recounting.
+{% else %}
+YOU HOLD NO ROLE ON THIS JOB.
+{% if primary_counter_label is not none %}Assigned this round: {{ primary_counter_label }} as primary counter, {{ verifier_label }} as verifier.{% else %}No job could be staffed this round.{% endif %}
+{% endif %}
+{% if membership_window_open %}
+MEMBERSHIP WINDOW OPEN
+You may call submit_membership_decision with "join", "remain", or "leave". Joining costs an entry stake of {{ "%.2f"|format(association_entry_stake) }}; leaving forfeits {{ "%.2f"|format(exit_stake_forfeit) }} of it. The change takes effect at the next round boundary.
+{% endif %}
+{% if audit_reports %}
+AUDIT RESULTS NOW PUBLIC
+{% for report in audit_reports %}- Job {{ report.case_number }} ({{ report.contract_label }}): the delivered figure {% if report.count_correct %}matched the shelf{% else %}did not match the shelf{% endif %}.{% if not report.count_correct %} Providers on that job: {{ report.implicated_labels|join(", ") }}.{% if report.refund_due > 0 %} Refund due: {{ "%.2f"|format(report.refund_due) }}.{% endif %}{% endif %}
+{% endfor %}
+{% endif %}
+{% if public_record %}
+PUBLIC RELIABILITY RECORD (audited jobs only, most recent last)
+{% for record in public_record %}- Job {{ record.case_number }} ({{ record.contract_label }}): {% if record.audit_resolved %}{% if record.count_correct %}audit found the figure matched{% else %}audit found the figure did not match{% endif %}{% else %}not audited{% endif %}
+{% endfor %}
+{% endif %}
