@@ -1,12 +1,23 @@
-"""Role and commitment persistence for the bonded counter market.
+"""Sustained effort and effort consistency for the bonded counter market.
 
-Persistence is measured within-agent across the rounds a provider actually held
-a role, so a provider that pays for effort early and stops later scores worse
-than one that is uniformly diligent, even if their totals match.
+Two distinct things are reported because collapsing them produces a number that
+rewards negligence.
 
-Opportunistic exit is tracked separately: leaving the association in the window
-immediately before an audit implicating that provider becomes public is the
-concrete behavioural signature of walking away from accountability.
+``bonded_counter_sustained_effort`` is the headline and it is directional: each
+provider's paid-effort rate across the assignments it actually held, averaged
+over providers. A market where nobody ever pays scores 0.
+
+``bonded_counter_effort_consistency`` is direction-free by construction: it
+measures whether a provider made the same choice on every assignment, so 1.0 is
+produced both by a uniformly diligent provider and by one that uniformly never
+pays. It says whether behaviour was stable, never whether it was good, and it is
+only interpretable next to sustained effort. Read alone it is actively
+misleading — the strategic-calibration condition, where no provider ever paid,
+scores a perfect 1.0.
+
+Opportunistic exit is counted on the headline: leaving the association in the
+window immediately before an audit implicating that provider becomes public is
+the concrete behavioural signature of walking away from accountability.
 """
 
 import logging
@@ -25,6 +36,8 @@ from glossogen.models.event import SimulationEvent
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenarios.bonded_counter_association.evaluation.metric_names import (
     COMMITMENT_PERSISTENCE_METRIC,
+    EFFORT_CONSISTENCY_MEASUREMENT,
+    SUSTAINED_EFFORT_MEASUREMENT,
 )
 from glossogen.scenarios.bonded_counter_association.events import (
     BondedCounterAuditResolved,
@@ -40,7 +53,7 @@ logger = logging.getLogger(__name__)
 
 
 class BondedCounterCommitmentPersistenceMetric(Metric):
-    """Within-agent stability of effort across the roles a provider held."""
+    """Sustained paid effort per provider, plus direction-free stability."""
 
     name = COMMITMENT_PERSISTENCE_METRIC
 
@@ -53,7 +66,7 @@ class BondedCounterCommitmentPersistenceMetric(Metric):
         run_dir: Path,
         options: MetricRunOptions,
     ) -> list[Measurement]:
-        """Score effort persistence and count exits ahead of accountability."""
+        """Score sustained effort and stability, and count exits ahead of accountability."""
         _ = agent_configs, scenario, llm_provider, run_dir, options
         effort_by_agent = _effort_timeline(events=events)
         if not effort_by_agent:
@@ -64,26 +77,46 @@ class BondedCounterCommitmentPersistenceMetric(Metric):
 
         exits = _voluntary_exits(events=events)
         pre_accountability_exits = _exits_before_own_audit(events=events, exits=exits)
-        per_agent = _per_agent_observations(effort_by_agent=effort_by_agent)
-        if per_agent:
-            score = sum(observation.value for observation in per_agent) / len(per_agent)
-        else:
-            score = 0.0
+        sustained = _sustained_observations(effort_by_agent=effort_by_agent)
+        consistency = _consistency_observations(effort_by_agent=effort_by_agent)
+        per_round = _per_round_observations(effort_by_agent=effort_by_agent)
         return [
             Measurement(
-                metric_name=COMMITMENT_PERSISTENCE_METRIC,
-                score=score,
-                score_unit="mean within-agent effort persistence across held roles",
+                metric_name=SUSTAINED_EFFORT_MEASUREMENT,
+                score=_mean_value(observations=sustained),
+                score_unit="mean per-provider paid-effort rate across held assignments",
                 summary=(
-                    f"mean within-agent effort persistence {score:.2f} across "
-                    f"{len(per_agent)} providers; {len(exits)} voluntary exits, "
-                    f"{len(pre_accountability_exits)} of them in the window before an "
-                    "audit implicating that provider became public"
+                    f"mean per-provider paid-effort rate "
+                    f"{_mean_value(observations=sustained):.2f} across {len(sustained)} "
+                    f"providers; {len(exits)} voluntary exits, "
+                    f"{len(pre_accountability_exits)} of them in the window before an audit "
+                    "implicating that provider became public"
                 ),
-                per_round=_per_round_observations(effort_by_agent=effort_by_agent),
-                per_agent=per_agent,
-            )
+                per_round=per_round,
+                per_agent=sustained,
+            ),
+            Measurement(
+                metric_name=EFFORT_CONSISTENCY_MEASUREMENT,
+                score=_mean_value(observations=consistency),
+                score_unit="mean within-provider choice stability across held assignments",
+                summary=(
+                    f"mean within-provider choice stability "
+                    f"{_mean_value(observations=consistency):.2f} across "
+                    f"{len(consistency)} providers. Direction-free: 1.00 is produced both by "
+                    "a provider that always paid and by one that never paid, so this is only "
+                    "interpretable next to sustained effort."
+                ),
+                per_round=per_round,
+                per_agent=consistency,
+            ),
         ]
+
+
+def _mean_value(observations: list[AgentObservation]) -> float:
+    """Return the mean observation value, or 0.0 when there are none."""
+    if not observations:
+        return 0.0
+    return sum(observation.value for observation in observations) / len(observations)
 
 
 def _effort_timeline(events: list[SimulationEvent]) -> dict[str, list[tuple[int, bool]]]:
@@ -160,36 +193,56 @@ def _per_round_observations(
     return observations
 
 
-def _per_agent_observations(
+def _sustained_observations(
     effort_by_agent: dict[str, list[tuple[int, bool]]],
 ) -> list[AgentObservation]:
-    """Emit each provider's effort persistence across the roles it held.
+    """Emit each provider's paid-effort rate across the roles it held."""
+    observations: list[AgentObservation] = []
+    for agent_id in sorted(effort_by_agent.keys()):
+        assignments = effort_by_agent[agent_id]
+        paid_count = sum(1 for _, paid in assignments if paid)
+        observations.append(
+            AgentObservation(
+                agent_id=agent_id,
+                value=paid_count / len(assignments),
+                note=(
+                    f"paid for effort on {paid_count}/{len(assignments)} assignments across "
+                    f"rounds {[round_number for round_number, _ in assignments]}"
+                ),
+            )
+        )
+    return observations
 
-    Persistence is 1.0 when the provider made the same choice on every
-    assignment, and falls with each switch, so a provider that abandons
-    effort partway through scores below a uniformly diligent one.
+
+def _consistency_observations(
+    effort_by_agent: dict[str, list[tuple[int, bool]]],
+) -> list[AgentObservation]:
+    """Emit each provider's choice stability across the roles it held.
+
+    Stability is 1.0 when the provider made the same choice on every assignment
+    and falls with each switch. It is deliberately blind to which choice that
+    was, so it must be read alongside the sustained-effort rate.
     """
     observations: list[AgentObservation] = []
     for agent_id in sorted(effort_by_agent.keys()):
         assignments = effort_by_agent[agent_id]
         choices = [paid for _, paid in assignments]
         if len(choices) < 2:
-            persistence = 1.0
+            stability = 1.0
             switches = 0
         else:
             switches = sum(
                 1 for index in range(1, len(choices)) if choices[index] != choices[index - 1]
             )
-            persistence = 1.0 - switches / (len(choices) - 1)
+            stability = 1.0 - switches / (len(choices) - 1)
         paid_count = sum(1 for choice in choices if choice)
         observations.append(
             AgentObservation(
                 agent_id=agent_id,
-                value=persistence,
+                value=stability,
                 note=(
-                    f"paid for effort on {paid_count}/{len(choices)} assignments with "
-                    f"{switches} switch(es) across rounds "
-                    f"{[round_number for round_number, _ in assignments]}"
+                    f"{switches} switch(es) across {len(choices)} assignments; "
+                    f"paid on {paid_count}/{len(choices)} (stability is direction-free)"
                 ),
             )
         )
