@@ -11,14 +11,14 @@
   "base_commit": "dba81e87b0cc3eae953afc8a872f6baaff82b2ca",
   "worktree_dirty": true,
   "commands": [
-    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --knobs docs/experiments/EXP-020-cross-model-compatibility/configs/independent.json",
-    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --knobs docs/experiments/EXP-020-cross-model-compatibility/configs/covenant.json",
-    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model claude-opus-5 --provider anthropic --runs-dir ./runs --knobs docs/experiments/EXP-020-cross-model-compatibility/configs/independent.json",
-    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model claude-opus-5 --provider anthropic --runs-dir ./runs --knobs docs/experiments/EXP-020-cross-model-compatibility/configs/covenant.json",
-    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model gpt-5.6-terra --provider openai --runs-dir ./runs --knobs docs/experiments/EXP-020-cross-model-compatibility/configs/independent.json",
-    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model gpt-5.6-terra --provider openai --runs-dir ./runs --knobs docs/experiments/EXP-020-cross-model-compatibility/configs/covenant.json",
-    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model gpt-5.6-sol --provider openai --runs-dir ./runs --knobs docs/experiments/EXP-020-cross-model-compatibility/configs/independent.json",
-    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model gpt-5.6-sol --provider openai --runs-dir ./runs --knobs docs/experiments/EXP-020-cross-model-compatibility/configs/covenant.json"
+    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --config docs/experiments/EXP-020-cross-model-compatibility/configs/independent.json",
+    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --config docs/experiments/EXP-020-cross-model-compatibility/configs/covenant.json",
+    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model claude-opus-5 --provider anthropic --runs-dir ./runs --config docs/experiments/EXP-020-cross-model-compatibility/configs/independent.json",
+    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model claude-opus-5 --provider anthropic --runs-dir ./runs --config docs/experiments/EXP-020-cross-model-compatibility/configs/covenant.json",
+    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model gpt-5.6-terra --provider openai --runs-dir ./runs --config docs/experiments/EXP-020-cross-model-compatibility/configs/independent.json",
+    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model gpt-5.6-terra --provider openai --runs-dir ./runs --config docs/experiments/EXP-020-cross-model-compatibility/configs/covenant.json",
+    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model gpt-5.6-sol --provider openai --runs-dir ./runs --config docs/experiments/EXP-020-cross-model-compatibility/configs/independent.json",
+    "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model gpt-5.6-sol --provider openai --runs-dir ./runs --config docs/experiments/EXP-020-cross-model-compatibility/configs/covenant.json"
   ],
   "configs": [
     {
@@ -113,6 +113,10 @@ Descriptive behavioral measures, without confirmatory claims:
 - Config ancestry: EXP-012's frozen seed-45 stability pair. The authoritative
   launch inputs are the two files in this bundle's `configs/` directory.
 - Exact commands and config hashes are recorded in the machine-readable block.
+- The initial preflight on 2026-08-05 exited before creating a run or making an
+  API call because the planned commands used the obsolete `--knobs` flag. The
+  commands were corrected to the current `--config` flag before any behavioral
+  result was observed, and planned validation now rejects this mismatch.
 - Runs: none launched at preregistration.
 
 ## Result

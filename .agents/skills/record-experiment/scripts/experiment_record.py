@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import re
+import shlex
 import subprocess
 import sys
 from collections import Counter
@@ -324,6 +325,41 @@ def validate_record(path: Path, repo_root: Path, phase: str) -> tuple[list[str],
         errors.append("pre-run sections still contain pending placeholders")
     if not isinstance(commands, list) or not commands:
         errors.append("record requires at least one exact command before launch")
+    elif isinstance(configs, list):
+        recorded_config_paths = {
+            item.get("path") for item in configs if isinstance(item, dict)
+        }
+        for index, command in enumerate(commands):
+            if not isinstance(command, str):
+                errors.append(f"commands[{index}] must be a string")
+                continue
+            try:
+                argv = shlex.split(command)
+            except ValueError as exc:
+                errors.append(f"commands[{index}] is not valid shell syntax: {exc}")
+                continue
+            is_run_command = any(
+                argv[offset : offset + 3] == ["-m", "glossogen", "run"]
+                for offset in range(max(0, len(argv) - 2))
+            )
+            if not is_run_command:
+                continue
+            if "--knobs" in argv:
+                errors.append(
+                    f"commands[{index}] uses obsolete --knobs; glossogen run expects --config"
+                )
+            if "--config" not in argv:
+                errors.append(f"commands[{index}] glossogen run is missing --config")
+                continue
+            config_index = argv.index("--config") + 1
+            if config_index >= len(argv):
+                errors.append(f"commands[{index}] --config has no path")
+                continue
+            command_config = argv[config_index]
+            if command_config not in recorded_config_paths:
+                errors.append(
+                    f"commands[{index}] config is not hashed in the record: {command_config}"
+                )
     if not isinstance(configs, list) or not configs:
         errors.append("record requires at least one config artifact before launch")
     if effective_phase == "complete":
