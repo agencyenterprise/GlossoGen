@@ -1,0 +1,14 @@
+{
+  "scheduled_events": [
+    {
+      "type": "inject_case",
+      "at_round": 17,
+      "payload": {
+        "kind": "confirmed_external_violation",
+        "case_number": 16001,
+        "agent_id": "provider_f",
+        "contract_fee": 155.0
+      }
+    }
+  ]
+}

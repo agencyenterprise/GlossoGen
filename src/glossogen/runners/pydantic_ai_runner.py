@@ -145,6 +145,7 @@ async def _run_agent_call(
     non_streaming_model_requests: bool,
     state: _StreamingState,
     flush_inter_call_response: Callable[[], None],
+    set_model_request_in_flight: Callable[[bool], None],
 ) -> PydanticAIAgentRunResult[str]:
     """Drive ``agent.iter`` so cumulative usage is captured even on cancellation.
 
@@ -175,7 +176,11 @@ async def _run_agent_call(
                 if Agent.is_model_request_node(node) and non_streaming_model_requests:
                     if state.accumulated_tool_calls:
                         flush_inter_call_response()
-                    next_node = await agent_run.next(node)
+                    set_model_request_in_flight(True)
+                    try:
+                        next_node = await agent_run.next(node)
+                    finally:
+                        set_model_request_in_flight(False)
                     if Agent.is_call_tools_node(next_node):
                         for part in next_node.model_response.parts:
                             if isinstance(part, TextPart):
@@ -184,7 +189,15 @@ async def _run_agent_call(
                                 state.accumulated_thinking += part.content
                     node = next_node
                     continue
-                if Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
+                if Agent.is_model_request_node(node):
+                    run_ctx = _agent_graph.build_run_context(agent_run.ctx)
+                    set_model_request_in_flight(True)
+                    try:
+                        async with node.stream(agent_run.ctx) as stream:
+                            await event_stream_handler(run_ctx, stream)
+                    finally:
+                        set_model_request_in_flight(False)
+                elif Agent.is_call_tools_node(node):
                     run_ctx = _agent_graph.build_run_context(agent_run.ctx)
                     async with node.stream(agent_run.ctx) as stream:
                         await event_stream_handler(run_ctx, stream)
@@ -249,6 +262,7 @@ class PydanticAIRunner(AgentRunner):
         """Launch a Pydantic AI agent that loops until it receives a done notification."""
         event_logger = runtime.event_logger
         agent_id = agent_config.agent_id
+        agent_session = runtime.resolve_session(agent_id=agent_id)
         provider = agent_config.provider
         if self._telemetry_enabled:
             # Round is global across agents; every runner points the telemetry
@@ -354,6 +368,9 @@ class PydanticAIRunner(AgentRunner):
                         nonlocal last_recorded_usage
                         last_recorded_usage = snapshot
 
+                    def _set_model_request_in_flight(active: bool) -> None:
+                        agent_session.model_request_in_flight = active
+
                     logger.debug(
                         "Agent %s starting cycle %d with prompt: %.100s",
                         agent_id,
@@ -391,6 +408,7 @@ class PydanticAIRunner(AgentRunner):
                                 non_streaming_model_requests=non_streaming_model_requests,
                                 state=captured_state,
                                 flush_inter_call_response=_flush_inter_call_response,
+                                set_model_request_in_flight=_set_model_request_in_flight,
                             )
                         cycle_succeeded = True
                     except Exception as exc:
@@ -508,6 +526,7 @@ class PydanticAIRunner(AgentRunner):
             logger.exception("Agent %s Pydantic AI run failed", agent_id)
             raise
         finally:
+            agent_session.model_request_in_flight = False
             # Wait for all background logging tasks to finish so no events are lost.
             pending = [t for t in all_background_tasks if not t.done()]
             if pending:

@@ -105,6 +105,19 @@ class SimulationRuntime:
         """Return the write lock for a channel."""
         return self._channel_locks[channel_id]
 
+    async def update_channel_members(
+        self,
+        channel_id: str,
+        member_agent_ids: list[str],
+        reason: str,
+    ) -> None:
+        """Expose logged channel membership changes to scenario tools."""
+        await self._world_context.update_channel_members(
+            channel_id=channel_id,
+            member_agent_ids=member_agent_ids,
+            reason=reason,
+        )
+
     def add_on_message_callback(self, callback: Callable[[], None]) -> None:
         """Register a callback invoked after every message is sent.
 

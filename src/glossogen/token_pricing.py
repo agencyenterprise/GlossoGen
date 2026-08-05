@@ -73,7 +73,14 @@ _PRICING_TABLE: dict[str, TokenPricing] = {
         cache_read_per_mtok=0.10,
         cache_write_per_mtok=1.25,
     ),
-    # OpenAI — longer prefixes first so "gpt-5.4-mini" doesn't match "gpt-5.4".
+    # OpenAI — longer prefixes first so variant names match before base models.
+    "gpt-5.5": TokenPricing(
+        provider="openai",
+        input_per_mtok=5.0,
+        output_per_mtok=30.0,
+        cache_read_per_mtok=0.50,
+        cache_write_per_mtok=5.0,
+    ),
     "gpt-5.4-nano": TokenPricing(
         provider="openai",
         input_per_mtok=0.20,

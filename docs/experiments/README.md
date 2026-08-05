@@ -12,9 +12,23 @@ rules something out saves the next person from repeating it.
 | [EXP-001](EXP-001-c0-calibration.md) | bonded_counter C0 — strategic calibration | complete | supported | $8.85 |
 | [EXP-002](EXP-002-c1-no-covenant.md) | bonded_counter C1 — no covenant (control) | complete | supported, with two design problems found | $18.44 |
 | [EXP-003](EXP-003-c2-full-covenant.md) | bonded_counter C2 — full covenant (treatment) | complete | changes behaviour; **not supported** that it improves any alignment outcome | $10.92 |
+| [EXP-004](EXP-004-team-production-calibration.md) | bonded team production — instrument calibration | complete | not supported: first pilot hit an effort ceiling; recalibration hit an effort floor | $6.39 |
+| [EXP-005](EXP-005-operational-parity-calibration.md) | bonded team production — operational-parity calibration | complete | not supported: equal team revenue still produced an effort and accuracy floor | $2.69 |
+| [EXP-006](EXP-006-lead-accountability-calibration.md) | bonded team production — lead-accountability calibration | complete | not supported: full lead refund produced an effort and accuracy ceiling | $2.39 |
+| [EXP-007](EXP-007-private-team-production-pilot.md) | private team production with varied temptation | complete | execution gate passed; extension shows directional completion and payment contrast | $4.66 |
+| [EXP-008](EXP-008-sonnet-team-production-replication.md) | Sonnet replication of private team production | complete | directional cross-model replication; more effort and no incorrect deliveries, with one covenant completion failure | $6.48 |
+| [EXP-009](EXP-009-sonnet-seed-replication.md) | Sonnet paired replication at seeds 43 and 44 | complete | mixed replication; strict enforcement repaired the client but collapsed the covenant institution | $7.71 |
+| [EXP-010](EXP-010-population-redundancy.md) | six-provider redundancy after enforcement | complete | population changes behavior; post-enforcement recovery not exercised | $7.76 |
+| [EXP-011](EXP-011-controlled-enforcement-challenge.md) | controlled enforcement and recovery challenge | complete | one-member covenant enforcement recovered; controlled gate was avoided | $11.88 |
+| [EXP-012](EXP-012-hidden-horizon-stability-pilot.md) | hidden-horizon stability pilot | complete | covenant improves compliance and continuity, with a substantial effort-cost trade-off | $11.15 |
+| [EXP-013](EXP-013-hidden-horizon-seed46-replication.md) | hidden-horizon seed-46 replication | complete | compliance and continuity contrast replicated, with the same effort-cost trade-off | $11.22 |
+| [EXP-014](EXP-014-opportunist-invasion-shock.md) | opportunist invasion shock | complete | stressor unactivated; both replacements complied, so containment was not tested | $11.79 |
+| [EXP-015](EXP-015-scripted-violation-recovery.md) | scripted violation and recovery | complete | activation gate failed; explicit violation prompt was ignored | untracked |
+| [EXP-016](EXP-016-external-violation-recovery.md) | confirmed external violation and recovery | complete | enforcement and operational recovery supported; repair response not interpretable | $4.54 |
+| [EXP-017](EXP-017-population-loss-dose-response.md) | covenant population-loss dose response | complete | two-member loss contained; minimum population is viable but fragile and collapsed in 1/2 trajectories | $17.16 |
 
-Total API spend logged: **$38.21** (plus $0.73 in phase-4 smoke tests not logged
-individually).
+Total API spend logged: **$144.04** (plus $0.73 in phase-4 smoke tests and
+interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The
 pivot criterion that fired is recorded in EXP-003: C2 differs from C1 only in

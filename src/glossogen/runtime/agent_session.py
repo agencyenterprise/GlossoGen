@@ -31,6 +31,7 @@ class AgentSession:
         self._active_calls: dict[int, float] = {}
         self._active_call_seq = itertools.count()
         self.read_notifications_in_flight = False
+        self.model_request_in_flight = False
         self.last_non_blocking_dispatch_ts: float | None = None
         self._terminated = False
         self._done_reason = ""

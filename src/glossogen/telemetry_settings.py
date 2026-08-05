@@ -20,7 +20,7 @@ class TelemetrySettings:
     @property
     def enabled(self) -> bool:
         """Return True when both Langfuse API keys are configured."""
-        return self.public_key is not None and self.secret_key is not None
+        return bool(self.public_key and self.secret_key)
 
 
 def load_telemetry_settings() -> TelemetrySettings:

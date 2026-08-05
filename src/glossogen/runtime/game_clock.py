@@ -75,15 +75,17 @@ class GameClock:
     def _all_agents_idle(self) -> bool:
         """True when every agent is blocked on read_notifications with empty queues.
 
-        Also requires that no agent has any non-blocking tool call in
-        flight (``active_non_blocking_calls == 0``) — pydantic-ai
-        dispatches parallel tool calls, so a ``read_notifications`` can
-        flip ``is_idle`` to True while the same agent's parallel
-        ``send_message`` is still mid-execution; ending the round in
-        that window drops the in-flight message into the next round.
+        Also requires that no agent has a model request or non-blocking tool
+        call in flight. A resumed agent can have one reconstructed
+        ``read_notifications`` call blocked while a slower model response is
+        already being generated from another completed notification. Ending
+        the round in that window attributes the response and its tool calls to
+        the next round.
         """
         for session in self._agent_sessions.values():
             if not session.is_idle:
+                return False
+            if session.model_request_in_flight:
                 return False
             if session.active_non_blocking_calls > 0:
                 return False

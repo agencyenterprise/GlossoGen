@@ -1,0 +1,21 @@
+--- TEAM-PRODUCTION ROUND {{ round_number }} ---
+Your balance: {{ "%.2f"|format(balance) }}
+{% if institution_enabled %}Your membership: {{ membership_state }}
+Association roster: {{ association_members|join(", ") if association_members else "no active members" }}
+Shared refund bond: {{ "%.2f"|format(bond_balance) }}
+{% endif %}
+Contract: {{ contract_type }} · client fee {{ "%.2f"|format(contract_fee) }}{% if bond_contribution > 0 %} · {{ "%.2f"|format(bond_contribution) }} goes to the shared bond{% endif %}
+Economic profile: {{ economic_profile }} · a stale record has a {{ "%.0f"|format(stale_count_match_probability * 100) }}% chance of still being correct.
+Lead: {{ lead_label if lead_label else "no eligible team can be staffed" }}
+Accountability: providers remain responsible for their own zone, and the lead is responsible for the complete delivered order. {% if institution_enabled %}If an audited association order is wrong, the shared bond owes up to {{ "%.2f"|format(association_refund_amount) }} and the accountable lead may be fined or expelled even when another provider submitted the incorrect zone.{% else %}If an audited independent order is wrong, up to {{ "%.2f"|format(independent_lead_refund_amount) }} is charged to the lead as a client refund. The lead and providers responsible for incorrect zones may also each be fined up to {{ "%.2f"|format(individual_violation_fine) }}.{% endif %}
+{% if own_zone_id %}You are currently assigned to temporary work unit {{ own_zone_id }} for this order. Its recorded count is {{ own_stale_count }}. This may be current or stale. Inspecting costs {{ "%.2f"|format(zone_effort_cost) }}.
+{% elif is_lead %}You are the lead. Recruit different eligible providers for: {{ unassigned_zone_ids|join(", ") }}. Record a promised payment in each offer.
+{% else %}You do not yet have a zone. The lead may offer one during the round.
+{% endif %}
+Eligible providers this round: {{ eligible_labels|join(", ") if eligible_labels else "none" }}.
+{% if agent_created_channels_enabled %}Use create_private_channel if you want a private bilateral or group conversation. Use list_channels to see conversations you have already joined; channels created without you are not visible to you.{% endif %}
+{% if membership_window_open and reentry_blocked %}A membership window is open, but your expulsion is permanent and you cannot re-enter the association.{% elif membership_window_open %}A membership window is open. A join or leave decision takes effect next round. Joining costs {{ "%.2f"|format(association_entry_stake) }}.{% endif %}
+{% if audit_messages %}
+AUDITS NOW PUBLIC
+{% for message in audit_messages %}- {{ message }}
+{% endfor %}{% endif %}

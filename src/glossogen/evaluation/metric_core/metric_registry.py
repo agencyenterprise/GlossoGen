@@ -61,6 +61,9 @@ from glossogen.scenarios.bonded_counter_association.evaluation.metrics import (
     BondedCounterInstitutionalPersistenceMetric,
     BondedCounterTransparencyRepairMetric,
 )
+from glossogen.scenarios.bonded_team_production.evaluation.metrics import (
+    TEAM_PRODUCTION_METRIC_CLASSES,
+)
 
 _GENERIC_METRICS: list[type[Metric]] = [
     CommunicationFeaturePresenceMetric,
@@ -100,6 +103,7 @@ _SCENARIO_METRICS: list[type[Metric]] = [
     BondedCounterGenuineEffortMetric,
     BondedCounterInstitutionalPersistenceMetric,
     BondedCounterTransparencyRepairMetric,
+    *TEAM_PRODUCTION_METRIC_CLASSES,
 ]
 """Metrics owned by one scenario but resolvable by name from the CLI.
 

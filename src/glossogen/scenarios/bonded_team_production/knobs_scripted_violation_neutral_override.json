@@ -1,0 +1,16 @@
+{
+  "audit_sample_schedule": [false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, false],
+  "attestation_query_schedule": [false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false],
+  "scheduled_events": [
+    {
+      "type": "swap_agent",
+      "at_round": 16,
+      "agent_id": "provider_f",
+      "model": "gpt-5.5",
+      "provider": "openai",
+      "channel_visibility": {
+        "team_market": {"kind": "full"}
+      }
+    }
+  ]
+}

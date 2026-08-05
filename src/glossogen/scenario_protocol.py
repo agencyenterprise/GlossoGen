@@ -78,6 +78,13 @@ class ScenarioRuntimeHandle(Protocol):
     @property
     def current_round(self) -> int: ...
 
+    async def update_channel_members(
+        self,
+        channel_id: str,
+        member_agent_ids: list[str],
+        reason: str,
+    ) -> None: ...
+
 
 class SimulationScenario(ABC):
     """Contract that a scenario plug-in must fulfil to run in autonomous mode.
