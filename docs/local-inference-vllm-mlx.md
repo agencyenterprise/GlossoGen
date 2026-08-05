@@ -12,23 +12,23 @@ Run all simulation agents against a single locally-hosted model on your Mac. Thr
 
 ### RAM Requirements
 
-| RAM   | Max Model Size (4-bit quantized) | Recommended Models (Ollama / MLX)           |
-|-------|----------------------------------|---------------------------------------------|
-| 16 GB | ~8B parameters                   | `qwen2.5:7b` / `mlx-community/Llama-3.2-3B-Instruct-4bit` |
-| 24 GB | ~14B parameters                  | `qwen2.5:14b` / `mlx-community/Qwen2.5-14B-Instruct-4bit` |
-| 32 GB | ~30B parameters                  | `qwen2.5:32b` / `mlx-community/Qwen2.5-32B-Instruct-4bit` |
+| RAM   | Max Model Size (4-bit quantized) | Recommended Models (Ollama / MLX)                           |
+| ----- | -------------------------------- | ----------------------------------------------------------- |
+| 16 GB | ~8B parameters                   | `qwen2.5:7b` / `mlx-community/Llama-3.2-3B-Instruct-4bit`   |
+| 24 GB | ~14B parameters                  | `qwen2.5:14b` / `mlx-community/Qwen2.5-14B-Instruct-4bit`   |
+| 32 GB | ~30B parameters                  | `qwen2.5:32b` / `mlx-community/Qwen2.5-32B-Instruct-4bit`   |
 | 64 GB | ~70B parameters                  | `qwen2.5:72b` / `mlx-community/Llama-3.3-70B-Instruct-4bit` |
 
 ## Server Comparison
 
-| Feature | Ollama | vllm-metal | vllm-mlx |
-|---------|--------|------------|----------|
-| Install | `brew install ollama` | Shell script | `uv tool install vllm-mlx` |
-| Concurrent batching | No (serial) | Yes | Yes |
-| Tool calling | Works | Parser works, model output inconsistent | Parser broken |
-| Simulations | Works | Not reliable | Does not work |
-| Evaluation | Works | Works | Works (with patch) |
-| Maturity | Production | Early (official vLLM plugin) | Early (independent) |
+| Feature             | Ollama                | vllm-metal                              | vllm-mlx                   |
+| ------------------- | --------------------- | --------------------------------------- | -------------------------- |
+| Install             | `brew install ollama` | Shell script                            | `uv tool install vllm-mlx` |
+| Concurrent batching | No (serial)           | Yes                                     | Yes                        |
+| Tool calling        | Works                 | Parser works, model output inconsistent | Parser broken              |
+| Simulations         | Works                 | Not reliable                            | Does not work              |
+| Evaluation          | Works                 | Works                                   | Works (with patch)         |
+| Maturity            | Production            | Early (official vLLM plugin)            | Early (independent)        |
 
 **Why Ollama works but vllm-metal/vllm-mlx don't for simulations**: Ollama uses GGUF quantization and a forgiving built-in tool call parser that handles multiple output formats. vllm-metal and vllm-mlx serve MLX-quantized weights (from mlx-community on HuggingFace) where 4-bit quantization degrades the model's ability to reliably produce `<tool_call>` formatted output. The vLLM hermes parser expects exact formatting and fails silently when the model outputs double curly braces `{{...}}` or omits the tags entirely.
 
@@ -153,12 +153,12 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
 
 ## Troubleshooting
 
-| Problem | Solution |
-|---------|----------|
-| `OLLAMA_BASE_URL` not set error | Add `OLLAMA_BASE_URL="http://localhost:11434/v1"` to `.env` |
-| `Connection refused` on Ollama | Run `ollama serve` to start the Ollama daemon |
-| `Connection refused` on port 8010 | Verify vllm-metal/vllm-mlx is running: `curl http://localhost:8010/v1/models` |
-| Out of memory / system swap | Use a smaller quantized model that fits in your available RAM |
-| Agents timing out | Increase `max_round_duration_seconds` in the scenario config |
-| Model responds in wrong language | Known issue with small quantized models. Use a larger model or 8-bit quantization |
-| `OPENAI_API_KEY not set` error | Set `OPENAI_API_KEY=dummy` in `.env` — vllm-mlx does not validate it but the SDK requires it |
+| Problem                           | Solution                                                                                     |
+| --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `OLLAMA_BASE_URL` not set error   | Add `OLLAMA_BASE_URL="http://localhost:11434/v1"` to `.env`                                  |
+| `Connection refused` on Ollama    | Run `ollama serve` to start the Ollama daemon                                                |
+| `Connection refused` on port 8010 | Verify vllm-metal/vllm-mlx is running: `curl http://localhost:8010/v1/models`                |
+| Out of memory / system swap       | Use a smaller quantized model that fits in your available RAM                                |
+| Agents timing out                 | Increase `max_round_duration_seconds` in the scenario config                                 |
+| Model responds in wrong language  | Known issue with small quantized models. Use a larger model or 8-bit quantization            |
+| `OPENAI_API_KEY not set` error    | Set `OPENAI_API_KEY=dummy` in `.env` — vllm-mlx does not validate it but the SDK requires it |

@@ -1,0 +1,14 @@
+Two players play an iterated Prisoner's Dilemma over {{ round_count }} rounds.
+
+Each round, the players may exchange messages freely on a shared `link`
+channel before each independently calls `submit_decision` to lock in
+`cooperate` or `defect`. The round resolves as soon as both decisions are
+in, and payoffs are computed from a fixed matrix:
+
+- Both cooperate: {{ payoff_reward }} points each
+- Both defect: {{ payoff_punishment }} points each
+- One defects, one cooperates: {{ payoff_temptation }} points for the
+  defector, {{ payoff_sucker }} points for the cooperator
+
+Round outcomes are determined by a fixed rule (no LLM judge): the payoff
+follows deterministically from the two submitted decisions.
