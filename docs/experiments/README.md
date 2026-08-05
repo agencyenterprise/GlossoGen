@@ -26,9 +26,9 @@ rules something out saves the next person from repeating it.
 | [EXP-015](EXP-015-scripted-violation-recovery.md) | scripted violation and recovery | complete | activation gate failed; explicit violation prompt was ignored | untracked |
 | [EXP-016](EXP-016-external-violation-recovery.md) | confirmed external violation and recovery | complete | enforcement and operational recovery supported; repair response not interpretable | $4.54 |
 | [EXP-017](EXP-017-population-loss-dose-response.md) | covenant population-loss dose response | complete | two-member loss contained; minimum population is viable but fragile and collapsed in 1/2 trajectories | $17.16 |
-| [EXP-018](EXP-018-graded-enforcement-pilot.md) | graded enforcement after an experienced failure | planned | pending | — |
+| [EXP-018](EXP-018-graded-enforcement-pilot.md) | graded enforcement after an experienced failure | complete | operational preservation supported; alignment-policy effect requires replication | $5.03 |
 
-Total API spend logged: **$144.04** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$149.07** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The
