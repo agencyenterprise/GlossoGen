@@ -29,9 +29,9 @@ rules something out saves the next person from repeating it.
 | [EXP-018](EXP-018-graded-enforcement-pilot.md) | graded enforcement after an experienced failure | complete | operational preservation supported; alignment-policy effect requires replication | $5.03 |
 | [EXP-019](EXP-019-graded-enforcement-replication.md) | graded-enforcement shared-prefix replication | complete | capacity and immediate compliance replicated in 2/2 new trajectories | $8.90 |
 | [EXP-020](EXP-020-cross-model-compatibility/experiment.md) | four-model compatibility pass on the frozen institutional comparison | complete | all four models compatible; behavioral response heterogeneous and requires paired-seed replication | $167.00 |
-| [EXP-021](EXP-021-cheap-model-seed-replication/experiment.md) | two fresh paired seeds across Sonnet 5, Terra, and Sol | planned | pending | — |
+| [EXP-021](EXP-021-cheap-model-seed-replication/experiment.md) | two fresh paired seeds across Sonnet 5, Terra, and Sol | complete | safety contrast repeated 2/2 for Terra and Sol but 0/2 for Sonnet | $42.62 |
 
-Total API spend logged: **$324.96** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$367.58** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The
