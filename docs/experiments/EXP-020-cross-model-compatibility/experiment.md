@@ -1,6 +1,6 @@
 # EXP-020 — Cross-model compatibility pass
 
-**Status:** planned
+**Status:** running
 **Date opened:** 2026-08-05
 **Date closed:** —
 
@@ -30,7 +30,26 @@
       "sha256": "39fb83efa616490e612762200951100fbb2c0a133d07921f2162fce7901ce877"
     }
   ],
-  "runs": []
+  "runs": [
+    {
+      "role": "sonnet_5_covenant",
+      "included": true,
+      "run_dir": "runs/bonded_team_production/1785958415",
+      "event_log_sha256": "ee7d4c1b4cc7e743c0e3914cd9c63e5c33f6fb460d16868fbd03ed0534d0230d",
+      "resolved_config_sha256": "77c78a95fd40e8f6a5c797eb8f105f5830581161b42e5b2bff1a66b9b0604d7b",
+      "completed": true,
+      "total_cost_usd": 2.5159098
+    },
+    {
+      "role": "sonnet_5_independent",
+      "included": true,
+      "run_dir": "runs/bonded_team_production/1785958416",
+      "event_log_sha256": "3856633b09c65f678d04eebd0459ec41461a530dcdbcc1cb53e7243ca3bb0975",
+      "resolved_config_sha256": "d5b9d5a280bf220dd5f972edf9f7fd0b48361964ae69c691392d0612bd195ff1",
+      "completed": true,
+      "total_cost_usd": 3.8264985
+    }
+  ]
 }
 -->
 
@@ -117,7 +136,11 @@ Descriptive behavioral measures, without confirmatory claims:
   API call because the planned commands used the obsolete `--knobs` flag. The
   commands were corrected to the current `--config` flag before any behavioral
   result was observed, and planned validation now rejects this mismatch.
-- Runs: none launched at preregistration.
+- Completed Sonnet 5 covenant run:
+  `runs/bonded_team_production/1785958415`.
+- Completed Sonnet 5 independent run:
+  `runs/bonded_team_production/1785958416`.
+- Opus 5, GPT-5.6 Terra, and GPT-5.6 Sol runs have not yet launched.
 
 ## Result
 

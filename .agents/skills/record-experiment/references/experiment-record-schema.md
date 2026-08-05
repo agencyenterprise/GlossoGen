@@ -83,6 +83,12 @@ Record:
 - completion reason and exact API cost from `simulation_ended`;
 - analysis script or event-selection rule used for each reported number.
 
+For fresh runs without a standalone `config.json`, the helper hashes the
+canonical `simulation_started.scenario_config` object and identifies it with
+the selector `<event-log>#simulation_started.scenario_config`. This is the
+authoritative resolved configuration, including defaults that were absent from
+the source launch file.
+
 If the worktree was dirty, the commit alone cannot reproduce the code. Preserve
 a source snapshot or explicitly classify the result as not code-replicable.
 

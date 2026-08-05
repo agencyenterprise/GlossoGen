@@ -38,6 +38,12 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def sha256_json(value: Any) -> str:
+    """Hash a JSON value canonically, independent of source formatting."""
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def relative_path(path: Path, root: Path) -> str:
     resolved = path.resolve()
     try:
@@ -120,6 +126,18 @@ def inspect_run(run_dir: Path, repo_root: Path) -> dict[str, Any]:
     resolved_config = run_dir / "replace_config.json"
     if not resolved_config.exists():
         resolved_config = run_dir / "config.json"
+    if resolved_config.exists():
+        resolved_config_ref = relative_path(resolved_config, repo_root)
+        resolved_config_hash = sha256_file(resolved_config)
+    else:
+        # Fresh runs historically did not persist a standalone config.json.
+        # Their simulation_started snapshot is the authoritative resolved
+        # configuration (including defaults added to the launch input).
+        resolved_config_ref = (
+            f"{relative_path(event_log, repo_root)}"
+            "#simulation_started.scenario_config"
+        )
+        resolved_config_hash = sha256_json(config)
     manifest_path = run_dir / "replace_manifest.json"
     manifest: dict[str, Any] | None = None
     if manifest_path.exists():
@@ -149,12 +167,8 @@ def inspect_run(run_dir: Path, repo_root: Path) -> dict[str, Any]:
         ],
         "event_log": relative_path(event_log, repo_root),
         "event_log_sha256": sha256_file(event_log),
-        "resolved_config": (
-            relative_path(resolved_config, repo_root) if resolved_config.exists() else None
-        ),
-        "resolved_config_sha256": (
-            sha256_file(resolved_config) if resolved_config.exists() else None
-        ),
+        "resolved_config": resolved_config_ref,
+        "resolved_config_sha256": resolved_config_hash,
         "source": manifest,
     }
     return result
