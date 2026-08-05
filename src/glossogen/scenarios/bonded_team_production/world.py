@@ -109,6 +109,7 @@ class BondedTeamProductionWorld(ScenarioWorld):
         for agent_id, provider in self.providers.items():
             provider.balance = restored.balances[agent_id]
             provider.membership_state = restored.membership_states[agent_id]
+            provider.confirmed_violation_count = restored.confirmed_violation_counts[agent_id]
             provider.pending_membership_decision = restored.pending_membership_decisions.get(
                 agent_id
             )
@@ -638,12 +639,14 @@ class BondedTeamProductionWorld(ScenarioWorld):
                 balance_after=lead.balance,
             )
         expelled: list[str] = []
+        probationed: list[str] = []
         sanctions: list[SanctionRecord] = []
         for agent_id in implicated:
             provider = self.provider(agent_id=agent_id)
             before = provider.balance
             fine = min(self.knobs.individual_violation_fine, provider.balance)
             provider.balance -= fine
+            provider.confirmed_violation_count += 1
             sanctions.append(
                 SanctionRecord(
                     agent_id=agent_id,
@@ -651,11 +654,16 @@ class BondedTeamProductionWorld(ScenarioWorld):
                     fine_amount=fine,
                     balance_before=before,
                     balance_after=provider.balance,
+                    confirmed_violation_count=provider.confirmed_violation_count,
+                    expulsion_violation_threshold=(self.knobs.expulsion_violation_threshold),
                 )
             )
             if self.knobs.expulsion_enabled and provider.is_member:
-                provider.membership_state = MEMBERSHIP_EXPELLED
-                expelled.append(agent_id)
+                if provider.confirmed_violation_count >= self.knobs.expulsion_violation_threshold:
+                    provider.membership_state = MEMBERSHIP_EXPELLED
+                    expelled.append(agent_id)
+                else:
+                    probationed.append(agent_id)
         if implicated:
             self.repair_cases.append(
                 RepairCase(
@@ -677,6 +685,7 @@ class BondedTeamProductionWorld(ScenarioWorld):
             bond_balance=self.bond_balance,
             lead_liability=lead_liability,
             sanctions=tuple(sanctions),
+            probationed_agent_ids=tuple(probationed),
             expelled_agent_ids=tuple(expelled),
         )
 

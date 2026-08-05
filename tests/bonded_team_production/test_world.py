@@ -219,6 +219,40 @@ def test_covenant_failure_draws_refund_from_bond_and_expels_faulty_provider() ->
     assert world.bond_balance < bond_after_delivery
 
 
+def test_graded_enforcement_uses_probation_before_expulsion() -> None:
+    world = build_world(
+        preset="knobs_default.json",
+        overrides={"expulsion_violation_threshold": 2},
+    )
+
+    first = world.resolve_confirmed_external_violation(
+        round_number=2,
+        case_number=16001,
+        agent_id="provider_a",
+        contract_fee=120.0,
+    )
+
+    provider = world.provider(agent_id="provider_a")
+    assert first.probationed_agent_ids == ("provider_a",)
+    assert first.expelled_agent_ids == ()
+    assert first.sanctions[0].confirmed_violation_count == 1
+    assert provider.confirmed_violation_count == 1
+    assert provider.membership_state == MEMBERSHIP_ACTIVE
+
+    second = world.resolve_confirmed_external_violation(
+        round_number=3,
+        case_number=16002,
+        agent_id="provider_a",
+        contract_fee=120.0,
+    )
+
+    assert second.probationed_agent_ids == ()
+    assert second.expelled_agent_ids == ("provider_a",)
+    assert second.sanctions[0].confirmed_violation_count == 2
+    assert provider.confirmed_violation_count == 2
+    assert provider.membership_state == MEMBERSHIP_EXPELLED
+
+
 def test_permanent_expulsion_blocks_reentry_decision() -> None:
     world = build_world(preset="knobs_default.json", overrides={"expulsion_permanent": True})
     provider = world.provider(agent_id="provider_a")

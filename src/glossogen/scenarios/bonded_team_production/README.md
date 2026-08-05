@@ -26,6 +26,9 @@ The lead is publicly identified each round and is accountable for the complete
 delivered order. In the independent market, a detected failure charges the client
 refund to the lead. In the association, the shared bond pays the client, while the
 lead and directly faulty providers remain exposed to fines, repair, and expulsion.
+`expulsion_violation_threshold` controls whether expulsion follows the first
+confirmed violation (`1`, the default) or a later violation, leaving sanctioned
+members active under public probation in the interim.
 
 The one-unit-per-counter rule is enforced by the state machine, not by prompt
 wording. Units are allocated anew for each order; counters do not permanently

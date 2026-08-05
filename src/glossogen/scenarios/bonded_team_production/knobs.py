@@ -37,6 +37,7 @@ class BondedTeamProductionKnobs(BaseKnobs):
     membership_visible: bool
     expulsion_enabled: bool
     expulsion_permanent: bool
+    expulsion_violation_threshold: int = 1
 
     true_count_min: int
     true_count_max: int
@@ -149,6 +150,8 @@ class BondedTeamProductionKnobs(BaseKnobs):
             raise ValueError("expulsion requires an institution")
         if self.expulsion_permanent and not self.expulsion_enabled:
             raise ValueError("permanent expulsion requires expulsion_enabled")
+        if self.expulsion_violation_threshold < 1:
+            raise ValueError("expulsion_violation_threshold must be at least 1")
         for name in ("audit_sample_schedule", "attestation_query_schedule"):
             schedule = getattr(self, name)
             if schedule is not None and len(schedule) != self.round_count:

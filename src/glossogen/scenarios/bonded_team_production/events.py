@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from glossogen.models.event_base import EventBase
 
@@ -178,6 +178,7 @@ class TeamProductionAuditResolved(EventBase):
     refund_paid: float
     refund_source: str = "none"
     bond_balance: float
+    probationed_agent_ids: list[str] = Field(default_factory=list[str])
     expelled_agent_ids: list[str]
 
 
@@ -201,6 +202,8 @@ class TeamProductionProviderSanctioned(EventBase):
     fine_amount: float
     balance_before: float
     balance_after: float
+    confirmed_violation_count: int = 1
+    expulsion_violation_threshold: int = 1
 
 
 class TeamProductionRepairSubmitted(EventBase):

@@ -30,6 +30,7 @@ class RestoredTeamProductionState(NamedTuple):
     balances: dict[str, float]
     membership_states: dict[str, str]
     pending_membership_decisions: dict[str, str]
+    confirmed_violation_counts: dict[str, int]
     bond_balance: float
     pending_audits: list[PendingAudit]
     repair_cases: list[RepairCase]
@@ -48,6 +49,7 @@ def build_restored_state(
     balances = dict(initial_balances)
     memberships = dict(initial_membership_states)
     pending_decisions: dict[str, str] = {}
+    violation_counts = dict.fromkeys(initial_balances, 0)
     bond_balance = initial_bond_balance
     case_starts: dict[int, TeamProductionCaseStarted] = {}
     case_number_by_round: dict[int, int] = {}
@@ -91,6 +93,7 @@ def build_restored_state(
             balances[event.lead_id] = event.balance_after
         elif isinstance(event, TeamProductionProviderSanctioned):
             balances[event.agent_id] = event.balance_after
+            violation_counts[event.agent_id] = event.confirmed_violation_count
         elif isinstance(event, TeamProductionAuditScheduled):
             scheduled_audits.append(event)
         elif isinstance(event, TeamProductionAuditResolved):
@@ -144,6 +147,7 @@ def build_restored_state(
         balances=balances,
         membership_states=memberships,
         pending_membership_decisions=pending_decisions,
+        confirmed_violation_counts=violation_counts,
         bond_balance=bond_balance,
         pending_audits=pending_audits,
         repair_cases=repair_cases,

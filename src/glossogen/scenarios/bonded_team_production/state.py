@@ -13,6 +13,7 @@ class ProviderState:
     balance: float
     membership_state: str
     pending_membership_decision: str | None = None
+    confirmed_violation_count: int = 0
 
     @property
     def is_member(self) -> bool:
@@ -235,6 +236,7 @@ class AuditResolution(NamedTuple):
     bond_balance: float
     lead_liability: LeadLiabilityRecord | None
     sanctions: tuple["SanctionRecord", ...]
+    probationed_agent_ids: tuple[str, ...]
     expelled_agent_ids: tuple[str, ...]
 
 
@@ -244,6 +246,8 @@ class SanctionRecord(NamedTuple):
     fine_amount: float
     balance_before: float
     balance_after: float
+    confirmed_violation_count: int
+    expulsion_violation_threshold: int
 
 
 @dataclass

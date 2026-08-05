@@ -1,9 +1,9 @@
 ---
-name: record-glossogen-experiment
+name: record-experiment
 description: Plan, close, audit, or reproduce GlossoGen experiments with machine-checked Markdown records, exact run provenance, resolved-config and JSONL hashes, fork lineage, costs, and validity gates. Use whenever creating or editing docs/experiments/EXP-*.md, launching or forking a research run, interpreting a completed run, updating the experiment index, or checking whether an earlier result can be replicated.
 ---
 
-# Record GlossoGen Experiment
+# Record Experiment
 
 Keep experimental decisions human-readable while deriving provenance and run
 facts from artifacts. Never infer a completed run from round counts: require a
@@ -25,7 +25,7 @@ before creating or changing an experiment record.
 Set the helper path from the skill directory:
 
 ```bash
-EXPERIMENT_RECORD=.agents/skills/record-glossogen-experiment/scripts/experiment_record.py
+EXPERIMENT_RECORD=.agents/skills/record-experiment/scripts/experiment_record.py
 ```
 
 The helper is read-only. It renders templates, inspects artifacts, and validates

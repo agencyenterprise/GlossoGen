@@ -210,9 +210,44 @@ def test_resolved_audit_is_not_replayed_and_sanction_state_is_preserved() -> Non
     assert world.pending_audits == []
     assert world.bond_balance == 55.0
     assert world.provider(agent_id="provider_a").balance == 355.0
+    assert world.provider(agent_id="provider_a").confirmed_violation_count == 1
     assert world.provider(agent_id="provider_a").membership_state == "expelled"
     assert len(world.repair_cases) == 1
     assert world.repair_cases[0].implicated_agent_ids == ("provider_a", "provider_c")
+
+
+def test_probation_count_survives_resume_without_expulsion() -> None:
+    events = [
+        *completed_round_events(),
+        TeamProductionAuditResolved(
+            round_number=3,
+            case_number=1,
+            contract_type="association",
+            correct=False,
+            incorrect_zone_ids=["zone_1"],
+            implicated_agent_ids=["provider_a"],
+            refund_due=120.0,
+            refund_paid=120.0,
+            bond_balance=55.0,
+            probationed_agent_ids=["provider_a"],
+            expelled_agent_ids=[],
+        ),
+        TeamProductionProviderSanctioned(
+            round_number=3,
+            agent_id="provider_a",
+            case_number=1,
+            fine_amount=30.0,
+            balance_before=385.0,
+            balance_after=355.0,
+            confirmed_violation_count=1,
+            expulsion_violation_threshold=2,
+        ),
+    ]
+    world = build_world()
+    world.restore_state_from_events(events=events)
+
+    assert world.provider(agent_id="provider_a").confirmed_violation_count == 1
+    assert world.provider(agent_id="provider_a").membership_state == MEMBERSHIP_ACTIVE
 
 
 def test_independent_lead_refund_balance_survives_resume() -> None:

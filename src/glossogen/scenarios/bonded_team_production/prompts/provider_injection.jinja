@@ -1,6 +1,8 @@
 --- TEAM-PRODUCTION ROUND {{ round_number }} ---
 Your balance: {{ "%.2f"|format(balance) }}
 {% if institution_enabled %}Your membership: {{ membership_state }}
+{% if expulsion_enabled %}Confirmed violations: {{ confirmed_violation_count }} of {{ expulsion_violation_threshold }} required for expulsion.
+{% endif %}
 Association roster: {{ association_members|join(", ") if association_members else "no active members" }}
 Shared refund bond: {{ "%.2f"|format(bond_balance) }}
 {% endif %}

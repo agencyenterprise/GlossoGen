@@ -243,6 +243,11 @@ class BondedTeamProductionScenario(SimulationScenario):
                 "balance": self._world.provider(agent_id=agent_id).balance,
                 "institution_enabled": self._knobs.institution_enabled,
                 "membership_state": self._world.provider(agent_id=agent_id).membership_state,
+                "confirmed_violation_count": (
+                    self._world.provider(agent_id=agent_id).confirmed_violation_count
+                ),
+                "expulsion_enabled": self._knobs.expulsion_enabled,
+                "expulsion_violation_threshold": (self._knobs.expulsion_violation_threshold),
                 "association_members": self._world.active_member_ids(),
                 "bond_balance": self._world.bond_balance,
                 "contract_type": job.contract_type,
@@ -403,6 +408,7 @@ class BondedTeamProductionScenario(SimulationScenario):
                 refund_paid=resolution.refund_paid,
                 refund_source=resolution.refund_source,
                 bond_balance=resolution.bond_balance,
+                probationed_agent_ids=list(resolution.probationed_agent_ids),
                 expelled_agent_ids=list(resolution.expelled_agent_ids),
             )
         )
@@ -427,6 +433,8 @@ class BondedTeamProductionScenario(SimulationScenario):
                     fine_amount=sanction.fine_amount,
                     balance_before=sanction.balance_before,
                     balance_after=sanction.balance_after,
+                    confirmed_violation_count=sanction.confirmed_violation_count,
+                    expulsion_violation_threshold=(sanction.expulsion_violation_threshold),
                 )
             )
         await self._world.notify_market(
@@ -434,11 +442,21 @@ class BondedTeamProductionScenario(SimulationScenario):
             text=f"AUDIT RESULT. {self._audit_message(resolution)}",
         )
         for implicated in resolution.implicated_agent_ids:
+            if implicated in resolution.expelled_agent_ids:
+                enforcement_status = "This violation expelled you from the association. "
+            elif implicated in resolution.probationed_agent_ids:
+                enforcement_status = (
+                    "You remain an active member under probation; another confirmed "
+                    "violation will expel you. "
+                )
+            else:
+                enforcement_status = ""
             await self._world.notify_agent(
                 agent_id=implicated,
                 text=(
                     f"Audit {resolution.case_number} implicated you as a zone provider "
-                    "or as the lead accountable for the final order. You may call "
+                    "or as the lead accountable for the final order. "
+                    f"{enforcement_status}You may call "
                     "submit_team_repair to acknowledge, disclose, contribute, contest, "
                     "or decline."
                 ),
@@ -519,8 +537,13 @@ class BondedTeamProductionScenario(SimulationScenario):
             return f"Order {resolution.case_number} matched all warehouse zones."
         zones = ", ".join(resolution.incorrect_zone_ids)
         implicated = ", ".join(resolution.implicated_agent_ids)
-        return (
+        message = (
             f"Order {resolution.case_number} failed in {zones}; implicated providers: "
             f"{implicated}. Accountable lead: {resolution.lead_id}. Refund paid by "
             f"{resolution.refund_source}: {resolution.refund_paid:.2f}."
         )
+        if resolution.probationed_agent_ids:
+            message += f" Probation: {', '.join(resolution.probationed_agent_ids)}."
+        if resolution.expelled_agent_ids:
+            message += f" Expelled: {', '.join(resolution.expelled_agent_ids)}."
+        return message
