@@ -16,3 +16,16 @@ def test_gpt_5_5_pricing_and_provider_are_registered() -> None:
 
 def test_gpt_5_5_snapshot_uses_base_pricing() -> None:
     assert find_pricing("gpt-5.5-2026-04-23") == find_pricing("gpt-5.5")
+
+
+def test_cross_model_validation_models_are_registered() -> None:
+    expected = {
+        "claude-opus-5": TokenPricing("anthropic", 5.0, 25.0, 0.50, 6.25),
+        "claude-sonnet-5": TokenPricing("anthropic", 2.0, 10.0, 0.20, 2.50),
+        "gpt-5.6-terra": TokenPricing("openai", 2.50, 15.0, 0.25, 3.125),
+        "gpt-5.6-sol": TokenPricing("openai", 5.0, 30.0, 0.50, 6.25),
+    }
+
+    for model, pricing in expected.items():
+        assert find_pricing(model) == pricing
+        assert (model, pricing.provider) in list_models()

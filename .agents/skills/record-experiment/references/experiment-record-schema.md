@@ -19,6 +19,23 @@ Write `Question`, `Expected decision`, `Design`, `Outcomes inspected`, and the
 planned portion of `Provenance` before running. Complete the remaining sections
 only from artifacts.
 
+## Bundle layout
+
+New records live in an experiment-owned directory:
+
+```text
+docs/experiments/EXP-NNN-slug/
+├── experiment.md
+├── configs/
+└── analysis/
+```
+
+`configs/` contains the exact immutable launch inputs for every arm. Commands
+in the record must reference those paths, not mutable scenario-level presets.
+`analysis/` contains any checked script used to derive reported claims. Empty
+`analysis/` directories need not be committed. Historical flat records remain
+valid.
+
 ## Machine-readable block
 
 Place one JSON block after the dates and before `Question`:
@@ -84,7 +101,7 @@ a source snapshot or explicitly classify the result as not code-replicable.
 Keep `docs/experiments/README.md` synchronized:
 
 ```markdown
-| [EXP-018](EXP-018-slug.md) | short experiment name | planned | pending | — |
+| [EXP-018](EXP-018-slug/experiment.md) | short experiment name | planned | pending | — |
 ```
 
 On closure, update status, concise outcome, and cost. Do not include costs from

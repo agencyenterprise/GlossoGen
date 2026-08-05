@@ -38,6 +38,13 @@ _PRICING_TABLE: dict[str, TokenPricing] = {
     # Anthropic — keys use dashes (matching actual API model IDs).
     # Longer prefixes first so "claude-opus-4-6-*" doesn't accidentally
     # match the cheaper "claude-opus-4" entry.
+    "claude-opus-5": TokenPricing(
+        provider="anthropic",
+        input_per_mtok=5.0,
+        output_per_mtok=25.0,
+        cache_read_per_mtok=0.50,
+        cache_write_per_mtok=6.25,
+    ),
     "claude-opus-4-7": TokenPricing(
         provider="anthropic",
         input_per_mtok=5.0,
@@ -59,6 +66,14 @@ _PRICING_TABLE: dict[str, TokenPricing] = {
         cache_read_per_mtok=0.50,
         cache_write_per_mtok=6.25,
     ),
+    # Introductory pricing through 2026-08-31. Update before later runs.
+    "claude-sonnet-5": TokenPricing(
+        provider="anthropic",
+        input_per_mtok=2.0,
+        output_per_mtok=10.0,
+        cache_read_per_mtok=0.20,
+        cache_write_per_mtok=2.50,
+    ),
     "claude-sonnet-4-6": TokenPricing(
         provider="anthropic",
         input_per_mtok=3.0,
@@ -74,6 +89,20 @@ _PRICING_TABLE: dict[str, TokenPricing] = {
         cache_write_per_mtok=1.25,
     ),
     # OpenAI — longer prefixes first so variant names match before base models.
+    "gpt-5.6-terra": TokenPricing(
+        provider="openai",
+        input_per_mtok=2.50,
+        output_per_mtok=15.0,
+        cache_read_per_mtok=0.25,
+        cache_write_per_mtok=3.125,
+    ),
+    "gpt-5.6-sol": TokenPricing(
+        provider="openai",
+        input_per_mtok=5.0,
+        output_per_mtok=30.0,
+        cache_read_per_mtok=0.50,
+        cache_write_per_mtok=6.25,
+    ),
     "gpt-5.5": TokenPricing(
         provider="openai",
         input_per_mtok=5.0,

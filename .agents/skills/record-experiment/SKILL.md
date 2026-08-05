@@ -34,8 +34,8 @@ workflow so the diff remains reviewable.
 
 ## Plan before running
 
-1. Resolve the next experiment ID from `docs/experiments/README.md` and existing
-   `EXP-*.md` files.
+1. Resolve the next experiment ID from `docs/experiments/README.md`, existing
+   `EXP-*.md` files, and `EXP-*/experiment.md` bundle records.
 2. Render a skeleton:
 
    ```bash
@@ -45,7 +45,20 @@ workflow so the diff remains reviewable.
      --repo-root .
    ```
 
-3. Create `docs/experiments/EXP-018-<slug>.md` from the rendered output.
+3. For every new experiment, create a self-contained bundle:
+
+   ```text
+   docs/experiments/EXP-018-<slug>/
+   ├── experiment.md
+   ├── configs/          # exact launch inputs owned by this experiment
+   └── analysis/         # checked scripts added when results are closed
+   ```
+
+   Historical flat `EXP-*.md` records remain valid and do not need migration.
+   Put the rendered output in `experiment.md`. Copy the exact resolved source
+   presets into `configs/` before hashing and launch the run from those bundled
+   paths, so later edits to scenario-wide presets cannot change the recorded
+   design silently. Do not duplicate secrets or generated run logs in a bundle.
 4. Replace every placeholder above `Result` before launching:
    - one decision-relevant question;
    - outcome gates and stopping rules;
@@ -80,7 +93,8 @@ workflow so the diff remains reviewable.
    - exact JSONL and resolved-config hashes;
    - model/provider, seed, configured rounds, completion reason, and cost;
    - source run and fork boundary when present.
-4. Compute claims from JSONL events or a checked analysis script. Distinguish:
+4. Compute claims from JSONL events or a checked analysis script stored in the
+   bundle's `analysis/` directory. Distinguish:
    - observed facts from interpretation;
    - stressor activation from treatment effect;
    - service accuracy from hidden effort/compliance;
@@ -99,7 +113,7 @@ Run:
 
 ```bash
 python3 "$EXPERIMENT_RECORD" validate-record \
-  docs/experiments/EXP-018-<slug>.md --repo-root . --phase auto
+  docs/experiments/EXP-018-<slug>/experiment.md --repo-root . --phase auto
 ```
 
 Treat the record as:
@@ -126,4 +140,6 @@ validity limitation.
 - Record fork semantics precisely, including any replayed boundary round.
 - Use resolved run configuration as authoritative over remembered CLI defaults.
 - Hash artifacts; do not paste large JSON configs or prompts into the record.
+- Launch new experiments from their bundled `configs/` files; scenario-level
+  presets may be cited as ancestry, but are not the authoritative launch input.
 - Never commit run logs containing secrets without an explicit storage policy.
