@@ -27,6 +27,7 @@ rules something out saves the next person from repeating it.
 | [EXP-016](EXP-016-external-violation-recovery.md) | confirmed external violation and recovery | complete | enforcement and operational recovery supported; repair response not interpretable | $4.54 |
 | [EXP-017](EXP-017-population-loss-dose-response.md) | covenant population-loss dose response | complete | two-member loss contained; minimum population is viable but fragile and collapsed in 1/2 trajectories | $17.16 |
 | [EXP-018](EXP-018-graded-enforcement-pilot.md) | graded enforcement after an experienced failure | complete | operational preservation supported; alignment-policy effect requires replication | $5.03 |
+| [EXP-019](EXP-019-graded-enforcement-replication.md) | graded-enforcement shared-prefix replication | planned | pending | — |
 
 Total API spend logged: **$149.07** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
