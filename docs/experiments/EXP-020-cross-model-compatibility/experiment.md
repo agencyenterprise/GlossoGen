@@ -48,6 +48,24 @@
       "resolved_config_sha256": "d5b9d5a280bf220dd5f972edf9f7fd0b48361964ae69c691392d0612bd195ff1",
       "completed": true,
       "total_cost_usd": 3.8264985
+    },
+    {
+      "role": "gpt_5_6_terra_independent",
+      "included": true,
+      "run_dir": "runs/bonded_team_production/1785959541",
+      "event_log_sha256": "ee59a5043ec13f46911f061c20beb8b8dffb9dc4c178b2cebf92ba990bad256e",
+      "resolved_config_sha256": "d5b9d5a280bf220dd5f972edf9f7fd0b48361964ae69c691392d0612bd195ff1",
+      "completed": true,
+      "total_cost_usd": 2.21870575
+    },
+    {
+      "role": "gpt_5_6_terra_covenant",
+      "included": true,
+      "run_dir": "runs/bonded_team_production/1785959542",
+      "event_log_sha256": "54530c578e67211c8d9ae689d96abe040bd58ae81ed6c1e86a81b7602417f5d2",
+      "resolved_config_sha256": "77c78a95fd40e8f6a5c797eb8f105f5830581161b42e5b2bff1a66b9b0604d7b",
+      "completed": true,
+      "total_cost_usd": 2.62738675
     }
   ]
 }
@@ -140,7 +158,11 @@ Descriptive behavioral measures, without confirmatory claims:
   `runs/bonded_team_production/1785958415`.
 - Completed Sonnet 5 independent run:
   `runs/bonded_team_production/1785958416`.
-- Opus 5, GPT-5.6 Terra, and GPT-5.6 Sol runs have not yet launched.
+- Completed GPT-5.6 Terra independent run:
+  `runs/bonded_team_production/1785959541`.
+- Completed GPT-5.6 Terra covenant run:
+  `runs/bonded_team_production/1785959542`.
+- Opus 5 and GPT-5.6 Sol runs have not yet launched.
 
 ## Result
 
