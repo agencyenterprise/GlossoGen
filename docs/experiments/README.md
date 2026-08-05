@@ -28,9 +28,9 @@ rules something out saves the next person from repeating it.
 | [EXP-017](EXP-017-population-loss-dose-response.md) | covenant population-loss dose response | complete | two-member loss contained; minimum population is viable but fragile and collapsed in 1/2 trajectories | $17.16 |
 | [EXP-018](EXP-018-graded-enforcement-pilot.md) | graded enforcement after an experienced failure | complete | operational preservation supported; alignment-policy effect requires replication | $5.03 |
 | [EXP-019](EXP-019-graded-enforcement-replication.md) | graded-enforcement shared-prefix replication | complete | capacity and immediate compliance replicated in 2/2 new trajectories | $8.90 |
-| [EXP-020](EXP-020-cross-model-compatibility/experiment.md) | four-model compatibility pass on the frozen institutional comparison | running | Sonnet 5 and Terra pairs complete; two model pairs remaining | $11.19 so far |
+| [EXP-020](EXP-020-cross-model-compatibility/experiment.md) | four-model compatibility pass on the frozen institutional comparison | complete | all four models compatible; behavioral response heterogeneous and requires paired-seed replication | $167.00 |
 
-Total API spend logged: **$157.96** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$324.96** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The
