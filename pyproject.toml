@@ -44,7 +44,7 @@ metrics-ml = [
     "torch>=2.2.0",
     "transformers>=5.0.0rc3",
     "minicons>=0.2.55",
-    "datasets>=3.0.0",
+    "datasets>=5.0.1",
 ]
 # Inspect-AI harness for the veyru judge-accuracy evaluation
 # (scenarios/veyru/evals/judge_accuracy_eval.py). Not needed to run
