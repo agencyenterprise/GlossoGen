@@ -18,21 +18,6 @@ A scenario is one self-contained 3-agent (or 2-agent, or N-agent) coordination t
 - **Optional frontend plug-in** — a bespoke knobs form, per-round detail panel, or replace-agent default knobs.
 - **Optional per-scenario scripts** — one-off runners and ontology builders that import the scenario directly.
 
-### What makes a scenario worth adding
-
-Two questions are worth answering before writing code, and they are the first
-things a reviewer will ask.
-
-**What communication pressure does it create?** The platform studies how agents
-change the way they talk under constraint — bandwidth limits, noise, a time
-budget, information split across agents. A scenario where agents can simply say
-everything plainly exercises nothing.
-
-**Is it solvable?** Validate with a capable model before submitting. If strong
-agents cannot succeed, the scenario measures its own impossibility rather than
-anything about communication. Note what you ran and the round-success it
-reached — see [Smoke test](#smoke-test).
-
 The platform discovers events, run-detail extensions, and frontend plug-ins automatically. The only file you have to *register* in is [scenario_registry.py](../src/glossogen/scenario_registry.py).
 
 ## Package layout
