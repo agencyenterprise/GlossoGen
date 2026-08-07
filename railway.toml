@@ -1,0 +1,17 @@
+# Config-as-code for deploying this repository directly to Railway.
+#
+# Without this file Railway falls back to auto-detection, which can pick a
+# different builder and drops the healthcheck settings below.
+#
+# Deployments that promote a prebuilt image instead of building from source
+# supply their own equivalent config; this file is what makes a source deploy
+# of this repository work out of the box.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
