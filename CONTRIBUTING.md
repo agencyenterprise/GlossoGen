@@ -76,9 +76,17 @@ guide. In short, a scenario supplies:
 
 - `ids.py`, `knobs.py` (all fields required — no defaults), and `knobs_default.json`
 - `events.py` for its own `EventBase` subclasses, and `world.py` for state
-- `scenario.py` implementing the two **required** hooks:
+- `scenario.py` implementing the two abstract hooks:
   - `get_primary_channels()` — which channel(s) generic metrics should score
-  - `judge_round_result(round_number, trigger)` — what counts as a round succeeding
+  - `judge_round_result(round_number, trigger)` — per-round success verdicts
+
+Both must be *implemented*, but neither forces a particular design. Despite the
+name, `judge_round_result` does not imply an LLM judge — `prisoners_dilemma`
+resolves rounds deterministically from its payoff matrix and involves no LLM
+anywhere. Return `[]` if the scenario genuinely has no per-round success
+criterion; that emits no `RoundResultRecorded` events and the round-success
+metrics simply produce no measurement for the run. Likewise `get_primary_channels()`
+returns `[]` when no channel is worth scoring.
 - `prompts/` as Jinja templates, never strings in Python
 - a `README.md` explaining the communication pressure the scenario creates
 
