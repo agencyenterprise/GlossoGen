@@ -59,14 +59,16 @@ services:
     build:
       context: frontend
       dockerfile: DockerfileFrontend
-      args:
-        # Next.js inlines NEXT_PUBLIC_* into the JS bundle at build time, so
-        # this is a build arg, not a runtime variable. Changing it requires a
-        # rebuild (`docker compose build frontend`).
-        NEXT_PUBLIC_API_URL: http://localhost:8000
     depends_on:
       - backend
     environment:
+      # Read at request time, not compiled in — changing these needs only a
+      # restart, not a rebuild. This is the browser-facing URL, so it is
+      # localhost (where you point your browser), not the compose service name.
+      API_URL: http://localhost:8000
+      # Set both for Clerk multi-tenant auth; omit for local mode.
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
       PORT: "3000"
     ports:
       - "3000:3000"

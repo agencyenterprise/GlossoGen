@@ -16,7 +16,7 @@ import dynamic from "next/dynamic";
  * Loaded via ``next/dynamic`` with ``ssr: false`` so it is never
  * rendered server-side. Required because ``<OrganizationList>`` throws
  * when no live ``<ClerkProvider>`` is in the tree — and during a
- * production build without ``NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`` set as
+ * production build without ``CLERK_PUBLISHABLE_KEY`` set as
  * a build arg, ``<ClerkProvider>`` is not mounted.
  */
 const OrganizationPicker = dynamic(

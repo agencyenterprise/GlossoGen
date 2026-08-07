@@ -199,7 +199,7 @@ cp .env.example .env
 | `HF_TOKEN` | Optional | HuggingFace token |
 | `DATABASE_URL` | No (local) / Yes (Clerk/prod) | Postgres connection string for the tenancy + runs index (e.g. `postgresql://localhost:5432/glossogen_dev`). Leave unset or blank for no-database local mode (runs index derived from the filesystem, OAuth state in memory). Required for Clerk multi-tenant auth and production. |
 | `CLERK_SECRET_KEY` | Yes (Clerk mode) | Clerk backend secret. If unset, the server boots in single-tenant **local mode** (every request runs as `local-user` in the `local` group). |
-| `CLERK_PUBLISHABLE_KEY` | Yes (Clerk mode) | Clerk publishable key (mirrors `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`). |
+| `CLERK_PUBLISHABLE_KEY` | Yes (Clerk mode) | Clerk publishable key. |
 | `CLERK_JWT_KEY` | Yes (Clerk mode) | PEM public key from the Clerk dashboard. Used for networkless JWT verification. |
 | `CLERK_WEBHOOK_SECRET` | Yes (Clerk mode) | Svix signing secret for `POST /api/clerk/webhook` that keeps the `groups` table in sync with Clerk org create/update/delete events. |
 | `CLERK_AUTHORIZED_PARTIES` | Optional (Clerk mode) | Comma-separated list of frontend origins allowed to mint tokens for this backend (e.g. `http://localhost:3000,https://app.example.com`). |
@@ -219,8 +219,8 @@ Frontend environment variables go in `frontend/.env.local` (see `frontend/.env.l
 
 | Variable | Default | Description |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend API base URL |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | (unset) | Publishable key from the Clerk dashboard. Leave unset for local mode; the frontend then skips mounting `<ClerkProvider>` and the proxy is a pass-through. |
+| `API_URL` | (required) | Backend API base URL. Read at request time and forwarded to the browser by the root layout — never compiled into the bundle. |
+| `CLERK_PUBLISHABLE_KEY` | (unset) | Publishable key from the Clerk dashboard. Leave unset for local mode; the frontend then skips mounting `<ClerkProvider>` and the proxy is a pass-through. |
 | `CLERK_SECRET_KEY` | (unset) | Clerk secret key for server-side `auth()` / `clerkMiddleware()` calls inside Next.js Server Components and the proxy. |
 
 ## Development
@@ -266,7 +266,7 @@ Two run-time modes, switched by the presence of `CLERK_SECRET_KEY`:
 
 ### Local Mode (no Clerk)
 
-Default for dev clones. Leave `CLERK_SECRET_KEY` unset on the backend and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` unset on the frontend.
+Default for dev clones. Leave `CLERK_SECRET_KEY` unset on the backend and `CLERK_PUBLISHABLE_KEY` unset on the frontend.
 
 - `ClerkIdentityMiddleware` short-circuits every request to a synthetic `local` group / `local-user`. The `local` row is upserted into `groups` at server startup by `identity/bootstrap.py:ensure_local_group`.
 - The frontend renders without a sign-in flow; `<GroupProvider>` is hard-coded to `LOCAL_GROUP_SLUG = "local"`.
@@ -275,7 +275,7 @@ Default for dev clones. Leave `CLERK_SECRET_KEY` unset on the backend and `NEXT_
 
 ### Clerk Mode (prod / multi-tenant)
 
-Set `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_JWT_KEY`, and `CLERK_WEBHOOK_SECRET` on the backend; set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` on the frontend. See README "Authentication" for the full Clerk-dashboard setup.
+Set `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_JWT_KEY`, and `CLERK_WEBHOOK_SECRET` on the backend; set `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` on the frontend. See README "Authentication" for the full Clerk-dashboard setup.
 
 - Frontend mounts `<ClerkProvider>`. Clerk-issued session tokens carry the active org as either `o = { id, slg, ... }` (v2 — default for new apps) or flat `org_id` / `org_slug` (legacy v1). The verifier reads both.
 - `frontend/src/proxy.ts` wires `clerkMiddleware` with `organizationSyncOptions.organizationPatterns = ["/g/:slug", "/g/:slug/(.*)"]`, so navigating to `/g/<slug>/...` automatically activates that organization on the user's session *server-side, for the current request* — before any token is minted. This is how a user with multiple Clerk orgs can hit any of them by URL without first calling `setActive`.
@@ -386,11 +386,11 @@ Environment variables:
 **Frontend service**: root directory `frontend`.
 
 Build args:
-- `NEXT_PUBLIC_API_URL` — backend service URL (e.g. `https://backend.up.railway.app`)
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — Clerk publishable key (required to mount `<ClerkProvider>` and gate routes)
+- `API_URL` — backend service URL (runtime variable, not a build arg)
+- `CLERK_PUBLISHABLE_KEY` — Clerk publishable key (required to mount `<ClerkProvider>` and gate routes)
 - `CLERK_SECRET_KEY` — Clerk secret key used by Next.js Server Components and the proxy
 
-**Deploy order**: Backend first (get URL) → set as frontend `NEXT_PUBLIC_API_URL` build arg → deploy frontend → update backend `ALLOWED_ORIGINS` with frontend URL.
+**Deploy order**: Backend first (get URL) → set it as the frontend's `API_URL` variable → deploy frontend → update backend `ALLOWED_ORIGINS` with the frontend URL.
 
 ## Run Output Directory Structure
 

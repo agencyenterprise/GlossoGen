@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { LOCAL_GROUP_SLUG } from "@/shared/lib/local-tenant";
 import { LandingPage } from "@/features/landing/landing-page";
+import { isClerkConfigured } from "@/shared/config/runtime-config";
 
 /**
  * Root route — always the public landing page.
@@ -13,7 +14,7 @@ import { LandingPage } from "@/features/landing/landing-page";
  *   is active yet.
  */
 export default async function Home() {
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+  if (!isClerkConfigured()) {
     return <LandingPage appHref={`/g/${LOCAL_GROUP_SLUG}/runs`} appLabel="Dashboard" />;
   }
 

@@ -350,7 +350,7 @@ A FastAPI backend + Next.js frontend for browsing simulation runs. The frontend 
 
 The backend uses **Clerk** for multi-tenant authentication. Each Clerk organization corresponds to a study group; every run is owned by exactly one group and never shared across groups except via the export/import flow.
 
-* **Local mode (default for dev clones):** leave `CLERK_SECRET_KEY` unset on the backend and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` unset on the frontend. The backend's identity middleware short-circuits every request to a synthetic `local` group / `local-user`; the frontend renders without a sign-in flow. With `DATABASE_URL` also unset, the backend runs with no database at all — the runs index comes from the filesystem and OAuth state is in memory. (Setting `DATABASE_URL` keeps local mode but stores the `local` group + `runs` index in Postgres.)
+* **Local mode (default for dev clones):** leave `CLERK_SECRET_KEY` unset on the backend and `CLERK_PUBLISHABLE_KEY` unset on the frontend. The backend's identity middleware short-circuits every request to a synthetic `local` group / `local-user`; the frontend renders without a sign-in flow. With `DATABASE_URL` also unset, the backend runs with no database at all — the runs index comes from the filesystem and OAuth state is in memory. (Setting `DATABASE_URL` keeps local mode but stores the `local` group + `runs` index in Postgres.)
 * **Clerk mode (prod / hosted):** set Clerk env vars on both sides plus `CLERK_WEBHOOK_SECRET` so the backend can keep its local `groups` table in sync with Clerk org create/update/delete events. The frontend mounts `<ClerkProvider>` and Clerk's middleware redirects unauthenticated traffic to `/sign-in`. API requests carry the Clerk session token as the Bearer header; the backend reads the active group from the URL slug (`/api/g/{slug}/...`) and validates membership against the JWT.
 
 The active group is identified by the URL slug — `/g/team-a/runs/...` on the frontend hits `/api/g/team-a/runs/...` on the backend. The identity middleware accepts the request only if the user's Clerk session has `team-a` as the active org.
@@ -574,9 +574,8 @@ This runs in **single-tenant local mode**: no Clerk, every request is `local-use
 in the `local` group. It performs no authentication, so do not expose it to the
 internet without configuring Clerk (see [Authentication](#authentication)).
 
-`NEXT_PUBLIC_API_URL` is a **build arg**, not a runtime variable — Next.js inlines
-it into the JS bundle. Pointing the frontend at a different backend requires
-`docker compose build frontend`, not just an environment change.
+`API_URL` is read at request time, so pointing the frontend at a different
+backend needs only a restart — no rebuild.
 
 Simulation data persists in the `runs-data` volume; Postgres in `postgres-data`.
 
@@ -598,8 +597,7 @@ under `~/.cache/glossogen/`, so they often work with no extra installed at all.
 
 The application deploys to Railway as two services. The backend is published as
 a container image and promoted by tag; the frontend is built from this
-repository, because Next.js bakes `NEXT_PUBLIC_*` values into the bundle at
-build time and one image therefore cannot serve multiple environments.
+repository.
 
 - **Backend** (`Dockerfile`): Python 3.12, FastAPI server with a persistent volume at `/data/runs` for simulation data. Built and pushed to GHCR by `.github/workflows/publish-images.yml` on a version tag.
 - **Frontend** (`frontend/DockerfileFrontend`, `frontend/railway.toml`): Node 22, Next.js standalone build.
@@ -614,7 +612,7 @@ Railway environment variables for the backend:
 - `OAUTH_ISSUER_URL` — public backend URL to enable MCP OAuth.
 - `ENABLE_EVALUATIONS` — set to `false` to disable the REST evaluate endpoint (the frontend "Run Eval" button): the endpoint returns 403 and the frontend hides the button. Defaults to enabled. Does not affect the CLI `glossogen evaluate` command.
 
-The frontend requires `NEXT_PUBLIC_API_URL` as a build arg pointing to the backend URL, plus `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` for Clerk-mode operation.
+The frontend reads `API_URL` at runtime (required), plus `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` for Clerk-mode operation. None are compiled into the bundle, so the same image serves any environment.
 
 The backend container runs `alembic upgrade head` on every start so the schema is always at the latest revision before the server begins accepting requests.
 

@@ -62,11 +62,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # The frontend image is environment-specific: Next.js inlines NEXT_PUBLIC_*
-  # values into the JS bundle at build time, so one image cannot serve multiple
-  # environments. Until the frontend reads those values at runtime, this job
-  # builds an image usable only for the environment whose values are supplied
-  # via repository variables.
+  # The frontend image is environment-agnostic: configuration is read at
+  # request time rather than compiled in, so the published image can be
+  # promoted between environments unchanged, exactly like the backend.
   frontend:
     runs-on: ubuntu-latest
     permissions:
@@ -101,9 +99,6 @@ jobs:
           context: frontend
           file: frontend/DockerfileFrontend
           push: true
-          build-args: |
-            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
-            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/glossogen-frontend:${{ steps.meta.outputs.tag }}
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/glossogen-frontend:latest

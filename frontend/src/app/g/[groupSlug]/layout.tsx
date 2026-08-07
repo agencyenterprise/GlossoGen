@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { GroupProvider } from "@/features/auth/group-context";
 import { GroupTopBar } from "@/features/auth/group-top-bar";
+import { isClerkConfigured } from "@/shared/config/runtime-config";
 
 /**
  * Group-scoped layout segment.
@@ -32,7 +33,7 @@ export default async function GroupLayout({
   params: Promise<{ groupSlug: string | string[] }>;
   children: ReactNode;
 }) {
-  if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+  if (isClerkConfigured()) {
     const { userId } = await auth();
     if (userId === null || userId === undefined) {
       redirect("/sign-in");

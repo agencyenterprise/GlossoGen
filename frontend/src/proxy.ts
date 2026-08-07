@@ -27,7 +27,7 @@ import type { NextRequest } from "next/server";
  * check then returns 403.
  */
 function isClerkConfigured(): boolean {
-  return Boolean(process.env.CLERK_SECRET_KEY && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+  return Boolean(process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY);
 }
 
 const _clerkMiddleware = isClerkConfigured()

@@ -2,6 +2,7 @@
 
 import { OrganizationList, RedirectToSignIn, useAuth, useOrganization } from "@clerk/nextjs";
 import { useState } from "react";
+import { getApiUrl } from "@/shared/config/runtime-config";
 
 /**
  * Client-only body of the MCP consent page.
@@ -9,7 +10,7 @@ import { useState } from "react";
  * Split out so the parent page can lazy-load it via ``next/dynamic`` with
  * ``ssr: false`` — required because Clerk hooks throw when no live
  * ``<ClerkProvider>`` is in the tree during a build without
- * ``NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY``.
+ * ``CLERK_PUBLISHABLE_KEY``.
  */
 export function ConsentClient({ requestId }: { requestId: string }) {
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
@@ -54,7 +55,7 @@ function ConsentBody({ requestId }: { requestId: string }) {
       if (token === null) {
         throw new Error("No Clerk token available");
       }
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const apiUrl = getApiUrl();
       // eslint-disable-next-line no-restricted-globals -- /mcp/consent/approve is not in the typed OpenAPI surface
       const response = await fetch(`${apiUrl}/mcp/consent/approve`, {
         method: "POST",
