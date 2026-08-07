@@ -24,6 +24,50 @@ make install-server     # backend only (uv sync)
 make install-frontend   # frontend only (npm ci)
 ```
 
+**If you intend to run evaluations, install the ML extra as well:**
+
+```bash
+make install-metrics    # everything above, plus the metrics-ml extra
+```
+
+This is the recommended setup for research use. It is a separate target because
+the extra pulls in torch and transformers — several gigabytes — which a server
+that only browses runs never executes. Deployments therefore install without it,
+which is why it is not the default.
+
+Three metrics depend on it:
+
+| Metric | Needs | Without the extra |
+|---|---|---|
+| `perplexity` | `torch`, `minicons` | **Fails** |
+| `english_ngram_surprisal` | `datasets` | Runs from a cached model; **fails** only when the cache is cold |
+| `english_ngram_backoff_surprisal` | `datasets` | Same |
+
+The n-gram metrics train a character trigram from wikitext once and cache it under
+`~/.cache/glossogen/`. After that first build they need no ML dependency at all, so
+copying a warm cache is an alternative to installing the extra.
+
+**Requesting a metric that cannot run is an error, not a skip.** Evaluation exits
+non-zero with a message naming the missing package and the install command. The
+report is still written first, so results from the metrics that *did* succeed are
+never lost — you get partial results *and* a failure signal.
+
+This is deliberate. A metric that quietly produced nothing would be
+indistinguishable from a run with nothing to measure, which is how a broken
+environment gets mistaken for a valid result. The same applies to any metric that
+raises for any reason: evaluation runs the rest, writes the report, then exits
+non-zero.
+
+Skipping is reserved for metrics that genuinely do not apply to a run — `perplexity`
+on a scenario with no primary channel, `round_success_after_resume` on a run that was
+never resumed. Those produce no measurement and do not fail, because there is nothing
+to measure and nothing is broken.
+
+Separately, the `evals` extra (`inspect-ai`) powers the veyru judge-accuracy harness at
+`src/glossogen/scenarios/veyru/evals/`. That one is a standalone script rather than a
+registered metric, so without the extra it fails with a plain `ModuleNotFoundError`.
+`make install-server` includes it, since type checking needs it.
+
 ### Local Postgres (optional)
 
 By default the backend runs in **no-database local mode** — leave `DATABASE_URL` unset and skip this entire section. The runs index is derived from the `runs/` directory on disk and MCP OAuth tokens are held in memory (they reset on restart, which just means re-authenticating the MCP client).
@@ -286,7 +330,7 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru
   2> /tmp/veyru_eval_debug.log
 ```
 
-The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth blocks) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `glossogen evaluate` and by `scripts/consolidate_communication_ontology.py` (see below). Without it the harness defaults to `INFO`. Both are dotenv-friendly — set them in `.env` for a persistent default or inline as shown above.
+The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth blocks) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `glossogen evaluate` and by the ontology-consolidation script (see below). Without it the harness defaults to `INFO`. Both are dotenv-friendly — set them in `.env` for a persistent default or inline as shown above.
 
 If the judge's structured output truncates (you'll see a `Field required ... input_value={}` validation warning followed by a metric failure), bump the per-call output-token cap by setting `LLM_MAX_TOKENS=32768` (or higher) in `.env` or inline. The default of `16384` covers the verbose communication-feature outputs but pathological runs with many labels × many evidence citations can still exceed it.
 
@@ -306,7 +350,7 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate <scen
 
 # 2. Consolidation: one LLM call across N runs of one scenario. Produces a
 #    versioned taxonomy under runs/<scenario>/_ontology/.
-LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.py \
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python consolidate_communication_ontology.py \
   --scenario-name <scenario> \
   --run-id <scenario>/<id1> --run-id <scenario>/<id2> --run-id <scenario>/<id3> \
   --runs-dir ./runs \
@@ -329,16 +373,18 @@ Always run with `LOG_LEVEL=DEBUG` and a stderr redirect during development so th
 
 Consolidated ontology JSONs live under `runs/<scenario_name>/_ontology/` so they ship with any export of the runs tree. The entire `runs/` directory is gitignored — the ontology JSONs are regenerable from the open-coding sidecars; pass them around alongside the runs they were derived from rather than committing them.
 
-## Results Viewer (Streamlit)
+## Analysing results
 
-A Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round metric hits across multiple evaluated runs — useful for comparing models or knob configurations. Tabs include Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS vs Frontier, and Probe similarity (Levenshtein-based comparisons across the per-run probe artifacts, with a multi-select run picker driving every sub-view).
+Evaluation writes a machine-readable report per run at
+`runs/{scenario}/{timestamp}/{scenario}_report.json`, alongside the JSONL event
+log and any per-metric sidecars (probe responses, per-message repetition
+factors, feature-presence vectors). Together these are the analysis surface —
+plain JSON and JSONL, no database required.
 
-```bash
-uv sync --group analysis    # one-time, installs streamlit + plotly
-make results-viewer         # opens the viewer in a browser
-```
-
-It reads from `GLOSSOGEN_RUNS_DIR` (defaults to `./runs`) and lists all runs that have a `{scenario}_report.json`.
+Point whatever you prefer at them: pandas, a notebook, a dashboard. The
+[Web UI](#web-ui) covers per-run inspection; cross-run aggregation is
+deliberately left open rather than baked in, since the useful comparison
+depends on the experiment.
 
 ## Web UI
 
@@ -348,7 +394,7 @@ A FastAPI backend + Next.js frontend for browsing simulation runs. The frontend 
 
 The backend uses **Clerk** for multi-tenant authentication. Each Clerk organization corresponds to a study group; every run is owned by exactly one group and never shared across groups except via the export/import flow.
 
-* **Local mode (default for dev clones):** leave `CLERK_SECRET_KEY` unset on the backend and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` unset on the frontend. The backend's identity middleware short-circuits every request to a synthetic `local` group / `local-user`; the frontend renders without a sign-in flow. With `DATABASE_URL` also unset, the backend runs with no database at all — the runs index comes from the filesystem and OAuth state is in memory. (Setting `DATABASE_URL` keeps local mode but stores the `local` group + `runs` index in Postgres.)
+* **Local mode (default for dev clones):** leave `CLERK_SECRET_KEY` unset on the backend and `CLERK_PUBLISHABLE_KEY` unset on the frontend. The backend's identity middleware short-circuits every request to a synthetic `local` group / `local-user`; the frontend renders without a sign-in flow. With `DATABASE_URL` also unset, the backend runs with no database at all — the runs index comes from the filesystem and OAuth state is in memory. (Setting `DATABASE_URL` keeps local mode but stores the `local` group + `runs` index in Postgres.)
 * **Clerk mode (prod / hosted):** set Clerk env vars on both sides plus `CLERK_WEBHOOK_SECRET` so the backend can keep its local `groups` table in sync with Clerk org create/update/delete events. The frontend mounts `<ClerkProvider>` and Clerk's middleware redirects unauthenticated traffic to `/sign-in`. API requests carry the Clerk session token as the Bearer header; the backend reads the active group from the URL slug (`/api/g/{slug}/...`) and validates membership against the JWT.
 
 The active group is identified by the URL slug — `/g/team-a/runs/...` on the frontend hits `/api/g/team-a/runs/...` on the backend. The identity middleware accepts the request only if the user's Clerk session has `team-a` as the active org.
@@ -427,7 +473,7 @@ The same OAuth flow that issues MCP tokens also gives the CLI a way to push loca
 # 1. One-time: sign in to the deployed backend. Opens your browser to the
 #    Clerk-gated consent page; pick your org, approve, the CLI's loopback
 #    server collects the code and writes ~/.glossogen/credentials.json (0600).
-glossogen login --url https://gnossogenapi.up.railway.app
+glossogen login --url https://your-backend.example.com
 
 # 2. Diff local runs against prod and upload anything missing. Filters by
 #    label (AND) and by report-present (so crashed runs are skipped). The
@@ -557,12 +603,48 @@ frontend/                      # Next.js web application
 
 See [Architecture.md](Architecture.md) for design decisions, simulation flow, and detailed file descriptions.
 
+## Self-hosting
+
+The fastest way to run the whole stack — Postgres, backend, and frontend:
+
+```bash
+cp .env.example .env     # then set ANTHROPIC_API_KEY
+docker compose up --build
+```
+
+Frontend at `http://localhost:3000`, backend at `http://localhost:8000`.
+
+This runs in **single-tenant local mode**: no Clerk, every request is `local-user`
+in the `local` group. It performs no authentication, so do not expose it to the
+internet without configuring Clerk (see [Authentication](#authentication)).
+
+`API_URL` is read at request time, so pointing the frontend at a different
+backend needs only a restart — no rebuild.
+
+Simulation data persists in the `runs-data` volume; Postgres in `postgres-data`.
+
+### Optional dependency extras
+
+The default install excludes heavyweight extras that most deployments never use:
+
+| Extra | Install | Needed for |
+|---|---|---|
+| `metrics-ml` | `uv sync --extra metrics-ml` | `perplexity` and the English n-gram surprisal metrics (pulls torch + transformers) |
+| `evals` | `uv sync --extra evals` | The veyru judge-accuracy evaluation harness (`inspect-ai`) |
+
+Without `metrics-ml`, those metrics log a skip and produce no measurement rather
+than failing — the same not-applicable convention the rest of the metric suite
+uses. The n-gram metrics additionally run from a cached model when one exists
+under `~/.cache/glossogen/`, so they often work with no extra installed at all.
+
 ## Deployment
 
-The application deploys to Railway as two services from a single repository. Each service has a `Dockerfile` and a `railway.toml` config-as-code file.
+The application deploys to Railway as two services. The backend is published as
+a container image and promoted by tag; the frontend is built from this
+repository.
 
-- **Backend** (`Dockerfile`, `railway.toml`): Python 3.12, FastAPI server with a persistent volume at `/data/runs` for simulation data.
-- **Frontend** (`frontend/Dockerfile`, `frontend/railway.toml`): Node 22, Next.js standalone build.
+- **Backend** (`Dockerfile`): Python 3.12, FastAPI server with a persistent volume at `/data/runs` for simulation data. Built and pushed to GHCR by `.github/workflows/publish-images.yml` on a version tag.
+- **Frontend** (`frontend/DockerfileFrontend`, `frontend/railway.toml`): Node 22, Next.js standalone build.
 
 Railway environment variables for the backend:
 
@@ -574,7 +656,7 @@ Railway environment variables for the backend:
 - `OAUTH_ISSUER_URL` — public backend URL to enable MCP OAuth.
 - `ENABLE_EVALUATIONS` — set to `false` to disable the REST evaluate endpoint (the frontend "Run Eval" button): the endpoint returns 403 and the frontend hides the button. Defaults to enabled. Does not affect the CLI `glossogen evaluate` command.
 
-The frontend requires `NEXT_PUBLIC_API_URL` as a build arg pointing to the backend URL, plus `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` for Clerk-mode operation.
+The frontend reads `API_URL` at runtime (required), plus `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` for Clerk-mode operation. None are compiled into the bundle, so the same image serves any environment.
 
 The backend container runs `alembic upgrade head` on every start so the schema is always at the latest revision before the server begins accepting requests.
 

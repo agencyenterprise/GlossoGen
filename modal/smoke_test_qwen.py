@@ -4,9 +4,10 @@ Runs inside a Modal container with the vllm-api-key secret attached so the API
 key never leaves Modal. Hits chat completion plain + tool-calling variants.
 """
 
+import os
+
 import modal
 
-ENDPOINT_BASE = "https://ae-alignment--qwen-3-32b-serve.modal.run"
 MODEL_NAME = "Qwen/Qwen3-32B"
 
 image = modal.Image.debian_slim().pip_install("httpx==0.28.1")
@@ -18,8 +19,12 @@ app = modal.App("qwen-3-32b-smoke-test")
     secrets=[modal.Secret.from_name("vllm-api-key")],
     timeout=15 * 60,
 )
-def smoke_test() -> None:
+def smoke_test(endpoint_base: str) -> None:
     """Hit the chat endpoints (plain + tool) and print results.
+
+    ``endpoint_base`` is resolved locally and passed in rather than read from
+    the environment here: Modal re-imports this module inside the container,
+    where the caller's shell environment does not exist.
 
     Retries on HTTP 303 with backoff for up to ~12 minutes, since Modal returns
     303 while the underlying vLLM server is still loading the weights.
@@ -41,7 +46,7 @@ def smoke_test() -> None:
         attempt = 0
         while True:
             attempt += 1
-            response = client.post(f"{ENDPOINT_BASE}{path}", headers=headers, json=payload)
+            response = client.post(f"{endpoint_base}{path}", headers=headers, json=payload)
             if response.status_code != 303:
                 return response
             elapsed = int(time.monotonic() - (deadline - 12 * 60))
@@ -103,5 +108,16 @@ def smoke_test() -> None:
 
 @app.local_entrypoint()
 def main() -> None:
-    """Trigger the remote smoke test."""
-    smoke_test.remote()
+    """Resolve the endpoint from the local environment and trigger the test.
+
+    Modal returns one hostname per app, namespaced by workspace:
+    ``https://<workspace>--qwen-3-32b-serve.modal.run``.
+    Set ``MODAL_QWEN_ENDPOINT_BASE`` to yours — no trailing slash, no ``/v1`` suffix.
+    """
+    endpoint_base = os.environ.get("MODAL_QWEN_ENDPOINT_BASE")
+    if not endpoint_base:
+        raise SystemExit(
+            "MODAL_QWEN_ENDPOINT_BASE is not set. Point it at your Modal "
+            "endpoint, e.g. https://<workspace>--qwen-3-32b-serve.modal.run"
+        )
+    smoke_test.remote(endpoint_base=endpoint_base.rstrip("/"))

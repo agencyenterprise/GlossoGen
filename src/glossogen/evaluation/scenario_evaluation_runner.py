@@ -15,6 +15,7 @@ from glossogen.evaluation.log_reader import (
     load_events,
 )
 from glossogen.evaluation.metric_core.measurement import Measurement
+from glossogen.evaluation.metric_core.metric_execution_error import MetricExecutionError
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_registry import GENERIC_METRIC_REGISTRY
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
@@ -88,8 +89,9 @@ async def run_scenario_evaluation(
             )
         new_measurements.extend(measurements)
     if failed_metrics:
-        logger.warning(
-            "Evaluation completed with %d failed metric(s): %s",
+        logger.error(
+            "%d metric(s) failed: %s — the report will still be written with "
+            "the metrics that succeeded, then evaluation will exit non-zero",
             len(failed_metrics),
             ", ".join(failed_metrics),
         )
@@ -122,4 +124,13 @@ async def run_scenario_evaluation(
         evaluation_cost=cumulative_cost,
     )
     await write_report(report=report, report_path=report_path)
+
+    # Report first, then fail. Writing the report keeps the results of every
+    # metric that did succeed, while raising ensures the process exits non-zero
+    # instead of presenting a partial report as a complete one.
+    if failed_metrics:
+        raise MetricExecutionError(
+            failed_metric_names=failed_metrics,
+            report_path=str(report_path),
+        )
     return report

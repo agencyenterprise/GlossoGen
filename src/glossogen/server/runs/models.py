@@ -39,8 +39,8 @@ class ReplaceAgentSource(BaseModel):
     """Provenance for a run created via the replace-agent endpoint.
 
     The replacement boundary is the start of round ``round_start``.
-    ``target_event_id`` is the resolved anchor inside the source
-    run's git history (the ``RoundAdvanced`` event for ``round_start``),
+    ``target_event_id`` is the resolved anchor inside the source run's
+    JSONL event log (the ``RoundAdvanced`` event for ``round_start``),
     kept for traceability.
     """
 

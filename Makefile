@@ -1,10 +1,27 @@
 # Installation
 install: install-server install-frontend
 
+# --extra evals is required for type checking: judge_accuracy_eval.py imports
+# inspect_ai at module scope, and without the package pyright reports every
+# symbol in that file as unknown. Extras are separate from dependency-groups
+# in uv, so --all-groups does not cover it.
+#
+# --extra metrics-ml is deliberately omitted: it is multi-gigabyte, and nothing
+# under src/ imports torch, minicons, or datasets directly (see
+# evaluation/metric_core/optional_ml_backend.py), so pyright does not need it.
 install-server:
 	@echo "Installing server dependencies..."
-	VIRTUAL_ENV= uv sync --all-groups
+	VIRTUAL_ENV= uv sync --all-groups --extra evals
 	@echo "Server dependencies installed"
+
+# Recommended for research use: adds the metrics-ml extra so `perplexity` and
+# the English n-gram surprisal metrics can run. Kept separate from
+# install-server because torch + transformers are several gigabytes and a
+# deployment that only serves runs never executes them.
+install-metrics:
+	@echo "Installing server dependencies with the metrics-ml extra..."
+	VIRTUAL_ENV= uv sync --all-groups --extra evals --extra metrics-ml
+	@echo "Server dependencies installed (metrics-ml enabled)"
 
 install-frontend:
 	cd frontend && npm ci
@@ -23,34 +40,6 @@ lint-server:
 	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal --exclude scripts
 	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs --exclude scripts
 	@echo "Server linting complete"
-
-results-viewer:
-	VIRTUAL_ENV= PYTHONPATH=. uv run --group analysis --no-sync streamlit run analysis/results_viewer/app.py
-
-# Google Sheets sync — regenerate each workbook, then overwrite only its data tabs
-# (chart tabs untouched; a pre-write CSV backup lands under analysis/sheets_sync/backups/).
-sync-sheets-baseline:
-	VIRTUAL_ENV= uv run --no-sync --with openpyxl python -m analysis.baseline_round_success.export_baseline_round_success
-	VIRTUAL_ENV= PYTHONPATH=. uv run --no-sync --group sheets python analysis/sheets_sync/sync_to_sheets.py --target baseline
-
-sync-sheets-noise:
-	VIRTUAL_ENV= uv run --no-sync --with openpyxl python -m analysis.channel_noise_export.export_channel_noise
-	VIRTUAL_ENV= PYTHONPATH=. uv run --no-sync --group sheets python analysis/sheets_sync/sync_to_sheets.py --target channel_noise
-
-sync-sheets-protocol:
-	VIRTUAL_ENV= uv run --no-sync --with openpyxl python -m analysis.protocol_learnability_export.export_protocol_learnability
-	VIRTUAL_ENV= PYTHONPATH=. uv run --no-sync --group sheets python analysis/sheets_sync/sync_to_sheets.py --target protocol_learnability
-
-sync-sheets-spot:
-	VIRTUAL_ENV= uv run --no-sync --with openpyxl python -m analysis.spot_the_difference_export.export_spot_the_difference
-	VIRTUAL_ENV= PYTHONPATH=. uv run --no-sync --group sheets python analysis/sheets_sync/sync_to_sheets.py --target spot_the_difference
-
-# Rebuild the hand-authored chart tabs in the spot_the_difference spreadsheet.
-charts-spot:
-	VIRTUAL_ENV= PYTHONPATH=. uv run --no-sync --group sheets python analysis/spot_the_difference_export/build_spot_charts.py
-
-sync-sheets: sync-sheets-baseline sync-sheets-noise sync-sheets-protocol sync-sheets-spot
-	@echo "All spreadsheets synced"
 
 lint-frontend:
 	@echo "Linting frontend..."
@@ -98,4 +87,4 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend results-viewer sync-sheets sync-sheets-baseline sync-sheets-noise sync-sheets-protocol sync-sheets-spot charts-spot langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types
+.PHONY: install install-server install-metrics install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types

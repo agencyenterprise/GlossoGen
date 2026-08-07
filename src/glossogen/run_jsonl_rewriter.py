@@ -1,7 +1,7 @@
 """Shared JSONL rewrite helper for derived runs (fork, replace-agent).
 
-Both the fork and replace-agent flows clone a source run's git repo at a
-target commit, then need to rewrite the in-place JSONL to (a) update the
+Both the fork and replace-agent flows copy a source run directory and
+truncate its JSONL at a target event, then rewrite it to (a) update the
 embedded ``run_id``, (b) optionally apply text edits to ``message_sent``
 events, and (c) drop a subset of events so derived agents start from a
 clean state. The drop predicate is the only thing that varies between the

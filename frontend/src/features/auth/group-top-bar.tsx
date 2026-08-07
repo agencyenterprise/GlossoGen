@@ -1,6 +1,7 @@
 "use client";
 
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
+import { isClerkConfigured } from "@/shared/config/runtime-config";
 
 /**
  * Group controls shown inside every ``/g/[groupSlug]/...`` route.
@@ -17,7 +18,7 @@ import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
  * clickable; the empty corner around it stays transparent to the page beneath.
  */
 export function GroupTopBar() {
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+  if (!isClerkConfigured()) {
     return null;
   }
   return (

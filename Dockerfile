@@ -1,8 +1,9 @@
 FROM python:3.12-slim
 
-# System deps for weasyprint (PDF export), git (run history), and build tools
+# System deps for weasyprint (PDF export). Nothing else here needs apt:
+# run history is a JSONL ledger with byte-offset truncation, so the image
+# carries no git — which on Debian would also pull in perl.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
     libpangocairo-1.0-0 \

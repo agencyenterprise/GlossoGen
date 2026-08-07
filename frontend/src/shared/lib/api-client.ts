@@ -1,11 +1,30 @@
 import createClient from "openapi-fetch";
+import { getApiUrl } from "@/shared/config/runtime-config";
 import type { paths } from "@/types/api.gen";
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+/**
+ * Placeholder origin handed to openapi-fetch at module load.
+ *
+ * `createClient` captures `baseUrl` when it is constructed, which is import
+ * time — too early to know the runtime API URL. Requests are therefore built
+ * against this sentinel and rewritten to the real origin in the `onRequest`
+ * middleware below, which already reconstructs every request. The sentinel is
+ * never dialled; a request escaping with this origin means the rewrite was
+ * skipped, and it fails loudly rather than silently hitting the wrong host.
+ */
+const SENTINEL_ORIGIN = "http://runtime-config.invalid";
 
 export const api = createClient<paths>({
-  baseUrl: API_URL,
+  baseUrl: SENTINEL_ORIGIN,
 });
+
+/** Swap the sentinel origin for the runtime API URL. */
+function resolveApiOrigin(url: string): string {
+  if (!url.startsWith(SENTINEL_ORIGIN)) {
+    return url;
+  }
+  return `${getApiUrl()}${url.slice(SENTINEL_ORIGIN.length)}`;
+}
 
 /**
  * Module-level mirror of the currently active group slug.
@@ -115,9 +134,9 @@ export async function buildEventStreamUrl({
   }
   const query = searchParams.toString();
   if (query.length > 0) {
-    return `${API_URL}${substituted}?${query}`;
+    return `${getApiUrl()}${substituted}?${query}`;
   }
-  return `${API_URL}${substituted}`;
+  return `${getApiUrl()}${substituted}`;
 }
 
 function extractFilename(disposition: string | null, fallback: string): string {
@@ -141,7 +160,8 @@ export async function downloadAuthenticatedFile({
   const substituted = substituteGroupSlug(path);
   assertGroupSlugSubstituted(substituted);
   const query = searchParams.toString();
-  const url = query.length > 0 ? `${API_URL}${substituted}?${query}` : `${API_URL}${substituted}`;
+  const base = getApiUrl();
+  const url = query.length > 0 ? `${base}${substituted}?${query}` : `${base}${substituted}`;
   const headers: Record<string, string> = {};
   const token = await getClerkSessionToken();
   if (token) {
@@ -166,7 +186,7 @@ export async function downloadAuthenticatedFile({
 
 api.use({
   async onRequest({ request }) {
-    const substituted = substituteGroupSlug(request.url);
+    const substituted = resolveApiOrigin(substituteGroupSlug(request.url));
     assertGroupSlugSubstituted(substituted);
     const token = await getClerkSessionToken();
 

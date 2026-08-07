@@ -1,0 +1,78 @@
+# Self-hosting GlossoGen: Postgres, backend, and frontend in one command.
+#
+#   cp .env.example .env      # then set ANTHROPIC_API_KEY
+#   docker compose up --build
+#
+# Frontend at http://localhost:3000, backend at http://localhost:8000.
+# Runs in single-tenant local mode (no Clerk) — every request is `local-user`
+# in the `local` group. Do not expose this configuration to the internet
+# without setting up Clerk; local mode performs no authentication.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: glossogen
+      POSTGRES_PASSWORD: glossogen
+      POSTGRES_DB: glossogen
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glossogen"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Not published to the host by default — the backend reaches it over the
+    # compose network. Uncomment to inspect with psql from your machine.
+    # ports:
+    #   - "5432:5432"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://glossogen:glossogen@postgres:5432/glossogen
+      GLOSSOGEN_RUNS_DIR: /data/runs
+      ALLOWED_ORIGINS: http://localhost:3000
+      PORT: "8000"
+      # Required to run simulations. Set it in .env rather than here.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Set to your public backend URL to enable the MCP endpoint at /mcp.
+      OAUTH_ISSUER_URL: ${OAUTH_ISSUER_URL:-}
+    volumes:
+      - runs-data:/data/runs
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  frontend:
+    build:
+      context: frontend
+      dockerfile: DockerfileFrontend
+    depends_on:
+      - backend
+    environment:
+      # Read at request time, not compiled in — changing these needs only a
+      # restart, not a rebuild. This is the browser-facing URL, so it is
+      # localhost (where you point your browser), not the compose service name.
+      API_URL: http://localhost:8000
+      # Set both for Clerk multi-tenant auth; omit for local mode.
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres-data:
+  runs-data:

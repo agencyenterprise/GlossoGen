@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Copy, X } from "lucide-react";
-import { API_URL } from "@/shared/lib/api-client";
+import { getApiUrl } from "@/shared/config/runtime-config";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -50,7 +50,7 @@ export function McpConfigModal({ onClose }: { onClose: () => void }) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const mcpUrl = `${API_URL}/mcp`;
+  const mcpUrl = `${getApiUrl()}/mcp`;
 
   const claudeCommand = `claude mcp add-json glossogen-runs '${JSON.stringify({ type: "http", url: mcpUrl })}'`;
 

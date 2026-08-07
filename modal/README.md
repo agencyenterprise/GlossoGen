@@ -103,9 +103,22 @@ If you can't recover the `VLLM_API_KEY` from Modal (the CLI does not expose secr
 
 ## Verify
 
+Each smoke test reads its endpoint from the environment, since the hostname is
+namespaced by your Modal workspace. Set the variable for the app you are testing
+— no trailing slash, no `/v1` suffix:
+
 ```bash
+export MODAL_LLAMA_ENDPOINT_BASE=https://<workspace>--llama-3-3-70b-instruct-serve.modal.run
 modal run modal/smoke_test_llama.py
+
+export MODAL_QWEN_ENDPOINT_BASE=https://<workspace>--qwen-3-32b-serve.modal.run
+modal run modal/smoke_test_qwen.py
 ```
+
+The value is resolved in the local entrypoint and passed into the remote
+function, because Modal re-imports the module inside the container where your
+shell environment does not exist. An unset variable fails immediately with a
+message naming the variable.
 
 Runs an ephemeral function inside Modal (the API key never leaves Modal) that hits both a plain chat completion and a tool-calling chat completion. Pass = HTTP 200 plus a `tool_calls[0].function.name = "get_weather"` in the second response. The function retries on HTTP 303 with exponential backoff for up to 12 minutes while vLLM finishes loading the model.
 

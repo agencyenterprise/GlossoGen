@@ -170,16 +170,13 @@ cython_debug/
 /logs/
 /runs/*
 !/runs/.gitkeep
-/scripts/
 
-# Generated analysis exports (regenerate via the export scripts)
-/analysis/baseline_round_success/output/
-/analysis/protocol_learnability_export/output/
-/analysis/channel_noise_export/output/
-/analysis/spot_the_difference_export/output/
-
-# Google Sheets sync: pre-write tab snapshots + service-account credentials
-/analysis/sheets_sync/backups/
+# Credentials
 secrets/
 *gcp_service_account*.json
 *service-account*.json
+
+# macOS / tooling noise
+.DS_Store
+.playwright-mcp/
+.streamlit/

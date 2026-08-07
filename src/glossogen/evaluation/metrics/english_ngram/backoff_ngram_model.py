@@ -26,10 +26,11 @@ less English-like.
 import logging
 import math
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
-from datasets import load_dataset  # type: ignore[import-untyped]
 from pydantic import BaseModel
+
+from glossogen.evaluation.metric_core.optional_ml_backend import load_hf_dataset_loader
 
 logger = logging.getLogger(__name__)
 
@@ -193,8 +194,12 @@ def _cache_path(case_sensitive: bool, keep_punctuation: bool) -> Path:
 
 
 def _build_model(case_sensitive: bool, keep_punctuation: bool) -> BackoffTrigramModel:
-    """Train the backoff trigram on the wikitext-2 train split."""
-    loader = cast(Any, load_dataset)
+    """Train the backoff trigram on the wikitext-2 train split.
+
+    Raises ``MetricsMlExtraMissing`` when the optional ``datasets`` dependency
+    is absent. Only reached on a cold cache.
+    """
+    loader = load_hf_dataset_loader()
     dataset = loader(_DATASET_NAME, _DATASET_CONFIG, split=_DATASET_SPLIT)
     lines = cast(list[str], dataset["text"])
     trigram: dict[str, int] = {}

@@ -98,6 +98,10 @@ class EnglishNgramBackoffSurprisalMetric(Metric):
                 )
                 continue
 
+            # A cold cache with no `datasets` installed raises
+            # MetricsMlExtraMissing, which is left to propagate: the metric was
+            # explicitly requested and cannot run, so the evaluation should fail
+            # rather than report nothing and look like a clean result.
             round_surprisals = await asyncio.to_thread(_score_all_rounds, rounds=rounds)
 
             all_means = [rs.mean_surprisal for rs in round_surprisals]
