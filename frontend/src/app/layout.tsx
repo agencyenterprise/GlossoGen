@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { AuthGate } from "@/features/auth/auth-gate";
 import { ClerkProviderWrapper } from "@/features/auth/clerk-provider-wrapper";
 import { readServerRuntimeConfig } from "@/shared/config/runtime-config";
 import { RuntimeConfigScript } from "@/shared/config/runtime-config-script";
@@ -51,9 +50,7 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ClerkProviderWrapper publishableKey={clerkPublishableKey}>
-          <QueryProvider>
-            <AuthGate>{children}</AuthGate>
-          </QueryProvider>
+          <QueryProvider>{children}</QueryProvider>
         </ClerkProviderWrapper>
       </body>
     </html>
