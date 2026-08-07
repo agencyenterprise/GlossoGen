@@ -15,9 +15,7 @@ import { DriveModuleRepairRoundDetailPanel } from "./drive-module-repair-round-d
 export const driveModuleRepairPlugin: ScenarioPlugin = {
   scenarioName: "drive_module_repair",
   primaryChannelId: "bay",
-  knobsForm: null,
   RoundDetailPanel: DriveModuleRepairRoundDetailPanel,
-  defaultReplaceAgentKnobs: {},
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,
   liveJudge: {

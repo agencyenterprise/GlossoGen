@@ -141,18 +141,3 @@ export function resolveSelectedInstance(
   const latest = instances.filter(i => i.agent_id === selected && i.is_latest).at(0);
   return latest ?? null;
 }
-
-/**
- * Group an agent_id's instances together for sidebar rendering. Ordering
- * matches the input `agents` list so the sidebar position is stable.
- */
-export function groupInstancesByAgent(
-  agents: AgentDetail[],
-  instances: AgentInstance[]
-): { agent_id: string; role_name: string; instances: AgentInstance[] }[] {
-  return agents.map(agent => ({
-    agent_id: agent.agent_id,
-    role_name: agent.role_name,
-    instances: instances.filter(i => i.agent_id === agent.agent_id),
-  }));
-}

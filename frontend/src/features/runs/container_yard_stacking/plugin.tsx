@@ -8,15 +8,7 @@
  */
 
 import type { components } from "@/types/api.gen";
-import type { AgentModelOverride } from "../agent-model-overrides";
-import type { KnobsFormError, ScenarioPlugin } from "../scenario-plugin";
-import { ContainerYardKnobsForm } from "./container-yard-knobs-form";
-import {
-  buildPayload as buildContainerYardPayload,
-  knobsToState,
-  validateState as validateContainerYardState,
-  type ContainerYardKnobsState,
-} from "./container-yard-knobs-state";
+import type { ScenarioPlugin } from "../scenario-plugin";
 import { formatExpectedMove, formatMoveArgs, moveVerdictAccepted } from "./move-verdict";
 import { YardMoveMetadataBlock } from "./yard-move-metadata-block";
 import { YardRoundDetailPanel } from "./yard-round-detail-panel";
@@ -29,51 +21,10 @@ function isYardExtras(extras: unknown): extras is ContainerYardRunExtras {
   return tagged.scenario_name === "container_yard_stacking";
 }
 
-function ContainerYardKnobsFormAdapter({
-  state,
-  errors,
-  onChange,
-}: {
-  state: unknown;
-  models: { model_prefix: string; provider: string }[];
-  errors: KnobsFormError[];
-  onChange: (next: unknown) => void;
-}) {
-  const typedState = state as ContainerYardKnobsState | null;
-  const typedErrors = errors as { field: keyof ContainerYardKnobsState; message: string }[];
-  if (typedState === null) {
-    const seeded = knobsToState({});
-    return (
-      <ContainerYardKnobsForm
-        state={seeded}
-        errors={typedErrors}
-        onChange={next => onChange(next)}
-      />
-    );
-  }
-  return (
-    <ContainerYardKnobsForm
-      state={typedState}
-      errors={typedErrors}
-      onChange={next => onChange(next)}
-    />
-  );
-}
-
 export const containerYardStackingPlugin: ScenarioPlugin = {
   scenarioName: "container_yard_stacking",
   primaryChannelId: "link",
-  knobsForm: {
-    Component: ContainerYardKnobsFormAdapter,
-    validate: state => validateContainerYardState(state as ContainerYardKnobsState),
-    buildPayload: ({ state, modelOverrides }) =>
-      buildContainerYardPayload({
-        state: state as ContainerYardKnobsState,
-        modelOverrides: modelOverrides as Record<string, AgentModelOverride>,
-      }),
-  },
   RoundDetailPanel: YardRoundDetailPanel,
-  defaultReplaceAgentKnobs: { postmortem_disabled_at_start: true },
   renderToolMetadata: ({ callId, extras }) => {
     if (!isYardExtras(extras)) return null;
     const metadata = extras.move_metadata_by_call_id[callId];
