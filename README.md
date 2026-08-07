@@ -603,6 +603,48 @@ frontend/                      # Next.js web application
 
 See [Architecture.md](Architecture.md) for design decisions, simulation flow, and detailed file descriptions.
 
+## Understanding cost
+
+Running a simulation spends real money against **your own** provider keys. An
+agent takes many turns per round, and every turn is an API call carrying the full
+conversation so far, so cost grows faster than round count alone suggests.
+
+The knobs that drive spend, roughly in order of impact:
+
+| Knob | Effect |
+|---|---|
+| `round_count` | Rounds per run — the main multiplier |
+| Model choice | The largest single factor. A frontier model can cost 10–30× a small one for identical work |
+| `max_round_duration_seconds` | Ceiling on how long agents keep talking before a round is cut off |
+| `agent_max_tokens` | Per-turn output cap (default `16384`) |
+| Number of agents | Each one is an independent conversation |
+| `--probe-replicas` | Evaluation only: multiplies probe calls per agent per question |
+
+Actual per-run cost is recorded in the run's evaluation report under
+`evaluation_cost`, and per-model pricing lives in
+[token_pricing.py](src/glossogen/token_pricing.py).
+
+**Before any sweep, do one run first and read its cost.** Multiply by the number
+of runs you intend. This is the single easiest expensive mistake to make.
+
+### Limiting concurrent spend
+
+The server launches simulations and evaluations as background subprocesses. Two
+ceilings bound how many can run at once:
+
+| Variable | Default | Limits |
+|---|---|---|
+| `MAX_CONCURRENT_RUNS` | `4` | Simultaneous simulations |
+| `MAX_CONCURRENT_EVALUATIONS` | `4` | Simultaneous evaluations |
+
+Exceeding either returns HTTP 429; the request is valid and will succeed once a
+slot frees. Slots are counted from the marker files running subprocesses write,
+so a crashed process releases its slot without any cleanup step.
+
+These bound *concurrency*, not total spend — a persistent client can still run
+work back to back within them. Set provider-side billing alerts as well; nothing
+here can enforce a budget your provider does not.
+
 ## Self-hosting
 
 The fastest way to run the whole stack — Postgres, backend, and frontend:
