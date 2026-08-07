@@ -103,7 +103,7 @@ export function useRunDetailData({
 
   // SSE streaming for in-progress runs
   const sseEnabled = restData?.status === "in_progress" || restData?.status === "starting";
-  const sse = useEventStream(runId, sseEnabled, knownEventIds, true, scenarioPlugin.liveJudge);
+  const sse = useEventStream(runId, sseEnabled, knownEventIds, scenarioPlugin.liveJudge);
   const sseConnected = sse.isConnected;
 
   // When SSE reports simulation ended, refetch REST for evaluation status

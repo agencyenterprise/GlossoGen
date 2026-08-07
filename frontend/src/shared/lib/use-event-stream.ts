@@ -75,7 +75,6 @@ export function useEventStream(
   runId: string,
   enabled: boolean,
   knownEventIds: Set<string>,
-  retryOnFailure: boolean,
   liveJudge: LiveJudgeConfig | null
 ): EventStreamState {
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
@@ -139,7 +138,7 @@ export function useEventStream(
         });
       } catch {
         // Group slug not primed yet, or token fetch failed. Retry shortly.
-        if (retryOnFailure && !cancelled) {
+        if (!cancelled) {
           retryTimer = setTimeout(connect, 2000);
         }
         return;
@@ -167,7 +166,7 @@ export function useEventStream(
         if (!hasConnected && (serverRejected || errorCount >= 3)) {
           eventSource.close();
           activeSource = null;
-          if (retryOnFailure && !cancelled) {
+          if (!cancelled) {
             retryTimer = setTimeout(connect, 2000);
           }
         }
@@ -399,7 +398,7 @@ export function useEventStream(
       }
       resetState();
     };
-  }, [runId, enabled, retryOnFailure, resetState, liveJudge]);
+  }, [runId, enabled, resetState, liveJudge]);
 
   return {
     messages,

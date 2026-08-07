@@ -13,9 +13,7 @@ import { SpotTheDifferenceRoundDetailPanel } from "./spot-the-difference-round-d
 export const spotTheDifferencePlugin: ScenarioPlugin = {
   scenarioName: "spot_the_difference",
   primaryChannelId: "link",
-  knobsForm: null,
   RoundDetailPanel: SpotTheDifferenceRoundDetailPanel,
-  defaultReplaceAgentKnobs: { postmortem_disabled_at_start: true },
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,
   liveJudge: null,
