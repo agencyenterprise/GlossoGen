@@ -7,9 +7,7 @@ import { ModelPicker } from "./model-picker";
 export type ChannelVisibilityKind = "full" | "none" | "from_round";
 
 export type ChannelVisibility =
-  | { kind: "full" }
-  | { kind: "none" }
-  | { kind: "from_round"; round_floor: number };
+  { kind: "full" } | { kind: "none" } | { kind: "from_round"; round_floor: number };
 
 export type SwapAgentEvent = {
   type: "swap_agent";
