@@ -3443,7 +3443,7 @@
           "replaced_at"
         ],
         "title": "ReplaceAgentSource",
-        "description": "Provenance for a run created via the replace-agent endpoint.\n\nThe replacement boundary is the start of round ``round_start``.\n``target_event_id`` is the resolved anchor inside the source\nrun's git history (the ``RoundAdvanced`` event for ``round_start``),\nkept for traceability."
+        "description": "Provenance for a run created via the replace-agent endpoint.\n\nThe replacement boundary is the start of round ``round_start``.\n``target_event_id`` is the resolved anchor inside the source run's\nJSONL event log (the ``RoundAdvanced`` event for ``round_start``),\nkept for traceability."
       },
       "ResumeAtRoundSource": {
         "properties": {
