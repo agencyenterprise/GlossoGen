@@ -65,45 +65,12 @@ reader does not know what Y was and does not care.
 
 ## Adding a scenario
 
-**Open a pull request with the scenario, not an issue proposing one.** A scenario
-is self-contained — its own package under `src/glossogen/scenarios/<name>/`,
-touching no shared code — so there is nothing to agree in advance. A working
-scenario is far easier to evaluate than a description of one, and nobody else is
-going to implement it for you.
+Open a pull request with the scenario rather than an issue proposing one. A
+scenario is self-contained — its own package under
+`src/glossogen/scenarios/<name>/`, touching no shared code.
 
 [docs/creating-a-scenario.md](docs/creating-a-scenario.md) is the step-by-step
-guide. In short, a scenario supplies:
-
-- `ids.py`, `knobs.py` (all fields required — no defaults), and `knobs_default.json`
-- `events.py` for its own `EventBase` subclasses, and `world.py` for state
-- `scenario.py` implementing the two abstract hooks:
-  - `get_primary_channels()` — which channel(s) generic metrics should score
-  - `judge_round_result(round_number, trigger)` — per-round success verdicts
-
-Both must be *implemented*, but neither forces a particular design. Despite the
-name, `judge_round_result` does not imply an LLM judge — `prisoners_dilemma`
-resolves rounds deterministically from its payoff matrix and involves no LLM
-anywhere. Return `[]` if the scenario genuinely has no per-round success
-criterion; that emits no `RoundResultRecorded` events and the round-success
-metrics simply produce no measurement for the run. Likewise `get_primary_channels()`
-returns `[]` when no channel is worth scoring.
-- `prompts/` as Jinja templates, never strings in Python
-- a `README.md` explaining the communication pressure the scenario creates
-
-Everything else is opt-in through hooks. Platform metrics consume scenario data
-through them, so **do not write scenario-specific metrics** — if you need a new
-measurement, add it to the platform so every scenario gets it.
-
-Two things reviewers will look for:
-
-**What communication pressure does it create?** The platform studies how agents
-change the way they talk under constraint — bandwidth limits, noise, a time
-budget, split information. A scenario where agents can just say everything
-plainly does not exercise anything.
-
-**Is it solvable?** Validate with a capable model before submitting. If strong
-agents cannot succeed, the scenario measures its own impossibility rather than
-communication. Include what you ran and the round-success it reached.
+guide.
 
 ## Releases
 
