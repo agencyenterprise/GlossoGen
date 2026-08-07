@@ -44,7 +44,7 @@ class ReplaceAgentRequest(NamedTuple):
 
     The boundary is the *start* of round ``round_start``: the resumed
     simulation enters that round. The exact ``RoundAdvanced`` event that
-    anchors the git rewind is resolved internally.
+    anchors the rewind is resolved internally.
 
     ``rounds_after_swap`` controls how many rounds the resumed
     simulation will play following the boundary: round_count is set
