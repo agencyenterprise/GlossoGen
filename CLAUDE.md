@@ -113,7 +113,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
   - `runs/run_detail_types.py` — leaf DTOs (`AgentDetail`, `ChannelMessage`) shared by `models.py` and scenario-side extensions so extensions can import them without re-entering `models.py` during its discovery-time import
   - `mcp/browser.py` — MCP server mounted at `/mcp` for programmatic run browsing and launching (Claude Code, Cursor)
   - `mcp/oauth_provider.py` — OAuth 2.0 authorization server provider for MCP
-  - `mcp/oauth_storage.py` — SQLite-backed storage for OAuth clients, codes, and tokens
+  - `mcp/oauth_storage.py` — Postgres-backed storage for OAuth clients, codes, and tokens
   - `mcp/oauth_login_page.py` — login form for the MCP OAuth authorization flow
   - `run_launcher.py` — shared simulation launch helper used by REST and MCP run-start flows
 - `linter/` — custom linting scripts

@@ -25,9 +25,7 @@ dependencies = [
     "weasyprint>=62.0",
     "markdown>=3.7",
     "python-dotenv>=1.2.2",
-    "aiosqlite>=0.22.1",
     "cachetools>=7.0.5",
-    "watchdog>=6.0.0",
     "rapidfuzz>=3.10.0",
     "psycopg[binary]>=3.2.0",
     "psycopg-pool>=3.2.0",
@@ -77,6 +75,18 @@ required-environments = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# Prompt templates, knob defaults, probe question banks, and judge golden
+# labels are loaded at runtime and must ship inside the installed package.
+# Without this, only .py files are packaged: a source checkout and the Docker
+# image still work (both install the project from source), but installing
+# glossogen as a dependency yields a package that cannot render any prompt.
+[tool.setuptools.package-data]
+glossogen = [
+    "**/*.jinja",
+    "**/*.json",
+    "**/*.tsv",
+]
 
 [tool.black]
 line-length = 100
