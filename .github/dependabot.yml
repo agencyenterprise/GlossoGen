@@ -10,6 +10,11 @@ updates:
       # still arrive individually because they need real review.
       python-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # Transitive only, and capped below 49 by every version of
+      # clerk-backend-api. Attempting to bump it makes the whole resolution
+      # unsatisfiable, which fails every Dependabot run for this ecosystem.
+      - dependency-name: "cryptography"
 
   - package-ecosystem: "npm"
     directory: "/frontend"
@@ -19,6 +24,12 @@ updates:
     groups:
       npm-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # TypeScript majors are an ecosystem migration, not a bump: typescript-eslint
+      # and eslint-config-next must support the new major first, and until they do
+      # `npm ci` fails to resolve before any check can run. Revisit deliberately.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
