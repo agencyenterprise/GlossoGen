@@ -3,7 +3,15 @@ install: install-server install-frontend
 
 install-server:
 	@echo "Installing server dependencies..."
-	VIRTUAL_ENV= uv sync --all-groups
+	# --extra evals is required for type checking: judge_accuracy_eval.py
+	# imports inspect_ai at module scope, and without the package pyright
+	# reports every symbol in that file as unknown. Extras are separate from
+	# dependency-groups in uv, so --all-groups does not cover it.
+	# --extra metrics-ml is deliberately omitted: it is multi-gigabyte, and
+	# nothing under src/ imports torch, minicons, or datasets directly (see
+	# evaluation/metric_core/optional_ml_backend.py), so pyright does not
+	# need it.
+	VIRTUAL_ENV= uv sync --all-groups --extra evals
 	@echo "Server dependencies installed"
 
 install-frontend:
