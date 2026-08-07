@@ -5,10 +5,8 @@ Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
 ## Unreleased
 
 ### Added
-- Concurrency ceilings on the paid background work the server spawns:
-  `MAX_CONCURRENT_RUNS` and `MAX_CONCURRENT_EVALUATIONS` (default 4 each).
-  Exceeding a limit returns HTTP 429. Previously both were unbounded, so a
-  retry loop in a client could run up an unbounded provider bill.
+- A cost model in the README: which knobs drive spend, and the advice to price
+  one run before launching a sweep.
 - `SECURITY.md`, `CONTRIBUTING.md`, Dependabot, and issue and pull-request
   templates.
 

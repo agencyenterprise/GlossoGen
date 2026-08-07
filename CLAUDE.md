@@ -204,8 +204,6 @@ cp .env.example .env
 | `CLERK_WEBHOOK_SECRET` | Yes (Clerk mode) | Svix signing secret for `POST /api/clerk/webhook` that keeps the `groups` table in sync with Clerk org create/update/delete events. |
 | `CLERK_AUTHORIZED_PARTIES` | Optional (Clerk mode) | Comma-separated list of frontend origins allowed to mint tokens for this backend (e.g. `http://localhost:3000,https://app.example.com`). |
 | `ALLOWED_ORIGINS` | Optional | Comma-separated CORS origins (defaults to `http://localhost:3000`) |
-| `MAX_CONCURRENT_RUNS` | Optional | Max simultaneous simulations the server will launch (default `4`). Exceeding it returns HTTP 429. Counted from live `stream.json` manifests, so a crashed run frees its slot. |
-| `MAX_CONCURRENT_EVALUATIONS` | Optional | Max simultaneous evaluations (default `4`). Same 429 behaviour, counted from `eval_in_progress.json`. |
 | `GLOSSOGEN_RUNS_DIR` | Optional | Directory for simulation run data (defaults to `./runs`) |
 | `ENABLE_EVALUATIONS` | Optional | Whether the REST evaluate endpoint (the frontend "Run Eval" button) is enabled. Defaults to enabled; set to `false`/`0`/`no`/`off` to disable (endpoint returns 403, frontend hides the button via `GET /api/server-config`). Does not affect the CLI `glossogen evaluate` command. |
 | `OAUTH_ISSUER_URL` | Yes (for MCP) | Public backend URL for MCP OAuth (MCP is disabled if unset) |

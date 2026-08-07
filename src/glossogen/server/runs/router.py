@@ -24,7 +24,6 @@ from glossogen.evaluation.reports.evaluation_report import (
 from glossogen.models.event import RunStatus, SimulationEnded
 from glossogen.run_archive import move_run_to_trash
 from glossogen.scenario_registry import SCENARIO_REGISTRY
-from glossogen.server.launch_capacity import LaunchCapacityExceeded, assert_evaluation_capacity
 from glossogen.server.response_models import LaunchStatus
 from glossogen.server.runs.branch_sources import list_branch_sources_for_group
 from glossogen.server.runs.derived_run_references import build_derived_run_references
@@ -376,14 +375,6 @@ async def start_evaluation(
             status_code=422,
             detail="Evaluation requires a completed, errored, or killed run",
         )
-
-    try:
-        assert_evaluation_capacity(runs_dir=request.app.state.runs_dir)
-    except LaunchCapacityExceeded as exc:
-        # 429 rather than 503: the request is valid and retrying later will
-        # succeed. Evaluations make LLM judge calls, so an unbounded fan-out
-        # spends real money.
-        raise HTTPException(status_code=429, detail=str(exc)) from exc
 
     if read_eval_manifest(run_dir=run_dir) is not None:
         raise HTTPException(

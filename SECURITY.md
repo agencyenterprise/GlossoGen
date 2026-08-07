@@ -39,9 +39,8 @@ Some things are known, documented properties rather than vulnerabilities:
 - **Simulations execute LLM-authored tool calls** against scenario-defined tools
   by design. That is what the platform is for.
 - **The server spawns subprocesses that spend money** on the operator's provider
-  keys. Concurrency limits exist (`MAX_CONCURRENT_RUNS`,
-  `MAX_CONCURRENT_EVALUATIONS`) but an authenticated user can still incur cost
-  within them.
+  keys. There is no spend cap in the platform; any authenticated user who can
+  start a run can incur cost.
 
 A way to escape those documented boundaries — reaching another tenant's runs,
 bypassing the identity middleware, executing code outside a simulation's intended
@@ -55,5 +54,5 @@ Two things matter most when deploying this:
 warning loud enough to substitute for checking.
 
 **Provider keys are spending credentials.** They are read from the environment and
-used by subprocesses the server launches. Scope them to the minimum, set billing
-alerts, and tune the concurrency limits to a ceiling you are willing to pay.
+used by subprocesses the server launches. Scope them to the minimum and set
+billing alerts with your provider — the platform enforces no budget of its own.

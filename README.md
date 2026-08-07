@@ -627,23 +627,8 @@ Actual per-run cost is recorded in the run's evaluation report under
 **Before any sweep, do one run first and read its cost.** Multiply by the number
 of runs you intend. This is the single easiest expensive mistake to make.
 
-### Limiting concurrent spend
-
-The server launches simulations and evaluations as background subprocesses. Two
-ceilings bound how many can run at once:
-
-| Variable | Default | Limits |
-|---|---|---|
-| `MAX_CONCURRENT_RUNS` | `4` | Simultaneous simulations |
-| `MAX_CONCURRENT_EVALUATIONS` | `4` | Simultaneous evaluations |
-
-Exceeding either returns HTTP 429; the request is valid and will succeed once a
-slot frees. Slots are counted from the marker files running subprocesses write,
-so a crashed process releases its slot without any cleanup step.
-
-These bound *concurrency*, not total spend — a persistent client can still run
-work back to back within them. Set provider-side billing alerts as well; nothing
-here can enforce a budget your provider does not.
+Nothing in the platform caps spend. Set billing alerts and per-key limits with
+your provider — that is the only ceiling that actually holds.
 
 ## Self-hosting
 

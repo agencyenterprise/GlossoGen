@@ -1,9 +1,6 @@
 """Shared utilities for launching simulation subprocesses.
 
 Used by the MCP browser to start new simulation runs as background processes.
-Every launch spends real money against the operator's provider keys, so the
-concurrency ceiling in ``launch_capacity`` is enforced here rather than at each
-call site.
 """
 
 import logging
@@ -19,7 +16,6 @@ import orjson
 
 from glossogen.run_config_validation import validate_run_config
 from glossogen.scenario_protocol import SimulationScenario
-from glossogen.server.launch_capacity import assert_simulation_capacity
 from glossogen.token_pricing import list_providers
 
 logger = logging.getLogger(__name__)
@@ -85,18 +81,10 @@ def launch_simulation(
     ``group_slug`` is forwarded to the CLI so the subprocess registers the
     new run row under the right tenant after ``claim_run_dir`` succeeds.
 
-    Raises ``ValueError`` for invalid config and ``LaunchCapacityExceeded``
-    when the concurrency ceiling is already reached.
+    Raises ``ValueError`` for invalid config.
     """
     if provider not in list_providers():
         raise ValueError(f"Unknown provider: {provider}")
-
-    # Checked before any work so a rejected launch costs nothing. This is a
-    # best-effort ceiling, not a lock: two launches arriving in the same
-    # instant can both observe a free slot. That is an acceptable overshoot of
-    # one for a spend guard, and far better than the previous behaviour of no
-    # ceiling at all.
-    assert_simulation_capacity(runs_dir=runs_dir)
 
     raw_config = dict(knobs) if knobs is not None else {}
 
