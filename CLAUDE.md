@@ -206,10 +206,11 @@ cp .env.example .env
 | `ALLOWED_ORIGINS` | Optional | Comma-separated CORS origins (defaults to `http://localhost:3000`) |
 | `GLOSSOGEN_RUNS_DIR` | Optional | Directory for simulation run data (defaults to `./runs`) |
 | `ENABLE_EVALUATIONS` | Optional | Whether the REST evaluate endpoint (the frontend "Run Eval" button) is enabled. Defaults to enabled; set to `false`/`0`/`no`/`off` to disable (endpoint returns 403, frontend hides the button via `GET /api/server-config`). Does not affect the CLI `glossogen evaluate` command. |
+| `FRONTEND_URL` | Optional | Base URL the MCP OAuth consent flow redirects to. Falls back to the first `ALLOWED_ORIGINS` entry, then `http://localhost:3000`. Required in Clerk mode for the `/mcp-consent` redirect to reach the right host. |
 | `OAUTH_ISSUER_URL` | Yes (for MCP) | Public backend URL for MCP OAuth (MCP is disabled if unset) |
 | `SELF_HOSTED_BASE_URLS` | Required for `--provider self-hosted` | JSON object mapping model name → OpenAI-compatible `/v1` base URL. Example: `{"meta-llama/Llama-3.3-70B-Instruct":"https://....modal.run/v1","Qwen/Qwen3-32B":"https://....modal.run/v1"}` |
 | `SELF_HOSTED_API_KEY` | Required for `--provider self-hosted` | Bearer token shared across all entries in `SELF_HOSTED_BASE_URLS` (matches each server's `--api-key`) |
-| `LOG_LEVEL` | Optional | Stdlib logging level for `glossogen` CLI commands and analysis scripts (`DEBUG`/`INFO`/`WARNING`/`ERROR`). Set to `DEBUG` to capture verbatim LLM-judge system prompt, user prompt, and structured-output JSON in stderr. Defaults to `INFO`. |
+| `LOG_LEVEL` | Optional | Stdlib logging level for `glossogen` CLI commands (`DEBUG`/`INFO`/`WARNING`/`ERROR`). Set to `DEBUG` to capture verbatim LLM-judge system prompt, user prompt, and structured-output JSON in stderr. Defaults to `INFO`. |
 | `LLM_MAX_TOKENS` | Optional | Per-call output-token cap applied uniformly to the Claude (`max_tokens`), OpenAI (`max_output_tokens`), and HuggingFace (`max_tokens`) providers. Defaults to `16384`; bump higher if structured-output JSON truncates. Note: this does **not** cap the simulation agents — those use the `agent_max_tokens` knob (see below). |
 | `LANGFUSE_PUBLIC_KEY` | Optional | Langfuse project public key. When both this and `LANGFUSE_SECRET_KEY` are set, `glossogen run` exports every simulation agent's LLM calls (prompts, completions, tool calls, token usage) to Langfuse as OpenTelemetry traces. `.env.example` pre-fills `pk-lf-local-dev` to match the local Docker stack. Only the `run` path is instrumented — `glossogen evaluate` stays untraced. |
 | `LANGFUSE_SECRET_KEY` | Optional | Langfuse project secret key. Pre-filled `sk-lf-local-dev`. Blank both keys to disable telemetry. |
@@ -361,14 +362,14 @@ The application deploys to Railway as two services from a single repository.
 
 ### Docker
 
-- `Dockerfile` (repo root) — Backend: Python 3.12, uv, weasyprint system dependencies, git
-- `frontend/Dockerfile` — Frontend: Node 22, three-stage build with Next.js standalone output
+- `Dockerfile` (repo root) — Backend: Python 3.12, uv, weasyprint system dependencies
+- `frontend/DockerfileFrontend` — Frontend: Node 22, three-stage build with Next.js standalone output
 
 ### Railway Configuration
 
-Each service has a `railway.toml` config-as-code file:
-- `railway.toml` (repo root) — Backend service: Dockerfile builder, `/api/health` healthcheck
-- `frontend/railway.toml` — Frontend service: Dockerfile builder
+The frontend service carries `frontend/railway.toml` (Dockerfile builder). The
+backend is deployed from a published image rather than built from this repo, so
+it has no config-as-code file here.
 
 ### Railway Dashboard Setup
 
@@ -385,7 +386,7 @@ Environment variables:
 
 **Frontend service**: root directory `frontend`.
 
-Build args:
+Runtime variables:
 - `API_URL` — backend service URL (runtime variable, not a build arg)
 - `CLERK_PUBLISHABLE_KEY` — Clerk publishable key (required to mount `<ClerkProvider>` and gate routes)
 - `CLERK_SECRET_KEY` — Clerk secret key used by Next.js Server Components and the proxy
@@ -421,7 +422,7 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── protocol_probe_cutoff_trajectory.json        # (same) per (agent, question) adjacent-cutoff series; multi-cutoff JSONLs
 ├── communication_open_coding.json               # (when communication_open_coding metric is run) free-form open-coding labels for this run
 ├── communication_feature_presence.json          # (when communication_feature_presence metric is run) per-category confidence vector against a consolidated ontology
-└── multi_swap_cache.json              # streamlit Multi-swap tab cache (per-phase round_success); regenerated whenever the JSONL's size or mtime changes
+└── multi_swap_cache.json              # cached per-phase round_success for multi-swap runs; regenerated whenever the JSONL's size or mtime changes
 ```
 
 ### Run Labels
@@ -621,7 +622,7 @@ glossogen cross-run-replace-agent veyru \
 
 **Verifying the imported history.** Each resumed run writes `resume_context_{agent_id}.json` to the new run dir capturing the exact reconstructed pydantic-ai messages handed to that agent on its first turn. For cross-run runs, `resume_context_<replaced_agent_id>.json`'s tail should match Sim B's last few `field_observer` (or whichever role) messages verbatim — that confirms the cross-run history is being mounted from Sim B and not contaminated by Sim A.
 
-**Label convention.** Cross-run runs are labelled `cross_team` plus a range tag like `15-25` (rounds played post-swap). The streamlit results viewer's "Cross-swap" tab filters on `cross_team` and plots `round_success_after_resume` per `(imported_model, round_start)` bucket against both Source A and Source B accuracy on the same rounds. Apply labels by writing `labels.json` directly *before* `glossogen evaluate` runs (the eval-derived labels merge into that file).
+**Label convention.** Cross-run runs are labelled `cross_team` plus a range tag like `15-25` (rounds played post-swap). That label lets analysis tooling group cross-team runs and compare `round_success_after_resume` per `(imported_model, round_start)` bucket against both Source A and Source B accuracy on the same rounds. Apply labels by writing `labels.json` directly *before* `glossogen evaluate` runs (the eval-derived labels merge into that file).
 
 **`round_success_after_resume` works for both flows.** The metric reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (`round_start`, `rounds_after_swap`, `source_run_id`, `source_run_dir`). For cross-run runs, the comparison is against Sim A (`source_a_*`) — i.e. "did the imported agent perform better/worse than what the original agent achieved over the same window?".
 
@@ -693,7 +694,6 @@ Channels not listed in `channel_visibility` default to `Full`.
 
 **Evaluation**: `round_success_after_resume` walks every `AgentSwappedMidRun` event and emits one Measurement per swap (`round_success_after_resume_round_<R>_<agent_id>`). The baseline window for each anchor is the previous phase in the same run; the summary carries `Δ vs source: ±N pp` between adjacent phases.
 
-**Streamlit Multi-swap tab**: per-phase round-success bar chart with Δ pp annotations between phases.
 
 ### Per-Agent Model Overrides
 

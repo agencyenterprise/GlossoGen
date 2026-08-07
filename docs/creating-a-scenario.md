@@ -43,7 +43,6 @@ src/glossogen/scenarios/<your_scenario>/
 │   └── <metric>_metric.py       # Metric subclasses scoring the scenario's primary signal
 ├── run_detail_extension.py      # optional; auto-discovered by the API
 ├── scripts/                     # optional; per-scenario one-offs
-└── analysis/                    # optional; scenario-specific Streamlit/notebook helpers
 ```
 
 Frontend plug-in (optional) lives separately at `frontend/src/features/runs/<your_scenario>/plugin.tsx`.

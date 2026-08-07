@@ -529,7 +529,7 @@ A FastAPI backend exposes simulation data via REST endpoints. The frontend consu
 ### Architecture
 
 - Postgres holds tenancy + the runs index (`groups`, `runs`, `user_last_active_group`, OAuth tables). Run bodies (JSONL event log, manifests, eval reports) stay on disk under `GLOSSOGEN_RUNS_DIR`. A request resolves a run via the DB lookup keyed on `(group_id, scenario, run_dir_name)` and only then opens files on disk; cross-tenant access is structurally impossible because the DB query is the gate.
-- `DATABASE_URL` is required; the backend will not boot without it. Migrations run via `alembic upgrade head` at container start (Railway start command) before the server begins accepting requests.
+- `DATABASE_URL` is optional: unset, the backend runs in no-database local mode (runs index from the filesystem, OAuth state in memory). It becomes required once `CLERK_SECRET_KEY` is set, since multi-tenancy needs Postgres. Migrations run via `alembic upgrade head` at container start (Railway start command) before the server begins accepting requests.
 - `GLOSSOGEN_RUNS_DIR` configures the on-disk runs root.
 - CORS origins are read from `ALLOWED_ORIGINS` (comma-separated). Defaults to `http://localhost:3000`.
 - Authentication is handled by `ClerkIdentityMiddleware` (pure ASGI, so SSE streams pass through without buffering). It accepts either a Clerk JWT or — as a fallback — an MCP OAuth access token, then attaches an `Identity(user_id, active_group_id, active_group_slug, ...)` to `request.state`. See [Multi-Tenancy & Authentication](#multi-tenancy--authentication).
@@ -659,15 +659,3 @@ The frontend includes an MCP integration modal (accessible via the **MCP** butto
   - The API client at [`shared/lib/api-client.ts`](frontend/src/shared/lib/api-client.ts) calls `session.getToken({ skipCache: true })` per request and substitutes `{group_slug}` in the URL template with the active slug. `skipCache: true` matters: without it, a token minted before `setActive` returns with `org_slug=null` and every `/api/g/<slug>/...` call 403s.
 - **Lineage badges**: derived runs (replace-agent, cross-run replace-agent, resume-at-round, legacy fork) display a badge in the run-detail header linking to the source run, plus floating-action buttons in the chat pane to scroll to each lineage event. Simulations are launched from the CLI (or via the MCP `start_run` tool); the frontend is a read-only viewer.
 
-## Results Viewer (Streamlit)
-
-A separate Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round metric scores across multiple evaluated runs. It is a read-only consumer of the standard run output (`runs/{scenario}/{ts}/{scenario}_report.json` plus the JSONL event log) — no API or backend coupling.
-
-- `run_catalog.py` — discovers runs that have a metric report.
-- `event_extractor.py` — derives a per-round timeline from the JSONL events.
-- `timeline_plot.py` — builds a Plotly figure overlaying multiple runs' metric scores per round.
-- `multi_swap_data.py` / `multi_swap_tab.py` — per-phase round-success visualisation for runs with one or more `AgentSwappedMidRun` events. Renders one bar per phase plus Δ pp annotations between adjacent phases. Loads runs concurrently via `asyncio.gather` + `asyncio.to_thread`, skips non-multi-swap runs through a byte-level pre-scan for the swap-event marker, and persists per-run results to `multi_swap_cache.json` keyed on JSONL size + mtime.
-- `probe_similarity_data.py` / `probe_similarity_tab.py` — Levenshtein-based comparisons over the per-run `protocol_probe_*.json` artifacts and the raw `protocol_probe_responses.jsonl`. A single multi-select at the top of the tab drives four sub-views: replica self-similarity (per-run consistency across replicas), agent-pair similarity (cross-agent agreement in two-team runs), cross-run model-vs-model (live pairwise matrix on a user-chosen `(question_id, role)` slice — the only place this tab does live Levenshtein), and cutoff trajectory (adjacent-cutoff drift). The data layer is cache-free — the per-run metric classes already cached the heavy work to disk.
-- `app.py` — Streamlit entrypoint; reads `GLOSSOGEN_RUNS_DIR`, lets the user multiselect runs.
-
-Streamlit and Plotly live behind the optional `analysis` uv dependency group so a server-only install (`uv sync`) does not pull them in. Launched with `make results-viewer`.

@@ -238,7 +238,7 @@ Configure via the `scheduled_events` knob in the scenario config. Two event type
 
 `channel_visibility` is a per-channel discriminated union: `{"kind":"full"}` keeps all predecessor history visible; `{"kind":"none"}` hides the channel entirely; `{"kind":"from_round","round_floor":R}` windows the channel to round `R` onward. Channels not listed default to `Full`. Globally disabled channels (e.g. veyru's postmortem after `set_postmortem`) are forced to `none` by the runtime regardless of the swap config.
 
-Each swap emits an `AgentSwappedMidRun` event into the JSONL, writes a `resume_context_<agent_id>_round_<R>.json` file capturing the swapped-in agent's seed history, and invokes `ScenarioWorld.on_agent_swapped_mid_run` so the scenario can suppress prior-round injection content for the swapped-in agent's first turn. The frontend renders one tab per `(agent_id, generation)` and a dashed indigo divider in the chat pane between adjacent rounds that straddle a swap. The `round_success_after_resume` metric emits one Measurement per swap (named `round_success_after_resume_round_<R>_<agent_id>`) with the previous phase as the baseline. The Streamlit Multi-swap tab visualises per-phase round-success with Δ pp annotations between phases.
+Each swap emits an `AgentSwappedMidRun` event into the JSONL, writes a `resume_context_<agent_id>_round_<R>.json` file capturing the swapped-in agent's seed history, and invokes `ScenarioWorld.on_agent_swapped_mid_run` so the scenario can suppress prior-round injection content for the swapped-in agent's first turn. The frontend renders one tab per `(agent_id, generation)` and a dashed indigo divider in the chat pane between adjacent rounds that straddle a swap. The `round_success_after_resume` metric emits one Measurement per swap (named `round_success_after_resume_round_<R>_<agent_id>`) with the previous phase as the baseline.
 
 ## Observability (Langfuse)
 
@@ -274,7 +274,7 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── protocol_probe_replica_self_similarity.json  # (veyru only) within-run replica × replica similarity matrices
 ├── protocol_probe_agent_pair_similarity.json    # (veyru only) within-run agent × agent similarity matrices (two-team)
 ├── protocol_probe_cutoff_trajectory.json        # (veyru only) per (agent, question) adjacent-cutoff series
-└── multi_swap_cache.json              # streamlit Multi-swap tab cache (per-phase round_success)
+└── multi_swap_cache.json              # cached per-phase round_success for multi-swap runs
 ```
 
 ## Running Evaluation
@@ -311,7 +311,7 @@ Round-success and post-swap metrics (powered by `judge_round_result` + manifests
 Protocol metrics (powered by `build_communication_rounds`, `detect_protocol_boundary_window`, `get_protocol_probe_config`):
 - `protocol_learned_after_swap` — LLM judge: did the newcomer adopt the pre-existing protocol after a personnel change?
 - `protocol_probe` — probes each agent under its original model on a fixed scenario question bank; writes `protocol_probe_responses.jsonl`; requires `--probe-replicas N`, optional `--probe-round R`
-- `protocol_probe_replica_self_similarity` / `protocol_probe_agent_pair_similarity` / `protocol_probe_cutoff_trajectory` — Levenshtein-based similarity over the probe responses; each writes its own matrix artifact for the streamlit "Probe similarity" tab
+- `protocol_probe_replica_self_similarity` / `protocol_probe_agent_pair_similarity` / `protocol_probe_cutoff_trajectory` — Levenshtein-based similarity over the probe responses; each writes its own matrix artifact
 - `communication_open_coding` / `communication_feature_presence` — the open-coding → ontology → relabel pipeline (see below)
 
 Scenarios opt in by implementing the corresponding hook on `SimulationScenario`; a scenario without the hook returns `[]` for that metric and the measurement is simply absent from the report.
