@@ -6,10 +6,16 @@ metrics. They ship in the optional ``metrics-ml`` extra so the simulation server
 image does not carry an ML stack it never executes.
 
 Every metric that needs them stays importable — and therefore registered —
-without the extra installed. This module owns the conditional loading so those
-metrics report a clean skip, matching the not-applicable convention used
-elsewhere in the metric suite (return no ``Measurement`` rather than a zero
-sentinel).
+without the extra installed, so the absence surfaces as an explicit failure at
+compute time rather than an ``ImportError`` at registry-import time.
+
+**A missing extra is an error, not a skip.** Asking for ``perplexity`` and
+receiving no measurement would be indistinguishable from a run with nothing to
+measure, which is how a broken environment gets mistaken for a valid result.
+The metrics therefore raise ``MetricsMlExtraMissing``. That is deliberately
+different from the not-applicable convention (returning no ``Measurement``),
+which is reserved for cases where the metric genuinely does not apply to the
+run — a scenario with no primary channel, say.
 
 The two metric families have different requirements, so the probes are
 separate:
@@ -63,18 +69,26 @@ def is_dataset_backend_available() -> bool:
     return _all_importable(module_names=_DATASET_MODULES)
 
 
-def missing_extra_message(metric_name: str, reason: str) -> str:
-    """Build a skip message naming the metric, the reason, and the install command."""
-    return (
-        f"{metric_name}: skipping — {reason}. Install the optional dependency "
-        f"set with `uv sync --extra {METRICS_ML_EXTRA}` to enable this metric."
+def require_perplexity_backend(metric_name: str) -> None:
+    """Raise ``MetricsMlExtraMissing`` unless ``torch`` and ``minicons`` are importable.
+
+    Called at the top of a metric's ``compute`` so an unrunnable metric fails
+    loudly instead of returning an empty result that reads as "nothing to
+    measure".
+    """
+    if is_perplexity_backend_available():
+        return
+    raise MetricsMlExtraMissing(
+        f"{metric_name} requires `torch` and `minicons`, which are not "
+        f"installed. Install them with `uv sync --extra {METRICS_ML_EXTRA}` "
+        f"(or `make install-metrics`), or drop {metric_name} from --metrics."
     )
 
 
 def load_incremental_lm_scorer() -> Any:
     """Return ``minicons.scorer.IncrementalLMScorer``.
 
-    Call only when ``is_perplexity_backend_available()`` is True.
+    Call only after ``require_perplexity_backend`` has passed.
     """
     scorer_module = importlib.import_module("minicons.scorer")
     return scorer_module.IncrementalLMScorer
@@ -83,7 +97,7 @@ def load_incremental_lm_scorer() -> Any:
 def resolve_torch_device() -> str:
     """Return ``"cuda"`` when a CUDA device is visible to torch, else ``"cpu"``.
 
-    Call only when ``is_perplexity_backend_available()`` is True.
+    Call only after ``require_perplexity_backend`` has passed.
     """
     torch_module = importlib.import_module("torch")
     if torch_module.cuda.is_available():

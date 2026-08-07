@@ -39,23 +39,34 @@ Three metrics depend on it:
 
 | Metric | Needs | Without the extra |
 |---|---|---|
-| `perplexity` | `torch`, `minicons` | Always skipped |
-| `english_ngram_surprisal` | `datasets` | Runs from a cached model; skipped only when the cache is cold |
+| `perplexity` | `torch`, `minicons` | **Fails** |
+| `english_ngram_surprisal` | `datasets` | Runs from a cached model; **fails** only when the cache is cold |
 | `english_ngram_backoff_surprisal` | `datasets` | Same |
 
 The n-gram metrics train a character trigram from wikitext once and cache it under
 `~/.cache/glossogen/`. After that first build they need no ML dependency at all, so
 copying a warm cache is an alternative to installing the extra.
 
-A missing extra is never fatal: the metric logs a one-line skip naming the install
-command, produces no measurement, and evaluation continues with a zero exit status.
-Requesting only skipped metrics yields a report with an empty `measurements` list —
-worth knowing, since that looks the same as a run with nothing to measure.
+**Requesting a metric that cannot run is an error, not a skip.** Evaluation exits
+non-zero with a message naming the missing package and the install command. The
+report is still written first, so results from the metrics that *did* succeed are
+never lost — you get partial results *and* a failure signal.
+
+This is deliberate. A metric that quietly produced nothing would be
+indistinguishable from a run with nothing to measure, which is how a broken
+environment gets mistaken for a valid result. The same applies to any metric that
+raises for any reason: evaluation runs the rest, writes the report, then exits
+non-zero.
+
+Skipping is reserved for metrics that genuinely do not apply to a run — `perplexity`
+on a scenario with no primary channel, `round_success_after_resume` on a run that was
+never resumed. Those produce no measurement and do not fail, because there is nothing
+to measure and nothing is broken.
 
 Separately, the `evals` extra (`inspect-ai`) powers the veyru judge-accuracy harness at
-`src/glossogen/scenarios/veyru/evals/`. Unlike the metrics, that one is a standalone
-script rather than a registered metric, so without the extra it fails with a plain
-`ModuleNotFoundError`. `make install-server` includes it, since type checking needs it.
+`src/glossogen/scenarios/veyru/evals/`. That one is a standalone script rather than a
+registered metric, so without the extra it fails with a plain `ModuleNotFoundError`.
+`make install-server` includes it, since type checking needs it.
 
 ### Local Postgres (optional)
 

@@ -23,9 +23,8 @@ from glossogen.evaluation.metric_core.measurement import Measurement, RoundObser
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.optional_ml_backend import (
-    is_perplexity_backend_available,
     load_incremental_lm_scorer,
-    missing_extra_message,
+    require_perplexity_backend,
     resolve_torch_device,
 )
 from glossogen.evaluation.metric_core.primary_channel_messages import (
@@ -73,19 +72,18 @@ class PerplexityMetric(Metric):
     ) -> list[Measurement]:
         """Score each primary channel's messages and report per-round perplexity stats."""
         _ = agent_configs, llm_provider, run_dir, options
-        if not is_perplexity_backend_available():
-            logger.info(
-                missing_extra_message(
-                    metric_name=self.name,
-                    reason="scoring requires `torch` and `minicons`, which are not installed",
-                )
-            )
-            return []
-
+        # Applicability first: a scenario with no primary channel has nothing to
+        # score regardless of which packages are installed, and demanding a
+        # multi-gigabyte extra just to report that would be perverse.
         channels = scenario.get_primary_channels()
         if not channels:
             logger.info("%s: skipping — scenario has no primary channel", self.name)
             return []
+
+        # Then dependencies. Raises rather than skipping: an empty result would
+        # be indistinguishable from a run with nothing to measure, hiding a
+        # broken environment behind a green evaluation.
+        require_perplexity_backend(metric_name=self.name)
 
         pristine_index = build_pristine_text_index(events=events)
         measurements: list[Measurement] = []
