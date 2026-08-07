@@ -38,14 +38,6 @@ class RunRow(BaseModel):
     evaluation_content_hash: str | None
 
 
-class UserLastActiveGroupRow(BaseModel):
-    """One row from the ``user_last_active_group`` table."""
-
-    user_id: str
-    group_id: UUID
-    updated_at: datetime
-
-
 class DerivedSourceCountRow(BaseModel):
     """One source run that has derived children, with the child count.
 

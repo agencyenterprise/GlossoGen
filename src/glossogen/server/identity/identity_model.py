@@ -23,6 +23,4 @@ class Identity(BaseModel):
 
     user_id: str
     active_group_id: UUID
-    active_group_slug: str
-    available_group_ids: frozenset[UUID]
     is_local_mode: bool

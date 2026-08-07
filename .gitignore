@@ -173,8 +173,6 @@ cython_debug/
 
 # Credentials
 secrets/
-*gcp_service_account*.json
-*service-account*.json
 
 # macOS / tooling noise
 .DS_Store
