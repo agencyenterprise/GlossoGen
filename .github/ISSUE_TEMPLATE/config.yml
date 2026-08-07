@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/agencyenterprise/GlossoGen/security/advisories/new
+    about: Report privately. Please do not open a public issue.
+  - name: Contributing a scenario
+    url: https://github.com/agencyenterprise/GlossoGen/blob/main/CONTRIBUTING.md#adding-a-scenario
+    about: Scenarios are self-contained packages — open a pull request rather than an issue.

@@ -1,7 +1,6 @@
 """Shared utilities for launching simulation subprocesses.
 
-Used by both the scenarios REST router and the MCP browser to start
-new simulation runs as background processes.
+Used by the MCP browser to start new simulation runs as background processes.
 """
 
 import logging
@@ -9,6 +8,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +25,11 @@ def build_config_file(knobs: dict[str, Any] | None) -> Path | None:
     """Write validated knobs to a temporary JSON config file.
 
     Returns the file path, or None if knobs is empty/None.
+
+    The file is left for the operating system to reclaim. It cannot be deleted
+    at launch time because the subprocess reads it at startup, and it is a few
+    hundred bytes in a directory the OS already manages — not worth the risk of
+    pattern-matching deletes in shared temp space.
     """
     config: dict[str, Any] = {}
     if knobs:
@@ -33,7 +38,7 @@ def build_config_file(knobs: dict[str, Any] | None) -> Path | None:
     if not config:
         return None
 
-    fd, tmp_path = tempfile.mkstemp(suffix=".json", prefix="config_")
+    fd, tmp_path = tempfile.mkstemp(suffix=".json", prefix="glossogen_config_")
     os.close(fd)
     config_path = Path(tmp_path)
     config_path.write_bytes(orjson.dumps(config))
@@ -53,7 +58,8 @@ def launch_simulation(
 
     ``group_slug`` is forwarded to the CLI so the subprocess registers the
     new run row under the right tenant after ``claim_run_dir`` succeeds.
-    Raises ValueError for invalid config, RuntimeError for launch failures.
+
+    Raises ``ValueError`` for invalid config.
     """
     if provider not in list_providers():
         raise ValueError(f"Unknown provider: {provider}")
@@ -89,11 +95,21 @@ def launch_simulation(
 
     logger.info("Launching new simulation: %s", " ".join(cmd))
 
-    stdout_log = runs_dir / f"{scenario_name}_start.log"
+    # One log file per launch. A single shared path truncates whenever two
+    # launches overlap, so the surviving log describes neither run.
+    launch_log_dir = runs_dir / "_launch_logs"
+    launch_log_dir.mkdir(parents=True, exist_ok=True)
+    stdout_log = launch_log_dir / f"{scenario_name}_{time.time_ns()}.log"
     with open(stdout_log, "w") as log_file:
-        subprocess.Popen(
+        process = subprocess.Popen(
             cmd,
             stdout=log_file,
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
+    logger.info(
+        "Launched simulation pid=%d scenario=%s log=%s",
+        process.pid,
+        scenario_name,
+        stdout_log,
+    )
