@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Gauge, Github, MessagesSquare } from "lucide-react";
+import { ArrowRight, ExternalLink, Gauge, MessagesSquare } from "lucide-react";
 import { CommsAnimation } from "./comms-animation";
 import { AgentLoopAnimation } from "./agent-loop-animation";
 import { EmergenceAnimation } from "./emergence-animation";
@@ -31,7 +31,7 @@ export function LandingPage({ appHref, appLabel }: { appHref: string; appLabel: 
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <Github className="h-4 w-4" /> GitHub
+            <ExternalLink className="h-4 w-4" /> GitHub
           </a>
           <Link
             href={appHref}
