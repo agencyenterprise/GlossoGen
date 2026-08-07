@@ -1233,7 +1233,7 @@ requires-dist = [
     { name = "minicons", marker = "extra == 'metrics-ml'", specifier = ">=0.2.55" },
     { name = "openai", specifier = ">=2.29.0" },
     { name = "orjson", specifier = ">=3.10.0" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "psycopg-pool", specifier = ">=3.2.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pydantic-ai", specifier = ">=2.4.0,<3.0.0" },
