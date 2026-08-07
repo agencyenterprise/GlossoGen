@@ -9,30 +9,30 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
-    "anthropic>=0.87.0",
-    "pydantic>=2.0.0",
+    "anthropic>=0.120.2",
+    "pydantic>=2.13.4",
     "aiofiles>=24.0.0",
-    "orjson>=3.10.0",
+    "orjson>=3.11.9",
     "jinja2>=3.1.0",
     "tenacity>=9.0.0",
-    "fastapi>=0.115.0",
+    "fastapi>=0.141.1",
     "uvicorn[standard]>=0.30.0",
     "mcp>=1.0.0",
-    "pydantic-ai>=2.4.0,<3.0.0",
+    "pydantic-ai>=2.23.0,<3.0.0",
     "openai>=2.29.0",
     "httpx>=0.28.1",
-    "huggingface_hub>=0.25.0",
+    "huggingface_hub>=1.26.0",
     "weasyprint>=62.0",
-    "markdown>=3.7",
+    "markdown>=3.10.3",
     "python-dotenv>=1.2.2",
-    "cachetools>=7.0.5",
+    "cachetools>=7.1.7",
     "rapidfuzz>=3.10.0",
     "psycopg[binary]>=3.3.4",
     "psycopg-pool>=3.2.0",
-    "alembic>=1.13.0",
-    "svix>=1.40.0",
+    "alembic>=1.18.5",
+    "svix>=1.99.1",
     "clerk-backend-api>=3.0.0",
-    "langfuse>=3.0.0",
+    "langfuse>=4.14.2",
 ]
 
 [project.optional-dependencies]
@@ -41,30 +41,30 @@ dependencies = [
 # executes these metrics. Absent the extra, those metrics log a skip and
 # return no Measurement — see evaluation/metric_core/optional_ml_backend.py.
 metrics-ml = [
-    "torch>=2.2.0",
-    "transformers>=5.0.0rc3",
-    "minicons>=0.2.55",
+    "torch>=2.13.0",
+    "transformers>=5.14.1",
+    "minicons>=0.3.39",
     "datasets>=5.0.1",
 ]
 # Inspect-AI harness for the veyru judge-accuracy evaluation
 # (scenarios/veyru/evals/judge_accuracy_eval.py). Not needed to run
 # simulations or the server.
 evals = [
-    "inspect-ai>=0.3.0",
+    "inspect-ai>=0.3.252",
 ]
 
 [dependency-groups]
 dev = [
-    "black>=26.3.1",
+    "black>=26.5.1",
     "isort==5.13.2",
-    "pyright>=1.1.407",
-    "ruff>=0.14.3",
+    "pyright>=1.1.411",
+    "ruff>=0.16.1",
     "vulture>=2.14",
-    "pytest>=9.0.3",
+    "pytest>=9.1.1",
     "types-aiofiles>=25.1.0.20251011",
     "types-Markdown>=3.7.0.20250322",
     "types-cachetools>=7.0.0.20260713",
-    "modal>=1.4.2",
+    "modal>=1.5.3",
 ]
 
 [tool.uv]
