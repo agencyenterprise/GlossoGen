@@ -24,6 +24,39 @@ make install-server     # backend only (uv sync)
 make install-frontend   # frontend only (npm ci)
 ```
 
+**If you intend to run evaluations, install the ML extra as well:**
+
+```bash
+make install-metrics    # everything above, plus the metrics-ml extra
+```
+
+This is the recommended setup for research use. It is a separate target because
+the extra pulls in torch and transformers — several gigabytes — which a server
+that only browses runs never executes. Deployments therefore install without it,
+which is why it is not the default.
+
+Three metrics depend on it:
+
+| Metric | Needs | Without the extra |
+|---|---|---|
+| `perplexity` | `torch`, `minicons` | Always skipped |
+| `english_ngram_surprisal` | `datasets` | Runs from a cached model; skipped only when the cache is cold |
+| `english_ngram_backoff_surprisal` | `datasets` | Same |
+
+The n-gram metrics train a character trigram from wikitext once and cache it under
+`~/.cache/glossogen/`. After that first build they need no ML dependency at all, so
+copying a warm cache is an alternative to installing the extra.
+
+A missing extra is never fatal: the metric logs a one-line skip naming the install
+command, produces no measurement, and evaluation continues with a zero exit status.
+Requesting only skipped metrics yields a report with an empty `measurements` list —
+worth knowing, since that looks the same as a run with nothing to measure.
+
+Separately, the `evals` extra (`inspect-ai`) powers the veyru judge-accuracy harness at
+`src/glossogen/scenarios/veyru/evals/`. Unlike the metrics, that one is a standalone
+script rather than a registered metric, so without the extra it fails with a plain
+`ModuleNotFoundError`. `make install-server` includes it, since type checking needs it.
+
 ### Local Postgres (optional)
 
 By default the backend runs in **no-database local mode** — leave `DATABASE_URL` unset and skip this entire section. The runs index is derived from the `runs/` directory on disk and MCP OAuth tokens are held in memory (they reset on restart, which just means re-authenticating the MCP client).

@@ -1,18 +1,27 @@
 # Installation
 install: install-server install-frontend
 
+# --extra evals is required for type checking: judge_accuracy_eval.py imports
+# inspect_ai at module scope, and without the package pyright reports every
+# symbol in that file as unknown. Extras are separate from dependency-groups
+# in uv, so --all-groups does not cover it.
+#
+# --extra metrics-ml is deliberately omitted: it is multi-gigabyte, and nothing
+# under src/ imports torch, minicons, or datasets directly (see
+# evaluation/metric_core/optional_ml_backend.py), so pyright does not need it.
 install-server:
 	@echo "Installing server dependencies..."
-	# --extra evals is required for type checking: judge_accuracy_eval.py
-	# imports inspect_ai at module scope, and without the package pyright
-	# reports every symbol in that file as unknown. Extras are separate from
-	# dependency-groups in uv, so --all-groups does not cover it.
-	# --extra metrics-ml is deliberately omitted: it is multi-gigabyte, and
-	# nothing under src/ imports torch, minicons, or datasets directly (see
-	# evaluation/metric_core/optional_ml_backend.py), so pyright does not
-	# need it.
 	VIRTUAL_ENV= uv sync --all-groups --extra evals
 	@echo "Server dependencies installed"
+
+# Recommended for research use: adds the metrics-ml extra so `perplexity` and
+# the English n-gram surprisal metrics can run. Kept separate from
+# install-server because torch + transformers are several gigabytes and a
+# deployment that only serves runs never executes them.
+install-metrics:
+	@echo "Installing server dependencies with the metrics-ml extra..."
+	VIRTUAL_ENV= uv sync --all-groups --extra evals --extra metrics-ml
+	@echo "Server dependencies installed (metrics-ml enabled)"
 
 install-frontend:
 	cd frontend && npm ci
@@ -78,4 +87,4 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types
+.PHONY: install install-server install-metrics install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types
