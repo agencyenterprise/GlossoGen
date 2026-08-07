@@ -215,3 +215,4 @@ parent_context  # unused variable (src/glossogen/telemetry_round_processor.py:52
 _.on_end  # unused method (src/glossogen/telemetry_round_processor.py:62)
 _.force_flush  # unused method (src/glossogen/telemetry_round_processor.py:68)
 timeout_millis  # unused variable (src/glossogen/telemetry_round_processor.py:68)
+sample_quotes  # consumed by communication_ontology_consolidate_user.jinja (scripts/consolidate_communication_ontology.py:77)

@@ -188,3 +188,20 @@ class CommunicationFeaturePresenceSidecar(BaseModel):
     generated_at: datetime
     scores: list[CategoryConfidence]
     notes: str
+
+
+class CommunicationOntologyConsolidationOutput(BaseModel):
+    """Structured output schema enforced on the consolidation LLM call.
+
+    Mirrors :class:`CommunicationOntology` minus the bookkeeping fields
+    (``version``, ``generated_at``, ``source_run_ids``) which the CLI script
+    fills in itself.
+    """
+
+    categories: list[OntologyCategory]
+    explanation: str = Field(
+        description=(
+            "Brief justification for the chosen taxonomy: which axes the "
+            "categories cover and what was deliberately left out."
+        ),
+    )
