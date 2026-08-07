@@ -20,7 +20,6 @@ dependencies = [
     "mcp>=1.0.0",
     "pydantic-ai>=2.4.0,<3.0.0",
     "openai>=2.29.0",
-    "datasets>=3.0.0",
     "httpx>=0.28.1",
     "huggingface_hub>=0.25.0",
     "weasyprint>=62.0",
@@ -29,21 +28,31 @@ dependencies = [
     "aiosqlite>=0.22.1",
     "cachetools>=7.0.5",
     "watchdog>=6.0.0",
-    "minicons>=0.2.55",
-    "torch>=2.2.0",
-    "transformers>=5.0.0rc3",
-    "matplotlib>=3.10.9",
     "rapidfuzz>=3.10.0",
     "psycopg[binary]>=3.2.0",
     "psycopg-pool>=3.2.0",
     "alembic>=1.13.0",
     "svix>=1.40.0",
     "clerk-backend-api>=3.0.0",
-    "streamlit>=1.57.0",
-    "plotly>=6.7.0",
-    "seaborn>=0.13.2",
-    "openpyxl>=3.1.5",
     "langfuse>=3.0.0",
+]
+
+[project.optional-dependencies]
+# ML backend for the `perplexity` and English n-gram surprisal metrics only.
+# Multi-gigabyte; deliberately excluded from the server image, which never
+# executes these metrics. Absent the extra, those metrics log a skip and
+# return no Measurement — see evaluation/metric_core/optional_ml_backend.py.
+metrics-ml = [
+    "torch>=2.2.0",
+    "transformers>=5.0.0rc3",
+    "minicons>=0.2.55",
+    "datasets>=3.0.0",
+]
+# Inspect-AI harness for the veyru judge-accuracy evaluation
+# (scenarios/veyru/evals/judge_accuracy_eval.py). Not needed to run
+# simulations or the server.
+evals = [
+    "inspect-ai>=0.3.0",
 ]
 
 [dependency-groups]
@@ -57,21 +66,7 @@ dev = [
     "types-aiofiles>=25.1.0.20251011",
     "types-Markdown>=3.7.0.20250322",
     "types-cachetools>=6.2.0.20260408",
-    "types-pyperclip>=1.11.0.20260408",
     "modal>=1.4.2",
-    "pandas-stubs>=3.0.0.260204",
-]
-analysis = [
-    "streamlit>=1.40.0",
-    "plotly>=5.24.0",
-    "pyperclip>=1.9.0",
-]
-eval = [
-    "inspect-ai>=0.3.0",
-]
-sheets = [
-    "gspread>=6.0.0",
-    "gspread-dataframe>=4.0.0",
 ]
 
 [tool.uv]
@@ -105,24 +100,6 @@ venvPath = "."
 venv = ".venv"
 extraPaths = ["src", "."]
 ignore = ["vulture_whitelist.py", "runs", "modal", "scripts"]
-
-# analysis/ is exploratory plotting code that talks to untyped libs
-# (pandas, plotly, matplotlib, streamlit). Relax the strict-only rules
-# that fire on inferred Unknown / missing-stub types there.
-[[tool.pyright.executionEnvironments]]
-root = "analysis"
-reportUnknownMemberType = "none"
-reportUnknownVariableType = "none"
-reportUnknownArgumentType = "none"
-reportUnknownLambdaType = "none"
-reportUnknownParameterType = "none"
-reportMissingTypeStubs = "none"
-reportMissingTypeArgument = "none"
-reportMissingParameterType = "none"
-reportPrivateUsage = "none"
-reportUntypedFunctionDecorator = "none"
-reportUntypedClassDecorator = "none"
-reportUnusedFunction = "none"
 
 [tool.vulture]
 min_confidence = 80

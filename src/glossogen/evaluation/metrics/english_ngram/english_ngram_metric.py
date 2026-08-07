@@ -21,6 +21,7 @@ from typing import NamedTuple
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.optional_ml_backend import MetricsMlExtraMissing
 from glossogen.evaluation.metric_core.primary_channel_messages import (
     RoundMessages,
     collect_primary_messages_by_round,
@@ -91,7 +92,14 @@ class EnglishNgramSurprisalMetric(Metric):
                 )
                 continue
 
-            round_surprisals = await asyncio.to_thread(_score_all_rounds, rounds=rounds)
+            try:
+                round_surprisals = await asyncio.to_thread(_score_all_rounds, rounds=rounds)
+            except MetricsMlExtraMissing as exc:
+                # Expected when the optional extra is absent and no model cache
+                # exists. Not an error — skip the metric the same way the
+                # not-applicable cases above do.
+                logger.info("%s: skipping — %s", self.name, exc)
+                return []
 
             all_means = [rs.mean_surprisal for rs in round_surprisals]
             total_messages = sum(rs.message_count for rs in round_surprisals)

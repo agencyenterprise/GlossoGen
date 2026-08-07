@@ -286,7 +286,7 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru
   2> /tmp/veyru_eval_debug.log
 ```
 
-The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth blocks) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `glossogen evaluate` and by `scripts/consolidate_communication_ontology.py` (see below). Without it the harness defaults to `INFO`. Both are dotenv-friendly — set them in `.env` for a persistent default or inline as shown above.
+The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth blocks) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `glossogen evaluate` and by the ontology-consolidation script (see below). Without it the harness defaults to `INFO`. Both are dotenv-friendly — set them in `.env` for a persistent default or inline as shown above.
 
 If the judge's structured output truncates (you'll see a `Field required ... input_value={}` validation warning followed by a metric failure), bump the per-call output-token cap by setting `LLM_MAX_TOKENS=32768` (or higher) in `.env` or inline. The default of `16384` covers the verbose communication-feature outputs but pathological runs with many labels × many evidence citations can still exceed it.
 
@@ -306,7 +306,7 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate <scen
 
 # 2. Consolidation: one LLM call across N runs of one scenario. Produces a
 #    versioned taxonomy under runs/<scenario>/_ontology/.
-LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.py \
+LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python consolidate_communication_ontology.py \
   --scenario-name <scenario> \
   --run-id <scenario>/<id1> --run-id <scenario>/<id2> --run-id <scenario>/<id3> \
   --runs-dir ./runs \
@@ -329,16 +329,18 @@ Always run with `LOG_LEVEL=DEBUG` and a stderr redirect during development so th
 
 Consolidated ontology JSONs live under `runs/<scenario_name>/_ontology/` so they ship with any export of the runs tree. The entire `runs/` directory is gitignored — the ontology JSONs are regenerable from the open-coding sidecars; pass them around alongside the runs they were derived from rather than committing them.
 
-## Results Viewer (Streamlit)
+## Analysing results
 
-A Streamlit app at [analysis/results_viewer/](analysis/results_viewer/) overlays per-round metric hits across multiple evaluated runs — useful for comparing models or knob configurations. Tabs include Timeline, Baseline, Verbosity, Resume, Cross-swap, Multi-swap, OSS vs Frontier, and Probe similarity (Levenshtein-based comparisons across the per-run probe artifacts, with a multi-select run picker driving every sub-view).
+Evaluation writes a machine-readable report per run at
+`runs/{scenario}/{timestamp}/{scenario}_report.json`, alongside the JSONL event
+log and any per-metric sidecars (probe responses, per-message repetition
+factors, feature-presence vectors). Together these are the analysis surface —
+plain JSON and JSONL, no database required.
 
-```bash
-uv sync --group analysis    # one-time, installs streamlit + plotly
-make results-viewer         # opens the viewer in a browser
-```
-
-It reads from `GLOSSOGEN_RUNS_DIR` (defaults to `./runs`) and lists all runs that have a `{scenario}_report.json`.
+Point whatever you prefer at them: pandas, a notebook, a dashboard. The
+[Web UI](#web-ui) covers per-run inspection; cross-run aggregation is
+deliberately left open rather than baked in, since the useful comparison
+depends on the experiment.
 
 ## Web UI
 
@@ -427,7 +429,7 @@ The same OAuth flow that issues MCP tokens also gives the CLI a way to push loca
 # 1. One-time: sign in to the deployed backend. Opens your browser to the
 #    Clerk-gated consent page; pick your org, approve, the CLI's loopback
 #    server collects the code and writes ~/.glossogen/credentials.json (0600).
-glossogen login --url https://gnossogenapi.up.railway.app
+glossogen login --url https://your-backend.example.com
 
 # 2. Diff local runs against prod and upload anything missing. Filters by
 #    label (AND) and by report-present (so crashed runs are skipped). The
@@ -557,12 +559,50 @@ frontend/                      # Next.js web application
 
 See [Architecture.md](Architecture.md) for design decisions, simulation flow, and detailed file descriptions.
 
+## Self-hosting
+
+The fastest way to run the whole stack — Postgres, backend, and frontend:
+
+```bash
+cp .env.example .env     # then set ANTHROPIC_API_KEY
+docker compose up --build
+```
+
+Frontend at `http://localhost:3000`, backend at `http://localhost:8000`.
+
+This runs in **single-tenant local mode**: no Clerk, every request is `local-user`
+in the `local` group. It performs no authentication, so do not expose it to the
+internet without configuring Clerk (see [Authentication](#authentication)).
+
+`NEXT_PUBLIC_API_URL` is a **build arg**, not a runtime variable — Next.js inlines
+it into the JS bundle. Pointing the frontend at a different backend requires
+`docker compose build frontend`, not just an environment change.
+
+Simulation data persists in the `runs-data` volume; Postgres in `postgres-data`.
+
+### Optional dependency extras
+
+The default install excludes heavyweight extras that most deployments never use:
+
+| Extra | Install | Needed for |
+|---|---|---|
+| `metrics-ml` | `uv sync --extra metrics-ml` | `perplexity` and the English n-gram surprisal metrics (pulls torch + transformers) |
+| `evals` | `uv sync --extra evals` | The veyru judge-accuracy evaluation harness (`inspect-ai`) |
+
+Without `metrics-ml`, those metrics log a skip and produce no measurement rather
+than failing — the same not-applicable convention the rest of the metric suite
+uses. The n-gram metrics additionally run from a cached model when one exists
+under `~/.cache/glossogen/`, so they often work with no extra installed at all.
+
 ## Deployment
 
-The application deploys to Railway as two services from a single repository. Each service has a `Dockerfile` and a `railway.toml` config-as-code file.
+The application deploys to Railway as two services. The backend is published as
+a container image and promoted by tag; the frontend is built from this
+repository, because Next.js bakes `NEXT_PUBLIC_*` values into the bundle at
+build time and one image therefore cannot serve multiple environments.
 
-- **Backend** (`Dockerfile`, `railway.toml`): Python 3.12, FastAPI server with a persistent volume at `/data/runs` for simulation data.
-- **Frontend** (`frontend/Dockerfile`, `frontend/railway.toml`): Node 22, Next.js standalone build.
+- **Backend** (`Dockerfile`): Python 3.12, FastAPI server with a persistent volume at `/data/runs` for simulation data. Built and pushed to GHCR by `.github/workflows/publish-images.yml` on a version tag.
+- **Frontend** (`frontend/DockerfileFrontend`, `frontend/railway.toml`): Node 22, Next.js standalone build.
 
 Railway environment variables for the backend:
 

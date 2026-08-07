@@ -19,12 +19,15 @@ import math
 from pathlib import Path
 from typing import Any, NamedTuple
 
-import torch
-from minicons import scorer  # type: ignore[import-untyped]
-
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.optional_ml_backend import (
+    is_perplexity_backend_available,
+    load_incremental_lm_scorer,
+    missing_extra_message,
+    resolve_torch_device,
+)
 from glossogen.evaluation.metric_core.primary_channel_messages import (
     RoundMessages,
     collect_primary_messages_by_round,
@@ -70,6 +73,15 @@ class PerplexityMetric(Metric):
     ) -> list[Measurement]:
         """Score each primary channel's messages and report per-round perplexity stats."""
         _ = agent_configs, llm_provider, run_dir, options
+        if not is_perplexity_backend_available():
+            logger.info(
+                missing_extra_message(
+                    metric_name=self.name,
+                    reason="scoring requires `torch` and `minicons`, which are not installed",
+                )
+            )
+            return []
+
         channels = scenario.get_primary_channels()
         if not channels:
             logger.info("%s: skipping — scenario has no primary channel", self.name)
@@ -136,13 +148,14 @@ def _score_all_rounds(
     model_name: str,
     rounds: list[RoundMessages],
 ) -> list[RoundPerplexity]:
-    """Load the scorer once and produce a RoundPerplexity for each round."""
-    if torch.cuda.is_available():
-        device = "cuda"
-    else:
-        device = "cpu"
+    """Load the scorer once and produce a RoundPerplexity for each round.
+
+    Callers must confirm ``is_metrics_ml_installed()`` before invoking this.
+    """
+    device = resolve_torch_device()
     logger.info("perplexity: loading %s on %s", model_name, device)
-    lm_scorer = scorer.IncrementalLMScorer(model_name, device)
+    incremental_lm_scorer = load_incremental_lm_scorer()
+    lm_scorer: Any = incremental_lm_scorer(model_name, device)
 
     results: list[RoundPerplexity] = []
     for round_messages in rounds:

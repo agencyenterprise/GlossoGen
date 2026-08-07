@@ -873,7 +873,7 @@ This exact bug clipped the last round from 13 veyru `channel_noise` runs (their 
 
 Rules for any launch-then-evaluate or scan-for-complete orchestration:
 
-- Wait for / filter on `simulation_ended`, e.g. `grep -q '"simulation_ended"' <run>/<scenario>.jsonl`. The shared `wait_for_simulation_end` helper in `scripts/run_rerun_plan.py` (reused by `rerun_18_parallel.py` and `run_self_hosted_reruns.py`) does this correctly — prefer it.
+- Wait for / filter on `simulation_ended`, e.g. `grep -q '"simulation_ended"' <run>/<scenario>.jsonl`. Any launch-then-evaluate orchestration should gate on that event, not on a round count.
 - `round_advanced` counts are fine only for *progress monitoring* (watching rounds climb), never for *completion*.
 
 After a simulation completes, score the log with one or more **metrics** — both deterministic ones and LLM-as-judge ones live behind the same `Metric` abstraction, returning a `Measurement` (`score`, `score_unit`, `summary`, `per_round`, `per_agent`). Evaluation uses `--provider` to select the LLM judge for the LLM-driven metrics; deterministic metrics ignore it. The evaluate command reads the scenario configuration from the JSONL event log, so no scenario-specific flags (like `--knobs`) are needed.
@@ -919,7 +919,7 @@ Generic metrics (available to all scenarios):
 - `round_ended_timeout` — flags rounds whose main phase ended because the wall-clock duration limit was reached (deterministic, no LLM). `score` = count of timeout-ended rounds. Requires `round_ended` events in the log.
 - `postmortem_ended_timeout` — flags rounds whose *postmortem* phase ended because the wall-clock duration limit was reached, rather than because all agents went idle (deterministic, no LLM). `score` = count of postmortem phases that hit the timeout; `per_round` lists the flagged rounds. Reads `PostmortemEnded` events (authoritative; includes the final round, whose postmortem end is otherwise unrecorded) and falls back to `RoundAdvanced(trigger="postmortem_timeout")` for runs predating that event — attributing each such advance to the round before it. **Returns `[]`** when the run had no postmortem phases (no `PostmortemStarted` events).
 - `content_filter_refusal` — counts `ContentFilterError` refusals across the run (deterministic, no LLM). `score` = total refusal count; `per_round` lists rounds with at least one refusal; `per_agent` lists per-agent counts.
-- `communication_open_coding` — pass 1 of the open-coding → ontology → relabel pipeline. One LLM call per run feeds the judge every primary-channel message plus the scenario-rendered per-round ground truth (via `SimulationScenario.build_communication_rounds`), and asks for free-form short labels naming communication-pattern features (multi-label per run, no pre-specified vocabulary). Writes `communication_open_coding.json` to the run dir with each label's evidence round and quote. `score` = number of free-form labels. Followed by `scripts/consolidate_communication_ontology.py` (one LLM call across N runs of one scenario, writes a versioned ontology under `runs/<scenario_name>/_ontology/<version>.json`) and then `communication_feature_presence` for relabel. **Returns `[]` (no Measurement)** when the scenario does not implement the `build_communication_rounds` hook.
+- `communication_open_coding` — pass 1 of the open-coding → ontology → relabel pipeline. One LLM call per run feeds the judge every primary-channel message plus the scenario-rendered per-round ground truth (via `SimulationScenario.build_communication_rounds`), and asks for free-form short labels naming communication-pattern features (multi-label per run, no pre-specified vocabulary). Writes `communication_open_coding.json` to the run dir with each label's evidence round and quote. `score` = number of free-form labels. Followed by an ontology-consolidation step (one LLM call across N runs of one scenario, writing a versioned ontology under `runs/<scenario_name>/_ontology/<version>.json`) and then `communication_feature_presence` for relabel. **Returns `[]` (no Measurement)** when the scenario does not implement the `build_communication_rounds` hook.
 - `communication_feature_presence` — pass 3 of the same pipeline. Accepts `--ontology-path PATH` to pin a specific ontology JSON; when omitted the metric auto-resolves the most recently modified ontology JSON under `runs/<scenario>/_ontology/`. One LLM call per run re-reads the same per-round transcript view against the ontology's categories and emits a 0–1 confidence per category. Writes `communication_feature_presence.json` (full feature-presence vector + ontology provenance). `score` = number of categories scoring ≥0.5. Passes 1 and 3 read the same `CommunicationRoundView` rows so confidences are commensurable with the open-coding labels. **Returns `[]` (no Measurement)** when the scenario does not implement the `build_communication_rounds` hook.
 - `round_success` — generic; reads `RoundResultRecorded` events. Single-team scenarios emit one Measurement (`metric_name="round_success"`); multi-team scenarios emit one per `team_id` (`round_success_team_a`, etc.). `judge_round_result` is a required abstract method; **returns `[]`** only when a scenario's `judge_round_result` yields no verdicts.
 - `round_success_after_resume` — generic; same accounting as `round_success` over the post-resume window. Reads `replace_manifest.json` / `cross_run_replace_manifest.json` and every `AgentSwappedMidRun` event; the comparison in `summary` is against the source run's same-window `round_success`. **Returns `[]`** on non-resume runs.
@@ -945,20 +945,20 @@ Scenarios opt into most platform metrics by implementing the corresponding hooks
 
 There are no scenario-specific metrics left — every scoring concept (round-success, post-resume re-scoring, language emergence, protocol learning, protocol probing) is platform code that consumes scenario data through these hooks. Scenarios only ship their domain-specific events + the hooks that surface them.
 
-## Judge Replay and Rerun Pipeline
+## What `scripts/` is for
 
-When the stabilization judge prompt changes, the full retroactive cleanup pipeline (re-judge old verdicts → surface flips in the FE/streamlit → build affected-set plan → re-execute originals → re-execute derived runs → re-replay) is documented in [docs/judge-replay-and-rerun-pipeline.md](docs/judge-replay-and-rerun-pipeline.md).
+`scripts/` holds build tooling only:
 
-Quick reference for the scripts (all live in `scripts/`):
+- `export_openapi.py` — drives `make gen-api-types`; the `check-api-types` CI job depends on it
+- `generate_demo_snapshot.py` — builds the frontend's `/demo` assets
 
-- `replay_veyru_judge.py` — re-judge previously-accepted verdicts; writes `runs/_judge_replay/{pair_cache,flips_by_run,summary}.{jsonl,json}`.
-- `write_judge_replay_sidecars.py` — fan the replay output into per-run `judge_replay.json` sidecars (read by the FE / streamlit).
-- `build_rerun_plan.py` — compute the affected-set (seed runs above threshold + transitive descendants), topologically sort, emit `rerun_plan.json` with per-spec `cli_invocation`.
-- `run_rerun_plan.py` — orchestrator: launch → wait-for-end → eval → archive each spec; concurrency is per-provider; state in `rerun_state.json`.
-- `recover_errored_reruns.py` — finish the pipeline for `sim_wait_timeout` casualties whose sim completed naturally on disk.
-- `rerun_network_impacted.py` (dry-run preview) and `rerun_18_parallel.py` (parallel re-execution alongside a running orchestrator) — re-execute archived runs whose round-timeouts were network-induced.
+Keep it that way. One-off experiment orchestration, cohort reruns, and label
+surgery do not belong here — they operate on run output, and the evaluation
+reports (`{scenario}_report.json`) plus the JSONL event logs are a stable enough
+interface that such tooling can live wherever the experiment does.
 
-Artifact directories: `runs/_judge_replay/` (cache + plan + state), `runs/_superseded/<scenario>/<old>/` (archived predecessors), `runs/_failed_network_timeout/<scenario>/<bad_new>/` (audit trail for re-executed failures).
+Scenario-local helper scripts are the exception and live under
+`src/glossogen/scenarios/<name>/scripts/`.
 
 ## Destructive Actions
 
