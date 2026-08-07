@@ -1,9 +1,13 @@
 """Identity-layer environment configuration.
 
-Reads the Clerk-related env vars once at process start so middleware /
-webhook code never re-reads them. The presence (or absence) of
-``CLERK_SECRET_KEY`` is what switches the server between Clerk-auth mode and
-single-tenant local mode.
+Reads the Clerk env vars the middleware needs once at process start. The
+presence (or absence) of ``CLERK_SECRET_KEY`` is what switches the server
+between Clerk-auth mode and single-tenant local mode.
+
+``CLERK_WEBHOOK_SECRET`` is deliberately not read here. The webhook router
+reads it per request and answers 503 when it is missing, so the server can
+boot in local mode without it — a startup read would make an optional
+secret mandatory.
 """
 
 import os
@@ -15,9 +19,7 @@ class IdentitySettings:
     """Resolved Clerk env config; ``clerk_secret_key`` absent => local mode."""
 
     clerk_secret_key: str | None
-    clerk_publishable_key: str | None
     clerk_jwt_key: str | None
-    clerk_webhook_secret: str | None
     clerk_authorized_parties: tuple[str, ...]
 
     @property
@@ -34,8 +36,6 @@ def load_identity_settings() -> IdentitySettings:
     )
     return IdentitySettings(
         clerk_secret_key=os.environ.get("CLERK_SECRET_KEY"),
-        clerk_publishable_key=os.environ.get("CLERK_PUBLISHABLE_KEY"),
         clerk_jwt_key=os.environ.get("CLERK_JWT_KEY"),
-        clerk_webhook_secret=os.environ.get("CLERK_WEBHOOK_SECRET"),
         clerk_authorized_parties=authorized_parties,
     )

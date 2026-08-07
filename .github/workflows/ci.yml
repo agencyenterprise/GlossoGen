@@ -25,8 +25,10 @@ jobs:
       - name: Install dependencies
         run: make install-server
 
-      - name: Lint server (black, isort, ruff, pyright, vulture, custom linters)
-        run: make lint-server
+      # check-server, not lint-server: the latter runs black and isort in write
+      # mode, so in CI it fixes the checkout and exits 0.
+      - name: Check server (black, isort, ruff, pyright, vulture, custom linters)
+        run: make check-server
 
   lint-frontend:
     runs-on: ubuntu-latest
@@ -78,5 +80,6 @@ jobs:
       - name: Regenerate API types and check for drift
         run: |
           make gen-api-types
-          git diff --exit-code frontend/src/types/api.gen.ts || \
-            (echo "API types are out of date. Run 'make gen-api-types' and commit the result." && exit 1)
+          # Both files are tracked and both are regenerated, so both must be guarded.
+          git diff --exit-code frontend/openapi.json frontend/src/types/api.gen.ts || \
+            (echo "API schema/types are out of date. Run 'make gen-api-types' and commit the result." && exit 1)

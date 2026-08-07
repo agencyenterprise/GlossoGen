@@ -119,6 +119,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     if _oauth_issuer_url is not None:
         logger.info("OAuth enabled (issuer=%s)", _oauth_issuer_url)
 
+    # Expired OAuth rows accumulate forever otherwise: nothing else deletes
+    # them, and the tables only grow. Once per boot is enough — these are
+    # hour- and month-lived tokens, not a hot path.
+    if _oauth_storage is not None:
+        try:
+            purged = await _oauth_storage.purge_expired()
+            if purged:
+                logger.info("Purged %d expired OAuth row(s)", purged)
+        except Exception:
+            logger.exception("Could not purge expired OAuth rows; continuing startup")
+
     async with app.state.mcp_session_manager.run():
         yield
 
