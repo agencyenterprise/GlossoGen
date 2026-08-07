@@ -24,9 +24,12 @@ logger = logging.getLogger(__name__)
 def build_config_file(knobs: dict[str, Any] | None) -> Path | None:
     """Write validated knobs to a temporary JSON config file.
 
-    Returns the file path, or None if knobs is empty/None. The caller owns the
-    file: the launched subprocess reads it at startup, so it cannot be deleted
-    immediately, and nothing else will clean it up.
+    Returns the file path, or None if knobs is empty/None.
+
+    The file is left for the operating system to reclaim. It cannot be deleted
+    at launch time because the subprocess reads it at startup, and it is a few
+    hundred bytes in a directory the OS already manages — not worth the risk of
+    pattern-matching deletes in shared temp space.
     """
     config: dict[str, Any] = {}
     if knobs:
@@ -40,31 +43,6 @@ def build_config_file(knobs: dict[str, Any] | None) -> Path | None:
     config_path = Path(tmp_path)
     config_path.write_bytes(orjson.dumps(config))
     return config_path
-
-
-def prune_stale_config_files(max_age_seconds: float) -> int:
-    """Delete leftover launch config files older than ``max_age_seconds``.
-
-    The launched subprocess reads its config at startup, so the file cannot be
-    removed at launch time. Sweeping on the next launch keeps them from
-    accumulating in the system temp directory for the life of the container.
-
-    Returns the number of files removed.
-    """
-    cutoff = time.time() - max_age_seconds
-    removed = 0
-    for path in Path(tempfile.gettempdir()).glob("glossogen_config_*.json"):
-        try:
-            if path.stat().st_mtime < cutoff:
-                path.unlink()
-                removed += 1
-        except OSError:
-            # Racing with another sweep, or a file we do not own. Skipping is
-            # correct: this is opportunistic cleanup, not a critical path.
-            logger.exception("Could not remove stale launch config %s", path)
-    if removed:
-        logger.info("Removed %d stale launch config file(s)", removed)
-    return removed
 
 
 def launch_simulation(
@@ -111,7 +89,6 @@ def launch_simulation(
         group_slug,
     ]
 
-    prune_stale_config_files(max_age_seconds=24 * 60 * 60)
     config_path = build_config_file(knobs=validated.scenario_config)
     if config_path is not None:
         cmd.extend(["--config", str(config_path)])
