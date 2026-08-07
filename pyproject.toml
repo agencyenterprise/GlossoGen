@@ -17,7 +17,7 @@ dependencies = [
     "tenacity>=9.0.0",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
-    "mcp>=1.0.0",
+    "mcp>=1.28.1",
     "pydantic-ai>=2.4.0,<3.0.0",
     "openai>=2.29.0",
     "httpx>=0.28.1",
@@ -41,7 +41,7 @@ dependencies = [
 # executes these metrics. Absent the extra, those metrics log a skip and
 # return no Measurement — see evaluation/metric_core/optional_ml_backend.py.
 metrics-ml = [
-    "torch>=2.2.0",
+    "torch>=2.13.0",
     "transformers>=5.0.0rc3",
     "minicons>=0.2.55",
     "datasets>=5.0.1",
