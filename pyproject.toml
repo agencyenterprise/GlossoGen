@@ -18,10 +18,10 @@ dependencies = [
     "fastapi>=0.141.1",
     "uvicorn[standard]>=0.52.1",
     "mcp>=1.28.1",
-    "pydantic-ai>=2.23.0,<3.0.0",
+    "pydantic-ai>=2.26.0,<3.0.0",
     "openai>=2.29.0",
     "httpx>=0.28.1",
-    "huggingface_hub>=1.26.0",
+    "huggingface_hub>=1.26.1",
     "weasyprint>=62.0",
     "markdown>=3.10.3",
     "python-dotenv>=1.2.2",
@@ -29,10 +29,10 @@ dependencies = [
     "rapidfuzz>=3.10.0",
     "psycopg[binary]>=3.3.4",
     "psycopg-pool>=3.2.0",
-    "alembic>=1.18.5",
+    "alembic>=1.19.0",
     "svix>=1.99.1",
     "clerk-backend-api>=6.0.1",
-    "langfuse>=4.14.2",
+    "langfuse>=4.14.3",
 ]
 
 [project.optional-dependencies]
