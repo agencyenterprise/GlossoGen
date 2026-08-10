@@ -25,7 +25,31 @@ const SCENARIO_PLUGINS: Record<string, ScenarioPlugin> = {
   [spotTheDifferencePlugin.scenarioName]: spotTheDifferencePlugin,
 };
 
+/**
+ * Primary channel for scenarios that ship no plug-in.
+ *
+ * Must match the scenario's `get_primary_channels()` on the backend. The
+ * round timeline filters messages on this, so a mismatch renders an empty
+ * list under a misleading header rather than failing — which is how
+ * spillway_release, warehouse_robot_recovery and
+ * hospital_bed_assignment_privacy silently showed nothing while the default
+ * assumed every scenario used "link".
+ *
+ * Scenarios with a plug-in declare `primaryChannelId` there instead.
+ */
+const PRIMARY_CHANNEL_OVERRIDES: Record<string, string> = {
+  spillway_release: "ops",
+  warehouse_robot_recovery: "radio",
+  hospital_bed_assignment_privacy: "public_ops",
+};
+
 /** Return the plug-in registered for ``scenarioName`` or the default no-op plug-in. */
 export function getScenarioPlugin(scenarioName: string): ScenarioPlugin {
-  return SCENARIO_PLUGINS[scenarioName] ?? DEFAULT_SCENARIO_PLUGIN;
+  const plugin = SCENARIO_PLUGINS[scenarioName];
+  if (plugin !== undefined) return plugin;
+  const primaryChannelId = PRIMARY_CHANNEL_OVERRIDES[scenarioName];
+  if (primaryChannelId !== undefined) {
+    return { ...DEFAULT_SCENARIO_PLUGIN, scenarioName, primaryChannelId };
+  }
+  return DEFAULT_SCENARIO_PLUGIN;
 }

@@ -16,10 +16,6 @@
  */
 
 import type { ComponentType, ReactNode } from "react";
-import type { AgentModelOverride } from "./agent-model-overrides";
-
-type KnobsMap = Record<string, unknown>;
-type ModelOption = { model_prefix: string; provider: string };
 
 /** Color palette for a scenario timeline marker's FAB and divider. */
 export type ScenarioMarkerTone = "amber" | "emerald" | "violet";
@@ -44,12 +40,6 @@ export interface ScenarioTimelineMarker {
   dividerTitle: ReactNode;
   /** Secondary line on the inline divider. */
   dividerSubtitle: ReactNode;
-}
-
-/** Validation error attached to a scenario-specific knobs form field. */
-export interface KnobsFormError {
-  field: string;
-  message: string;
 }
 
 /**
@@ -79,29 +69,6 @@ export interface LiveJudgeConfig {
   judgedToolNames: string[];
 }
 
-/**
- * Adapter wrapping a scenario's bespoke knobs form.
- *
- * The form is expected to self-bootstrap (e.g. load defaults from a
- * preset endpoint) on mount when `state` is `null`.
- */
-export interface ScenarioKnobsForm {
-  /** Component rendered in place of the standard knobs-preset picker. */
-  Component: ComponentType<{
-    state: unknown;
-    models: ModelOption[];
-    errors: KnobsFormError[];
-    onChange: (next: unknown) => void;
-  }>;
-  /** Return field-scoped validation errors. Empty array means valid. */
-  validate: (state: unknown) => KnobsFormError[];
-  /** Convert form state into the wire-format knobs payload posted to the backend. */
-  buildPayload: (args: {
-    state: unknown;
-    modelOverrides: Record<string, AgentModelOverride>;
-  }) => KnobsMap;
-}
-
 /** Props for the per-scenario round-detail panel mounted inside the round timeline modal.
  *
  * ``extras`` is the run's ``scenario_extras`` payload typed as ``unknown``
@@ -126,15 +93,8 @@ export interface ScenarioPlugin {
    * registered plug-in.
    */
   primaryChannelId: string;
-  /** Bespoke knobs form (null = use the standard preset picker). */
-  knobsForm: ScenarioKnobsForm | null;
   /** Header panel rendered above the timeline in the round-detail modal. */
   RoundDetailPanel: ComponentType<RoundDetailPanelProps> | null;
-  /**
-   * Knobs payload defaulted into the cross-run-replace-agent modal for
-   * this scenario. Empty record means no default.
-   */
-  defaultReplaceAgentKnobs: KnobsMap;
   /**
    * Render a scenario's bespoke supplementary block for a tool-use entry
    * (e.g. the container-yard move verdict). LLM-judged scenarios surface
