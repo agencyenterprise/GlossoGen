@@ -1,0 +1,30 @@
+name: Release label
+
+# Every pull request must state whether it ships. As a required check, the
+# decision cannot be skipped by forgetting it — which is how the version in
+# pyproject.toml came to sit two releases ahead of the newest tag.
+#
+# Adding or removing a label re-runs this, so the answer stays current.
+#
+#   release:patch / release:minor / release:major   merging cuts that release
+#   norelease                                       merges without releasing
+#
+# These label names are the ones release.yml reads, so changing one here means
+# changing it there too.
+
+on:
+  pull_request:
+    types: [opened, reopened, labeled, unlabeled, synchronize]
+
+jobs:
+  release-label:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Require exactly one release label
+        uses: mheap/github-action-required-labels@v5
+        with:
+          mode: exactly
+          count: 1
+          labels: "release:patch, release:minor, release:major, norelease"

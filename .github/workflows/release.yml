@@ -1,0 +1,124 @@
+name: Release
+
+# Cuts the release a merged pull request asked for via its label.
+#
+#   release:patch / release:minor / release:major   bump, tag, publish
+#   norelease                                       merge without releasing
+#
+# The tag push publishes both images (publish-images.yml), which glossogen-deploy
+# then promotes to production. Merging a labelled pull request is therefore a
+# deploy — the label is where that decision is made.
+#
+# The version bump is committed BEFORE the tag is created, so `vX.Y.Z` always
+# points at a tree whose pyproject.toml says X.Y.Z. The common form of this
+# workflow tags first and bumps afterwards, which leaves every release tag
+# carrying the previous version.
+#
+# RELEASE_TOKEN must belong to a repository admin: main's ruleset requires a
+# pull request, and admins are its bypass actors. It also has to be a real
+# token rather than GITHUB_TOKEN, because a tag pushed with GITHUB_TOKEN does
+# not start a workflow run — the release would tag and never build.
+
+on:
+  pull_request:
+    types: [closed]
+
+# Two pull requests merged together must not race for the same version. The
+# second run re-reads main after the first has pushed.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Resolve the release kind
+        id: kind
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          KIND=$(echo "$LABELS" | python3 -c "
+          import json, sys
+          bumps = {'release:patch': 'patch', 'release:minor': 'minor', 'release:major': 'major'}
+          found = [bumps[l] for l in json.load(sys.stdin) if l in bumps]
+          print(found[0] if len(found) == 1 else '')
+          ")
+          echo "kind=${KIND}" >> "$GITHUB_OUTPUT"
+          if [ -z "$KIND" ]; then
+            echo "no release label — nothing to cut"
+          else
+            echo "release kind: ${KIND}"
+          fi
+
+      - name: Require the release token
+        if: steps.kind.outputs.kind != ''
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "RELEASE_TOKEN is not set."
+            echo
+            echo "It must be a fine-grained PAT belonging to a repository admin,"
+            echo "scoped to this repository, with Contents: read/write. Admins are"
+            echo "the bypass actors on main's ruleset, and a tag pushed with the"
+            echo "default GITHUB_TOKEN would never trigger the image build."
+            exit 1
+          fi
+
+      - name: Checkout main
+        if: steps.kind.outputs.kind != ''
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          token: ${{ secrets.RELEASE_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        if: steps.kind.outputs.kind != ''
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        if: steps.kind.outputs.kind != ''
+        uses: astral-sh/setup-uv@v7
+
+      - name: Bump the version
+        if: steps.kind.outputs.kind != ''
+        id: bump
+        run: |
+          set -euo pipefail
+          # Re-locks so uv.lock's recorded project version keeps step with
+          # pyproject.toml, without building a virtualenv to do it.
+          uv version --bump "${{ steps.kind.outputs.kind }}" --no-sync
+          echo "version=$(uv version --short)" >> "$GITHUB_OUTPUT"
+
+      - name: Commit, tag, and push
+        if: steps.kind.outputs.kind != ''
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -qam "Release ${TAG} (#${PR_NUMBER})"
+          git tag -a "$TAG" -m "Release ${TAG} (#${PR_NUMBER})"
+
+          # main first: a tag pointing at a commit that never reached main is
+          # harder to unpick than a bump that briefly has no tag.
+          git push origin HEAD:main
+          git push origin "$TAG"
+
+          gh release create "$TAG" --title "$TAG" --generate-notes
+
+          echo "### Released \`${TAG}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Images publish from the tag, then glossogen-deploy promotes them." >> "$GITHUB_STEP_SUMMARY"

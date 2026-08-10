@@ -74,12 +74,19 @@ guide.
 
 ## Releases
 
-Tag `vX.Y.Z` on `main`. That triggers `publish-images.yml`, which builds and pushes
-the backend and frontend images to GHCR.
+Releases are cut by labelling a pull request with exactly one of `release:patch`,
+`release:minor`, `release:major`, or `norelease`. A required check fails until one
+is set.
 
-**Bump `project.version` in `pyproject.toml` in the same commit as the tag.** The
-two drifted once already, which made `importlib.metadata.version("glossogen")`
-report a release that was not the one installed.
+Merging a labelled pull request runs `uv version --bump <label>`, commits the new
+version, tags it `vX.Y.Z`, and publishes the backend and frontend images to GHCR.
+
+**Do not edit `project.version` in `pyproject.toml` yourself** — the release commit
+sets it. Keeping the bump and the tag in one automated step is what stops the two
+drifting, which is what happened while it was a manual step.
+
+Tagging `vX.Y.Z` by hand still publishes images, for the cases the label flow does
+not cover.
 
 ## Costs
 
