@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # System deps for weasyprint (PDF export). Nothing else here needs apt:
 # run history is a JSONL ledger with byte-offset truncation, so the image
