@@ -164,3 +164,44 @@ class InMemoryOAuthStorage:
     async def delete_pending_consent(self, request_id: str) -> None:
         """Delete a pending consent request (consumed or expired)."""
         self._pending_consents.pop(request_id, None)
+
+    async def purge_expired(self) -> int:
+        """Drop expired authorization codes and tokens.
+
+        In-memory state dies with the process, so this reclaims nothing across
+        restarts — it exists so both storage implementations satisfy the port
+        and the startup purge behaves the same in local and Clerk mode.
+
+        The three stores wrap their payload under different names
+        (``code`` vs ``token``), so each is handled explicitly rather than
+        duck-typed.
+        """
+        now = time.time()
+        removed = 0
+
+        expired_codes = [
+            key for key, entry in self._auth_codes.items() if entry.code.expires_at < now
+        ]
+        for key in expired_codes:
+            del self._auth_codes[key]
+        removed += len(expired_codes)
+
+        expired_access = [
+            key
+            for key, entry in self._access_tokens.items()
+            if entry.token.expires_at is not None and entry.token.expires_at < now
+        ]
+        for key in expired_access:
+            del self._access_tokens[key]
+        removed += len(expired_access)
+
+        expired_refresh = [
+            key
+            for key, entry in self._refresh_tokens.items()
+            if entry.token.expires_at is not None and entry.token.expires_at < now
+        ]
+        for key in expired_refresh:
+            del self._refresh_tokens[key]
+        removed += len(expired_refresh)
+
+        return removed

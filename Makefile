@@ -36,10 +36,24 @@ lint-server:
 	VIRTUAL_ENV= uv run --no-sync isort . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'vulture_whitelist.py' --skip-glob 'runs/*'
 	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude vulture_whitelist.py --exclude runs
 	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
-	VIRTUAL_ENV= uv run --no-sync vulture src/ vulture_whitelist.py --min-confidence 60
+	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.py --min-confidence 60
 	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal --exclude scripts
 	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs --exclude scripts
 	@echo "Server linting complete"
+
+# CI mode for the server: same checks as lint-server, but black and isort only
+# report. lint-server rewrites files, which in CI means it fixes the ephemeral
+# checkout and exits 0 — so formatting drift was structurally uncatchable.
+check-server:
+	@echo "Checking server..."
+	VIRTUAL_ENV= uv run --no-sync black --check . --exclude '\.venv|frontend|vulture_whitelist\.py|runs'
+	VIRTUAL_ENV= uv run --no-sync isort --check-only . --skip-glob '.venv/*' --skip-glob 'frontend/*' --skip-glob 'vulture_whitelist.py' --skip-glob 'runs/*'
+	VIRTUAL_ENV= uv run --no-sync ruff check . --exclude .venv --exclude frontend --exclude vulture_whitelist.py --exclude runs
+	VIRTUAL_ENV= uv run --no-sync pyright --project pyproject.toml
+	VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ vulture_whitelist.py --min-confidence 60
+	VIRTUAL_ENV= uv run --no-sync python linter/check_inline_imports.py --target-dir . --exclude runs --exclude modal
+	VIRTUAL_ENV= uv run --no-sync python linter/check_type_checking.py --target-dir . --exclude runs
+	@echo "Server check complete"
 
 lint-frontend:
 	@echo "Linting frontend..."
@@ -87,4 +101,4 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-metrics install-frontend lint lint-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types
+.PHONY: install install-server install-metrics install-frontend lint lint-server check-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types

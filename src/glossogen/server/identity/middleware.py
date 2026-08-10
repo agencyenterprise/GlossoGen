@@ -34,7 +34,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from glossogen.db.local_tenant import LOCAL_GROUP_SLUG, LOCAL_USER_ID
+from glossogen.db.local_tenant import LOCAL_USER_ID
 from glossogen.db.queries import get_group_by_slug
 from glossogen.server.identity.clerk_verifier import (
     ClerkSessionClaims,
@@ -175,8 +175,6 @@ class ClerkIdentityMiddleware:
         return Identity(
             user_id=LOCAL_USER_ID,
             active_group_id=local_group_id,
-            active_group_slug=LOCAL_GROUP_SLUG,
-            available_group_ids=frozenset({local_group_id}),
             is_local_mode=True,
         )
 
@@ -224,7 +222,6 @@ class ClerkIdentityMiddleware:
             oauth_identity = await self._try_oauth_bearer(
                 request=request,
                 token=token,
-                url_slug=url_slug,
                 expected_group_id=group.id,
             )
             if oauth_identity is None:
@@ -247,8 +244,6 @@ class ClerkIdentityMiddleware:
         identity = Identity(
             user_id=claims.user_id,
             active_group_id=group.id,
-            active_group_slug=group.slug,
-            available_group_ids=frozenset({group.id}),
             is_local_mode=False,
         )
         request.state.identity = identity
@@ -258,7 +253,6 @@ class ClerkIdentityMiddleware:
         self,
         request: Request,
         token: str,
-        url_slug: str,
         expected_group_id: UUID,
     ) -> Identity | None:
         """Look up a Bearer as an MCP OAuth access token.
@@ -281,7 +275,5 @@ class ClerkIdentityMiddleware:
         return Identity(
             user_id=f"oauth:{token[:8]}",
             active_group_id=expected_group_id,
-            active_group_slug=url_slug,
-            available_group_ids=frozenset({expected_group_id}),
             is_local_mode=False,
         )

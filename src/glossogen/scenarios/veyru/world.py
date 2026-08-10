@@ -233,10 +233,6 @@ class VeyruWorld(ScenarioWorld):
         self._intern_takeover_just_happened = True
         return displaced
 
-    def mark_intern_takeover(self) -> None:
-        """Flag that the intern just took over; consumed by the next injection pass."""
-        self._intern_takeover_just_happened = True
-
     def consume_intern_takeover(self) -> bool:
         """Return whether an intern takeover just happened and clear the flag."""
         was_set = self._intern_takeover_just_happened

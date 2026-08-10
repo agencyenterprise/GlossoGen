@@ -12,12 +12,7 @@ from datetime import datetime
 import psycopg
 
 from glossogen.db.pool import get_database_url
-from glossogen.db.queries import (
-    get_group_by_slug,
-    insert_run,
-    insert_run_if_absent,
-    update_run_status,
-)
+from glossogen.db.queries import get_group_by_slug, insert_run, update_run_status
 
 logger = logging.getLogger(__name__)
 
@@ -63,43 +58,6 @@ async def register_run_standalone(
         run_dir_name,
         group_slug,
     )
-
-
-async def register_run_if_absent_standalone(
-    group_slug: str,
-    scenario: str,
-    run_dir_name: str,
-    status: str,
-    created_at: datetime,
-    created_by_user_id: str | None,
-    source_run_scenario: str | None,
-    source_run_dir_name: str | None,
-) -> bool:
-    """Same as ``register_run_standalone`` but idempotent.
-
-    Returns True if a row was inserted, False if one was already present.
-    Used by the backfill script to skip already-indexed runs. Returns False in
-    no-database local mode (``DATABASE_URL`` unset): there is no index to write.
-    """
-    conninfo = get_database_url()
-    if conninfo is None:
-        return False
-    async with await psycopg.AsyncConnection.connect(conninfo=conninfo) as conn:
-        group = await get_group_by_slug(conn=conn, slug=group_slug)
-        if group is None:
-            raise RuntimeError(f"Unknown group slug for run registration: {group_slug!r}")
-        inserted = await insert_run_if_absent(
-            conn=conn,
-            group_id=group.id,
-            scenario=scenario,
-            run_dir_name=run_dir_name,
-            status=status,
-            created_at=created_at,
-            created_by_user_id=created_by_user_id,
-            source_run_scenario=source_run_scenario,
-            source_run_dir_name=source_run_dir_name,
-        )
-    return inserted
 
 
 async def update_run_status_standalone(

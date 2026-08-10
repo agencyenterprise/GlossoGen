@@ -11,7 +11,7 @@ from uuid import UUID
 from psycopg import AsyncConnection
 from psycopg.rows import TupleRow
 
-from glossogen.db.rows import DerivedSourceCountRow, GroupRow, RunRow, UserLastActiveGroupRow
+from glossogen.db.rows import DerivedSourceCountRow, GroupRow, RunRow
 
 _GROUP_COLUMNS = "id, clerk_org_id, slug, name, created_at"
 _RUN_COLUMNS = (
@@ -46,22 +46,6 @@ async def get_group_by_id(
         await cur.execute(
             f"SELECT {_GROUP_COLUMNS} FROM groups WHERE id = %s",
             (group_id,),
-        )
-        row = await cur.fetchone()
-    if row is None:
-        return None
-    return _group_row_from_tuple(row)
-
-
-async def get_group_by_clerk_org_id(
-    conn: AsyncConnection[TupleRow],
-    clerk_org_id: str,
-) -> GroupRow | None:
-    """Look up a group by its Clerk org id; returns ``None`` if not found."""
-    async with conn.cursor() as cur:
-        await cur.execute(
-            f"SELECT {_GROUP_COLUMNS} FROM groups WHERE clerk_org_id = %s",
-            (clerk_org_id,),
         )
         row = await cur.fetchone()
     if row is None:
@@ -291,46 +275,6 @@ async def insert_run(
     return _run_row_from_tuple(row)
 
 
-async def insert_run_if_absent(
-    conn: AsyncConnection[TupleRow],
-    group_id: UUID,
-    scenario: str,
-    run_dir_name: str,
-    status: str,
-    created_at: datetime,
-    created_by_user_id: str | None,
-    source_run_scenario: str | None,
-    source_run_dir_name: str | None,
-) -> bool:
-    """Insert a run row only if ``(scenario, run_dir_name)`` is not already taken.
-
-    Returns ``True`` when a row was inserted, ``False`` when one already existed.
-    Used by ``scripts/backfill_runs_index.py``.
-    """
-    async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            INSERT INTO runs (
-                group_id, scenario, run_dir_name, status, created_at,
-                created_by_user_id, source_run_scenario, source_run_dir_name
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (scenario, run_dir_name) DO NOTHING
-            """,
-            (
-                group_id,
-                scenario,
-                run_dir_name,
-                status,
-                created_at,
-                created_by_user_id,
-                source_run_scenario,
-                source_run_dir_name,
-            ),
-        )
-        return cur.rowcount == 1
-
-
 async def update_run_status(
     conn: AsyncConnection[TupleRow],
     scenario: str,
@@ -357,22 +301,6 @@ async def delete_run(
             "DELETE FROM runs WHERE group_id = %s AND scenario = %s AND run_dir_name = %s",
             (group_id, scenario, run_dir_name),
         )
-
-
-async def get_last_active_group(
-    conn: AsyncConnection[TupleRow],
-    user_id: str,
-) -> UserLastActiveGroupRow | None:
-    """Return the last-active group entry for a user, or ``None`` if unrecorded."""
-    async with conn.cursor() as cur:
-        await cur.execute(
-            "SELECT user_id, group_id, updated_at FROM user_last_active_group WHERE user_id = %s",
-            (user_id,),
-        )
-        row = await cur.fetchone()
-    if row is None:
-        return None
-    return UserLastActiveGroupRow(user_id=row[0], group_id=row[1], updated_at=row[2])
 
 
 async def set_last_active_group(
@@ -444,6 +372,46 @@ async def update_run_evaluation_content_hash(
             """,
             (content_hash, group_id, scenario, run_dir_name),
         )
+
+
+async def insert_run_if_absent(
+    conn: AsyncConnection[TupleRow],
+    group_id: UUID,
+    scenario: str,
+    run_dir_name: str,
+    status: str,
+    created_at: datetime,
+    created_by_user_id: str | None,
+    source_run_scenario: str | None,
+    source_run_dir_name: str | None,
+) -> bool:
+    """Insert a run row only if ``(scenario, run_dir_name)`` is not already taken.
+
+    Returns ``True`` when a row was inserted, ``False`` when one already existed.
+    Used by ``scripts/backfill_runs_index.py``.
+    """
+    async with conn.cursor() as cur:
+        await cur.execute(
+            """
+            INSERT INTO runs (
+                group_id, scenario, run_dir_name, status, created_at,
+                created_by_user_id, source_run_scenario, source_run_dir_name
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (scenario, run_dir_name) DO NOTHING
+            """,
+            (
+                group_id,
+                scenario,
+                run_dir_name,
+                status,
+                created_at,
+                created_by_user_id,
+                source_run_scenario,
+                source_run_dir_name,
+            ),
+        )
+        return cur.rowcount == 1
 
 
 async def list_runs_missing_evaluation_content_hash(
