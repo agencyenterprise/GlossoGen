@@ -154,10 +154,27 @@ EXP-023 tested their factorial effects over fifteen hidden rounds at two fresh
 matched Sonnet seeds. The pledge effect and pledge-by-stake interaction reversed
 sign across seeds. The stake effect was negative in both seeds: it reduced raw
 inspection by 1.5 and 8 assignments, reduced safe delivery by 3.0 and 2.5
-orders, and increased unsafe delivery by 1.5 orders in each seed. Its
-inspection-rate effect was nearly zero in one seed and strongly negative in the
-other, so the direction is an exploratory adverse candidate rather than a
-stable effect estimate.
+orders, and increased unsafe delivery by 1.5 orders in each seed.
+
+EXP-024 then measured how much a trajectory varies when nothing changes. Six
+replicates of the association baseline — identical config, identical seed 49,
+identical model — produced inspected assignments ranging from 25/45 to 37/45,
+with a standard deviation of 4.71. Safe deliveries ranged from 6 to 10 of 15.
+Sanctions fired in two of the six. Whether agents communicated at all was also
+stochastic: four sent no messages, one sent nine, one sent seventy-eight.
+
+That number reframes the mechanism result. Because an EXP-023 factorial main
+effect averages two single-run differences, its sampling standard deviation
+equals the per-run figure exactly, with no reduction. The stake contrasts are
+therefore 0.32 and 1.70 standard deviations, and the rule that promoted them —
+the same non-zero sign at two fresh seeds — agrees by chance one time in four
+under a true zero. The adverse stake direction is **underpowered rather than
+repeated**, and resolving a four-assignment effect would take 23 runs per arm.
+
+The bundle results are unaffected. Terra and Sol moved from 5–9 unsafe
+deliveries to 0 in every observed covenant trajectory, which is 3–6 standard
+deviations on that term and additionally sat at a hard 45/45 ceiling with no
+spread.
 
 ## Findings so far
 
@@ -186,8 +203,16 @@ stable effect estimate.
   produced extensive public deliberation, affecting observability and cost.
 - The explicit fairness pledge did not produce a repeatable incremental effect
   inside the full association across two fresh Sonnet seeds. The unconditional
-  personal entry stake repeated only as an adverse effort-and-safety candidate;
-  “skin in the game” was not automatically beneficial.
+  personal entry stake is neither established nor excluded: its contrasts fall
+  within the instrument's own run-to-run noise. “Skin in the game” was not shown
+  to be beneficial, and was not shown to be harmful either.
+- Run-to-run noise at a fixed seed is large: 4.71 inspected assignments, 1.60
+  safe deliveries, 1.51 unsafe deliveries. Mechanism-scale claims need replicates
+  per cell; single runs per cell suffice only for saturated contrasts.
+- False effort attestations were zero in all six identical replicates, with zero
+  variance, consistent with zero across every trajectory in the program. The
+  scenario does not elicit deception, because attestation carries no payoff.
+  This is an instrument limitation to fix, not evidence of honesty.
 
 ## Current conclusion
 
@@ -200,12 +225,23 @@ safer refusal, redundant work, or operational fragility.
 
 The current evidence is sufficient for an exploratory briefing. More unchanged
 Terra or Sol runs have low information value because all three observed
-covenant trajectories reached the same ceiling. The first mechanism ablation
-did not support the pledge or pledge-by-stake interaction and identified the
-current stake as a potentially harmful treatment. The next decision is whether
-to replicate that adverse stake direction in another model or redesign the
-cost so that it is forfeited only after a commitment violation. Fair
-enforcement, deception, and long-run durability remain separate questions.
+covenant trajectories reached the same ceiling.
+
+The mechanism layer is now blocked on measurement rather than on design. The
+first ablation did not support the pledge or the pledge-by-stake interaction, and
+the stake contrast turned out to lie inside the instrument's noise. At 23 runs
+per arm, neither replicating the stake in a second model nor redesigning it is
+affordable for the effect size it appears to have, so neither is authorized.
+
+The next steps are the ones whose value does not depend on resolving a
+four-assignment difference: recutting the existing runs distributionally to match
+the human study's own headline statistic, adding a neutral arm with no
+institutional framing to check whether the current independent arm licenses
+shirking rather than merely omitting the institution, and comparing an agent that
+carries an accumulated history of honored commitments against a fresh agent given
+the same commitment as a written rule. Fair enforcement, deception, long-run
+durability, and newcomer transmission remain separate questions, and deception in
+particular needs the attestation payoff fixed before it can be studied at all.
 
 ## Source records
 
@@ -219,5 +255,6 @@ enforcement, deception, and long-run durability remain separate questions.
 - [Two-seed economical-model replication](experiments/EXP-021-cheap-model-seed-replication/experiment.md)
 - [Pledge × personal stake activation pilot](experiments/EXP-022-pledge-personal-stake-pilot/experiment.md)
 - [Pledge × personal stake factorial](experiments/EXP-023-pledge-stake-factorial/experiment.md)
+- [Baseline run-to-run variance](experiments/EXP-024-baseline-variance/experiment.md)
 - [Frozen independent config](experiments/EXP-020-cross-model-compatibility/configs/independent.json)
 - [Frozen covenant config](experiments/EXP-020-cross-model-compatibility/configs/covenant.json)

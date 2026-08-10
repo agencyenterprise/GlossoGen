@@ -25,7 +25,15 @@ and its
 - [STUDY-003 — Enforcement and resilience](../studies/STUDY-003-enforcement-resilience.md):
   EXP-014–019.
 - [STUDY-004 — Pledge × personal cost](../studies/STUDY-004-pledge-cost-mechanism.md):
-  EXP-022–023 complete. Next available record is EXP-024.
+  EXP-022–023 complete.
+- [STUDY-005 — Measurement resolution](../studies/STUDY-005-measurement-resolution.md):
+  EXP-024 complete. Next available record is EXP-025.
+
+Working noise terms for sizing any new experiment in this program, from
+[EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
+assignments, `1.60` safe deliveries, `1.51` unsafe deliveries, per run at a
+fixed seed on Claude Sonnet 5. State a target effect size and the replicate
+count that resolves it before launching.
 
 ## Chronological index
 
@@ -54,8 +62,9 @@ and its
 | [EXP-021](EXP-021-cheap-model-seed-replication/experiment.md) | two fresh paired seeds across Sonnet 5, Terra, and Sol | complete | safety contrast repeated 2/2 for Terra and Sol but 0/2 for Sonnet | $42.62 |
 | [EXP-022](EXP-022-pledge-personal-stake-pilot/experiment.md) | pledge × personal stake activation pilot | complete | supported: both manipulations activated with useful variation | $5.19 |
 | [EXP-023](EXP-023-pledge-stake-factorial/experiment.md) | fifteen-round pledge × personal stake factorial | complete | personal stake repeated as an adverse effort/safety candidate; pledge and interaction did not repeat | $27.18 |
+| [EXP-024](EXP-024-baseline-variance/experiment.md) | run-to-run variance of the association baseline at a fixed seed | complete | supported: `s = 4.71` inspections from identical inputs; kill criterion fired, cost redesign not authorized | $21.26 |
 
-Total API spend logged: **$394.76** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$416.02** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The

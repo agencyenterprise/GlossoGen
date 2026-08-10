@@ -1,12 +1,15 @@
 # Covenant Game Research Handoff
 
-**Last updated:** 2026-08-07  
+**Last updated:** 2026-08-10  
 **Repository:** GlossoGen  
 **Working branch:** `feat/bonded-counter-association-impl`  
-**Current recorded HEAD before this handoff:** `430a141`  
+**Current recorded HEAD before this handoff:** `e374bec`  
 **Research status:** Exploratory bundle cycle and first pledge × personal-cost
-mechanism study complete; the next decision is cross-model replication of the
-adverse stake candidate versus a violation-contingent cost redesign.
+mechanism study complete. The instrument's run-to-run noise has now been measured
+(EXP-024) and it is large relative to mechanism-scale effects: the adverse stake
+candidate is underpowered rather than repeated, and no further mechanism ablation
+is authorized at this cost. The authorized next steps are the ones that do not
+require resolving a small difference.
 
 ## Purpose
 
@@ -25,7 +28,9 @@ Start with this file, then read:
 4. [Cross-model pass](../research/covenant-game/experiments/EXP-020-cross-model-compatibility/experiment.md)
 5. [Two-seed replication](../research/covenant-game/experiments/EXP-021-cheap-model-seed-replication/experiment.md)
 6. [Pledge × personal stake factorial](../research/covenant-game/experiments/EXP-023-pledge-stake-factorial/experiment.md)
-7. [Experiment-record skill](../../.agents/skills/record-experiment/SKILL.md)
+7. [Baseline run-to-run variance](../research/covenant-game/experiments/EXP-024-baseline-variance/experiment.md)
+   — read this before designing any new comparison
+8. [Experiment-record skill](../../.agents/skills/record-experiment/SKILL.md)
 
 ## Research objective
 
@@ -225,6 +230,17 @@ fifteen independent samples.
   Terra, and Sol. Opus was excluded from replication because its first pair
   cost $148.15.
 
+### 5. Mechanism ablation and measurement calibration — EXP-022 to EXP-024
+
+- EXP-022 validated the explicit pledge and a 30-unit personal entry stake as
+  independently activated treatments.
+- EXP-023 ran the 2 × 2 factorial at two fresh Sonnet seeds. The pledge effect
+  and the interaction reversed sign; the stake effect was negative at both seeds.
+- EXP-024 then measured what the instrument does when nothing changes: six
+  identical replicates of the association baseline at seed 49. Inspected
+  assignments ranged 25/45 to 37/45, `s = 4.71`. This retired the program's
+  two-seed sign rule and downgraded the stake finding.
+
 ## Main quantitative findings
 
 ### GPT-5.5 hidden-horizon comparison, two seeds
@@ -244,10 +260,38 @@ In the independent arm, effort fell most sharply in the tempting profile. Only
 “effort was abandoned precisely in the tempting profile” is too strong because
 seed 46 also omitted five marginal inspections.
 
+### Measured instrument noise — read this before interpreting any table below
+
+EXP-024 ran six replicates of the association baseline with identical config,
+identical seed, and identical model. Per-run standard deviations:
+
+| Outcome | `s` |
+|---|---:|
+| Inspected assignments | 4.71 |
+| Safe deliveries | 1.60 |
+| Unsafe deliveries | 1.51 |
+| Correct completed orders | 1.03 |
+| False attestations | 0.00 |
+
+Replicates per arm to resolve an effect `d` are `n ≈ 16 · s² / d²`: for inspection
+counts, 23 runs at `d = 4`, 6 at `d = 8`, 3 at `d = 12`.
+
+Two consequences apply throughout this document. First, a contrast built as the
+mean of two single-run differences — the EXP-023 factorial main effect — has a
+sampling standard deviation equal to `s` itself, with no reduction from the
+averaging. Second, "the same non-zero sign at two fresh seeds" is satisfied by
+chance 25% of the time under a true zero, so it is no longer a sufficient
+evidence rule at mechanism scale. It remains adequate for saturated contrasts
+where an arm sits at a ceiling with no observed spread.
+
+Runs are also not reproducible in principle: no temperature is pinned in the
+per-provider defaults, and rounds end on wall-clock elapsed time or on all agents
+going idle, so network latency alone changes where each round is cut.
+
 ### Cross-model unsafe deliveries
 
 Each cell is `independent market -> covenant` unsafe deliveries in one
-fifteen-round run.
+fifteen-round run. Read the margins against `s = 1.51` for this outcome.
 
 | Model | Seed 45, descriptive | Seed 46 | Seed 47 | New-seed result |
 |---|---:|---:|---:|---|
@@ -261,6 +305,14 @@ orders in every observed covenant trajectory. Sonnet increased total effort
 under the covenant but did not reliably make whole orders safer. Opus reduced
 unsafe delivery in its single pair primarily by increasing non-delivery from 1
 to 6, which is safer refusal rather than replicated compliance.
+
+Against the measured noise, Terra and Sol's contrasts are 3–6 `s` and their
+covenant arms additionally sat at a hard 45/45 ceiling with no spread, so these
+conclusions do not depend on the retired sign rule. Sonnet's pattern is also
+consistent with the noise estimate rather than mysterious: `10 -> 4` is about
+4 `s`, while `9 -> 9` and `5 -> 6` are 0.0 and 0.7 `s`. The correct statement is
+that Sonnet's effect is real but inconsistent across trajectories, not that it
+failed to replicate for unknown reasons.
 
 ### Enforcement and resilience
 
@@ -277,12 +329,28 @@ recovery. It does not demonstrate deterrence. Four remaining members provided
 enough redundancy to continue; exactly three members were viable but fragile,
 and one of two minimum-population trajectories later collapsed.
 
+These are observed events rather than effect estimates, so they do not depend on
+replicate counts. But **whether enforcement fires at all is itself stochastic**:
+sanctions occurred in two of the six identical EXP-024 replicates and not in the
+other four. Never attribute the presence or absence of enforcement to a condition
+without replicates in both arms.
+
 ### Shirking and deception
 
 Across EXP-020 and EXP-021 there were 743 effort attestations and zero false
 claims. Agents sometimes skipped inspections but reported that truthfully.
 The current task therefore elicits shirking more effectively than deception and
 provides no evidence that the covenant reduces deception.
+
+EXP-024 sharpens this from an absence into a finding: false attestations were
+zero in all six identical replicates with **zero variance**, while every other
+outcome varied substantially. This is a stable property of the task, not a
+sampling artifact. The mechanical reason is that attestation carries no payoff —
+skipping inspection can be reported truthfully at no cost, so there is nothing to
+gain by lying. Any future study of deception must first make attestation
+payoff-relevant, for example by paying attested effort or by reducing audit
+probability for attested work, with detection probabilistic and delayed. Until
+then the instrument cannot speak to deception at all.
 
 ### Communication and cost
 
@@ -302,21 +370,39 @@ Message volume is not a coordination-quality metric. Silent structured
 execution, explicit negotiation, and verbose but ineffective coordination are
 different behavioral modes.
 
+EXP-024 adds a stronger caveat: **whether agents communicate at all is trajectory
+noise, not a property of an arm or a model.** Four of six identical replicates
+sent zero messages, one sent nine, and one sent seventy-eight. The per-model
+descriptions above are therefore about tendencies observed in single runs and must
+not be treated as behavioral signatures. Cost follows the same dispersion and is
+right-skewed — `$2.58` to `$6.64` across identical replicates — so budget from the
+maximum, never the mean.
+
 ## What the evidence supports
 
 - Agents respond to the economic setup rather than always behaving well.
 - The full covenant bundle can change effort, behavior, service safety, and
   institutional continuity.
-- Terra and Sol show a repeatable full-compliance and order-safety contrast in
-  this frozen environment across the two new seeds.
+- Terra and Sol show a full-compliance and order-safety contrast in this frozen
+  environment across all three observed seeds, at 3–6 `s` and at a ceiling with no
+  spread. This survives the noise calibration.
 - Refunds can protect clients, and expulsion can enforce membership boundaries.
 - Membership redundancy can preserve service after enforcement.
 - Correctness, effort, delivery, deterrence, and recovery are distinct outcomes.
+- The instrument's own resolution is now known, and it is a durable result that
+  every future comparison in this program depends on.
+- The scenario does not elicit deception, for a mechanical reason, with zero
+  variance across identical replicates.
 
 ## What is contradicted or not yet established
 
 - **Contradicted:** a universal alignment or order-safety improvement across
   all tested models.
+- **Retired:** "the contrast had the same non-zero sign in two fresh seeds" as a
+  sufficient evidence rule at mechanism scale. It fires by chance 25% of the time.
+- **Downgraded to unknown:** the adverse personal-stake direction. Its contrasts
+  are 0.32 `s` and 1.70 `s`, inside the instrument's noise. It is neither
+  established nor excluded, and must not be reported as a candidate effect.
 - **Not causally identified:** which individual covenant mechanism produced an
   observed difference.
 - **Not established:** any reduction in deception.
@@ -334,19 +420,57 @@ automatically run more unchanged Terra or Sol seeds: all three observed
 covenant trajectories for each model reached the same safety and effort
 ceiling, so another identical run has low information value.
 
-[STUDY-004 — Pledge × personal cost](../research/covenant-game/studies/STUDY-004-pledge-cost-mechanism.md)
-is now complete at the exploratory stage. EXP-022 validated the manipulations;
-EXP-023 found no repeatable pledge or interaction effect across two fresh
-Sonnet seeds. The unconditional 30-unit stake repeated in a negative direction
-for effort and service safety, but with an unstable magnitude. The next
-decision-relevant option is either to replicate that adverse candidate in a
-second model without changing the treatment or to open a separate study of a
-violation-contingent forfeiture.
+The mechanism layer is blocked on measurement, not on design.
+[STUDY-004](../research/covenant-game/studies/STUDY-004-pledge-cost-mechanism.md)
+is closed at the exploratory stage with a pledge null and an interaction null, and
+its stake candidate has since been downgraded to unknown by
+[EXP-024](../research/covenant-game/experiments/EXP-024-baseline-variance/experiment.md).
+Resolving a four-assignment effect needs 23 runs per arm, about `$160` per arm,
+while still confined to one seed and one model. **Neither replicating the stake in
+a second model nor redesigning the cost is authorized at that price for that
+effect size.**
 
-Fair enforcement, deception, longer-run durability, newcomer transmission, and
-Opus replication remain valid later directions. They should become separate
-studies or records only when the team selects the corresponding scientific
-question and decision rule.
+The strategic consequence matters more than the specific block. The collaborating
+human study solves noise with `N = 1113` participants; our unit of replication is
+an entire multi-agent trajectory at roughly `$3`. This instrument will not win at
+estimating small effects and should not be pointed at questions that require it.
+It should be pointed at what only it can observe.
+
+Authorized next steps, none of which require resolving a small difference:
+
+1. **Distributional re-cut of the existing runs.** The human paper's headline is
+   that 21% of no-commitment members sent nothing against 2% of covenant members —
+   the covenant suppressed the worst behavior rather than raising the mean. The
+   direct analogue is unsafe delivery, which this program has been reporting
+   alongside mean effort rather than as the primary framing. Costs nothing.
+2. **A neutral third arm with no institutional framing.** In the human study the
+   group explicitly defined by the absence of obligation performed *worse* than
+   having no group at all (`d = 0.22`–`0.27`). The current independent arm tells
+   agents there is no association, so it may be licensing shirking rather than
+   merely omitting the institution, which would inflate the covenant contrast.
+3. **Accumulated history versus written rule.** Fork a covenanted run at a chosen
+   round into two continuations facing the same temptation: one agent retaining its
+   full history of honored commitments, one fresh agent given the same commitment
+   as a system-prompt rule. This is the empirical form of the Joel-versus-Judd
+   disagreement about whether a forkable system can hold genuine stake, and the
+   platform already has the machinery (`replace-agent`, `cross-run-replace-agent`,
+   `resume-at-round`, `channel_visibility`).
+4. **Fix the attestation payoff before any deception study.** See the shirking and
+   deception section above.
+
+Two design notes for whoever resumes the mechanism question later. The
+collaborating paper states on its page 8 that its own covenant bundles a pledge and
+a 10% cost and that its design cannot separate them — so this program's factorial
+answers a limitation they wrote down, and the null is a contribution rather than an
+internal failure. And their cost is 10% of *realized winnings* charged at the end,
+whereas the tested treatment was a flat 30 charged at entry from starting capital;
+those differ in both timing and proportionality, so a matched replication is a
+different manipulation from the one already run.
+
+Fair enforcement, longer-run durability, newcomer transmission, and Opus
+replication remain valid later directions. They should become separate studies or
+records only when the team selects the corresponding scientific question, decision
+rule, target effect size, and replicate count.
 
 ## Reproducibility and operating rules
 
@@ -362,6 +486,14 @@ question and decision rule.
 - Fresh runs answer regime questions. Forks are useful for shocks or
   counterfactual continuations but should not be described as a fresh stable
   regime.
+- **State the target effect size and the replicate count that resolves it before
+  launching**, using the noise terms above. One run per condition cell is
+  sufficient only for saturated contrasts.
+- **Do not trust a recorded `base_commit` when `worktree_dirty` is true.** EXP-023
+  records `430a141`, but the provider system prompt differs between that commit and
+  the code that actually ran; the prompt stored in its own event log proved it ran
+  the later code. Verify the rendered prompt from the event log before comparing
+  runs across records.
 - Do not treat lucky stale correctness as performed effort.
 - Keep safe delivery, unsafe delivery, non-delivery, and correctness separate.
 - Keep operational recovery, financial recovery, and deterrence separate.
@@ -376,10 +508,14 @@ obtaining an explicit storage decision.
 
 ## Cost snapshot
 
-- Logged experiment spend: **$367.58**.
+- Logged experiment spend: **$416.02**.
 - Additional smoke/preflight spend noted separately: approximately **$0.73**.
 - EXP-020 Opus pair: **$148.15**.
 - EXP-021 twelve-run replication: **$42.62**.
+- EXP-024 six-replicate variance calibration: **$21.26**, which prevented
+  presenting a contrast with a 25% chance-agreement rate as a finding.
+- Per-run cost in the baseline arm ranges **$2.58–$6.64** for identical inputs.
+  Budget from the maximum.
 
 Use staged pilots when calibrating, but do not stop a preregistered fixed grid
 based on interim outcomes. Forks save early-round cost and provide shared-prefix

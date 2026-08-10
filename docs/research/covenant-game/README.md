@@ -25,13 +25,27 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-002 — Institutional bundle](studies/STUDY-002-institutional-bundle.md) | exploratory phase complete | Does the full covenant bundle change effort, safety, and continuity, and does the contrast repeat? |
 | [STUDY-003 — Enforcement and resilience](studies/STUDY-003-enforcement-resilience.md) | exploratory phase complete | Can the institution enforce boundaries and continue operating after violations, exits, or population loss? |
 | [STUDY-004 — Pledge × personal cost](studies/STUDY-004-pledge-cost-mechanism.md) | exploratory phase complete | Is behavior changed by the pledge, personal cost, or their interaction? |
+| [STUDY-005 — Measurement resolution](studies/STUDY-005-measurement-resolution.md) | first calibration complete | How much does a trajectory vary when nothing changes, and which effect sizes can this instrument resolve? |
 
 ## Current decision
 
 The first targeted mechanism study is complete. The explicit pledge and its
 interaction with the entry stake did not repeat across two fresh Sonnet seeds.
 The stake itself repeated only in an adverse direction and with an unstable
-magnitude. The next high-information decision is whether to replicate that
-adverse candidate in a second model or redesign the cost as a
-violation-contingent forfeiture. More unchanged Terra, Sol, or Sonnet bundle
-runs remain lower-information than either mechanism-focused option.
+magnitude.
+
+EXP-024 has now measured that dispersion, and its preregistered kill criterion
+fired. Six identical replicates of the association baseline produced inspected
+assignments ranging from 25/45 to 37/45, `s = 4.71`. The EXP-023 stake contrasts
+are 0.32 and 1.70 standard deviations, so the adverse direction is underpowered
+rather than repeated, and the "same sign at two fresh seeds" rule agrees by
+chance one time in four. Resolving a four-assignment effect needs 23 runs per
+arm, so neither the second-model replication nor the cost redesign is authorized.
+
+The authorized next steps are the ones that do not depend on resolving a small
+difference: recut the existing runs distributionally against the human study's
+own headline statistic, add a neutral arm with no institutional framing, and
+compare an agent carrying an accumulated history of honored commitments against a
+fresh agent given the same commitment as a written rule. Every new experiment must
+state its target effect size and required replicate count up front, using the
+noise terms in [STUDY-005](studies/STUDY-005-measurement-resolution.md).
