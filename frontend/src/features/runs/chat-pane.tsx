@@ -412,6 +412,11 @@ export function ChatPane({
     estimateSize: () => 480,
     overscan: 4,
     getItemKey: index => `round-${rounds[index]?.roundNumber ?? index}`,
+    // The adapter otherwise wraps its re-render in flushSync, which React 19
+    // rejects because the call originates from the measureElement ref during
+    // commit. Rounds are measured dynamically, so this fired on any scroll that
+    // mounted one. Batching the re-render instead is the library's own opt-out.
+    useFlushSync: false,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
 
@@ -538,10 +543,27 @@ export function ChatPane({
       return;
     }
     const roundIdx = roundIndexByNumber.get(dividerJumpTarget.roundNumber);
-    if (roundIdx !== undefined) {
-      rowVirtualizer.scrollToIndex(roundIdx, { align: "center" });
+    const elementId = dividerJumpTarget.elementId;
+    if (roundIdx === undefined) {
+      return;
     }
-    flashElementById(dividerJumpTarget.elementId);
+    // Round heights are estimated until measured, so one scrollToIndex lands
+    // near the target rather than on it, and the offset keeps shifting as rounds
+    // are measured on the way. Re-issue it until the divider mounts — a distant
+    // jump (round 11 of 40) needs several passes to converge.
+    let attemptsLeft = 60;
+    const settle = () => {
+      rowVirtualizer.scrollToIndex(roundIdx, { align: "center" });
+      if (document.getElementById(elementId)) {
+        flashElementById(elementId);
+        return;
+      }
+      if (attemptsLeft > 0) {
+        attemptsLeft -= 1;
+        requestAnimationFrame(settle);
+      }
+    };
+    requestAnimationFrame(settle);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dividerJumpNonce forces a re-jump to the same divider
   }, [dividerJumpTarget, dividerJumpNonce]);
 
