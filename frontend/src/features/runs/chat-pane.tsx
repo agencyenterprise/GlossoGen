@@ -388,6 +388,7 @@ export function ChatPane({
   // Round-level virtualization: only rounds near the viewport are mounted, so a
   // run with thousands of entries keeps a small DOM. Round heights vary and are
   // measured dynamically via ``measureElement``.
+  // eslint-disable-next-line react-hooks/incompatible-library -- useVirtualizer returns uncacheable functions, so React Compiler skips memoizing this component
   const rowVirtualizer = useVirtualizer({
     count: rounds.length,
     getScrollElement: () => scrollContainerRef.current,
