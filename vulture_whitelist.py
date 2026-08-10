@@ -216,3 +216,11 @@ _.on_end  # unused method (src/glossogen/telemetry_round_processor.py:62)
 _.force_flush  # unused method (src/glossogen/telemetry_round_processor.py:68)
 timeout_millis  # unused variable (src/glossogen/telemetry_round_processor.py:68)
 sample_quotes  # consumed by communication_ontology_consolidate_user.jinja (scripts/consolidate_communication_ontology.py:77)
+
+# Consumed by the sibling repositories, not by this one. vulture only sees this
+# repo, so after the split it reports the platform's own public surface as dead.
+# Deleting these breaks the consumers at their next dependency bump, which is a
+# long way from the edit that caused it.
+per_round_joint_success  # glossogen-research: analysis/results_viewer/{multi_swap,resume,cross_swap}_data.py
+insert_run_if_absent  # glossogen-deploy: backfills/backfill_runs_index.py
+list_runs_missing_evaluation_content_hash  # glossogen-deploy: backfills/backfill_evaluation_content_hash.py

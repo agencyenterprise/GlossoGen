@@ -372,3 +372,62 @@ async def update_run_evaluation_content_hash(
             """,
             (content_hash, group_id, scenario, run_dir_name),
         )
+
+
+async def insert_run_if_absent(
+    conn: AsyncConnection[TupleRow],
+    group_id: UUID,
+    scenario: str,
+    run_dir_name: str,
+    status: str,
+    created_at: datetime,
+    created_by_user_id: str | None,
+    source_run_scenario: str | None,
+    source_run_dir_name: str | None,
+) -> bool:
+    """Insert a run row only if ``(scenario, run_dir_name)`` is not already taken.
+
+    Returns ``True`` when a row was inserted, ``False`` when one already existed.
+    Used by ``scripts/backfill_runs_index.py``.
+    """
+    async with conn.cursor() as cur:
+        await cur.execute(
+            """
+            INSERT INTO runs (
+                group_id, scenario, run_dir_name, status, created_at,
+                created_by_user_id, source_run_scenario, source_run_dir_name
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (scenario, run_dir_name) DO NOTHING
+            """,
+            (
+                group_id,
+                scenario,
+                run_dir_name,
+                status,
+                created_at,
+                created_by_user_id,
+                source_run_scenario,
+                source_run_dir_name,
+            ),
+        )
+        return cur.rowcount == 1
+
+
+async def list_runs_missing_evaluation_content_hash(
+    conn: AsyncConnection[TupleRow],
+) -> list[RunRow]:
+    """Return every run row whose ``evaluation_content_hash`` is NULL.
+
+    Used by ``scripts/backfill_evaluation_content_hash.py`` to seed the
+    column for pre-existing rows written before migration 0004 landed.
+    Not group-scoped: the backfill script walks every group's runs.
+    """
+    async with conn.cursor() as cur:
+        await cur.execute(f"""
+            SELECT {_RUN_COLUMNS} FROM runs
+             WHERE evaluation_content_hash IS NULL
+             ORDER BY scenario, run_dir_name
+            """)
+        rows = await cur.fetchall()
+    return [_run_row_from_tuple(row) for row in rows]
