@@ -8,15 +8,19 @@
 
 ## Releasing
 
-Add **exactly one** of these labels. A required check fails until you do, so it
-is not something you can forget.
+This pull request was opened with **`release:patch`** applied automatically.
+Change it if that is wrong — exactly one of these must be set, and a required
+check enforces it.
 
 | Label | From `0.1.2` | Use for |
 | --- | --- | --- |
-| `release:patch` | `0.1.3` | Fixes, docs, internal changes |
+| `release:patch` | `0.1.3` | Fixes, docs, internal changes — **the default** |
 | `release:minor` | `0.2.0` | New functionality, backward compatible |
 | `release:major` | `1.0.0` | Breaking change |
 | `norelease` | — | Merges without cutting a release |
+
+To swap the label, add the new one first and then remove `release:patch` — the
+check will flag the moment both are on.
 
 **Do not edit the version in `pyproject.toml` yourself.** On merge, a workflow
 runs `uv version --bump <label>`, commits the result, tags it `vX.Y.Z`, and

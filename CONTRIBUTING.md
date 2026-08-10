@@ -75,8 +75,10 @@ guide.
 ## Releases
 
 Releases are cut by labelling a pull request with exactly one of `release:patch`,
-`release:minor`, `release:major`, or `norelease`. A required check fails until one
-is set.
+`release:minor`, `release:major`, or `norelease`. New pull requests get
+`release:patch` automatically — change it if the work is a new feature, a breaking
+change, or should not ship yet. A required check enforces that exactly one is set,
+so merging always means something explicit.
 
 Merging a labelled pull request runs `uv version --bump <label>`, commits the new
 version, tags it `vX.Y.Z`, and publishes the backend and frontend images to GHCR.

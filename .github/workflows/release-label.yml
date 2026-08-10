@@ -1,13 +1,17 @@
 name: Release label
 
-# Every pull request must state whether it ships. As a required check, the
-# decision cannot be skipped by forgetting it — which is how the version in
-# pyproject.toml came to sit two releases ahead of the newest tag.
-#
-# Adding or removing a label re-runs this, so the answer stays current.
+# Every pull request carries exactly one release label, so what merging ships is
+# always explicit. New pull requests default to `release:patch` — the common case
+# — and you change it when this is more than a patch, or should not ship at all.
 #
 #   release:patch / release:minor / release:major   merging cuts that release
 #   norelease                                       merges without releasing
+#
+# Defaulting and checking live in one job on purpose. A label applied with
+# GITHUB_TOKEN does not re-trigger `on: labeled`, so a separate labeller would
+# leave the pull request correctly labelled behind a stale failing check. Here
+# the check runs after the default in the same job, and it reads labels from the
+# API rather than the event payload, so it sees what was just applied.
 #
 # These label names are the ones release.yml reads, so changing one here means
 # changing it there too.
@@ -20,8 +24,28 @@ jobs:
   release-label:
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: read
+      pull-requests: write
     steps:
+      # Only on open. Re-applying on every event would make a label impossible
+      # to remove: dropping `release:patch` to replace it would just add it back.
+      - name: Default new pull requests to release:patch
+        if: github.event.action == 'opened' || github.event.action == 'reopened'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          APPLIED=$(gh pr view "$PR" --repo "$REPO" --json labels --jq '[.labels[].name] | join(" ")')
+          # Dependabot opens its pull requests already carrying `norelease`;
+          # anything already labelled is left exactly as the author set it.
+          if echo " $APPLIED " | grep -qE ' (release:patch|release:minor|release:major|norelease) '; then
+            echo "already labelled: ${APPLIED}"
+          else
+            gh pr edit "$PR" --repo "$REPO" --add-label "release:patch"
+            echo "defaulted to release:patch"
+          fi
+
       - name: Require exactly one release label
         uses: mheap/github-action-required-labels@v5
         with:
