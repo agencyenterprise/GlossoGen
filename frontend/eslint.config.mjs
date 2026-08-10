@@ -18,6 +18,11 @@ const eslintConfig = [
   ...nextConfig,
   eslintConfigPrettier,
   {
+    // Pinned instead of eslint-config-next's "detect": the version probe in
+    // eslint-plugin-react 7.37.5 calls the context API ESLint 10 removed.
+    settings: {
+      react: { version: "19.2" },
+    },
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": [
