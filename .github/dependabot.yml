@@ -5,6 +5,11 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # Dependabot cannot pick a release label, and the release-label check is
+    # required. Without this every dependency PR would sit blocked. `norelease`
+    # batches the bumps into whatever release comes next rather than cutting one
+    # per dependency; label a PR `release:patch` by hand to ship it immediately.
+    labels: ["dependencies", "norelease"]
     groups:
       # One PR for routine patch/minor bumps keeps the queue readable; majors
       # still arrive individually because they need real review.
@@ -16,6 +21,11 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # Dependabot cannot pick a release label, and the release-label check is
+    # required. Without this every dependency PR would sit blocked. `norelease`
+    # batches the bumps into whatever release comes next rather than cutting one
+    # per dependency; label a PR `release:patch` by hand to ship it immediately.
+    labels: ["dependencies", "norelease"]
     groups:
       npm-minor-patch:
         update-types: ["minor", "patch"]
@@ -24,8 +34,18 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    # Dependabot cannot pick a release label, and the release-label check is
+    # required. Without this every dependency PR would sit blocked. `norelease`
+    # batches the bumps into whatever release comes next rather than cutting one
+    # per dependency; label a PR `release:patch` by hand to ship it immediately.
+    labels: ["dependencies", "norelease"]
 
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "monthly"
+    # Dependabot cannot pick a release label, and the release-label check is
+    # required. Without this every dependency PR would sit blocked. `norelease`
+    # batches the bumps into whatever release comes next rather than cutting one
+    # per dependency; label a PR `release:patch` by hand to ship it immediately.
+    labels: ["dependencies", "norelease"]
