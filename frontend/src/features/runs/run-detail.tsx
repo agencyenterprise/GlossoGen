@@ -30,6 +30,7 @@ import { useGroupPath } from "@/features/auth/group-context";
 import { AgentDrawer } from "./agent-drawer";
 import { resolveSelectedInstance } from "./agent-instance";
 import { ChatPane } from "./chat-pane";
+import type { DividerJumpTarget } from "./chat-pane";
 import { CollapsibleConfigBadges } from "./collapsible-config-badges";
 import { LabelBadges } from "./eval-label-group";
 import { EvalLogPanel } from "./eval-log-panel";
@@ -68,6 +69,8 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [highlightNonce, setHighlightNonce] = useState(0);
+  const [dividerJumpTarget, setDividerJumpTarget] = useState<DividerJumpTarget | null>(null);
+  const [dividerJumpNonce, setDividerJumpNonce] = useState(0);
   const [showDescription, setShowDescription] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showEvalLogs, setShowEvalLogs] = useState(false);
@@ -171,22 +174,16 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
   const activeInstance = resolveSelectedInstance(selectedAgent, agentInstances);
   const activeAgentColor = activeInstance ? agentColorMap.get(activeInstance.agent_id) : undefined;
 
-  const scrollToDivider = (elementId: string) => {
-    flushSync(() => {
-      setSelectedAgent(null);
-      setShowLogs(false);
-      setSelectedChannel(null);
-      setHighlightedMessageId(null);
-    });
-    requestAnimationFrame(() => {
-      const el = document.getElementById(elementId);
-      if (!el) return;
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("animate-highlight");
-      setTimeout(() => {
-        el.classList.remove("animate-highlight");
-      }, 1500);
-    });
+  const scrollToDivider = (elementId: string, roundNumber: number) => {
+    // Clear the filters that could hide the target round, then hand the jump to
+    // ChatPane. It owns the virtualizer, so it is the only place that can mount
+    // the round before the divider is looked up.
+    setSelectedAgent(null);
+    setShowLogs(false);
+    setSelectedChannel(null);
+    setHighlightedMessageId(null);
+    setDividerJumpTarget({ elementId, roundNumber });
+    setDividerJumpNonce(n => n + 1);
   };
 
   const handleNavigateToForkPoint = (targetMessageId: string) => {
@@ -509,6 +506,8 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             onSelectAgent={setSelectedAgent}
             highlightedMessageId={highlightedMessageId}
             highlightNonce={highlightNonce}
+            dividerJumpTarget={dividerJumpTarget}
+            dividerJumpNonce={dividerJumpNonce}
             forkPointMessageId={restData.fork_source?.target_message_id ?? null}
             scenarioMarkers={scenarioMarkers}
             replaceAgentSource={restData.replace_agent_source}

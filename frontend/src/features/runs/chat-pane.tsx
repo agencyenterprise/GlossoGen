@@ -44,6 +44,15 @@ interface ChatPaneProps {
   onSelectAgent: (agentId: string) => void;
   highlightedMessageId: string | null;
   highlightNonce: number;
+  /**
+   * Divider to jump to, from one of the floating jump-to buttons. Rounds are
+   * virtualized, so the target element is usually not mounted when the button is
+   * clicked — its round has to be scrolled to first. That is why this carries a
+   * round number and not just an element id.
+   */
+  dividerJumpTarget: DividerJumpTarget | null;
+  /** Bumped per request so clicking the same button twice jumps again. */
+  dividerJumpNonce: number;
   /** The message_id that was the fork point, if this is a forked run. */
   forkPointMessageId: string | null;
   /** Round-anchored scenario-specific markers (from the scenario plug-in), rendered as dividers at their round. */
@@ -88,6 +97,12 @@ interface ChatPaneProps {
    * instance has no upper bound.
    */
   activeInstanceRoundRange: { start: number; end: number | null } | null;
+}
+
+/** A divider the run viewer can scroll to, identified by element and round. */
+export interface DividerJumpTarget {
+  elementId: string;
+  roundNumber: number;
 }
 
 export interface AgentSwapDivider {
@@ -177,6 +192,8 @@ export function ChatPane({
   channelColorMap,
   onSelectAgent,
   highlightedMessageId,
+  dividerJumpTarget,
+  dividerJumpNonce,
   highlightNonce,
   forkPointMessageId,
   scenarioMarkers,
@@ -489,6 +506,44 @@ export function ChatPane({
       rowVirtualizer.scrollToIndex(rounds.length - 1, { align: "end" });
     });
   }, [rounds.length, rowVirtualizer]);
+
+  // Flash an element by id once mounted. Dividers are rendered inside their
+  // round, so this retries across frames exactly like flashMessage: the round is
+  // virtualized out until scrollToIndex mounts it.
+  const flashElementById = useCallback((elementId: string) => {
+    let attemptsLeft = 30;
+    const attempt = () => {
+      const el = document.getElementById(elementId);
+      if (el) {
+        el.scrollIntoView({ behavior: "instant", block: "center" });
+        el.classList.remove("animate-highlight");
+        void el.offsetWidth;
+        el.classList.add("animate-highlight");
+        window.setTimeout(() => el.classList.remove("animate-highlight"), 1500);
+        return;
+      }
+      if (attemptsLeft > 0) {
+        attemptsLeft -= 1;
+        requestAnimationFrame(attempt);
+      }
+    };
+    requestAnimationFrame(attempt);
+  }, []);
+
+  // Jump to a divider requested by a floating button. The round must be scrolled
+  // to first: until the virtualizer mounts it, the divider is not in the DOM and
+  // looking it up by id finds nothing.
+  useEffect(() => {
+    if (!dividerJumpTarget) {
+      return;
+    }
+    const roundIdx = roundIndexByNumber.get(dividerJumpTarget.roundNumber);
+    if (roundIdx !== undefined) {
+      rowVirtualizer.scrollToIndex(roundIdx, { align: "center" });
+    }
+    flashElementById(dividerJumpTarget.elementId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dividerJumpNonce forces a re-jump to the same divider
+  }, [dividerJumpTarget, dividerJumpNonce]);
 
   // Scroll to a message flagged for highlight (e.g. from the branches viewer or
   // a fork-point jump). Same round-then-flash path as an explicit jump.

@@ -20,7 +20,7 @@ type AgentSwapEvent = components["schemas"]["AgentSwapEventDTO"];
  * scenario markers, replace-agent / cross-run boundaries, and in-run agent
  * swaps. Each button's ``stackIndex`` positions it in the shared vertical
  * stack. Navigation itself is delegated to the parent via ``onScrollToDivider``
- * (scroll to a divider element) and ``onNavigateToForkPoint`` (highlight the
+ * (scroll to a divider element, mounting its round first) and ``onNavigateToForkPoint`` (highlight the
  * fork-point message).
  */
 export function RunTimelineFabs({
@@ -37,7 +37,7 @@ export function RunTimelineFabs({
   crossRunReplaceAgentSource: CrossRunReplaceAgentSource | null;
   scenarioMarkers: ScenarioTimelineMarker[];
   swapEvents: AgentSwapEvent[];
-  onScrollToDivider: (elementId: string) => void;
+  onScrollToDivider: (elementId: string, roundNumber: number) => void;
   onNavigateToForkPoint: (targetMessageId: string) => void;
 }) {
   let nextStackIndex = 0;
@@ -61,7 +61,7 @@ export function RunTimelineFabs({
           key={marker.id}
           marker={marker}
           stackIndex={scenarioMarkerStackStart + i}
-          onClick={() => onScrollToDivider(marker.id)}
+          onClick={() => onScrollToDivider(marker.id, marker.roundNumber)}
         />
       ))}
 
@@ -69,7 +69,7 @@ export function RunTimelineFabs({
         <ReplaceAgentPointFab
           stackIndex={replaceAgentStackIndex}
           roundNumber={replaceAgentSource.round_start}
-          onClick={() => onScrollToDivider("replace-agent-divider")}
+          onClick={() => onScrollToDivider("replace-agent-divider", replaceAgentSource.round_start)}
         />
       ) : null}
 
@@ -77,7 +77,12 @@ export function RunTimelineFabs({
         <CrossRunReplaceAgentPointFab
           stackIndex={crossRunReplaceStackIndex}
           roundNumber={crossRunReplaceAgentSource.round_start}
-          onClick={() => onScrollToDivider("cross-run-replace-agent-divider")}
+          onClick={() =>
+            onScrollToDivider(
+              "cross-run-replace-agent-divider",
+              crossRunReplaceAgentSource.round_start
+            )
+          }
         />
       ) : null}
 
@@ -88,7 +93,10 @@ export function RunTimelineFabs({
           roundNumber={swap.round_number}
           agentId={swap.agent_id}
           onClick={() =>
-            onScrollToDivider(`agent-swap-divider-r${swap.round_number}-${swap.agent_id}`)
+            onScrollToDivider(
+              `agent-swap-divider-r${swap.round_number}-${swap.agent_id}`,
+              swap.round_number
+            )
           }
         />
       ))}

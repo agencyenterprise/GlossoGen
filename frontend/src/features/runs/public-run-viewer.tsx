@@ -432,6 +432,8 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
               roundResults={run.round_results}
               roundInjections={run.round_injections}
               resumeCutoffTimestamp={null}
+              dividerJumpTarget={null}
+              dividerJumpNonce={0}
               agentSwapDividers={[]}
               contextCompactionMarkers={[]}
               activeInstanceRoundRange={
