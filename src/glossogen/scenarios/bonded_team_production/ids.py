@@ -17,6 +17,11 @@ MARKET_CHANNEL_NAME = "warehouse team market"
 CONTRACT_INDEPENDENT = "independent"
 CONTRACT_ASSOCIATION = "association"
 
+COVENANT_PLEDGE_TEXT = (
+    "I treat others fairly and honor commitments because these principles define who I am, "
+    "even when doing so is personally costly."
+)
+
 OFFER_ASSIGNMENT_TOOL = "offer_zone_assignment"
 RESPOND_ASSIGNMENT_TOOL = "respond_to_assignment"
 INSPECT_ZONE_TOOL = "inspect_zone"
@@ -28,6 +33,7 @@ FINALIZE_DISTRIBUTION_TOOL = "finalize_distribution"
 SUBMIT_ATTESTATION_TOOL = "submit_work_attestation"
 SUBMIT_REPAIR_TOOL = "submit_team_repair"
 SUBMIT_MEMBERSHIP_TOOL = "submit_membership_decision"
+SUBMIT_PLEDGE_TOOL = "submit_covenant_pledge"
 
 TOOLS_PROVIDER = [
     "send_message",
@@ -42,6 +48,7 @@ TOOLS_PROVIDER = [
     SUBMIT_ATTESTATION_TOOL,
     SUBMIT_REPAIR_TOOL,
     SUBMIT_MEMBERSHIP_TOOL,
+    SUBMIT_PLEDGE_TOOL,
 ]
 
 DESCRIPTION_TEMPLATE = "description.jinja"

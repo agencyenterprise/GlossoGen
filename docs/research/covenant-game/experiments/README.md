@@ -1,11 +1,33 @@
-# Experiment log
+# Covenant Game experiment records
 
-One file per experiment. Entries are written **before** the run (question,
-expected decision, design) and completed after it. Negative and inconclusive
-results are recorded with the same care as positive ones — an experiment that
-rules something out saves the next person from repeating it.
+This is the chronological record index for the
+[Covenant Game research program](../README.md). One record represents one
+decision-relevant calibration, pilot, comparison, replication, stress test, or
+ablation. A record may contain several runs; the 21 completed records below are
+not 21 independent studies.
 
-## Index
+Entries are written **before** the run (question, expected decision, design)
+and completed after it. Negative and inconclusive results are recorded with the
+same care as positive ones — an experiment that rules something out saves the
+next person from repeating it.
+
+For account or researcher transition, start with the
+[Covenant Game research handoff](../../../handoffs/COVENANT-GAME-HANDOFF.md)
+and its
+[new-account resume prompt](../../../handoffs/NEW-ACCOUNT-RESUME-PROMPT.md).
+
+## Study map
+
+- [STUDY-001 — Instrument development](../studies/STUDY-001-instrument-development.md):
+  EXP-001–007.
+- [STUDY-002 — Full institutional bundle](../studies/STUDY-002-institutional-bundle.md):
+  EXP-008–013 and EXP-020–021.
+- [STUDY-003 — Enforcement and resilience](../studies/STUDY-003-enforcement-resilience.md):
+  EXP-014–019.
+- [STUDY-004 — Pledge × personal cost](../studies/STUDY-004-pledge-cost-mechanism.md):
+  EXP-022–023 complete. Next available record is EXP-024.
+
+## Chronological index
 
 | ID | Experiment | Status | Outcome | Cost |
 |---|---|---|---|---|
@@ -26,12 +48,14 @@ rules something out saves the next person from repeating it.
 | [EXP-015](EXP-015-scripted-violation-recovery.md) | scripted violation and recovery | complete | activation gate failed; explicit violation prompt was ignored | untracked |
 | [EXP-016](EXP-016-external-violation-recovery.md) | confirmed external violation and recovery | complete | enforcement and operational recovery supported; repair response not interpretable | $4.54 |
 | [EXP-017](EXP-017-population-loss-dose-response.md) | covenant population-loss dose response | complete | two-member loss contained; minimum population is viable but fragile and collapsed in 1/2 trajectories | $17.16 |
-| [EXP-018](EXP-018-graded-enforcement-pilot.md) | graded enforcement after an experienced failure | complete | operational preservation supported; alignment-policy effect requires replication | $5.03 |
-| [EXP-019](EXP-019-graded-enforcement-replication.md) | graded-enforcement shared-prefix replication | complete | capacity and immediate compliance replicated in 2/2 new trajectories | $8.90 |
+| [EXP-018](EXP-018-graded-enforcement-pilot/experiment.md) | graded enforcement after an experienced failure | complete | operational preservation supported; alignment-policy effect requires replication | $5.03 |
+| [EXP-019](EXP-019-graded-enforcement-replication/experiment.md) | graded-enforcement shared-prefix replication | complete | capacity and immediate compliance replicated in 2/2 new trajectories | $8.90 |
 | [EXP-020](EXP-020-cross-model-compatibility/experiment.md) | four-model compatibility pass on the frozen institutional comparison | complete | all four models compatible; behavioral response heterogeneous and requires paired-seed replication | $167.00 |
 | [EXP-021](EXP-021-cheap-model-seed-replication/experiment.md) | two fresh paired seeds across Sonnet 5, Terra, and Sol | complete | safety contrast repeated 2/2 for Terra and Sol but 0/2 for Sonnet | $42.62 |
+| [EXP-022](EXP-022-pledge-personal-stake-pilot/experiment.md) | pledge × personal stake activation pilot | complete | supported: both manipulations activated with useful variation | $5.19 |
+| [EXP-023](EXP-023-pledge-stake-factorial/experiment.md) | fifteen-round pledge × personal stake factorial | complete | personal stake repeated as an adverse effort/safety candidate; pledge and interaction did not repeat | $27.18 |
 
-Total API spend logged: **$367.58** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$394.76** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The
@@ -39,69 +63,31 @@ pivot criterion that fired is recorded in EXP-003: C2 differs from C1 only in
 effort and cost, never in an alignment property, because one paid count yields
 certainty and leaves the covenant no problem to solve.
 
-## Template
+## Creating the next record
 
-Copy this for a new entry. Fill everything above `Result` **before launching**.
-
-```markdown
-# EXP-NNN — <title>
-
-**Status:** planned | running | complete | invalid
-**Date opened:** YYYY-MM-DD
-**Date closed:** YYYY-MM-DD
-
-## Question
-What this experiment decides. One sentence.
-
-## Expected decision
-What we will do differently depending on how it comes out. Written before the
-run, so the result cannot retro-fit the question.
-
-## Design
-Scenario, condition, the knobs that differ from the comparison arm, model,
-provider, seed, rounds, replicas. State what is held constant.
-
-## Provenance
-- Commit: `<sha>` — `<subject>`
-- Config: path to the preset, plus any inline overrides verbatim
-- Runs: run directory paths
-
-## Result
-The numbers. No interpretation in this section.
-
-## Outcome
-supported | not supported | inconclusive
-
-## Validity limitations
-What this run cannot establish. Replica count, model coverage, seeds, ceilings,
-confounds.
-
-## What it changed
-What we do differently because of this. If nothing changed, say so and say why —
-either the question was not decision-relevant, or the result was ignored.
-
-## Traps found
-Things that broke, misled, or cost time. The field with the highest long-run
-value: it is what stops the same mistake twice.
-```
+The next available ID is `EXP-024`. Before launching, use the
+[`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
+skill to create a program- and study-scoped bundle, freeze its configs, record
+the decision rule, and validate the planned record. Do not copy an old flat
+record as a template; new records use the machine-checked v2 schema.
 
 ## Conventions
 
-- **Canonical seed is 42** across matched arms, so the case sequence and audit
-  draws are identical and replicas measure model stochasticity on the same
-  workload.
+- **Use the same seed within matched arms**, so the case sequence and audit
+  draws are identical. Use fresh preregistered seeds for replication.
 - **Do not treat a single replica as evidence of stability.** 15 rounds is one
-  trajectory of four interacting agents, not 15 independent observations. The
+  trajectory of interacting agents, not 15 independent observations. The
   independent unit is the run.
 - **Only `simulation_ended` means a run finished.** Round counts do not.
 - Run directories are gitignored. Paths recorded here are the pointer to the raw
   data on the machine that produced it; the JSONL event log is the canonical
   record and every number in these entries is recomputable from it.
 
-## Recalibration budget
+## Historical recalibration budget
 
-Adopted after EXP-002 to prevent open-ended tuning of an environment until it
-produces a desired result:
+This rule applied to the first counter–verifier cycle. It was adopted after
+EXP-002 to prevent open-ended tuning of an environment until it produced a
+desired result:
 
 1. Finish the current condition set (C0, C1, C2).
 2. Allow **at most one** significant environment revision.

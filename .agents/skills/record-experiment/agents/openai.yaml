@@ -1,4 +1,4 @@
 interface:
   display_name: "Record Experiment"
-  short_description: "Create and validate reproducible experiment records"
-  default_prompt: "Use $record-experiment to plan, close, or validate a GlossoGen experiment record."
+  short_description: "Manage reproducible program-scoped experiment records"
+  default_prompt: "Use $record-experiment to plan, close, audit, or reproduce a GlossoGen experiment within its research program and study."

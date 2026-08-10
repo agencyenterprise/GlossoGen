@@ -148,6 +148,17 @@ worker who skipped inspection were expelled, and the remaining four members
 continued delivering. However, unsafe and incorrect delivery recurred after
 enforcement, so operational recovery did not imply deterrence.
 
+EXP-022 then validated an explicit pledge and a real 30-unit personal entry
+stake as independently activated treatments inside the full association.
+EXP-023 tested their factorial effects over fifteen hidden rounds at two fresh
+matched Sonnet seeds. The pledge effect and pledge-by-stake interaction reversed
+sign across seeds. The stake effect was negative in both seeds: it reduced raw
+inspection by 1.5 and 8 assignments, reduced safe delivery by 3.0 and 2.5
+orders, and increased unsafe delivery by 1.5 orders in each seed. Its
+inspection-rate effect was nearly zero in one seed and strongly negative in the
+other, so the direction is an exploratory adverse candidate rather than a
+stable effect estimate.
+
 ## Findings so far
 
 - Agents do not automatically behave well when hidden effort is costly.
@@ -173,6 +184,10 @@ enforcement, so operational recovery did not imply deterrence.
   prevent subsequent unsafe delivery.
 - Communication was model-dependent: Sol used structured actions, while Opus
   produced extensive public deliberation, affecting observability and cost.
+- The explicit fairness pledge did not produce a repeatable incremental effect
+  inside the full association across two fresh Sonnet seeds. The unconditional
+  personal entry stake repeated only as an adverse effort-and-safety candidate;
+  “skin in the game” was not automatically beneficial.
 
 ## Current conclusion
 
@@ -185,19 +200,24 @@ safer refusal, redundant work, or operational fragility.
 
 The current evidence is sufficient for an exploratory briefing. More unchanged
 Terra or Sol runs have low information value because all three observed
-covenant trajectories reached the same ceiling. Further experiments should be
-chosen by the next scientific question: isolate mechanisms with ablations,
-compare fair enforcement policies, or separately test deception and long-run
-durability.
+covenant trajectories reached the same ceiling. The first mechanism ablation
+did not support the pledge or pledge-by-stake interaction and identified the
+current stake as a potentially harmful treatment. The next decision is whether
+to replicate that adverse stake direction in another model or redesign the
+cost so that it is forfeited only after a commitment violation. Fair
+enforcement, deception, and long-run durability remain separate questions.
 
 ## Source records
 
-- [Experiment index](README.md)
-- [Hidden-horizon stability pilot](EXP-012-hidden-horizon-stability-pilot.md)
-- [Hidden-horizon replication](EXP-013-hidden-horizon-seed46-replication.md)
-- [Population-loss dose response](EXP-017-population-loss-dose-response.md)
-- [Graded-enforcement replication](EXP-019-graded-enforcement-replication.md)
-- [Cross-model compatibility pass](EXP-020-cross-model-compatibility/experiment.md)
-- [Two-seed economical-model replication](EXP-021-cheap-model-seed-replication/experiment.md)
-- [Frozen independent config](EXP-020-cross-model-compatibility/configs/independent.json)
-- [Frozen covenant config](EXP-020-cross-model-compatibility/configs/covenant.json)
+- [Program overview](README.md)
+- [Experiment index](experiments/README.md)
+- [Hidden-horizon stability pilot](experiments/EXP-012-hidden-horizon-stability-pilot.md)
+- [Hidden-horizon replication](experiments/EXP-013-hidden-horizon-seed46-replication.md)
+- [Population-loss dose response](experiments/EXP-017-population-loss-dose-response.md)
+- [Graded-enforcement replication](experiments/EXP-019-graded-enforcement-replication/experiment.md)
+- [Cross-model compatibility pass](experiments/EXP-020-cross-model-compatibility/experiment.md)
+- [Two-seed economical-model replication](experiments/EXP-021-cheap-model-seed-replication/experiment.md)
+- [Pledge × personal stake activation pilot](experiments/EXP-022-pledge-personal-stake-pilot/experiment.md)
+- [Pledge × personal stake factorial](experiments/EXP-023-pledge-stake-factorial/experiment.md)
+- [Frozen independent config](experiments/EXP-020-cross-model-compatibility/configs/independent.json)
+- [Frozen covenant config](experiments/EXP-020-cross-model-compatibility/configs/covenant.json)

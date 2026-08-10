@@ -3,10 +3,16 @@
 **Status:** complete
 **Date opened:** 2026-08-05
 **Date closed:** 2026-08-05
+**Research program:** covenant-game
+**Study:** STUDY-002 — Full institutional bundle
+**Role:** compatibility
 
-<!-- experiment-record:v1
+<!-- experiment-record:v2
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "research_program": "covenant-game",
+  "study_id": "STUDY-002",
+  "experiment_role": "compatibility",
   "experiment_id": "EXP-020",
   "base_commit": "dba81e87b0cc3eae953afc8a872f6baaff82b2ca",
   "worktree_dirty": true,
@@ -22,11 +28,13 @@
   ],
   "configs": [
     {
-      "path": "docs/experiments/EXP-020-cross-model-compatibility/configs/independent.json",
+      "path": "docs/research/covenant-game/experiments/EXP-020-cross-model-compatibility/configs/independent.json",
+      "launch_path": "docs/experiments/EXP-020-cross-model-compatibility/configs/independent.json",
       "sha256": "807a00c5139fee2115a889d5b221694005fe2bc29250b53fa1df12b06edc9918"
     },
     {
-      "path": "docs/experiments/EXP-020-cross-model-compatibility/configs/covenant.json",
+      "path": "docs/research/covenant-game/experiments/EXP-020-cross-model-compatibility/configs/covenant.json",
+      "launch_path": "docs/experiments/EXP-020-cross-model-compatibility/configs/covenant.json",
       "sha256": "39fb83efa616490e612762200951100fbb2c0a133d07921f2162fce7901ce877"
     }
   ],
@@ -208,6 +216,9 @@ Descriptive behavioral measures, without confirmatory claims:
   `runs/bonded_team_production/1785960388`.
 - Analysis command:
   `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python docs/experiments/EXP-020-cross-model-compatibility/analysis/summarize_runs.py`.
+- Documentation migration: the exact commands above retain the paths used at
+  launch. The bundled artifacts now live under
+  `docs/research/covenant-game/experiments/`; their hashes are unchanged.
 - Total canonical API cost: `$166.9972473`.
 
 ## Result

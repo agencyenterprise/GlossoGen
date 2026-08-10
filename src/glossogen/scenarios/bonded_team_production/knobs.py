@@ -35,6 +35,8 @@ class BondedTeamProductionKnobs(BaseKnobs):
 
     institution_enabled: bool
     membership_visible: bool
+    explicit_pledge_enabled: bool = False
+    initial_members_pay_entry_stake: bool = False
     expulsion_enabled: bool
     expulsion_permanent: bool
     expulsion_violation_threshold: int = 1
@@ -152,6 +154,15 @@ class BondedTeamProductionKnobs(BaseKnobs):
             raise ValueError("permanent expulsion requires expulsion_enabled")
         if self.expulsion_violation_threshold < 1:
             raise ValueError("expulsion_violation_threshold must be at least 1")
+        if self.explicit_pledge_enabled and not self.institution_enabled:
+            raise ValueError("an explicit pledge requires an institution")
+        if self.initial_members_pay_entry_stake and not self.institution_enabled:
+            raise ValueError("an initial member stake requires an institution")
+        if (
+            self.initial_members_pay_entry_stake
+            and self.association_entry_stake > self.starting_provider_balance
+        ):
+            raise ValueError("the initial member stake cannot exceed the starting balance")
         for name in ("audit_sample_schedule", "attestation_query_schedule"):
             schedule = getattr(self, name)
             if schedule is not None and len(schedule) != self.round_count:

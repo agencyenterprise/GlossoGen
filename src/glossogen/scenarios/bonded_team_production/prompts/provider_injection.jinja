@@ -17,6 +17,9 @@ Accountability: providers remain responsible for their own zone, and the lead is
 Eligible providers this round: {{ eligible_labels|join(", ") if eligible_labels else "none" }}.
 {% if agent_created_channels_enabled %}Use create_private_channel if you want a private bilateral or group conversation. Use list_channels to see conversations you have already joined; channels created without you are not visible to you.{% endif %}
 {% if membership_window_open and reentry_blocked %}A membership window is open, but your expulsion is permanent and you cannot re-enter the association.{% elif membership_window_open %}A membership window is open. A join or leave decision takes effect next round. Joining costs {{ "%.2f"|format(association_entry_stake) }}.{% endif %}
+{% if explicit_pledge_enabled and pledge_decision is none %}PLEDGE DECISION PENDING: call submit_covenant_pledge with affirm or decline. Statement: "{{ pledge_text }}"
+{% elif explicit_pledge_enabled %}Your recorded pledge decision: {{ pledge_decision }}.
+{% endif %}
 {% if audit_messages %}
 AUDITS NOW PUBLIC
 {% for message in audit_messages %}- {{ message }}

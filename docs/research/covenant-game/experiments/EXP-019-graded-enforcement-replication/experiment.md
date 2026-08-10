@@ -3,10 +3,16 @@
 **Status:** complete
 **Date opened:** 2026-08-05
 **Date closed:** 2026-08-05
+**Research program:** covenant-game
+**Study:** STUDY-003 — Enforcement and resilience
+**Role:** replication
 
-<!-- experiment-record:v1
+<!-- experiment-record:v2
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "research_program": "covenant-game",
+  "study_id": "STUDY-003",
+  "experiment_role": "replication",
   "experiment_id": "EXP-019",
   "base_commit": "ae48c2bb1549f62822bf2005c0fe90df13ce48e8",
   "worktree_dirty": true,
@@ -15,11 +21,13 @@
   ],
   "configs": [
     {
-      "path": "runs/bonded_team_production/1785884603/replace_config.json",
+      "path": "docs/research/covenant-game/experiments/EXP-019-graded-enforcement-replication/configs/source-replace-config.json",
+      "launch_path": "runs/bonded_team_production/1785884603/replace_config.json",
       "sha256": "3f2ef1e22a5b4cfca7ecb4d4cac7eef934cd84e017443b4ce37d285ce1cb02d0"
     },
     {
-      "path": "src/glossogen/scenarios/bonded_team_production/knobs_graded_enforcement_override.json",
+      "path": "docs/research/covenant-game/experiments/EXP-019-graded-enforcement-replication/configs/graded-enforcement-override.json",
+      "launch_path": "src/glossogen/scenarios/bonded_team_production/knobs_graded_enforcement_override.json",
       "sha256": "e8fef0ba6fc84956cd1c7325c746145cf3d0a7d9c57fe888cff29a039e07b996"
     }
   ],

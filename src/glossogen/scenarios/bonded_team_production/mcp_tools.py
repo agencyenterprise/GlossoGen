@@ -13,6 +13,7 @@ from glossogen.scenarios.bonded_team_production.events import (
     TeamProductionFundsTransferred,
     TeamProductionMembershipDecisionSubmitted,
     TeamProductionOrderDelivered,
+    TeamProductionPledgeSubmitted,
     TeamProductionPrivateChannelCreated,
     TeamProductionRepairSubmitted,
     TeamProductionZoneInspected,
@@ -27,6 +28,7 @@ from glossogen.scenarios.bonded_team_production.ids import (
     RESPOND_ASSIGNMENT_TOOL,
     SUBMIT_ATTESTATION_TOOL,
     SUBMIT_MEMBERSHIP_TOOL,
+    SUBMIT_PLEDGE_TOOL,
     SUBMIT_REPAIR_TOOL,
     SUBMIT_ZONE_COUNT_TOOL,
     TRANSFER_FUNDS_TOOL,
@@ -393,6 +395,24 @@ def build_mcp_tools(
             )
         return f"MEMBERSHIP DECISION RECORDED. '{decision}' takes effect next round."
 
+    async def submit_covenant_pledge(ctx: ToolContext, decision: str) -> str:
+        agent_id = resolve_agent_id(ctx=ctx)
+        try:
+            pledge_text = world.submit_pledge(agent_id=agent_id, decision=decision)
+        except ValueError as exc:
+            return f"ACTION REJECTED. {exc}"
+        runtime = get_runtime()
+        if runtime is not None:
+            await runtime.event_logger.log(
+                event=TeamProductionPledgeSubmitted(
+                    agent_id=agent_id,
+                    round_number=runtime.current_round,
+                    decision=decision,
+                    pledge_text=pledge_text,
+                )
+            )
+        return f"PLEDGE DECISION RECORDED. decision={decision}."
+
     return [
         ScenarioMcpTool(
             CREATE_PRIVATE_CHANNEL_TOOL,
@@ -457,5 +477,11 @@ def build_mcp_tools(
             SUBMIT_MEMBERSHIP_TOOL,
             "During a membership window: submit join, remain, or leave. Takes effect next round.",
             submit_membership_decision,
+        ),
+        ScenarioMcpTool(
+            SUBMIT_PLEDGE_TOOL,
+            "When an explicit covenant pledge is enabled: affirm or decline it once. "
+            "Args: decision ('affirm' or 'decline').",
+            submit_covenant_pledge,
         ),
     ]

@@ -3,17 +3,21 @@
 import json
 from pathlib import Path
 
+from glossogen.runtime.scheduled_events import InjectCase, SwapAgent
 from glossogen.scenarios.bonded_team_production.events import TeamProductionPrivateChannelCreated
 from glossogen.scenarios.bonded_team_production.ids import (
     MARKET_CHANNEL_ID,
     MEMBERSHIP_EXPELLED,
+    SUBMIT_PLEDGE_TOOL,
 )
 from glossogen.scenarios.bonded_team_production.knobs import BondedTeamProductionKnobs
 from glossogen.scenarios.bonded_team_production.scenario import BondedTeamProductionScenario
 from glossogen.scenarios.bonded_team_production.world import BondedTeamProductionWorld
-from glossogen.runtime.scheduled_events import InjectCase
 
 PRESET_DIR = Path("src/glossogen/scenarios/bonded_team_production")
+EXP_022_CONFIG_DIR = Path(
+    "docs/research/covenant-game/experiments/" "EXP-022-pledge-personal-stake-pilot/configs"
+)
 
 
 def load_scenario(filename: str) -> BondedTeamProductionScenario:
@@ -152,6 +156,62 @@ def test_stability_replication_pairs_cases_and_hides_the_horizon() -> None:
     )
 
 
+def test_pledge_tool_and_prompt_are_exposed_only_in_pledge_condition() -> None:
+    payload = json.loads((PRESET_DIR / "knobs_default.json").read_text())
+    without_pledge = BondedTeamProductionScenario(
+        knobs=BondedTeamProductionKnobs.model_validate(
+            {**payload, "explicit_pledge_enabled": False}
+        )
+    )
+    with_pledge = BondedTeamProductionScenario(
+        knobs=BondedTeamProductionKnobs.model_validate({**payload, "explicit_pledge_enabled": True})
+    )
+
+    control_agent = without_pledge.get_agents(
+        default_model="claude-sonnet-5",
+        default_provider="anthropic",
+    )[0]
+    pledge_agent = with_pledge.get_agents(
+        default_model="claude-sonnet-5",
+        default_provider="anthropic",
+    )[0]
+
+    assert SUBMIT_PLEDGE_TOOL not in control_agent.tool_names
+    assert "one-time explicit pledge" not in control_agent.system_prompt
+    assert SUBMIT_PLEDGE_TOOL in pledge_agent.tool_names
+    assert "one-time explicit pledge" in pledge_agent.system_prompt
+
+
+def test_exp022_factorial_configs_change_only_pledge_and_stake() -> None:
+    filenames = [
+        "no-pledge-no-cost.json",
+        "pledge-only.json",
+        "cost-only.json",
+        "pledge-and-cost.json",
+    ]
+    payloads = {
+        filename: json.loads((EXP_022_CONFIG_DIR / filename).read_text()) for filename in filenames
+    }
+    allowed_differences = {
+        "explicit_pledge_enabled",
+        "initial_members_pay_entry_stake",
+        "association_entry_stake",
+    }
+    baseline = payloads["no-pledge-no-cost.json"]
+    for payload in payloads.values():
+        BondedTeamProductionKnobs.model_validate(payload)
+        differences = {key for key, value in payload.items() if value != baseline[key]}
+        assert differences <= allowed_differences
+        assert payload["seed"] == 48
+        assert payload["round_count"] == 6
+
+    assert payloads["pledge-only.json"]["explicit_pledge_enabled"] is True
+    assert payloads["cost-only.json"]["initial_members_pay_entry_stake"] is True
+    assert payloads["cost-only.json"]["association_entry_stake"] == 30.0
+    assert payloads["pledge-and-cost.json"]["explicit_pledge_enabled"] is True
+    assert payloads["pledge-and-cost.json"]["initial_members_pay_entry_stake"] is True
+
+
 def test_opportunist_shock_overrides_are_paired_except_for_private_objective() -> None:
     source_payload = json.loads(
         (PRESET_DIR / "knobs_stability_replication_covenant_seed46.json").read_text()
@@ -169,13 +229,19 @@ def test_opportunist_shock_overrides_are_paired_except_for_private_objective() -
 
     assert neutral.audit_sample_schedule == treatment.audit_sample_schedule
     assert neutral.attestation_query_schedule == treatment.attestation_query_schedule
+    assert neutral.audit_sample_schedule is not None
     assert neutral.audit_sample_schedule[-1] is False
-    assert neutral.scheduled_events[0].at_round == 15
-    assert treatment.scheduled_events[0].at_round == 15
-    assert neutral.scheduled_events[0].agent_id == "provider_d"
-    assert treatment.scheduled_events[0].agent_id == "provider_d"
-    assert neutral.scheduled_events[0].system_prompt is None
-    assert "private objective" in (treatment.scheduled_events[0].system_prompt or "")
+
+    neutral_swap = neutral.scheduled_events[0]
+    treatment_swap = treatment.scheduled_events[0]
+    assert isinstance(neutral_swap, SwapAgent)
+    assert isinstance(treatment_swap, SwapAgent)
+    assert neutral_swap.at_round == 15
+    assert treatment_swap.at_round == 15
+    assert neutral_swap.agent_id == "provider_d"
+    assert treatment_swap.agent_id == "provider_d"
+    assert neutral_swap.system_prompt is None
+    assert "private objective" in (treatment_swap.system_prompt or "")
 
 
 def test_scripted_violation_targets_the_audited_round_16_lead() -> None:
@@ -197,14 +263,21 @@ def test_scripted_violation_targets_the_audited_round_16_lead() -> None:
 
     assert neutral.audit_sample_schedule == treatment.audit_sample_schedule
     assert neutral.attestation_query_schedule == treatment.attestation_query_schedule
+    assert neutral.audit_sample_schedule is not None
+    assert neutral.attestation_query_schedule is not None
     assert neutral.audit_sample_schedule[15] is True
     assert neutral.attestation_query_schedule[15] is True
-    assert neutral.scheduled_events[0].at_round == 16
-    assert treatment.scheduled_events[0].at_round == 16
-    assert neutral.scheduled_events[0].agent_id == "provider_f"
-    assert treatment.scheduled_events[0].agent_id == "provider_f"
-    assert neutral.scheduled_events[0].system_prompt is None
-    assert "CONTROLLED ONE-SHOT CHALLENGE" in (treatment.scheduled_events[0].system_prompt or "")
+
+    neutral_swap = neutral.scheduled_events[0]
+    treatment_swap = treatment.scheduled_events[0]
+    assert isinstance(neutral_swap, SwapAgent)
+    assert isinstance(treatment_swap, SwapAgent)
+    assert neutral_swap.at_round == 16
+    assert treatment_swap.at_round == 16
+    assert neutral_swap.agent_id == "provider_f"
+    assert treatment_swap.agent_id == "provider_f"
+    assert neutral_swap.system_prompt is None
+    assert "CONTROLLED ONE-SHOT CHALLENGE" in (treatment_swap.system_prompt or "")
 
 
 def test_confirmed_external_violation_uses_normal_refund_and_expulsion_pipeline() -> None:
@@ -250,6 +323,7 @@ def test_external_violation_recovery_override_targets_round_17() -> None:
     )
 
     event = knobs.scheduled_events[0]
+    assert isinstance(event, InjectCase)
     assert event.at_round == 17
     assert event.payload == {
         "kind": "confirmed_external_violation",

@@ -12,6 +12,8 @@ class ProviderState:
     agent_id: str
     balance: float
     membership_state: str
+    membership_stake: float = 0.0
+    pledge_decision: str | None = None
     pending_membership_decision: str | None = None
     confirmed_violation_count: int = 0
 

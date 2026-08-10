@@ -1,5 +1,22 @@
 # Experiment record schema
 
+## Research hierarchy
+
+Every structured record belongs to exactly one research program and one study:
+
+```text
+research program -> study -> experiment record -> run
+```
+
+- A **research program** is a durable agenda.
+- A **study** is one broad scientific question or experimental series.
+- An **experiment record** preregisters one decision-relevant design.
+- A **run** is one trajectory; several runs can implement one record.
+
+The scenario is recorded in `Design` as the experimental instrument. It does
+not determine the program or study boundary. Use a new experiment record when
+the result can change a research decision, not for every run.
+
 ## Required Markdown sections
 
 Every record must contain these headings in order:
@@ -21,35 +38,66 @@ only from artifacts.
 
 ## Bundle layout
 
-New records live in an experiment-owned directory:
+Structured records live in an experiment-owned directory within their program:
 
 ```text
-docs/experiments/EXP-NNN-slug/
-├── experiment.md
-├── configs/
-└── analysis/
+docs/research/<program>/
+├── README.md
+├── studies/
+│   └── STUDY-NNN-slug.md
+└── experiments/
+    ├── README.md
+    └── EXP-NNN-slug/
+        ├── experiment.md
+        ├── configs/
+        └── analysis/
 ```
 
-`configs/` contains the exact immutable launch inputs for every arm. Commands
-in the record must reference those paths, not mutable scenario-level presets.
+`configs/` contains the exact immutable launch inputs for every arm. Whenever a
+command names a config explicitly, it must use the corresponding `launch_path`,
+not an unrecorded mutable preset; `path` locates the current bundled copy.
 `analysis/` contains any checked script used to derive reported claims. Empty
-`analysis/` directories need not be committed. Historical flat records remain
-valid.
+`analysis/` directories need not be committed.
+
+Experiment IDs are scoped to the program. Use `<program>/EXP-NNN` as the fully
+qualified reference outside the program's own documents.
+
+## Human-readable classification
+
+Place these fields after the dates and before the machine-readable block:
+
+```markdown
+**Research program:** covenant-game
+**Study:** STUDY-004 — Pledge × personal cost
+**Role:** pilot
+```
+
+Recommended roles are `calibration`, `pilot`, `replication`, `stress-test`,
+`ablation`, `compatibility`, and `confirmatory`. Use another concise role only
+when none describes the decision the record supports.
 
 ## Machine-readable block
 
-Place one JSON block after the dates and before `Question`:
+Every machine-checked record uses schema version 2. Place one JSON block after
+the classification fields and before `Question`:
 
 ```markdown
-<!-- experiment-record:v1
+<!-- experiment-record:v2
 {
-  "schema_version": 1,
-  "experiment_id": "EXP-018",
+  "schema_version": 2,
+  "research_program": "covenant-game",
+  "study_id": "STUDY-004",
+  "experiment_role": "pilot",
+  "experiment_id": "EXP-022",
   "base_commit": "<40-character Git SHA>",
   "worktree_dirty": false,
   "commands": ["<exact command without secrets>"],
   "configs": [
-    {"path": "path/from/repo/root.json", "sha256": "<64 hex>"}
+    {
+      "path": "docs/research/<program>/experiments/EXP-022-slug/configs/arm.json",
+      "launch_path": "docs/research/<program>/experiments/EXP-022-slug/configs/arm.json",
+      "sha256": "<64 hex>"
+    }
   ],
   "runs": [
     {
@@ -66,7 +114,11 @@ Place one JSON block after the dates and before `Question`:
 -->
 ```
 
-The block is provenance, not interpretation. Keep paths repository-relative.
+The block is provenance and classification, not interpretation. Keep paths
+repository-relative. `path` locates the immutable artifact now;
+`launch_path` is the path appearing in the exact command. They are identical
+for a newly planned experiment. Keeping both fields preserves an exact command
+if documentation is moved later without introducing another schema variant.
 Use one run entry for every run mentioned in quantitative results. Mark failed,
 interrupted, smoke, or excluded runs with `included: false` and a `reason`.
 
@@ -104,10 +156,11 @@ a source snapshot or explicitly classify the result as not code-replicable.
 
 ## Index row
 
-Keep `docs/experiments/README.md` synchronized:
+Keep the program's `experiments/README.md` synchronized and link the record from
+its study document:
 
 ```markdown
-| [EXP-018](EXP-018-slug/experiment.md) | short experiment name | planned | pending | — |
+| [EXP-022](EXP-022-slug/experiment.md) | short experiment name | planned | pending | — |
 ```
 
 On closure, update status, concise outcome, and cost. Do not include costs from

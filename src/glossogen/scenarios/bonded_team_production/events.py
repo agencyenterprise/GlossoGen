@@ -48,6 +48,23 @@ class TeamProductionMembershipDecisionSubmitted(EventBase):
     current_state: str
 
 
+class TeamProductionInitialStakeCharged(EventBase):
+    event_type: Literal["team_production_initial_stake_charged"] = (
+        "team_production_initial_stake_charged"
+    )
+    agent_id: str
+    stake_amount: float
+    balance_before: float
+    balance_after: float
+
+
+class TeamProductionPledgeSubmitted(EventBase):
+    event_type: Literal["team_production_pledge_submitted"] = "team_production_pledge_submitted"
+    agent_id: str
+    decision: str
+    pledge_text: str
+
+
 class TeamProductionPrivateChannelCreated(EventBase):
     event_type: Literal["team_production_private_channel_created"] = (
         "team_production_private_channel_created"

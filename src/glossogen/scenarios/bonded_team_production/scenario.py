@@ -17,6 +17,7 @@ from glossogen.scenarios.bonded_team_production.events import (
     TeamProductionAuditScheduled,
     TeamProductionCaseStarted,
     TeamProductionExternalViolationInjected,
+    TeamProductionInitialStakeCharged,
     TeamProductionLeadLiabilityCharged,
     TeamProductionMembershipChanged,
     TeamProductionOrderSettled,
@@ -25,6 +26,7 @@ from glossogen.scenarios.bonded_team_production.events import (
 )
 from glossogen.scenarios.bonded_team_production.ids import (
     CONTRACT_ASSOCIATION,
+    COVENANT_PLEDGE_TEXT,
     CREATE_PRIVATE_CHANNEL_TOOL,
     DESCRIPTION_TEMPLATE,
     MARKET_CHANNEL_ID,
@@ -32,6 +34,7 @@ from glossogen.scenarios.bonded_team_production.ids import (
     MEMBERSHIP_EXPELLED,
     PROVIDER_INJECTION_TEMPLATE,
     PROVIDER_SYSTEM_TEMPLATE,
+    SUBMIT_PLEDGE_TOOL,
     TOOLS_PROVIDER,
     private_channel_slot_ids,
     provider_ids,
@@ -143,6 +146,13 @@ class BondedTeamProductionScenario(SimulationScenario):
                         "round_count": self._knobs.round_count,
                         "horizon_disclosed": self._knobs.horizon_disclosed,
                         "institution_enabled": self._knobs.institution_enabled,
+                        "explicit_pledge_enabled": self._knobs.explicit_pledge_enabled,
+                        "pledge_text": COVENANT_PLEDGE_TEXT,
+                        "initial_members_pay_entry_stake": (
+                            self._knobs.initial_members_pay_entry_stake
+                        ),
+                        "association_entry_stake": self._knobs.association_entry_stake,
+                        "exit_stake_forfeit_fraction": (self._knobs.exit_stake_forfeit_fraction),
                         "agent_created_channels_enabled": (
                             self._knobs.agent_created_channels_enabled
                         ),
@@ -154,6 +164,7 @@ class BondedTeamProductionScenario(SimulationScenario):
                     for tool_name in TOOLS_PROVIDER
                     if self._knobs.agent_created_channels_enabled
                     or tool_name != CREATE_PRIVATE_CHANNEL_TOOL
+                    if self._knobs.explicit_pledge_enabled or tool_name != SUBMIT_PLEDGE_TOOL
                 ],
                 model=default_model,
                 provider=default_provider,
@@ -242,6 +253,9 @@ class BondedTeamProductionScenario(SimulationScenario):
                 "round_number": round_number,
                 "balance": self._world.provider(agent_id=agent_id).balance,
                 "institution_enabled": self._knobs.institution_enabled,
+                "explicit_pledge_enabled": self._knobs.explicit_pledge_enabled,
+                "pledge_decision": self._world.provider(agent_id=agent_id).pledge_decision,
+                "pledge_text": COVENANT_PLEDGE_TEXT,
                 "membership_state": self._world.provider(agent_id=agent_id).membership_state,
                 "confirmed_violation_count": (
                     self._world.provider(agent_id=agent_id).confirmed_violation_count
@@ -288,6 +302,17 @@ class BondedTeamProductionScenario(SimulationScenario):
     async def on_round_advanced(self, round_number: int) -> None:
         opening = self._world.begin_round(round_number=round_number)
         self._audit_messages = [self._audit_message(item) for item in opening.audit_resolutions]
+        if round_number == 1 and self._knobs.initial_members_pay_entry_stake:
+            for agent_id in self._knobs.initial_member_ids:
+                await self.runtime.event_logger.log(
+                    event=TeamProductionInitialStakeCharged(
+                        agent_id=agent_id,
+                        round_number=round_number,
+                        stake_amount=self._knobs.association_entry_stake,
+                        balance_before=self._knobs.starting_provider_balance,
+                        balance_after=self._world.provider(agent_id=agent_id).balance,
+                    )
+                )
         for change in opening.membership_changes:
             await self.runtime.event_logger.log(
                 event=TeamProductionMembershipChanged(

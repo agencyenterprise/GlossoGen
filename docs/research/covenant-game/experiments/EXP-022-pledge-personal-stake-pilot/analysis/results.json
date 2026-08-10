@@ -1,0 +1,397 @@
+{
+  "gates": {
+    "advance_to_full_factorial": true,
+    "cost_activated": true,
+    "distinct_inspection_safe_delivery_outcomes": [
+      [
+        10,
+        2
+      ],
+      [
+        12,
+        4
+      ],
+      [
+        14,
+        3
+      ],
+      [
+        15,
+        4
+      ]
+    ],
+    "execution_valid": true,
+    "pledge_activated": true,
+    "pooled_inspected_assignments": 51,
+    "pooled_omitted_accepted_assignments": 21,
+    "useful_behavioral_variation": true
+  },
+  "runs": {
+    "cost_only": {
+      "accepted_assignments": 18,
+      "arm": "cost_only",
+      "association_members_at_final_case_start": 5,
+      "attestations": 15,
+      "audits_resolved": 2,
+      "authoritatively_completed": true,
+      "cases_started": 6,
+      "completed_orders": 6,
+      "completed_orders_underpaid": 0,
+      "correct_completed_orders": 5,
+      "cost_usd": 2.2204045,
+      "expelled_agents": [
+        "provider_d"
+      ],
+      "explicit_pledge_enabled": false,
+      "false_attestations": 0,
+      "final_bond_balance": 160.0,
+      "incorrect_audits": 1,
+      "incorrect_zone_submissions": 1,
+      "initial_members_pay_entry_stake": true,
+      "inspected_assignments": 15,
+      "llm_responses": 118,
+      "material_repairs": 0,
+      "membership_decisions": 1,
+      "messages": 38,
+      "no_deliveries": 0,
+      "omitted_accepted_assignments": 3,
+      "orders_settled": 6,
+      "paid_on_completed_orders": 448.0,
+      "pledge_agents": [],
+      "pledge_decisions": {},
+      "pledge_events": 0,
+      "post_stake_starting_balances": {
+        "270.0": 6
+      },
+      "private_channels_created": 6,
+      "profile_outcomes": {
+        "effort_favorable": {
+          "accepted_assignments": 6,
+          "inspected_assignments": 6,
+          "no_deliveries": 0,
+          "orders": 2,
+          "safe_deliveries": 2,
+          "unsafe_deliveries": 0
+        },
+        "marginal": {
+          "accepted_assignments": 6,
+          "inspected_assignments": 4,
+          "no_deliveries": 0,
+          "orders": 2,
+          "safe_deliveries": 1,
+          "unsafe_deliveries": 1
+        },
+        "shirking_tempting": {
+          "accepted_assignments": 6,
+          "inspected_assignments": 5,
+          "no_deliveries": 0,
+          "orders": 2,
+          "safe_deliveries": 1,
+          "unsafe_deliveries": 1
+        }
+      },
+      "profiles": {
+        "effort_favorable": 2,
+        "marginal": 2,
+        "shirking_tempting": 2
+      },
+      "promised_on_completed_orders": 448.0,
+      "refund_due": 140.0,
+      "refund_paid": 140.0,
+      "repair_contribution": 0.0,
+      "repair_events": 1,
+      "run_id": "1786139287",
+      "safe_deliveries": 4,
+      "sanctions": 1,
+      "simulation_end_reason": "scenario_complete",
+      "stake_agents": [
+        "provider_a",
+        "provider_b",
+        "provider_c",
+        "provider_d",
+        "provider_e",
+        "provider_f"
+      ],
+      "stake_amounts": {
+        "30.0": 6
+      },
+      "stake_events": 6,
+      "submitted_assignments": 18,
+      "tool_calls": 532,
+      "uninspected_submissions": 3,
+      "unsafe_deliveries": 2
+    },
+    "no_pledge_no_cost": {
+      "accepted_assignments": 18,
+      "arm": "no_pledge_no_cost",
+      "association_members_at_final_case_start": 6,
+      "attestations": 15,
+      "audits_resolved": 2,
+      "authoritatively_completed": true,
+      "cases_started": 6,
+      "completed_orders": 6,
+      "completed_orders_underpaid": 0,
+      "correct_completed_orders": 5,
+      "cost_usd": 0.8603791,
+      "expelled_agents": [],
+      "explicit_pledge_enabled": false,
+      "false_attestations": 0,
+      "final_bond_balance": 300.0,
+      "incorrect_audits": 0,
+      "incorrect_zone_submissions": 1,
+      "initial_members_pay_entry_stake": false,
+      "inspected_assignments": 10,
+      "llm_responses": 88,
+      "material_repairs": 0,
+      "membership_decisions": 4,
+      "messages": 0,
+      "no_deliveries": 0,
+      "omitted_accepted_assignments": 8,
+      "orders_settled": 6,
+      "paid_on_completed_orders": 390.0,
+      "pledge_agents": [],
+      "pledge_decisions": {},
+      "pledge_events": 0,
+      "post_stake_starting_balances": {},
+      "private_channels_created": 0,
+      "profile_outcomes": {
+        "effort_favorable": {
+          "accepted_assignments": 6,
+          "inspected_assignments": 6,
+          "no_deliveries": 0,
+          "orders": 2,
+          "safe_deliveries": 2,
+          "unsafe_deliveries": 0
+        },
+        "marginal": {
+          "accepted_assignments": 6,
+          "inspected_assignments": 3,
+          "no_deliveries": 0,
+          "orders": 2,
+          "safe_deliveries": 0,
+          "unsafe_deliveries": 2
+        },
+        "shirking_tempting": {
+          "accepted_assignments": 6,
+          "inspected_assignments": 1,
+          "no_deliveries": 0,
+          "orders": 2,
+          "safe_deliveries": 0,
+          "unsafe_deliveries": 2
+        }
+      },
+      "profiles": {
+        "effort_favorable": 2,
+        "marginal": 2,
+        "shirking_tempting": 2
+      },
+      "promised_on_completed_orders": 390.0,
+      "refund_due": 0.0,
+      "refund_paid": 0.0,
+      "repair_contribution": 0,
+      "repair_events": 0,
+      "run_id": "1786139285",
+      "safe_deliveries": 2,
+      "sanctions": 0,
+      "simulation_end_reason": "scenario_complete",
+      "stake_agents": [],
+      "stake_amounts": {},
+      "stake_events": 0,
+      "submitted_assignments": 18,
+      "tool_calls": 245,
+      "uninspected_submissions": 8,
+      "unsafe_deliveries": 4
+    },
+    "pledge_and_cost": {
+      "accepted_assignments": 18,
+      "arm": "pledge_and_cost",
+      "association_members_at_final_case_start": 6,
+      "attestations": 15,
+      "audits_resolved": 2,
+      "authoritatively_completed": true,
+      "cases_started": 6,
+      "completed_orders": 6,
+      "completed_orders_underpaid": 0,
+      "correct_completed_orders": 5,
+      "cost_usd": 1.1866316,
+      "expelled_agents": [],
+      "explicit_pledge_enabled": true,
+      "false_attestations": 0,
+      "final_bond_balance": 300.0,
+      "incorrect_audits": 0,
+      "incorrect_zone_submissions": 1,
+      "initial_members_pay_entry_stake": true,
+      "inspected_assignments": 14,
+      "llm_responses": 99,
+      "material_repairs": 0,
+      "membership_decisions": 2,
+      "messages": 5,
+      "no_deliveries": 0,
+      "omitted_accepted_assignments": 4,
+      "orders_settled": 6,
+      "paid_on_completed_orders": 456.0,
+      "pledge_agents": [
+        "provider_a",
+        "provider_b",
+        "provider_c",
+        "provider_d",
+        "provider_e",
+        "provider_f"
+      ],
+      "pledge_decisions": {
+        "affirm": 6
+      },
+      "pledge_events": 6,
+      "post_stake_starting_balances": {
+        "270.0": 6
+      },
+      "private_channels_created": 0,
+      "profile_outcomes": {
+        "effort_favorable": {
+          "accepted_assignments": 6,
+          "inspected_assignments": 6,
+          "no_deliveries": 0,
+          "orders": 2,
+          "safe_deliveries": 2,
+          "unsafe_deliveries": 0
+        },
+        "marginal": {
+          "accepted_assignments": 6,
+          "inspected_assignments": 5,
+          "no_deliveries": 0,
+          "orders": 2,
+          "safe_deliveries": 1,
+          "unsafe_deliveries": 1
+        },
+        "shirking_tempting": {
+          "accepted_assignments": 6,
+          "inspected_assignments": 3,
+          "no_deliveries": 0,
+          "orders": 2,
+          "safe_deliveries": 0,
+          "unsafe_deliveries": 2
+        }
+      },
+      "profiles": {
+        "effort_favorable": 2,
+        "marginal": 2,
+        "shirking_tempting": 2
+      },
+      "promised_on_completed_orders": 456.0,
+      "refund_due": 0.0,
+      "refund_paid": 0.0,
+      "repair_contribution": 0,
+      "repair_events": 0,
+      "run_id": "1786139286",
+      "safe_deliveries": 3,
+      "sanctions": 0,
+      "simulation_end_reason": "scenario_complete",
+      "stake_agents": [
+        "provider_a",
+        "provider_b",
+        "provider_c",
+        "provider_d",
+        "provider_e",
+        "provider_f"
+      ],
+      "stake_amounts": {
+        "30.0": 6
+      },
+      "stake_events": 6,
+      "submitted_assignments": 18,
+      "tool_calls": 308,
+      "uninspected_submissions": 4,
+      "unsafe_deliveries": 3
+    },
+    "pledge_only": {
+      "accepted_assignments": 18,
+      "arm": "pledge_only",
+      "association_members_at_final_case_start": 6,
+      "attestations": 15,
+      "audits_resolved": 2,
+      "authoritatively_completed": true,
+      "cases_started": 6,
+      "completed_orders": 6,
+      "completed_orders_underpaid": 0,
+      "correct_completed_orders": 5,
+      "cost_usd": 0.9219227,
+      "expelled_agents": [],
+      "explicit_pledge_enabled": true,
+      "false_attestations": 0,
+      "final_bond_balance": 300.0,
+      "incorrect_audits": 0,
+      "incorrect_zone_submissions": 1,
+      "initial_members_pay_entry_stake": false,
+      "inspected_assignments": 12,
+      "llm_responses": 99,
+      "material_repairs": 0,
+      "membership_decisions": 4,
+      "messages": 1,
+      "no_deliveries": 0,
+      "omitted_accepted_assignments": 6,
+      "orders_settled": 6,
+      "paid_on_completed_orders": 440.0,
+      "pledge_agents": [
+        "provider_a",
+        "provider_b",
+        "provider_c",
+        "provider_d",
+        "provider_e",
+        "provider_f"
+      ],
+      "pledge_decisions": {
+        "affirm": 6
+      },
+      "pledge_events": 6,
+      "post_stake_starting_balances": {},
+      "private_channels_created": 1,
+      "profile_outcomes": {
+        "effort_favorable": {
+          "accepted_assignments": 6,
+          "inspected_assignments": 6,
+          "no_deliveries": 0,
+          "orders": 2,
+          "safe_deliveries": 2,
+          "unsafe_deliveries": 0
+        },
+        "marginal": {
+          "accepted_assignments": 6,
+          "inspected_assignments": 6,
+          "no_deliveries": 0,
+          "orders": 2,
+          "safe_deliveries": 2,
+          "unsafe_deliveries": 0
+        },
+        "shirking_tempting": {
+          "accepted_assignments": 6,
+          "inspected_assignments": 0,
+          "no_deliveries": 0,
+          "orders": 2,
+          "safe_deliveries": 0,
+          "unsafe_deliveries": 2
+        }
+      },
+      "profiles": {
+        "effort_favorable": 2,
+        "marginal": 2,
+        "shirking_tempting": 2
+      },
+      "promised_on_completed_orders": 440.0,
+      "refund_due": 0.0,
+      "refund_paid": 0.0,
+      "repair_contribution": 0,
+      "repair_events": 0,
+      "run_id": "1786139288",
+      "safe_deliveries": 4,
+      "sanctions": 0,
+      "simulation_end_reason": "scenario_complete",
+      "stake_agents": [],
+      "stake_amounts": {},
+      "stake_events": 0,
+      "submitted_assignments": 18,
+      "tool_calls": 275,
+      "uninspected_submissions": 6,
+      "unsafe_deliveries": 2
+    }
+  }
+}

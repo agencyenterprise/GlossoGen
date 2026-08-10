@@ -66,7 +66,8 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen run bonded_team_production \
 ```
 
 The current pilot plan is recorded in
-`docs/experiments/EXP-007-private-team-production-pilot.md`. Do not launch the
+`docs/research/covenant-game/experiments/EXP-007-private-team-production-pilot.md`.
+Do not launch the
 full condition grid until the paired short pilots demonstrate usable variation
 across the three economic profiles.
 

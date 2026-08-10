@@ -3,10 +3,16 @@
 **Status:** complete
 **Date opened:** 2026-08-05
 **Date closed:** 2026-08-05
+**Research program:** covenant-game
+**Study:** STUDY-003 — Enforcement and resilience
+**Role:** policy-pilot
 
-<!-- experiment-record:v1
+<!-- experiment-record:v2
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "research_program": "covenant-game",
+  "study_id": "STUDY-003",
+  "experiment_role": "policy-pilot",
   "experiment_id": "EXP-018",
   "base_commit": "48cacef2e81489c165efff643e688cf7ffd96270",
   "worktree_dirty": true,
@@ -15,11 +21,13 @@
   ],
   "configs": [
     {
-      "path": "runs/bonded_team_production/1785884603/replace_config.json",
+      "path": "docs/research/covenant-game/experiments/EXP-018-graded-enforcement-pilot/configs/source-replace-config.json",
+      "launch_path": "runs/bonded_team_production/1785884603/replace_config.json",
       "sha256": "3f2ef1e22a5b4cfca7ecb4d4cac7eef934cd84e017443b4ce37d285ce1cb02d0"
     },
     {
-      "path": "src/glossogen/scenarios/bonded_team_production/knobs_graded_enforcement_override.json",
+      "path": "docs/research/covenant-game/experiments/EXP-018-graded-enforcement-pilot/configs/graded-enforcement-override.json",
+      "launch_path": "src/glossogen/scenarios/bonded_team_production/knobs_graded_enforcement_override.json",
       "sha256": "e8fef0ba6fc84956cd1c7325c746145cf3d0a7d9c57fe888cff29a039e07b996"
     }
   ],

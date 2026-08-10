@@ -8,6 +8,7 @@ import pytest
 
 from glossogen.scenarios.bonded_team_production.cases import build_cases
 from glossogen.scenarios.bonded_team_production.ids import (
+    COVENANT_PLEDGE_TEXT,
     MEMBERSHIP_ACTIVE,
     MEMBERSHIP_DECISION_JOIN,
     MEMBERSHIP_EXPELLED,
@@ -63,6 +64,48 @@ def recruit_full_team(world: BondedTeamProductionWorld) -> tuple[str, list[str]]
             response="accept",
         )
     return lead_id, selected
+
+
+def test_initial_members_pay_a_real_entry_stake() -> None:
+    world = build_world(
+        preset="knobs_default.json",
+        overrides={
+            "association_entry_stake": 30.0,
+            "initial_members_pay_entry_stake": True,
+        },
+    )
+
+    provider = world.provider(agent_id="provider_a")
+    assert provider.balance == 270.0
+    assert provider.membership_stake == 30.0
+
+    world.begin_round(round_number=1)
+    world.submit_membership_decision(agent_id="provider_a", decision="leave")
+    world.begin_round(round_number=2)
+
+    assert provider.balance == 285.0
+    assert provider.membership_stake == 0.0
+
+
+def test_explicit_pledge_records_one_private_decision() -> None:
+    world = build_world(
+        preset="knobs_default.json",
+        overrides={"explicit_pledge_enabled": True},
+    )
+
+    pledge_text = world.submit_pledge(agent_id="provider_a", decision="affirm")
+
+    assert pledge_text == COVENANT_PLEDGE_TEXT
+    assert world.provider(agent_id="provider_a").pledge_decision == "affirm"
+    with pytest.raises(ValueError, match="already submitted"):
+        world.submit_pledge(agent_id="provider_a", decision="decline")
+
+
+def test_explicit_pledge_is_unavailable_in_control_condition() -> None:
+    world = build_world(preset="knobs_default.json")
+
+    with pytest.raises(ValueError, match="disabled"):
+        world.submit_pledge(agent_id="provider_a", decision="affirm")
 
 
 def test_one_provider_cannot_cover_two_zones() -> None:

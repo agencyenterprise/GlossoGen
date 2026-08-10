@@ -13,6 +13,7 @@ from glossogen.scenarios.bonded_team_production.events import (
     TeamProductionMembershipDecisionSubmitted,
     TeamProductionOrderDelivered,
     TeamProductionOrderSettled,
+    TeamProductionPledgeSubmitted,
     TeamProductionProviderSanctioned,
     TeamProductionRepairSubmitted,
     TeamProductionZoneInspected,
@@ -29,6 +30,8 @@ class RestoredTeamProductionState(NamedTuple):
 
     balances: dict[str, float]
     membership_states: dict[str, str]
+    membership_stakes: dict[str, float]
+    pledge_decisions: dict[str, str]
     pending_membership_decisions: dict[str, str]
     confirmed_violation_counts: dict[str, int]
     bond_balance: float
@@ -42,12 +45,16 @@ def build_restored_state(
     events: list[Any],
     initial_balances: dict[str, float],
     initial_membership_states: dict[str, str],
+    initial_membership_stakes: dict[str, float],
     initial_bond_balance: float,
     institution_enabled: bool,
+    association_entry_stake: float,
 ) -> RestoredTeamProductionState:
     """Replay authoritative economic events and rebuild delayed obligations."""
     balances = dict(initial_balances)
     memberships = dict(initial_membership_states)
+    membership_stakes = dict(initial_membership_stakes)
+    pledge_decisions: dict[str, str] = {}
     pending_decisions: dict[str, str] = {}
     violation_counts = dict.fromkeys(initial_balances, 0)
     bond_balance = initial_bond_balance
@@ -72,9 +79,15 @@ def build_restored_state(
                     memberships[member_id] = "active"
         elif isinstance(event, TeamProductionMembershipDecisionSubmitted):
             pending_decisions[event.agent_id] = event.decision
+        elif isinstance(event, TeamProductionPledgeSubmitted):
+            pledge_decisions[event.agent_id] = event.decision
         elif isinstance(event, TeamProductionMembershipChanged):
             memberships[event.agent_id] = event.new_state
             balances[event.agent_id] = event.balance_after
+            if event.new_state == "active":
+                membership_stakes[event.agent_id] = association_entry_stake
+            else:
+                membership_stakes[event.agent_id] = 0.0
             pending_decisions.pop(event.agent_id, None)
         elif isinstance(event, TeamProductionZoneInspected):
             balances[event.agent_id] = event.balance_after
@@ -103,6 +116,7 @@ def build_restored_state(
                 failed_audits[event.case_number] = event
             for agent_id in event.expelled_agent_ids:
                 memberships[agent_id] = MEMBERSHIP_EXPELLED
+                membership_stakes[agent_id] = 0.0
         elif isinstance(event, TeamProductionRepairSubmitted):
             balances[event.agent_id] = event.balance_after
             repair_acted.setdefault(event.case_number, set()).add(event.agent_id)
@@ -146,6 +160,8 @@ def build_restored_state(
     return RestoredTeamProductionState(
         balances=balances,
         membership_states=memberships,
+        membership_stakes=membership_stakes,
+        pledge_decisions=pledge_decisions,
         pending_membership_decisions=pending_decisions,
         confirmed_violation_counts=violation_counts,
         bond_balance=bond_balance,

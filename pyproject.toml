@@ -122,6 +122,24 @@ reportMissingParameterType = "none"
 reportPrivateUsage = "none"
 reportUntypedFunctionDecorator = "none"
 reportUntypedClassDecorator = "none"
+
+# Per-experiment analysis scripts under docs/research/<program>/experiments/
+# <EXP>/analysis/ are the same category: one-off scripts that read JSONL event
+# logs into untyped dicts. They are frozen with their experiment record, so
+# they are not refactored to satisfy strict inference.
+[[tool.pyright.executionEnvironments]]
+root = "docs/research"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownParameterType = "none"
+reportMissingTypeStubs = "none"
+reportMissingTypeArgument = "none"
+reportMissingParameterType = "none"
+reportPrivateUsage = "none"
+reportUntypedFunctionDecorator = "none"
+reportUntypedClassDecorator = "none"
 reportUnusedFunction = "none"
 
 [tool.vulture]

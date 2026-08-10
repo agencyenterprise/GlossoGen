@@ -27,7 +27,7 @@ REQUIRED_SECTIONS = (
     "What it changed",
     "Traps found",
 )
-RECORD_PATTERN = re.compile(r"<!-- experiment-record:v1\s*(\{.*?\})\s*-->", re.DOTALL)
+RECORD_PATTERN = re.compile(r"<!-- experiment-record:v2\s*(\{.*?\})\s*-->", re.DOTALL)
 
 
 def sha256_file(path: Path) -> str:
@@ -134,8 +134,7 @@ def inspect_run(run_dir: Path, repo_root: Path) -> dict[str, Any]:
         # Their simulation_started snapshot is the authoritative resolved
         # configuration (including defaults added to the launch input).
         resolved_config_ref = (
-            f"{relative_path(event_log, repo_root)}"
-            "#simulation_started.scenario_config"
+            f"{relative_path(event_log, repo_root)}" "#simulation_started.scenario_config"
         )
         resolved_config_hash = sha256_json(config)
     manifest_path = run_dir / "replace_manifest.json"
@@ -208,7 +207,10 @@ def render_template(args: argparse.Namespace) -> str:
     commit, dirty = git_state(repo_root)
     opened = args.date or date.today().isoformat()
     metadata = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "research_program": args.research_program,
+        "study_id": args.study_id,
+        "experiment_role": args.role,
         "experiment_id": args.experiment_id,
         "base_commit": commit,
         "worktree_dirty": dirty,
@@ -222,8 +224,11 @@ def render_template(args: argparse.Namespace) -> str:
 **Status:** planned
 **Date opened:** {opened}
 **Date closed:** —
+**Research program:** {args.research_program}
+**Study:** {args.study_id} — {args.study_title}
+**Role:** {args.role}
 
-<!-- experiment-record:v1
+<!-- experiment-record:v2
 {record}
 -->
 
@@ -279,10 +284,10 @@ Pending.
 def parse_record(text: str) -> dict[str, Any]:
     match = RECORD_PATTERN.search(text)
     if match is None:
-        raise ValueError("missing experiment-record:v1 JSON block")
+        raise ValueError("missing experiment-record:v2 JSON block")
     record = json.loads(match.group(1))
     if not isinstance(record, dict):
-        raise ValueError("experiment-record:v1 must contain a JSON object")
+        raise ValueError("experiment record block must contain a JSON object")
     return record
 
 
@@ -321,8 +326,41 @@ def validate_record(path: Path, repo_root: Path, phase: str) -> tuple[list[str],
     absent = sorted(required_keys - set(record))
     if absent:
         errors.append(f"record block missing keys: {', '.join(absent)}")
-    if record.get("schema_version") != 1:
-        errors.append("schema_version must be 1")
+    schema_version = record.get("schema_version")
+    if schema_version != 2:
+        errors.append("schema_version must be 2")
+    classification_keys = {
+        "research_program",
+        "study_id",
+        "experiment_role",
+    }
+    classification_absent = sorted(classification_keys - set(record))
+    if classification_absent:
+        errors.append(
+            "record block missing classification keys: " + ", ".join(classification_absent)
+        )
+    research_program = record.get("research_program")
+    study_id = record.get("study_id")
+    experiment_role = record.get("experiment_role")
+    if not isinstance(research_program, str) or not re.fullmatch(
+        r"[a-z0-9]+(?:-[a-z0-9]+)*", research_program
+    ):
+        errors.append("research_program must be a lowercase hyphenated slug")
+    if not isinstance(study_id, str) or not re.fullmatch(r"STUDY-[0-9]{3}", study_id):
+        errors.append("study_id must match STUDY-NNN")
+    if not isinstance(experiment_role, str) or not re.fullmatch(
+        r"[a-z0-9]+(?:-[a-z0-9]+)*", experiment_role
+    ):
+        errors.append("experiment_role must be a lowercase hyphenated label")
+    program_match = re.search(r"^\*\*Research program:\*\*\s*(.+)$", text, flags=re.MULTILINE)
+    study_match = re.search(r"^\*\*Study:\*\*\s*(.+)$", text, flags=re.MULTILINE)
+    role_match = re.search(r"^\*\*Role:\*\*\s*(.+)$", text, flags=re.MULTILINE)
+    if program_match is None or program_match.group(1).strip() != research_program:
+        errors.append("Markdown Research program does not match record metadata")
+    if study_match is None or not study_match.group(1).strip().startswith(str(study_id)):
+        errors.append("Markdown Study does not match record metadata")
+    if role_match is None or role_match.group(1).strip() != experiment_role:
+        errors.append("Markdown Role does not match record metadata")
     commit = record.get("base_commit")
     if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
         errors.append("base_commit must be a 40-character lowercase Git SHA")
@@ -340,9 +378,13 @@ def validate_record(path: Path, repo_root: Path, phase: str) -> tuple[list[str],
     if not isinstance(commands, list) or not commands:
         errors.append("record requires at least one exact command before launch")
     elif isinstance(configs, list):
-        recorded_config_paths = {
-            item.get("path") for item in configs if isinstance(item, dict)
-        }
+        launch_config_paths: set[str] = set()
+        for item in configs:
+            if not isinstance(item, dict):
+                continue
+            launch_path = item.get("launch_path")
+            if isinstance(launch_path, str):
+                launch_config_paths.add(launch_path)
         for index, command in enumerate(commands):
             if not isinstance(command, str):
                 errors.append(f"commands[{index}] must be a string")
@@ -370,7 +412,7 @@ def validate_record(path: Path, repo_root: Path, phase: str) -> tuple[list[str],
                 errors.append(f"commands[{index}] --config has no path")
                 continue
             command_config = argv[config_index]
-            if command_config not in recorded_config_paths:
+            if command_config not in launch_config_paths:
                 errors.append(
                     f"commands[{index}] config is not hashed in the record: {command_config}"
                 )
@@ -389,10 +431,13 @@ def validate_record(path: Path, repo_root: Path, phase: str) -> tuple[list[str],
                 errors.append(f"configs[{index}] must be an object")
                 continue
             config_path = item.get("path")
+            launch_path = item.get("launch_path")
             expected_hash = item.get("sha256")
             if not isinstance(config_path, str):
                 errors.append(f"configs[{index}].path must be a string")
                 continue
+            if not isinstance(launch_path, str):
+                errors.append(f"configs[{index}].launch_path must be a string")
             absolute = repo_root / config_path
             if not absolute.is_file():
                 errors.append(f"config does not exist: {config_path}")
@@ -439,6 +484,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     template = subparsers.add_parser("render-template")
     template.add_argument("--experiment-id", required=True, type=str.upper)
+    template.add_argument("--research-program", required=True, type=str.lower)
+    template.add_argument("--study-id", required=True, type=str.upper)
+    template.add_argument("--study-title", required=True)
+    template.add_argument("--role", required=True, type=str.lower)
     template.add_argument("--title", required=True)
     template.add_argument("--repo-root", default=".")
     template.add_argument("--date")

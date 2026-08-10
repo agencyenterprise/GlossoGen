@@ -3,10 +3,16 @@
 **Status:** complete
 **Date opened:** 2026-08-05
 **Date closed:** 2026-08-05
+**Research program:** covenant-game
+**Study:** STUDY-002 — Full institutional bundle
+**Role:** replication
 
-<!-- experiment-record:v1
+<!-- experiment-record:v2
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "research_program": "covenant-game",
+  "study_id": "STUDY-002",
+  "experiment_role": "replication",
   "experiment_id": "EXP-021",
   "base_commit": "514434bef022625dc6146b08643af9174e5f0fb9",
   "worktree_dirty": true,
@@ -25,10 +31,10 @@
     "PYTHONPATH=. .venv/bin/python -m glossogen run bonded_team_production --model gpt-5.6-sol --provider openai --runs-dir ./runs --config docs/experiments/EXP-021-cheap-model-seed-replication/configs/covenant-seed47.json"
   ],
   "configs": [
-    {"path": "docs/experiments/EXP-021-cheap-model-seed-replication/configs/independent-seed46.json", "sha256": "c908ab377e52c1fcfed4a8d7ba732a103503901dc9e77e0688d0ec3d884dd6ae"},
-    {"path": "docs/experiments/EXP-021-cheap-model-seed-replication/configs/covenant-seed46.json", "sha256": "b583e3334aeb8e417cb2db9e02381559fc836f2ca17a3bc4c28ed810eb6798b9"},
-    {"path": "docs/experiments/EXP-021-cheap-model-seed-replication/configs/independent-seed47.json", "sha256": "f2cf20774a422cea6e059ad7256bcf43be529d6a82ef95efb61e91dcea4fc0d2"},
-    {"path": "docs/experiments/EXP-021-cheap-model-seed-replication/configs/covenant-seed47.json", "sha256": "f76274484239b5513e7b621e57954adbd57146c780aa4559997a7104dd2cbfae"}
+    {"path": "docs/research/covenant-game/experiments/EXP-021-cheap-model-seed-replication/configs/independent-seed46.json", "launch_path": "docs/experiments/EXP-021-cheap-model-seed-replication/configs/independent-seed46.json", "sha256": "c908ab377e52c1fcfed4a8d7ba732a103503901dc9e77e0688d0ec3d884dd6ae"},
+    {"path": "docs/research/covenant-game/experiments/EXP-021-cheap-model-seed-replication/configs/covenant-seed46.json", "launch_path": "docs/experiments/EXP-021-cheap-model-seed-replication/configs/covenant-seed46.json", "sha256": "b583e3334aeb8e417cb2db9e02381559fc836f2ca17a3bc4c28ed810eb6798b9"},
+    {"path": "docs/research/covenant-game/experiments/EXP-021-cheap-model-seed-replication/configs/independent-seed47.json", "launch_path": "docs/experiments/EXP-021-cheap-model-seed-replication/configs/independent-seed47.json", "sha256": "f2cf20774a422cea6e059ad7256bcf43be529d6a82ef95efb61e91dcea4fc0d2"},
+    {"path": "docs/research/covenant-game/experiments/EXP-021-cheap-model-seed-replication/configs/covenant-seed47.json", "launch_path": "docs/experiments/EXP-021-cheap-model-seed-replication/configs/covenant-seed47.json", "sha256": "f76274484239b5513e7b621e57954adbd57146c780aa4559997a7104dd2cbfae"}
   ],
   "runs": [
     {"role": "sonnet_5_seed46_independent", "included": true, "run_dir": "runs/bonded_team_production/1785966998", "event_log_sha256": "8e19b64fa0ca249af19e04baa69e9bfe85a2b217d89d6f1683614bf755be27f8", "resolved_config_sha256": "b55aa70590e7a56c165a562b5dc3b298b395ebbc7451e6cbca67858fbfcd58a0", "completed": true, "total_cost_usd": 2.5189325},
@@ -147,6 +153,9 @@ stale correctness does not count as performed effort.
   twelve were fresh runs and ended with `scenario_complete`.
 - Analysis command:
   `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python docs/experiments/EXP-021-cheap-model-seed-replication/analysis/summarize_runs.py`.
+- Documentation migration: the exact commands above retain the paths used at
+  launch. The bundled artifacts now live under
+  `docs/research/covenant-game/experiments/`; their hashes are unchanged.
 - Actual canonical API cost: `$42.62378365`.
 
 ## Result

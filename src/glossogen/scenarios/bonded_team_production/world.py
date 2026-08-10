@@ -8,6 +8,7 @@ from glossogen.scenarios.bonded_team_production.events import TeamProductionPriv
 from glossogen.scenarios.bonded_team_production.ids import (
     CONTRACT_ASSOCIATION,
     CONTRACT_INDEPENDENT,
+    COVENANT_PLEDGE_TEXT,
     MEMBERSHIP_ACTIVE,
     MEMBERSHIP_DECISION_JOIN,
     MEMBERSHIP_DECISION_LEAVE,
@@ -58,9 +59,16 @@ class BondedTeamProductionWorld(ScenarioWorld):
         self.providers = {
             agent_id: ProviderState(
                 agent_id=agent_id,
-                balance=knobs.starting_provider_balance,
+                balance=self._initial_balance(
+                    agent_id=agent_id,
+                    initial_members=initial_members,
+                ),
                 membership_state=(
                     MEMBERSHIP_ACTIVE if agent_id in initial_members else MEMBERSHIP_INDEPENDENT
+                ),
+                membership_stake=self._initial_stake(
+                    agent_id=agent_id,
+                    initial_members=initial_members,
                 ),
             )
             for agent_id in provider_ids(provider_count=knobs.provider_count)
@@ -98,18 +106,32 @@ class BondedTeamProductionWorld(ScenarioWorld):
         restored = build_restored_state(
             events=events,
             initial_balances={
-                agent_id: self.knobs.starting_provider_balance for agent_id in self.providers
+                agent_id: self._initial_balance(
+                    agent_id=agent_id,
+                    initial_members=set(self.knobs.initial_member_ids),
+                )
+                for agent_id in self.providers
             },
             initial_membership_states={
                 agent_id: state.membership_state for agent_id, state in self.providers.items()
             },
+            initial_membership_stakes={
+                agent_id: self._initial_stake(
+                    agent_id=agent_id,
+                    initial_members=set(self.knobs.initial_member_ids),
+                )
+                for agent_id in self.providers
+            },
             initial_bond_balance=self.knobs.initial_bond_balance,
             institution_enabled=self.knobs.institution_enabled,
+            association_entry_stake=self.knobs.association_entry_stake,
         )
         for agent_id, provider in self.providers.items():
             provider.balance = restored.balances[agent_id]
             provider.membership_state = restored.membership_states[agent_id]
             provider.confirmed_violation_count = restored.confirmed_violation_counts[agent_id]
+            provider.membership_stake = restored.membership_stakes[agent_id]
+            provider.pledge_decision = restored.pledge_decisions.get(agent_id)
             provider.pending_membership_decision = restored.pending_membership_decisions.get(
                 agent_id
             )
@@ -521,6 +543,18 @@ class BondedTeamProductionWorld(ScenarioWorld):
             raise ValueError("expulsion is permanent; re-entry is not available")
         provider.pending_membership_decision = decision
 
+    def submit_pledge(self, *, agent_id: str, decision: str) -> str:
+        """Record one provider's explicit covenant pledge decision."""
+        if not self.knobs.explicit_pledge_enabled:
+            raise ValueError("the explicit pledge is disabled in this condition")
+        if decision not in {"affirm", "decline"}:
+            raise ValueError("decision must be 'affirm' or 'decline'")
+        provider = self.provider(agent_id=agent_id)
+        if provider.pledge_decision is not None:
+            raise ValueError("this provider already submitted a pledge decision")
+        provider.pledge_decision = decision
+        return COVENANT_PLEDGE_TEXT
+
     def settle_round(self, *, round_number: int) -> RoundOutcome:
         if self._round_settled:
             existing = next(item for item in self.outcomes if item.round_number == round_number)
@@ -661,6 +695,7 @@ class BondedTeamProductionWorld(ScenarioWorld):
             if self.knobs.expulsion_enabled and provider.is_member:
                 if provider.confirmed_violation_count >= self.knobs.expulsion_violation_threshold:
                     provider.membership_state = MEMBERSHIP_EXPELLED
+                    provider.membership_stake = 0.0
                     expelled.append(agent_id)
                 else:
                     probationed.append(agent_id)
@@ -707,6 +742,7 @@ class BondedTeamProductionWorld(ScenarioWorld):
                 previous = provider.membership_state
                 provider.balance -= stake
                 provider.membership_state = MEMBERSHIP_ACTIVE
+                provider.membership_stake = stake
                 changes.append(
                     MembershipChange(
                         provider.agent_id,
@@ -719,11 +755,12 @@ class BondedTeamProductionWorld(ScenarioWorld):
                 )
             elif decision == MEMBERSHIP_DECISION_LEAVE and provider.is_member:
                 before = provider.balance
-                returned = self.knobs.association_entry_stake * (
+                returned = provider.membership_stake * (
                     1.0 - self.knobs.exit_stake_forfeit_fraction
                 )
                 provider.balance += returned
                 provider.membership_state = MEMBERSHIP_INDEPENDENT
+                provider.membership_stake = 0.0
                 changes.append(
                     MembershipChange(
                         provider.agent_id,
@@ -735,6 +772,17 @@ class BondedTeamProductionWorld(ScenarioWorld):
                     )
                 )
         return tuple(changes)
+
+    def _initial_stake(self, *, agent_id: str, initial_members: set[str]) -> float:
+        if agent_id not in initial_members or not self.knobs.initial_members_pay_entry_stake:
+            return 0.0
+        return self.knobs.association_entry_stake
+
+    def _initial_balance(self, *, agent_id: str, initial_members: set[str]) -> float:
+        return self.knobs.starting_provider_balance - self._initial_stake(
+            agent_id=agent_id,
+            initial_members=initial_members,
+        )
 
     def _assigned_zone(self, *, agent_id: str, zone_id: str) -> ZoneState:
         job = self._require_job()
