@@ -158,29 +158,31 @@ def load_backoff_ngram_model(case_sensitive: bool, keep_punctuation: bool) -> Ba
     configurations coexist. CPU- and I/O-bound on a cache miss, so callers should
     invoke this off the event loop via ``asyncio.to_thread``.
     """
-    cache_path = _cache_path(case_sensitive=case_sensitive, keep_punctuation=keep_punctuation)
-    if cache_path.exists():
+    resolved_cache_path = cache_path(
+        case_sensitive=case_sensitive, keep_punctuation=keep_punctuation
+    )
+    if resolved_cache_path.exists():
         logger.info("backoff_ngram: loading cached model from %s", cache_path)
-        return BackoffTrigramModel.model_validate_json(cache_path.read_text())
+        return BackoffTrigramModel.model_validate_json(resolved_cache_path.read_text())
     logger.info(
         "backoff_ngram: no cache at %s; building from %s/%s",
-        cache_path,
+        resolved_cache_path,
         _DATASET_NAME,
         _DATASET_CONFIG,
     )
     model = _build_model(case_sensitive=case_sensitive, keep_punctuation=keep_punctuation)
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(model.model_dump_json())
+    resolved_cache_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_cache_path.write_text(model.model_dump_json())
     logger.info(
         "backoff_ngram: cached model (vocab=%d, trigrams=%d) to %s",
         len(model.vocab),
         len(model.trigram),
-        cache_path,
+        resolved_cache_path,
     )
     return model
 
 
-def _cache_path(case_sensitive: bool, keep_punctuation: bool) -> Path:
+def cache_path(case_sensitive: bool, keep_punctuation: bool) -> Path:
     """Return the configuration-keyed cache path for a backoff trigram model."""
     if case_sensitive:
         case_tag = "cased"

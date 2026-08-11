@@ -41,8 +41,8 @@ from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 
-_CASE_SENSITIVE = True
-_KEEP_PUNCTUATION = True
+CASE_SENSITIVE = True
+KEEP_PUNCTUATION = True
 
 
 class RoundSurprisal(NamedTuple):
@@ -148,8 +148,8 @@ class EnglishNgramBackoffSurprisalMetric(Metric):
 def _score_all_rounds(rounds: list[RoundMessages]) -> list[RoundSurprisal]:
     """Load the backoff trigram model once and produce a RoundSurprisal per round."""
     model = load_backoff_ngram_model(
-        case_sensitive=_CASE_SENSITIVE,
-        keep_punctuation=_KEEP_PUNCTUATION,
+        case_sensitive=CASE_SENSITIVE,
+        keep_punctuation=KEEP_PUNCTUATION,
     )
     results: list[RoundSurprisal] = []
     for round_messages in rounds:

@@ -258,13 +258,20 @@ async def _score_round(
     scores: list[_MessageScore] = []
     for index, message in enumerate(round_messages.messages, start=1):
         replica_factors = factors_by_number.get(index, [])
-        mean_factor = statistics.fmean(replica_factors) if replica_factors else 1.0
+        if not replica_factors:
+            # No replica scored this message, so there is no observation to
+            # report. Substituting 1.0 would claim the judge read the message
+            # and found no redundancy, which is the healthiest value the scale
+            # defines and indistinguishable from a real result. It also filled
+            # the score list unconditionally, which is what made the caller's
+            # "every judge replica failed" guard unreachable.
+            continue
         scores.append(
             _MessageScore(
                 message=message,
                 round_number=round_messages.round_number,
                 message_number=index,
-                mean_factor=mean_factor,
+                mean_factor=statistics.fmean(replica_factors),
                 replica_factors=replica_factors,
             )
         )

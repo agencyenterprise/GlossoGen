@@ -26,6 +26,7 @@ from pydantic_ai.messages import ModelMessage
 from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.mid_run_swap_overrides import apply_mid_run_swaps
 from glossogen.evaluation.metrics.probe_usage_report import (
     accumulate_probe_usage,
     build_probe_usage_report,
@@ -84,8 +85,10 @@ class ProtocolProbeMetric(Metric):
     ) -> list[Measurement]:
         """Probe matching agents on the test bank and stream rows to the JSONL."""
         _ = llm_provider
-        if options.probe_replicas is None or options.probe_replicas < 1:
-            raise ValueError("protocol_probe requires --probe-replicas N with N >= 1")
+        # Applicability first, then the flag. A scenario with no probe config
+        # cannot be probed however the flags are set, and reporting a missing
+        # --probe-replicas for it sends the caller after a flag that would not
+        # have helped.
         probe_config = scenario.get_protocol_probe_config()
         if probe_config is None:
             logger.info(
@@ -94,10 +97,15 @@ class ProtocolProbeMetric(Metric):
                 scenario.name(),
             )
             return []
+        if options.probe_replicas is None or options.probe_replicas < 1:
+            raise ValueError("protocol_probe requires --probe-replicas N with N >= 1")
         probe_round = options.probe_round
         probe_replicas = options.probe_replicas
         renderer = TemplateRenderer(prompts_dirs=[probe_config.prompts_dir])
         questions = _load_test_bank(path=probe_config.questions_path)
+        # A swapped-in agent has no AgentRegistered of its own, so without
+        # this it would be probed under its predecessor's model.
+        swapped_configs = apply_mid_run_swaps(agent_configs=agent_configs, events=events)
         responses_path = run_dir / _RESPONSES_FILE_NAME
         target_timestamp = resolve_history_timestamp(events=events)
 
@@ -106,7 +114,7 @@ class ProtocolProbeMetric(Metric):
         with responses_path.open("a", encoding="utf-8") as responses_file:
             for question in questions:
                 matching_agents = _match_agents(
-                    agent_configs=agent_configs,
+                    agent_configs=swapped_configs,
                     role_filter=question.agent_role_filter,
                     role_groups=probe_config.role_groups,
                 )

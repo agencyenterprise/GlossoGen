@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field
 from glossogen.evaluation.metric_core.measurement import AgentObservation, Measurement
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.mid_run_swap_overrides import apply_mid_run_swaps
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metrics.probe_usage_report import (
     accumulate_probe_usage,
@@ -129,7 +130,9 @@ class ProtocolExplanationMetric(Metric):
 
         manifest = read_replace_manifest(run_dir=run_dir)
         target_timestamp = _last_event_timestamp(events=events)
-        latest_per_agent = _dedupe_latest_registration(agent_configs=agent_configs)
+        latest_per_agent = _dedupe_latest_registration(
+            agent_configs=apply_mid_run_swaps(agent_configs=agent_configs, events=events)
+        )
 
         config = scenario.get_protocol_explanation_config()
         renderer = _build_renderer(config=config)

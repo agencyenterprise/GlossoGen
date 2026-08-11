@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from glossogen.evaluation.metric_core.measurement import Measurement, RoundNote, RoundObservation
 from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
 from glossogen.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from glossogen.evaluation.round_transcript_builder import build_round_transcripts
 from glossogen.llm.provider import LLMMessage, LLMProvider
@@ -68,7 +69,7 @@ class ShorthandCodesMetric(Metric):
         round_transcripts = build_round_transcripts(
             events=events,
             scenario=scenario,
-            pristine_index={},
+            pristine_index=build_pristine_text_index(events=events),
         )
 
         if not round_transcripts:

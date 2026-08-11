@@ -32,9 +32,14 @@ install-frontend:
 # bound rather than CPU-bound (they wait on a real MCP server and the game
 # clock's timing floors), so running them alongside each other costs nothing and
 # is where most of the saving comes from.
+#
+# --dist loadgroup keeps tests marked with the same xdist_group on one worker.
+# tests/metrics shares a single simulated run across every metric file; spread
+# over workers, each would build its own and the parallel run would cost more
+# simulations than the serial one.
 test:
 	@echo "Running tests..."
-	VIRTUAL_ENV= uv run --no-sync python -m pytest tests/ -q -n auto
+	VIRTUAL_ENV= uv run --no-sync python -m pytest tests/ -q -n auto --dist loadgroup
 	@echo "Tests complete"
 
 # Tracing every import roughly triples a worker's startup, so `test` stays lean

@@ -95,6 +95,12 @@ glossogen = [
 testpaths = ["tests"]
 # The runtime is async throughout, so bare `async def` tests just work.
 asyncio_mode = "auto"
+# pytest-xdist registers this itself, but only when it is loaded. Declaring it
+# here keeps a serial run (`-p no:xdist`) from warning about an unknown mark.
+markers = [
+    "xdist_group: run these tests on the same worker, so they can share a fixture",
+    "metrics_ml: needs the metrics-ml extra; skipped unless --metrics-ml is passed",
+]
 
 [tool.coverage.run]
 source = ["src/glossogen"]

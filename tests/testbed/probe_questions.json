@@ -1,0 +1,17 @@
+[
+  {
+    "id": "q_first_agent_recall",
+    "agent_role_filter": "first_agent",
+    "inputs": {"prompt": "What did you send on the link channel?"}
+  },
+  {
+    "id": "q_second_agent_recall",
+    "agent_role_filter": "second_agent",
+    "inputs": {"prompt": "What did you send on the link channel?"}
+  },
+  {
+    "id": "q_shared_protocol",
+    "agent_role_filter": "everyone",
+    "inputs": {"prompt": "Describe the convention you and your partner used."}
+  }
+]

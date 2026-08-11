@@ -8,6 +8,38 @@ import pytest
 
 from glossogen.event_bus import EventBus
 
+METRICS_ML_OPTION = "--metrics-ml"
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Register the opt-in flag for tests that need the `metrics-ml` extra.
+
+    Those tests download and run a real model, which is minutes of wall clock
+    and gigabytes of dependency. They are off by default so `make test` stays
+    something anyone can run, and available on demand so the code they cover is
+    not permanently untestable.
+    """
+    parser.addoption(
+        METRICS_ML_OPTION,
+        action="store_true",
+        default=False,
+        help="run tests that need the metrics-ml extra (downloads and runs a real model)",
+    )
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Skip `metrics_ml` tests unless the flag was passed.
+
+    The skip reason names the flag, so a reader who wonders why the real
+    perplexity path is not covered finds out how to cover it.
+    """
+    if config.getoption(METRICS_ML_OPTION):
+        return
+    skip = pytest.mark.skip(reason=f"needs the metrics-ml extra; pass {METRICS_ML_OPTION} to run")
+    for item in items:
+        if item.get_closest_marker("metrics_ml") is not None:
+            item.add_marker(skip)
+
 
 @pytest.fixture
 def event_bus() -> EventBus:
