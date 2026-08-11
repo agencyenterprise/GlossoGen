@@ -25,9 +25,10 @@ normative elements appear only when an arm explicitly presents a pledge.
 
 The study classifies the joint outcome according to whether both providers make
 the transfer. The other provider's choice remains unknown while an agent
-decides, but both transfer or retention actions appear in a public allocation
-record once both decisions are recorded. The baseline therefore measures
-directly observed allocation, not deception or response to monitoring.
+decides. The experiment records both actions directly, while the rules-only
+baseline does not re-inject a history of the other provider's past choices. The
+baseline therefore measures observed allocation, not deception or response to
+monitoring.
 
 ## Treatment structure
 
@@ -39,9 +40,10 @@ directly observed allocation, not deception or response to monitoring.
 | Costly pledge | public registry | public, mutually visible pledge | voluntary affirmation deducts 2.1 units (10% of 21) once at setup; it is not contingent on later remittance |
 
 All arms receive the same clients, fixed 21/7 allocation, participants, hidden
-horizon, direct public outcome record, and communication restrictions. There
-are no audits, fines, forfeitures, or action-contingent penalties. Only group
-identity, public commitment, and the one-time cost of affirmation vary.
+horizon, and no writable communication channel. There are no audits, fines,
+forfeitures, or action-contingent penalties. Only group identity, public
+commitment, and the one-time cost of affirmation vary. Where group identity or
+pledge is a treatment, the corresponding registry is visible to both providers.
 
 In the costly-pledge arm, declining does not remove a provider from the shared
 work. The provider remains able to make the same 7→21 decisions as a publicly
@@ -96,8 +98,11 @@ bundling them into this first human-parallel test.
    rather than an arm comparison. A subsequent study must introduce and
    preregister a behaviorally meaningful decision before testing this ladder
    again; more unchanged replicas would not resolve the causal question.
-5. The next revision neutralizes the common prompt: it frames a 7-unit transfer
-   as one of two allocations, removes client ownership and commitment language
-   from non-pledge arms, and calls the shared channel an allocation record. It
-   is recorded as [EXP-031](../experiments/EXP-031-neutral-baseline-calibration/experiment.md)
-   and must be calibrated before any arm comparison.
+5. [EXP-031](../experiments/EXP-031-neutral-baseline-calibration/experiment.md)
+   removed the initial client-ownership and commitment framing. Its three
+   no-group trajectories produced both actions (33 transfers and 63 retentions)
+   but ranged from almost universal retention to universal transfer. It therefore
+   closed the prior ceiling without licensing an arm comparison. The next
+   instrument revision will present only operational allocation rules, omit
+   descriptions of absent mechanisms, and stop re-injecting prior action
+   histories; it must be calibrated before the four-arm ladder is launched.

@@ -1,22 +1,18 @@
-Two providers repeatedly make allocation decisions concerning the same client
-account. Each receives {{ client_payment }} units and chooses whether to
-transfer {{ client_reserve }} units to that account and retain the remaining
-{{ client_payment - client_reserve }}, or retain all {{ client_payment }} units.
-The study records whether both providers make the transfer. It does not assign
-prior ownership of the {{ client_reserve }} units or prescribe either action.
+Two providers repeatedly receive {{ client_payment }} units and each choose
+between transferring {{ client_reserve }} units to a client account while
+retaining {{ client_payment - client_reserve }}, or retaining all {{ client_payment }} units.
 
 Condition: {{ condition }}. {% if group_enabled %}The two providers have a
-public group registry.{% else %}The providers have no shared group identity.{% endif %}
+public group registry.{% endif %}
 {% if pledge_enabled %}Both providers receive an explicit public pledge; their choices are
 visible in the registry before client decisions begin.{% endif %}
 {% if entry_cost_enabled %}Affirming deducts a one-time, irreversible {{ pledge_entry_cost }}-unit
-entry cost. It is not contingent on later remittance decisions.
+entry cost.
 {% endif %}
 {% if bond_enabled %}Covenant members must post a {{ covenant_bond }}-unit personal
 bond that is forfeited when a delayed audit confirms that they retained the transfer amount. A provider who
 declines remains eligible to work as a publicly listed non-member. Forfeiture reduces retained
 earnings by the bond amount.
 {% endif %}{% if audit_enabled %}Audits are selectively sampled at rate {{ audit_probability }} and resolve
-after {{ audit_resolution_delay_rounds }} round(s).{% else %}Each completed transfer or retention is directly
-recorded in the public ledger after both providers decide. There are no audits or action-contingent penalties.
+after {{ audit_resolution_delay_rounds }} round(s).
 {% endif %}

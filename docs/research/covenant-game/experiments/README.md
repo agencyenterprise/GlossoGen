@@ -36,8 +36,9 @@ and its
   design complete; EXP-027 found a communication leak, EXP-028 found unequal
   action opportunities; EXP-029 restored parity but hit a universal remittance
   ceiling; EXP-030 repeated that ceiling in all twelve trajectories under a
-  peer-visible group, pledge, and costly-pledge ladder with directly observed
-  remittance.
+  peer-visible group, pledge, and costly-pledge ladder. EXP-031 removed the
+  initial moral framing but showed extreme baseline variation, so the next
+  rules-only revision must be calibrated before comparing arms.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -79,9 +80,9 @@ count that resolves it before launching.
 | [EXP-028](EXP-028-joint-commitment-readonly-calibration/experiment.md) | read-only joint commitment instrument calibration | complete | invalid: pledge setup consumed a decision round | $0.56 |
 | [EXP-029](EXP-029-joint-commitment-common-setup-calibration/experiment.md) | common-setup joint commitment instrument calibration | complete | not supported: universal remittance ceiling | $0.73 |
 | [EXP-030](EXP-030-public-registry-same-seed-replication/experiment.md) | costly-pledge same-seed replication | complete | not supported: repeatable practical remittance ceiling in all 12 runs | $2.20 |
-| [EXP-031](EXP-031-neutral-baseline-calibration/experiment.md) | neutral no-group prompt calibration | planned | pending: test whether prompt neutralization restores behavioral variation | — |
+| [EXP-031](EXP-031-neutral-baseline-calibration/experiment.md) | neutral no-group prompt calibration | complete | supported: variation restored, but prompt still contains coordination-relevant context | $0.53 |
 
-Total API spend logged: **$420.86** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$421.39** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The
@@ -91,7 +92,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-031`. Before launching, use the
+The next available ID is `EXP-032`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat

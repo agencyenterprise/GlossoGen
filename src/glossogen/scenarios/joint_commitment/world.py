@@ -65,14 +65,6 @@ class JointCommitmentWorld(ScenarioWorld):
             return None
         return self._outcomes[-1]
 
-    def previous_attestations(self) -> dict[str, str]:
-        """Return the previous round's public reports by provider."""
-        outcome = self.previous_outcome()
-        if outcome is None:
-            return {}
-        decisions = self._decisions_by_round.get(outcome.round_number, {})
-        return {agent_id: record.public_attestation for agent_id, record in decisions.items()}
-
     def public_pledge_decisions(self) -> dict[str, str]:
         """Return every recorded pledge decision for the shared setup record."""
         return {

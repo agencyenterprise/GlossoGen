@@ -38,8 +38,8 @@ def build_knobs(
     )
 
 
-def test_baseline_prompt_neutralizes_ownership_and_commitment_language() -> None:
-    """Keep ownership and promise language exclusive to pledge treatments."""
+def test_baseline_prompt_contains_only_operational_allocation_rules() -> None:
+    """Keep absent mechanisms and moral framing out of the baseline prompt."""
     no_group = JointCommitmentScenario(
         knobs=build_knobs(
             condition=JointCommitmentCondition.NO_GROUP,
@@ -71,7 +71,40 @@ def test_baseline_prompt_neutralizes_ownership_and_commitment_language() -> None
     assert "protect the client" not in no_group_prompt
     assert "promise" not in no_group_prompt
     assert "commitment" not in no_group_prompt
+    assert "audit" not in no_group_prompt
+    assert "enforcement" not in no_group_prompt
+    assert "communicate" not in no_group_prompt
+    assert "pledge" not in no_group_prompt
     assert "i publicly commit to transfer 7 units" in pledge_agent.system_prompt.lower()
+
+
+def test_later_allocation_prompts_omit_previous_provider_actions() -> None:
+    """Avoid supplying a coordination history outside the group registry treatment."""
+    scenario = JointCommitmentScenario(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.NO_GROUP,
+            audit_probability=0.0,
+        )
+    )
+    world = cast(JointCommitmentWorld, scenario.get_world())
+    world.begin_round(round_number=2)
+    world.submit_decision(
+        agent_id="provider_a",
+        actual_action="remit",
+        public_attestation="remitted",
+    )
+    world.submit_decision(
+        agent_id="provider_b",
+        actual_action="retain",
+        public_attestation="retained",
+    )
+    world.settle_round(round_number=2)
+
+    injection = scenario.get_injection(round_number=3, agent_id="provider_a")
+
+    assert injection is not None
+    assert "Previous-round" not in injection
+    assert "provider_b: retained" not in injection
 
 
 def test_joint_safety_requires_both_providers_to_remit() -> None:

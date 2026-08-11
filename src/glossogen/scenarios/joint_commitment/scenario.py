@@ -194,7 +194,6 @@ class JointCommitmentScenario(SimulationScenario):
                 "client_payment": self._knobs.client_payment,
                 "client_reserve": self._knobs.client_reserve,
                 "covenant_bond": self._knobs.covenant_bond,
-                "previous_attestations": self._world.previous_attestations(),
             },
         )
 

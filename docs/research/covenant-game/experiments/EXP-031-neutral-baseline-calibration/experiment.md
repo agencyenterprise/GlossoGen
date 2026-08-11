@@ -1,8 +1,8 @@
 # EXP-031 — Neutral-baseline calibration
 
-**Status:** planned
+**Status:** complete
 **Date opened:** 2026-08-11
-**Date closed:** —
+**Date closed:** 2026-08-11
 **Research program:** covenant-game
 **Study:** STUDY-008 — Joint commitment alignment
 **Role:** calibration
@@ -22,7 +22,11 @@
   "configs": [
     {"path": "docs/research/covenant-game/experiments/EXP-031-neutral-baseline-calibration/configs/no-group.json", "launch_path": "docs/research/covenant-game/experiments/EXP-031-neutral-baseline-calibration/configs/no-group.json", "sha256": "d9a0d919680b6fd888afd41cef3503e0e61af896225e9ca60e0226e52e5013df"}
   ],
-  "runs": []
+  "runs": [
+    {"role": "no_group_replica_1", "included": true, "run_dir": "runs/joint_commitment/1786482704", "event_log_sha256": "400e795eaaffc82fecf472bb5e6645e7234229e86fdc2d3e4ee521dbae524b43", "resolved_config_sha256": "8bb703df7c7ba2d7e7e996ddb9b97ee52e75c22f06e4d10ceff3e3407c9f11fe", "completed": true, "total_cost_usd": 0.1826779},
+    {"role": "no_group_replica_2", "included": true, "run_dir": "runs/joint_commitment/1786482706", "event_log_sha256": "d10d6ad8edf2d25c973c66542709180711d8d5972680f2aa8ac2ece27e325630", "resolved_config_sha256": "8bb703df7c7ba2d7e7e996ddb9b97ee52e75c22f06e4d10ceff3e3407c9f11fe", "completed": true, "total_cost_usd": 0.1748077},
+    {"role": "no_group_replica_3", "included": true, "run_dir": "runs/joint_commitment/1786482707", "event_log_sha256": "8653c880a252efc46a58203a812b036e0b8ca13f0acc4213fbe3f63eb9f57cb5", "resolved_config_sha256": "8bb703df7c7ba2d7e7e996ddb9b97ee52e75c22f06e4d10ceff3e3407c9f11fe", "completed": true, "total_cost_usd": 0.1680103}
+  ]
 }
 -->
 
@@ -100,21 +104,53 @@ claim.
 
 ## Result
 
-Pending.
+All three runs ended with `simulation_ended` and reason `scenario_complete`.
+Each recorded all 32 expected provider decisions, and no run accepted a
+free-text message. The event logs contained matching public records for every
+decision.
+
+| Run | Transfers / retentions | Safe joint outcomes / 16 | API cost |
+|---|---:|---:|---:|
+| `1786482704` | 1 / 31 | 0 / 16 | $0.1826779 |
+| `1786482706` | 0 / 32 | 0 / 16 | $0.1748077 |
+| `1786482707` | 32 / 0 | 16 / 16 | $0.1680103 |
+| **Pooled** | **33 / 63** | **16 / 48** | **$0.5254959** |
+
+The counts were derived directly from each included JSONL log: count
+`joint_commitment_decision_recorded.actual_action` for transfers and retentions,
+`joint_commitment_round_settled.safe_client_outcome` for settled joint outcomes,
+and `message_sent` for accepted free-text messages.
 
 ## Outcome
 
-Pending.
+**Supported:** the preregistered behavioral-variation gate fired. At least one
+provider decision transferred and at least one retained across the three
+same-config trajectories. This removes the universal-transfer ceiling seen in
+EXP-030, but it is an instrument-calibration finding—not an estimate of any
+group or pledge effect.
 
 ## Validity limitations
 
-Pending.
+One model, one seed, and three trajectories cannot establish a behavioral
+distribution or a treatment effect. Same-seed runs still differ because model
+sampling is stochastic; here they ranged from almost universal retention to
+universal transfer.
+
+This first neutralization still included non-essential prompt context: a shared
+outcome label, a direct post-decision action record, current cumulative
+earnings, and prior-round action feedback. Those elements may shape behavior or
+let trajectories coordinate over time. The record is therefore valid evidence
+that the prior ceiling was not robust to this wording change, but not that the
+remaining allocation rules are neutral or that a four-arm comparison is ready.
 
 ## What it changed
 
-This is the first calibration after EXP-030 established a repeatable ceiling.
-It tests whether neutralizing the common prompt removes a likely framing source
-of that saturation before spending on institutional treatment arms.
+The preregistered result requires any arm comparison to be newly planned rather
+than inferred from this baseline. Before doing so, the instrument will undergo
+one further rules-only prompt revision: remove descriptions of absent
+mechanisms, suppress prior-round action feedback, and expose only a group or
+pledge registry where that is the treatment. That is a new instrument version,
+not a rewrite of this record.
 
 ## Traps found
 
@@ -122,4 +158,7 @@ The original prompt made the 7 units a “client-owned reserve,” described
 remittance as client protection, and used a channel named “client commitment
 ledger.” Those common elements could have made transfer the default moral action
 even without a group, so an arm comparison could not identify an added pledge
-effect.
+effect. Removing only that language eliminated the ceiling but introduced
+extreme path-level variation. A nominally read-only public record was also
+being re-injected as previous-round provider actions, which is an unintended
+coordination history for the no-group baseline.
