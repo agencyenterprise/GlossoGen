@@ -1,8 +1,8 @@
 # EXP-033 — Communication-free rules-only baseline calibration
 
-**Status:** planned
+**Status:** complete
 **Date opened:** 2026-08-11
-**Date closed:** —
+**Date closed:** 2026-08-11
 **Research program:** covenant-game
 **Study:** STUDY-008 — Joint commitment alignment
 **Role:** calibration
@@ -18,7 +18,11 @@
   "worktree_dirty": true,
   "commands": ["VIRTUAL_ENV= uv run --no-sync python -m glossogen run joint_commitment --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --config docs/research/covenant-game/experiments/EXP-033-communication-free-baseline-calibration/configs/no-group.json"],
   "configs": [{"path": "docs/research/covenant-game/experiments/EXP-033-communication-free-baseline-calibration/configs/no-group.json", "launch_path": "docs/research/covenant-game/experiments/EXP-033-communication-free-baseline-calibration/configs/no-group.json", "sha256": "d9a0d919680b6fd888afd41cef3503e0e61af896225e9ca60e0226e52e5013df"}],
-  "runs": []
+  "runs": [
+    {"role": "rules_only_replica_1", "included": true, "run_dir": "runs/joint_commitment/1786484935", "event_log_sha256": "125ad054efbb1bc84c7d7eb9632096b5149722d60e14b9018fdf150938f9f7a2", "resolved_config_sha256": "8bb703df7c7ba2d7e7e996ddb9b97ee52e75c22f06e4d10ceff3e3407c9f11fe", "completed": true, "total_cost_usd": 0.1208335},
+    {"role": "rules_only_replica_2", "included": true, "run_dir": "runs/joint_commitment/1786484938", "event_log_sha256": "31d86dc018e3568a0615cd52f1ce35d7b824bb324ae3bd94ee58de88fbe7ec94", "resolved_config_sha256": "8bb703df7c7ba2d7e7e996ddb9b97ee52e75c22f06e4d10ceff3e3407c9f11fe", "completed": true, "total_cost_usd": 0.1202009},
+    {"role": "rules_only_replica_3", "included": true, "run_dir": "runs/joint_commitment/1786484939", "event_log_sha256": "8d7d893dbafaff722a844d4861b25426999960f875b7566a46a44e3ababc3b52", "resolved_config_sha256": "8bb703df7c7ba2d7e7e996ddb9b97ee52e75c22f06e4d10ceff3e3407c9f11fe", "completed": true, "total_cost_usd": 0.1185255}
+  ]
 }
 -->
 
@@ -71,20 +75,36 @@ The primary criterion is whether both actions occur anywhere in the three runs. 
 
 ## Result
 
-Pending.
+All three trajectories ended with authoritative `simulation_ended` events and
+all 32 decisions per run. Every provider selected `remit`: 96 of 96 recorded
+decisions remitted, and all 48 joint client outcomes were safe. No run recorded
+a `message_sent` event.
+
+The registered environment confirms the intended repair: both providers had an
+empty `channel_ids` list, `communication_enabled: false`, and exactly two
+visible tools, `read_notifications` and `submit_client_reserve_decision`.
+Total API cost was `$0.3595599`.
 
 ## Outcome
 
-Pending.
+**Not supported.** The behaviorally variable baseline gate did not activate:
+the rules-only, communication-free allocation task still produced a repeated
+practical remittance ceiling. The four-arm group/pledge ladder is not
+authorized on this instrument.
 
 ## Validity limitations
 
-Pending.
+- The instrument validly removes free-text communication, but a valid
+  implementation does not guarantee a behaviorally informative measure.
+- Three stochastic trajectories at one model and seed establish this local
+  ceiling gate only; they do not show human behavior or a model-general norm.
+- The result does not test group identity, pledge, cost, audit, or covenant
+  effects because none of those arms was launched.
 
 ## What it changed
 
-EXP-032 established that rejecting a message does not remove communication as a behavioral affordance. EXP-033 makes the absence of communication structural while preserving the rules-only allocation task.
+EXP-032 established that rejecting a message does not remove communication as a behavioral affordance. EXP-033 made the absence of communication structural while preserving the rules-only allocation task. Its ceiling result means the next study must change the behavioral decision rather than add covenant arms.
 
 ## Traps found
 
-The allocation prompt, runtime tool schema, and generic agent protocol are all part of the treatment. A scenario cannot claim to remove communication while a universal tool list or system suffix still offers it.
+The allocation prompt, runtime tool schema, and generic agent protocol are all part of the treatment. A scenario cannot claim to remove communication while a universal tool list or system suffix still offers it. Conversely, removing that affordance does not itself create meaningful behavioral variation.

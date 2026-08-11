@@ -113,5 +113,6 @@ bundling them into this first human-parallel test.
    a gate for a later group/pledge comparison, not a test of covenant
    mechanisms itself.
 7. [EXP-033](../experiments/EXP-033-communication-free-baseline-calibration/experiment.md)
-   preregisters that repaired baseline calibration. It preserves the allocation
-   rules and seed while making communication technically unavailable.
+   validated that repair, but all 96 provider decisions remitted. The four-arm
+   ladder remains unauthorized: its next instrument must change the decision
+   itself rather than adding institutional conditions to a ceiling task.
