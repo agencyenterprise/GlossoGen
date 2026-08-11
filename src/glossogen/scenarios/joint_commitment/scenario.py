@@ -180,6 +180,7 @@ class JointCommitmentScenario(SimulationScenario):
                 "bond_forfeited": provider.bond_forfeited,
                 "membership_in_good_standing": provider.membership_in_good_standing,
                 "pledge_text": PLEDGE_TEXT,
+                "public_pledge_decisions": self._world.public_pledge_decisions(),
                 "client_payment": self._knobs.client_payment,
                 "client_reserve": self._knobs.client_reserve,
                 "covenant_bond": self._knobs.covenant_bond,

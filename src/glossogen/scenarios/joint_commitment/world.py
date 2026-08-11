@@ -65,6 +65,14 @@ class JointCommitmentWorld(ScenarioWorld):
         decisions = self._decisions_by_round.get(outcome.round_number, {})
         return {agent_id: record.public_attestation for agent_id, record in decisions.items()}
 
+    def public_pledge_decisions(self) -> dict[str, str]:
+        """Return every recorded pledge decision for the shared setup record."""
+        return {
+            agent_id: provider.pledge_decision
+            for agent_id, provider in self._providers.items()
+            if provider.pledge_decision is not None
+        }
+
     def audit_selected_for_round(self, round_number: int) -> bool:
         """Return whether the frozen hidden audit schedule selects a round."""
         return round_number in self._audit_rounds

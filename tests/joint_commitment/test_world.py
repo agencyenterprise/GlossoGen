@@ -1,5 +1,7 @@
 """Unit tests for the joint client-commitment state machine."""
 
+from typing import cast
+
 from glossogen.scenarios.joint_commitment.events import JointCommitmentAuditResolved
 from glossogen.scenarios.joint_commitment.knobs import (
     JointCommitmentCondition,
@@ -95,6 +97,21 @@ def test_setup_requires_pledges_only_in_pledge_conditions() -> None:
         pledge.submit_pledge(agent_id=agent_id, decision="affirm")
 
     assert pledge.setup_complete() is True
+
+
+def test_pledge_decisions_are_visible_to_both_providers_after_setup() -> None:
+    """The decision-round prompt exposes both agents' completed pledge record."""
+    scenario = JointCommitmentScenario(knobs=build_knobs(JointCommitmentCondition.PLEDGE))
+
+    world = cast(JointCommitmentWorld, scenario.get_world())
+    world.submit_pledge(agent_id="provider_a", decision="affirm")
+    world.submit_pledge(agent_id="provider_b", decision="decline")
+    injection = scenario.get_injection(round_number=2, agent_id="provider_a")
+
+    assert injection is not None
+    assert "Public setup record:" in injection
+    assert "provider_a: affirm" in injection
+    assert "provider_b: decline" in injection
 
 
 def test_audited_retention_forfeits_bond_and_revokes_good_standing() -> None:
