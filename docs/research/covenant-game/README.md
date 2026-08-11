@@ -26,7 +26,8 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-003 — Enforcement and resilience](studies/STUDY-003-enforcement-resilience.md) | exploratory phase complete | Can the institution enforce boundaries and continue operating after violations, exits, or population loss? |
 | [STUDY-004 — Pledge × personal cost](studies/STUDY-004-pledge-cost-mechanism.md) | exploratory phase complete | Is behavior changed by the pledge, personal cost, or their interaction? |
 | [STUDY-005 — Measurement resolution](studies/STUDY-005-measurement-resolution.md) | first calibration complete | How much does a trajectory vary when nothing changes, and which effect sizes can this instrument resolve? |
-| [STUDY-006 — Human-parallel commitment](studies/STUDY-006-human-parallel-commitment.md) | planned | Do group identity, pledge, and a 10% forfeiture change repeated promise adherence under a fixed temptation? |
+| [STUDY-006 — Human-parallel commitment](studies/STUDY-006-human-parallel-commitment.md) | complete | Do group identity, pledge, and a 10% forfeiture change repeated promise adherence under a fixed temptation? |
+| [STUDY-007 — Repeated trust-game replication](studies/STUDY-007-repeated-trust-game.md) | planned | Does the human covenant bundle change repeated trust and reciprocity under the controlled 10/7/21 trust-game schedule? |
 
 ## Current decision
 
@@ -43,8 +44,9 @@ rather than repeated, and the "same sign at two fresh seeds" rule agrees by
 chance one time in four. Resolving a four-assignment effect needs 23 runs per
 arm, so neither the second-model replication nor the cost redesign is authorized.
 
-The next planned work is [STUDY-006](studies/STUDY-006-human-parallel-commitment.md):
-a new, reduced scenario that distinguishes group identity, pledge, and the human
-study's 10% forfeiture under a fixed immediate temptation. It is a separate
+EXP-025 tested that reduced warehouse proxy and reached a practical floor, so
+the next planned work is [STUDY-007](studies/STUDY-007-repeated-trust-game.md):
+a direct three-arm implementation of the human study's 10/7/21 trust-game
+schedule, extended to repeated hidden-horizon interaction. It is a separate
 commitment experiment, not a replacement for the institution and enforcement
 studies. Every run remains subject to its preregistered decision gates.

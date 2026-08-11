@@ -1,0 +1,18 @@
+{
+  "round_count": 16,
+  "max_round_duration_seconds": 300.0,
+  "model_overrides": {},
+  "postmortem_duration_seconds": 0.0,
+  "replace_agent_default_channel_visibility": {},
+  "scheduled_events": [],
+  "agent_max_tokens": 16384,
+  "round_time_budget_seconds": null,
+  "compaction": {"enabled": false, "token_threshold": 50000},
+  "seed": 61,
+  "condition": "no_commitment_group",
+  "trustor_endowment": 10,
+  "fixed_partner_send": 7,
+  "transfer_multiplier": 3,
+  "forfeiture_fraction": 0.0,
+  "horizon_disclosed": false
+}
