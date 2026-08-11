@@ -61,6 +61,19 @@ class CommunicationFeaturePresenceMetric(Metric):
     ) -> list[Measurement]:
         """Run the relabel judge against the supplied ontology and persist the vector."""
         _ = agent_configs
+        # Applicability before inputs, matching communication_open_coding. A
+        # scenario that produces no communication rounds cannot be scored even
+        # with a valid ontology, and hunting for one first turns a metric that
+        # should skip into an error that fails the whole evaluation.
+        rounds = scenario.build_communication_rounds(events=events)
+        if not rounds:
+            logger.info(
+                "%s: skipping — scenario %s produced no communication rounds",
+                self.name,
+                scenario.name(),
+            )
+            return []
+
         if options.ontology_path is None:
             ontology_path = _resolve_latest_ontology_path(
                 run_dir=run_dir, scenario_name=scenario.name()
@@ -78,15 +91,6 @@ class CommunicationFeaturePresenceMetric(Metric):
         )
         if not ontology.categories:
             raise ValueError(f"Ontology at {ontology_path} has no categories")
-
-        rounds = scenario.build_communication_rounds(events=events)
-        if not rounds:
-            logger.info(
-                "%s: skipping — scenario %s produced no communication rounds",
-                self.name,
-                scenario.name(),
-            )
-            return []
 
         judge_prompt = render_evaluator_prompt(
             template_name="communication_feature_presence_user.jinja",

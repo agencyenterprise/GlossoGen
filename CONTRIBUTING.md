@@ -45,6 +45,19 @@ preset in the tree, so a new scenario is covered the moment it is registered.
 Adding a rule there applies it to every existing scenario at once, which is the
 cheapest place to catch the mistakes that only show up minutes into a run.
 
+A few tests need the optional `metrics-ml` extra, which downloads and runs a
+real model. They are skipped by default and named in the skip reason:
+
+```bash
+uv sync --extra metrics-ml
+VIRTUAL_ENV= uv run --no-sync python -m pytest tests/ --metrics-ml
+```
+
+Everything else about those metrics is covered without the extra. The
+`english_ngram_*` pair loads a hand-built model from its cache, and `perplexity`
+runs its aggregation against an injected scorer, so only the real forward pass
+is behind the flag.
+
 For coverage, `make test-cov` writes `.coverage` and prints the uncovered lines;
 `make coverage-html` renders it browsable at `htmlcov/index.html`. CI runs
 `make test-cov` on every PR and posts a comment with the total, the change
