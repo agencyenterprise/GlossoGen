@@ -30,6 +30,31 @@ jobs:
       - name: Check server (black, isort, ruff, pyright, vulture, custom linters)
         run: make check-server
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: make install-server
+
+      # No network and no provider keys: agents run on a scripted model and
+      # judges on a stub, so a contributor without credentials gets the same
+      # result CI does.
+      - name: Run tests
+        run: make test
+
   lint-frontend:
     runs-on: ubuntu-latest
     steps:
