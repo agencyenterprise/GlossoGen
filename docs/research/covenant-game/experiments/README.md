@@ -34,7 +34,8 @@ and its
   EXP-026 complete; trust moved under covenant, reciprocity was invariant.
 - [STUDY-008 — Joint commitment alignment](../studies/STUDY-008-joint-commitment-alignment.md):
   design complete; EXP-027 found a communication leak, EXP-028 found unequal
-  action opportunities, and EXP-029 is the common-setup calibration.
+  action opportunities; EXP-029 restored parity but hit a universal remittance
+  ceiling.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -74,9 +75,9 @@ count that resolves it before launching.
 | [EXP-026](EXP-026-repeated-trust-game-pilot/experiment.md) | repeated trust-game human-parallel pilot | complete | inconclusive: trust contrast met its threshold but reciprocity was invariant | $1.21 |
 | [EXP-027](EXP-027-joint-commitment-calibration/experiment.md) | joint commitment instrument calibration | complete | invalid: ledger allowed informal coordination | $0.20 |
 | [EXP-028](EXP-028-joint-commitment-readonly-calibration/experiment.md) | read-only joint commitment instrument calibration | complete | invalid: pledge setup consumed a decision round | $0.56 |
-| [EXP-029](EXP-029-joint-commitment-common-setup-calibration/experiment.md) | common-setup joint commitment instrument calibration | planned | pending | — |
+| [EXP-029](EXP-029-joint-commitment-common-setup-calibration/experiment.md) | common-setup joint commitment instrument calibration | complete | not supported: universal remittance ceiling | $0.73 |
 
-Total API spend logged: **$420.13** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$420.86** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The

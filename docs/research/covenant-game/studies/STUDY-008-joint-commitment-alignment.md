@@ -76,10 +76,12 @@ expulsion and replacement separately.
    [EXP-028](../experiments/EXP-028-joint-commitment-readonly-calibration/experiment.md)
    found unequal decision opportunities because pledge setup consumed the first
    action round. Both were closed invalid. Run
-   [EXP-029](../experiments/EXP-029-joint-commitment-common-setup-calibration/experiment.md),
-   which freezes a common setup phase, allocation, audit schedule, bond rule,
-   model, seed, and decision gates before paid simulation.
-3. Run a small same-seed Sonnet calibration across all four conditions before
-   deciding whether three to five identical-config replicas are informative.
-4. Only after usable variation, run fixed-config replicas and, if warranted,
-   fresh-seed replication.
+   [EXP-029](../experiments/EXP-029-joint-commitment-common-setup-calibration/experiment.md)
+   restored the common setup phase and treatment exposure, but all 128 observed
+   decisions remitted. It was closed as a valid ceiling calibration.
+3. Revise the behavioral task before adding replicas. Preserve the matched
+   common setup, 7→21 allocation, audit schedule, and four treatment arms, but
+   introduce an individual temptation that creates observable retention without
+   changing the allocation by condition.
+4. Only after usable variation, run fixed-config same-seed replicas and, if
+   warranted, fresh-seed replication.
