@@ -87,7 +87,7 @@ Each round the stabilization engineer receives a reading that maps every failure
 
 ### What the Stabilization Engineer Sees
 
-- **System prompt** lists two orthogonal sets: (a) all 14 failure motifs with their observable symptoms, and (b) all 14 procedure templates with visible placeholders (`{hold_duration}`, `{starting_face}`, `{intensity_level}`) — no pre-baked mapping between motif and procedure.
+- **System prompt** lists two orthogonal sets: (a) every failure motif with its observable symptoms, and (b) all 14 procedure templates with visible placeholders (`{hold_duration}`, `{starting_face}`, `{intensity_level}`) — no pre-baked mapping between motif and procedure.
 - **Round injection** contains a 14-row table mapping each failure motif to the fully-rendered procedure for this round (placeholders already substituted). The stabilization engineer just matches the observer's description to a motif, finds its action in the table, and relays the full procedure verbatim.
 
 ### Parameter Pools

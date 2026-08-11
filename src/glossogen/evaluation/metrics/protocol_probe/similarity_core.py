@@ -8,7 +8,7 @@ This module centralises:
 * JSONL loading (``load_probe_rows``).
 * The pairwise similarity primitive (``pairwise_similarity_matrix``) on top
   of ``rapidfuzz.distance.Levenshtein.normalized_similarity``.
-* Pydantic artifact-row models reused across the three metrics
+* Pydantic artifact-row models reused across the similarity metrics
   (``ProbeSimilarityCell`` etc.) plus the shared schema-version constant.
 """
 

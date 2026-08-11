@@ -1,4 +1,4 @@
-"""Protocol-probe metric family: the probe runner plus three similarity metrics."""
+"""Protocol-probe metric family: the probe runner plus its similarity metrics."""
 
 from glossogen.evaluation.metrics.protocol_probe.protocol_probe_agent_pair_similarity_metric import (  # noqa: E501
     ProtocolProbeAgentPairSimilarityMetric,

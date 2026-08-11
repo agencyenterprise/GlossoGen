@@ -1,7 +1,7 @@
 """Availability probes and loaders for the optional ``metrics-ml`` dependency set.
 
 ``torch``, ``minicons``, and ``datasets`` are multi-gigabyte installs needed by
-exactly three metrics: ``perplexity`` and the two English n-gram surprisal
+the ``perplexity`` and English n-gram surprisal
 metrics. They ship in the optional ``metrics-ml`` extra so the simulation server
 image does not carry an ML stack it never executes.
 

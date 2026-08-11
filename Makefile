@@ -27,6 +27,11 @@ install-frontend:
 	cd frontend && npm ci
 
 # Linting
+test:
+	@echo "Running tests..."
+	VIRTUAL_ENV= uv run --no-sync python -m pytest tests/ -q
+	@echo "Tests complete"
+
 lint: lint-server lint-frontend
 	@echo "All linting complete"
 
@@ -101,4 +106,4 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-metrics install-frontend lint lint-server check-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types
+.PHONY: install install-server install-metrics install-frontend lint lint-server check-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types test

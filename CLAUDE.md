@@ -74,7 +74,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
     - `protocol_explanation_metric.py` — generic; probes each agent under its own model with its full end-of-run history to describe (free-text) the communication protocol it remembers. Renders the scenario's per-role template from `get_protocol_explanation_config()` when present, else a generic prompt. Writes `protocol_explanation_responses.jsonl` + `protocol_explanation_usage.json`; answers also land in `per_agent[].note`.
     - `probe_usage_report.py` — shared per-(model, provider) token-usage aggregation (`ProbeUsageReport`, `accumulate_probe_usage`, `build_probe_usage_report`) used by both `protocol_probe` and `protocol_explanation`.
     - `protocol_learned_after_swap_metric.py` — generic LLM-judge; calls the scenario's `detect_protocol_boundary_window` to find the pre/post split and `build_communication_rounds` to render transcripts. Returns `[]` when either hook opts out.
-    - `protocol_probe/` — generic protocol-probe metric family (4 metrics). Reads `SimulationScenario.get_protocol_probe_config()` for the per-scenario question bank and probe-prompt templates; returns `[]` when the hook returns `None`.
+    - `protocol_probe/` — generic protocol-probe metric family. Reads `SimulationScenario.get_protocol_probe_config()` for the per-scenario question bank and probe-prompt templates; returns `[]` when the hook returns `None`.
       - `protocol_probe_metric.py` — runs the probe LLM calls and writes `protocol_probe_responses.jsonl`
       - `protocol_probe_replica_self_similarity_metric.py` — within-(agent, question, cutoff) replica self-similarity
       - `protocol_probe_agent_pair_similarity_metric.py` — agent × agent matrix per (question, cutoff); skips on single-team runs
@@ -167,6 +167,13 @@ All prompts (agent system prompts, round injections) use Jinja2 templates stored
 - **Every public class and important function needs a docstring.**
 - **Be factual only.** Describe what the code does, not assumptions about why. Never use subjective language.
 - **Be concise.** One to three sentences for most docstrings.
+- **Never state a count of things that can change.** "Six scenarios build a judge",
+  "the four probe metrics", "28 questions per agent" — every one of these becomes a
+  lie the next time someone adds a scenario, a metric, or a question, and nothing
+  fails when it does. Name the property instead: "scenarios that judge their own
+  rounds", "the probe metrics", "the whole question bank". Counts that describe a
+  fixed design ("three agents share one channel") are fine, because changing them
+  means redesigning the thing being described.
 
 ## Frontend
 

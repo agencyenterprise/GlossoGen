@@ -212,7 +212,7 @@ Most scoring is now scenario-agnostic. Because `get_primary_channels()` is requi
 | `round_success_after_resume` | `judge_round_result(...)` + the run was launched via replace-agent / cross-run / scheduled swap / resume-at-round |
 | `protocol_learned_after_swap` | `build_communication_rounds(events)` + `detect_protocol_boundary_window(...)` |
 | `communication_open_coding`, `communication_feature_presence` | `build_communication_rounds(events)` |
-| `protocol_probe` family (4 metrics) | `get_protocol_probe_config()` |
+| `protocol_probe` family | `get_protocol_probe_config()` |
 
 Add a scenario-specific metric under `evaluation/` only when the platform doesn't already cover what you want to measure (a domain-specific signal that doesn't reduce to round-success or to language phenomena on the primary channel). If you do, `evaluation/__init__.py` should export the metric class so the scenario can register it in its metric registry.
 

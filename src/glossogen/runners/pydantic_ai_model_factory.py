@@ -62,7 +62,7 @@ def default_pydantic_ai_settings(provider: str) -> ModelSettings:
     top-level ``cache_control`` parameter so the server caches the longest
     matching prefix across calls — important when many calls share the same
     ``system + history`` prefix but vary the trailing user prompt (e.g. the
-    probe metric calls 28 questions per agent).
+    probe metric calls the whole question bank per agent).
     """
     if provider == "anthropic":
         return AnthropicModelSettings(

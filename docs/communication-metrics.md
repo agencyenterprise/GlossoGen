@@ -33,7 +33,7 @@ Read these once; they explain choices common to every column.
   separately. We then average: the message values are meaned within a round, and the
   per-round means are meaned across the run to get the headline number. We do **not** glue a
   round's (or run's) messages into one block before scoring.
-- **Deterministic vs. judge.** Four metrics are deterministic algorithms (same input →
+- **Deterministic vs. judge.** Most metrics are deterministic algorithms (same input →
   identical output, no API calls). One (`dialog` / `retransmission`) is produced by an LLM
   judge and is therefore approximate and not bit-reproducible.
 - **Where each number lives in the spreadsheets:**
@@ -305,7 +305,7 @@ coordinate rather than carry new task content. They are produced by an LLM judge
   new task data (asking for clarification, confirming/acknowledging receipt, coordinating
   turns). Pure retransmission requests are counted separately, not double-counted here.
 
-**The idea in depth.** Unlike the four metrics above, this is not a formula over the
+**The idea in depth.** Unlike the deterministic metrics above, this is not a formula over the
 characters — it is a _classification count_. For each round, an LLM judge reads every
 link message, decides which of the two buckets (if any) it falls into, and counts them. The
 hard part is that the agents' protocol evolves into terse, coded shorthand, so a message is
@@ -347,7 +347,7 @@ dialog. Treat dialog counts as a relative signal across runs rather than an exac
 
 ## How to read them together
 
-- The four deterministic metrics are reproducible and free to recompute; the dialog /
+- The deterministic metrics are reproducible and free to recompute; the dialog /
   retransmission counts come from an LLM and will vary slightly if re-judged.
 - `perplexity`, `english_ngram_surprisal`, `english_ngram_backoff_surprisal`,
   `message_entropy`, and `gzip_compression_ratio` all
