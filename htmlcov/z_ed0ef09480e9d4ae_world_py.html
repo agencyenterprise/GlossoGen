@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/glossogen/scenarios/veyru/world.py: 35%</title>
+    <title>Coverage for src/glossogen/scenarios/veyru/world.py: 36%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_dd2e7eb5.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>src<span class="sep">/</span>glossogen<span class="sep">/</span>scenarios<span class="sep">/</span>veyru<span class="sep">/</span>world.py</b>:
-            <span class="pc_cov">35%</span>
+            <span class="pc_cov">36%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -56,8 +56,8 @@
         </aside>
         <h2>
             <span class="text">188 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">78<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">110<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">80<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">108<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
             <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">1<span class="text"> partial</span></button>
         </h2>
@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_ed0ef09480e9d4ae_world_state_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-11 18:55 +0000
+            created at 2026-08-11 20:56 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -242,7 +242,7 @@
     <p class="run"><span class="n"><a id="t158" href="#t158">158</a></span><span class="t">    <span class="op">@</span><span class="nam">property</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t159" href="#t159">159</a></span><span class="t">    <span class="key">def</span> <span class="nam">is_postmortem_disabled</span><span class="op">(</span><span class="nam">self</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">bool</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t160" href="#t160">160</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Whether postmortem has been globally disabled (e.g. post-swap).&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t161" href="#t161">161</a></span><span class="t">        <span class="key">return</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_postmortem_globally_disabled</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t161" href="#t161">161</a></span><span class="t">        <span class="key">return</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_postmortem_globally_disabled</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t162" href="#t162">162</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t163" href="#t163">163</a></span><span class="t">    <span class="key">def</span> <span class="nam">enter_postmortem</span><span class="op">(</span><span class="nam">self</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t164" href="#t164">164</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Mark the start of a postmortem discussion phase.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
@@ -346,13 +346,13 @@
     <p class="pln"><span class="n"><a id="t262" href="#t262">262</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t263" href="#t263">263</a></span><span class="t">    <span class="key">def</span> <span class="nam">compute_outcome_if_needed</span><span class="op">(</span><span class="nam">self</span><span class="op">,</span> <span class="nam">round_number</span><span class="op">:</span> <span class="nam">int</span><span class="op">,</span> <span class="nam">team_id</span><span class="op">:</span> <span class="nam">TeamId</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">VeyruOutcome</span> <span class="op">|</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t264" href="#t264">264</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Build and store the outcome for the given team/round if not already done.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t265" href="#t265">265</a></span><span class="t">        <span class="key">return</span> <span class="nam">compute_outcome_if_needed</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t266" href="#t266">266</a></span><span class="t">            <span class="nam">teams</span><span class="op">=</span><span class="nam">self</span><span class="op">.</span><span class="nam">_teams</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t267" href="#t267">267</a></span><span class="t">            <span class="nam">veyru_cases</span><span class="op">=</span><span class="nam">self</span><span class="op">.</span><span class="nam">_veyru_cases</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t268" href="#t268">268</a></span><span class="t">            <span class="nam">round_number</span><span class="op">=</span><span class="nam">round_number</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t269" href="#t269">269</a></span><span class="t">            <span class="nam">team_id</span><span class="op">=</span><span class="nam">team_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t270" href="#t270">270</a></span><span class="t">            <span class="nam">case_overrides</span><span class="op">=</span><span class="nam">self</span><span class="op">.</span><span class="nam">_case_overrides</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t271" href="#t271">271</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t265" href="#t265">265</a></span><span class="t">        <span class="key">return</span> <span class="nam">compute_outcome_if_needed</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t266" href="#t266">266</a></span><span class="t">            <span class="nam">teams</span><span class="op">=</span><span class="nam">self</span><span class="op">.</span><span class="nam">_teams</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t267" href="#t267">267</a></span><span class="t">            <span class="nam">veyru_cases</span><span class="op">=</span><span class="nam">self</span><span class="op">.</span><span class="nam">_veyru_cases</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t268" href="#t268">268</a></span><span class="t">            <span class="nam">round_number</span><span class="op">=</span><span class="nam">round_number</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t269" href="#t269">269</a></span><span class="t">            <span class="nam">team_id</span><span class="op">=</span><span class="nam">team_id</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t270" href="#t270">270</a></span><span class="t">            <span class="nam">case_overrides</span><span class="op">=</span><span class="nam">self</span><span class="op">.</span><span class="nam">_case_overrides</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t271" href="#t271">271</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t272" href="#t272">272</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t273" href="#t273">273</a></span><span class="t">    <span class="key">def</span> <span class="nam">finalize_round_sync</span><span class="op">(</span><span class="nam">self</span><span class="op">,</span> <span class="nam">round_number</span><span class="op">:</span> <span class="nam">int</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t274" href="#t274">274</a></span><span class="t">        <span class="str">&quot;&quot;&quot;Compute previous round outcomes for all teams and reset per-round state.</span>&nbsp;</span><span class="r"></span></p>
@@ -545,7 +545,7 @@
             <a class="nav" href="z_ed0ef09480e9d4ae_world_state_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-11 18:55 +0000
+            created at 2026-08-11 20:56 +0000
         </p>
     </div>
 </footer>
