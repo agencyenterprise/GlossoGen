@@ -1,6 +1,6 @@
 # STUDY-007 — Repeated trust-game replication
 
-**Status:** planned
+**Status:** first pilot complete
 **Research program:** covenant-game
 
 ## Question
@@ -35,5 +35,19 @@ human replication.
 ## Experiments
 
 - [EXP-026 — Repeated trust-game human-parallel pilot](../experiments/EXP-026-repeated-trust-game-pilot/experiment.md)
-  will validate the repeated instrument and estimate fixed-seed model spread
-  before any fresh-seed replication claim.
+  found a repeated trust increase for the covenant bundle relative to the
+  no-commitment group, but no reciprocity variation. The preregistered joint
+  gate did not pass, so no unchanged fresh-seed replication is authorized.
+
+## Current synthesis
+
+The direct trust-game instrument is operational: all nine Sonnet trajectories
+completed, all covenant participants affirmed, and the 10% forfeiture was
+logged. Covenant trust was higher than the no-commitment group in all three
+fixed-seed replica positions (7.17 versus 6.00 sent from 10), but every trustee
+returned exactly 10 from 21 across all conditions. This supports neither a
+joint trust-and-reciprocity effect nor a direct behavioral replication claim.
+
+Any successor must preserve the human study's controlled 7→21 schedule while
+changing the repeated decision environment enough to test whether reciprocity
+can vary. It should be a new record, not an unchanged replication.

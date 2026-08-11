@@ -31,7 +31,7 @@ and its
 - [STUDY-006 — Human-parallel commitment](../studies/STUDY-006-human-parallel-commitment.md):
   EXP-025 complete; fixed action framing hit a joint-inspection floor.
 - [STUDY-007 — Repeated trust-game replication](../studies/STUDY-007-repeated-trust-game.md):
-  EXP-026 planned; direct three-arm trust/reciprocity comparison.
+  EXP-026 complete; trust moved under covenant, reciprocity was invariant.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -68,9 +68,9 @@ count that resolves it before launching.
 | [EXP-023](EXP-023-pledge-stake-factorial/experiment.md) | fifteen-round pledge × personal stake factorial | complete | personal stake repeated as an adverse effort/safety candidate; pledge and interaction did not repeat | $27.18 |
 | [EXP-024](EXP-024-baseline-variance/experiment.md) | run-to-run variance of the association baseline at a fixed seed | complete | supported: `s = 4.71` inspections from identical inputs; kill criterion fired, cost redesign not authorized | $21.26 |
 | [EXP-025](EXP-025-human-parallel-commitment-pilot/experiment.md) | human-parallel commitment instrument pilot | complete | not supported: primary joint-inspection outcome remained at its floor | $2.14 |
-| [EXP-026](EXP-026-repeated-trust-game-pilot/experiment.md) | repeated trust-game human-parallel pilot | planned | pending | — |
+| [EXP-026](EXP-026-repeated-trust-game-pilot/experiment.md) | repeated trust-game human-parallel pilot | complete | inconclusive: trust contrast met its threshold but reciprocity was invariant | $1.21 |
 
-Total API spend logged: **$418.16** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$419.37** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The

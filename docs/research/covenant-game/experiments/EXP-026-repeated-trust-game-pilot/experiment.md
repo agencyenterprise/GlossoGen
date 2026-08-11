@@ -1,7 +1,8 @@
 # EXP-026 — Repeated trust-game human-parallel pilot
 
-**Status:** planned
+**Status:** complete
 **Date opened:** 2026-08-11
+**Date closed:** 2026-08-11
 **Research program:** covenant-game
 **Study:** STUDY-007 — Repeated trust-game replication
 **Role:** pilot
@@ -25,7 +26,17 @@
     {"path": "docs/research/covenant-game/experiments/EXP-026-repeated-trust-game-pilot/configs/no-commitment-group.json", "launch_path": "docs/research/covenant-game/experiments/EXP-026-repeated-trust-game-pilot/configs/no-commitment-group.json", "sha256": "e83a2f1e68a0957a9e2d79736241c881b3a1a49bdfda04b1cbd8618854375bda"},
     {"path": "docs/research/covenant-game/experiments/EXP-026-repeated-trust-game-pilot/configs/covenant.json", "launch_path": "docs/research/covenant-game/experiments/EXP-026-repeated-trust-game-pilot/configs/covenant.json", "sha256": "a0a5d069bb1d6d2fcb2f94177a25533e6b83e4a7161650650f018a79553f36f9"}
   ],
-  "runs": []
+  "runs": [
+    {"role": "no_commitment_group_replicate_1", "included": true, "run_dir": "runs/repeated_trust_game/1786420190", "event_log_sha256": "c72412444ba67986325685c21f815d69a57c14f5e31ba9cf02fafad539b77a33", "resolved_config_sha256": "99eb354e8f0d2b4f2ae45188b4166e995d2ed1c2c041f8657fe89ee19509c927", "completed": true, "total_cost_usd": 0.1341722},
+    {"role": "covenant_replicate_1", "included": true, "run_dir": "runs/repeated_trust_game/1786420192", "event_log_sha256": "46f84ee1329bb939add25c4f395017b82500a2bd0ae1f6f3843aa2843d8c02f8", "resolved_config_sha256": "d99350eae0f449022bf5321dd6d9f806933f33f907d6e61732a899b6b51832cb", "completed": true, "total_cost_usd": 0.1575545},
+    {"role": "no_group_replicate_1", "included": true, "run_dir": "runs/repeated_trust_game/1786420194", "event_log_sha256": "0ca52b16d920b529e37a490319f4281279c6d9c79ac56826b9c5ba9a9e155231", "resolved_config_sha256": "9a6fec32cc73848fc49b40d889e48a1be677dca7ca931838ba1d272dde7aa508", "completed": true, "total_cost_usd": 0.1252895},
+    {"role": "no_commitment_group_replicate_2", "included": true, "run_dir": "runs/repeated_trust_game/1786420304", "event_log_sha256": "25cbf53c7248ef149c72f0b7afda36b037926000248e826477a119485a453341", "resolved_config_sha256": "99eb354e8f0d2b4f2ae45188b4166e995d2ed1c2c041f8657fe89ee19509c927", "completed": true, "total_cost_usd": 0.1218853},
+    {"role": "covenant_replicate_2", "included": true, "run_dir": "runs/repeated_trust_game/1786420305", "event_log_sha256": "16bb9c845a4e89e198dcaba4df9530aac75a4ec0f3a04e3e5b16ad4b0772bbc9", "resolved_config_sha256": "d99350eae0f449022bf5321dd6d9f806933f33f907d6e61732a899b6b51832cb", "completed": true, "total_cost_usd": 0.1535512},
+    {"role": "covenant_replicate_3", "included": true, "run_dir": "runs/repeated_trust_game/1786420306", "event_log_sha256": "d9696f9283513f6710495408a1001a64a7803dd9e2d4c2c0dc8b6d21f6c257e7", "resolved_config_sha256": "d99350eae0f449022bf5321dd6d9f806933f33f907d6e61732a899b6b51832cb", "completed": true, "total_cost_usd": 0.15199620000000003},
+    {"role": "no_group_replicate_2", "included": true, "run_dir": "runs/repeated_trust_game/1786420307", "event_log_sha256": "a2a27fc2262f443c05b30b52c598b0468b325362d7c0a2effa2b3395977c1559", "resolved_config_sha256": "9a6fec32cc73848fc49b40d889e48a1be677dca7ca931838ba1d272dde7aa508", "completed": true, "total_cost_usd": 0.1226068},
+    {"role": "no_commitment_group_replicate_3", "included": true, "run_dir": "runs/repeated_trust_game/1786420308", "event_log_sha256": "30660d0f2427fe754dc8779d051854dc6898b7478a93d5a193924fc8d8fcd938", "resolved_config_sha256": "99eb354e8f0d2b4f2ae45188b4166e995d2ed1c2c041f8657fe89ee19509c927", "completed": true, "total_cost_usd": 0.1232874},
+    {"role": "no_group_replicate_3", "included": true, "run_dir": "runs/repeated_trust_game/1786420309", "event_log_sha256": "079f0c93e947ee350b141c07537498a7876e11ebd56901ac164201502d2e8c76", "resolved_config_sha256": "9a6fec32cc73848fc49b40d889e48a1be677dca7ca931838ba1d272dde7aa508", "completed": true, "total_cost_usd": 0.1218965}
+  ]
 }
 -->
 
@@ -129,11 +140,34 @@ newcomers. It must not be used to make claims about them.
 
 ## Result
 
-Pending execution.
+All nine planned trajectories ended with an authoritative
+`simulation_ended` event after 16 completed rounds. Each run contained 16
+trustor and 16 trustee decisions across the alternating participants. The six
+covenant participants all affirmed the structured pledge, and the covenant
+arms recorded **66.4 units** of automatic forfeiture; no other arm recorded a
+pledge event or forfeiture.
+
+The covenant arm increased the trustor decision relative to the primary
+no-commitment-group comparator in all three replica positions: the condition
+means were **7.17/10** sent in covenant (sample SD 0.29) versus **6.00/10** in
+the no-commitment group (SD 0.00), a +1.17 difference. The no-group mean was
+5.50/10 (SD 0.50). However, the trustee outcome was invariant: every one of
+the 144 completed trustee decisions returned **10/21**. Covenant, group, and
+no-group therefore all had a mean reciprocity of 10.00/21.
+
+The planned batch cost **$1.2122**. Every result above is derived from the nine
+event logs by [`analysis/summarize_runs.py`](analysis/summarize_runs.py), whose
+checked output is [`analysis/results.json`](analysis/results.json).
 
 ## Outcome
 
-Pending preregistered decision gate.
+**Inconclusive.** The trust component met its directional threshold: covenant
+exceeded the no-commitment group by at least one unit in each replica position.
+But the preregistered decision required both a trust and a 2-unit reciprocity
+contrast. Reciprocity showed no condition variation, so the gate did not pass
+and a fresh-seed replication is not authorized. This is not a practical floor
+or ceiling under the stated rule, but it is a fixed-response limitation for
+the reciprocity outcome.
 
 ## Validity limitations
 
@@ -150,10 +184,22 @@ Pending preregistered decision gate.
 - The scenario captures commitment framing and cost, not the full institutional
   covenant mechanism of durable membership, boundary enforcement, or shared
   governance.
+- All trustee decisions returned 10/21. This prevents the current instrument
+  from resolving a treatment effect on reciprocity, even though its numerical
+  scale is neither at the preregistered floor nor ceiling.
+- The three same-seed trajectories measure only conditional LLM sampling
+  variation. They do not establish a between-seed effect or generalize to
+  another model.
 
 ## What it changed
 
-Pending execution.
+The scenario successfully implemented the three human-study conditions as
+distinct, event-verifiable treatments and produced an interpretable trust
+contrast under repeated interaction. It also showed that the unchanged
+trustee framing elicits a rigid 10/21 policy from Sonnet. The next step is a
+small, separately preregistered instrument revision that preserves the fixed
+7→21 input while creating a genuine reason for trustees to vary their return;
+it should not be another unchanged seed batch.
 
 ## Traps found
 
@@ -161,3 +207,5 @@ Pending execution.
 - Do not treat sixteen rounds in one trajectory as sixteen independent samples.
 - Do not interpret the forfeiture as a violation penalty or as a mechanism that
   makes trusting individually profitable.
+- A non-floor, non-ceiling numerical average can still be uninformative when
+  every model decision repeats the same value.
