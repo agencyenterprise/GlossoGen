@@ -91,8 +91,8 @@ bundling them into this first human-parallel test.
    shared read-only registry; make the costly pledge an irreversible one-time
    2.1-unit entry cost, with no audit or action-contingent punishment.
 4. [EXP-030](../experiments/EXP-030-public-registry-same-seed-replication/experiment.md)
-   runs three fixed-config same-seed trajectories per arm before interpreting
-   any observed pattern as behavioral repeatability. If the first three
-   trajectories per arm still leave the primary outcomes saturated, record a
-   repeatable ceiling; otherwise use the run-level variation to preregister a
-   fresh-seed comparison.
+   completed three fixed-config same-seed trajectories per arm. All 384
+   provider decisions remitted, so it closed as a repeatable practical ceiling
+   rather than an arm comparison. A subsequent study must introduce and
+   preregister a behaviorally meaningful decision before testing this ladder
+   again; more unchanged replicas would not resolve the causal question.

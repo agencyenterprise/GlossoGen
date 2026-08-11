@@ -35,8 +35,9 @@ and its
 - [STUDY-008 — Joint commitment alignment](../studies/STUDY-008-joint-commitment-alignment.md):
   design complete; EXP-027 found a communication leak, EXP-028 found unequal
   action opportunities; EXP-029 restored parity but hit a universal remittance
-  ceiling; EXP-030 will test whether that ceiling repeats under a peer-visible
-  group, pledge, and costly-pledge ladder with directly observed remittance.
+  ceiling; EXP-030 repeated that ceiling in all twelve trajectories under a
+  peer-visible group, pledge, and costly-pledge ladder with directly observed
+  remittance.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -77,7 +78,7 @@ count that resolves it before launching.
 | [EXP-027](EXP-027-joint-commitment-calibration/experiment.md) | joint commitment instrument calibration | complete | invalid: ledger allowed informal coordination | $0.20 |
 | [EXP-028](EXP-028-joint-commitment-readonly-calibration/experiment.md) | read-only joint commitment instrument calibration | complete | invalid: pledge setup consumed a decision round | $0.56 |
 | [EXP-029](EXP-029-joint-commitment-common-setup-calibration/experiment.md) | common-setup joint commitment instrument calibration | complete | not supported: universal remittance ceiling | $0.73 |
-| [EXP-030](EXP-030-public-registry-same-seed-replication/experiment.md) | costly-pledge same-seed replication | planned | pending: no-audit costly-pledge baseline | — |
+| [EXP-030](EXP-030-public-registry-same-seed-replication/experiment.md) | costly-pledge same-seed replication | complete | not supported: repeatable practical remittance ceiling in all 12 runs | $2.20 |
 
 Total API spend logged: **$420.86** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
