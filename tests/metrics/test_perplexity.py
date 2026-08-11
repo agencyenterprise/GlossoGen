@@ -173,7 +173,7 @@ async def test_a_message_the_scorer_cannot_score_is_dropped_not_propagated(
     )
 
     measurement = scored.measurement(metric_name=METRIC)
-    assert measurement.score == measurement.score, "a NaN reached the run mean"
+    assert not math.isnan(measurement.score), "a NaN reached the run mean"
     assert measurement.score == pytest.approx(4.0)
 
 
@@ -198,6 +198,6 @@ async def test_it_scores_real_text_under_gpt2(
     )
 
     measurement = scored.measurement(metric_name=METRIC)
-    assert measurement.score == measurement.score, "gpt2 produced a NaN run mean"
+    assert not math.isnan(measurement.score), "gpt2 produced a NaN run mean"
     assert 0.0 < measurement.score < 50.0, "mean per-token surprisal in nats"
     assert measurement.per_round

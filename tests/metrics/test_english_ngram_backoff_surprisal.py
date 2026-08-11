@@ -11,6 +11,7 @@ model. A cached model loads from JSON with no ML dependency, which is what lets
 the scoring be tested here.
 """
 
+import math
 from pathlib import Path
 
 import pytest
@@ -171,9 +172,9 @@ async def test_it_reports_a_surprisal_per_round(
 
     measurement = scored.measurement(metric_name=METRIC)
     assert measurement.per_round
-    assert measurement.score == measurement.score, "run mean is nan"
+    assert not math.isnan(measurement.score), "run mean is nan"
     for observation in measurement.per_round:
-        assert observation.value == observation.value, f"round {observation.round_number} is nan"
+        assert not math.isnan(observation.value), f"round {observation.round_number} is nan"
 
 
 async def test_it_raises_rather_than_skipping_when_the_model_cannot_be_built(
