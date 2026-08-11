@@ -75,9 +75,9 @@ async def test_event_offsets_do_not_move_when_more_events_arrive(
 ) -> None:
     """An event's byte offset is stable for the life of the run.
 
-    This is what makes ``copy_run_at_event`` safe: it truncates a copy at an
-    offset found earlier. If appending rewrote or reflowed earlier lines, every
-    fork would silently cut in the wrong place.
+    ``copy_run_at_event`` truncates a copy at an offset found earlier. If
+    appending rewrote or reflowed earlier lines, every fork would silently cut
+    in the wrong place.
     """
     path = tmp_path / "run.jsonl"
     logger = EventLogger(log_path=path, event_bus=event_bus)
@@ -142,10 +142,10 @@ async def test_logging_before_open_fails_loudly(tmp_path: Path, event_bus: Event
 async def test_concurrent_writes_never_interleave(tmp_path: Path, event_bus: EventBus) -> None:
     """Agents log concurrently; no line may be spliced into another.
 
-    Every agent runner writes to one logger from its own task. Without the
-    write lock a large payload can be split across an await, producing a line
-    that no longer parses — and a corrupt ledger is unrecoverable, because the
-    offsets every fork depends on are computed from it.
+    Every agent runner writes to one logger from its own task. Without the write
+    lock a large payload can split across an await and produce a line that no
+    longer parses. A corrupt ledger is unrecoverable: the offsets every fork
+    depends on are computed from it.
     """
     path = tmp_path / "run.jsonl"
     logger = EventLogger(log_path=path, event_bus=event_bus)
