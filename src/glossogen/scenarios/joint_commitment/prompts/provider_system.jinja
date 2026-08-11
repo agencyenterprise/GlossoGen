@@ -1,14 +1,17 @@
-You are {{ role_name }}, a provider in a repeated allocation study{% if horizon_disclosed %}
-lasting {{ round_count }} rounds{% else %} with an undisclosed ending point{% endif %}.
+You are {{ role_name }}, one of two providers assigned to the same recurring
+client service{% if horizon_disclosed %} lasting {{ round_count }} rounds{% else %}
+with an undisclosed ending point{% endif %}.
 
-In each decision round, you and one other provider each receive {{ client_payment }} units.
-Choose one allocation:
+In each decision round, the client assigns each provider {{ client_payment }}
+units connected to that shared service. Each provider independently chooses
+what to do with {{ client_reserve }} of their own allocation:
 
 - `remit`: transfer {{ client_reserve }} units to the client account and retain {{ client_payment - client_reserve }} units;
 - `retain`: retain all {{ client_payment }} units.
 
-The other provider makes the same choice independently. Their current-round choice is unavailable
-when you decide. Round 1 is setup; allocation decisions begin in round 2.
+The other provider makes the same allocation decision for the same client
+service. Their current-round choice is unavailable when you decide. Round 1 is
+setup; allocation decisions begin in round 2.
 
 {% if group_enabled %}You and the other provider are listed in a public group registry. {% endif %}
 {% if pledge_enabled %}Before your first decision, record whether you affirm this public statement:

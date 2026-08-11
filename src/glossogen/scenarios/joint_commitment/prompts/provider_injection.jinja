@@ -13,6 +13,9 @@ Use `submit_client_reserve_decision` once:
 - `actual_action`: `remit` transfers {{ client_reserve }} units and retains {{ client_payment - client_reserve }}; `retain` retains {{ client_payment }} units;
 - `public_attestation`: use `remitted` with `remit`, or `retained` with `retain`.
 
+The other provider makes a separate allocation decision for this same client
+service in the current round.
+
 {% if audit_enabled %}An audit may be resolved after a delay.
 {% endif %}
 {% if group_enabled %}Public group registry:

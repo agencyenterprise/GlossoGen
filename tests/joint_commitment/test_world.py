@@ -76,6 +76,7 @@ def test_baseline_prompt_contains_only_operational_allocation_rules() -> None:
     assert "enforcement" not in no_group_prompt
     assert "communicate" not in no_group_prompt
     assert "pledge" not in no_group_prompt
+    assert "recurring\nclient service" in no_group_prompt
     assert "i publicly commit to transfer 7 units" in pledge_agent.system_prompt.lower()
 
 
