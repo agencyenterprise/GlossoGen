@@ -15,7 +15,7 @@ pair AND the communication budget is not exhausted.
 
 import logging
 from pathlib import Path
-from typing import Any, NamedTuple, Self
+from typing import Any, NamedTuple
 
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
@@ -159,12 +159,6 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
         """Return this scenario's validated knobs instance."""
         return self._knobs
 
-    @classmethod
-    def create_from_config(cls, config: dict[str, Any]) -> Self:
-        """Reconstruct the scenario from a serialized config dict."""
-        knobs = HospitalBedAssignmentPrivacyKnobs.model_validate(config)
-        return cls(knobs=knobs)
-
     def __init__(self, knobs: HospitalBedAssignmentPrivacyKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
@@ -194,10 +188,6 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
             PUBLIC_OPS_CHANNEL_ID: "public ops",
             POSTMORTEM_CHANNEL_ID: "team discussion",
         }
-
-    def name(self) -> str:
-        """Return the scenario identifier."""
-        return "hospital_bed_assignment_privacy"
 
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""
@@ -319,15 +309,6 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
                 )
             )
         return channels
-
-    def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
-        """Return the channel display name as seen by a given agent."""
-        _ = agent_id
-        return self._channel_display_names.get(channel_id, channel_id)
-
-    def get_agent_display_name(self, agent_id: str) -> str:
-        """Return the human-readable display name for an agent."""
-        return self._agent_display_names.get(agent_id, agent_id)
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
         """The public ops channel is the primary channel for all metrics."""
