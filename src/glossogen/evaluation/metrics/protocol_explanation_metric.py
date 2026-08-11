@@ -147,6 +147,7 @@ class ProtocolExplanationMetric(Metric):
                 base_prompt=agent.system_prompt,
                 role_name=agent.role_name,
                 communication_enabled=agent.communication_enabled,
+                communication_required=agent.communication_required,
             )
             history = build_message_history(
                 events=events,
@@ -159,6 +160,7 @@ class ProtocolExplanationMetric(Metric):
                 split_parallel_tool_calls=agent.provider == SELF_HOSTED_PROVIDER,
                 continue_prompt=continue_prompt_for(
                     communication_enabled=agent.communication_enabled,
+                    communication_required=agent.communication_required,
                 ),
             )
             if not history:

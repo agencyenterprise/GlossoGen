@@ -80,8 +80,8 @@ def test_baseline_prompt_contains_only_operational_allocation_rules() -> None:
     assert "i publicly commit to transfer 7 units" in pledge_agent.system_prompt.lower()
 
 
-def test_allocation_study_has_no_free_text_communication_affordance() -> None:
-    """Keep the allocation decision environment free of message channels and prompts."""
+def test_allocation_study_has_an_optional_common_communication_affordance() -> None:
+    """Keep the shared channel available without requiring messages."""
     scenario = JointCommitmentScenario(
         knobs=build_knobs(
             condition=JointCommitmentCondition.NO_GROUP,
@@ -94,14 +94,16 @@ def test_allocation_study_has_no_free_text_communication_affordance() -> None:
         base_prompt=agent.system_prompt,
         role_name=agent.role_name,
         communication_enabled=agent.communication_enabled,
+        communication_required=agent.communication_required,
     ).lower()
 
-    assert agent.channel_ids == []
-    assert agent.communication_enabled is False
-    assert scenario.get_channels() == []
-    assert scenario.get_primary_channels() == []
-    assert "send_message" not in full_prompt
-    assert "read_channel" not in full_prompt
+    assert agent.channel_ids == ["client_commitment_ledger"]
+    assert agent.communication_enabled is True
+    assert agent.communication_required is False
+    assert len(scenario.get_channels()) == 1
+    assert len(scenario.get_primary_channels()) == 1
+    assert "send_message" in full_prompt
+    assert "sending a message is optional" in full_prompt
 
 
 def test_later_allocation_prompts_omit_previous_provider_actions() -> None:
@@ -345,8 +347,8 @@ def test_audit_selection_excludes_rounds_that_cannot_resolve() -> None:
     assert world.audit_selected_for_round(round_number=4) is False
 
 
-def test_client_ledger_rejects_free_text_coordination() -> None:
-    """The shared attestation record cannot become an informal pledge channel."""
+def test_shared_service_channel_allows_free_text_coordination() -> None:
+    """Providers may use the common channel in every experimental arm."""
     scenario = JointCommitmentScenario(
         knobs=build_knobs(
             condition=JointCommitmentCondition.NO_GROUP,
@@ -359,8 +361,7 @@ def test_client_ledger_rejects_free_text_coordination() -> None:
         channel_id="client_commitment_ledger",
     )
 
-    assert rejection is not None
-    assert "read-only" in rejection
+    assert rejection is None
 
 
 def test_costly_pledge_deducts_entry_cost_without_a_later_punishment() -> None:

@@ -18,6 +18,11 @@ CONTINUE_PROMPT = _renderer.render(
     template_variables={},
 )
 
+OPTIONAL_CONTINUE_PROMPT = _renderer.render(
+    template_name="continue_prompt_optional.jinja",
+    template_variables={},
+)
+
 SILENT_CONTINUE_PROMPT = _renderer.render(
     template_name="continue_prompt_silent.jinja",
     template_variables={},
@@ -33,11 +38,14 @@ def build_full_system_prompt(
     base_prompt: str,
     role_name: str,
     communication_enabled: bool,
+    communication_required: bool,
 ) -> str:
     """Combine an agent prompt with its enabled runtime interaction protocol."""
     template_name = "system_suffix_silent.jinja"
-    if communication_enabled:
+    if communication_enabled and communication_required:
         template_name = "system_suffix.jinja"
+    elif communication_enabled:
+        template_name = "system_suffix_optional.jinja"
     suffix = _renderer.render(
         template_name=template_name,
         template_variables={"role_name": role_name},
@@ -45,8 +53,10 @@ def build_full_system_prompt(
     return base_prompt + "\n\n" + suffix
 
 
-def continue_prompt_for(communication_enabled: bool) -> str:
+def continue_prompt_for(communication_enabled: bool, communication_required: bool) -> str:
     """Return the continuation prompt matching an agent's tool affordances."""
-    if communication_enabled:
+    if communication_enabled and communication_required:
         return CONTINUE_PROMPT
+    if communication_enabled:
+        return OPTIONAL_CONTINUE_PROMPT
     return SILENT_CONTINUE_PROMPT

@@ -113,6 +113,8 @@ async def execute_agent_swap(
         role_name=old_config.role_name,
         system_prompt=seed_history_config.system_prompt,
         channel_ids=old_config.channel_ids,
+        communication_enabled=old_config.communication_enabled,
+        communication_required=old_config.communication_required,
         tool_names=old_config.tool_names,
         model=spec.model,
         provider=spec.provider,
@@ -246,6 +248,7 @@ async def _build_seed_history(
         base_prompt=base_prompt,
         role_name=last_registration.role_name,
         communication_enabled=last_registration.communication_enabled,
+        communication_required=last_registration.communication_required,
     )
     history = build_message_history(
         events=events,
@@ -258,6 +261,7 @@ async def _build_seed_history(
         split_parallel_tool_calls=spec.provider == SELF_HOSTED_PROVIDER,
         continue_prompt=continue_prompt_for(
             communication_enabled=last_registration.communication_enabled,
+            communication_required=last_registration.communication_required,
         ),
     )
     return _SeedHistory(history=history, system_prompt=system_prompt)

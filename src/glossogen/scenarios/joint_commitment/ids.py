@@ -5,7 +5,7 @@ PROVIDER_B_ID = "provider_b"
 PROVIDER_IDS = (PROVIDER_A_ID, PROVIDER_B_ID)
 
 LEDGER_CHANNEL_ID = "client_commitment_ledger"
-LEDGER_CHANNEL_NAME = "allocation record"
+LEDGER_CHANNEL_NAME = "shared client service"
 
 SUBMIT_PLEDGE_TOOL = "submit_group_pledge"
 POST_BOND_TOOL = "post_covenant_bond"

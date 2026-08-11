@@ -78,6 +78,8 @@ def extract_agent_configs(events: list[SimulationEvent]) -> list[AgentConfig]:
                     role_name=event.role_name,
                     system_prompt=event.system_prompt,
                     channel_ids=event.channel_ids,
+                    communication_enabled=event.communication_enabled,
+                    communication_required=event.communication_required,
                     tool_names=event.tool_names,
                     model=event.model,
                     provider=event.provider,

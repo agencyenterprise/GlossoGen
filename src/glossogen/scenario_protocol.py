@@ -85,6 +85,8 @@ class ScenarioRuntimeHandle(Protocol):
         reason: str,
     ) -> None: ...
 
+    async def post_system_message(self, channel_id: str, text: str) -> Any: ...
+
 
 class SimulationScenario(ABC):
     """Contract that a scenario plug-in must fulfil to run in autonomous mode.

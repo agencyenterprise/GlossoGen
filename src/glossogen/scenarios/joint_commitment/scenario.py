@@ -115,8 +115,9 @@ class JointCommitmentScenario(SimulationScenario):
                         "pledge_entry_cost": self._knobs.pledge_entry_cost,
                     },
                 ),
-                channel_ids=[],
-                communication_enabled=False,
+                channel_ids=[LEDGER_CHANNEL_ID],
+                communication_enabled=True,
+                communication_required=False,
                 tool_names=tools,
                 model=default_model,
                 provider=default_provider,
@@ -127,11 +128,17 @@ class JointCommitmentScenario(SimulationScenario):
         ]
 
     def get_channels(self) -> list[Channel]:
-        """Return no free-text channels for the structured allocation study."""
-        return []
+        """Return the common optional channel for the recurring client service."""
+        return [
+            Channel(
+                channel_id=LEDGER_CHANNEL_ID,
+                name=LEDGER_CHANNEL_NAME,
+                member_agent_ids=list(PROVIDER_IDS),
+            )
+        ]
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
-        """Return the public ledger name for known providers."""
+        """Return the shared service-channel name for known providers."""
         _ = agent_id
         if channel_id != LEDGER_CHANNEL_ID:
             raise ValueError(f"unknown joint-commitment channel: {channel_id}")
@@ -142,19 +149,16 @@ class JointCommitmentScenario(SimulationScenario):
         return provider_role_name(agent_id=agent_id)
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
-        """Return no message channel because the study uses structured actions."""
-        return []
+        """Return the shared service channel for communication metrics."""
+        return [PrimaryChannel(channel_id=LEDGER_CHANNEL_ID, team_id=None)]
 
     def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
-        """Reject free-text coordination on the allocation record."""
+        """Allow provider messages on the shared service channel."""
         if agent_id not in PROVIDER_IDS:
-            return "only registered providers may access the allocation record"
+            return "only registered providers may access the shared service channel"
         if channel_id != LEDGER_CHANNEL_ID:
-            return "this scenario has no writable communication channels"
-        return (
-            "The allocation record is read-only. Record your public attestation only through "
-            "submit_client_reserve_decision."
-        )
+            return "this scenario has no writable communication channel with that ID"
+        return None
 
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:
         """Return the current condition's structured actions."""

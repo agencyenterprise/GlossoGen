@@ -11,9 +11,11 @@ from glossogen.scenarios.joint_commitment.events import (
     JointCommitmentPledgeSubmitted,
 )
 from glossogen.scenarios.joint_commitment.ids import (
+    LEDGER_CHANNEL_ID,
     PLEDGE_TEXT,
     SUBMIT_DECISION_TOOL,
     SUBMIT_PLEDGE_TOOL,
+    provider_role_name,
 )
 from glossogen.scenarios.joint_commitment.knobs import JointCommitmentKnobs
 from glossogen.scenarios.joint_commitment.world import JointCommitmentWorld
@@ -45,6 +47,18 @@ def build_mcp_tools(
                     decision=recorded,
                     pledge_text=PLEDGE_TEXT,
                 )
+            )
+            if recorded == "affirm":
+                pledge_notice = (
+                    f"{provider_role_name(agent_id=agent_id)} publicly affirmed: “{PLEDGE_TEXT}”"
+                )
+            else:
+                pledge_notice = (
+                    f"{provider_role_name(agent_id=agent_id)} declined the public pledge."
+                )
+            await runtime.post_system_message(
+                channel_id=LEDGER_CHANNEL_ID,
+                text=pledge_notice,
             )
         if knobs.bond_enabled and recorded == "affirm":
             try:

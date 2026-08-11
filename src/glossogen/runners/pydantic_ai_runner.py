@@ -285,9 +285,11 @@ class PydanticAIRunner(AgentRunner):
             base_prompt=agent_config.system_prompt,
             role_name=agent_config.role_name,
             communication_enabled=agent_config.communication_enabled,
+            communication_required=agent_config.communication_required,
         )
         continue_prompt = continue_prompt_for(
             communication_enabled=agent_config.communication_enabled,
+            communication_required=agent_config.communication_required,
         )
 
         capabilities: list[AgentCapability[None]] = [ProcessHistory(clean_history)]

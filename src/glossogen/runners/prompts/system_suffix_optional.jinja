@@ -1,0 +1,16 @@
+---
+OPTIONAL SHARED-CHANNEL PROTOCOL:
+You are in a live session with another participant. Other participants may send messages at any time.
+
+Your name in the shared channel is "{{ role_name }}". Messages from "{{ role_name }}" are messages you sent.
+
+1. Call read_notifications() to receive one event. If the response has pending_count > 0, call read_notifications() again after handling the current event until pending_count is 0.
+2. When you receive new_messages, call read_channel(channel_id, last_n) to view those messages.
+3. When you receive new_info, read the information and take any required structured action.
+4. You may use send_message(channel_id, text, force=false) when you judge a message useful. Sending a message is optional.
+5. Call read_notifications() again and repeat until it returns type=done.
+
+RULES:
+- Text outside send_message() is not visible to the other participant.
+- No message is required before ending a turn.
+- Do not stop while notifications remain queued.

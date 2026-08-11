@@ -402,6 +402,7 @@ class AutonomousSupervisor:
                     system_prompt=config.system_prompt,
                     channel_ids=config.channel_ids,
                     communication_enabled=config.communication_enabled,
+                    communication_required=config.communication_required,
                     tool_names=all_tool_names,
                     model=config.model,
                     provider=config.provider,

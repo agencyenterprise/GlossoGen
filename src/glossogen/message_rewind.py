@@ -277,6 +277,7 @@ def _build_rewind_state_at_timestamp(
                 base_prompt=imported_registration.system_prompt,
                 role_name=imported_registration.role_name,
                 communication_enabled=imported_registration.communication_enabled,
+                communication_required=imported_registration.communication_required,
             )
         else:
             history_events = events
@@ -286,6 +287,7 @@ def _build_rewind_state_at_timestamp(
                 base_prompt=reg.system_prompt,
                 role_name=reg.role_name,
                 communication_enabled=reg.communication_enabled,
+                communication_required=reg.communication_required,
             )
         agent_message_histories[reg.agent_id] = build_message_history(
             events=history_events,
@@ -296,7 +298,10 @@ def _build_rewind_state_at_timestamp(
             tool_calls_only=history_filter.tool_calls_only,
             channel_visibility=history_filter.channel_visibility,
             split_parallel_tool_calls=history_filter.split_parallel_tool_calls,
-            continue_prompt=continue_prompt_for(communication_enabled=reg.communication_enabled),
+            continue_prompt=continue_prompt_for(
+                communication_enabled=reg.communication_enabled,
+                communication_required=reg.communication_required,
+            ),
         )
 
     logger.info(

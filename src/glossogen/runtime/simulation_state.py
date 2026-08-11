@@ -8,15 +8,21 @@ Does not define MCP tools — those live in ``mcp_tools``.
 import asyncio
 import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
+from uuid import uuid4
 
 from glossogen.channel_router import ChannelRouter
 from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter, create_token_counter
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.channel import Channel
-from glossogen.models.event import InjectionDelivered, PostmortemStarted
-from glossogen.runtime.activity_notification import DoneNotification, NewInfoNotification
+from glossogen.models.event import InjectionDelivered, MessageSent, PostmortemStarted
+from glossogen.models.message import SimulationMessage
+from glossogen.runtime.activity_notification import (
+    DoneNotification,
+    NewInfoNotification,
+    NewMessagesNotification,
+)
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.scenario_protocol import SimulationScenario
@@ -104,6 +110,38 @@ class SimulationRuntime:
     def get_channel_lock(self, channel_id: str) -> asyncio.Lock:
         """Return the write lock for a channel."""
         return self._channel_locks[channel_id]
+
+    async def post_system_message(self, channel_id: str, text: str) -> SimulationMessage:
+        """Append an experiment-authored public record to a shared channel."""
+        if channel_id not in self._channel_locks:
+            raise ValueError(f"Unknown channel: {channel_id}")
+        async with self.get_channel_lock(channel_id=channel_id):
+            message = SimulationMessage(
+                message_id=str(uuid4()),
+                channel_id=channel_id,
+                sender_agent_id="study_record",
+                sender_display_name="Study record",
+                text=text,
+                timestamp=datetime.now(tz=UTC),
+                round_number=self._current_round,
+            )
+            self._channel_router.append_message(message=message)
+            await self._event_logger.log(
+                event=MessageSent(
+                    message=message,
+                    round_number=self._current_round,
+                    token_count=0,
+                )
+            )
+            member_ids = self._channel_router.get_channel_member_ids(channel_id=channel_id)
+            for member_id in member_ids:
+                session = self._agent_sessions.get(member_id)
+                if session is not None:
+                    session.push_notification(
+                        notification=NewMessagesNotification(channels=[channel_id]),
+                    )
+            self.fire_on_message_callbacks()
+            return message
 
     async def update_channel_members(
         self,
