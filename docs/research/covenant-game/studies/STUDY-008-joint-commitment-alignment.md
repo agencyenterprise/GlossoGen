@@ -40,7 +40,7 @@ monitoring.
 | Costly pledge | public registry | public, mutually visible pledge | voluntary affirmation deducts 2.1 units (10% of 21) once at setup; it is not contingent on later remittance |
 
 All arms receive the same clients, fixed 21/7 allocation, participants, hidden
-horizon, and no writable communication channel. There are no audits, fines,
+horizon, and optional shared service channel. There are no audits, fines,
 forfeitures, or action-contingent penalties. Only group identity, public
 commitment, and the one-time cost of affirmation vary. Where group identity or
 pledge is a treatment, the corresponding registry is visible to both providers.
@@ -113,6 +113,12 @@ bundling them into this first human-parallel test.
    a gate for a later group/pledge comparison, not a test of covenant
    mechanisms itself.
 7. [EXP-033](../experiments/EXP-033-communication-free-baseline-calibration/experiment.md)
-   validated that repair, but all 96 provider decisions remitted. The four-arm
-   ladder remains unauthorized: its next instrument must change the decision
-   itself rather than adding institutional conditions to a ceiling task.
+   validated the no-channel repair, but all 96 provider decisions remitted. It
+   does not test the relationship between two providers serving the same client.
+8. [EXP-034](../experiments/EXP-034-shared-service-communication-baseline/experiment.md)
+   restores a shared, optional service channel in every arm without requiring
+   communication. All 96 observed decisions remitted, while agents used that
+   channel to construct client-trust and relationship explanations that the
+   world did not implement. The successor will diagnose this professional
+   framing package against a neutral allocation framing before the
+   group/pledge/costly-pledge ladder is launched.

@@ -6,6 +6,7 @@ from typing import cast
 from glossogen.scenarios.joint_commitment.events import JointCommitmentAuditResolved
 from glossogen.scenarios.joint_commitment.knobs import (
     JointCommitmentCondition,
+    JointCommitmentFraming,
     JointCommitmentKnobs,
 )
 from glossogen.scenarios.joint_commitment.scenario import JointCommitmentScenario
@@ -76,8 +77,37 @@ def test_baseline_prompt_contains_only_operational_allocation_rules() -> None:
     assert "enforcement" not in no_group_prompt
     assert "communicate" not in no_group_prompt
     assert "pledge" not in no_group_prompt
-    assert "recurring\nclient service" in no_group_prompt
+    assert "recurring client" in no_group_prompt
     assert "i publicly commit to transfer 7 units" in pledge_agent.system_prompt.lower()
+
+
+def test_neutral_framing_removes_professional_and_attestation_language() -> None:
+    """Keep professional service cues out of the neutral framing diagnostic."""
+    neutral_knobs = build_knobs(
+        condition=JointCommitmentCondition.NO_GROUP,
+        audit_probability=0.0,
+    ).model_copy(update={"framing": JointCommitmentFraming.NEUTRAL_ALLOCATION})
+    neutral = JointCommitmentScenario(knobs=neutral_knobs)
+    neutral_agents = neutral.get_agents(
+        default_model="test-model",
+        default_provider="test-provider",
+    )
+    neutral_agent = neutral_agents[0]
+    neutral_prompt = "\n".join(
+        [
+            neutral_agent.system_prompt,
+            neutral.get_injection(round_number=2, agent_id="provider_a") or "",
+        ]
+    ).lower()
+
+    assert neutral_agent.role_name == "Participant A"
+    assert "client" not in neutral_prompt
+    assert "provider" not in neutral_prompt
+    assert "remit" not in neutral_prompt
+    assert "`retain`" not in neutral_prompt
+    assert "attestation" not in neutral_prompt
+    assert "allocation_a" in neutral_prompt
+    assert "account c" in neutral_prompt
 
 
 def test_allocation_study_has_an_optional_common_communication_affordance() -> None:
@@ -97,7 +127,7 @@ def test_allocation_study_has_an_optional_common_communication_affordance() -> N
         communication_required=agent.communication_required,
     ).lower()
 
-    assert agent.channel_ids == ["client_commitment_ledger"]
+    assert agent.channel_ids == ["joint_allocation_channel"]
     assert agent.communication_enabled is True
     assert agent.communication_required is False
     assert len(scenario.get_channels()) == 1
@@ -358,7 +388,7 @@ def test_shared_service_channel_allows_free_text_coordination() -> None:
 
     rejection = scenario.validate_outgoing_message(
         agent_id="provider_a",
-        channel_id="client_commitment_ledger",
+        channel_id="joint_allocation_channel",
     )
 
     assert rejection is None

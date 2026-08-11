@@ -1,6 +1,5 @@
-Two providers repeatedly receive {{ client_payment }} units and each choose
-between transferring {{ client_reserve }} units to a client account while
-retaining {{ client_payment - client_reserve }}, or retaining all {{ client_payment }} units.
+Two agents repeatedly receive {{ client_payment }} units and each choose one of two
+fixed allocations. Framing: {{ framing }}.
 
 Condition: {{ condition }}. {% if group_enabled %}The two providers have a
 public group registry.{% endif %}

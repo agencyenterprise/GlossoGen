@@ -21,7 +21,10 @@ from glossogen.scenarios.joint_commitment.ids import (
     SUBMIT_PLEDGE_TOOL,
     provider_role_name,
 )
-from glossogen.scenarios.joint_commitment.knobs import JointCommitmentKnobs
+from glossogen.scenarios.joint_commitment.knobs import (
+    JointCommitmentFraming,
+    JointCommitmentKnobs,
+)
 from glossogen.scenarios.joint_commitment.mcp_tools import build_mcp_tools
 from glossogen.scenarios.joint_commitment.world import JointCommitmentWorld
 from glossogen.template_renderer import TemplateRenderer
@@ -74,6 +77,7 @@ class JointCommitmentScenario(SimulationScenario):
             template_name="description.jinja",
             template_variables={
                 "condition": self._knobs.condition.value,
+                "framing": self._knobs.framing.value,
                 "group_enabled": self._knobs.group_enabled,
                 "pledge_enabled": self._knobs.pledge_enabled,
                 "entry_cost_enabled": self._knobs.entry_cost_enabled,
@@ -96,11 +100,12 @@ class JointCommitmentScenario(SimulationScenario):
         return [
             AgentConfig(
                 agent_id=agent_id,
-                role_name=provider_role_name(agent_id=agent_id),
+                role_name=self._agent_role_name(agent_id=agent_id),
                 system_prompt=self._renderer.render(
                     template_name="provider_system.jinja",
                     template_variables={
-                        "role_name": provider_role_name(agent_id=agent_id),
+                        "role_name": self._agent_role_name(agent_id=agent_id),
+                        "framing": self._knobs.framing.value,
                         "round_count": self._knobs.round_count,
                         "horizon_disclosed": self._knobs.horizon_disclosed,
                         "group_enabled": self._knobs.group_enabled,
@@ -128,7 +133,7 @@ class JointCommitmentScenario(SimulationScenario):
         ]
 
     def get_channels(self) -> list[Channel]:
-        """Return the common optional channel for the recurring client service."""
+        """Return the common optional channel for joint allocation decisions."""
         return [
             Channel(
                 channel_id=LEDGER_CHANNEL_ID,
@@ -138,24 +143,24 @@ class JointCommitmentScenario(SimulationScenario):
         ]
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
-        """Return the shared service-channel name for known providers."""
+        """Return the common study-channel name for known providers."""
         _ = agent_id
         if channel_id != LEDGER_CHANNEL_ID:
             raise ValueError(f"unknown joint-commitment channel: {channel_id}")
         return LEDGER_CHANNEL_NAME
 
     def get_agent_display_name(self, agent_id: str) -> str:
-        """Return one stable provider display name."""
-        return provider_role_name(agent_id=agent_id)
+        """Return one stable display name for the active framing."""
+        return self._agent_role_name(agent_id=agent_id)
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
-        """Return the shared service channel for communication metrics."""
+        """Return the shared study channel for communication metrics."""
         return [PrimaryChannel(channel_id=LEDGER_CHANNEL_ID, team_id=None)]
 
     def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
-        """Allow provider messages on the shared service channel."""
+        """Allow agent messages on the shared study channel."""
         if agent_id not in PROVIDER_IDS:
-            return "only registered providers may access the shared service channel"
+            return "only registered agents may access the shared study channel"
         if channel_id != LEDGER_CHANNEL_ID:
             return "this scenario has no writable communication channel with that ID"
         return None
@@ -169,7 +174,7 @@ class JointCommitmentScenario(SimulationScenario):
         )
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
-        """Render one provider's fixed-stakes commitment decision."""
+        """Render one agent's fixed-stakes commitment decision."""
         if agent_id not in PROVIDER_IDS:
             return None
         provider = self._world.provider(agent_id=agent_id)
@@ -177,6 +182,7 @@ class JointCommitmentScenario(SimulationScenario):
             template_name="provider_injection.jinja",
             template_variables={
                 "round_number": round_number,
+                "framing": self._knobs.framing.value,
                 "earnings": provider.earnings,
                 "pledge_enabled": self._knobs.pledge_enabled,
                 "pledge_decision": provider.pledge_decision,
@@ -257,3 +263,10 @@ class JointCommitmentScenario(SimulationScenario):
     def restore_state_from_events(self, events: list[Any]) -> None:
         """Restore world state from authoritative events for fork/resume."""
         self._world.restore_state_from_events(events=events)
+
+    def _agent_role_name(self, agent_id: str) -> str:
+        """Return the framing-appropriate label for one participant."""
+        provider_name = provider_role_name(agent_id=agent_id)
+        if self._knobs.framing == JointCommitmentFraming.NEUTRAL_ALLOCATION:
+            return provider_name.replace("Provider", "Participant")
+        return provider_name

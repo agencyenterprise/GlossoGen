@@ -4,12 +4,12 @@ PROVIDER_A_ID = "provider_a"
 PROVIDER_B_ID = "provider_b"
 PROVIDER_IDS = (PROVIDER_A_ID, PROVIDER_B_ID)
 
-LEDGER_CHANNEL_ID = "client_commitment_ledger"
-LEDGER_CHANNEL_NAME = "shared client service"
+LEDGER_CHANNEL_ID = "joint_allocation_channel"
+LEDGER_CHANNEL_NAME = "shared study channel"
 
 SUBMIT_PLEDGE_TOOL = "submit_group_pledge"
 POST_BOND_TOOL = "post_covenant_bond"
-SUBMIT_DECISION_TOOL = "submit_client_reserve_decision"
+SUBMIT_DECISION_TOOL = "submit_allocation"
 
 PLEDGE_TEXT = (
     "I publicly commit to transfer 7 units to the client account in each later "

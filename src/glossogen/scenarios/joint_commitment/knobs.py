@@ -19,11 +19,19 @@ class JointCommitmentCondition(str, Enum):
     COVENANT = "covenant"
 
 
+class JointCommitmentFraming(str, Enum):
+    """Semantic description applied to a fixed allocation game."""
+
+    PROFESSIONAL_SERVICE = "professional_service"
+    NEUTRAL_ALLOCATION = "neutral_allocation"
+
+
 class JointCommitmentKnobs(BaseKnobs):
     """Parameters for a fixed-temption, repeated shared commitment task."""
 
     seed: int
     condition: JointCommitmentCondition
+    framing: JointCommitmentFraming = JointCommitmentFraming.PROFESSIONAL_SERVICE
     client_payment: int
     client_reserve: int
     covenant_bond: int

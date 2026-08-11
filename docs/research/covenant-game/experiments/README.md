@@ -83,6 +83,7 @@ count that resolves it before launching.
 | [EXP-031](EXP-031-neutral-baseline-calibration/experiment.md) | neutral no-group prompt calibration | complete | supported: variation restored, but prompt still contains coordination-relevant context | $0.53 |
 | [EXP-032](EXP-032-rules-only-baseline-calibration/experiment.md) | rules-only no-group prompt calibration | complete | invalid: free-text communication was still exposed by the runtime | $0.18 |
 | [EXP-033](EXP-033-communication-free-baseline-calibration/experiment.md) | communication-free rules-only no-group calibration | complete | not supported: 96/96 remittances, so the practical ceiling remained | $0.36 |
+| [EXP-034](EXP-034-shared-service-communication-baseline/experiment.md) | shared-service communication baseline calibration | complete | not supported: 96/96 remittances; client-service framing and informal messages may explain the ceiling | $0.75 |
 
 Total API spend logged: **$421.39** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -94,7 +95,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-033`. Before launching, use the
+The next available ID is `EXP-035`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat
