@@ -1,0 +1,39 @@
+name: Post coverage comment
+
+# A pull_request run from a fork gets a read-only token, so the Lint workflow
+# cannot post its own coverage comment. It uploads the comment as an artifact
+# instead and this workflow, which runs from the base repository with write
+# access, posts it. Fork code is never checked out or executed here: the only
+# thing that crosses over is the text of the comment.
+on:
+  workflow_run:
+    workflows: ["Lint"]
+    types:
+      - completed
+
+concurrency:
+  # github.ref is the default branch on workflow_run, so grouping on it would
+  # make every PR's run cancel every other PR's.
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  post:
+    name: Post coverage comment
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    permissions:
+      pull-requests: write
+      actions: read
+      contents: read
+    steps:
+      # Deliberately no actions/checkout: this workflow runs with write
+      # permissions on a trigger the fork controls.
+      # https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+      - name: Post comment
+        uses: py-cov-action/python-coverage-comment-action@v4.3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_PR_RUN_ID: ${{ github.event.workflow_run.id }}

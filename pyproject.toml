@@ -66,6 +66,8 @@ dev = [
     "types-Markdown>=3.7.0.20250322",
     "types-cachetools>=7.0.0.20260713",
     "modal>=1.5.3",
+    "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.8.0",
 ]
 
 [tool.uv]
@@ -93,6 +95,28 @@ glossogen = [
 testpaths = ["tests"]
 # The runtime is async throughout, so bare `async def` tests just work.
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src/glossogen"]
+branch = true
+# The PR comment action reads paths out of the .coverage file and matches them
+# against the diff. Absolute paths carry the runner's checkout directory and
+# match nothing.
+relative_files = true
+# Alembic revisions only execute against a live database, so every one of them
+# would sit at 0% forever and say nothing about the code under test.
+omit = ["src/glossogen/db/migrations/*"]
+
+[tool.coverage.report]
+show_missing = true
+# Bodies that exist to be overridden, not executed. `...` is the whole body of
+# every abstract method on the scenario and metric contracts, so counting them
+# as uncovered would report the ABCs as untested no matter what runs.
+exclude_also = [
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+    "\\.\\.\\.$",
+]
 
 [tool.black]
 line-length = 100

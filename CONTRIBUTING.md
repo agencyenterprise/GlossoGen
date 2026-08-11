@@ -21,9 +21,36 @@ same thing, so a clean local run means a clean CI run.
 ## Before you open a PR
 
 - [ ] `make lint` passes
+- [ ] `make test` passes
 - [ ] `make gen-api-types` produces no diff if you touched a response model (CI fails on drift)
 - [ ] Docstrings on new modules and public functions
 - [ ] No dead code left behind
+
+## Tests
+
+`make test` runs the suite, in parallel across your cores. It needs no API keys
+and reaches no network: agents run on a scripted fake model, so the result is the
+same on your machine as in CI.
+
+```
+tests/fakes/       a pydantic-ai model that plays a written script, and a stub LLM provider
+tests/testbed/     a two-agent scenario and a harness that runs it end to end
+tests/unit/        one module at a time
+tests/integration/ a real simulation, with only the model faked
+tests/conformance/ every registered scenario against the platform's contract
+```
+
+The conformance suite is parametrized over the scenario registry and every knobs
+preset in the tree, so a new scenario is covered the moment it is registered.
+Adding a rule there applies it to every existing scenario at once, which is the
+cheapest place to catch the mistakes that only show up minutes into a run.
+
+For coverage, `make test-cov` writes `.coverage` and prints the uncovered lines;
+`make coverage-html` renders it browsable at `htmlcov/index.html`. CI runs
+`make test-cov` on every PR and posts a comment with the total, the change
+against `main`, and how much of your diff is covered. Whole subsystems are still
+uncovered, so the total moving down is not automatically a problem. What the
+comment is really for is the diff column: code you added that nothing runs.
 
 ## Conventions worth knowing
 

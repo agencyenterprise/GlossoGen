@@ -27,10 +27,29 @@ install-frontend:
 	cd frontend && npm ci
 
 # Linting
+
+# -n auto spreads the suite over every core. The integration tests are sleep-
+# bound rather than CPU-bound (they wait on a real MCP server and the game
+# clock's timing floors), so running them alongside each other costs nothing and
+# is where most of the saving comes from.
 test:
 	@echo "Running tests..."
-	VIRTUAL_ENV= uv run --no-sync python -m pytest tests/ -q
+	VIRTUAL_ENV= uv run --no-sync python -m pytest tests/ -q -n auto
 	@echo "Tests complete"
+
+# Tracing every import roughly triples a worker's startup, so `test` stays lean
+# and CI runs this one. It writes .coverage, which the PR comment action reads
+# to work out how well the diff is covered. pytest-cov combines the per-worker
+# data files itself, so the parallel total matches the serial one.
+test-cov:
+	@echo "Running tests with coverage..."
+	VIRTUAL_ENV= uv run --no-sync python -m pytest tests/ -q -n auto --cov --cov-report=term-missing:skip-covered
+	@echo "Coverage complete"
+
+# Same data as test-cov, rendered as a browsable report at htmlcov/index.html.
+coverage-html: test-cov
+	VIRTUAL_ENV= uv run --no-sync coverage html
+	@echo "Open htmlcov/index.html"
 
 lint: lint-server lint-frontend
 	@echo "All linting complete"
@@ -106,4 +125,4 @@ gen-api-types: export-openapi
 	cd frontend && npx openapi-typescript openapi.json --output src/types/api.gen.ts
 	cd frontend && npx prettier --write src/types/api.gen.ts
 
-.PHONY: install install-server install-metrics install-frontend lint lint-server check-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types test
+.PHONY: install install-server install-metrics install-frontend lint lint-server check-server lint-frontend check-frontend dev dev-frontend langfuse-up langfuse-down langfuse-logs export-openapi gen-api-types test test-cov coverage-html
