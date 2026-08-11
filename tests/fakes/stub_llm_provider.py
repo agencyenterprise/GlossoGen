@@ -1,10 +1,11 @@
 """An LLMProvider that returns answers the test chose in advance.
 
-Six scenarios build a judge in ``__init__``, and metrics judge transcripts, so a
-test that never touches the network still needs something shaped like a
-provider. This returns queued responses and records what it was asked, which is
-usually the more interesting assertion: not what the judge said, but what it was
-shown.
+Scenarios that judge their own rounds build a provider when they are
+constructed, and the judge metrics call one directly, so a test that never
+touches the network still needs something shaped like a provider.
+
+Answers come from a queue. Every call is recorded, which is usually the more
+interesting assertion: not what the judge said, but what it was shown.
 """
 
 from collections import deque

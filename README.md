@@ -35,7 +35,7 @@ the extra pulls in torch and transformers — several gigabytes — which a serv
 that only browses runs never executes. Deployments therefore install without it,
 which is why it is not the default.
 
-Three metrics depend on it:
+These metrics depend on it:
 
 | Metric | Needs | Without the extra |
 |---|---|---|

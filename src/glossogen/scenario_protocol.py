@@ -542,7 +542,7 @@ class SimulationScenario(ABC):
         that want post-simulation probing implement this hook to point at
         their question bank, probe prompts directory, and the mapping
         from question ``agent_role_filter`` strings to scenario role
-        names. Returning ``None`` causes all four probe metrics to skip
+        names. Returning ``None`` causes every probe metric to skip
         with no Measurement.
         """
         return None

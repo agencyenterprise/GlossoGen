@@ -19,10 +19,11 @@ def event_bus() -> EventBus:
 def no_real_provider_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     """Give every test placeholder credentials.
 
-    Six scenarios build an LLM judge in ``__init__``, so they cannot even be
-    constructed without a key. The values are never sent anywhere: tests that
-    exercise an LLM replace the provider outright. Setting them here means a
-    contributor with no keys still gets a green suite.
+    Scenarios that judge their own rounds build a provider when they are
+    constructed, so they cannot be built at all without a key. The values are
+    never sent anywhere — tests that exercise an LLM replace the provider
+    outright — so this only removes the construction barrier, and a contributor
+    with no keys still gets a green suite.
     """
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-never-sent")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key-never-sent")
