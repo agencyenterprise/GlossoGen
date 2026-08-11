@@ -1,0 +1,9 @@
+Two providers repeatedly decide whether to contribute 7 of their own 21-unit
+payment to a common Continuity Reserve or retain all 21 units. The reserve pays
+fixed client claims; an uncovered claim ends the service and all later provider
+payments. This run uses the {{ condition }} condition.
+
+{% if group_enabled %}Both providers are publicly listed in a common group registry.
+{% endif %}{% if pledge_enabled %}Each provider publicly chooses whether to affirm a pledge before the first decision.
+{% endif %}{% if entry_cost_enabled %}Affirming deducts a one-time {{ pledge_entry_cost }}-unit cost from that provider's balance.
+{% endif %}

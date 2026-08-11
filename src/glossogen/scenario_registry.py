@@ -23,6 +23,7 @@ from glossogen.scenarios.joint_commitment.scenario import JointCommitmentScenari
 from glossogen.scenarios.orbital_anomaly.scenario import OrbitalAnomalyScenario
 from glossogen.scenarios.repeated_trust_game.scenario import RepeatedTrustGameScenario
 from glossogen.scenarios.satellite_contact_window.scenario import SatelliteContactWindowScenario
+from glossogen.scenarios.shared_reserve_commitment.scenario import SharedReserveCommitmentScenario
 from glossogen.scenarios.spillway_release.scenario import SpillwayReleaseScenario
 from glossogen.scenarios.spot_the_difference.scenario import SpotTheDifferenceScenario
 from glossogen.scenarios.veyru.scenario import VeyruScenario
@@ -39,6 +40,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "orbital_anomaly": OrbitalAnomalyScenario,
     "repeated_trust_game": RepeatedTrustGameScenario,
     "satellite_contact_window": SatelliteContactWindowScenario,
+    "shared_reserve_commitment": SharedReserveCommitmentScenario,
     "spillway_release": SpillwayReleaseScenario,
     "spot_the_difference": SpotTheDifferenceScenario,
     "veyru": VeyruScenario,

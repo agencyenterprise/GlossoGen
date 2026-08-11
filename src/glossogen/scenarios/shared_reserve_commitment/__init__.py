@@ -1,0 +1,1 @@
+"""Shared reserve commitment scenario."""

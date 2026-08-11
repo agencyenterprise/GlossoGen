@@ -1,0 +1,21 @@
+--- SHARED RESERVE ROUND {{ round_number }} ---
+{% if round_number == 1 %}
+Setup phase. Active contribution decisions begin in round 2.
+{% if group_enabled %}The public group registry lists Provider A and Provider B as Shared Service Group members.
+{% endif %}{% if pledge_enabled %}Use `submit_group_pledge` once with `affirm` or `decline`.
+Public statement: "I voluntarily commit to contribute 7 units to the shared Continuity Reserve in every active decision round."
+{% if entry_cost_enabled %}Affirming deducts {{ pledge_entry_cost }} units from your personal balance once.
+{% endif %}{% else %}No structured action is required during setup.
+{% endif %}
+{% elif not service_active %}
+The shared service has ended after an uncovered client claim. No further payment or allocation decision is available.
+{% else %}
+Use `submit_reserve_action` once:
+
+- `contribute`: place {{ contribution_amount }} of your {{ client_payment }} units in the shared Continuity Reserve and retain {{ client_payment - contribution_amount }};
+- `retain`: retain all {{ client_payment }} units.
+
+The other provider makes a separate current-round decision. Their current action is unavailable until both decisions are recorded. Your current cumulative balance is {{ earnings }}. The shared reserve currently contains {{ reserve_balance }} units.
+{% if entry_cost_enabled %}Your paid entry cost is {{ entry_cost_paid }} units.
+{% endif %}
+{% endif %}

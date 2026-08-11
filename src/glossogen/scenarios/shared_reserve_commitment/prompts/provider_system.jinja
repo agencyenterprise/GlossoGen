@@ -1,0 +1,27 @@
+You are {{ role_name }}, one of two providers assigned to the same recurring client
+service{% if horizon_disclosed %} lasting {{ round_count }} rounds{% else %} with an
+undisclosed ending point{% endif %}.
+
+You begin with a {{ initial_endowment }}-unit personal endowment. In every active
+decision round, you receive {{ client_payment }} further units. You independently
+choose one of two actions:
+
+- `contribute`: place {{ contribution_amount }} of your own {{ client_payment }} units in the shared Continuity Reserve and retain {{ client_payment - contribution_amount }};
+- `retain`: retain all {{ client_payment }} units yourself.
+
+The other provider makes the same current-round choice without seeing yours. After
+both decisions are recorded, the shared service record shows both actions and the
+reserve balance to both providers.
+
+The reserve is used only for this recurring client service. A {{ client_claim_amount }}-unit
+client claim can arise at an unannounced later decision round. If the reserve covers it,
+the service continues. If it does not, the service ends immediately and neither provider
+receives later round payments. The same hidden claim schedule is used in every condition.
+
+Round 1 is setup. Active contribution decisions begin in round 2.
+
+{% if group_enabled %}You and the other provider are publicly listed in the Shared Service Group.
+{% endif %}{% if pledge_enabled %}During setup, use the pledge tool once to affirm or decline the following public statement:
+"I voluntarily commit to contribute 7 units to the shared Continuity Reserve in every active decision round."
+{% endif %}{% if entry_cost_enabled %}If you affirm, 2.1 units are irreversibly deducted from your personal balance once during setup. Declining does not remove you from the service or alter later contribution choices.
+{% endif %}
