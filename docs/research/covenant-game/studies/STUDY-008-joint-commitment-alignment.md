@@ -71,9 +71,11 @@ expulsion and replacement separately.
 
 1. Implement and locally test a separate `joint_commitment` scenario with
    event-logged remittance, attestation, audit, bond, and membership state.
-2. Run [EXP-027](../experiments/EXP-027-joint-commitment-calibration/experiment.md),
-   the preregistered calibration that freezes the allocation, audit schedule,
-   bond rule, model, seed, and decision gates before paid simulation.
+2. [EXP-027](../experiments/EXP-027-joint-commitment-calibration/experiment.md)
+   found an unplanned free-text ledger channel and was closed invalid. Run
+   [EXP-028](../experiments/EXP-028-joint-commitment-readonly-calibration/experiment.md),
+   the corrected preregistered calibration that freezes the allocation, audit
+   schedule, bond rule, model, seed, and decision gates before paid simulation.
 3. Run a small same-seed Sonnet calibration across all four conditions before
    deciding whether three to five identical-config replicas are informative.
 4. Only after usable variation, run fixed-config replicas and, if warranted,
