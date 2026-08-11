@@ -1,9 +1,12 @@
-"""Data models for the per-metric measurement output of an evaluation run.
+"""What a metric returns from ``compute``.
 
-Replaces the verdict-shaped ``MetricResult`` with a numeric-shaped
-``Measurement`` that carries an overall scalar score, a unit string, and
-structured per-round / per-agent observations. Every metric in the codebase
-returns one or more ``Measurement`` instances from its ``compute`` method.
+A ``Measurement`` is numeric rather than a verdict: one scalar ``score``, a
+``score_unit`` naming what the number counts, and optional per-round and
+per-agent observations. The unit matters because scores are not comparable
+across metrics; one counts rounds, another averages nats per token.
+
+A metric may return several, which is how a multi-team scenario reports one
+result per team.
 """
 
 from pydantic import BaseModel, Field

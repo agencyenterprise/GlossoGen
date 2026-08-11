@@ -1,8 +1,9 @@
 """Abstract base class for agent runners.
 
-An agent runner launches and manages a single autonomous agent that connects
-to the simulation runtime via MCP.  Concrete implementations wrap a specific
-agentic runtime (Claude Code, Codex, Gemini, etc.).
+A runner launches and manages one autonomous agent, which connects to the
+simulation runtime over MCP and decides for itself when to act. The base class
+exists so a different agent framework can be dropped in without the supervisor
+knowing; ``PydanticAIRunner`` is the only implementation today.
 """
 
 from abc import ABC, abstractmethod

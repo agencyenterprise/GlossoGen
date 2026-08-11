@@ -332,8 +332,9 @@ class SimulationScenario(ABC):
         return False
 
     def get_early_round_end_trigger(self) -> str | None:
-        """Return a trigger string when the current round has decisively ended,
-        or None if the round should continue.
+        """Return a trigger string when the round has decisively ended, else None.
+
+        A trigger ends the round; None lets it continue.
 
         The game clock checks this each iteration (outside the postmortem phase)
         and, when a non-None value is returned, immediately emits a
@@ -560,8 +561,10 @@ class SimulationScenario(ABC):
 
     @classmethod
     def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:
-        """Return channel IDs whose ``send_message``/``read_channel`` traffic
-        should be stripped from a replaced agent's reconstructed tool history.
+        """Return channel IDs to strip from a replaced agent's tool history.
+
+        Their ``send_message`` and ``read_channel`` traffic is removed from the
+        reconstructed history.
 
         Used by the replace-agent flow to hide scenario-private channels
         (e.g. a discussion/postmortem channel) from the new agent so it

@@ -1,7 +1,14 @@
-"""Reads and parses simulation log files.
+"""Reading a run back off disk.
 
-Provides event loading, agent config extraction, and simulation ID extraction
-from JSONL event logs.
+The JSONL event log is the only durable record of a run, so everything that
+inspects a finished simulation comes through here: the CLI, the web server, the
+metrics, and the fork and resume flows. Reconstruction works off the events
+alone, which is what lets a run be evaluated or resumed long after the process
+that wrote it exited.
+
+What the events do not carry cannot come back. ``AgentRegistered`` records no
+compaction settings, so a rebuilt ``AgentConfig`` reports the default rather
+than what the agent ran with.
 """
 
 import asyncio
@@ -68,7 +75,12 @@ async def load_events(log_path: Path) -> list[SimulationEvent]:
 
 
 def extract_agent_configs(events: list[SimulationEvent]) -> list[AgentConfig]:
-    """Extract AgentConfig entries from AgentRegistered events in the event list."""
+    """Rebuild each agent's config from the ``AgentRegistered`` event it emitted.
+
+    ``compaction`` is not recorded in that event, so every rebuilt config claims
+    the default (disabled). Callers that care what compaction a run actually used
+    must read the ``ContextCompacted`` events instead of trusting this field.
+    """
     configs: list[AgentConfig] = []
     for event in events:
         if isinstance(event, AgentRegistered):

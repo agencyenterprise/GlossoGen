@@ -1,5 +1,13 @@
-"""Data model for representing the outcome of scenario evaluations
-and report serialization.
+"""The evaluation report on disk, and how repeated runs fold into it.
+
+One report per run, written next to its JSONL. Evaluating the same run again
+replaces the results of the metrics that were re-run and leaves the rest alone,
+which is why a metric can be added and scored later without re-running the ones
+that came before it.
+
+Cost accumulates across invocations only while the judge model stays the same.
+Change it and the running total resets, because summing spend across two
+different judges would describe neither.
 """
 
 import hashlib

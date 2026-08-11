@@ -1,4 +1,11 @@
-"""Abstract base class for simulation metrics."""
+"""The contract every metric implements.
+
+``compute`` is the only entry point. It receives the run's events, the agent
+configs, the scenario and an LLM provider, and returns a list of measurements.
+
+The empty-list convention is the part worth knowing before writing one, and
+``compute`` documents it in full.
+"""
 
 from abc import ABC, abstractmethod
 from pathlib import Path

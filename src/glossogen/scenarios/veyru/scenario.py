@@ -343,8 +343,9 @@ class VeyruScenario(SimulationScenario):
         return results
 
     def get_early_round_end_trigger(self) -> str | None:
-        """Signal the game clock to end the round as soon as every team has a
-        decisive Veyru outcome (stabilized or collapsed).
+        """End the round once every team has a decisive Veyru outcome.
+
+        Decisive means stabilized or collapsed.
 
         Returns ``"veyru_stabilized"`` when every team stabilized,
         ``"veyru_collapsed"`` when every team's Veyru collapsed, or
