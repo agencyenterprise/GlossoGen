@@ -1,5 +1,6 @@
 """Deterministic world state for fixed-temption joint commitments."""
 
+from decimal import Decimal
 import random
 from typing import Any
 
@@ -9,6 +10,7 @@ from glossogen.scenarios.joint_commitment.events import (
     JointCommitmentBondPosted,
     JointCommitmentDecisionRecorded,
     JointCommitmentMembershipChanged,
+    JointCommitmentPledgeEntryCostPaid,
     JointCommitmentPledgeSubmitted,
     JointCommitmentRoundSettled,
 )
@@ -36,8 +38,9 @@ class JointCommitmentWorld(ScenarioWorld):
         self._knobs = knobs
         self._providers: dict[str, ProviderState] = {
             agent_id: ProviderState(
-                earnings=0,
+                earnings=Decimal("0.0"),
                 pledge_decision=None,
+                entry_cost_paid=Decimal("0.0"),
                 bond_posted=0,
                 bond_forfeited=0,
                 membership_in_good_standing=True,
@@ -108,11 +111,31 @@ class JointCommitmentWorld(ScenarioWorld):
         self._providers[agent_id] = ProviderState(
             earnings=provider.earnings,
             pledge_decision=decision,
+            entry_cost_paid=provider.entry_cost_paid,
             bond_posted=provider.bond_posted,
             bond_forfeited=provider.bond_forfeited,
             membership_in_good_standing=provider.membership_in_good_standing,
         )
         return decision
+
+    def pay_pledge_entry_cost(self, agent_id: str) -> Decimal:
+        """Deduct the irreversible cost required by an affirmative costly pledge."""
+        if not self._knobs.entry_cost_enabled:
+            raise ValueError("this condition has no pledge entry cost")
+        provider = self._providers[agent_id]
+        if provider.pledge_decision != _AFFIRM:
+            raise ValueError("affirm the pledge before paying its entry cost")
+        if provider.entry_cost_paid > Decimal("0.0"):
+            raise ValueError("pledge entry cost is already paid")
+        self._providers[agent_id] = ProviderState(
+            earnings=provider.earnings - self._knobs.pledge_entry_cost,
+            pledge_decision=provider.pledge_decision,
+            entry_cost_paid=self._knobs.pledge_entry_cost,
+            bond_posted=provider.bond_posted,
+            bond_forfeited=provider.bond_forfeited,
+            membership_in_good_standing=provider.membership_in_good_standing,
+        )
+        return self._knobs.pledge_entry_cost
 
     def post_bond(self, agent_id: str) -> int:
         """Register one covenant member's fixed conditional bond."""
@@ -128,6 +151,7 @@ class JointCommitmentWorld(ScenarioWorld):
         self._providers[agent_id] = ProviderState(
             earnings=provider.earnings,
             pledge_decision=provider.pledge_decision,
+            entry_cost_paid=provider.entry_cost_paid,
             bond_posted=self._knobs.covenant_bond,
             bond_forfeited=provider.bond_forfeited,
             membership_in_good_standing=provider.membership_in_good_standing,
@@ -151,9 +175,20 @@ class JointCommitmentWorld(ScenarioWorld):
             raise ValueError("actual_action must be remit or retain")
         if public_attestation not in {_REMITTED, _RETAINED}:
             raise ValueError("public_attestation must be remitted or retained")
+        expected_attestation = _RETAINED
+        if actual_action == _REMIT:
+            expected_attestation = _REMITTED
+        if not self._knobs.audit_enabled and public_attestation != expected_attestation:
+            raise ValueError("directly observed remittance requires a matching public record")
         provider = self._providers[agent_id]
         if self._knobs.pledge_enabled and provider.pledge_decision is None:
             raise ValueError("record a pledge decision before acting")
+        if (
+            self._knobs.entry_cost_enabled
+            and provider.pledge_decision == _AFFIRM
+            and provider.entry_cost_paid == Decimal("0.0")
+        ):
+            raise ValueError("pay the pledge entry cost before acting")
         if (
             self._knobs.bond_enabled
             and provider.pledge_decision == _AFFIRM
@@ -179,6 +214,7 @@ class JointCommitmentWorld(ScenarioWorld):
         self._providers[agent_id] = ProviderState(
             earnings=record.earnings_after,
             pledge_decision=provider.pledge_decision,
+            entry_cost_paid=provider.entry_cost_paid,
             bond_posted=provider.bond_posted,
             bond_forfeited=provider.bond_forfeited,
             membership_in_good_standing=provider.membership_in_good_standing,
@@ -248,6 +284,7 @@ class JointCommitmentWorld(ScenarioWorld):
                     self._providers[agent_id] = ProviderState(
                         earnings=provider.earnings - bond_forfeited,
                         pledge_decision=provider.pledge_decision,
+                        entry_cost_paid=provider.entry_cost_paid,
                         bond_posted=0,
                         bond_forfeited=provider.bond_forfeited + bond_forfeited,
                         membership_in_good_standing=membership_in_good_standing,
@@ -283,6 +320,27 @@ class JointCommitmentWorld(ScenarioWorld):
                 agent_id=agent_id,
                 membership_status="group participant",
                 pledge_status="not offered",
+                entry_cost_status="not applicable",
+                standing_status="not applicable",
+            )
+        if self._knobs.entry_cost_enabled:
+            pledge_status = "pending"
+            entry_cost_status = "not paid"
+            membership_status = "costly pledge setup pending"
+            if provider.pledge_decision == _AFFIRM:
+                pledge_status = "affirmed"
+                membership_status = "costly pledge participant"
+                if provider.entry_cost_paid > Decimal("0.0"):
+                    entry_cost_status = "paid"
+            if provider.pledge_decision == _DECLINE:
+                pledge_status = "declined"
+                entry_cost_status = "not applicable"
+                membership_status = "outside costly pledge"
+            return PublicRegistryEntry(
+                agent_id=agent_id,
+                membership_status=membership_status,
+                pledge_status=pledge_status,
+                entry_cost_status=entry_cost_status,
                 standing_status="not applicable",
             )
         if not self._knobs.bond_enabled:
@@ -293,6 +351,7 @@ class JointCommitmentWorld(ScenarioWorld):
                 agent_id=agent_id,
                 membership_status="group participant",
                 pledge_status=pledge_status,
+                entry_cost_status="not applicable",
                 standing_status="not applicable",
             )
         if provider.pledge_decision == _DECLINE:
@@ -300,6 +359,7 @@ class JointCommitmentWorld(ScenarioWorld):
                 agent_id=agent_id,
                 membership_status="outside covenant",
                 pledge_status="declined",
+                entry_cost_status="not applicable",
                 standing_status="not applicable",
             )
         if provider.pledge_decision == _AFFIRM and provider.membership_in_good_standing:
@@ -310,6 +370,7 @@ class JointCommitmentWorld(ScenarioWorld):
                 agent_id=agent_id,
                 membership_status=membership_status,
                 pledge_status="affirmed",
+                entry_cost_status="not applicable",
                 standing_status="in good standing",
             )
         if provider.pledge_decision == _AFFIRM:
@@ -317,12 +378,14 @@ class JointCommitmentWorld(ScenarioWorld):
                 agent_id=agent_id,
                 membership_status="former covenant member",
                 pledge_status="affirmed",
+                entry_cost_status="not applicable",
                 standing_status="revoked",
             )
         return PublicRegistryEntry(
             agent_id=agent_id,
             membership_status="covenant setup pending",
             pledge_status="pending",
+            entry_cost_status="not applicable",
             standing_status="not applicable",
         )
 
@@ -336,6 +399,17 @@ class JointCommitmentWorld(ScenarioWorld):
                 self._providers[event.agent_id] = ProviderState(
                     earnings=provider.earnings,
                     pledge_decision=event.decision,
+                    entry_cost_paid=provider.entry_cost_paid,
+                    bond_posted=provider.bond_posted,
+                    bond_forfeited=provider.bond_forfeited,
+                    membership_in_good_standing=provider.membership_in_good_standing,
+                )
+            elif isinstance(event, JointCommitmentPledgeEntryCostPaid):
+                provider = self._providers[event.agent_id]
+                self._providers[event.agent_id] = ProviderState(
+                    earnings=provider.earnings - event.amount,
+                    pledge_decision=provider.pledge_decision,
+                    entry_cost_paid=event.amount,
                     bond_posted=provider.bond_posted,
                     bond_forfeited=provider.bond_forfeited,
                     membership_in_good_standing=provider.membership_in_good_standing,
@@ -345,6 +419,7 @@ class JointCommitmentWorld(ScenarioWorld):
                 self._providers[event.agent_id] = ProviderState(
                     earnings=provider.earnings,
                     pledge_decision=provider.pledge_decision,
+                    entry_cost_paid=provider.entry_cost_paid,
                     bond_posted=event.amount,
                     bond_forfeited=provider.bond_forfeited,
                     membership_in_good_standing=provider.membership_in_good_standing,
@@ -365,6 +440,7 @@ class JointCommitmentWorld(ScenarioWorld):
                 self._providers[event.agent_id] = ProviderState(
                     earnings=event.earnings_after,
                     pledge_decision=provider.pledge_decision,
+                    entry_cost_paid=provider.entry_cost_paid,
                     bond_posted=provider.bond_posted,
                     bond_forfeited=provider.bond_forfeited,
                     membership_in_good_standing=provider.membership_in_good_standing,
@@ -385,6 +461,7 @@ class JointCommitmentWorld(ScenarioWorld):
                 self._providers[event.agent_id] = ProviderState(
                     earnings=provider.earnings - event.bond_forfeited,
                     pledge_decision=provider.pledge_decision,
+                    entry_cost_paid=provider.entry_cost_paid,
                     bond_posted=provider.bond_posted - event.bond_forfeited,
                     bond_forfeited=provider.bond_forfeited + event.bond_forfeited,
                     membership_in_good_standing=event.membership_in_good_standing,

@@ -1,5 +1,6 @@
 """Event schemas for joint client-commitment trajectories."""
 
+from decimal import Decimal
 from typing import Literal
 
 from glossogen.models.event_base import EventBase
@@ -22,11 +23,21 @@ class JointCommitmentPledgeSubmitted(EventBase):
 
 
 class JointCommitmentBondPosted(EventBase):
-    """Records the escrowed covenant bond for one provider."""
+    """Records the conditional covenant bond for one provider."""
 
     event_type: Literal["joint_commitment_bond_posted"] = "joint_commitment_bond_posted"
     agent_id: str
     amount: int
+
+
+class JointCommitmentPledgeEntryCostPaid(EventBase):
+    """Records an irreversible entry cost after an affirmative costly pledge."""
+
+    event_type: Literal["joint_commitment_pledge_entry_cost_paid"] = (
+        "joint_commitment_pledge_entry_cost_paid"
+    )
+    agent_id: str
+    amount: Decimal
 
 
 class JointCommitmentDecisionRecorded(EventBase):
@@ -38,8 +49,8 @@ class JointCommitmentDecisionRecorded(EventBase):
     public_attestation: str
     reserve_remitted: int
     reserve_retained: int
-    earnings_before: int
-    earnings_after: int
+    earnings_before: Decimal
+    earnings_after: Decimal
 
 
 class JointCommitmentRoundSettled(EventBase):

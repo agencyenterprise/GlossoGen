@@ -1,13 +1,15 @@
 """In-memory records for joint client-commitment decisions."""
 
+from decimal import Decimal
 from typing import NamedTuple
 
 
 class ProviderState(NamedTuple):
-    """Cumulative earnings, commitment status, and covenant bond state."""
+    """Cumulative earnings, pledge state, entry cost, and legacy covenant-bond state."""
 
-    earnings: int
+    earnings: Decimal
     pledge_decision: str | None
+    entry_cost_paid: Decimal
     bond_posted: int
     bond_forfeited: int
     membership_in_good_standing: bool
@@ -19,19 +21,20 @@ class PublicRegistryEntry(NamedTuple):
     agent_id: str
     membership_status: str
     pledge_status: str
+    entry_cost_status: str
     standing_status: str
 
 
 class ReserveDecision(NamedTuple):
-    """One provider's private remittance and public report."""
+    """One provider's remittance decision and ledger record."""
 
     agent_id: str
     actual_action: str
     public_attestation: str
     reserve_remitted: int
     reserve_retained: int
-    earnings_before: int
-    earnings_after: int
+    earnings_before: Decimal
+    earnings_after: Decimal
 
 
 class RoundOutcome(NamedTuple):

@@ -7,9 +7,14 @@ Condition: {{ condition }}. {% if group_enabled %}The two providers have a
 public group registry.{% else %}The providers have no shared group identity.{% endif %}
 {% if pledge_enabled %}Both providers receive an explicit public pledge; their choices are
 visible in the registry before client decisions begin.{% endif %}
+{% if entry_cost_enabled %}Affirming deducts a one-time, irreversible {{ pledge_entry_cost }}-unit
+entry cost. It is not contingent on later remittance decisions.
+{% endif %}
 {% if bond_enabled %}Covenant members must post a {{ covenant_bond }}-unit personal
 bond that is forfeited when a delayed audit confirms retained client reserve. A provider who
 declines remains eligible to work as a publicly listed non-member. Forfeiture reduces retained
 earnings by the bond amount.
-{% endif %}Audits are selectively sampled at rate {{ audit_probability }} and resolve
-after {{ audit_resolution_delay_rounds }} round(s).
+{% endif %}{% if audit_enabled %}Audits are selectively sampled at rate {{ audit_probability }} and resolve
+after {{ audit_resolution_delay_rounds }} round(s).{% else %}Each completed remittance or retention is directly
+recorded in the public ledger after both providers decide. There are no audits or action-contingent penalties.
+{% endif %}

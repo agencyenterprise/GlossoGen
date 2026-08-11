@@ -1,5 +1,6 @@
 """Unit tests for the joint client-commitment state machine."""
 
+from decimal import Decimal
 from typing import cast
 
 from glossogen.scenarios.joint_commitment.events import JointCommitmentAuditResolved
@@ -11,7 +12,10 @@ from glossogen.scenarios.joint_commitment.scenario import JointCommitmentScenari
 from glossogen.scenarios.joint_commitment.world import JointCommitmentWorld
 
 
-def build_knobs(condition: JointCommitmentCondition) -> JointCommitmentKnobs:
+def build_knobs(
+    condition: JointCommitmentCondition,
+    audit_probability: float,
+) -> JointCommitmentKnobs:
     """Build a compact valid configuration for one treatment condition."""
     return JointCommitmentKnobs(
         round_count=4,
@@ -27,7 +31,8 @@ def build_knobs(condition: JointCommitmentCondition) -> JointCommitmentKnobs:
         client_payment=21,
         client_reserve=7,
         covenant_bond=14,
-        audit_probability=0.5,
+        pledge_entry_cost=Decimal("2.1"),
+        audit_probability=audit_probability,
         audit_resolution_delay_rounds=1,
         horizon_disclosed=False,
     )
@@ -35,7 +40,12 @@ def build_knobs(condition: JointCommitmentCondition) -> JointCommitmentKnobs:
 
 def test_joint_safety_requires_both_providers_to_remit() -> None:
     """One retained reserve makes a completed shared client result unsafe."""
-    world = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.NO_GROUP))
+    world = JointCommitmentWorld(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.NO_GROUP,
+            audit_probability=0.5,
+        )
+    )
 
     world.begin_round(round_number=2)
     world.submit_decision(
@@ -58,7 +68,12 @@ def test_joint_safety_requires_both_providers_to_remit() -> None:
 
 def test_covenant_affirmation_requires_a_bond_but_decline_allows_nonmember_work() -> None:
     """Covenant membership is voluntary while bond exposure remains real."""
-    world = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.COVENANT))
+    world = JointCommitmentWorld(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.COVENANT,
+            audit_probability=0.5,
+        )
+    )
 
     world.begin_round(round_number=2)
     try:
@@ -96,8 +111,18 @@ def test_covenant_affirmation_requires_a_bond_but_decline_allows_nonmember_work(
 
 def test_setup_requires_pledges_only_in_pledge_conditions() -> None:
     """The first shared setup phase resolves automatically outside pledge arms."""
-    no_group = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.NO_GROUP))
-    pledge = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.PLEDGE))
+    no_group = JointCommitmentWorld(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.NO_GROUP,
+            audit_probability=0.5,
+        )
+    )
+    pledge = JointCommitmentWorld(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.PLEDGE,
+            audit_probability=0.5,
+        )
+    )
 
     assert no_group.setup_complete() is True
     assert pledge.setup_complete() is False
@@ -110,7 +135,12 @@ def test_setup_requires_pledges_only_in_pledge_conditions() -> None:
 
 def test_public_registry_is_visible_to_both_providers_after_setup() -> None:
     """The decision prompt exposes both providers' institution-visible status."""
-    scenario = JointCommitmentScenario(knobs=build_knobs(JointCommitmentCondition.COVENANT))
+    scenario = JointCommitmentScenario(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.COVENANT,
+            audit_probability=0.5,
+        )
+    )
 
     world = cast(JointCommitmentWorld, scenario.get_world())
     world.submit_pledge(agent_id="provider_a", decision="affirm")
@@ -125,7 +155,12 @@ def test_public_registry_is_visible_to_both_providers_after_setup() -> None:
 
 def test_group_registry_shows_identity_without_a_pledge() -> None:
     """The group arm supplies observable identity without commitment language."""
-    scenario = JointCommitmentScenario(knobs=build_knobs(JointCommitmentCondition.GROUP))
+    scenario = JointCommitmentScenario(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.GROUP,
+            audit_probability=0.5,
+        )
+    )
 
     injection = scenario.get_injection(round_number=2, agent_id="provider_a")
 
@@ -136,7 +171,12 @@ def test_group_registry_shows_identity_without_a_pledge() -> None:
 
 def test_audited_retention_forfeits_bond_and_revokes_good_standing() -> None:
     """A selected delayed audit applies the covenant consequence to retention."""
-    world = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.COVENANT))
+    world = JointCommitmentWorld(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.COVENANT,
+            audit_probability=0.5,
+        )
+    )
 
     world.begin_round(round_number=2)
     for agent_id in ("provider_a", "provider_b"):
@@ -169,7 +209,12 @@ def test_audited_retention_forfeits_bond_and_revokes_good_standing() -> None:
     assert provider_b.earnings == 7
     assert provider_b.membership_in_good_standing is False
 
-    scenario = JointCommitmentScenario(knobs=build_knobs(JointCommitmentCondition.COVENANT))
+    scenario = JointCommitmentScenario(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.COVENANT,
+            audit_probability=0.5,
+        )
+    )
     scenario_world = cast(JointCommitmentWorld, scenario.get_world())
     for agent_id in ("provider_a", "provider_b"):
         scenario_world.submit_pledge(agent_id=agent_id, decision="affirm")
@@ -195,14 +240,24 @@ def test_audited_retention_forfeits_bond_and_revokes_good_standing() -> None:
 
 def test_audit_selection_excludes_rounds_that_cannot_resolve() -> None:
     """The hidden schedule never selects a final round beyond the delay window."""
-    world = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.COVENANT))
+    world = JointCommitmentWorld(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.COVENANT,
+            audit_probability=0.5,
+        )
+    )
 
     assert world.audit_selected_for_round(round_number=4) is False
 
 
 def test_client_ledger_rejects_free_text_coordination() -> None:
     """The shared attestation record cannot become an informal pledge channel."""
-    scenario = JointCommitmentScenario(knobs=build_knobs(JointCommitmentCondition.NO_GROUP))
+    scenario = JointCommitmentScenario(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.NO_GROUP,
+            audit_probability=0.5,
+        )
+    )
 
     rejection = scenario.validate_outgoing_message(
         agent_id="provider_a",
@@ -211,3 +266,86 @@ def test_client_ledger_rejects_free_text_coordination() -> None:
 
     assert rejection is not None
     assert "read-only" in rejection
+
+
+def test_costly_pledge_deducts_entry_cost_without_a_later_punishment() -> None:
+    """An affirmative pledge pays its fixed cost before all later 7→21 choices."""
+    scenario = JointCommitmentScenario(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.COSTLY_PLEDGE,
+            audit_probability=0.0,
+        )
+    )
+    world = cast(JointCommitmentWorld, scenario.get_world())
+
+    world.submit_pledge(agent_id="provider_a", decision="affirm")
+    world.pay_pledge_entry_cost(agent_id="provider_a")
+    world.submit_pledge(agent_id="provider_b", decision="decline")
+    world.begin_round(round_number=2)
+    world.submit_decision(
+        agent_id="provider_a",
+        actual_action="remit",
+        public_attestation="remitted",
+    )
+    world.submit_decision(
+        agent_id="provider_b",
+        actual_action="retain",
+        public_attestation="retained",
+    )
+    injection = scenario.get_injection(round_number=3, agent_id="provider_b")
+
+    assert world.provider(agent_id="provider_a").earnings == Decimal("11.9")
+    assert injection is not None
+    assert (
+        "provider_a: costly pledge participant | pledge: affirmed | entry cost: paid" in injection
+    )
+    assert (
+        "provider_b: outside costly pledge | pledge: declined | entry cost: not applicable"
+        in injection
+    )
+    assert "selectively audited" not in injection
+
+
+def test_costly_pledge_requires_the_entry_cost_before_a_later_choice() -> None:
+    """Affirmation alone does not grant costly-pledge treatment exposure."""
+    world = JointCommitmentWorld(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.COSTLY_PLEDGE,
+            audit_probability=0.0,
+        )
+    )
+    world.submit_pledge(agent_id="provider_a", decision="affirm")
+    world.begin_round(round_number=2)
+
+    try:
+        world.submit_decision(
+            agent_id="provider_a",
+            actual_action="remit",
+            public_attestation="remitted",
+        )
+    except ValueError as exc:
+        assert str(exc) == "pay the pledge entry cost before acting"
+    else:
+        raise AssertionError("costly pledge accepted a decision before the entry cost")
+
+
+def test_direct_observed_remittance_rejects_a_false_public_record() -> None:
+    """The human-parallel instrument does not permit audit-dependent deception."""
+    world = JointCommitmentWorld(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.NO_GROUP,
+            audit_probability=0.0,
+        )
+    )
+    world.begin_round(round_number=2)
+
+    try:
+        world.submit_decision(
+            agent_id="provider_a",
+            actual_action="retain",
+            public_attestation="remitted",
+        )
+    except ValueError as exc:
+        assert str(exc) == "directly observed remittance requires a matching public record"
+    else:
+        raise AssertionError("directly observed remittance accepted a false public record")

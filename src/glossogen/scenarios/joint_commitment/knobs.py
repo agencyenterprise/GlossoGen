@@ -1,5 +1,6 @@
 """Validated configuration for joint client-commitment runs."""
 
+from decimal import Decimal
 from enum import Enum
 from typing import Self
 
@@ -14,6 +15,7 @@ class JointCommitmentCondition(str, Enum):
     NO_GROUP = "no_group"
     GROUP = "group"
     PLEDGE = "pledge"
+    COSTLY_PLEDGE = "costly_pledge"
     COVENANT = "covenant"
 
 
@@ -25,6 +27,7 @@ class JointCommitmentKnobs(BaseKnobs):
     client_payment: int
     client_reserve: int
     covenant_bond: int
+    pledge_entry_cost: Decimal = Decimal("0.0")
     audit_probability: float
     audit_resolution_delay_rounds: int
     horizon_disclosed: bool
@@ -39,8 +42,19 @@ class JointCommitmentKnobs(BaseKnobs):
         """Return whether providers must record a public commitment."""
         return self.condition in {
             JointCommitmentCondition.PLEDGE,
+            JointCommitmentCondition.COSTLY_PLEDGE,
             JointCommitmentCondition.COVENANT,
         }
+
+    @property
+    def entry_cost_enabled(self) -> bool:
+        """Return whether affirming deducts the fixed pledge-entry cost."""
+        return self.condition == JointCommitmentCondition.COSTLY_PLEDGE
+
+    @property
+    def audit_enabled(self) -> bool:
+        """Return whether the current instrument uses delayed action audits."""
+        return self.audit_probability > 0.0
 
     @property
     def bond_enabled(self) -> bool:
@@ -56,8 +70,10 @@ class JointCommitmentKnobs(BaseKnobs):
             raise ValueError("the fixed client reserve must equal 7")
         if self.covenant_bond <= self.client_reserve:
             raise ValueError("the covenant bond must exceed the retained reserve")
-        if self.audit_probability <= 0.0 or self.audit_probability >= 1.0:
-            raise ValueError("audit_probability must be strictly between zero and one")
+        if self.audit_probability < 0.0 or self.audit_probability >= 1.0:
+            raise ValueError("audit_probability must be at least zero and less than one")
+        if self.entry_cost_enabled and self.pledge_entry_cost <= Decimal("0.0"):
+            raise ValueError("a costly pledge requires a positive entry cost")
         if self.audit_resolution_delay_rounds < 1:
             raise ValueError("audit_resolution_delay_rounds must be at least one")
         if self.round_count < 4:

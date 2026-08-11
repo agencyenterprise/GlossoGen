@@ -7,6 +7,7 @@ from glossogen.scenario_protocol import ScenarioRuntimeHandle
 from glossogen.scenarios.joint_commitment.events import (
     JointCommitmentBondPosted,
     JointCommitmentDecisionRecorded,
+    JointCommitmentPledgeEntryCostPaid,
     JointCommitmentPledgeSubmitted,
 )
 from glossogen.scenarios.joint_commitment.ids import (
@@ -26,7 +27,7 @@ def build_mcp_tools(
     knobs: JointCommitmentKnobs,
     get_runtime: RuntimeGetter,
 ) -> list[ScenarioMcpTool]:
-    """Build the condition-appropriate pledge, bond, and decision actions."""
+    """Build the condition-appropriate pledge, entry-cost, bond, and decision actions."""
 
     async def submit_group_pledge(ctx: ToolContext, decision: str) -> str:
         """Record one provider's public commitment response."""
@@ -62,6 +63,23 @@ def build_mcp_tools(
                 f"PLEDGE DECISION RECORDED: {recorded}. "
                 f"CONDITIONAL COVENANT BOND RECORDED: {amount} units are forfeited "
                 "after an audited violation."
+            )
+        if knobs.entry_cost_enabled and recorded == "affirm":
+            try:
+                amount = world.pay_pledge_entry_cost(agent_id=agent_id)
+            except ValueError as exc:
+                return f"ACTION REJECTED. {exc}"
+            if runtime is not None:
+                await runtime.event_logger.log(
+                    event=JointCommitmentPledgeEntryCostPaid(
+                        round_number=runtime.current_round,
+                        agent_id=agent_id,
+                        amount=amount,
+                    )
+                )
+            return (
+                f"PLEDGE DECISION RECORDED: {recorded}. "
+                f"IRREVERSIBLE ENTRY COST PAID: {amount} units."
             )
         return f"PLEDGE DECISION RECORDED: {recorded}."
 
@@ -106,7 +124,8 @@ def build_mcp_tools(
             name=SUBMIT_DECISION_TOOL,
             description=(
                 "Choose actual_action remit or retain for the fixed client reserve, and "
-                "public_attestation remitted or retained for the client record."
+                "public_attestation remitted or retained for the client record. "
+                "In direct-observation conditions, the public record must match the actual action."
             ),
             executor=submit_client_reserve_decision,
         )
