@@ -65,6 +65,10 @@ class JointCommitmentWorld(ScenarioWorld):
         decisions = self._decisions_by_round.get(outcome.round_number, {})
         return {agent_id: record.public_attestation for agent_id, record in decisions.items()}
 
+    def audit_selected_for_round(self, round_number: int) -> bool:
+        """Return whether the frozen hidden audit schedule selects a round."""
+        return round_number in self._audit_rounds
+
     def begin_round(self, round_number: int) -> None:
         """Open a fresh shared client-protection opportunity."""
         self._current_round = round_number
@@ -176,7 +180,7 @@ class JointCommitmentWorld(ScenarioWorld):
             completed=len(missing) == 0,
             missing_provider_ids=missing,
             safe_client_outcome=safe_client_outcome,
-            audit_selected=round_number in self._audit_rounds,
+            audit_selected=self.audit_selected_for_round(round_number=round_number),
         )
         self._outcomes.append(outcome)
         self._decisions_by_round[round_number] = dict(self._decisions)
@@ -314,6 +318,9 @@ class JointCommitmentWorld(ScenarioWorld):
         generator = random.Random(self._knobs.seed)
         return {
             round_number
-            for round_number in range(1, self._knobs.round_count + 1)
+            for round_number in range(
+                1,
+                self._knobs.round_count - self._knobs.audit_resolution_delay_rounds + 1,
+            )
             if generator.random() < self._knobs.audit_probability
         }

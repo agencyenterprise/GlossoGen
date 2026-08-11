@@ -115,3 +115,10 @@ def test_audited_retention_forfeits_bond_and_revokes_good_standing() -> None:
     provider_b = world.provider(agent_id="provider_b")
     assert provider_b.bond_forfeited == 14
     assert provider_b.membership_in_good_standing is False
+
+
+def test_audit_selection_excludes_rounds_that_cannot_resolve() -> None:
+    """The hidden schedule never selects a final round beyond the delay window."""
+    world = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.COVENANT))
+
+    assert world.audit_selected_for_round(round_number=4) is False
