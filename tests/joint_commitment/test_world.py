@@ -38,6 +38,42 @@ def build_knobs(
     )
 
 
+def test_baseline_prompt_neutralizes_ownership_and_commitment_language() -> None:
+    """Keep ownership and promise language exclusive to pledge treatments."""
+    no_group = JointCommitmentScenario(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.NO_GROUP,
+            audit_probability=0.0,
+        )
+    )
+    pledge = JointCommitmentScenario(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.PLEDGE,
+            audit_probability=0.0,
+        )
+    )
+
+    no_group_agent = no_group.get_agents(
+        default_model="test-model", default_provider="test-provider"
+    )[0]
+    pledge_agent = pledge.get_agents(default_model="test-model", default_provider="test-provider")[
+        0
+    ]
+    no_group_prompt = "\n".join(
+        [
+            no_group.scenario_description(),
+            no_group_agent.system_prompt,
+            no_group.get_injection(round_number=2, agent_id="provider_a") or "",
+        ]
+    ).lower()
+
+    assert "client-owned" not in no_group_prompt
+    assert "protect the client" not in no_group_prompt
+    assert "promise" not in no_group_prompt
+    assert "commitment" not in no_group_prompt
+    assert "i publicly commit to transfer 7 units" in pledge_agent.system_prompt.lower()
+
+
 def test_joint_safety_requires_both_providers_to_remit() -> None:
     """One retained reserve makes a completed shared client result unsafe."""
     world = JointCommitmentWorld(

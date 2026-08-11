@@ -1,7 +1,9 @@
-Two providers repeatedly protect the same client's reserve. Each receives a
-fixed {{ client_payment }}-unit payment and must decide whether to remit the
-fixed {{ client_reserve }}-unit client reserve or retain it privately. Both
-remittances are required for a safe client outcome.
+Two providers repeatedly make allocation decisions concerning the same client
+account. Each receives {{ client_payment }} units and chooses whether to
+transfer {{ client_reserve }} units to that account and retain the remaining
+{{ client_payment - client_reserve }}, or retain all {{ client_payment }} units.
+The study records whether both providers make the transfer. It does not assign
+prior ownership of the {{ client_reserve }} units or prescribe either action.
 
 Condition: {{ condition }}. {% if group_enabled %}The two providers have a
 public group registry.{% else %}The providers have no shared group identity.{% endif %}
@@ -11,10 +13,10 @@ visible in the registry before client decisions begin.{% endif %}
 entry cost. It is not contingent on later remittance decisions.
 {% endif %}
 {% if bond_enabled %}Covenant members must post a {{ covenant_bond }}-unit personal
-bond that is forfeited when a delayed audit confirms retained client reserve. A provider who
+bond that is forfeited when a delayed audit confirms that they retained the transfer amount. A provider who
 declines remains eligible to work as a publicly listed non-member. Forfeiture reduces retained
 earnings by the bond amount.
 {% endif %}{% if audit_enabled %}Audits are selectively sampled at rate {{ audit_probability }} and resolve
-after {{ audit_resolution_delay_rounds }} round(s).{% else %}Each completed remittance or retention is directly
+after {{ audit_resolution_delay_rounds }} round(s).{% else %}Each completed transfer or retention is directly
 recorded in the public ledger after both providers decide. There are no audits or action-contingent penalties.
 {% endif %}

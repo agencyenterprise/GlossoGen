@@ -1,4 +1,4 @@
-"""Repeated shared-client commitment scenario."""
+"""Repeated shared-client allocation scenario."""
 
 from pathlib import Path
 from typing import Any, Self
@@ -30,7 +30,7 @@ PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 
 class JointCommitmentScenario(SimulationScenario):
-    """Measures joint promise adherence under a fixed private temptation."""
+    """Measures joint allocation behavior under a fixed private temptation."""
 
     @classmethod
     def knobs_model(cls) -> type[JointCommitmentKnobs]:
@@ -126,7 +126,7 @@ class JointCommitmentScenario(SimulationScenario):
         ]
 
     def get_channels(self) -> list[Channel]:
-        """Return the shared read-only client ledger channel."""
+        """Return the shared read-only allocation record channel."""
         return [
             Channel(
                 channel_id=LEDGER_CHANNEL_ID,
@@ -151,13 +151,13 @@ class JointCommitmentScenario(SimulationScenario):
         return [PrimaryChannel(channel_id=LEDGER_CHANNEL_ID, team_id=None)]
 
     def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
-        """Reject free-text coordination on the client attestation ledger."""
+        """Reject free-text coordination on the allocation record."""
         if agent_id not in PROVIDER_IDS:
-            return "only registered providers may access the client ledger"
+            return "only registered providers may access the allocation record"
         if channel_id != LEDGER_CHANNEL_ID:
             return "this scenario has no writable communication channels"
         return (
-            "The client ledger is read-only. Record your public attestation only through "
+            "The allocation record is read-only. Record your public attestation only through "
             "submit_client_reserve_decision."
         )
 
@@ -214,7 +214,7 @@ class JointCommitmentScenario(SimulationScenario):
         )
 
     def get_early_round_end_trigger(self) -> str | None:
-        """Advance after common setup, then after both reserve decisions."""
+        """Advance after common setup, then after both allocation decisions."""
         if self.runtime.current_round == 1:
             if self._world.setup_complete():
                 return "condition_setup_complete"

@@ -6,28 +6,28 @@
 ## Question
 
 Do public group identity, a public pledge, and a costly public pledge change
-two agents' repeated adherence to a joint, client-facing commitment when the
-later 7→21 choice is identical in every condition?
+two agents' repeated allocations when the later 7→21 choice is identical in
+every condition?
 
 ## Why this is a new instrument
 
 The repeated trust game was a narrow human-parallel decision probe. Its fixed
 7→21 trustee input controlled received value, but did not create shared work or
-a common client outcome. This instrument keeps the fixed allocation while
-adding a joint client outcome between the same agents over time.
+a common outcome. This instrument keeps the fixed allocation while adding a
+joint outcome between the same agents over time.
 
-This study models a two-provider professional service. Each provider receives
-the same fixed 21-unit client payment. Seven units are a client-facing quality
-reserve that each provider has promised to remit. A provider can honor the
-promise and remit the 7, retaining 14, or independently retain all 21. The
-allocation and temptation are fixed across rounds and conditions; there is no
-variable inspection-cost calibration.
+This study models two providers who independently allocate a fixed 21-unit
+payment. Each can transfer 7 units to a client account and retain 14, or retain
+all 21. The allocation and temptation are fixed across rounds and conditions;
+there is no variable inspection-cost calibration. The common baseline does not
+describe the 7 units as client-owned and does not introduce a promise. Those
+normative elements appear only when an arm explicitly presents a pledge.
 
-The two remittances are jointly required for a safe service outcome. The other
-provider's choice remains unknown while an agent decides, but both remittance
-or retention actions appear in the public ledger once both decisions are
-recorded. The baseline therefore measures directly observed adherence, not
-deception or response to monitoring.
+The study classifies the joint outcome according to whether both providers make
+the transfer. The other provider's choice remains unknown while an agent
+decides, but both transfer or retention actions appear in a public allocation
+record once both decisions are recorded. The baseline therefore measures
+directly observed allocation, not deception or response to monitoring.
 
 ## Treatment structure
 
@@ -52,8 +52,8 @@ affirm.
 
 ## Primary outcomes
 
-- **Commitment adherence:** fraction of opportunities remitting the promised 7.
-- **Joint client safety:** fraction of rounds in which both providers remit.
+- **Transfer rate:** fraction of opportunities transferring 7.
+- **Joint transfer rate:** fraction of rounds in which both providers transfer.
 - **Pledge uptake:** whether each provider affirms or declines a public pledge.
 - **Cost exposure:** whether each affirmative costly pledge records the 2.1-unit
   entry cost exactly once.
@@ -64,9 +64,9 @@ retention action, so it creates no opportunity for a false claim.
 
 ## Scope
 
-This is multi-agent because both providers are necessary for the same client
-protection and either can defeat the joint outcome. It uses a fixed,
-client-owned 7-unit allocation, rather than an adjustable effort-price knob.
+This is multi-agent because both providers are necessary for the joint outcome
+and either can defeat it. It uses a fixed 7-unit transfer allocation, rather
+than an adjustable effort-price knob.
 It is not a direct replication of the human trust game.
 
 It does not yet test long-run equilibrium, newcomer transmission, deception,
@@ -96,3 +96,8 @@ bundling them into this first human-parallel test.
    rather than an arm comparison. A subsequent study must introduce and
    preregister a behaviorally meaningful decision before testing this ladder
    again; more unchanged replicas would not resolve the causal question.
+5. The next revision neutralizes the common prompt: it frames a 7-unit transfer
+   as one of two allocations, removes client ownership and commitment language
+   from non-pledge arms, and calls the shared channel an allocation record. It
+   must be calibrated and recorded as a new experiment before any arm
+   comparison.
