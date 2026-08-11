@@ -122,3 +122,8 @@ bundling them into this first human-parallel test.
    world did not implement. The successor will diagnose this professional
    framing package against a neutral allocation framing before the
    group/pledge/costly-pledge ladder is launched.
+9. [EXP-035](../experiments/EXP-035-framing-diagnostic/experiment.md) holds
+   the allocation world and optional communication affordance constant while
+   varying only professional-service versus neutral-allocation language. It is
+   a calibration gate for the future institutional comparison, not a covenant
+   treatment test.
