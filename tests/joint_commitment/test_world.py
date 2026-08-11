@@ -35,7 +35,7 @@ def test_joint_safety_requires_both_providers_to_remit() -> None:
     """One retained reserve makes a completed shared client result unsafe."""
     world = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.NO_GROUP))
 
-    world.begin_round(round_number=1)
+    world.begin_round(round_number=2)
     world.submit_decision(
         agent_id="provider_a",
         actual_action="remit",
@@ -46,7 +46,7 @@ def test_joint_safety_requires_both_providers_to_remit() -> None:
         actual_action="retain",
         public_attestation="retained",
     )
-    outcome = world.settle_round(round_number=1)
+    outcome = world.settle_round(round_number=2)
 
     assert outcome.completed is True
     assert outcome.safe_client_outcome is False
@@ -58,7 +58,7 @@ def test_covenant_requires_pledge_and_bond_before_a_decision() -> None:
     """Covenant exposure is a world action rather than prompt-only text."""
     world = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.COVENANT))
 
-    world.begin_round(round_number=1)
+    world.begin_round(round_number=2)
     try:
         world.submit_decision(
             agent_id="provider_a",
@@ -83,11 +83,25 @@ def test_covenant_requires_pledge_and_bond_before_a_decision() -> None:
         raise AssertionError("decision was accepted before bond exposure")
 
 
+def test_setup_requires_pledges_only_in_pledge_conditions() -> None:
+    """The first shared setup phase resolves automatically outside pledge arms."""
+    no_group = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.NO_GROUP))
+    pledge = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.PLEDGE))
+
+    assert no_group.setup_complete() is True
+    assert pledge.setup_complete() is False
+
+    for agent_id in ("provider_a", "provider_b"):
+        pledge.submit_pledge(agent_id=agent_id, decision="affirm")
+
+    assert pledge.setup_complete() is True
+
+
 def test_audited_retention_forfeits_bond_and_revokes_good_standing() -> None:
     """A selected delayed audit applies the covenant consequence to retention."""
     world = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.COVENANT))
 
-    world.begin_round(round_number=1)
+    world.begin_round(round_number=2)
     for agent_id in ("provider_a", "provider_b"):
         world.submit_pledge(agent_id=agent_id, decision="affirm")
         world.post_bond(agent_id=agent_id)
@@ -101,8 +115,8 @@ def test_audited_retention_forfeits_bond_and_revokes_good_standing() -> None:
         actual_action="retain",
         public_attestation="remitted",
     )
-    outcome = world.settle_round(round_number=1)
-    audit_events = world.resolve_due_audits(round_number=2)
+    outcome = world.settle_round(round_number=2)
+    audit_events = world.resolve_due_audits(round_number=3)
 
     assert outcome.audit_selected is True
     provider_b_audit = next(

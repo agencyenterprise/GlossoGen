@@ -11,7 +11,6 @@ from glossogen.scenarios.joint_commitment.events import (
 )
 from glossogen.scenarios.joint_commitment.ids import (
     PLEDGE_TEXT,
-    POST_BOND_TOOL,
     SUBMIT_DECISION_TOOL,
     SUBMIT_PLEDGE_TOOL,
 )
@@ -46,25 +45,24 @@ def build_mcp_tools(
                     pledge_text=PLEDGE_TEXT,
                 )
             )
-        return f"PLEDGE DECISION RECORDED: {recorded}."
-
-    async def post_covenant_bond(ctx: ToolContext) -> str:
-        """Post the fixed covenant bond in escrow."""
-        agent_id = resolve_agent_id(ctx=ctx)
-        try:
-            amount = world.post_bond(agent_id=agent_id)
-        except ValueError as exc:
-            return f"ACTION REJECTED. {exc}"
-        runtime = get_runtime()
-        if runtime is not None:
-            await runtime.event_logger.log(
-                event=JointCommitmentBondPosted(
-                    round_number=runtime.current_round,
-                    agent_id=agent_id,
-                    amount=amount,
+        if knobs.bond_enabled and recorded == "affirm":
+            try:
+                amount = world.post_bond(agent_id=agent_id)
+            except ValueError as exc:
+                return f"ACTION REJECTED. {exc}"
+            if runtime is not None:
+                await runtime.event_logger.log(
+                    event=JointCommitmentBondPosted(
+                        round_number=runtime.current_round,
+                        agent_id=agent_id,
+                        amount=amount,
+                    )
                 )
+            return (
+                f"PLEDGE DECISION RECORDED: {recorded}. "
+                f"COVENANT BOND POSTED: {amount} units are held in escrow."
             )
-        return f"COVENANT BOND POSTED: {amount} units are held in escrow."
+        return f"PLEDGE DECISION RECORDED: {recorded}."
 
     async def submit_client_reserve_decision(
         ctx: ToolContext,
@@ -119,15 +117,6 @@ def build_mcp_tools(
                 name=SUBMIT_PLEDGE_TOOL,
                 description="Record affirm or decline for the displayed group pledge.",
                 executor=submit_group_pledge,
-            ),
-        )
-    if knobs.bond_enabled:
-        tools.insert(
-            1,
-            ScenarioMcpTool(
-                name=POST_BOND_TOOL,
-                description="Post the displayed covenant bond after affirming the pledge.",
-                executor=post_covenant_bond,
             ),
         )
     return tools

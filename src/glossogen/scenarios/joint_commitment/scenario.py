@@ -16,7 +16,6 @@ from glossogen.scenarios.joint_commitment.ids import (
     LEDGER_CHANNEL_ID,
     LEDGER_CHANNEL_NAME,
     PLEDGE_TEXT,
-    POST_BOND_TOOL,
     PROVIDER_IDS,
     SUBMIT_DECISION_TOOL,
     SUBMIT_PLEDGE_TOOL,
@@ -91,8 +90,6 @@ class JointCommitmentScenario(SimulationScenario):
         tools = [SUBMIT_DECISION_TOOL]
         if self._knobs.pledge_enabled:
             tools.insert(0, SUBMIT_PLEDGE_TOOL)
-        if self._knobs.bond_enabled:
-            tools.insert(1, POST_BOND_TOOL)
         return [
             AgentConfig(
                 agent_id=agent_id,
@@ -191,7 +188,9 @@ class JointCommitmentScenario(SimulationScenario):
         )
 
     async def on_round_advanced(self, round_number: int) -> None:
-        """Resolve due audits, then open one shared client opportunity."""
+        """Run one common setup phase before opening client opportunities."""
+        if round_number == 1:
+            return
         audit_events = self._world.resolve_due_audits(round_number=round_number)
         for event in audit_events:
             await self.runtime.event_logger.log(event=event)
@@ -204,7 +203,11 @@ class JointCommitmentScenario(SimulationScenario):
         )
 
     def get_early_round_end_trigger(self) -> str | None:
-        """Advance once both providers recorded their decision."""
+        """Advance after common setup, then after both reserve decisions."""
+        if self.runtime.current_round == 1:
+            if self._world.setup_complete():
+                return "condition_setup_complete"
+            return None
         if self._world.decisions_complete():
             return "both_client_reserve_decisions_recorded"
         return None
@@ -212,6 +215,8 @@ class JointCommitmentScenario(SimulationScenario):
     async def on_round_ended(self, round_number: int, trigger: str) -> None:
         """Record the joint client result and hidden audit selection."""
         _ = trigger
+        if round_number == 1:
+            return
         outcome = self._world.settle_round(round_number=round_number)
         await self.runtime.event_logger.log(
             event=JointCommitmentRoundSettled(
@@ -227,6 +232,8 @@ class JointCommitmentScenario(SimulationScenario):
     def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
         """Report decision completion without collapsing safety into success."""
         _ = round_number, trigger
+        if round_number == 1:
+            return []
         outcome = self._world.previous_outcome()
         if outcome is None:
             return []

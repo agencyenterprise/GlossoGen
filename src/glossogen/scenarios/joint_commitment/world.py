@@ -165,6 +165,12 @@ class JointCommitmentWorld(ScenarioWorld):
         """Return whether both providers made their structured decisions."""
         return len(self._decisions) == len(PROVIDER_IDS)
 
+    def setup_complete(self) -> bool:
+        """Return whether the common first-round setup can conclude."""
+        if not self._knobs.pledge_enabled:
+            return True
+        return all(provider.pledge_decision is not None for provider in self._providers.values())
+
     def settle_round(self, round_number: int) -> RoundOutcome:
         """Freeze the shared client outcome and any hidden audit selection."""
         if self._current_round_settled:
@@ -319,7 +325,7 @@ class JointCommitmentWorld(ScenarioWorld):
         return {
             round_number
             for round_number in range(
-                1,
+                2,
                 self._knobs.round_count - self._knobs.audit_resolution_delay_rounds + 1,
             )
             if generator.random() < self._knobs.audit_probability
