@@ -1,0 +1,23 @@
+--- WAREHOUSE COMMITMENT ROUND {{ round_number }} ---
+Your balance: {{ "%.2f"|format(balance) }}
+{% if forfeiture_enabled %}Total forfeiture paid so far: {{ "%.2f"|format(forfeiture_paid) }}
+{% endif %}
+{% if group_enabled %}You and the other provider are publicly in the same professional group.
+{% else %}There is no shared professional group in this condition.
+{% endif %}
+{% if pledge_enabled and pledge_decision is none %}
+PLEDGE DECISION REQUIRED BEFORE ACTION: call `submit_covenant_pledge` with `affirm` or `decline`.
+Statement: "{{ pledge_text }}"
+{% elif pledge_enabled %}Your recorded pledge decision: {{ pledge_decision }}.
+{% endif %}
+
+Choose exactly one action for your assigned zone:
+- inspect_assigned_zone: gross {{ "%.2f"|format(base_round_payment) }}{% if forfeiture_enabled %}; automatic forfeiture {{ "%.2f"|format(base_round_payment * forfeiture_fraction) }}; net {{ "%.2f"|format(base_round_payment * (1 - forfeiture_fraction)) }}{% endif %}.
+- take_shortcut: gross {{ "%.2f"|format(base_round_payment + shortcut_bonus) }}{% if forfeiture_enabled %}; automatic forfeiture {{ "%.2f"|format((base_round_payment + shortcut_bonus) * forfeiture_fraction) }}; net {{ "%.2f"|format((base_round_payment + shortcut_bonus) * (1 - forfeiture_fraction)) }}{% endif %}.
+
+{% if previous and disclose_actions_after_round %}
+PREVIOUS ROUND'S PUBLIC ACTION SUMMARY
+Both providers completed the round: {{ "yes" if previous.completed else "no" }}.
+Inspections: {{ previous.inspected_provider_count }}/2. Shortcuts: {{ previous.shortcut_provider_count }}/2.
+Actions: {% for provider_id, action in previous.actions_by_provider.items() %}{{ provider_id }}={{ action }}{% if not loop.last %}, {% endif %}{% endfor %}.
+{% endif %}

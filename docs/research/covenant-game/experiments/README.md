@@ -28,6 +28,8 @@ and its
   EXP-022–023 complete.
 - [STUDY-005 — Measurement resolution](../studies/STUDY-005-measurement-resolution.md):
   EXP-024 complete. Next available record is EXP-025.
+- [STUDY-006 — Human-parallel commitment](../studies/STUDY-006-human-parallel-commitment.md):
+  EXP-025 planned.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -63,6 +65,7 @@ count that resolves it before launching.
 | [EXP-022](EXP-022-pledge-personal-stake-pilot/experiment.md) | pledge × personal stake activation pilot | complete | supported: both manipulations activated with useful variation | $5.19 |
 | [EXP-023](EXP-023-pledge-stake-factorial/experiment.md) | fifteen-round pledge × personal stake factorial | complete | personal stake repeated as an adverse effort/safety candidate; pledge and interaction did not repeat | $27.18 |
 | [EXP-024](EXP-024-baseline-variance/experiment.md) | run-to-run variance of the association baseline at a fixed seed | complete | supported: `s = 4.71` inspections from identical inputs; kill criterion fired, cost redesign not authorized | $21.26 |
+| [EXP-025](EXP-025-human-parallel-commitment-pilot/experiment.md) | human-parallel commitment instrument pilot | planned | pending | — |
 
 Total API spend logged: **$416.02** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -74,7 +77,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-024`. Before launching, use the
+The next available ID is `EXP-026`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat

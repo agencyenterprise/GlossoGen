@@ -26,6 +26,7 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-003 — Enforcement and resilience](studies/STUDY-003-enforcement-resilience.md) | exploratory phase complete | Can the institution enforce boundaries and continue operating after violations, exits, or population loss? |
 | [STUDY-004 — Pledge × personal cost](studies/STUDY-004-pledge-cost-mechanism.md) | exploratory phase complete | Is behavior changed by the pledge, personal cost, or their interaction? |
 | [STUDY-005 — Measurement resolution](studies/STUDY-005-measurement-resolution.md) | first calibration complete | How much does a trajectory vary when nothing changes, and which effect sizes can this instrument resolve? |
+| [STUDY-006 — Human-parallel commitment](studies/STUDY-006-human-parallel-commitment.md) | planned | Do group identity, pledge, and a 10% forfeiture change repeated promise adherence under a fixed temptation? |
 
 ## Current decision
 
@@ -42,10 +43,8 @@ rather than repeated, and the "same sign at two fresh seeds" rule agrees by
 chance one time in four. Resolving a four-assignment effect needs 23 runs per
 arm, so neither the second-model replication nor the cost redesign is authorized.
 
-The authorized next steps are the ones that do not depend on resolving a small
-difference: recut the existing runs distributionally against the human study's
-own headline statistic, add a neutral arm with no institutional framing, and
-compare an agent carrying an accumulated history of honored commitments against a
-fresh agent given the same commitment as a written rule. Every new experiment must
-state its target effect size and required replicate count up front, using the
-noise terms in [STUDY-005](studies/STUDY-005-measurement-resolution.md).
+The next planned work is [STUDY-006](studies/STUDY-006-human-parallel-commitment.md):
+a new, reduced scenario that distinguishes group identity, pledge, and the human
+study's 10% forfeiture under a fixed immediate temptation. It is a separate
+commitment experiment, not a replacement for the institution and enforcement
+studies. Every run remains subject to its preregistered decision gates.

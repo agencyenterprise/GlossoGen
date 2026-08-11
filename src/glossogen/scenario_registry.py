@@ -25,6 +25,7 @@ from glossogen.scenarios.spillway_release.scenario import SpillwayReleaseScenari
 from glossogen.scenarios.spot_the_difference.scenario import SpotTheDifferenceScenario
 from glossogen.scenarios.veyru.scenario import VeyruScenario
 from glossogen.scenarios.warehouse_robot_recovery.scenario import WarehouseRobotRecoveryScenario
+from glossogen.scenarios.warehouse_commitment.scenario import WarehouseCommitmentScenario
 
 SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "bonded_counter_association": BondedCounterAssociationScenario,
@@ -38,4 +39,5 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "spot_the_difference": SpotTheDifferenceScenario,
     "veyru": VeyruScenario,
     "warehouse_robot_recovery": WarehouseRobotRecoveryScenario,
+    "warehouse_commitment": WarehouseCommitmentScenario,
 }

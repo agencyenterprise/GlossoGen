@@ -1,0 +1,6 @@
+Two warehouse providers repeatedly choose whether to perform a genuine inspection
+or take a private shortcut. The immediate shortcut incentive is fixed in every
+condition. This run uses the {{ condition }} condition{% if group_enabled %},
+with public group membership{% endif %}{% if pledge_enabled %}, an explicit
+commitment pledge{% endif %}{% if forfeiture_enabled %}, and an automatic
+{{ "%.0f"|format(forfeiture_fraction * 100) }}% forfeiture of every realized reward{% endif %}.
