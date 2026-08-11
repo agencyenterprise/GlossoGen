@@ -32,6 +32,8 @@ and its
   EXP-025 complete; fixed action framing hit a joint-inspection floor.
 - [STUDY-007 — Repeated trust-game replication](../studies/STUDY-007-repeated-trust-game.md):
   EXP-026 complete; trust moved under covenant, reciprocity was invariant.
+- [STUDY-008 — Joint commitment alignment](../studies/STUDY-008-joint-commitment-alignment.md):
+  design complete; EXP-027 is reserved for instrument calibration.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected

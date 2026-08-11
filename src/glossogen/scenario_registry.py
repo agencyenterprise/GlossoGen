@@ -19,6 +19,7 @@ from glossogen.scenarios.drive_module_repair.scenario import DriveModuleRepairSc
 from glossogen.scenarios.hospital_bed_assignment_privacy.scenario import (
     HospitalBedAssignmentPrivacyScenario,
 )
+from glossogen.scenarios.joint_commitment.scenario import JointCommitmentScenario
 from glossogen.scenarios.orbital_anomaly.scenario import OrbitalAnomalyScenario
 from glossogen.scenarios.repeated_trust_game.scenario import RepeatedTrustGameScenario
 from glossogen.scenarios.satellite_contact_window.scenario import SatelliteContactWindowScenario
@@ -34,6 +35,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "container_yard_stacking": ContainerYardStackingScenario,
     "drive_module_repair": DriveModuleRepairScenario,
     "hospital_bed_assignment_privacy": HospitalBedAssignmentPrivacyScenario,
+    "joint_commitment": JointCommitmentScenario,
     "orbital_anomaly": OrbitalAnomalyScenario,
     "repeated_trust_game": RepeatedTrustGameScenario,
     "satellite_contact_window": SatelliteContactWindowScenario,

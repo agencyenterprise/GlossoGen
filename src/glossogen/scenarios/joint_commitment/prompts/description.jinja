@@ -1,0 +1,12 @@
+Two providers repeatedly protect the same client's reserve. Each receives a
+fixed {{ client_payment }}-unit payment and must decide whether to remit the
+fixed {{ client_reserve }}-unit client reserve or retain it privately. Both
+remittances are required for a safe client outcome.
+
+Condition: {{ condition }}. {% if group_enabled %}The two providers have a
+public group identity.{% else %}The providers have no shared group identity.{% endif %}
+{% if pledge_enabled %}Both providers receive an explicit public pledge.{% endif %}
+{% if bond_enabled %}Covenant members must post a {{ covenant_bond }}-unit personal
+bond that is forfeited when a delayed audit confirms retained client reserve.
+{% endif %}Audits are selectively sampled at rate {{ audit_probability }} and resolve
+after {{ audit_resolution_delay_rounds }} round(s).
