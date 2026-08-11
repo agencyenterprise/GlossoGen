@@ -1,8 +1,8 @@
 # EXP-032 — Rules-only baseline calibration
 
-**Status:** planned
+**Status:** complete
 **Date opened:** 2026-08-11
-**Date closed:** —
+**Date closed:** 2026-08-11
 **Research program:** covenant-game
 **Study:** STUDY-008 — Joint commitment alignment
 **Role:** calibration
@@ -22,7 +22,11 @@
   "configs": [
     {"path": "docs/research/covenant-game/experiments/EXP-032-rules-only-baseline-calibration/configs/no-group.json", "launch_path": "docs/research/covenant-game/experiments/EXP-032-rules-only-baseline-calibration/configs/no-group.json", "sha256": "d9a0d919680b6fd888afd41cef3503e0e61af896225e9ca60e0226e52e5013df"}
   ],
-  "runs": []
+  "runs": [
+    {"role": "rules_only_preflight_1", "included": false, "reason": "Cancelled after the runtime exposed send_message and an agent attempted coordination; the environment did not meet the preregistered no-free-text requirement.", "run_dir": "runs/joint_commitment/1786483796", "event_log_sha256": "f0a7fca8ab2feaf8c98946a4dcd7b2d940dcb7ded3e2daa0f487b84f60fc5fcb", "resolved_config_sha256": "8bb703df7c7ba2d7e7e996ddb9b97ee52e75c22f06e4d10ceff3e3407c9f11fe", "completed": false},
+    {"role": "rules_only_preflight_2", "included": false, "reason": "The runtime exposed send_message and a universal communication prompt, so this completed trajectory does not meet the preregistered no-free-text environment.", "run_dir": "runs/joint_commitment/1786483798", "event_log_sha256": "6b4791692bc1e7c0116c08d957f03441bbadac6e1383000a804a11b40d352829", "resolved_config_sha256": "8bb703df7c7ba2d7e7e996ddb9b97ee52e75c22f06e4d10ceff3e3407c9f11fe", "completed": true, "total_cost_usd": 0.1791856},
+    {"role": "rules_only_preflight_3", "included": false, "reason": "Cancelled after the runtime exposed send_message and an agent attempted coordination; the environment did not meet the preregistered no-free-text requirement.", "run_dir": "runs/joint_commitment/1786483799", "event_log_sha256": "a0176e185ae40f53834e50afa0baca6a1892ee74896c2a19486611a48c7379af", "resolved_config_sha256": "8bb703df7c7ba2d7e7e996ddb9b97ee52e75c22f06e4d10ceff3e3407c9f11fe", "completed": false}
+  ]
 }
 -->
 
@@ -98,21 +102,35 @@ This does not establish an institutional, human, or model-general effect.
 
 ## Result
 
-Pending.
+The three launch attempts were stopped in the first round. Although the joint
+commitment scenario rejected free-text messages, the shared runtime still
+advertised `send_message` and its universal communication protocol instructed
+the agents to use it. An agent consequently attempted coordination before any
+allocation decision. None of the attempts is included as behavioral evidence.
+
+The repair makes communication an environmental constraint: this scenario now
+has no channels, its providers are registered with communication disabled, the
+MCP tool list excludes all free-text tools, and the silent runtime protocol
+only permits notifications and structured decisions.
 
 ## Outcome
 
-Pending.
+**Invalid.** The preflight did not provide the no-communication environment
+specified in the record. It cannot answer the calibration question.
 
 ## Validity limitations
 
-Pending.
+- These cancelled attempts have no authoritative completion event or canonical
+  final cost, so they are excluded from both behavioral and cost summaries.
+- The repair changes runtime tool exposure, so a fresh preregistered record is
+  required before launching the intended three-replica calibration.
 
 ## What it changed
 
-This calibration isolates the remaining common prompt context identified in
-EXP-031 before a costly four-arm institutional comparison. It cannot itself
-test public group identity, pledge, or costly pledge.
+This preflight exposed a runtime-level source of treatment contamination. Its
+successor tests the same rules-only allocation prompt with free-text
+communication unavailable rather than merely prohibited in text. It cannot
+itself test public group identity, pledge, or costly pledge.
 
 ## Traps found
 
@@ -120,3 +138,7 @@ EXP-030's universal remittance and EXP-031's extreme between-run variation show
 that prompt wording and injected shared history can dominate the behavior being
 measured. The absence of an institutional mechanism must be represented by the
 environment, not narrated to the provider.
+
+Rejecting an attempted message is not equivalent to making communication
+unavailable: the exposed tool schema and universal protocol can themselves
+alter behavior.

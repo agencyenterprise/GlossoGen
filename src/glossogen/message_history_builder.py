@@ -40,7 +40,7 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.models.tool_definition import ToolCallRequest
-from glossogen.runners.communication_protocol import CONTINUE_PROMPT, INITIAL_PROMPT
+from glossogen.runners.communication_protocol import INITIAL_PROMPT
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
@@ -395,6 +395,7 @@ def build_message_history(
     tool_calls_only: bool,
     channel_visibility: dict[str, ChannelVisibility],
     split_parallel_tool_calls: bool,
+    continue_prompt: str,
 ) -> list[ModelMessage]:
     """Build a pydantic-ai message history for an agent from JSONL events.
 
@@ -585,6 +586,6 @@ def build_message_history(
         )
         is_last = index == len(kept_cycles) - 1
         if cycle.stop_reason == "end_turn" and not cycle.parent_past_cutoff and not is_last:
-            messages.append(ModelRequest(parts=[UserPromptPart(content=CONTINUE_PROMPT)]))
+            messages.append(ModelRequest(parts=[UserPromptPart(content=continue_prompt)]))
 
     return messages

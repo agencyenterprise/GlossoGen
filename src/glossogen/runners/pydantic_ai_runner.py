@@ -56,9 +56,9 @@ from glossogen.runners.agent_run_result import AgentRunResult
 from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.communication_protocol import (
     COMPACTION_INSTRUCTIONS,
-    CONTINUE_PROMPT,
     INITIAL_PROMPT,
     build_full_system_prompt,
+    continue_prompt_for,
 )
 from glossogen.runners.history_cleanup_processor import clean_history
 from glossogen.runners.pydantic_ai_model_factory import (
@@ -284,6 +284,10 @@ class PydanticAIRunner(AgentRunner):
         full_system_prompt = build_full_system_prompt(
             base_prompt=agent_config.system_prompt,
             role_name=agent_config.role_name,
+            communication_enabled=agent_config.communication_enabled,
+        )
+        continue_prompt = continue_prompt_for(
+            communication_enabled=agent_config.communication_enabled,
         )
 
         capabilities: list[AgentCapability[None]] = [ProcessHistory(clean_history)]
@@ -324,7 +328,7 @@ class PydanticAIRunner(AgentRunner):
         total_turns = 0
         cumulative_cost = 0.0
         if message_history is not None:
-            prompt: str = CONTINUE_PROMPT
+            prompt: str = continue_prompt
         else:
             prompt = INITIAL_PROMPT
         bus = self._event_bus
@@ -465,7 +469,7 @@ class PydanticAIRunner(AgentRunner):
                     if not cycle_succeeded or result is None:
                         all_background_tasks.extend(state.background_tasks)
                         total_turns += 1
-                        prompt = CONTINUE_PROMPT
+                        prompt = continue_prompt
                         continue
 
                     message_history = result.all_messages()
@@ -514,7 +518,7 @@ class PydanticAIRunner(AgentRunner):
                         )
                         break
 
-                    prompt = CONTINUE_PROMPT
+                    prompt = continue_prompt
 
                 if total_turns >= self._max_turns:
                     logger.warning(

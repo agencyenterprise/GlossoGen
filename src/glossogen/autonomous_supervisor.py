@@ -259,10 +259,15 @@ class AutonomousSupervisor:
         for config in self._agent_configs:
             agent_sessions[config.agent_id] = AgentSession(agent_id=config.agent_id)
 
-        # Build per-agent tool allowlists from scenario-specific tool_names.
-        agent_tool_allowlists: dict[str, frozenset[str]] = {
-            config.agent_id: frozenset(config.tool_names) for config in self._agent_configs
-        }
+        # Build per-agent tool allowlists from scenario actions and the
+        # communication affordances explicitly enabled for each agent.
+        agent_tool_allowlists: dict[str, frozenset[str]] = {}
+        for config in self._agent_configs:
+            allowed_tool_names = set(config.tool_names)
+            allowed_tool_names.add("read_notifications")
+            if config.communication_enabled:
+                allowed_tool_names.update(BASE_TOOL_NAMES)
+            agent_tool_allowlists[config.agent_id] = frozenset(allowed_tool_names)
 
         # Build the world context (needs sessions and logger, not the runtime).
         world_context = WorldContext(
@@ -389,13 +394,14 @@ class AutonomousSupervisor:
                 )
             )
         for config in self._agent_configs:
-            all_tool_names = [*BASE_TOOL_NAMES, *config.tool_names]
+            all_tool_names = sorted(agent_tool_allowlists[config.agent_id])
             await self._event_logger.log(
                 event=AgentRegistered(
                     agent_id=config.agent_id,
                     role_name=config.role_name,
                     system_prompt=config.system_prompt,
                     channel_ids=config.channel_ids,
+                    communication_enabled=config.communication_enabled,
                     tool_names=all_tool_names,
                     model=config.model,
                     provider=config.provider,

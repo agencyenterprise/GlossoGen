@@ -68,11 +68,7 @@ BASE_TOOL_NAMES: frozenset[str] = frozenset(
         "get_channel_members",
     }
 )
-"""Base communication tools available to all agents unconditionally.
-
-These are always visible in ``tools/list`` and exempt from the per-agent
-authorization guard.
-"""
+"""Names of the runtime's general communication tools."""
 
 
 def _build_notification_payload(

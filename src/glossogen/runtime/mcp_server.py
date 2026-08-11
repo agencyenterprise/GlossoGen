@@ -1,9 +1,7 @@
 """Starts the MCP server over Streamable HTTP transport with per-agent tool filtering.
 
 Creates a ``FilteringFastMCP`` instance that extends FastMCP to return only
-the tools each agent is authorized to see. Base communication tools are
-always visible; scenario-specific tools are filtered against the per-agent
-allowlist stored in ``SimulationRuntime``.
+the tools each agent is authorized to see.
 """
 
 import logging
@@ -12,7 +10,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.lowlevel.server import request_ctx
 from mcp.types import Tool as MCPTool
 
-from glossogen.runtime.mcp_tools import BASE_TOOL_NAMES, register_tools
+from glossogen.runtime.mcp_tools import register_tools
 from glossogen.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
@@ -24,8 +22,8 @@ class FilteringFastMCP(FastMCP):
     When a client calls ``tools/list``, this reads the ``agent_id`` from
     the HTTP query parameters (set by the MCP library's ``request_ctx``
     contextvar) and returns only the tools that agent is allowed to see.
-    Base communication tools are always included; scenario tools are
-    filtered against ``SimulationRuntime.is_tool_allowed()``.
+    Every registered tool is filtered against
+    ``SimulationRuntime.is_tool_allowed()``.
     """
 
     def __init__(self, runtime: SimulationRuntime, name: str, host: str, port: int) -> None:
@@ -49,9 +47,7 @@ class FilteringFastMCP(FastMCP):
 
         filtered: list[MCPTool] = []
         for tool in all_tools:
-            if tool.name in BASE_TOOL_NAMES:
-                filtered.append(tool)
-            elif self._runtime.is_tool_allowed(agent_id=agent_id, tool_name=tool.name):
+            if self._runtime.is_tool_allowed(agent_id=agent_id, tool_name=tool.name):
                 filtered.append(tool)
             else:
                 logger.debug(

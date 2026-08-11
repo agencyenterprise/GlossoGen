@@ -10,6 +10,7 @@ from glossogen.scenarios.joint_commitment.knobs import (
 )
 from glossogen.scenarios.joint_commitment.scenario import JointCommitmentScenario
 from glossogen.scenarios.joint_commitment.world import JointCommitmentWorld
+from glossogen.runners.communication_protocol import build_full_system_prompt
 
 
 def build_knobs(
@@ -76,6 +77,30 @@ def test_baseline_prompt_contains_only_operational_allocation_rules() -> None:
     assert "communicate" not in no_group_prompt
     assert "pledge" not in no_group_prompt
     assert "i publicly commit to transfer 7 units" in pledge_agent.system_prompt.lower()
+
+
+def test_allocation_study_has_no_free_text_communication_affordance() -> None:
+    """Keep the allocation decision environment free of message channels and prompts."""
+    scenario = JointCommitmentScenario(
+        knobs=build_knobs(
+            condition=JointCommitmentCondition.NO_GROUP,
+            audit_probability=0.0,
+        )
+    )
+
+    agent = scenario.get_agents(default_model="test-model", default_provider="test-provider")[0]
+    full_prompt = build_full_system_prompt(
+        base_prompt=agent.system_prompt,
+        role_name=agent.role_name,
+        communication_enabled=agent.communication_enabled,
+    ).lower()
+
+    assert agent.channel_ids == []
+    assert agent.communication_enabled is False
+    assert scenario.get_channels() == []
+    assert scenario.get_primary_channels() == []
+    assert "send_message" not in full_prompt
+    assert "read_channel" not in full_prompt
 
 
 def test_later_allocation_prompts_omit_previous_provider_actions() -> None:

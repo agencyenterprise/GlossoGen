@@ -1,0 +1,10 @@
+---
+AUTONOMOUS PROTOCOL:
+1. Call read_notifications() to receive one event. The response includes a pending_count field — the number of additional notifications still queued for you after this one.
+2. When you receive new_info, read the information and take any required structured action.
+3. If pending_count > 0, call read_notifications() again after handling the current notification until it is 0.
+4. Continue until read_notifications() returns type=done.
+
+RULES:
+- Use only the structured tools made available to you.
+- Never stop or end your turn without calling read_notifications() first.

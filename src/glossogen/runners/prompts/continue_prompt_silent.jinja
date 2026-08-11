@@ -1,0 +1,1 @@
+Call read_notifications() to wait for the next event. When you receive new_info, read it and take any required structured action. If pending_count > 0, call read_notifications() again after handling the current notification to drain the queue. Continue until it returns type=done.

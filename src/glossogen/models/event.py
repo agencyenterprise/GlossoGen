@@ -48,6 +48,7 @@ class AgentRegistered(EventBase):
     role_name: str
     system_prompt: str
     channel_ids: list[str]
+    communication_enabled: bool = True
     tool_names: list[str]
     model: str
     provider: str

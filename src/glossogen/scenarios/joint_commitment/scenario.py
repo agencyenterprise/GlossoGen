@@ -115,7 +115,8 @@ class JointCommitmentScenario(SimulationScenario):
                         "pledge_entry_cost": self._knobs.pledge_entry_cost,
                     },
                 ),
-                channel_ids=[LEDGER_CHANNEL_ID],
+                channel_ids=[],
+                communication_enabled=False,
                 tool_names=tools,
                 model=default_model,
                 provider=default_provider,
@@ -126,14 +127,8 @@ class JointCommitmentScenario(SimulationScenario):
         ]
 
     def get_channels(self) -> list[Channel]:
-        """Return the shared read-only allocation record channel."""
-        return [
-            Channel(
-                channel_id=LEDGER_CHANNEL_ID,
-                name=LEDGER_CHANNEL_NAME,
-                member_agent_ids=list(PROVIDER_IDS),
-            )
-        ]
+        """Return no free-text channels for the structured allocation study."""
+        return []
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
         """Return the public ledger name for known providers."""
@@ -147,8 +142,8 @@ class JointCommitmentScenario(SimulationScenario):
         return provider_role_name(agent_id=agent_id)
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
-        """Expose the read-only public ledger to generic metrics."""
-        return [PrimaryChannel(channel_id=LEDGER_CHANNEL_ID, team_id=None)]
+        """Return no message channel because the study uses structured actions."""
+        return []
 
     def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
         """Reject free-text coordination on the allocation record."""

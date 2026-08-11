@@ -22,7 +22,7 @@ from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import AgentRegistered, AgentSwappedMidRun
 from glossogen.resume_context_writer import write_swap_resume_context_file
 from glossogen.runners.agent_runner_base import AgentRunner
-from glossogen.runners.communication_protocol import build_full_system_prompt
+from glossogen.runners.communication_protocol import build_full_system_prompt, continue_prompt_for
 from glossogen.runtime.activity_notification import DoneNotification, NewMessagesNotification
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.scheduled_events import ChannelVisibility, ChannelVisibilityNone, SwapAgent
@@ -245,6 +245,7 @@ async def _build_seed_history(
     system_prompt = build_full_system_prompt(
         base_prompt=base_prompt,
         role_name=last_registration.role_name,
+        communication_enabled=last_registration.communication_enabled,
     )
     history = build_message_history(
         events=events,
@@ -255,6 +256,9 @@ async def _build_seed_history(
         tool_calls_only=True,
         channel_visibility=spec.channel_visibility,
         split_parallel_tool_calls=spec.provider == SELF_HOSTED_PROVIDER,
+        continue_prompt=continue_prompt_for(
+            communication_enabled=last_registration.communication_enabled,
+        ),
     )
     return _SeedHistory(history=history, system_prompt=system_prompt)
 

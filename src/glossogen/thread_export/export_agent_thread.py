@@ -16,7 +16,7 @@ from glossogen.evaluation.log_reader import extract_agent_configs, load_events
 from glossogen.message_history_builder import build_message_history, resolve_history_timestamp
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
-from glossogen.runners.communication_protocol import build_full_system_prompt
+from glossogen.runners.communication_protocol import build_full_system_prompt, continue_prompt_for
 from glossogen.thread_export.provider_thread_serializer import (
     to_anthropic_request,
     to_openai_request,
@@ -88,6 +88,7 @@ def export_agent_thread(
     full_system_prompt = build_full_system_prompt(
         base_prompt=agent_config.system_prompt,
         role_name=agent_config.role_name,
+        communication_enabled=agent_config.communication_enabled,
     )
     history = build_message_history(
         events=events,
@@ -98,6 +99,9 @@ def export_agent_thread(
         tool_calls_only=False,
         channel_visibility={},
         split_parallel_tool_calls=False,
+        continue_prompt=continue_prompt_for(
+            communication_enabled=agent_config.communication_enabled,
+        ),
     )
     if not history:
         raise ValueError(

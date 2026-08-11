@@ -37,7 +37,7 @@ from glossogen.llm.provider import LLMProvider
 from glossogen.message_history_builder import build_message_history, resolve_history_timestamp
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
-from glossogen.runners.communication_protocol import build_full_system_prompt
+from glossogen.runners.communication_protocol import build_full_system_prompt, continue_prompt_for
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.template_renderer import TemplateRenderer
 from glossogen.token_pricing import SELF_HOSTED_PROVIDER
@@ -133,6 +133,7 @@ class ProtocolProbeMetric(Metric):
                     full_system_prompt = build_full_system_prompt(
                         base_prompt=agent_config.system_prompt,
                         role_name=agent_config.role_name,
+                        communication_enabled=agent_config.communication_enabled,
                     )
                     history = build_message_history(
                         events=events,
@@ -143,6 +144,9 @@ class ProtocolProbeMetric(Metric):
                         tool_calls_only=False,
                         channel_visibility={},
                         split_parallel_tool_calls=agent_config.provider == SELF_HOSTED_PROVIDER,
+                        continue_prompt=continue_prompt_for(
+                            communication_enabled=agent_config.communication_enabled,
+                        ),
                     )
                     if not history:
                         logger.warning(

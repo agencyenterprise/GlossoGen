@@ -42,7 +42,7 @@ from glossogen.message_history_builder import build_message_history
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
 from glossogen.replace_manifest import ReplaceManifest, read_replace_manifest
-from glossogen.runners.communication_protocol import build_full_system_prompt
+from glossogen.runners.communication_protocol import build_full_system_prompt, continue_prompt_for
 from glossogen.runtime.scheduled_events import (
     ChannelVisibility,
     ChannelVisibilityFromRound,
@@ -146,6 +146,7 @@ class ProtocolExplanationMetric(Metric):
             full_system_prompt = build_full_system_prompt(
                 base_prompt=agent.system_prompt,
                 role_name=agent.role_name,
+                communication_enabled=agent.communication_enabled,
             )
             history = build_message_history(
                 events=events,
@@ -156,6 +157,9 @@ class ProtocolExplanationMetric(Metric):
                 tool_calls_only=False,
                 channel_visibility=channel_visibility,
                 split_parallel_tool_calls=agent.provider == SELF_HOSTED_PROVIDER,
+                continue_prompt=continue_prompt_for(
+                    communication_enabled=agent.communication_enabled,
+                ),
             )
             if not history:
                 logger.info(

@@ -38,7 +38,7 @@ from glossogen.models.event import (
     SimulationStarted,
 )
 from glossogen.models.message import SimulationMessage
-from glossogen.runners.communication_protocol import build_full_system_prompt
+from glossogen.runners.communication_protocol import build_full_system_prompt, continue_prompt_for
 from glossogen.runtime.scheduled_events import ChannelVisibility
 
 logger = logging.getLogger(__name__)
@@ -276,6 +276,7 @@ def _build_rewind_state_at_timestamp(
             system_prompt = build_full_system_prompt(
                 base_prompt=imported_registration.system_prompt,
                 role_name=imported_registration.role_name,
+                communication_enabled=imported_registration.communication_enabled,
             )
         else:
             history_events = events
@@ -284,6 +285,7 @@ def _build_rewind_state_at_timestamp(
             system_prompt = build_full_system_prompt(
                 base_prompt=reg.system_prompt,
                 role_name=reg.role_name,
+                communication_enabled=reg.communication_enabled,
             )
         agent_message_histories[reg.agent_id] = build_message_history(
             events=history_events,
@@ -294,6 +296,7 @@ def _build_rewind_state_at_timestamp(
             tool_calls_only=history_filter.tool_calls_only,
             channel_visibility=history_filter.channel_visibility,
             split_parallel_tool_calls=history_filter.split_parallel_tool_calls,
+            continue_prompt=continue_prompt_for(communication_enabled=reg.communication_enabled),
         )
 
     logger.info(

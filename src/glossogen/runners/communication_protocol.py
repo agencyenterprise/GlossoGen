@@ -1,9 +1,4 @@
-"""Shared prompts and constants for the agent communication protocol.
-
-All agent runners use the same communication protocol: agents call
-read_notifications(), read channels, send messages, and loop until done.
-Prompt text lives in Jinja2 templates under ``runners/prompts/``.
-"""
+"""Shared prompts and constants for autonomous agent interaction protocols."""
 
 from pathlib import Path
 
@@ -23,16 +18,35 @@ CONTINUE_PROMPT = _renderer.render(
     template_variables={},
 )
 
+SILENT_CONTINUE_PROMPT = _renderer.render(
+    template_name="continue_prompt_silent.jinja",
+    template_variables={},
+)
+
 COMPACTION_INSTRUCTIONS = _renderer.render(
     template_name="compaction_instructions.jinja",
     template_variables={},
 )
 
 
-def build_full_system_prompt(base_prompt: str, role_name: str) -> str:
-    """Combine an agent's base system prompt with the communication protocol instructions."""
+def build_full_system_prompt(
+    base_prompt: str,
+    role_name: str,
+    communication_enabled: bool,
+) -> str:
+    """Combine an agent prompt with its enabled runtime interaction protocol."""
+    template_name = "system_suffix_silent.jinja"
+    if communication_enabled:
+        template_name = "system_suffix.jinja"
     suffix = _renderer.render(
-        template_name="system_suffix.jinja",
+        template_name=template_name,
         template_variables={"role_name": role_name},
     )
     return base_prompt + "\n\n" + suffix
+
+
+def continue_prompt_for(communication_enabled: bool) -> str:
+    """Return the continuation prompt matching an agent's tool affordances."""
+    if communication_enabled:
+        return CONTINUE_PROMPT
+    return SILENT_CONTINUE_PROMPT
