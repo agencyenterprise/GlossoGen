@@ -1,7 +1,7 @@
-"""Proof that a scripted agent drives real tools, with no network.
+"""A scripted agent drives real tools, with no network.
 
-If these pass, a scenario test can assert what an agent *did* rather than hope
-an LLM chose it — which is the prerequisite for testing scenarios at all.
+If these pass, a scenario test can assert what an agent did instead of hoping an
+LLM chose it.
 """
 
 import pytest
@@ -30,10 +30,11 @@ async def test_scripted_agent_calls_the_tool_the_script_names() -> None:
 
     agent: Agent[None, str] = Agent(
         model=build_scripted_model(
+            when_exhausted=None,
             turns=[
                 ToolTurn(tool_name="send_message", args={"channel_id": "link", "text": "AB12"}),
                 SayTurn(text="sent"),
-            ]
+            ],
         ),
         deps_type=type(None),
         system_prompt="you are under test",
@@ -60,12 +61,13 @@ async def test_turns_are_played_in_order() -> None:
 
     agent: Agent[None, str] = Agent(
         model=build_scripted_model(
+            when_exhausted=None,
             turns=[
                 ToolTurn(tool_name="step", args={"n": 1}),
                 ToolTurn(tool_name="step", args={"n": 2}),
                 ToolTurn(tool_name="step", args={"n": 3}),
                 SayTurn(text="finished"),
-            ]
+            ],
         ),
         deps_type=type(None),
         system_prompt="you are under test",
@@ -90,7 +92,9 @@ async def test_running_past_the_script_fails_loudly() -> None:
     describing behaviour nobody wrote down.
     """
     agent: Agent[None, str] = Agent(
-        model=build_scripted_model(turns=[ToolTurn(tool_name="noop", args={})]),
+        model=build_scripted_model(
+            when_exhausted=None, turns=[ToolTurn(tool_name="noop", args={})]
+        ),
         deps_type=type(None),
         system_prompt="you are under test",
     )
