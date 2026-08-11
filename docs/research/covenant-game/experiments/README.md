@@ -29,7 +29,7 @@ and its
 - [STUDY-005 — Measurement resolution](../studies/STUDY-005-measurement-resolution.md):
   EXP-024 complete. Next available record is EXP-025.
 - [STUDY-006 — Human-parallel commitment](../studies/STUDY-006-human-parallel-commitment.md):
-  EXP-025 planned.
+  EXP-025 complete; fixed action framing hit a joint-inspection floor.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -65,9 +65,9 @@ count that resolves it before launching.
 | [EXP-022](EXP-022-pledge-personal-stake-pilot/experiment.md) | pledge × personal stake activation pilot | complete | supported: both manipulations activated with useful variation | $5.19 |
 | [EXP-023](EXP-023-pledge-stake-factorial/experiment.md) | fifteen-round pledge × personal stake factorial | complete | personal stake repeated as an adverse effort/safety candidate; pledge and interaction did not repeat | $27.18 |
 | [EXP-024](EXP-024-baseline-variance/experiment.md) | run-to-run variance of the association baseline at a fixed seed | complete | supported: `s = 4.71` inspections from identical inputs; kill criterion fired, cost redesign not authorized | $21.26 |
-| [EXP-025](EXP-025-human-parallel-commitment-pilot/experiment.md) | human-parallel commitment instrument pilot | planned | pending | — |
+| [EXP-025](EXP-025-human-parallel-commitment-pilot/experiment.md) | human-parallel commitment instrument pilot | complete | not supported: primary joint-inspection outcome remained at its floor | $2.14 |
 
-Total API spend logged: **$416.02** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$418.16** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The

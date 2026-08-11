@@ -1,6 +1,6 @@
 # STUDY-006 — Human-parallel commitment
 
-**Status:** planned
+**Status:** instrument revision needed
 **Research program:** covenant-game
 
 ## Question
@@ -43,6 +43,8 @@ human-style pledge-and-forfeiture bundle.
 ## Experiments
 
 - [EXP-025 — Human-parallel commitment instrument pilot](../experiments/EXP-025-human-parallel-commitment-pilot/experiment.md)
-  is planned. It will first verify that all four treatments activate through
-  structured events and that the fixed-payoff task has usable inspection and
-  shortcut variation before any replication claim is made.
+  implemented all four treatments as world events, but the primary joint
+  inspection outcome remained at zero in all twelve runs. A successor record
+  should revise the action setup before testing another seed: it must preserve
+  a fixed temptation while allowing a pledge to be action-relevant and every
+  round to offer the same choice.
