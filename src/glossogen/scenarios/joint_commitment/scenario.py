@@ -147,6 +147,17 @@ class JointCommitmentScenario(SimulationScenario):
         """Expose the read-only public ledger to generic metrics."""
         return [PrimaryChannel(channel_id=LEDGER_CHANNEL_ID, team_id=None)]
 
+    def validate_outgoing_message(self, agent_id: str, channel_id: str) -> str | None:
+        """Reject free-text coordination on the client attestation ledger."""
+        if agent_id not in PROVIDER_IDS:
+            return "only registered providers may access the client ledger"
+        if channel_id != LEDGER_CHANNEL_ID:
+            return "this scenario has no writable communication channels"
+        return (
+            "The client ledger is read-only. Record your public attestation only through "
+            "submit_client_reserve_decision."
+        )
+
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:
         """Return the current condition's structured actions."""
         return build_mcp_tools(

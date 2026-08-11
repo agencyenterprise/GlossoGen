@@ -5,6 +5,7 @@ from glossogen.scenarios.joint_commitment.knobs import (
     JointCommitmentCondition,
     JointCommitmentKnobs,
 )
+from glossogen.scenarios.joint_commitment.scenario import JointCommitmentScenario
 from glossogen.scenarios.joint_commitment.world import JointCommitmentWorld
 
 
@@ -122,3 +123,16 @@ def test_audit_selection_excludes_rounds_that_cannot_resolve() -> None:
     world = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.COVENANT))
 
     assert world.audit_selected_for_round(round_number=4) is False
+
+
+def test_client_ledger_rejects_free_text_coordination() -> None:
+    """The shared attestation record cannot become an informal pledge channel."""
+    scenario = JointCommitmentScenario(knobs=build_knobs(JointCommitmentCondition.NO_GROUP))
+
+    rejection = scenario.validate_outgoing_message(
+        agent_id="provider_a",
+        channel_id="client_commitment_ledger",
+    )
+
+    assert rejection is not None
+    assert "read-only" in rejection
