@@ -1,8 +1,8 @@
 # EXP-028 — Read-only joint commitment instrument calibration
 
-**Status:** planned
+**Status:** complete
 **Date opened:** 2026-08-11
-**Date closed:** —
+**Date closed:** 2026-08-11
 **Research program:** covenant-game
 **Study:** STUDY-008 — Joint commitment alignment
 **Role:** calibration
@@ -28,7 +28,11 @@
     {"path": "docs/research/covenant-game/experiments/EXP-028-joint-commitment-readonly-calibration/configs/pledge.json", "launch_path": "docs/research/covenant-game/experiments/EXP-028-joint-commitment-readonly-calibration/configs/pledge.json", "sha256": "ddf213d3c48a36318cc6e09f2c1029c4de7c696fc6cf0440f60c8da6c390cd78"},
     {"path": "docs/research/covenant-game/experiments/EXP-028-joint-commitment-readonly-calibration/configs/covenant.json", "launch_path": "docs/research/covenant-game/experiments/EXP-028-joint-commitment-readonly-calibration/configs/covenant.json", "sha256": "7fdfb73a8d2d57a5804062d894bd0605b5e7364126d80d0164185b074b2b55e3"}
   ],
-  "runs": []
+  "runs": [
+    {"role": "no_group_readonly_attempt", "included": false, "reason": "The read-only communication repair worked, but this arm received sixteen reserve-decision opportunities while the pledge arm later received fifteen.", "run_dir": "runs/joint_commitment/1786475760", "event_log_sha256": "fa4ba2209b770883f98c0b96507f1ba547d21b34a3a65bd1b6818a047a5bca59", "resolved_config_sha256": "038a3d49f30ecd089e7e9725706d40912d05279eca1abeab85321b4e7cfc301a", "completed": true, "total_cost_usd": 0.1781223},
+    {"role": "group_readonly_attempt", "included": false, "reason": "The read-only communication repair worked, but this arm received sixteen reserve-decision opportunities while the pledge arm later received fifteen.", "run_dir": "runs/joint_commitment/1786475858", "event_log_sha256": "9e5bfbd2625eae226a1029403bab0726138848a59ece7c67e40eecc0c46321cf", "resolved_config_sha256": "b50de79b623a7b459d0437f66d48232e581bb110c8ec618575fa882567975dda", "completed": true, "total_cost_usd": 0.1811451},
+    {"role": "pledge_readonly_attempt", "included": false, "reason": "The pledge setup consumed round 1, leaving fifteen reserve-decision opportunities instead of the sixteen available in the no-group and group arms.", "run_dir": "runs/joint_commitment/1786475953", "event_log_sha256": "38e405a765151efc15cf6395f5e4b2e66c9cece6a067fc09cf9d0a922e6c4d9e", "resolved_config_sha256": "e1b952f16d1a6f1895dbfc19b745055694fab2fa9fae05305f136707a4c3f9ce", "completed": true, "total_cost_usd": 0.2041077}
+  ]
 }
 -->
 
@@ -127,11 +131,22 @@ covenant component.
 
 ## Result
 
-Pending.
+All three launched arms ended with an authoritative `simulation_ended` event
+and zero accepted `message_sent` events. The repaired ledger therefore did not
+permit free-text coordination. The no-group and group runs each created sixteen
+reserve-decision opportunities, while the pledge run spent round 1 recording
+the pledge and created only fifteen. All recorded decisions remitted the
+reserve. The covenant arm was not launched after this mismatch was detected.
+
+The three excluded attempts cost `$0.5633751` in total. Their exact logs,
+resolved configurations, and costs are preserved in the machine-readable block.
 
 ## Outcome
 
-Pending.
+**Invalid.** The arms do not expose agents to the same number of client-reserve
+decisions, so no remittance-rate or joint-safety comparison is interpretable.
+This is a design-comparability failure rather than evidence for a ceiling or for
+any group effect.
 
 ## Validity limitations
 
@@ -144,10 +159,16 @@ Pending.
   not yet simulate a replacement provider or operational capacity loss.
 - One run per condition is only an activation check. It cannot establish a
   stochastic effect, a between-seed result, or a model-general conclusion.
+- Only three arms launched, and their action-opportunity counts differ. The
+  runs cannot estimate a treatment contrast or establish a behavioral ceiling.
 
 ## What it changed
 
-Pending.
+The successor configuration gives every arm a common setup round, followed by
+sixteen client-reserve opportunities. In pledge arms, the pledge is recorded in
+the setup round; in the covenant arm, affirming it posts the bond in that same
+structured action. Audit selection starts in decision round 2, so no audit is
+assigned to setup.
 
 ## Traps found
 
@@ -158,3 +179,7 @@ Pending.
   deception.
 - Do not interpret the fixed 7-unit reserve as a calibrated effort cost. Its
   value is intentionally identical in all rounds and conditions.
+- Setup is part of the instrument. If a treatment's required setup consumes a
+  decision round while the comparison arms act immediately, the resulting
+  trajectories are not matched even when their configured `round_count` is the
+  same.
