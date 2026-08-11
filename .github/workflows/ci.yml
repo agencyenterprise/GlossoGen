@@ -32,6 +32,12 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    permissions:
+      # GitHub downgrades both to read-only for pull_request runs from forks,
+      # so a fork's PR cannot use them. Trusted PRs get their comment posted
+      # here; fork PRs fall through to post-coverage-comment.yml.
+      pull-requests: write
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -52,8 +58,24 @@ jobs:
       # No network and no provider keys: agents run on a scripted model and
       # judges on a stub, so a contributor without credentials gets the same
       # result CI does.
-      - name: Run tests
-        run: make test
+      - name: Run tests with coverage
+        run: make test-cov
+
+      # On a PR: comment with the total, the delta against main, and how much
+      # of the diff is covered. On main: refresh the stored baseline the next
+      # PR compares against, on the python-coverage-comment-action-data branch.
+      - name: Coverage comment
+        id: coverage_comment
+        uses: py-cov-action/python-coverage-comment-action@v4.3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Store the comment for a fork PR to post
+        uses: actions/upload-artifact@v7
+        if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
+        with:
+          name: python-coverage-comment-action
+          path: python-coverage-comment-action.txt
 
   lint-frontend:
     runs-on: ubuntu-latest

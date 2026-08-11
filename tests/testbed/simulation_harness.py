@@ -184,13 +184,11 @@ async def run_simulation(
     )
 
     # A round cannot end before MIN_ROUND_DURATION_SECONDS even once every agent
-    # is idle, which exists so a round is not declared over before the agents
-    # have had a chance to act. Scripted agents act immediately, so the floor
-    # only buys wall-clock: it makes every round cost five seconds and nothing
-    # else. Lowered rather than removed, so idle detection still has to win a
-    # race against it rather than being skipped.
-    monkeypatch.setattr("glossogen.runtime.game_clock.MIN_ROUND_DURATION_SECONDS", 0.2)
-    monkeypatch.setattr("glossogen.runtime.game_clock.IDLE_CHECK_INTERVAL_SECONDS", 0.05)
+    # is idle, so a round is not declared over before the agents have had a
+    # chance to act. It stays above the idle-check interval, so idle detection
+    # races the floor exactly as it does in a real run.
+    monkeypatch.setattr("glossogen.runtime.game_clock.MIN_ROUND_DURATION_SECONDS", 0.05)
+    monkeypatch.setattr("glossogen.runtime.game_clock.IDLE_CHECK_INTERVAL_SECONDS", 0.01)
 
     def make_runner() -> PydanticAIRunner:
         """Build a runner the same way the CLI does."""
