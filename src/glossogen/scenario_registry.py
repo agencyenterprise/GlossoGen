@@ -20,6 +20,7 @@ from glossogen.scenarios.hospital_bed_assignment_privacy.scenario import (
     HospitalBedAssignmentPrivacyScenario,
 )
 from glossogen.scenarios.orbital_anomaly.scenario import OrbitalAnomalyScenario
+from glossogen.scenarios.repeated_trust_game.scenario import RepeatedTrustGameScenario
 from glossogen.scenarios.satellite_contact_window.scenario import SatelliteContactWindowScenario
 from glossogen.scenarios.spillway_release.scenario import SpillwayReleaseScenario
 from glossogen.scenarios.spot_the_difference.scenario import SpotTheDifferenceScenario
@@ -34,6 +35,7 @@ SCENARIO_REGISTRY: dict[str, type[SimulationScenario]] = {
     "drive_module_repair": DriveModuleRepairScenario,
     "hospital_bed_assignment_privacy": HospitalBedAssignmentPrivacyScenario,
     "orbital_anomaly": OrbitalAnomalyScenario,
+    "repeated_trust_game": RepeatedTrustGameScenario,
     "satellite_contact_window": SatelliteContactWindowScenario,
     "spillway_release": SpillwayReleaseScenario,
     "spot_the_difference": SpotTheDifferenceScenario,

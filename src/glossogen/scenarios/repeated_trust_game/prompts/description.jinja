@@ -1,0 +1,7 @@
+Two participants repeatedly complete the two decision roles of a standard trust
+game. Trustors receive 10 units and select an amount to send. Trustees receive
+a standardized offer of 7 units, multiplied to 21, and select an amount to
+return. This run uses the {{ condition }} condition{% if group_enabled %}, with
+public group membership{% endif %}{% if pledge_enabled %}, an explicit fairness
+pledge{% endif %}{% if forfeiture_fraction > 0 %}, and a {{ "%.0f"|format(forfeiture_fraction * 100) }}%
+forfeiture of game earnings{% endif %}.

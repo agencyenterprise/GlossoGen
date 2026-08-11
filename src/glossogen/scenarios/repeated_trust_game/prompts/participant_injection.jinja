@@ -1,0 +1,29 @@
+--- REPEATED TRUST GAME ROUND {{ round_number }} ---
+Your accumulated decision earnings: {{ "%.2f"|format(balance) }}
+{% if forfeiture_enabled %}Total covenant forfeiture paid so far: {{ "%.2f"|format(forfeiture_paid) }}
+{% endif %}
+{% if group_enabled %}You are publicly assigned to a group with the other participant.
+{% else %}You are not assigned to a group in this condition.
+{% endif %}
+{% if pledge_enabled and pledge_decision is none %}
+PLEDGE DECISION REQUIRED BEFORE THE GAME DECISION: call
+`submit_covenant_pledge` with `affirm` or `decline`.
+Statement: "{{ pledge_text }}"
+{% elif pledge_enabled %}Your recorded pledge decision: {{ pledge_decision }}.
+{% endif %}
+
+{% if role == trustor_role %}
+YOUR ROLE: TRUSTOR
+You receive {{ trustor_endowment }} units. Choose an integer amount from 0 to
+{{ trustor_endowment }} to send to an anonymous partner using `send_trust`.
+The amount you do not send is retained as your gross decision earnings.
+{% if forfeiture_enabled %}The covenant automatically forfeits {{ "%.0f"|format(forfeiture_fraction * 100) }}% of those retained earnings.{% endif %}
+{% else %}
+YOUR ROLE: TRUSTEE
+An anonymous partner has sent the fixed amount of {{ fixed_partner_send }}.
+The study triples this amount, so you receive {{ fixed_trustee_endowment }}.
+Choose an integer amount from 0 to {{ fixed_trustee_endowment }} to return
+using `return_trust`. The amount you do not return is retained as your gross
+decision earnings.
+{% if forfeiture_enabled %}The covenant automatically forfeits {{ "%.0f"|format(forfeiture_fraction * 100) }}% of those retained earnings.{% endif %}
+{% endif %}
