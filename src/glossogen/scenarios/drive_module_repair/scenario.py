@@ -31,7 +31,7 @@ generation), :mod:`world_state` (the outcome type), and
 import logging
 import random
 from pathlib import Path
-from typing import Any, Self
+from typing import Any
 
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
@@ -110,12 +110,6 @@ class DriveModuleRepairScenario(SimulationScenario):
         """Return this scenario's validated knobs instance."""
         return self._knobs
 
-    @classmethod
-    def create_from_config(cls, config: dict[str, Any]) -> Self:
-        """Reconstruct the scenario from a serialized config dict."""
-        knobs = DriveModuleRepairKnobs.model_validate(config)
-        return cls(knobs=knobs)
-
     def __init__(self, knobs: DriveModuleRepairKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
@@ -146,10 +140,6 @@ class DriveModuleRepairScenario(SimulationScenario):
             reasoning_effort=None,
         )
 
-    def name(self) -> str:
-        """Return the scenario identifier."""
-        return "drive_module_repair"
-
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""
         return self._renderer.render(
@@ -177,15 +167,6 @@ class DriveModuleRepairScenario(SimulationScenario):
             postmortem_initially_active=self._postmortem_initially_active,
             channel_display_names=self._channel_display_names,
         )
-
-    def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
-        """Return the display name for a channel as seen by a specific agent."""
-        _ = agent_id
-        return self._channel_display_names.get(channel_id, channel_id)
-
-    def get_agent_display_name(self, agent_id: str) -> str:
-        """Return the human-readable display name for an agent."""
-        return self._agent_display_names.get(agent_id, agent_id)
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the per-round injection for one agent, or None."""

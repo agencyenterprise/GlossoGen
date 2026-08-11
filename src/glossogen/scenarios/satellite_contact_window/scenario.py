@@ -14,7 +14,7 @@ submitted command sequence does not satisfy the round-success criteria.
 import logging
 import random
 from pathlib import Path
-from typing import Any, NamedTuple, Self
+from typing import Any, NamedTuple
 
 from pydantic import BaseModel, ConfigDict
 
@@ -114,12 +114,6 @@ class SatelliteContactWindowScenario(SimulationScenario):
         """Return this scenario's validated knobs instance."""
         return self._knobs
 
-    @classmethod
-    def create_from_config(cls, config: dict[str, Any]) -> Self:
-        """Reconstruct the scenario from a serialized config dict."""
-        knobs = SatelliteContactWindowKnobs.model_validate(config)
-        return cls(knobs=knobs)
-
     def __init__(self, knobs: SatelliteContactWindowKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
@@ -154,10 +148,6 @@ class SatelliteContactWindowScenario(SimulationScenario):
             inference_provider=None,
             reasoning_effort=None,
         )
-
-    def name(self) -> str:
-        """Return the scenario identifier."""
-        return "satellite_contact_window"
 
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""

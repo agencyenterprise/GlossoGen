@@ -11,7 +11,7 @@ payoff resolution), :mod:`mcp_tools` (the `submit_decision` tool).
 """
 
 from pathlib import Path
-from typing import Any, Self
+from typing import Any
 
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
@@ -62,12 +62,6 @@ class PrisonersDilemmaScenario(SimulationScenario):
         """Return this scenario's validated knobs instance."""
         return self._knobs
 
-    @classmethod
-    def create_from_config(cls, config: dict[str, Any]) -> Self:
-        """Reconstruct the scenario from a serialized config dict."""
-        knobs = PrisonersDilemmaKnobs.model_validate(config)
-        return cls(knobs=knobs)
-
     def __init__(self, knobs: PrisonersDilemmaKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
@@ -77,10 +71,6 @@ class PrisonersDilemmaScenario(SimulationScenario):
             payoff_punishment=knobs.payoff_punishment,
             payoff_sucker=knobs.payoff_sucker,
         )
-
-    def name(self) -> str:
-        """Return the scenario identifier."""
-        return "prisoners_dilemma"
 
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active payoff matrix."""

@@ -88,6 +88,19 @@ class SimulationScenario(ABC):
     """
 
     _runtime: ScenarioRuntimeHandle | None = None
+    # Populated by scenarios that rename agents or channels for display.
+    # Empty here so the default lookups fall through to the raw id.
+    _agent_display_names: dict[str, str] = {}
+    _channel_display_names: dict[str, str] = {}
+
+    def __init__(self, knobs: BaseKnobs) -> None:
+        """Construct the scenario from its validated knobs.
+
+        Declared here because ``create_from_config`` builds every scenario this
+        way. Subclasses narrow ``knobs`` to their own model and assign the
+        attributes they need; they do not call up to this.
+        """
+        _ = knobs
 
     @classmethod
     def get_available_metric_names(cls) -> list[str]:
@@ -162,7 +175,6 @@ class SimulationScenario(ABC):
         return config
 
     @classmethod
-    @abstractmethod
     def create_from_config(cls, config: dict[str, Any]) -> Self:
         """Reconstruct a scenario from its serialized config dict.
 
@@ -170,13 +182,20 @@ class SimulationScenario(ABC):
         - ``run`` preflight (CLI and API) to validate prepared config payloads
         - ``evaluate`` to rebuild the scenario from JSONL-stored config
         - fork/resume flows to reconstruct scenarios from persisted state
-        """
-        ...
 
-    @abstractmethod
+        Validates through ``knobs_model``, so a scenario only declares its knobs
+        class once. Override if construction needs more than the knobs.
+        """
+        return cls(knobs=cls.knobs_model().model_validate(config))
+
     def name(self) -> str:
-        """Return the unique identifier for this scenario."""
-        ...
+        """Return the unique identifier for this scenario.
+
+        Derived from the package directory, which the registry already keys on,
+        so the two cannot disagree. Override only if a scenario needs an
+        identifier that differs from its folder.
+        """
+        return type(self).__module__.split(".")[-2]
 
     @abstractmethod
     def scenario_description(self) -> str:
@@ -193,15 +212,21 @@ class SimulationScenario(ABC):
         """Return the communication channels available in this scenario."""
         ...
 
-    @abstractmethod
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
-        """Return the display name of a channel as seen by a specific agent."""
-        ...
+        """Return the display name of a channel as seen by a specific agent.
 
-    @abstractmethod
+        Looks the id up in ``_channel_display_names``, falling back to the id
+        itself. Override when the name depends on which agent is asking.
+        """
+        _ = agent_id
+        return self._channel_display_names.get(channel_id, channel_id)
+
     def get_agent_display_name(self, agent_id: str) -> str:
-        """Return the human-readable display name for an agent."""
-        ...
+        """Return the human-readable display name for an agent.
+
+        Looks the id up in ``_agent_display_names``, falling back to the id.
+        """
+        return self._agent_display_names.get(agent_id, agent_id)
 
     def get_agent_display_name_at_round(self, agent_id: str, round_number: int) -> str:
         """Return the display name for an agent at a specific round.

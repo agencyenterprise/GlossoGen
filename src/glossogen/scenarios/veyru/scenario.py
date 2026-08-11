@@ -23,7 +23,7 @@ join/takeover choreography), :mod:`case_event_conversion`
 import logging
 import random
 from pathlib import Path
-from typing import Any, Self
+from typing import Any
 
 from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
@@ -153,12 +153,6 @@ class VeyruScenario(SimulationScenario):
         """Return this scenario's validated knobs instance."""
         return self._knobs
 
-    @classmethod
-    def create_from_config(cls, config: dict[str, Any]) -> Self:
-        """Reconstruct the scenario from a serialized config dict."""
-        knobs = VeyruKnobs.model_validate(config)
-        return cls(knobs=knobs)
-
     def __init__(self, knobs: VeyruKnobs) -> None:
         self._knobs = knobs
         self._renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
@@ -176,9 +170,11 @@ class VeyruScenario(SimulationScenario):
             two_teams=knobs.two_teams,
             intern_enabled=knobs.intern_enabled,
         )
-        self._channel_display_names: dict[str, dict[str, str]] = build_channel_display_names(
-            two_teams=knobs.two_teams,
-            intern_enabled=knobs.intern_enabled,
+        self._channel_display_names_by_agent: dict[str, dict[str, str]] = (
+            build_channel_display_names(
+                two_teams=knobs.two_teams,
+                intern_enabled=knobs.intern_enabled,
+            )
         )
         self._world = VeyruWorld(
             veyru_cases=self._veyru_cases,
@@ -196,10 +192,6 @@ class VeyruScenario(SimulationScenario):
     def veyru_cases(self) -> list[VeyruCase]:
         """Return the Veyru cases for this simulation."""
         return self._veyru_cases
-
-    def name(self) -> str:
-        """Return the scenario identifier."""
-        return "veyru"
 
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""
@@ -225,7 +217,7 @@ class VeyruScenario(SimulationScenario):
         return build_agents(
             knobs=self._knobs,
             postmortem_active=self._postmortem_active,
-            channel_display_names=self._channel_display_names,
+            channel_display_names=self._channel_display_names_by_agent,
             renderer=self._renderer,
             default_model=default_model,
             default_provider=default_provider,
@@ -237,7 +229,7 @@ class VeyruScenario(SimulationScenario):
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
         """Return the display name for a channel as seen by a specific agent."""
-        channel_map = self._channel_display_names.get(channel_id)
+        channel_map = self._channel_display_names_by_agent.get(channel_id)
         if channel_map is None:
             return channel_id
         agent_display = channel_map.get(agent_id)
