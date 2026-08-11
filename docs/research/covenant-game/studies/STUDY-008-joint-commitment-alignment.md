@@ -99,5 +99,5 @@ bundling them into this first human-parallel test.
 5. The next revision neutralizes the common prompt: it frames a 7-unit transfer
    as one of two allocations, removes client ownership and commitment language
    from non-pledge arms, and calls the shared channel an allocation record. It
-   must be calibrated and recorded as a new experiment before any arm
-   comparison.
+   is recorded as [EXP-031](../experiments/EXP-031-neutral-baseline-calibration/experiment.md)
+   and must be calibrated before any arm comparison.

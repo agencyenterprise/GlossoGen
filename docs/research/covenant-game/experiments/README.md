@@ -79,6 +79,7 @@ count that resolves it before launching.
 | [EXP-028](EXP-028-joint-commitment-readonly-calibration/experiment.md) | read-only joint commitment instrument calibration | complete | invalid: pledge setup consumed a decision round | $0.56 |
 | [EXP-029](EXP-029-joint-commitment-common-setup-calibration/experiment.md) | common-setup joint commitment instrument calibration | complete | not supported: universal remittance ceiling | $0.73 |
 | [EXP-030](EXP-030-public-registry-same-seed-replication/experiment.md) | costly-pledge same-seed replication | complete | not supported: repeatable practical remittance ceiling in all 12 runs | $2.20 |
+| [EXP-031](EXP-031-neutral-baseline-calibration/experiment.md) | neutral no-group prompt calibration | planned | pending: test whether prompt neutralization restores behavioral variation | — |
 
 Total API spend logged: **$420.86** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
