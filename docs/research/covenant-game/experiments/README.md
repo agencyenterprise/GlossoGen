@@ -3,7 +3,7 @@
 This is the chronological record index for the
 [Covenant Game research program](../README.md). One record represents one
 decision-relevant calibration, pilot, comparison, replication, stress test, or
-ablation. A record may contain several runs; the 21 completed records below are
+ablation. A record may contain several runs; the 26 completed records below are
 not 21 independent studies.
 
 Entries are written **before** the run (question, expected decision, design)
@@ -71,6 +71,7 @@ count that resolves it before launching.
 | [EXP-024](EXP-024-baseline-variance/experiment.md) | run-to-run variance of the association baseline at a fixed seed | complete | supported: `s = 4.71` inspections from identical inputs; kill criterion fired, cost redesign not authorized | $21.26 |
 | [EXP-025](EXP-025-human-parallel-commitment-pilot/experiment.md) | human-parallel commitment instrument pilot | complete | not supported: primary joint-inspection outcome remained at its floor | $2.14 |
 | [EXP-026](EXP-026-repeated-trust-game-pilot/experiment.md) | repeated trust-game human-parallel pilot | complete | inconclusive: trust contrast met its threshold but reciprocity was invariant | $1.21 |
+| [EXP-027](EXP-027-joint-commitment-calibration/experiment.md) | joint commitment instrument calibration | planned | pending | — |
 
 Total API spend logged: **$419.37** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -82,7 +83,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-027`. Before launching, use the
+The next available ID is `EXP-028`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat
