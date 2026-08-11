@@ -81,6 +81,7 @@ count that resolves it before launching.
 | [EXP-029](EXP-029-joint-commitment-common-setup-calibration/experiment.md) | common-setup joint commitment instrument calibration | complete | not supported: universal remittance ceiling | $0.73 |
 | [EXP-030](EXP-030-public-registry-same-seed-replication/experiment.md) | costly-pledge same-seed replication | complete | not supported: repeatable practical remittance ceiling in all 12 runs | $2.20 |
 | [EXP-031](EXP-031-neutral-baseline-calibration/experiment.md) | neutral no-group prompt calibration | complete | supported: variation restored, but prompt still contains coordination-relevant context | $0.53 |
+| [EXP-032](EXP-032-rules-only-baseline-calibration/experiment.md) | rules-only no-group prompt calibration | planned | pending: test whether the minimal prompt avoids a universal action floor or ceiling | — |
 
 Total API spend logged: **$421.39** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -92,7 +93,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-032`. Before launching, use the
+The next available ID is `EXP-033`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat

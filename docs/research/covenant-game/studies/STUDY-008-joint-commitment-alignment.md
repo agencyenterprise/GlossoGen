@@ -106,3 +106,7 @@ bundling them into this first human-parallel test.
    instrument revision will present only operational allocation rules, omit
    descriptions of absent mechanisms, and stop re-injecting prior action
    histories; it must be calibrated before the four-arm ladder is launched.
+6. [EXP-032](../experiments/EXP-032-rules-only-baseline-calibration/experiment.md)
+   preregisters that rules-only calibration with three same-config Sonnet
+   trajectories. It is a gate for a later group/pledge comparison, not a test
+   of the covenant mechanisms itself.
