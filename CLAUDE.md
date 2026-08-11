@@ -161,6 +161,31 @@ All prompts (agent system prompts, round injections) use Jinja2 templates stored
 
 - **Always use output schemas to enforce structured LLM responses.** Never parse free text from LLM responses. Define a Pydantic model for the desired output shape, pass it to `generate_structured()`, and use the validated instance directly.
 
+### Writing
+
+This applies to every word committed here: docstrings, comments, markdown, commit
+messages, PR descriptions.
+
+Write like an engineer explaining something to the next engineer. The habits below
+read as machine-written and are not wanted:
+
+- **Em-dashes mid-sentence.** "The log is what everyone reads — so a thing that
+  wasn't logged didn't happen." Use a comma, a colon, or two sentences. A dash
+  introducing a definition in a list is fine and common here:
+  `` - `src/` — application source code ``.
+- **Announcing importance instead of stating fact.** "These are the tests that
+  matter", "this is the whole point", "deliberately loud". Say what the thing
+  does and let the reader judge.
+- **Restating the heading** in the first sentence under it. Add information.
+- **Inflated words**: leverage, harness, seamless, robust, powerful, unlock,
+  streamline, empower, at scale, cutting-edge. Use the plain one.
+- **"Not just X, it's Y"** and **rule-of-three lists** when three isn't the real
+  count. State the point; say the true number.
+- **Every sentence the same medium length.** Vary it. Some should be short.
+
+Read it back before committing. If you would not say it out loud to a colleague,
+rewrite it.
+
 ### Docstrings
 
 - **Every module needs a module-level docstring** describing what it defines.
