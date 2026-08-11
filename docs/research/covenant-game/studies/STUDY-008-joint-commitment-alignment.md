@@ -90,7 +90,8 @@ bundling them into this first human-parallel test.
 3. Make group identity and pledge decisions genuinely observable through a
    shared read-only registry; make the costly pledge an irreversible one-time
    2.1-unit entry cost, with no audit or action-contingent punishment.
-4. Run three fixed-config same-seed trajectories per arm before interpreting
+4. [EXP-030](../experiments/EXP-030-public-registry-same-seed-replication/experiment.md)
+   runs three fixed-config same-seed trajectories per arm before interpreting
    any observed pattern as behavioral repeatability. If the first three
    trajectories per arm still leave the primary outcomes saturated, record a
    repeatable ceiling; otherwise use the run-level variation to preregister a
