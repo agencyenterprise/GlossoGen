@@ -112,3 +112,6 @@ bundling them into this first human-parallel test.
    available before starting three same-config Sonnet trajectories. It remains
    a gate for a later group/pledge comparison, not a test of covenant
    mechanisms itself.
+7. [EXP-033](../experiments/EXP-033-communication-free-baseline-calibration/experiment.md)
+   preregisters that repaired baseline calibration. It preserves the allocation
+   rules and seed while making communication technically unavailable.
