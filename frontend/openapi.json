@@ -3665,6 +3665,13 @@
             "type": "array",
             "title": "Channel Ids"
           },
+          "primary_channel_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Primary Channel Ids"
+          },
           "provider": {
             "type": "string",
             "title": "Provider"
@@ -3872,6 +3879,7 @@
           "duration_seconds",
           "status",
           "channel_ids",
+          "primary_channel_ids",
           "provider",
           "agents",
           "agent_swap_events",

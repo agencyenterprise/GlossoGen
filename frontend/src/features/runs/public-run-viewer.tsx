@@ -427,6 +427,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
               replaceAgentSource={null}
               crossRunReplaceAgentSource={null}
               scenarioName={run.scenario_name}
+              primaryChannelIds={run.primary_channel_ids}
               scenarioExtras={run.scenario_extras}
               roundEndings={run.round_endings}
               roundResults={run.round_results}
@@ -491,6 +492,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
             roundNumber={timelineRound}
             messages={displayEntries.filter(entry => entry.round_number === timelineRound)}
             scenarioName={run.scenario_name}
+            primaryChannelIds={run.primary_channel_ids}
             scenarioExtras={run.scenario_extras}
             roundEnding={
               run.round_endings.find(ending => ending.round_number === timelineRound) ?? null

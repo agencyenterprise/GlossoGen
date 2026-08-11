@@ -513,6 +513,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             replaceAgentSource={restData.replace_agent_source}
             crossRunReplaceAgentSource={restData.cross_run_replace_agent_source}
             scenarioName={restData.scenario_name}
+            primaryChannelIds={restData.primary_channel_ids}
             scenarioExtras={restData.scenario_extras ?? null}
             roundEndings={restData.round_endings}
             roundResults={restData.round_results}

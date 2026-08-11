@@ -12,7 +12,6 @@ import { SpotTheDifferenceRoundDetailPanel } from "./spot-the-difference-round-d
 
 export const spotTheDifferencePlugin: ScenarioPlugin = {
   scenarioName: "spot_the_difference",
-  primaryChannelId: "link",
   RoundDetailPanel: SpotTheDifferenceRoundDetailPanel,
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,

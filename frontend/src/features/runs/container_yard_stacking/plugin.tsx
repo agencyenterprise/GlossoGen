@@ -23,7 +23,6 @@ function isYardExtras(extras: unknown): extras is ContainerYardRunExtras {
 
 export const containerYardStackingPlugin: ScenarioPlugin = {
   scenarioName: "container_yard_stacking",
-  primaryChannelId: "link",
   RoundDetailPanel: YardRoundDetailPanel,
   renderToolMetadata: ({ callId, extras }) => {
     if (!isYardExtras(extras)) return null;

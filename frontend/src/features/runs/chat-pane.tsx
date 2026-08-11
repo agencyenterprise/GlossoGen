@@ -65,6 +65,9 @@ interface ChatPaneProps {
   crossRunReplaceAgentSource: CrossRunReplaceAgentSource | null;
   /** Scenario name, used to dispatch to the scenario plug-in for the round-detail modal. */
   scenarioName: string;
+  /** Ids of the channels the scenario scores, from `get_primary_channels()` on
+   *  the backend. The round-detail modal shows messages on these. */
+  primaryChannelIds: string[];
   /** Scenario-specific run extras, dispatched to the scenario plug-in for the round-detail modal. Null for scenarios with no extras. */
   scenarioExtras: ScenarioExtras | null;
   /** One entry per completed round describing why its main phase ended. */
@@ -200,6 +203,7 @@ export function ChatPane({
   replaceAgentSource,
   crossRunReplaceAgentSource,
   scenarioName,
+  primaryChannelIds,
   scenarioExtras,
   roundEndings,
   roundResults,
@@ -618,6 +622,7 @@ export function ChatPane({
           roundNumber={timelineRound}
           messages={messagesByRound.get(timelineRound) ?? []}
           scenarioName={scenarioName}
+          primaryChannelIds={primaryChannelIds}
           scenarioExtras={scenarioExtras}
           roundEnding={endingByRound.get(timelineRound) ?? null}
           onClose={() => setTimelineRound(null)}

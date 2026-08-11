@@ -17,6 +17,10 @@ interface RoundTimelineModalProps {
   roundNumber: number;
   messages: DisplayEntry[];
   scenarioName: string;
+  /** Ids of the channels the scenario scores, straight from
+   *  `get_primary_channels()` on the backend. The timeline shows messages on
+   *  these and nothing else. */
+  primaryChannelIds: string[];
   scenarioExtras: ScenarioExtras | null;
   roundEnding: RoundEnding | null;
   onClose: () => void;
@@ -27,6 +31,10 @@ interface TimelineRow {
   timestamp: string;
   kind: "message" | "judged_tool";
   sender: string;
+  /** Channel the message was sent on. Empty for judged tool calls, which are
+   *  not channel traffic. Rendered per row because a two-team scenario scores
+   *  more than one channel. */
+  channelId: string;
   text: string;
   toolName: string;
   verdictAccepted: boolean | null;
@@ -36,7 +44,7 @@ interface TimelineRow {
 
 function buildTimelineRows(
   messages: DisplayEntry[],
-  primaryChannelId: string,
+  primaryChannelIds: Set<string>,
   plugin: ScenarioPlugin,
   extras: ScenarioExtras | null
 ): TimelineRow[] {
@@ -53,6 +61,7 @@ function buildTimelineRows(
         timestamp: m.timestamp,
         kind: "judged_tool",
         sender: m.sender_agent_id,
+        channelId: "",
         text: action,
         toolName: m.tool_name,
         verdictAccepted: m.judge_metadata.judge_match,
@@ -74,6 +83,7 @@ function buildTimelineRows(
           timestamp: m.timestamp,
           kind: "judged_tool",
           sender: m.sender_agent_id,
+          channelId: "",
           text: verdict.actionText,
           toolName: verdict.toolLabel,
           verdictAccepted: verdict.accepted,
@@ -83,12 +93,13 @@ function buildTimelineRows(
       }
       continue;
     }
-    if (m.channel_id !== primaryChannelId) continue;
+    if (!primaryChannelIds.has(m.channel_id)) continue;
     rows.push({
       key: m.message_id,
       timestamp: m.timestamp,
       kind: "message",
       sender: m.sender_agent_id,
+      channelId: m.channel_id,
       text: m.text,
       toolName: "",
       verdictAccepted: null,
@@ -144,13 +155,14 @@ export function RoundTimelineModal({
   roundNumber,
   messages,
   scenarioName,
+  primaryChannelIds,
   scenarioExtras,
   roundEnding,
   onClose,
 }: RoundTimelineModalProps) {
   const plugin = getScenarioPlugin(scenarioName);
   const RoundDetailPanel = plugin.RoundDetailPanel;
-  const primaryChannelId = plugin.primaryChannelId;
+  const primaryChannelIdSet = useMemo(() => new Set(primaryChannelIds), [primaryChannelIds]);
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -162,8 +174,8 @@ export function RoundTimelineModal({
   }, [onClose]);
 
   const rows = useMemo(
-    () => buildTimelineRows(messages, primaryChannelId, plugin, scenarioExtras),
-    [messages, primaryChannelId, plugin, scenarioExtras]
+    () => buildTimelineRows(messages, primaryChannelIdSet, plugin, scenarioExtras),
+    [messages, primaryChannelIdSet, plugin, scenarioExtras]
   );
 
   return createPortal(
@@ -235,7 +247,7 @@ export function RoundTimelineModal({
                         </>
                       ) : (
                         <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
-                          #{primaryChannelId}
+                          #{row.channelId}
                         </span>
                       )}
                     </div>

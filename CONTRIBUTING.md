@@ -95,7 +95,9 @@ working around it. Conditional loading of an optional dependency goes through
 
 **Prompts live in Jinja templates**, never hardcoded in Python. They ship inside
 the package, so a new `prompts/` directory needs no packaging change. A new
-file *extension* does, via `[tool.setuptools.package-data]`.
+file *extension* does, via `[tool.setuptools.package-data]`. Rendering is strict:
+a name the template uses but the caller never passes raises, because the
+permissive default turns a typo into a prompt that is quietly missing a line.
 
 **LLM output is parsed through a schema.** Define a Pydantic model, pass it to
 `generate_structured()`, use the validated instance. Never parse free text.

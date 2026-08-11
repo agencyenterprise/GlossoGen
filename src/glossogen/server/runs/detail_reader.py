@@ -53,6 +53,7 @@ from glossogen.server.runs.models import (
     RunDetailResponse,
     ToolUseEntry,
 )
+from glossogen.server.runs.primary_channel_resolution import resolve_primary_channel_ids
 from glossogen.server.runs.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.server.runs.scenario_extension import SCENARIO_RUN_EXTENSIONS
 from glossogen.stream_manifest import delete_manifest, read_manifest
@@ -499,6 +500,10 @@ async def load_run_detail(
     else:
         scenario_extras = None
 
+    primary_channel_ids = resolve_primary_channel_ids(
+        scenario_name=scenario_name, scenario_config=scenario_config
+    )
+
     labels = await _read_labels_async(run_dir=run_dir)
     note = await _read_note(run_dir=run_dir)
 
@@ -524,6 +529,7 @@ async def load_run_detail(
         duration_seconds=duration_seconds,
         status=status,
         channel_ids=channel_ids,
+        primary_channel_ids=primary_channel_ids,
         provider=provider,
         agents=agents,
         agent_swap_events=agent_swap_events,

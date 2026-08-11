@@ -2,11 +2,17 @@
 
 Provides a reusable renderer that loads templates from a given directory
 and renders them with explicit template variables.
+
+Rendering is strict: a name the caller did not pass raises instead of
+resolving to the empty string. Prompts are the experiment here, so the
+permissive default turned a misspelled variable into a budget line with no
+number and a whole ``{% if %}`` block that silently disappeared, in a prompt
+that still looked plausible enough to run fifteen rounds against.
 """
 
 from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 
 class TemplateRenderer:
@@ -22,6 +28,7 @@ class TemplateRenderer:
             loader=FileSystemLoader([str(path) for path in prompts_dirs]),
             autoescape=False,
             keep_trailing_newline=False,
+            undefined=StrictUndefined,
         )
 
     def render(self, template_name: str, template_variables: dict[str, object]) -> str:

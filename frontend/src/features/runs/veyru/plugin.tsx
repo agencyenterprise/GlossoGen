@@ -99,7 +99,6 @@ function classifyVeyruTrigger(trigger: string): RoundTriggerOutcome | null {
 
 export const veyruPlugin: ScenarioPlugin = {
   scenarioName: "veyru",
-  primaryChannelId: "link",
   RoundDetailPanel: VeyruRoundDetailPanel,
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,
