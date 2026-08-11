@@ -36,7 +36,7 @@ from typing import Any
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
-from glossogen.llm.provider_factory import create_provider
+from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.models.event import SimulationEvent
@@ -133,7 +133,7 @@ class DriveModuleRepairScenario(SimulationScenario):
             cases=self._cases,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
         )
-        self._judge_provider = create_provider(
+        self._judge_provider = DeferredLLMProvider(
             provider_name=knobs.judge_provider,
             model=knobs.judge_model,
             inference_provider=None,

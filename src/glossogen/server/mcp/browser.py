@@ -504,6 +504,7 @@ async def _tool_get_run(
             duration_seconds=detail.duration_seconds,
             status=detail.status,
             channel_ids=detail.channel_ids,
+            primary_channel_ids=detail.primary_channel_ids,
             provider=detail.provider,
             agent_swap_events=[s for s in detail.agent_swap_events if s.agent_id == agent_id],
             context_compaction_events=[

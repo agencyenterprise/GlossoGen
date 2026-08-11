@@ -28,7 +28,7 @@ import random
 from pathlib import Path
 from typing import Any
 
-from glossogen.llm.provider_factory import create_provider
+from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
@@ -114,7 +114,7 @@ class OrbitalAnomalyScenario(SimulationScenario):
             cases=self._cases,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
         )
-        self._judge_provider = create_provider(
+        self._judge_provider = DeferredLLMProvider(
             provider_name=knobs.judge_provider,
             model=knobs.judge_model,
             inference_provider=None,

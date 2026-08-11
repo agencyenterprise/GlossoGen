@@ -407,6 +407,10 @@ class RunDetailResponse(BaseModel):
     duration_seconds: float
     status: RunStatus
     channel_ids: list[str]
+    # The channels the scenario scores, from its own `get_primary_channels()`.
+    # The round timeline filters to these; it used to read a hand-kept map in
+    # the frontend, which is how three scenarios showed an empty timeline.
+    primary_channel_ids: list[str]
     provider: str
     agents: list[AgentDetail]
     agent_swap_events: list[AgentSwapEventDTO]

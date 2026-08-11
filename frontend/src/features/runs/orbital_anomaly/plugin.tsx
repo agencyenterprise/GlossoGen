@@ -14,7 +14,6 @@ import { OrbitalAnomalyRoundDetailPanel } from "./orbital-anomaly-round-detail-p
 
 export const orbitalAnomalyPlugin: ScenarioPlugin = {
   scenarioName: "orbital_anomaly",
-  primaryChannelId: "link",
   RoundDetailPanel: OrbitalAnomalyRoundDetailPanel,
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,

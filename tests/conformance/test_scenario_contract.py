@@ -24,6 +24,7 @@ from glossogen.runtime.mcp_tools import BASE_TOOL_NAMES
 from glossogen.scenario_loader import get_scenario_class
 from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenario_registry import SCENARIO_REGISTRY
+from glossogen.server.runs.primary_channel_resolution import resolve_primary_channel_ids
 
 DEFAULT_MODEL = "claude-sonnet-4-6"
 DEFAULT_PROVIDER = "anthropic"
@@ -260,6 +261,60 @@ def test_round_one_injections_render(
     _, _, scenario = built
     for agent in agents_of(scenario):
         scenario.get_injection(round_number=1, agent_id=agent.agent_id)
+
+
+def test_postmortem_injections_render(
+    built: tuple[str, dict[str, Any], SimulationScenario],
+) -> None:
+    """A postmortem template only renders once a round has ended.
+
+    That is minutes into a paid run, and later than round-one injections, so
+    it is the template most likely to reach production unrendered. Scenarios
+    without a postmortem return None here and pass trivially.
+    """
+    _, _, scenario = built
+    for agent in agents_of(scenario):
+        scenario.get_postmortem_injection(round_number=1, agent_id=agent.agent_id)
+
+
+@pytest.mark.parametrize(("name", "path"), PRESETS, ids=PRESET_IDS)
+def test_scenarios_build_without_provider_credentials(
+    name: str, path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Describing a scenario must not require a key for anybody's model.
+
+    Scenarios hold an LLM judge, and building the judge eagerly made
+    construction a live credential check. That reached further than the judge:
+    `validate_run_config` builds a scenario to preflight a config, `evaluate`
+    and the resume flows build one to read its config back, and the run-detail
+    API builds one to ask which channels it scores. With the judge built in
+    `__init__`, a user holding only an OpenAI key could not validate an OpenAI
+    run, because every preset judges on Anthropic.
+    """
+    for variable in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "HF_TOKEN"):
+        monkeypatch.delenv(variable, raising=False)
+    scenario_cls = get_scenario_class(name=name)
+    config: dict[str, Any] = json.loads(path.read_text())
+    scenario = scenario_cls.create_from_config(
+        config=dict(scenario_cls.prepare_config(config=config))
+    )
+    assert scenario.get_primary_channels() is not None
+
+
+def test_the_api_reports_the_same_primary_channels_as_the_scenario(
+    built: tuple[str, dict[str, Any], SimulationScenario],
+) -> None:
+    """The run-detail response is the frontend's only source for this.
+
+    The round timeline filters messages to these channels. It used to read a
+    hand-maintained map in the frontend instead, which is how three scenarios
+    rendered an empty timeline under a channel name they never used.
+    """
+    name, _, scenario = built
+    resolved = resolve_primary_channel_ids(
+        scenario_name=name, scenario_config=scenario.get_scenario_config()
+    )
+    assert resolved == [entry.channel_id for entry in scenario.get_primary_channels()]
 
 
 def test_advertised_metrics_are_registered(

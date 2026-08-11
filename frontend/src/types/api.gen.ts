@@ -1737,6 +1737,8 @@ export interface components {
             status: components["schemas"]["RunStatus"];
             /** Channel Ids */
             channel_ids: string[];
+            /** Primary Channel Ids */
+            primary_channel_ids: string[];
             /** Provider */
             provider: string;
             /** Agents */

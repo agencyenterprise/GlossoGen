@@ -9,7 +9,6 @@ import type { ScenarioPlugin } from "./scenario-plugin";
 
 export const DEFAULT_SCENARIO_PLUGIN: ScenarioPlugin = {
   scenarioName: "__default__",
-  primaryChannelId: "link",
   RoundDetailPanel: null,
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,

@@ -200,6 +200,10 @@ Every prompt is a Jinja2 template, never a hardcoded string in Python. Required:
 
 For scenarios with LLM judges, one `<judge_name>.jinja` per judge. These are the system prompts handed to the judge's `generate_structured(...)` call. Judges live in a separate `<scenario>_judge.py` module and pull their templates via `TemplateRenderer`.
 
+Rendering is strict. A name the template uses but the Python never passes raises `UndefinedError` rather than resolving to the empty string, so a misspelling fails at render instead of producing a prompt that reads fine but is missing a number or a whole `{% if %}` block. Pass every name the template mentions, including the ones you only use inside a condition. `None` is fine: it is a value you chose, so `{% if previous_outcome %}` still works on round one.
+
+The conformance suite renders every scenario's description, system prompts, round-one injections, and postmortem injections against every preset in the tree, so a template that references a name nobody passes fails in CI rather than partway into a paid run.
+
 ### 9. (Optional) Write `evaluation/`
 
 Most scoring is now scenario-agnostic. Because `get_primary_channels()` is required, you get every generic primary-channel metric for free:

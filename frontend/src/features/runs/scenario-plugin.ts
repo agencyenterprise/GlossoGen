@@ -87,12 +87,6 @@ export interface RoundDetailPanelProps {
  */
 export interface ScenarioPlugin {
   scenarioName: string;
-  /**
-   * The primary (budgeted) channel whose messages appear in the
-   * round-timeline modal. Defaults to ``"link"`` for scenarios without a
-   * registered plug-in.
-   */
-  primaryChannelId: string;
   /** Header panel rendered above the timeline in the round-detail modal. */
   RoundDetailPanel: ComponentType<RoundDetailPanelProps> | null;
   /**
