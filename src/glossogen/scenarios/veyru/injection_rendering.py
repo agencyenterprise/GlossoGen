@@ -78,7 +78,7 @@ def previous_outcome_for_agent(
     """Return the most recent outcome for the team the agent belongs to.
 
     Returns None for an agent that was just swapped in at the start of
-    ``round_number`` — they did not participate in ``round_number - 1``
+    ``round_number``, since they did not participate in ``round_number - 1``
     and the ``PREVIOUS VEYRU RESULT`` block would leak prior-round
     context they should not see.
     """

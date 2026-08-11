@@ -1,7 +1,7 @@
 """Clerk-gated approval endpoint for parked OAuth consent requests.
 
 The MCP server's OAuth ``authorize`` endpoint cannot synchronously issue an
-authorization code in Clerk mode — the user must first sign in via Clerk
+authorization code in Clerk mode. The user must first sign in via Clerk
 on the frontend and pick which group they want to authorize. Backend's
 :meth:`GlossoGenOAuthProvider.authorize` parks the request and redirects to
 ``{frontend_url}/mcp-consent?request_id=...``; the frontend page (which
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/mcp")
 
 
 class ApproveConsentRequest(BaseModel):
-    """Body for ``POST /mcp/consent/approve`` — the parked request to materialize."""
+    """Body for ``POST /mcp/consent/approve``: the parked request to materialize."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -37,14 +37,14 @@ class ApproveConsentRequest(BaseModel):
 
 
 class ApproveConsentResponse(BaseModel):
-    """Response for ``POST /mcp/consent/approve`` — where the browser should go next."""
+    """Response for ``POST /mcp/consent/approve``: where the browser should go next."""
 
     redirect_url: str
     group_slug: str
 
 
 class WhoAmIResponse(BaseModel):
-    """Response for ``GET /mcp/whoami`` — group bound to the calling OAuth token."""
+    """Response for ``GET /mcp/whoami``: the group bound to the calling OAuth token."""
 
     group_id: str
     group_slug: str

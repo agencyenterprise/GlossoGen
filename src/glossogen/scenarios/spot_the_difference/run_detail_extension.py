@@ -68,7 +68,7 @@ class SpotTeamRoundResult(BaseModel):
     """One team's outcome for one round (the correctness-gate + win/loss verdict).
 
     ``team_id`` is ``null`` in single-team mode. ``reason`` is the human-readable
-    explanation written by ``judge_round_result`` (e.g. ``won — found 3/3, 465
+    explanation written by ``judge_round_result`` (e.g. ``won, found 3/3, 465
     chars`` / ``did not submit (found 0/3, 576 chars)``).
     """
 
@@ -144,7 +144,7 @@ def _build_call_id_map(events: list[SimulationEvent]) -> dict[str, SpotSubmissio
 
     Keyed by ``(agent_id, round_number)``: an agent submits at most once per
     round (later submits are rejected) and is judged at most once per round,
-    both in the same round — so the mapping is exact. A plain FIFO would
+    both in the same round, so the mapping is exact. A plain FIFO would
     mis-pair here because under ``all_must_submit`` the first member's verdict
     is logged only when the team locks (on the second member's call), i.e.
     after that member's own tool result. Only accepted submit calls (recorded

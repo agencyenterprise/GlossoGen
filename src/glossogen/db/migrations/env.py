@@ -1,6 +1,6 @@
 """Alembic environment for glossogen.
 
-Alembic uses SQLAlchemy for connection management here — that's confined to
+Alembic uses SQLAlchemy for connection management here, confined to
 this file. Migration bodies must remain raw SQL via ``op.execute(...)``; no
 Table/Column declarations belong in any ``versions/`` file.
 """

@@ -7,7 +7,7 @@ against the human-curated ``expected_match`` golden label. The headline metric
 is accuracy; two extra metrics break accuracy down by whether the golden label
 came from a unanimous or a split (2-1) majority vote during labeling.
 
-Run it (the inspect ``--model`` is a placeholder — the judge call is made
+Run it (the inspect ``--model`` is a placeholder, because the judge call is made
 inside the solver via the project's own LLM provider, not via inspect):
 
     VIRTUAL_ENV= uv run --no-sync inspect eval \

@@ -12,7 +12,7 @@ without the ranger's park schedule.
 Round scoring is fully deterministic (see :mod:`world_state`): a round
 succeeds only when the reservoir ends within its safe band, no release
 reaches an occupied park, and neither a needless park closure nor an
-unwarranted evacuation occurred — all within the communication budget.
+unwarranted evacuation occurred, all within the communication budget.
 
 Heavy logic lives in dedicated sibling modules: :mod:`agent_factory`
 (agent/channel construction), :mod:`mcp_tools` (the four action tools),

@@ -29,7 +29,7 @@ class TelemetryPattern(NamedTuple):
     """A single telemetry-pattern catalog entry with operator-facing readings.
 
     ``command_template`` is a tuple of ``(action, wait_template)`` pairs.
-    The wait template is an int literal — the round's ``CommandParameters``
+    The wait template is an int literal; the round's ``CommandParameters``
     add ``wait_offset_seconds`` so the same pattern's wait values shift
     between rounds. ``priority`` (1-5) controls easy-round selection and
     the order patterns are sequenced when multiple appear in a round.

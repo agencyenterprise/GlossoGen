@@ -55,7 +55,7 @@ class Metric(ABC):
             metric that detects it does not apply to this run (e.g.
             ``round_success_after_resume`` on a non-resume run,
             cross-team probe similarity on a single-team run) returns
-            an empty list — the report records no entry for that metric,
+            an empty list, so the report records no entry for that metric,
             which is cleaner than a zero-score sentinel with a
             "does not apply" summary.
         """

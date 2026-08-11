@@ -6,7 +6,7 @@ between Clerk-auth mode and single-tenant local mode.
 
 ``CLERK_WEBHOOK_SECRET`` is deliberately not read here. The webhook router
 reads it per request and answers 503 when it is missing, so the server can
-boot in local mode without it — a startup read would make an optional
+boot in local mode without it, because a startup read would make an optional
 secret mandatory.
 """
 

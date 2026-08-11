@@ -6,7 +6,7 @@ agent was the one swapped in via ``replace-agent``) and runs one structured
 ``run_structured_probe`` call (``output_type=ProtocolExplanationOutput``) asking
 the agent to explain the protocol it actually remembers using. Each agent is
 probed under its own original model/provider, so the answer is the agent's own
-account of the protocol — not a third party's.
+account of the protocol, not a third party's.
 
 When the scenario implements ``get_protocol_explanation_config``, the metric
 renders that scenario's per-role prose template (grounded in the scenario's
@@ -292,7 +292,7 @@ def _resolve_channel_visibility(
     For the agent that was swapped in via ``replace-agent`` we apply the same
     channel-visibility map the runtime applied at resume time (so postmortem
     reads and out-of-window link sends are stripped). Every other agent gets
-    an empty filter — full reconstruction.
+    an empty filter, meaning full reconstruction.
     """
     if manifest is None or manifest.replaced_agent_id != agent_id:
         return {}
@@ -316,7 +316,7 @@ def _last_event_timestamp(events: list[SimulationEvent]) -> datetime:
 
 
 def _dedupe_latest_registration(agent_configs: list[AgentConfig]) -> list[AgentConfig]:
-    """Keep one ``AgentConfig`` per ``agent_id`` — the last one in the input.
+    """Keep one ``AgentConfig`` per ``agent_id``: the last one in the input.
 
     ``extract_agent_configs`` emits one entry per ``AgentRegistered`` event,
     so on a replace-agent / multi-swap run the same ``agent_id`` shows up

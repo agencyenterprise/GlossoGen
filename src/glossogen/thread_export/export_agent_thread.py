@@ -1,7 +1,7 @@
 """Orchestrate exporting one agent's thread from a finished run into a provider request.
 
-Reuses the protocol probe's reconstruction path — ``build_message_history`` with the
-same exclusive ``cutoff_round`` semantics and ``build_full_system_prompt`` — then
+Reuses the protocol probe's reconstruction path: ``build_message_history`` with the
+same exclusive ``cutoff_round`` semantics and ``build_full_system_prompt``, then
 serializes the result with ``provider_thread_serializer`` into a ``ThreadExport``.
 ``export_agent_thread_from_run_dir`` loads the JSONL itself; ``export_agent_thread``
 takes already-loaded events for callers (the web server) that have them in hand.

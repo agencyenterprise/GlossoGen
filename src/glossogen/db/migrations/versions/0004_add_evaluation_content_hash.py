@@ -11,7 +11,7 @@ measurements list (see ``compute_measurements_hash``). The
 this migration it had to PUT every eval report unconditionally on every
 sync because prod exposed no cheap drift signal.
 
-Nullable — existing rows stay ``NULL`` until the next ``PUT /evaluation``
+Nullable, so existing rows stay ``NULL`` until the next ``PUT /evaluation``
 handler run (or the one-shot backfill script) populates them.
 """
 

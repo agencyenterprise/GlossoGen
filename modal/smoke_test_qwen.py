@@ -112,7 +112,7 @@ def main() -> None:
 
     Modal returns one hostname per app, namespaced by workspace:
     ``https://<workspace>--qwen-3-32b-serve.modal.run``.
-    Set ``MODAL_QWEN_ENDPOINT_BASE`` to yours — no trailing slash, no ``/v1`` suffix.
+    Set ``MODAL_QWEN_ENDPOINT_BASE`` to yours, with no trailing slash and no ``/v1`` suffix.
     """
     endpoint_base = os.environ.get("MODAL_QWEN_ENDPOINT_BASE")
     if not endpoint_base:

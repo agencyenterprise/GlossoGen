@@ -60,7 +60,7 @@ def default_pydantic_ai_settings(provider: str) -> ModelSettings:
     On Anthropic we enable automatic prompt caching (``anthropic_cache=True``)
     rather than the per-block ``anthropic_cache_messages``. Auto mode passes a
     top-level ``cache_control`` parameter so the server caches the longest
-    matching prefix across calls — important when many calls share the same
+    matching prefix across calls, which matters when many calls share the same
     ``system + history`` prefix but vary the trailing user prompt (e.g. the
     probe metric calls the whole question bank per agent).
     """

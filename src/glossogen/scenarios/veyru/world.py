@@ -178,7 +178,7 @@ class VeyruWorld(ScenarioWorld):
         """Record that an agent was swapped at the start of ``round_number``.
 
         Consulted by injection rendering so the agent's first injection skips
-        the ``PREVIOUS VEYRU RESULT`` block — the new agent did not
+        the ``PREVIOUS VEYRU RESULT`` block, since the new agent did not
         participate in round ``round_number - 1`` and leaking that result
         would hand them context they should not see.
         """
@@ -284,7 +284,7 @@ class VeyruWorld(ScenarioWorld):
         natural-cycle case is selected by modular index. Setting the override
         on ``_current_case`` here is what makes the stabilize_veyru judge,
         time-budget checks, and outcome computations all read the injected
-        case's stages instead of the natural one — without this, the
+        case's stages instead of the natural one. Without this, the
         observer/engineer prompts would show the override but the judge
         would silently compare against the wrong procedure.
         """

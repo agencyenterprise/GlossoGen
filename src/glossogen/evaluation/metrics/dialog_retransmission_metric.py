@@ -20,7 +20,7 @@ count per round.
 Because the agents' communication protocol evolves into terse, coded shorthand, a single
 message can be cryptic in isolation. The judge therefore receives the **full run context**:
 every round's transcript (so the protocol's evolution is visible) with each round split into
-its primary-channel messages and its other-channel messages — including the **postmortem**
+its primary-channel messages and its other-channel messages, including the **postmortem**
 debriefs where agents establish and explain their codes. The prompt directs the judge to use
 that context as a codebook to decode terse primary-channel messages before classifying them,
 and to infer communicative intent from meaning rather than surface cues like question marks.
@@ -105,7 +105,7 @@ class DialogRetransmissionMetric(Metric):
     """Counts dialog and retransmission-request messages per round via an LLM judge.
 
     Runs the judge ``_JUDGE_REPLICAS`` times and averages the per-round counts, then emits
-    two Measurements — ``dialog_count`` and ``retransmission_request_count`` — each scored as
+    two Measurements, ``dialog_count`` and ``retransmission_request_count``, each scored as
     the mean averaged count per round across the run. Scenarios with no messages get a no-op
     result.
     """

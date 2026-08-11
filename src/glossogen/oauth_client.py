@@ -355,7 +355,7 @@ async def refresh_credentials(*, credentials: Credentials) -> Credentials:
     """Trade the stored refresh token for a fresh access token.
 
     Raises ``RuntimeError`` if no refresh_token is stored or the server
-    rejects the refresh — callers should fall back to ``glossogen login``.
+    rejects the refresh. Callers should fall back to ``glossogen login``.
     """
     if credentials.refresh_token is None:
         raise RuntimeError("No refresh_token in credentials; run `glossogen login` again.")

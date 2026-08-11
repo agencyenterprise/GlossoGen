@@ -1,7 +1,7 @@
 """Mean Chars per Message (MCM) metric for primary-channel messages.
 
 Computes the mean number of characters per message sent on the scenario's
-primary channel. Aggregates per-round and overall statistics. Deterministic —
+primary channel. Aggregates per-round and overall statistics. Deterministic:
 does not consult the LLM provider.
 
 Pairs with ``mean_chars_per_round``: MCR conflates message density with

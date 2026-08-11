@@ -155,7 +155,7 @@ def load_backoff_ngram_model(case_sensitive: bool, keep_punctuation: bool) -> Ba
     """Load the cached backoff trigram model, building and caching on first use.
 
     The cache filename encodes the case/punctuation configuration so distinct
-    configurations coexist. CPU- and I/O-bound on a cache miss — callers should
+    configurations coexist. CPU- and I/O-bound on a cache miss, so callers should
     invoke this off the event loop via ``asyncio.to_thread``.
     """
     cache_path = _cache_path(case_sensitive=case_sensitive, keep_punctuation=keep_punctuation)

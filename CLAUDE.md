@@ -193,7 +193,7 @@ rewrite it.
 - **Be factual only.** Describe what the code does, not assumptions about why. Never use subjective language.
 - **Be concise.** One to three sentences for most docstrings.
 - **Never state a count of things that can change.** "Six scenarios build a judge",
-  "the four probe metrics", "28 questions per agent" — every one of these becomes a
+  "the four probe metrics", "28 questions per agent". Every one of these becomes a
   lie the next time someone adds a scenario, a metric, or a question, and nothing
   fails when it does. Name the property instead: "scenarios that judge their own
   rounds", "the probe metrics", "the whole question bank". Counts that describe a
@@ -206,7 +206,7 @@ Stack: Next.js 16, React 19, TypeScript (strict), Tailwind CSS v4, TanStack Reac
 
 ### API Client & Type Safety
 
-All API calls must use the generated typed client from `@/shared/lib/api-client`. Raw `fetch()` is forbidden — enforced by ESLint.
+All API calls must use the generated typed client from `@/shared/lib/api-client`. Raw `fetch()` is forbidden, enforced by ESLint.
 
 To regenerate types after changing backend endpoints:
 
@@ -279,21 +279,21 @@ make langfuse-logs   # tail the langfuse-web logs
   `LANGFUSE_INIT_*` in `docker-compose.langfuse.yml`). Langfuse's internal postgres is mapped
   to host 5433 to avoid clashing with a local 5432 Postgres.
 - The `glossogen` org + project and the API keys (`pk-lf-local-dev` / `sk-lf-local-dev`) are
-  headlessly seeded on first boot — no UI setup needed. Those keys are pre-filled in
+  headlessly seeded on first boot, so there is no UI setup. Those keys are pre-filled in
   `.env.example`, so `glossogen run` traces to this instance out of the box.
 - Each run is one Langfuse **session** keyed by `run_id`; every agent's cycles trace under it,
   tagged with `agent_id` / `role_name` / `model` / `provider` / `scenario`.
 - Telemetry is initialized only in the `glossogen run` path (`init_langfuse_telemetry` in
   [telemetry_bootstrap.py](src/glossogen/telemetry_bootstrap.py)), so `glossogen evaluate`'s
   probe/judge LLM calls are not traced. If the stack is down or keys are unset, the run logs
-  one warning and proceeds untraced — telemetry never blocks a simulation.
+  one warning and proceeds untraced. Telemetry never blocks a simulation.
 - Docker Desktop needs adequate resources for the full stack (Langfuse suggests ~4 cores /
   16 GiB). The stack exposes `langfuse-web` on host :3001 and `minio` on :9090; the other
   services (postgres :5433, redis, clickhouse) bind to localhost only.
 
 ## Authentication
 
-The backend is multi-tenant. Each Clerk **organization** corresponds to a study **group**; every run is owned by exactly one group, never shared across groups except via the export/import flow. The active group is identified by the URL slug — `/g/<slug>/...` on the frontend maps to `/api/g/<slug>/...` on the backend.
+The backend is multi-tenant. Each Clerk **organization** corresponds to a study **group**; every run is owned by exactly one group, never shared across groups except via the export/import flow. The active group is identified by the URL slug: `/g/<slug>/...` on the frontend maps to `/api/g/<slug>/...` on the backend.
 
 Two run-time modes, switched by the presence of `CLERK_SECRET_KEY`:
 
@@ -366,7 +366,7 @@ The backend exposes an MCP (Model Context Protocol) server at `/mcp` for program
 
 ### Connecting
 
-From the web UI, click the **MCP** button on the runs page to see connection instructions. Clients discover OAuth automatically via the well-known metadata endpoint — no auth headers needed in the config.
+From the web UI, click the **MCP** button on the runs page to see connection instructions. Clients discover OAuth automatically via the well-known metadata endpoint, so the config needs no auth headers.
 
 **Claude Code:**
 
@@ -386,7 +386,7 @@ claude mcp add-json glossogen-runs '{"type":"http","url":"<API_URL>/mcp"}'
 }
 ```
 
-Replace `<API_URL>` with the backend URL (e.g. `http://localhost:8000` for local development). The client handles OAuth registration, authorization, and token refresh automatically. In local mode the consent step auto-approves to the synthetic `local` group. In Clerk mode the client's browser tab opens the Clerk-gated `/mcp-consent` page — the user signs in (if not already) and clicks Approve to bind the issued token to their active org. See the **MCP OAuth 2.0 Authentication** section above for the full flow.
+Replace `<API_URL>` with the backend URL (e.g. `http://localhost:8000` for local development). The client handles OAuth registration, authorization, and token refresh automatically. In local mode the consent step auto-approves to the synthetic `local` group. In Clerk mode the client's browser tab opens the Clerk-gated `/mcp-consent` page, where the user signs in (if not already) and clicks Approve to bind the issued token to their active org. See the **MCP OAuth 2.0 Authentication** section above for the full flow.
 
 ## Deployment
 
@@ -405,7 +405,7 @@ it has no config-as-code file here.
 
 ### Railway Dashboard Setup
 
-**Backend service**: root directory `/`, volume mounted at `/data/runs`. Attach a Railway Postgres database — its connection string becomes `DATABASE_URL`. The Dockerfile runs `alembic upgrade head` before starting the server.
+**Backend service**: root directory `/`, volume mounted at `/data/runs`. Attach a Railway Postgres database. Its connection string becomes `DATABASE_URL`. The Dockerfile runs `alembic upgrade head` before starting the server.
 
 Environment variables:
 - `DATABASE_URL` — Postgres connection string (required; backend won't boot without it)
@@ -427,7 +427,7 @@ Runtime variables:
 
 ## Run Output Directory Structure
 
-All simulation outputs use a standard directory layout. The JSONL event log is the canonical state ledger for a run — every fork, replace-agent, cross-run, and resume-at-round operation locates the target event in the JSONL and writes a truncated copy into a new run directory.
+All simulation outputs use a standard directory layout. The JSONL event log is the canonical state ledger for a run. Every fork, replace-agent, cross-run, and resume-at-round operation locates the target event in the JSONL and writes a truncated copy into a new run directory.
 
 ```
 runs/{scenario_name}/{unix_timestamp}/
@@ -506,7 +506,7 @@ Forks, replace-agent, cross-run replace-agent, and resume-at-round all locate th
 
 Agents connect to a shared MCP server via the Pydantic AI framework. A game clock manages round progression. Always run simulations as a background process, piping all output to a log file.
 
-**Canonical seed: `seed=42`.** Always use `seed=42` when launching comparison runs so results are comparable against the baseline. Do not vary the seed across replications — the seed fixes the case set, so running multiple times with the same seed measures LLM stochasticity on an identical workload. Only change the seed if the user explicitly asks for it.
+**Canonical seed: `seed=42`.** Always use `seed=42` when launching comparison runs so results are comparable against the baseline. Do not vary the seed across replications. The seed fixes the case set, so running multiple times with the same seed measures LLM stochasticity on an identical workload. Only change the seed if the user explicitly asks for it.
 
 **Canonical judge: `claude-haiku-4-5-20251001`.** Set `judge_model: "claude-haiku-4-5-20251001"` and `judge_provider: "anthropic"` in every scenario knobs file. Keeping the judge fixed across runs holds judge-side noise constant so cross-run comparisons measure agent behavior, not judge variance. Only change the judge if the user explicitly asks for it.
 
@@ -525,7 +525,7 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen run <scenario> \
 Required flags: `--model`, `--provider` (`anthropic`, `openai`, `google-gla`, `ollama`, `self-hosted`), `--runs-dir`.
 Optional flags: `--max-agent-turns` (default: 200), `--config <path>` (base config JSON file).
 
-The `self-hosted` provider points pydantic-ai at any OpenAI-compatible chat-completions endpoint. `SELF_HOSTED_BASE_URLS` is a JSON map from model name → `/v1` URL, so multiple self-hosted models can coexist; `SELF_HOSTED_API_KEY` is the bearer token shared across them. Reference deployments are in `modal/` (Llama 3.3 70B + Qwen3-32B, both vLLM with tool calling) — see `modal/README.md` for deploy steps. Once deployed and the env vars are set:
+The `self-hosted` provider points pydantic-ai at any OpenAI-compatible chat-completions endpoint. `SELF_HOSTED_BASE_URLS` is a JSON map from model name → `/v1` URL, so multiple self-hosted models can coexist; `SELF_HOSTED_API_KEY` is the bearer token shared across them. Reference deployments are in `modal/` (Llama 3.3 70B + Qwen3-32B, both vLLM with tool calling); see `modal/README.md` for deploy steps. Once deployed and the env vars are set:
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
@@ -537,7 +537,7 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen run veyru \
 
 The pricing entry in `src/glossogen/token_pricing.py` is keyed by the literal model name (case-sensitive prefix match after dots→dashes); add a new entry there if you serve a different model.
 
-**Self-hosted context budget (`agent_max_tokens` knob).** Simulation agents' per-cycle output cap is the `agent_max_tokens` knob (`BaseKnobs`, default `16384`) — not `LLM_MAX_TOKENS`. Self-hosted models are served at a small fixed context (Llama 3.3 70B is `--max-model-len 24576` in `modal/serve_llama.py`), and `input + agent_max_tokens` must stay under it or vLLM 400s with `"maximum context length is 24576 tokens"` and the run stalls. For **replace-agent / swap / cross-run** runs with a self-hosted agent, the swapped-in agent's *reconstructed history accumulates* (the veyru observer grows to ~18k tokens over a 10-round swap), so the default `16384` output cap overflows. **Set `agent_max_tokens: 2048` in the `--knobs` for self-hosted swap runs** (veyru outputs are short tool calls, so it truncates nothing). Raising `--max-model-len` instead risks KV-cache OOM on H100:2 — see `modal/README.md`. The platform also serializes parallel tool calls in reconstructed history for self-hosted agents automatically (vLLM rejects multi-tool-call turns); no action needed there.
+**Self-hosted context budget (`agent_max_tokens` knob).** Simulation agents' per-cycle output cap is the `agent_max_tokens` knob (`BaseKnobs`, default `16384`), not `LLM_MAX_TOKENS`. Self-hosted models are served at a small fixed context (Llama 3.3 70B is `--max-model-len 24576` in `modal/serve_llama.py`), and `input + agent_max_tokens` must stay under it or vLLM 400s with `"maximum context length is 24576 tokens"` and the run stalls. For **replace-agent / swap / cross-run** runs with a self-hosted agent, the swapped-in agent's *reconstructed history accumulates* (the veyru observer grows to ~18k tokens over a 10-round swap), so the default `16384` output cap overflows. **Set `agent_max_tokens: 2048` in the `--knobs` for self-hosted swap runs** (veyru outputs are short tool calls, so it truncates nothing). Raising `--max-model-len` instead risks KV-cache OOM on H100:2; see `modal/README.md`. The platform also serializes parallel tool calls in reconstructed history for self-hosted agents automatically (vLLM rejects multi-tool-call turns); no action needed there.
 
 Examples:
 
@@ -575,7 +575,7 @@ Known cases:
 
 - **veyru**: `postmortem_after_swap=true` requires `postmortem_enabled=true`. When sweeping with `postmortem_enabled=false`, also pass `postmortem_after_swap=false` (the default knobs JSON has it set to true).
 
-Defensive launcher pattern: when overriding a knob, also override every knob the scenario's `model_validator` checks against it. If you're unsure, run one foreground launch first to surface validation errors before queueing a sweep — those errors land in the launch's stdout/stderr log, not in the orchestrator log.
+Defensive launcher pattern: when overriding a knob, also override every knob the scenario's `model_validator` checks against it. If you're unsure, run one foreground launch first to surface validation errors before queueing a sweep. Those errors land in the launch's stdout/stderr log, not in the orchestrator log.
 
 ### Live Streaming
 
@@ -597,7 +597,7 @@ The `--resume` flag requires the same `--config` as the original run. The `--run
 
 ### Replacing an Agent (Round-Level Rewind)
 
-Replay a finished run from the start of a chosen round with one specific agent restarted on a fresh history while every other agent keeps its full reconstructed history. Useful for asking "could a fresh agent follow the engineer from here on?" — a direct, empirical alternative to a judge.
+Replay a finished run from the start of a chosen round with one specific agent restarted on a fresh history while every other agent keeps its full reconstructed history. Useful for asking "could a fresh agent follow the engineer from here on?". It answers empirically what a judge only estimates.
 
 ```bash
 glossogen replace-agent veyru \
@@ -611,7 +611,7 @@ glossogen replace-agent veyru \
   [--knobs path/to/overrides.json]
 ```
 
-Internals: clones the source run's git repo at the commit produced by the source's `RoundAdvanced` event for `--round-start`. The cloned JSONL therefore contains every committed event up to and including that `round_advanced` (round N-1 fully ended in source — game phase, postmortem, both `round_ended` events) but no `injection_delivered` events for round N yet. On resume the game clock starts at round N and calls `runtime.deliver_round_injections(N)` to fire the round-N injections fresh. The replaced agent's full event log is preserved on disk; its reconstructed pydantic-ai history is stripped of `text` / `thinking` parts and any tool calls targeting blocked channels (e.g. veyru's postmortem channels). The veyru world's per-team `outcomes` list is seeded from the source's `veyru_case_started` / `veyru_stabilization_judged` / `round_ended` events via `restore_state_from_events`, so the round-N injection's "PREVIOUS VEYRU RESULT" block reflects the source's actual round N-1 outcome. Cannot be used with `--round-start 1`. Non-replaced agents stay on their exact original models.
+Internals: clones the source run's git repo at the commit produced by the source's `RoundAdvanced` event for `--round-start`. The cloned JSONL therefore contains every committed event up to and including that `round_advanced` (round N-1 fully ended in source: game phase, postmortem, both `round_ended` events) but no `injection_delivered` events for round N yet. On resume the game clock starts at round N and calls `runtime.deliver_round_injections(N)` to fire the round-N injections fresh. The replaced agent's full event log is preserved on disk; its reconstructed pydantic-ai history is stripped of `text` / `thinking` parts and any tool calls targeting blocked channels (e.g. veyru's postmortem channels). The veyru world's per-team `outcomes` list is seeded from the source's `veyru_case_started` / `veyru_stabilization_judged` / `round_ended` events via `restore_state_from_events`, so the round-N injection's "PREVIOUS VEYRU RESULT" block reflects the source's actual round N-1 outcome. Cannot be used with `--round-start 1`. Non-replaced agents stay on their exact original models.
 
 `--rounds-after-swap` defaults to `source_round_count - round_start` (the remaining rounds in the original run after the replacement boundary). The resumed simulation's `round_count` is set to `round_start + rounds_after_swap`.
 
@@ -652,11 +652,11 @@ glossogen cross-run-replace-agent veyru \
 
 **Manifest + provenance.** Persisted as `cross_run_replace_manifest.json` (parallel to `replace_manifest.json`). Carries both `source_a_run_id` (target timeline) and `source_b_run_id` (where the imported agent came from), plus `imported_model`/`imported_provider`, `round_start`, `source_b_round_end`, `rounds_after_swap`, `replaced_agent_id`, `channels_with_visible_history`, `blocked_tool_call_channels`. The discovery layer surfaces this on `RunSummary` / `RunDetailResponse` as `cross_run_replace_agent_source`. Cross-run runs appear in the run list with a violet "Cross-run" badge that links back to both sources.
 
-**Verifying the imported history.** Each resumed run writes `resume_context_{agent_id}.json` to the new run dir capturing the exact reconstructed pydantic-ai messages handed to that agent on its first turn. For cross-run runs, `resume_context_<replaced_agent_id>.json`'s tail should match Sim B's last few `field_observer` (or whichever role) messages verbatim — that confirms the cross-run history is being mounted from Sim B and not contaminated by Sim A.
+**Verifying the imported history.** Each resumed run writes `resume_context_{agent_id}.json` to the new run dir capturing the exact reconstructed pydantic-ai messages handed to that agent on its first turn. For cross-run runs, `resume_context_<replaced_agent_id>.json`'s tail should match Sim B's last few `field_observer` (or whichever role) messages verbatim, which confirms the cross-run history is being mounted from Sim B and not contaminated by Sim A.
 
 **Label convention.** Cross-run runs are labelled `cross_team` plus a range tag like `15-25` (rounds played post-swap). That label lets analysis tooling group cross-team runs and compare `round_success_after_resume` per `(imported_model, round_start)` bucket against both Source A and Source B accuracy on the same rounds. Apply labels by writing `labels.json` directly *before* `glossogen evaluate` runs (the eval-derived labels merge into that file).
 
-**`round_success_after_resume` works for both flows.** The metric reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (`round_start`, `rounds_after_swap`, `source_run_id`, `source_run_dir`). For cross-run runs, the comparison is against Sim A (`source_a_*`) — i.e. "did the imported agent perform better/worse than what the original agent achieved over the same window?".
+**`round_success_after_resume` works for both flows.** The metric reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (`round_start`, `rounds_after_swap`, `source_run_id`, `source_run_dir`). For cross-run runs, the comparison is against Sim A (`source_a_*`): "did the imported agent perform better/worse than what the original agent achieved over the same window?".
 
 ### Resume at a Round (Post-Hoc, No Agent Replacement)
 
@@ -675,13 +675,13 @@ Required: `scenario_name` (positional), `--source-run-dir`, `--round-start` (≥
 
 **Mechanism.** The flow reuses the `replace-agent` machinery with `replaced_agent_id=None`. `resolve_round_start_anchor` finds the source's `RoundAdvanced(round_start)` event id, the git repo is cloned and checked out at that commit, `model_overrides` is built by pinning every agent to its source-active registration (so a multi-swap source's per-phase models survive the resume), the merged config writes `replace_config.json`, and the resumed subprocess launches via `glossogen run --resume`. The manifest is the standard `replace_manifest.json` with `replaced_agent_id`, `replacement_model`, `replacement_provider` all `null` and `channels_with_visible_history` / `blocked_tool_call_channels` empty.
 
-**Resume ordering on the boundary round.** The game clock's resume branch defers `deliver_round_injections` until after agent runners are launched and the boundary hook fires. The supervisor calls `dispatch_resume_boundary_events()` (which executes any `scheduled_events` bucketed at `round_start`) then `deliver_initial_round_injections()`. This mirrors the normal `_advance_round` order (boundary hook → injection delivery) and ensures that when a `swap_agent` event fires exactly at `round_start`, the round's injection lands in the post-swap session rather than the cancelled predecessor's queue. The `RoundBoundaryScheduler` is pre-seeded from `RewindState.rounds_with_fired_scheduler_events` (set of round numbers carrying `AgentSwappedMidRun` or `PostmortemDisabledMidRun` in the loaded events) so boundaries that already fired in the source — or in a crashed-and-resumed run — are not re-dispatched.
+**Resume ordering on the boundary round.** The game clock's resume branch defers `deliver_round_injections` until after agent runners are launched and the boundary hook fires. The supervisor calls `dispatch_resume_boundary_events()` (which executes any `scheduled_events` bucketed at `round_start`) then `deliver_initial_round_injections()`. This mirrors the normal `_advance_round` order (boundary hook → injection delivery) and ensures that when a `swap_agent` event fires exactly at `round_start`, the round's injection lands in the post-swap session rather than the cancelled predecessor's queue. The `RoundBoundaryScheduler` is pre-seeded from `RewindState.rounds_with_fired_scheduler_events` (set of round numbers carrying `AgentSwappedMidRun` or `PostmortemDisabledMidRun` in the loaded events) so boundaries that already fired in the source, or in a crashed-and-resumed run, are not re-dispatched.
 
-**Inherited `scheduled_events` semantics.** When the source's config carries `scheduled_events`, those entries are preserved unless overridden. Events at `at_round < round_start` are silently skipped (the resumed clock never visits those rounds). Events at `at_round == round_start` fire on resume — by design — because the cloned JSONL captures the state at `RoundAdvanced(round_start)`, which is committed *before* the source's scheduler dispatches that boundary. Pass `--knobs '{"scheduled_events": [...]}'` to override the list (e.g. add a post-hoc swap at a later round, or clear the schedule entirely).
+**Inherited `scheduled_events` semantics.** When the source's config carries `scheduled_events`, those entries are preserved unless overridden. Events at `at_round < round_start` are silently skipped (the resumed clock never visits those rounds). Events at `at_round == round_start` fire on resume, by design, because the cloned JSONL captures the state at `RoundAdvanced(round_start)`, which is committed *before* the source's scheduler dispatches that boundary. Pass `--knobs '{"scheduled_events": [...]}'` to override the list (e.g. add a post-hoc swap at a later round, or clear the schedule entirely).
 
 **Picking the subprocess `--model`/`--provider`.** Since every agent is pinned via `model_overrides`, the top-level `--model`/`--provider` flags are unused. The CLI selects the first source-active registration's pair as the defaults so `glossogen run`'s required argparse flags are satisfied.
 
-**Knob-schema evolution caveat.** If the scenario's knobs schema gained a required field after the source was created, validation will reject the merged config until the missing key is supplied. Pass it via `--knobs` for that resume (example: veyru's `easy_round_numbers: frozenset[int]` was added later — older veyru runs need `--knobs '{"easy_round_numbers": [1, 2, 3, 6, 13]}'` to resume).
+**Knob-schema evolution caveat.** If the scenario's knobs schema gained a required field after the source was created, validation will reject the merged config until the missing key is supplied. Pass it via `--knobs` for that resume (example: veyru's `easy_round_numbers: frozenset[int]` was added later, so older veyru runs need `--knobs '{"easy_round_numbers": [1, 2, 3, 6, 13]}'` to resume).
 
 **Discovery.** The manifest is surfaced as `RunSummary.resume_at_round_source` / `RunDetailResponse.resume_at_round_source` (`ResumeAtRoundSource { source_run_id, round_start, rounds_after_resume, target_event_id, resumed_at }`); when `replaced_agent_id` is null, `replace_agent_source` is suppressed in favour of this field.
 
@@ -758,7 +758,7 @@ Or embed in the `--config` JSON file under `model_overrides`:
 
 When running simulations, evaluations, or any long-running background process, **always** follow this pattern:
 
-**No `sleep`. Use a background heartbeat wake-up and do the checks yourself on wake.** Never run a foreground `sleep` (including any sleep→check→report loop) — it blocks the whole session so the user cannot chat. The working mode:
+**No `sleep`. Use a background heartbeat wake-up and do the checks yourself on wake.** Never run a foreground `sleep` (including any sleep→check→report loop). It blocks the whole session so the user cannot chat. The working mode:
 
 1. Launch the process in the background (with `run_in_background` or `&`).
 2. Arm a **periodic heartbeat** monitor whose only job is to wake you every ~30–60s — the Monitor tool with `while true; do echo "$(date) tick"; sleep 45; done`, or an equivalent `run_in_background` loop that keeps emitting. Each emitted line is a notification. The internal `sleep` inside a *background* watcher is fine; only a *foreground* block is forbidden.
@@ -766,7 +766,7 @@ When running simulations, evaluations, or any long-running background process, *
 4. **Do NOT gate the wake-up on a single condition** (`until grep -q '<pattern>' <file>; do sleep; done`). A condition embeds an assumption — a grep string that doesn't match the real (often compact, no-space) JSONL serialization, a guessed event field, a wrong path — and if it's wrong the monitor fires **never** and you hang silently. A heartbeat can't silently fail: a bad assumption costs one wasted tick, not an infinite hang. Only use a condition-based exit when you've *verified* the exact match string against real output first. See memory `feedback_monitor_heartbeat_not_condition`.
 5. For on-demand status, run a single instant snapshot command — never a sleep loop.
 
-**Sim runs cost money and time — actively monitor, do not just wait.** Every 1–2 minutes while a launcher or eval is running, tail its log, count running sims per model, and verify no errors / no stuck sims / no duplicate launches. Long unattended gaps are not acceptable: a launcher that's silently looping on a misconfigured spec, a sim caught in a death-spiral retry loop, or a duplicate launch can burn through hours of API spend before the user notices. If you've already launched something and have downtime, fill it with a check — don't wait for the user to ask.
+**Sim runs cost money and time, so monitor them rather than waiting.** Every 1–2 minutes while a launcher or eval is running, tail its log, count running sims per model, and verify no errors / no stuck sims / no duplicate launches. Long unattended gaps are not acceptable: a launcher that's silently looping on a misconfigured spec, a sim caught in a death-spiral retry loop, or a duplicate launch can burn through hours of API spend before the user notices. If you've already launched something and have downtime, fill it with a check rather than waiting for the user to ask.
 
 **Per-launch sanity checks** (after every launcher iteration, not just at the end):
 
@@ -800,12 +800,12 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
 
 To run several replace-agent variants while keeping at most N simulations live, use a small bash orchestrator. Each `glossogen replace-agent` call returns in ~25s after spawning its detached `python -m glossogen run veyru ... --resume` subprocess; the orchestrator polls active simulations via `pgrep` against the `Python -m glossogen run ... --resume` cmdline, sleeps when full, and launches the next spec when a slot frees up.
 
-**Parallelism policy — per-provider, never shared.** Each provider has independent rate limits and capacity, so the orchestrator must:
+**Parallelism policy: per-provider, never shared.** Each provider has independent rate limits and capacity, so the orchestrator must:
 
 - **Cap per model at 15 concurrent sims** (the Anthropic + OpenAI accounts comfortably sustain this).
 - **Run a separate queue per model in parallel** so a paused `gpt-5.4` queue (waiting for an OpenAI slot) never holds back the `claude-sonnet-4-6` queue. Strict-sequential single-queue orchestrators are a bug: with mixed-model specs, the queue blocks on the current spec's model and idles every slot on the other provider until the current spec launches. Always use per-provider parallel queues — typically two background subshells joined by `wait`.
 
-Reference shape — per-provider parallel orchestrator (save as `/tmp/replace_orchestrator.sh` or anywhere outside the repo):
+Reference shape for a per-provider parallel orchestrator (save as `/tmp/replace_orchestrator.sh` or anywhere outside the repo):
 
 ```bash
 #!/bin/bash
@@ -899,16 +899,16 @@ The orchestrator has no automatic recovery: if it dies, simulations keep running
 
 ### NEVER evaluate a run before it has emitted `simulation_ended`
 
-**The only safe "this run is finished" signal is the `simulation_ended` event in the JSONL.** Do not gate evaluation (or any "completed" check) on a round count such as `grep -c '"round_advanced"' >= round_count` or `round_advanced.round_number == <last>`. `round_advanced` to round N fires when round N **starts**; round N's `RoundResultRecorded` is not written until round N **ends** (after its game phase + postmortem). So a count-based gate fires while the final round is still running and evaluates a run that is missing its last round — `round_success` then reads `N-1` rounds (e.g. `6/14` instead of `7/15`), and any per-round export keyed off `round_success` silently drops the final round's data.
+**The only safe "this run is finished" signal is the `simulation_ended` event in the JSONL.** Do not gate evaluation (or any "completed" check) on a round count such as `grep -c '"round_advanced"' >= round_count` or `round_advanced.round_number == <last>`. `round_advanced` to round N fires when round N **starts**; round N's `RoundResultRecorded` is not written until round N **ends** (after its game phase + postmortem). So a count-based gate fires while the final round is still running and evaluates a run that is missing its last round. `round_success` then reads `N-1` rounds (e.g. `6/14` instead of `7/15`), and any per-round export keyed off `round_success` silently drops the final round's data.
 
-This exact bug clipped the last round from 13 veyru `channel_noise` runs (their `rolling_eval.sh` used a `round_advanced >= 15` gate); re-evaluating the untouched JSONL produced the correct `/15`. The data was always complete — only the premature eval was wrong.
+This exact bug clipped the last round from 13 veyru `channel_noise` runs (their `rolling_eval.sh` used a `round_advanced >= 15` gate); re-evaluating the untouched JSONL produced the correct `/15`. The data was always complete; only the premature eval was wrong.
 
 Rules for any launch-then-evaluate or scan-for-complete orchestration:
 
 - Wait for / filter on `simulation_ended`, e.g. `grep -q '"simulation_ended"' <run>/<scenario>.jsonl`. Any launch-then-evaluate orchestration should gate on that event, not on a round count.
 - `round_advanced` counts are fine only for *progress monitoring* (watching rounds climb), never for *completion*.
 
-After a simulation completes, score the log with one or more **metrics** — both deterministic ones and LLM-as-judge ones live behind the same `Metric` abstraction, returning a `Measurement` (`score`, `score_unit`, `summary`, `per_round`, `per_agent`). Evaluation uses `--provider` to select the LLM judge for the LLM-driven metrics; deterministic metrics ignore it. The evaluate command reads the scenario configuration from the JSONL event log, so no scenario-specific flags (like `--knobs`) are needed.
+After a simulation completes, score the log with one or more **metrics**. Deterministic and LLM-as-judge metrics both live behind the same `Metric` abstraction, returning a `Measurement` (`score`, `score_unit`, `summary`, `per_round`, `per_agent`). Evaluation uses `--provider` to select the LLM judge for the LLM-driven metrics; deterministic metrics ignore it. The evaluate command reads the scenario configuration from the JSONL event log, so no scenario-specific flags (like `--knobs`) are needed.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate <scenario> \
@@ -927,7 +927,7 @@ Each metric returns zero or more `Measurement` entries written into `<scenario>_
 - `per_round[]` — structured `RoundObservation` entries (`round_number`, `value`, `note`). Pure metrics like perplexity emit one per round with messages; flag-style metrics like `neologism` emit one per round where the phenomenon was observed.
 - `per_agent[]` — structured `AgentObservation` entries; populated by metrics that have per-agent breakdowns (e.g. `content_filter_refusal`).
 
-**Not-applicable metrics return `[]`.** When a metric detects it cannot apply to the current run (e.g. `protocol_probe_agent_pair_similarity` on a single-team run, `round_success_after_resume` on a non-resume run, `perplexity`/`mcr`/`mcm` on a scenario with no primary channel, the LLM-judge metrics on runs with no link messages, `protocol_learned_after_swap` on runs without a swap boundary, `communication_*` on runs with no link data), it returns an empty list and logs an INFO-level skip line. No zero-score sentinel Measurement is written. Existing entries from prior invocations are preserved via `merge_measurements` until the next invocation that produces a real Measurement for that metric_name replaces them — to forcibly drop stale not-applicable entries from a report, delete the report file before re-evaluating.
+**Not-applicable metrics return `[]`.** When a metric detects it cannot apply to the current run (e.g. `protocol_probe_agent_pair_similarity` on a single-team run, `round_success_after_resume` on a non-resume run, `perplexity`/`mcr`/`mcm` on a scenario with no primary channel, the LLM-judge metrics on runs with no link messages, `protocol_learned_after_swap` on runs without a swap boundary, `communication_*` on runs with no link data), it returns an empty list and logs an INFO-level skip line. No zero-score sentinel Measurement is written. Existing entries from prior invocations are preserved via `merge_measurements` until the next invocation that produces a real Measurement for that metric_name replaces them. To forcibly drop stale not-applicable entries from a report, delete the report file before re-evaluating.
 
 Metrics that DO emit a zero-score Measurement keep doing so when the count is a legitimate observation: `round_ended_idle`, `round_ended_timeout`, and `content_filter_refusal` all use `score = 0` to mean "this run had zero rounds/refusals with the trigger." (`postmortem_ended_timeout` is a hybrid: `score = 0` when postmortem ran but never timed out, but `[]` when the run had no postmortem phase at all.)
 
@@ -962,7 +962,7 @@ Generic metrics (available to all scenarios):
 - `protocol_probe_agent_pair_similarity` — generic; agent × agent matrix per (question, cutoff). `score` = macro mean across groups; persisted to `protocol_probe_agent_pair_similarity.json`. Only meaningful in two-team / cross-team runs. **Returns `[]`** on single-team runs.
 - `protocol_probe_cutoff_trajectory` — generic; for each `(agent_id, question_id)` pair where the JSONL contains rows from ≥2 distinct `cutoff_round` values, computes the mean cross-replica similarity between each adjacent cutoff snapshot. `score` = macro mean across all adjacent-cutoff pairs; persisted to `protocol_probe_cutoff_trajectory.json`. **Returns `[]`** when the JSONL has only one cutoff value.
 
-Scenarios opt into most platform metrics by implementing the corresponding hooks on `SimulationScenario`. `judge_round_result` and `get_primary_channels` are **required** (abstract) — every scenario must implement them, since round-success and primary-channel throughput/language metrics are core; the rest below are opt-in:
+Scenarios opt into most platform metrics by implementing the corresponding hooks on `SimulationScenario`. `judge_round_result` and `get_primary_channels` are **required** (abstract): every scenario must implement them, since round-success and primary-channel throughput/language metrics are core; the rest below are opt-in:
 
 | Hook | Enables |
 |---|---|
@@ -975,7 +975,7 @@ Scenarios opt into most platform metrics by implementing the corresponding hooks
 | `restore_state_from_events(events)` | Accurate "previous round" injection context after fork / resume / replace-agent |
 | `get_replace_agent_blocked_tool_call_channels() -> frozenset[str]` | Strips scenario-private channel traffic (e.g. postmortem) from replaced agent's reconstructed history |
 
-There are no scenario-specific metrics left — every scoring concept (round-success, post-resume re-scoring, language emergence, protocol learning, protocol probing) is platform code that consumes scenario data through these hooks. Scenarios only ship their domain-specific events + the hooks that surface them.
+There are no scenario-specific metrics left. Every scoring concept (round-success, post-resume re-scoring, language emergence, protocol learning, protocol probing) is platform code that consumes scenario data through these hooks. Scenarios only ship their domain-specific events + the hooks that surface them.
 
 ## What `scripts/` is for
 
@@ -986,7 +986,7 @@ There are no scenario-specific metrics left — every scoring concept (round-suc
 - `consolidate_communication_ontology.py` — pass 2 of the communication pipeline, between the `communication_open_coding` and `communication_feature_presence` metrics
 
 Keep it that way. One-off experiment orchestration, cohort reruns, and label
-surgery do not belong here — they operate on run output, and the evaluation
+surgery do not belong here. They operate on run output, and the evaluation
 reports (`{scenario}_report.json`) plus the JSONL event logs are a stable enough
 interface that such tooling can live wherever the experiment does.
 

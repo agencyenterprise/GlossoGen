@@ -3,7 +3,7 @@
 Tracks each player's decision for the in-progress round and resolves the
 round's payoff as soon as both players have submitted via
 ``submit_decision``. All resolution logic is deterministic arithmetic over
-the configured payoff matrix — there is no LLM judge involved anywhere in
+the configured payoff matrix. There is no LLM judge involved anywhere in
 this scenario.
 """
 
@@ -73,7 +73,7 @@ class PrisonersDilemmaWorld(ScenarioWorld):
         """Record one player's decision. Returns True once both players have decided.
 
         Raises ``ValueError`` if the agent already submitted a decision this
-        round — callers use this to reject a duplicate ``submit_decision`` call.
+        round. Callers use this to reject a duplicate ``submit_decision`` call.
         """
         if agent_id in self._pending_decisions:
             raise ValueError(f"{agent_id} already submitted a decision this round")
@@ -95,7 +95,7 @@ class PrisonersDilemmaWorld(ScenarioWorld):
         """Force-resolve a round that ended before both players decided.
 
         Any player who never called ``submit_decision`` this round is
-        treated as having defected — silence is the safe default a real
+        treated as having defected. Silence is the safe default a real
         opponent would assume. Called from the game-clock's
         ``on_round_ended`` hook so every round always has a recorded
         outcome, even one ended by timeout or all-agents-idle.

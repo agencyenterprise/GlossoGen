@@ -3,7 +3,7 @@
 A three-agent coordination scenario built on the same pattern as
 `warehouse_robot_recovery` and `veyru`. A satellite is visible to a ground
 station for a short contact window each round. None of the three agents
-can solve a round alone — every round combines three sources of private,
+can solve a round alone: every round combines three sources of private,
 rotating knowledge that all must be reported on the shared `link` channel
 before the telemetry operator submits the command sequence.
 

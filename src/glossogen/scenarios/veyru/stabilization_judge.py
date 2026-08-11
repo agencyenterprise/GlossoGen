@@ -40,7 +40,7 @@ async def judge_stabilization(
     """Ask the LLM judge whether the observer's action matches the expected procedure.
 
     ``expected_actions`` is a pre-rendered description of the correct
-    procedure with stellar parameters already baked in — no conflicting
+    procedure with stellar parameters already baked in, so there are no conflicting
     numbers for the judge to resolve.
 
     Runs ``JUDGE_VOTE_COUNT`` independent judge calls concurrently and returns

@@ -41,13 +41,13 @@ human-curated ground truth, produced as follows:
    *consistently* (across repeated runs) disagreed with the golden label were
    re-reviewed by hand. Where the judge was right and the majority vote was
    wrong, the golden was corrected and its `explanation` rewritten to record the
-   override (e.g. row 51). Most stable disagreements were left as-is — they are
+   override (e.g. row 51). Most stable disagreements were left as-is. They are
    genuine judge over-rejections, which is the judge's dominant failure mode.
 
 The net result: `expected_match` reflects the *correct* classification a careful
 reviewer would assign, which on this dataset trends slightly more lenient than
 the live judge on synonym/paraphrase matches. `split_vote=TRUE` rows are where
-"correct" is most contestable and warrant the most scrutiny — hence the separate
+"correct" is most contestable and warrant the most scrutiny, hence the separate
 `accuracy_split` metric below.
 
 ## How it works
@@ -56,7 +56,7 @@ The eval bypasses Inspect's model interface: a custom solver calls the project's
 own `judge_stabilization(...)` per sample (using the project's `LLMProvider`),
 and a custom scorer compares the judge's `TRUE`/`FALSE` verdict to the golden
 `expected_match`. Inspect's `--model` is therefore just a placeholder
-(`mockllm/model`) — it is never actually queried.
+(`mockllm/model`), and it is never actually queried.
 
 Metrics:
 - `accuracy` / `stderr` — overall agreement with the golden labels.

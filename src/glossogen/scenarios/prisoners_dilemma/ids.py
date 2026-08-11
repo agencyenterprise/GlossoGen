@@ -1,7 +1,7 @@
 """Canonical identifier constants for the Prisoner's Dilemma scenario.
 
 Centralizes agent IDs, channel IDs, tool names, and the decision type so
-every module — the scenario, the world, the tool, and the prompts —
+every module (the scenario, the world, the tool, and the prompts)
 refers to the same literals.
 """
 

@@ -12,11 +12,11 @@ Three agents service one or more failing drive modules each round. The informati
 
 ## The action: a full multi-step procedure
 
-Each component's replacement is **not** a single fact but an ordered multi-step service procedure, so every `service_component` action is a compound procedure the technician must transmit and perform precisely — not "swap part X". The procedure *shape* is fixed by the component's **service class** (`bolted-panel`, `rotating-assembly`, `press-fit`, `electrical-pack`, `sensor`); the *parameters* (tool, torque, passes, calibration, fastener/lead counts, tightening pattern, hold/settle durations) are drawn per unit per round. Example:
+Each component's replacement is **not** a single fact but an ordered multi-step service procedure, so every `service_component` action is a compound procedure the technician must transmit and perform precisely, not "swap part X". The procedure *shape* is fixed by the component's **service class** (`bolted-panel`, `rotating-assembly`, `press-fit`, `electrical-pack`, `sensor`); the *parameters* (tool, torque, passes, calibration, fastener/lead counts, tightening pattern, hold/settle durations) are drawn per unit per round. Example:
 
 > *Replace module-2's terminal_block. De-energize and discharge the bus, holding 5s. Disconnect the 6 leads and lift out the old part with hex-6. Fit the replacement and torque the terminals to 8 Nm in 2 passes. Run the seat-and-lock routine and verify.*
 
-The LLM judge scores the technician's free-text action against the full procedure — the unit, the component, and every step with its parameters, in order — lenient on wording, strict on substance.
+The LLM judge scores the technician's free-text action against the full procedure: the unit, the component, and every step with its parameters, in order, lenient on wording but strict on substance.
 
 All three share one budgeted channel `bay` (primary; one character = one simulated second; optional per-character noise) plus an optional `postmortem` discussion channel.
 
@@ -33,7 +33,7 @@ Round **success** = every fault on every unit fixed correctly within the communi
 
 ## Multiple units per round + progressive reveal
 
-Several drive units can be on the bench in one round (`module_count_*`), each with its own faulty subset, serviced in a fixed canonical order (module-1 first), depth-ordered within a unit. The ground-truth stage list is the units' depth-ordered faults concatenated, so the single-pointer staged world and judge are unchanged — each stage's expected action just names its unit.
+Several drive units can be on the bench in one round (`module_count_*`), each with its own faulty subset, serviced in a fixed canonical order (module-1 first), depth-ordered within a unit. The ground-truth stage list is the units' depth-ordered faults concatenated, so the single-pointer staged world and judge are unchanged; each stage's expected action just names its unit.
 
 Each unit is a different **revision**: both its fault-tree (symptom → component) and its service procedures (component → full multi-step procedure) are drawn independently per unit and re-randomized every round, so the same symptom can mean a different component on another unit and the same component's procedure takes different parameters.
 
@@ -91,8 +91,8 @@ All generic-metric and study hooks are wired:
 
 ## Deferred follow-ons
 
-Veyru-style **study modes** (agent swap / intern takeover / two-team) are not implemented — they require multi-team world state plus the swap / intern lifecycle, a scenario-design effort separate from the additive hooks above. (`detect_protocol_boundary_window` is intentionally left to the platform default, which detects the first `AgentSwappedMidRun`; a scenario-specific override only becomes useful once a study mode exists.)
+Veyru-style **study modes** (agent swap / intern takeover / two-team) are not implemented. They require multi-team world state plus the swap / intern lifecycle, a scenario-design effort separate from the additive hooks above. (`detect_protocol_boundary_window` is intentionally left to the platform default, which detects the first `AgentSwappedMidRun`; a scenario-specific override only becomes useful once a study mode exists.)
 
 ## Design note
 
-Order is enforced by the reveal itself — only the currently-revealed fault can be serviced, and the next fault is not revealed until the current one is correctly fixed — so there is no "wrong order" to attempt. An incorrect `service_component` on the current fault is **retryable** (the stage simply doesn't advance), which keeps single LLM-judge misjudgments non-fatal; persistent wrong attempts fail the round by exhausting the budget. Making a wrong replacement immediately terminal is an available stricter variant.
+Order is enforced by the reveal itself: only the currently-revealed fault can be serviced, and the next fault is not revealed until the current one is correctly fixed, so there is no "wrong order" to attempt. An incorrect `service_component` on the current fault is **retryable** (the stage simply doesn't advance), which keeps single LLM-judge misjudgments non-fatal; persistent wrong attempts fail the round by exhausting the budget. Making a wrong replacement immediately terminal is an available stricter variant.

@@ -3,7 +3,7 @@
 Renders the actual stabilization-engineer system prompt and a representative
 first-round injection, then makes a direct Anthropic API call. Reports the
 stop_reason and (for the multi-shot mode) the refusal rate, with no MCP /
-no pydantic-ai involved — the smallest possible surface that still hits the
+no pydantic-ai involved. The smallest possible surface that still hits the
 Anthropic content filter.
 
 Usage:

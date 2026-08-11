@@ -37,7 +37,7 @@ We tried variations of this pattern in several scenarios. In all of them, we ask
 
 ### 2026-04-15 — Telephone works but doesn't sell
 
-**What we tried.** Evaluated the Telephone scenario [^4] as a candidate headline scenario alongside Alien Patient [^2]. The Telephone setup is a minimal two-agent relay with budget pressure — deliberately stripped down so we could iterate on knobs quickly.
+**What we tried.** Evaluated the Telephone scenario [^4] as a candidate headline scenario alongside Alien Patient [^2]. The Telephone setup is a minimal two-agent relay with budget pressure, deliberately stripped down so we could iterate on knobs quickly.
 
 **What happened.** Technically it works. Pressure produces compression, and the scenario iterates substantially faster than Alien Patient (shorter rounds, simpler state, fewer moving parts). But as a demonstration it landed flat: telephone-style relay games have an extensive existing emergent-communication literature (iterated reference games, signalling games, etc.), and LLM results in that setting don't visibly differentiate from what's already been shown with smaller models or non-LLM agents. Nothing in the output screams "this required an LLM".
 
@@ -51,23 +51,23 @@ We tried variations of this pattern in several scenarios. In all of them, we ask
 
 ### 2026-04-15 — Progressive pressure produces emergence but confounds the measurement
 
-**What we tried.** The first mechanism that actually produced emergent communication in the Alien scenario [^2] was a progressive pressure curriculum: start agents in a relatively easy environment (generous budget), then shrink the budget across epochs within a single simulation, forcing them to iterate toward shorter and shorter messages. No post-mortem, no meta-reflection phase — just a shrinking budget over time. It worked.
+**What we tried.** The first mechanism that actually produced emergent communication in the Alien scenario [^2] was a progressive pressure curriculum: start agents in a relatively easy environment (generous budget), then shrink the budget across epochs within a single simulation, forcing them to iterate toward shorter and shorter messages. No post-mortem, no meta-reflection phase, just a shrinking budget over time. It worked.
 
 **What happened.** At the Apr 15 client sync, Elias asked us to drop progressive pressure as the default experimental setup. His reasoning, paraphrased from the call:
 
 > "I feel like the epochs here are actually maybe, at least initially, not necessary. It seems like this is introducing an additional variable."
 
-The proposal: treat each pressure level as its own separate environment with a fixed knob (100%, 75%, 50%, 35%), run agents only in that environment, and see what comes out. The curriculum question ("does training in an easier environment first help?") is a real question, but it's a downstream question — not the primary experiment.
+The proposal: treat each pressure level as its own separate environment with a fixed knob (100%, 75%, 50%, 35%), run agents only in that environment, and see what comes out. The curriculum question ("does training in an easier environment first help?") is a real question, but it's a downstream question, not the primary experiment.
 
-Simon Kirby agreed and sharpened the point: a fixed-pressure setup gives you a clean, testable hypothesis ("how does encoding vary with cost?"). You can run the sim at 75% and at 35% and directly compare them. With progressive pressure, you can't separate "the pressure is now 35%" from "the agents have been through 75% first" — every result has two causes baked into it.
+Simon Kirby agreed and sharpened the point: a fixed-pressure setup gives you a clean, testable hypothesis ("how does encoding vary with cost?"). You can run the sim at 75% and at 35% and directly compare them. With progressive pressure, you can't separate "the pressure is now 35%" from "the agents have been through 75% first". Every result has two causes baked into it.
 
 **Why it matters.** This is a scientific-methodology constraint, not a platform limitation. Progressive pressure is a mechanism that produces emergence, but it's not a measurement we can cleanly reason about. It confounds the knob (budget) with the history (prior training on easier budgets).
 
-It also foreshadowed the Apr 16 regression: once the team removed progressive pressure in favor of fixed levels, emergent communication disappeared entirely. That regression is what motivated the post-mortem mechanism [^3] — we needed something that produces emergence under static pressure, so that the pressure level itself remains a clean independent variable.
+It also foreshadowed the Apr 16 regression: once the team removed progressive pressure in favor of fixed levels, emergent communication disappeared entirely. That regression is what motivated the post-mortem mechanism [^3]. We needed something that produces emergence under static pressure, so that the pressure level itself remains a clean independent variable.
 
 **Decision.** Primary experiments use fixed pressure levels (100%, 75%, 50%, 35%) with default 50%. Progressive pressure retained as a fifth setting on the knob so we can still produce emergence when we need it (demos, sanity checks) and study the curriculum question later as its own experiment. The post-mortem mechanism was introduced to recover emergence under static pressure without reintroducing the confound.
 
-**Related.** Two principles worth carrying forward: (1) mechanisms that _produce_ a result are not the same as mechanisms that cleanly _measure_ it; scientific validity often requires sacrificing the former for the latter. (2) Every knob we add should be independently controllable — pressure level and pressure history are two different variables and should not be entangled by default.
+**Related.** Two principles worth carrying forward: (1) mechanisms that _produce_ a result are not the same as mechanisms that cleanly _measure_ it; scientific validity often requires sacrificing the former for the latter. (2) Every knob we add should be independently controllable. Pressure level and pressure history are two different variables and should not be entangled by default.
 
 ---
 
@@ -109,9 +109,9 @@ This makes sense in hindsight: agents stayed in-character trying to save the pat
 
 **What we tried.** Ran the Alien Patient / Veyru scenario [^2] with the post-mortem mechanism [^3] enabled on top of a fixed symptom→treatment mapping. The Specialist held the 14-motif lookup table; the Field Observer did not. The post-mortem phase let both agents talk freely between rounds about their communication protocol.
 
-**What happened.** The codebook shorthand emerged as hoped (see the earlier 2026-04-17 entry above), but a second failure mode surfaced: because post-mortem discussion is unconstrained and cumulative across rounds, the Field Observer could learn the symptom→treatment mapping directly from the Specialist over time. Once the Observer had seen enough rounds, they could in principle self-diagnose and self-treat without needing the Specialist at all — exactly the collapse the Apr 14 learning warned about, re-introduced through the back door by the very mechanism we added to fix compression.
+**What happened.** The codebook shorthand emerged as hoped (see the earlier 2026-04-17 entry above), but a second failure mode surfaced: because post-mortem discussion is unconstrained and cumulative across rounds, the Field Observer could learn the symptom→treatment mapping directly from the Specialist over time. Once the Observer had seen enough rounds, they could in principle self-diagnose and self-treat without needing the Specialist at all, exactly the collapse the Apr 14 learning warned about, re-introduced through the back door by the very mechanism we added to fix compression.
 
-**Why it matters.** Structural asymmetry is not a one-time property of a scenario. Any mechanism that lets information flow between agents — and the post-mortem is explicitly designed to do that — can leak the asymmetric information over time and dissolve the constraint. Knowledge gaps need to be maintained _per round_, not just set up once at scenario start.
+**Why it matters.** Structural asymmetry is not a one-time property of a scenario. Any mechanism that lets information flow between agents, and the post-mortem is explicitly designed to do that, can leak the asymmetric information over time and dissolve the constraint. Knowledge gaps need to be maintained _per round_, not just set up once at scenario start.
 
 **Decision.** Added a per-round "stellar alignment" mechanic. Each round:
 
@@ -121,7 +121,7 @@ This makes sense in hindsight: agents stayed in-character trying to save the pat
 
 Even if the Observer has fully memorized all 14 motif procedures and all possible parameter values through post-mortem, they cannot act without the Specialist's per-round stellar reading. Per-round communication stays necessary by construction.
 
-**Related.** This is a refinement of the Apr 14 structural-asymmetry principle: the asymmetry must be _renewable_, not just present. It also shows that mechanisms interact — post-mortem and fixed-table knowledge asymmetry are each defensible in isolation but combine badly.
+**Related.** This is a refinement of the Apr 14 structural-asymmetry principle: the asymmetry must be _renewable_, not just present. It also shows that mechanisms interact. Post-mortem and fixed-table knowledge asymmetry are each defensible in isolation but combine badly.
 
 ---
 
@@ -129,13 +129,13 @@ Even if the Observer has fully memorized all 14 motif procedures and all possibl
 
 **What we tried.** Ran Alien Patient baselines across model families. Sonnet was expected to behave consistently with itself across runs.
 
-**What happened.** Sonnet baselines were wildly inconsistent — identical setups produced round-success rates from 0.17 to 0.73. The cause wasn't protocol variance: Anthropic's safety filter was refusing model calls. Two triggers — the role name "specialist", and aggressive procedural verbs in the alien-patient prompts ("tap firmly", "press"). Refused calls returned silently as no-ops, so corrupted runs looked like idle agents rather than failed API calls. Refusals were happening \~15 times per 20-round run before we knew to look.
+**What happened.** Sonnet baselines were wildly inconsistent: identical setups produced round-success rates from 0.17 to 0.73. The cause wasn't protocol variance: Anthropic's safety filter was refusing model calls. Two triggers: the role name "specialist", and aggressive procedural verbs in the alien-patient prompts ("tap firmly", "press"). Refused calls returned silently as no-ops, so corrupted runs looked like idle agents rather than failed API calls. Refusals were happening \~15 times per 20-round run before we knew to look.
 
-**Why it matters.** Provider-side safety filters can silently substitute no-ops into a run, and the corruption is indistinguishable from a real behavioral signal. Every baseline before this fix was contaminated — the apparent "Sonnet is weaker than GPT-4" gap was an artifact of refusals, not capability.
+**Why it matters.** Provider-side safety filters can silently substitute no-ops into a run, and the corruption is indistinguishable from a real behavioral signal. Every baseline before this fix was contaminated. The apparent "Sonnet is weaker than GPT-4" gap was an artifact of refusals, not capability.
 
 **Decision.** Two-pronged fix shipped together: (1) replaced aggressive verbs in scenario prompts with neutral alternatives, audited the rest for similar triggers (the earlier "specialist alpha" rename workaround is subsumed); (2) added a `tenacity`\-based retry around `agent.run()` so refused calls fail loudly and re-attempt instead of producing silent no-ops.
 
-**Result.** Refusal rate down from \~15 to 1–2 per 20-round run. A 50-round stress run completed with zero refusals. Sonnet's baseline now closely tracks GPT-4 — the first cross-family data point supporting the central thesis that **protocol design, not raw model capability, is the dominant variable.**
+**Result.** Refusal rate down from \~15 to 1–2 per 20-round run. A 50-round stress run completed with zero refusals. Sonnet's baseline now closely tracks GPT-4, the first cross-family data point supporting the central thesis that **protocol design, not raw model capability, is the dominant variable.**
 
 **Related.** Two principles to carry forward: refusals must be observable (no provider-injected silence), and scenario prompt audits for filter triggers are part of platform hygiene before each cross-model baseline sweep.
 

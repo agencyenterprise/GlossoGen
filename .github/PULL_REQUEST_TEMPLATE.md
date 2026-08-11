@@ -9,7 +9,7 @@
 ## Releasing
 
 This pull request was opened with **`release:patch`** applied automatically.
-Change it if that is wrong — exactly one of these must be set, and a required
+Change it if that is wrong. Exactly one of these must be set, and a required
 check enforces it.
 
 | Label | From `0.1.2` | Use for |
@@ -19,16 +19,16 @@ check enforces it.
 | `release:major` | `1.0.0` | Breaking change |
 | `norelease` | — | Merges without cutting a release |
 
-To swap the label, add the new one first and then remove `release:patch` — the
+To swap the label, add the new one first and then remove `release:patch`. The
 check will flag the moment both are on.
 
 **Do not edit the version in `pyproject.toml` yourself.** On merge, a workflow
 runs `uv version --bump <label>`, commits the result, tags it `vX.Y.Z`, and
-publishes both images — so a hand-edit only conflicts with that commit.
+publishes both images, so a hand-edit only conflicts with that commit.
 
 Be aware what a release label does end to end: the tag publishes images, and
 glossogen-deploy promotes them to production on its next hourly poll. Merging a
-labelled PR is a deploy. Use `norelease` if you are not ready for that — the
+labelled PR is a deploy. Use `norelease` if you are not ready for that. The
 change still lands on `main` and ships with whatever release comes next.
 
 ## Checklist

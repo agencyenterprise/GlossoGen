@@ -6,8 +6,8 @@ the first call from either member locks the team's answer for the round; when it
 is on, each member submits their own answer and the team locks only once both
 have submitted. Once the team is complete an LLM judge scores every submitted
 answer, the combined verdict is recorded, and a JSONL event is written per
-answer. The result is not revealed at submit time — it is announced when the
-round ends — so the submission stays one-shot.
+answer. The result is not revealed at submit time. It is announced when the
+round ends, so the submission stays one-shot.
 """
 
 from typing import Callable

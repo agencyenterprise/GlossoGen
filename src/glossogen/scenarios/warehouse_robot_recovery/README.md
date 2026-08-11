@@ -2,7 +2,7 @@
 
 A three-agent coordination scenario built on the same pattern as `veyru`. A
 stopped warehouse robot must be recovered each round. None of the three agents
-can solve a round alone — every round combines three sources of private,
+can solve a round alone: every round combines three sources of private,
 rotating knowledge that all must be reported on the shared radio channel
 before the floor associate executes the recovery.
 

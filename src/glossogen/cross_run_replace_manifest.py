@@ -1,7 +1,7 @@
 """Schema and reader for ``cross_run_replace_manifest.json``.
 
-A cross-run replace-agent operation imports one agent — with its full
-pydantic-ai history — from a different completed run (Sim B) into a
+A cross-run replace-agent operation imports one agent, with its full
+pydantic-ai history, from a different completed run (Sim B) into a
 target run (Sim A) at a chosen round boundary. The manifest captures
 the provenance of both runs and the parameters needed to reconstruct
 the imported agent's history on resume.

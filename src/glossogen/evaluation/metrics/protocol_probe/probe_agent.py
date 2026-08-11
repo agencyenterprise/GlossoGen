@@ -3,7 +3,7 @@
 Given an agent's original ``model``/``provider``, a reconstructed message
 history, and a probe prompt, ``run_structured_probe`` builds a tool-less
 pydantic-ai ``Agent`` with the caller's ``output_type`` and runs one
-``agent.run(...)`` call. No MCP server, no game clock, no subprocess — just one
+``agent.run(...)`` call. No MCP server, no game clock, no subprocess, just one
 LLM round-trip. It returns the validated structured output together with the
 token usage of the call so the caller can aggregate cost per ``(model,
 provider)``.
@@ -79,8 +79,8 @@ async def run_structured_probe(
 
     Builds a fresh ``Agent`` with no tools and the caller's ``output_type`` so
     the LLM produces a validated structured response. The caller passes the
-    agent's full system prompt — the ``base_prompt + communication-protocol
-    suffix`` composition the runner applied at simulation time — so
+    agent's full system prompt: the ``base_prompt + communication-protocol
+    suffix`` composition the runner applied at simulation time, so
     reconstruction and the new ``Agent`` construction stay consistent.
     """
     agent: Agent[None, ProbeOutputT] = Agent(

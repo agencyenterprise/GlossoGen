@@ -1,7 +1,7 @@
 """Per-request context for MCP tool calls.
 
 The FastMCP sub-app is mounted inside the FastAPI app, but MCP tools are
-plain async functions — they don't see ``Request`` and would otherwise rely
+plain async functions. They don't see ``Request`` and would otherwise rely
 on module-level globals. ``RunContext`` carries the three values every tool
 needs (runs directory, DB pool, active group_id) via a ``ContextVar`` set by
 an ASGI wrapper around the sub-app.

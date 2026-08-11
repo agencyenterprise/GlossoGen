@@ -2,8 +2,8 @@
 
 The scenario runs in two layouts: solo (two viewers on one link channel) and
 two-team (four viewers over two link channels), each with or without the
-postmortem discussion channel. Both viewers on a team are symmetric — they
-differ only in which scene they hold (left = scene A, right = scene B) — so
+postmortem discussion channel. Both viewers on a team are symmetric. They
+differ only in which scene they hold (left = scene A, right = scene B), so
 they get the same tool set and channels, differing only in their system
 template.
 """
@@ -131,7 +131,7 @@ def build_agent_defs(
     postmortem_initially_active: bool,
     agent_display_names: dict[str, str],
 ) -> list[AgentDef]:
-    """Return the agent definition list — 2 single-team, 4 two-team."""
+    """Return the agent definition list: 2 single-team, 4 two-team."""
     defs: list[AgentDef] = []
     for team_id in _team_ids_for_mode(two_teams=knobs.two_teams):
         defs.extend(

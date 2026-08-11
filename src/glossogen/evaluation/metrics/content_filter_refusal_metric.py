@@ -1,7 +1,7 @@
 """Metric that counts content-filter refusals recorded in the event log.
 
 A refusal is an ``AgentRunCycleFailed`` event with ``error_type`` equal to
-``"ContentFilterError"`` — pydantic_ai raises this when the underlying provider
+``"ContentFilterError"``. Pydantic-ai raises this when the underlying provider
 returns a ``finish_reason`` of ``"refusal"`` / ``"content_filter"``. The
 runner's cycle-retry loop catches the exception, emits the event, and
 re-prompts, so simulations usually still make progress, but each refusal

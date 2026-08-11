@@ -66,14 +66,14 @@ def merge_measurements(
     reflects the latest verdict for every attempted metric:
 
     * Existing measurements whose metric_name was attempted are removed
-      (the new result — empty or otherwise — replaces them). This is how
+      (the new result, empty or otherwise, replaces them). This is how
       a "doesn't apply" re-run clears a stale zero-score sentinel from a
       prior invocation that ran under different code or against
       different data.
     * Existing measurements whose metric_name was NOT attempted are
       preserved, so partial re-runs do not wipe unrelated results.
     * The new list may contain metric_names not in
-      ``attempted_metric_names`` — a base metric like ``round_success``
+      ``attempted_metric_names``. A base metric like ``round_success``
       emits ``round_success_team_a`` / ``round_success_team_b``, and
       ``dialog_retransmission`` emits ``dialog_count`` /
       ``retransmission_request_count``. Existing measurements sharing any
@@ -134,7 +134,7 @@ def compute_measurements_hash(measurements: list[Measurement]) -> str:
     order preserved) and hashes with blake2b, so a byte-identical report
     always maps to the same digest. Excludes ``evaluation_cost`` because
     that field changes on every re-eval (token usage, dollar cost) even
-    when the measurements are semantically unchanged — the hash needs to
+    when the measurements are semantically unchanged, so the hash needs to
     survive cost drift to be useful as a drift-detection signal for
     ``glossogen sync-metadata-to-prod``.
     """

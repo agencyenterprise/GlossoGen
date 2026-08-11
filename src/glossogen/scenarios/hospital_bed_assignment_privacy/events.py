@@ -79,7 +79,7 @@ class HospitalInterceptSubmitted(EventBase):
 
     Records the (patient_token, destination) guess and whether each
     component matches the hidden assignment. ``intercept_succeeded`` is
-    true iff BOTH match — the Observer wins only on a full pair match.
+    true iff BOTH match: the Observer wins only on a full pair match.
     """
 
     event_type: Literal["hospital_intercept_submitted"] = "hospital_intercept_submitted"

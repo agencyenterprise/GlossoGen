@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class SchedulerOps(Protocol):
     """Hooks the scheduler invokes when a scheduled event fires.
 
-    Decouples the scheduler from the supervisor — production code wires
+    Decouples the scheduler from the supervisor. Production code wires
     ``AutonomousSupervisor`` through this protocol so the scheduler does
     not need a concrete supervisor reference.
     """
@@ -44,7 +44,7 @@ class RoundBoundaryScheduler:
     fires when the game clock advances to that round. Each round's
     bucket fires at most once per simulation (``dispatch`` is idempotent
     on subsequent calls for the same round). Within a bucket, events
-    fire in declared order — declare ``set_postmortem`` before
+    fire in declared order, so declare ``set_postmortem`` before
     ``swap_agent`` for the same round to ensure the new agent never
     sees postmortem state.
     """

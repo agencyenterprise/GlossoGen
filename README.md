@@ -31,7 +31,7 @@ make install-metrics    # everything above, plus the metrics-ml extra
 ```
 
 This is the recommended setup for research use. It is a separate target because
-the extra pulls in torch and transformers — several gigabytes — which a server
+the extra pulls in torch and transformers (several gigabytes), which a server
 that only browses runs never executes. Deployments therefore install without it,
 which is why it is not the default.
 
@@ -50,7 +50,7 @@ copying a warm cache is an alternative to installing the extra.
 **Requesting a metric that cannot run is an error, not a skip.** Evaluation exits
 non-zero with a message naming the missing package and the install command. The
 report is still written first, so results from the metrics that *did* succeed are
-never lost — you get partial results *and* a failure signal.
+never lost: you get partial results *and* a failure signal.
 
 This is deliberate. A metric that quietly produced nothing would be
 indistinguishable from a run with nothing to measure, which is how a broken
@@ -58,19 +58,19 @@ environment gets mistaken for a valid result. The same applies to any metric tha
 raises for any reason: evaluation runs the rest, writes the report, then exits
 non-zero.
 
-Skipping is reserved for metrics that genuinely do not apply to a run — `perplexity`
+Skipping is reserved for metrics that genuinely do not apply to a run: `perplexity`
 on a scenario with no primary channel, `round_success_after_resume` on a run that was
 never resumed. Those produce no measurement and do not fail, because there is nothing
 to measure and nothing is broken.
 
-Separately, the `evals` extra (`inspect-ai`) powers the veyru judge-accuracy harness at
+Separately, the `evals` extra (`inspect-ai`) is used by the veyru judge-accuracy harness at
 `src/glossogen/scenarios/veyru/evals/`. That one is a standalone script rather than a
 registered metric, so without the extra it fails with a plain `ModuleNotFoundError`.
 `make install-server` includes it, since type checking needs it.
 
 ### Local Postgres (optional)
 
-By default the backend runs in **no-database local mode** — leave `DATABASE_URL` unset and skip this entire section. The runs index is derived from the `runs/` directory on disk and MCP OAuth tokens are held in memory (they reset on restart, which just means re-authenticating the MCP client).
+By default the backend runs in **no-database local mode**. Leave `DATABASE_URL` unset and skip this entire section. The runs index is derived from the `runs/` directory on disk and MCP OAuth tokens are held in memory (they reset on restart, which just means re-authenticating the MCP client).
 
 Set up Postgres only if you want the Postgres-backed runs index locally, or to run Clerk multi-tenant auth. Create a role, a local database owned by that role, and point the backend at it via `DATABASE_URL`.
 
@@ -95,7 +95,7 @@ psql -d glossogen_dev -c "\dt"
 
 The `DATABASE_URL` format is `postgresql://<user>:<password>@<host>:<port>/<db>`. On a Homebrew install where the role matches your OS user and local connections use `trust`/`peer` auth, you can drop the credentials entirely: `postgresql://localhost:5432/glossogen_dev`.
 
-The first time the backend boots it will also auto-create the synthetic `local` group used in single-tenant local mode. There's nothing else to do — leave `CLERK_SECRET_KEY` unset and every request runs as `local-user` inside the `local` group.
+The first time the backend boots it will also auto-create the synthetic `local` group used in single-tenant local mode. There's nothing else to do: leave `CLERK_SECRET_KEY` unset and every request runs as `local-user` inside the `local` group.
 
 To reset the database, drop and recreate it: `dropdb glossogen_dev && createdb -O glossogen glossogen_dev && alembic upgrade head`.
 
@@ -143,7 +143,7 @@ The simulation picks up from where it left off, preserving channel messages and 
 
 ### Replacing an Agent (Round-Level Rewind)
 
-Replay a finished run from the start of a chosen round with one specific agent restarted on a fresh history while every other agent keeps its full reconstructed history. Useful for asking "could a fresh agent follow the engineer from here on?" — a direct, empirical alternative to a judge.
+Replay a finished run from the start of a chosen round with one specific agent restarted on a fresh history while every other agent keeps its full reconstructed history. Useful for asking "could a fresh agent follow the engineer from here on?". It answers empirically what a judge only estimates.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
@@ -210,9 +210,9 @@ VIRTUAL_ENV= uv run --no-sync python -m glossogen resume-at-round veyru \
 
 Internals: the flow reuses the `replace-agent` machinery with `replaced_agent_id=None`. Clones the source's git repo at the `RoundAdvanced(round_start)` commit, pins every agent to its source-active model via `model_overrides` (so resuming a multi-swap source picks up each agent's per-phase model), writes `replace_manifest.json` with `replaced_agent_id` / `replacement_model` / `replacement_provider` all `null`, and launches `glossogen run --resume`. The game clock's resume branch defers `deliver_round_injections` until after agent runners are launched and the boundary hook fires, so `scheduled_events` bucketed at `round_start` execute against a fully-wired runtime and the resulting round-start injection lands in the post-swap session.
 
-`--knobs` accepts a JSON file shallow-merged onto the source's `scenario_config`. Use it to flip `postmortem_enabled`, append new `scheduled_events` for post-hoc multi-swap studies, extend `round_count` beyond what the source ran, or override `model_overrides`. When the scenario's knobs schema gained a required field after the source was created, pass that field via `--knobs` so validation passes (example: veyru's `easy_round_numbers` was added later — older runs need `--knobs '{"easy_round_numbers": [1, 2, 3, 6, 13]}'`).
+`--knobs` accepts a JSON file shallow-merged onto the source's `scenario_config`. Use it to flip `postmortem_enabled`, append new `scheduled_events` for post-hoc multi-swap studies, extend `round_count` beyond what the source ran, or override `model_overrides`. When the scenario's knobs schema gained a required field after the source was created, pass that field via `--knobs` so validation passes (example: veyru's `easy_round_numbers` was added later, so older runs need `--knobs '{"easy_round_numbers": [1, 2, 3, 6, 13]}'`).
 
-Inherited `scheduled_events` semantics: events at `at_round < round_start` are silently skipped (the resumed clock never visits those rounds). Events at `at_round == round_start` fire on resume — by design — because the cloned JSONL is captured before the source dispatched that boundary's scheduler events. Boundaries that already fired in the source (or in a crashed-and-resumed run) are pre-seeded into the scheduler's `_fired_rounds` set so they are not re-dispatched.
+Inherited `scheduled_events` semantics: events at `at_round < round_start` are silently skipped (the resumed clock never visits those rounds). Events at `at_round == round_start` fire on resume, by design, because the cloned JSONL is captured before the source dispatched that boundary's scheduler events. Boundaries that already fired in the source (or in a crashed-and-resumed run) are pre-seeded into the scheduler's `_fired_rounds` set so they are not re-dispatched.
 
 Runs created this way appear with a green "↺ Resumed @ round N" badge linking back to the source. Multi-swap runs (whether direct via `scheduled_events` or inherited via resume) render one floating action button per swap so users can scroll directly to any boundary.
 
@@ -242,7 +242,7 @@ Each swap emits an `AgentSwappedMidRun` event into the JSONL, writes a `resume_c
 
 ## Observability (Langfuse)
 
-Simulation agents are instrumented with [pydantic-ai](https://ai.pydantic.dev/)'s OpenTelemetry support, exporting every LLM call (prompts, completions, tool calls, token usage, latency, cost) to a **local, self-hosted [Langfuse](https://langfuse.com/)** — never a cloud endpoint.
+Simulation agents are instrumented with [pydantic-ai](https://ai.pydantic.dev/)'s OpenTelemetry support, exporting every LLM call (prompts, completions, tool calls, token usage, latency, cost) to a **local, self-hosted [Langfuse](https://langfuse.com/)**, never a cloud endpoint.
 
 ```bash
 make langfuse-up      # start the local stack (web, worker, postgres, clickhouse, redis, minio)
@@ -320,7 +320,7 @@ Output is a JSON report under the `measurements` field; metrics no longer write 
 
 ### Auditing LLM-judge calls
 
-LLM-judge metrics emit their full system prompt, user prompt, and structured output via stdlib `logger.debug`. Set `LOG_LEVEL=DEBUG` in the environment and pipe stderr to a file to capture the exact text the judge saw and returned. The capture is the source of truth for "did the metric get all the data it needed and nothing else" — review it whenever a metric's output looks surprising.
+LLM-judge metrics emit their full system prompt, user prompt, and structured output via stdlib `logger.debug`. Set `LOG_LEVEL=DEBUG` in the environment and pipe stderr to a file to capture the exact text the judge saw and returned. The capture is the source of truth for "did the metric get all the data it needed and nothing else". Review it whenever a metric's output looks surprising.
 
 ```bash
 LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
@@ -330,7 +330,7 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru
   2> /tmp/veyru_eval_debug.log
 ```
 
-The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth blocks) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `glossogen evaluate` and by `scripts/consolidate_communication_ontology.py` (see below). Without it the harness defaults to `INFO`. Both are dotenv-friendly — set them in `.env` for a persistent default or inline as shown above.
+The debug log records contain the verbatim Jinja-rendered prompt blocks (per-round transcripts, ground-truth blocks) plus the judge's raw structured output as JSON. The `LOG_LEVEL` env var is honoured by `glossogen evaluate` and by `scripts/consolidate_communication_ontology.py` (see below). Without it the CLI defaults to `INFO`. Both are dotenv-friendly: set them in `.env` for a persistent default, or inline as shown above.
 
 If the judge's structured output truncates (you'll see a `Field required ... input_value={}` validation warning followed by a metric failure), bump the per-call output-token cap by setting `LLM_MAX_TOKENS=32768` (or higher) in `.env` or inline. The default of `16384` covers the verbose communication-feature outputs but pathological runs with many labels × many evidence citations can still exceed it.
 
@@ -371,14 +371,14 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate <scen
 
 Always run with `LOG_LEVEL=DEBUG` and a stderr redirect during development so the prompt and the structured judge output land in an auditable file. Both passes use the same per-round view (primary-channel messages + the scenario-rendered per-agent ground truth) so the open-coding labels and feature-presence confidences are commensurable.
 
-Consolidated ontology JSONs live under `runs/<scenario_name>/_ontology/` so they ship with any export of the runs tree. The entire `runs/` directory is gitignored — the ontology JSONs are regenerable from the open-coding sidecars; pass them around alongside the runs they were derived from rather than committing them.
+Consolidated ontology JSONs live under `runs/<scenario_name>/_ontology/` so they ship with any export of the runs tree. The entire `runs/` directory is gitignored. The ontology JSONs are regenerable from the open-coding sidecars, so pass them around alongside the runs they were derived from rather than committing them.
 
 ## Analysing results
 
 Evaluation writes a machine-readable report per run at
 `runs/{scenario}/{timestamp}/{scenario}_report.json`, alongside the JSONL event
 log and any per-metric sidecars (probe responses, per-message repetition
-factors, feature-presence vectors). Together these are the analysis surface —
+factors, feature-presence vectors). Together these are the analysis surface:
 plain JSON and JSONL, no database required.
 
 Point whatever you prefer at them: pandas, a notebook, a dashboard. The
@@ -397,21 +397,21 @@ The backend uses **Clerk** for multi-tenant authentication. Each Clerk organizat
 * **Local mode (default for dev clones):** leave `CLERK_SECRET_KEY` unset on the backend and `CLERK_PUBLISHABLE_KEY` unset on the frontend. The backend's identity middleware short-circuits every request to a synthetic `local` group / `local-user`; the frontend renders without a sign-in flow. With `DATABASE_URL` also unset, the backend runs with no database at all — the runs index comes from the filesystem and OAuth state is in memory. (Setting `DATABASE_URL` keeps local mode but stores the `local` group + `runs` index in Postgres.)
 * **Clerk mode (prod / hosted):** set Clerk env vars on both sides plus `CLERK_WEBHOOK_SECRET` so the backend can keep its local `groups` table in sync with Clerk org create/update/delete events. The frontend mounts `<ClerkProvider>` and Clerk's middleware redirects unauthenticated traffic to `/sign-in`. API requests carry the Clerk session token as the Bearer header; the backend reads the active group from the URL slug (`/api/g/{slug}/...`) and validates membership against the JWT.
 
-The active group is identified by the URL slug — `/g/team-a/runs/...` on the frontend hits `/api/g/team-a/runs/...` on the backend. The identity middleware accepts the request only if the user's Clerk session has `team-a` as the active org.
+The active group is identified by the URL slug: `/g/team-a/runs/...` on the frontend hits `/api/g/team-a/runs/...` on the backend. The identity middleware accepts the request only if the user's Clerk session has `team-a` as the active org.
 
-#### Multi-org users — Clerk `organizationSyncOptions`
+#### Multi-org users and Clerk `organizationSyncOptions`
 
 The frontend `middleware.ts` wires Clerk's `organizationSyncOptions.organizationPatterns` to `["/g/:slug", "/g/:slug/(.*)"]`. Clerk's middleware reads the slug from the URL and activates that org on the session for the current request *before* the page renders or the API client mints a token. A user who belongs to multiple orgs can therefore navigate to any of them by URL without first clicking the org switcher.
 
 If the user is not a member of the URL's org, Clerk leaves the previously active org in place; the backend then sees `claims.org_slug != url_slug` and returns 403.
 
-**Tab caveat.** Clerk's session cookie is a singleton per browser, so only one tab's active org is reflected in the cookie at a time. Each tab still activates its own org server-side on navigation (so initial page loads and Server-Component fetches are correct), and the API client uses `getToken()` per request (not the cookie), so foreground tab requests get a token aligned to that tab's URL. Background fetches (cron, service workers) that don't pass through the focused tab can race — there are none in glossogen today.
+**Tab caveat.** Clerk's session cookie is a singleton per browser, so only one tab's active org is reflected in the cookie at a time. Each tab still activates its own org server-side on navigation (so initial page loads and Server-Component fetches are correct), and the API client uses `getToken()` per request (not the cookie), so foreground tab requests get a token aligned to that tab's URL. Background fetches (cron, service workers) that don't pass through the focused tab can race, though there are none in glossogen today.
 
-The MCP endpoint at `/mcp` uses OAuth 2.0 with PKCE (see MCP Integration below). MCP tokens are bound to a specific group at consent time — in local mode the synthetic `local` group, in Clerk mode the user's active org picked on the consent page — so every tool call is automatically scoped.
+The MCP endpoint at `/mcp` uses OAuth 2.0 with PKCE (see MCP Integration below). MCP tokens are bound to a specific group at consent time (in local mode the synthetic `local` group, in Clerk mode the user's active org picked on the consent page), so every tool call is automatically scoped.
 
 ### Starting the Servers
 
-The backend and frontend run as separate processes — start each in its own terminal:
+The backend and frontend run as separate processes. Start each in its own terminal:
 
 ```bash
 make dev            # terminal 1: FastAPI backend on port 8000 (reads from ./runs/)
@@ -424,7 +424,7 @@ The frontend displays a list of all simulation runs with scenario name, timestam
 
 ### Live Token Streaming
 
-Every `glossogen run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` discovery file to the run directory. When `glossogen serve` detects a live simulation (via `stream.json`), it proxies the simulation's SSE stream — including token-by-token text deltas from the LLM streaming API — to connected frontends. The frontend shows text appearing character-by-character as agents generate responses. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing.
+Every `glossogen run` starts an embedded streaming server on an ephemeral port and writes a `stream.json` discovery file to the run directory. When `glossogen serve` detects a live simulation (via `stream.json`), it proxies the simulation's SSE stream to connected frontends, including the token-by-token text deltas from the LLM streaming API. The frontend shows text appearing character-by-character as agents generate responses. When the simulation ends, `stream.json` is deleted and the server falls back to JSONL tailing.
 
 ### API Type Safety
 
@@ -436,7 +436,7 @@ make gen-api-types
 
 ### MCP Integration
 
-The backend exposes an MCP (Model Context Protocol) server at `/mcp` for programmatic access to simulation data from LLM clients like Claude Code or Cursor. The MCP endpoint uses OAuth 2.0 with PKCE and dynamic client registration — clients handle authentication automatically.
+The backend exposes an MCP (Model Context Protocol) server at `/mcp` for programmatic access to simulation data from LLM clients like Claude Code or Cursor. The MCP endpoint uses OAuth 2.0 with PKCE and dynamic client registration, so clients handle authentication automatically.
 
 **Requires `OAUTH_ISSUER_URL`** to be set to the public backend URL (e.g. `http://localhost:8000`). The MCP endpoint is disabled if this variable is unset.
 
@@ -446,7 +446,7 @@ Click the **MCP** button on the runs page for connection instructions, or config
 claude mcp add-json glossogen-runs '{"type":"http","url":"http://localhost:8000/mcp"}'
 ```
 
-No auth headers needed — the client discovers OAuth metadata and handles registration, authorization, and token refresh automatically. In local mode the consent step auto-approves to the synthetic `local` group; in Clerk mode the backend parks the authorization request and redirects the browser to the frontend at `/mcp-consent?request_id=...`, where Clerk forces sign-in and the user picks which organization to authorize. The frontend POSTs back to `/mcp/consent/approve` with a fresh Clerk JWT; the backend resolves the active org to a group, mints the authorization code bound to that `group_id`, and redirects the browser to the OAuth client's callback. Every subsequent MCP tool call is automatically scoped to the chosen group.
+No auth headers needed: the client discovers OAuth metadata and handles registration, authorization and token refresh automatically. In local mode the consent step auto-approves to the synthetic `local` group; in Clerk mode the backend parks the authorization request and redirects the browser to the frontend at `/mcp-consent?request_id=...`, where Clerk forces sign-in and the user picks which organization to authorize. The frontend POSTs back to `/mcp/consent/approve` with a fresh Clerk JWT; the backend resolves the active org to a group, mints the authorization code bound to that `group_id`, and redirects the browser to the OAuth client's callback. Every subsequent MCP tool call is automatically scoped to the chosen group.
 
 Available tools:
 - `list_scenarios`
@@ -467,7 +467,7 @@ Typical MCP run-start workflow:
 
 ### Pushing local runs to a remote glossogen server
 
-The same OAuth flow that issues MCP tokens also gives the CLI a way to push local run bundles to a deployed (Clerk-protected) backend. The CLI calls the remote's existing `/api/g/{slug}/runs/import` REST endpoint — there's no separate prod-upload server-side feature.
+The same OAuth flow that issues MCP tokens also gives the CLI a way to push local run bundles to a deployed (Clerk-protected) backend. The CLI calls the remote's existing `/api/g/{slug}/runs/import` REST endpoint. There is no separate prod-upload feature on the server.
 
 ```bash
 # 1. One-time: sign in to the deployed backend. Opens your browser to the
@@ -493,7 +493,7 @@ For runs that **already exist on prod** but whose local labels or evaluation rep
 ```bash
 # For every local-evaluated run that's already on prod: PUT the local
 # labels (when they differ from the remote's) and PUT the local
-# evaluation report (unconditionally — local is the source of truth).
+# evaluation report (unconditionally; local is the source of truth).
 # Use this when you only need to push metadata edits without
 # re-uploading bundles.
 glossogen sync-metadata-to-prod --runs-dir ./runs
@@ -510,7 +510,7 @@ The middleware accepts the MCP OAuth Bearer for both `/mcp/*` tool calls and `/a
 
 ### Veyru
 
-Two agents (Field Observer, Stabilization Engineer) stabilize failing Veyru entities — fictional box-shaped entities with internal wave-patterns — across a series of budget-constrained rounds. Every character sent on the comm link costs one simulated second against a fixed per-round time budget; a Veyru collapses when total communication time exceeds that budget. Selected early/mid rounds (1, 2, 3, 6, 13) are forced to a single priority-≤2 motif so pressure ramps up gradually over the run. The position of reference star SAGWE392 remaps the symptom→treatment mapping each round and varies physical parameters (hold duration, starting face, pressure level), forcing per-round communication even if agents develop shorthand. See the [scenario README](src/glossogen/scenarios/veyru/README.md).
+Two agents (Field Observer, Stabilization Engineer) stabilize failing Veyru entities (fictional box-shaped entities with internal wave-patterns) across a series of budget-constrained rounds. Every character sent on the comm link costs one simulated second against a fixed per-round time budget; a Veyru collapses when total communication time exceeds that budget. Selected early/mid rounds (1, 2, 3, 6, 13) are forced to a single priority-≤2 motif so pressure ramps up gradually over the run. The position of reference star SAGWE392 remaps the symptom→treatment mapping each round and varies physical parameters (hold duration, starting face, pressure level), forcing per-round communication even if agents develop shorthand. See the [scenario README](src/glossogen/scenarios/veyru/README.md).
 
 ![Veyru scenario overview](images/veyru_overview.webp)
 
@@ -528,7 +528,7 @@ Three agents (Yard Operator, Logistics Planner, Crane Operator) place one incomi
 
 ### Adding a New Scenario
 
-See [docs/creating-a-scenario.md](docs/creating-a-scenario.md) for the full step-by-step guide — package layout, every optional extension surface (run-detail API hook, frontend plug-in, per-scenario scripts), the canonical smoke-test recipe, and a pre-flight checklist.
+See [docs/creating-a-scenario.md](docs/creating-a-scenario.md) for the full step-by-step guide: package layout, every optional extension surface (run-detail API hook, frontend plug-in, per-scenario scripts), the canonical smoke-test recipe, and a pre-flight checklist.
 
 ## Project Structure
 
@@ -628,11 +628,11 @@ Actual per-run cost is recorded in the run's evaluation report under
 of runs you intend. This is the single easiest expensive mistake to make.
 
 Nothing in the platform caps spend. Set billing alerts and per-key limits with
-your provider — that is the only ceiling that actually holds.
+your provider. That is the only ceiling that actually holds.
 
 ## Self-hosting
 
-The fastest way to run the whole stack — Postgres, backend, and frontend:
+The fastest way to run the whole stack (Postgres, backend, frontend):
 
 ```bash
 cp .env.example .env     # then set ANTHROPIC_API_KEY
@@ -646,7 +646,7 @@ in the `local` group. It performs no authentication, so do not expose it to the
 internet without configuring Clerk (see [Authentication](#authentication)).
 
 `API_URL` is read at request time, so pointing the frontend at a different
-backend needs only a restart — no rebuild.
+backend needs only a restart, not a rebuild.
 
 Simulation data persists in the `runs-data` volume; Postgres in `postgres-data`.
 
@@ -660,7 +660,7 @@ The default install excludes heavyweight extras that most deployments never use:
 | `evals` | `uv sync --extra evals` | The veyru judge-accuracy evaluation harness (`inspect-ai`) |
 
 Without `metrics-ml`, those metrics log a skip and produce no measurement rather
-than failing — the same not-applicable convention the rest of the metric suite
+than failing, the same not-applicable convention the rest of the metric suite
 uses. The n-gram metrics additionally run from a cached model when one exists
 under `~/.cache/glossogen/`, so they often work with no extra installed at all.
 
@@ -704,4 +704,4 @@ Vulture runs at 60% confidence. False positives (Pydantic fields, FastAPI handle
 VIRTUAL_ENV= uv run --no-sync vulture src/ --min-confidence 60 --make-whitelist 2>/dev/null | tee vulture_whitelist.py
 ```
 
-Review the generated whitelist before committing — every entry should be a genuine false positive, not actual dead code.
+Review the generated whitelist before committing. Every entry should be a genuine false positive, not actual dead code.

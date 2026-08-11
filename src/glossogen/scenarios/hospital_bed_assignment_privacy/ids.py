@@ -1,8 +1,8 @@
 """Canonical identifier constants for the hospital bed-assignment privacy scenario.
 
 Centralizes agent IDs, channel IDs, role names, template filenames, tool name
-lists, and marker strings so every module — the scenario, the world, and
-evaluators — refers to the same literals.
+lists, and marker strings so every module (the scenario, the world, and
+evaluators) refers to the same literals.
 """
 
 BED_MANAGER_ID = "bed_manager"

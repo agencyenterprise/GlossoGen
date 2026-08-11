@@ -13,7 +13,7 @@ each scenario's open-coding labels consolidate into a distinct
 ontology because the scenarios have different domain vocabularies and
 different communication patterns are worth carving.
 
-Run-id selection is explicit only — pass ``--run-id <id>`` repeatedly
+Run-id selection is explicit only: pass ``--run-id <id>`` repeatedly
 or ``--run-ids-file <path>`` (one id per line). This avoids accidental
 inclusion of unrelated runs (label-glob disasters as warned in
 ``CLAUDE.md``).
@@ -321,7 +321,7 @@ def _build_ontology(
 
 
 async def _main() -> int:
-    """Entry point — returns an exit code for ``sys.exit``."""
+    """Entry point, returning an exit code for ``sys.exit``."""
     log_level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
     log_level = getattr(logging, log_level_name, logging.INFO)
     logging.basicConfig(level=log_level, format="%(asctime)s %(levelname)s %(message)s")

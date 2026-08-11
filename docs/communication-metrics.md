@@ -7,8 +7,8 @@ means**, and **how it was generated**.
 
 ## Background: what we're measuring
 
-In a veyru simulation, two agents — the **Field Observer** and the **Stabilization
-Engineer** — collaborate to stabilize a case. They talk over a single, length-budgeted
+In a veyru simulation, two agents (the **Field Observer** and the **Stabilization
+Engineer**) collaborate to stabilize a case. They talk over a single, length-budgeted
 **link** channel that, in the noise experiments, can drop or corrupt characters in transit.
 They also share a private **postmortem** backchannel for debriefing between rounds.
 
@@ -27,7 +27,7 @@ Read these once; they explain choices common to every column.
   language the agents _intended_, not the damage the channel did to it.
 - **Only the link channel, both agents.** The per-message language metrics look at every
   message sent on the **link** channel by **either** agent. The private postmortem channel is
-  excluded from those metrics (it is used only as context by the dialog metric — see below).
+  excluded from those metrics (it is used only as context by the dialog metric; see below).
 - **Each message is scored on its own — we do NOT concatenate.** For the per-message metrics
   (perplexity, english-ngram, entropy, gzip), every individual link message is scored
   separately. We then average: the message values are meaned within a round, and the
@@ -56,7 +56,7 @@ Read these once; they explain choices common to every column.
 
 ### Illustrative example
 
-How the same composed messages score (approximate values — `english_ngram` depends on the
+How the same composed messages score (approximate values; `english_ngram` depends on the
 trained corpus; gzip values exclude framing as described below):
 
 | message                              | perplexity | english_ngram | message_entropy | gzip_ratio |
@@ -87,7 +87,7 @@ this token":
 - one it thought 10% likely costs `−ln(0.10) ≈ 2.3`,
 - one it thought 1% likely costs `−ln(0.01) ≈ 4.6`.
 
-A **token** is not a character or a whole word — it is a byte-pair-encoding chunk GPT-2 was
+A **token** is not a character or a whole word. It is a byte-pair-encoding chunk GPT-2 was
 trained on. Common English words are usually a single token (`burn`, `the`); rarer words
 split into a few pieces; invented codes shatter into many tiny pieces (e.g. `Lf` → `L` +
 `f`). Surprisal is therefore measured _per chunk-of-text_, and a message's score is the
@@ -109,7 +109,7 @@ is "cheap" to GPT-2 even though it is obviously not normal English).
 - Model: **GPT-2** via `minicons` (downloaded once, run locally; no data leaves the machine).
 - **Scored in isolation.** Each message's pristine text is fed to GPT-2 on its own (seeded
   with a start-of-text marker so the first token has context). The model never sees the other
-  messages, the channel, or the task — only that message.
+  messages, the channel, or the task, only that message.
 - **Averaged over its tokens.** We sum the per-token surprisals and divide by the token count,
   giving a per-token mean; dividing by length keeps a 4-token and a 40-token message
   comparable. Messages that tokenize to a single token (no internal context) are dropped.
@@ -132,7 +132,7 @@ compressibility.
 
 **The idea in depth.** It uses the same "surprisal" idea as perplexity, but with two key
 differences: it works on **characters** (not tokens), and the "model" is not a neural net but
-a small **character trigram** — a lookup table that, for every pair of characters, records
+a small **character trigram**: a lookup table that, for every pair of characters, records
 how often each next character follows it in English. We build that table once by counting
 character triples in the `wikitext-2-raw-v1` corpus (add-1 smoothed so unseen triples still
 get a small non-zero probability). For each character in a message, its surprisal is
@@ -140,13 +140,13 @@ get a small non-zero probability). For each character in a message, its surprisa
 score is the average over its characters.
 
 Because English has strong local spelling regularities (`q` is almost always followed by `u`;
-`t` is often followed by `h`), text that obeys them scores **low**, and text that does not —
-digit runs, symbol codes, or character sequences English never uses — scores **high**.
+`t` is often followed by `h`), text that obeys them scores **low**. Text that does not, meaning digit runs,
+symbol codes, or character sequences English never uses, scores **high**.
 
 **What the number means.** Higher = less English-like. Real English sits around ~2 nats/char;
 emergent codes and degenerate repetition score much higher. Crucially, repetition does **not**
 look cheap here (the opposite of perplexity): the triple `lll` essentially never occurs in
-English, so each extra `l` stays surprising — which is why `LLLLLLL` scores _high_.
+English, so each extra `l` stays surprising, which is why `LLLLLLL` scores _high_.
 
 > **Worked micro-example.** `gentle` decomposes into common English triples (`gen`, `ent`,
 > `ntl`, `tle`) → low surprisal. `LLLLLLL` hits the near-zero-probability triple `lll`
@@ -169,7 +169,7 @@ English, so each extra `l` stays surprising — which is why `LLLLLLL` scores _h
 ## `english_ngram_backoff_surprisal`
 
 **What it is.** The same idea as `english_ngram_surprisal` — mean per-**character** surprisal
-(**nats**) against an English character trigram — but a more faithful variant. Higher = less
+(**nats**) against an English character trigram, but a more faithful variant. Higher = less
 English-like.
 
 **How it differs from `english_ngram_surprisal`.** Two deliberate upgrades:
@@ -187,7 +187,7 @@ English-like.
 
 **What the number means.** Same direction as `english_ngram_surprisal` (higher = less
 English-like), but the two won't be numerically identical because they use different
-vocabularies and smoothing. Treat this as the more discriminating of the two — especially for
+vocabularies and smoothing. Treat this as the more discriminating of the two, especially for
 protocols heavy in digits, symbols, or case tricks. Because "stupid backoff" scores aren't
 normalized probabilities, read it as a relative distance-from-English, not a calibrated one.
 
@@ -203,16 +203,16 @@ backoff smoothing described above. Source:
 
 ## `message_entropy`
 
-**What it is.** The Shannon entropy of the _characters within a single message_ — i.e. how
+**What it is.** The Shannon entropy of the _characters within a single message_: how
 varied the symbols are. Reported in **bits per character**.
 
 **The idea in depth.** Unlike the previous two, this metric is _not_ about prediction or about
-English — it looks only at the message's own character mix. Take the message's character
+English. It looks only at the message's own character mix. Take the message's character
 frequencies (e.g. `aabb` → `a`: 50%, `b`: 50%) and compute Shannon entropy
 `H = −Σ p(c)·log₂ p(c)`. `H` answers: "on average, how many bits would you need to encode each
 character of this message, given how often each character appears in it?" Few distinct
 characters (or one dominant character) → low entropy; many characters used evenly → high
-entropy. It depends only on the _counts_ of characters, not their order — `abab` and `aabb`
+entropy. It depends only on the _counts_ of characters, not their order: `abab` and `aabb`
 have the same entropy.
 
 **What the number means.** Lower = more repetitive / less internal variety. Extremes: a
@@ -246,7 +246,7 @@ repeat as a short back-reference ("copy 6 bytes from 9 bytes ago"). The more rep
 structure a message has, the smaller the compressed output, so the ratio
 `compressed_bytes ÷ original_bytes` is a direct, model-free measure of redundancy. This is
 strictly richer than `message_entropy`: entropy only sees single-character frequencies, while
-gzip also catches **multi-character** patterns — repeated words, repeated codes, `ABAB`
+gzip also catches **multi-character** patterns: repeated words, repeated codes, `ABAB`
 structure. So `Lf 12 Lf 12 Lf 12` looks very compressible to gzip (one repeated unit) even
 though its character variety (entropy) is unremarkable.
 
@@ -261,9 +261,9 @@ repetition).
 **Why the column has so many _identical_ values (and what that means).** The ratio is one
 integer divided by another (`compressed_bytes ÷ original_bytes`). For the short messages on a
 link channel those integers are small, so the ratio can only take a limited set of discrete
-fractions — and **many different messages land on exactly the same value**. For example
+fractions, and **many different messages land on exactly the same value**. For example
 `1.090909… = 24 ÷ 22`: every 22-byte message that DEFLATE cannot shrink compresses to 24 bytes
-and therefore reports exactly `1.0909`. A repeated value like that is not a bug — it means
+and therefore reports exactly `1.0909`. A repeated value like that is not a bug. It means
 "these messages are all about the same short length and essentially incompressible (no
 exploitable repetition), so DEFLATE returned the input size plus its small fixed per-stream
 overhead." The signal is most meaningful in aggregate (run/round averages), not as an exact
@@ -279,11 +279,11 @@ per-message figure.
   `raw_deflate_len == gzip_len − 18`), so the ratio reflects real compressibility and
   repetitive text correctly scores low.
 - **Per message, not concatenated.** Each message is scored on its own (then per-round mean →
-  run mean). We considered concatenating a whole round's messages before compressing — that
-  would erase the overhead and also capture _cross-message_ repetition — but kept the
+  run mean). We considered concatenating a whole round's messages before compressing. That
+  would erase the overhead and also capture _cross-message_ repetition, but we kept the
   per-message form for consistency with the other columns. (DEFLATE still has a small
-  per-stream overhead, so very short messages can read well above 1.0 — a 1–2 character
-  message compresses to ~3 bytes, giving ratios of 2–3 — while longer incompressible messages
+  per-stream overhead, so very short messages can read well above 1.0. A 1–2 character
+  message compresses to ~3 bytes, giving ratios of 2–3, while longer incompressible messages
   settle near 1.0.)
 - Deterministic, model-free.
 - Source: `src/glossogen/evaluation/metric_core/gzip_compression.py` +
@@ -295,7 +295,7 @@ per-message figure.
 
 ## `dialog_count` and `retransmission_request_count`
 
-**What they are.** Two per-round counts of _communication overhead_ — link messages that
+**What they are.** Two per-round counts of _communication overhead_: link messages that
 coordinate rather than carry new task content. They are produced by an LLM judge.
 
 - `retransmission_request_count` — messages asking the partner to **repeat or resend**
@@ -306,12 +306,12 @@ coordinate rather than carry new task content. They are produced by an LLM judge
   turns). Pure retransmission requests are counted separately, not double-counted here.
 
 **The idea in depth.** Unlike the deterministic metrics above, this is not a formula over the
-characters — it is a _classification count_. For each round, an LLM judge reads every
+characters. It is a _classification count_. For each round, an LLM judge reads every
 link message, decides which of the two buckets (if any) it falls into, and counts them. The
 hard part is that the agents' protocol evolves into terse, coded shorthand, so a message is
 often cryptic in isolation; a coded "resend" may have no question mark and look like noise. To
-handle that, the judge is given the **whole run at once** — every round's link messages **and**
-that round's postmortem-channel messages — and is told to use the postmortem debriefs and
+handle that, the judge is given the **whole run at once**: every round's link messages **and**
+that round's postmortem-channel messages. It is told to use the postmortem debriefs and
 earlier rounds as a "codebook" to decode each message's intent _before_ classifying it.
 
 **What the number means.** Both are **average messages per round**. A `run_level`
@@ -338,7 +338,7 @@ for each individual round; in `run_level` you see the per-round average for the 
 **Where to find them.** `run_level` (run-average per round) and `round_context` (the per-round
 counts).
 
-**Reliability note.** From manual spot-checks, `retransmission_request_count` is reliable —
+**Reliability note.** From manual spot-checks, `retransmission_request_count` is reliable:
 the judge consistently catches genuine "resend" messages. `dialog_count` is directionally
 useful but runs a bit high: the judge sometimes counts task-outcome reports or status pings as
 dialog. Treat dialog counts as a relative signal across runs rather than an exact tally.
@@ -353,6 +353,6 @@ dialog. Treat dialog counts as a relative signal across runs rather than an exac
   `message_entropy`, and `gzip_compression_ratio` all
   touch "how non-standard / compressible is the language," but via different mechanisms, so
   they are correlated yet **not** redundant (e.g. on baseline runs, perplexity vs.
-  english-ngram correlate ~0.5 at the run level — related, but each adds signal).
+  english-ngram correlate ~0.5 at the run level: related, but each adds signal).
 - The dialog / retransmission counts measure something orthogonal: _conversational overhead_
   rather than the character-level shape of the text.

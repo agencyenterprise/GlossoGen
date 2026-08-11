@@ -28,7 +28,7 @@ def build_config_file(knobs: dict[str, Any] | None) -> Path | None:
 
     The file is left for the operating system to reclaim. It cannot be deleted
     at launch time because the subprocess reads it at startup, and it is a few
-    hundred bytes in a directory the OS already manages — not worth the risk of
+    hundred bytes in a directory the OS already manages, which is not worth the risk of
     pattern-matching deletes in shared temp space.
     """
     config: dict[str, Any] = {}

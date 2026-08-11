@@ -45,7 +45,7 @@ def find_postmortem_timeout_rounds(events: list[SimulationEvent]) -> set[int]:
 
     Reads ``PostmortemEnded`` events (authoritative; covers the final round) and
     falls back to ``RoundAdvanced(trigger='postmortem_timeout')`` for runs that
-    predate the ``PostmortemEnded`` event — attributing each such advance to the
+    predate the ``PostmortemEnded`` event, attributing each such advance to the
     round before it (the postmortem's round, since ``RoundAdvanced`` carries the
     incremented round number). The union is safe: both sources derive the trigger
     from the same phase-end decision, so they never disagree for a given round.

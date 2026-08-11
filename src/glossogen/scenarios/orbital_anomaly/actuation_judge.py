@@ -38,7 +38,7 @@ async def judge_actuation(
     """Ask the LLM judge whether the astronaut's action matches the expected procedure.
 
     ``expected_procedure`` is the fully filled corrective procedure with all
-    parameters baked in — no conflicting values for the judge to resolve.
+    parameters baked in, so there are no conflicting values for the judge to resolve.
     """
     system_prompt = _renderer.render(template_name="actuation_judge.jinja", template_variables={})
     user_message = (

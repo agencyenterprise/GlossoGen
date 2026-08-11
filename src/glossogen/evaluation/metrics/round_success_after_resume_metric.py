@@ -17,7 +17,7 @@ scenarios emit one. In-run scheduled flows additionally suffix the
 metric name with ``_round_<R>_<agent_id>`` so multiple anchors in
 one run produce distinct measurement names.
 
-Summary format contract — the ``Resumed: W/T (P%)`` and
+Summary format contract: the ``Resumed: W/T (P%)`` and
 ``Source ... over the same window: W/T (P%).`` prefixes are parsed by
 the Streamlit resume tab; keep them stable when editing this module.
 """

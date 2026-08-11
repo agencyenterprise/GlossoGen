@@ -42,9 +42,9 @@ Some things are known, documented properties rather than vulnerabilities:
   keys. There is no spend cap in the platform; any authenticated user who can
   start a run can incur cost.
 
-A way to escape those documented boundaries — reaching another tenant's runs,
+A way to escape those documented boundaries, such as reaching another tenant's runs,
 bypassing the identity middleware, executing code outside a simulation's intended
-surface — is very much in scope.
+surface, is very much in scope.
 
 ## Operator notes
 
@@ -55,4 +55,4 @@ warning loud enough to substitute for checking.
 
 **Provider keys are spending credentials.** They are read from the environment and
 used by subprocesses the server launches. Scope them to the minimum and set
-billing alerts with your provider — the platform enforces no budget of its own.
+billing alerts with your provider. The platform enforces no budget of its own.

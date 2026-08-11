@@ -3,7 +3,7 @@
 Two entry points share the same ``VeyruOutcome`` shape:
 
 * :func:`compute_outcome_if_needed` reads the current ``TeamState`` and
-  builds an outcome on demand — used by postmortem injections, which run
+  builds an outcome on demand. Used by postmortem injections, which run
   *before* the next round's reset clears the team's per-round counters.
 * :func:`restore_outcomes_from_events` walks a JSONL event list on
   resume / fork / replace-agent and appends one ``VeyruOutcome`` per
@@ -32,7 +32,7 @@ def compute_outcome_if_needed(
     Returns the outcome, or ``None`` when ``round_number < 1``. Idempotent:
     if an outcome for this round was already appended, returns it without
     appending a duplicate. ``case_overrides`` provides per-round case
-    overrides set by ``InjectCase`` scheduled events — when ``round_number``
+    overrides set by ``InjectCase`` scheduled events. When ``round_number``
     has an override, the outcome's ``failure_name`` / ``stages`` / budget
     reflect the injected case rather than the natural-cycle pick.
     """

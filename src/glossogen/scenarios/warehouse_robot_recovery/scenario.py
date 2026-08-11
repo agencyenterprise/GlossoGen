@@ -1,8 +1,8 @@
 """Warehouse robot recovery simulation scenario.
 
-Three agents — a floor associate next to a stopped robot, a robotics
+Three agents (a floor associate next to a stopped robot, a robotics
 engineer with the live recovery sheet, and a fleet safety coordinator
-with the live aisle/traffic dashboard — coordinate over a shared radio
+with the live aisle/traffic dashboard) coordinate over a shared radio
 channel to recover stopped warehouse robots. The same visible symptoms
 can map to different procedures depending on the robot model and
 firmware, and any step may be forbidden by the live safety state. Every

@@ -376,7 +376,7 @@ class VeyruScenario(SimulationScenario):
 
         Without this hook, a round ending via ``all_agents_idle`` or
         ``round_timeout`` before the character budget runs out leaves the
-        Veyru in an indeterminate state — no terminal world event fires,
+        Veyru in an indeterminate state: no terminal world event fires,
         and the round shows as a gap in the timeline. We treat it as a
         failure (agents gave up before stabilizing) and emit the same
         ``VEYRU HAS COLLAPSED`` marker the budget-exceeded path emits.

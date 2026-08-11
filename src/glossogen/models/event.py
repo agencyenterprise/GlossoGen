@@ -113,7 +113,7 @@ class ContextCompacted(EventBase):
     """Emitted when the provider compacts an agent's message history into a summary.
 
     Emitted once per compaction, in the round where it fired (flushed when the
-    model request that compacted finishes streaming, not at agent-cycle end —
+    model request that compacted finishes streaming, not at agent-cycle end,
     cycles span many rounds). ``summary_text`` is reconstructed from the streamed
     ``CompactionPart`` deltas; it may be empty even when a compaction fired (e.g.
     OpenAI stores an encrypted summary server-side and returns no text).
@@ -217,7 +217,7 @@ class PostmortemEnded(EventBase):
 
     The postmortem-phase counterpart of :class:`RoundEnded`. ``trigger`` records
     why the postmortem terminated (``all_agents_idle`` or ``postmortem_timeout``).
-    Emitted for every postmortem phase, including the final round's — which is not
+    Emitted for every postmortem phase, including the final round's, which is not
     followed by a ``RoundAdvanced`` and would otherwise have no event capturing why
     it ended.
     """
@@ -327,7 +327,7 @@ def _discover_scenario_event_types() -> tuple[type[EventBase], ...]:
     Imports each scenario's ``events`` submodule (registering its classes in
     ``EventBase.__subclasses__``), then returns every concrete ``EventBase``
     subclass that is not one of the core types. Scenario authors register new
-    event types by adding them to their scenario's ``events.py`` — no edit to
+    event types by adding them to their scenario's ``events.py``, with no edit to
     this module is required.
     """
     import_scenario_submodules(submodule_name="events")

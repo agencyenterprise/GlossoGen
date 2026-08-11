@@ -7,7 +7,7 @@ current round, delivered injections, and agent/scenario metadata.
 State reconstruction (channels, injections, current round) is always
 timestamp-anchored: every event with ``timestamp <= target_timestamp``
 is replayed, including the boundary ``RoundAdvanced`` whose timestamp
-equals the anchor — so the resumed simulation knows it has just entered
+equals the anchor, so the resumed simulation knows it has just entered
 ``round_start``. Per-agent history reconstruction additionally accepts
 a ``cutoff_round`` (set by the replace-agent flow): individual tool
 calls are kept iff their own ``ToolCallInvoked.round_number <
@@ -66,7 +66,7 @@ class AgentHistoryFilter(NamedTuple):
 
     ``tool_calls_only`` strips text and thinking parts from the agent's
     prior responses; only tool call parts survive. ``channel_visibility``
-    maps channel_id to a ``ChannelVisibility`` variant — ``Full`` keeps
+    maps channel_id to a ``ChannelVisibility`` variant. ``Full`` keeps
     every send/read tool call on that channel, ``None`` drops them all,
     ``FromRound(R)`` drops every ``read_channel`` and drops
     ``send_message`` calls with ``ToolCallInvoked.round_number < R``.

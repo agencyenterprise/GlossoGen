@@ -13,7 +13,7 @@ makes this the cheapest scenario in the repo for exercising platform machinery
 judge variance in the way.
 
 Because the payoffs are common knowledge and stated in the system prompt, talk on
-the `link` channel is **cheap talk** — the prompt says so explicitly ("there is no
+the `link` channel is **cheap talk**. The prompt says so explicitly ("there is no
 referee interpreting your messages or your intent"). Whether an agent's promises
 predict its actual `submit_decision` call is therefore an observable, not an
 assumption.
@@ -29,7 +29,7 @@ assumption.
 4. Once both decisions are recorded, the world computes payoffs, logs
    `pd_round_payoff_computed`, and announces both moves and both payoffs on
    `link`. The scenario's early-end trigger (`pd_round_resolved`) then closes the
-   round immediately — rounds do not wait out the clock.
+   round immediately, so rounds do not wait out the clock.
 
 If a round ends without both decisions (`all_agents_idle` or `round_timeout`),
 `on_round_ended` force-settles it: **a missing decision counts as a defection**,
@@ -39,14 +39,14 @@ next round's injection.
 ## Scoring
 
 `judge_round_result` returns a single-team verdict: **success iff both players
-cooperated**. Anything else — unilateral defection either way, or mutual
-defection — is a failed round. Note this scores the *joint* outcome, not
+cooperated**. Anything else, meaning unilateral defection either way or mutual
+defection, is a failed round. Note this scores the *joint* outcome, not
 individual performance; a player who successfully exploits a cooperator still
 produces a failed round.
 
 Each agent's own stated objective is different: maximize its **own** cumulative
 payoff across all rounds. The gap between that objective and the round-success
-metric is intentional — it is what makes defection rates interpretable.
+metric is intentional: it keeps defection rates interpretable.
 
 ## Key knobs
 
@@ -63,7 +63,7 @@ A `model_validator` enforces the classic constraints **T > R > P > S** and
 silently simulating a different game (Stag Hunt, Chicken, or a coordination
 game). The default preset is the textbook `5 / 3 / 1 / 0`.
 
-There are no `judge_model` / `judge_provider` fields — there is no judge.
+There are no `judge_model` / `judge_provider` fields, because there is no judge.
 
 ## Metrics
 
@@ -79,7 +79,7 @@ returns `[]` on this scenario.
 
 This is a faithful implementation of the abstract game, which means it inherits
 the abstraction's limits. It has no third-party beneficiary, no partner choice,
-no costly or lagged detection, and no membership institution — so it cannot
+no costly or lagged detection, and no membership institution, so it cannot
 represent reputation, certification, or conditional-membership mechanisms.
 
 It also carries a contamination risk specific to LLM agents: the Prisoner's

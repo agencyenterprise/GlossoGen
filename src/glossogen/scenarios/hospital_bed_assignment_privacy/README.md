@@ -1,6 +1,6 @@
 # Scenario: Hospital Bed-Assignment Privacy
 
-Three agents coordinate a privacy-preserving patient routing over a single public ops channel. The **Bed Manager** holds the private per-round bed board — anonymized patient tokens, candidate destinations, transport modes, the hidden routing assignment, and a small list of restricted vocabulary words the Manager must avoid using literally on the public channel. The Manager must direct the **Transport Lead** to route the correct patient to the correct destination using the correct transport mode while preventing an **Unauthorized Observer** who reads the same channel from inferring the hidden (patient_token, destination) pair.
+Three agents coordinate a privacy-preserving patient routing over a single public ops channel. The **Bed Manager** holds the private per-round bed board: anonymized patient tokens, candidate destinations, transport modes, the hidden routing assignment, and a small list of restricted vocabulary words the Manager must avoid using literally on the public channel. The Manager must direct the **Transport Lead** to route the correct patient to the correct destination using the correct transport mode while preventing an **Unauthorized Observer** who reads the same channel from inferring the hidden (patient_token, destination) pair.
 
 A round is a full success only when the Transport Lead's routing tuple matches the hidden assignment AND every Observer intercept attempt fails to match the (patient_token, destination) pair AND the public-channel communication budget is not exhausted. This two-sided pressure rewards privacy-preserving routing rather than mere correctness.
 
@@ -8,7 +8,7 @@ A round is a full success only when the Transport Lead's routing tuple matches t
 
 ### Bed Manager
 
-Holds the private bed board: patient tokens with public labels and clinical notes, destinations with privacy classifications, transport modes, the hidden routing assignment, and the restricted-vocabulary list. Sends obfuscated routing instructions on the public ops channel. Cannot route the patient directly — only the Transport Lead can.
+Holds the private bed board: patient tokens with public labels and clinical notes, destinations with privacy classifications, transport modes, the hidden routing assignment, and the restricted-vocabulary list. Sends obfuscated routing instructions on the public ops channel. Cannot route the patient directly; only the Transport Lead can.
 
 ### Transport Lead
 

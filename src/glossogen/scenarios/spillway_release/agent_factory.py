@@ -1,7 +1,7 @@
 """Assemble agent and channel configurations from spillway-scenario knobs.
 
-The scenario runs three agents — dam operator, civil defense coordinator,
-and park ranger — on one shared ops channel, plus an optional postmortem
+The scenario runs three agents (dam operator, civil defense coordinator,
+and park ranger) on one shared ops channel, plus an optional postmortem
 discussion channel. These factory functions turn a validated
 ``SpillwayReleaseKnobs`` instance into the ``AgentConfig`` and ``Channel``
 lists the runtime expects, plus the display-name maps used by the UI.

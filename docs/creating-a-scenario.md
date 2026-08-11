@@ -1,8 +1,8 @@
 # Creating a new scenario
 
-This guide walks through adding a new scenario to glossogen end-to-end. By the end you'll have a registered scenario, a working smoke run, and (optionally) bespoke run-detail data on the API and bespoke UI on the frontend — every extension surface that exists today, all opt-in.
+This guide walks through adding a new scenario to glossogen end-to-end. By the end you'll have a registered scenario, a working smoke run, and (optionally) bespoke run-detail data on the API and bespoke UI on the frontend: every extension surface that exists today, all opt-in.
 
-If you just want to copy an existing scenario as a starting point, [container_yard_stacking](../src/glossogen/scenarios/container_yard_stacking/) is the freshest 3-agent reference — its file list and shape is what this guide aims at.
+If you just want to copy an existing scenario as a starting point, [container_yard_stacking](../src/glossogen/scenarios/container_yard_stacking/) is the freshest 3-agent reference, and its file list and shape is what this guide aims at.
 
 ## What a scenario is
 
@@ -66,7 +66,7 @@ Leave `__init__.py` empty.
 
 ### 2. Write `ids.py`
 
-Centralize every literal string the scenario uses — agent IDs, channel IDs, tool names, world-event marker strings, and per-agent tool lists. Keeps the rest of the package free of magic strings.
+Centralize every literal string the scenario uses: agent IDs, channel IDs, tool names, world-event marker strings, and per-agent tool lists. Keeps the rest of the package free of magic strings.
 
 See [container_yard_stacking/ids.py](../src/glossogen/scenarios/container_yard_stacking/ids.py) for a worked example. Typical contents:
 
@@ -83,7 +83,7 @@ CRANE_MOVE_TOOL = "crane_move"
 SEND_MESSAGE_TOOL = "send_message"
 
 # World marker strings (must appear literally in tool result strings or
-# WorldEventDelivered.text — used by the round_success metric to detect
+# WorldEventDelivered.text, read by the round_success metric to detect
 # success vs. failure).
 TRUCK_ARRIVED_MARKER = "[truck_arrived]"
 ROUND_SUCCESS_MARKER = "[round_success]"
@@ -92,7 +92,7 @@ ROUND_FAILED_MARKER = "[round_failed]"
 
 ### 3. Write `knobs.py`
 
-Define a `ScenarioKnobs` Pydantic model that extends `BaseKnobs`. Every field MUST be required (no defaults — per the project's "no default parameter values" rule); presets supply values via `knobs_default.json`. `BaseKnobs` already provides `round_count`, `max_round_duration_seconds`, `model_overrides`, `scheduled_events`, and the other shared fields — declare only your scenario-specific knobs here.
+Define a `ScenarioKnobs` Pydantic model that extends `BaseKnobs`. Every field MUST be required (no defaults, per the project's "no default parameter values" rule); presets supply values via `knobs_default.json`. `BaseKnobs` already provides `round_count`, `max_round_duration_seconds`, `model_overrides`, `scheduled_events`, and the other shared fields, so declare only your scenario-specific knobs here.
 
 ```python
 from glossogen.knobs_base import BaseKnobs
@@ -148,7 +148,7 @@ class YardCaseStarted(EventBase):
 
 ### 6. Write `world.py`
 
-Subclass `ScenarioWorld` (defined in [scenario_world.py](../src/glossogen/runtime/scenario_world.py)). The world is the live simulated environment — it mutates internal state synchronously in `on_message`, reacts asynchronously (pushing notifications to agents via `context.send_update_to_channel(...)`) in `on_message_async`, and tracks the state the scenario reads to decide when a round succeeds or fails. The base class provides the `run` event loop; you override the message hooks, not `run`.
+Subclass `ScenarioWorld` (defined in [scenario_world.py](../src/glossogen/runtime/scenario_world.py)). The world is the live simulated environment. It mutates internal state synchronously in `on_message`, reacts asynchronously (pushing notifications to agents via `context.send_update_to_channel(...)`) in `on_message_async`, and tracks the state the scenario reads to decide when a round succeeds or fails. The base class provides the `run` event loop; you override the message hooks, not `run`.
 
 The shape to mimic is [`WarehouseWorld`](../src/glossogen/scenarios/warehouse_robot_recovery/world.py) (single-tool scenarios) or [`ContainerYardWorld`](../src/glossogen/scenarios/container_yard_stacking/world.py) (multi-tool scenarios with sequenced action state).
 
@@ -159,7 +159,7 @@ The world is also the place where:
 
 ### 7. Write `scenario.py`
 
-The `SimulationScenario` subclass — the entry point the registry hands to the CLI, MCP `start_run` tool, and run-detail UI. Required classmethods and methods are spelled out in [scenario_protocol.py](../src/glossogen/scenario_protocol.py). The key ones:
+The `SimulationScenario` subclass is the entry point the registry hands to the CLI, the MCP `start_run` tool, and the run-detail UI. Required classmethods and methods are spelled out in [scenario_protocol.py](../src/glossogen/scenario_protocol.py). The key ones:
 
 - `name()` → the registry key (string).
 - `scenario_description()` → a short human-readable description.
@@ -178,7 +178,7 @@ The `SimulationScenario` subclass — the entry point the registry hands to the 
 - `judge_round_result(round_number, trigger)` → **required** — return a list of `RoundResult(success, team_id, reason)`. The game clock writes one `RoundResultRecorded` event per element; the platform `round_success` metric reads these directly and emits one Measurement per `team_id` (single-team scenarios pass `team_id=None` and get one Measurement named `round_success`). Return `[]` only if the scenario genuinely has no per-round success criterion. Despite the name this does not imply an LLM judge — [prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/scenario.py) resolves rounds deterministically from its payoff matrix with no LLM anywhere, while veyru calls one. Judge however the task demands.
 - `restore_state_from_events(events)` → optional. Called after a fork/resume rewind has been built and before the runtime starts. Walk the event list and seed any per-round outcomes you need so the first post-resume injection renders accurate "previous result" context (most scenarios need this only if their injection templates surface prior-round state).
 
-For scenarios with custom tools (anything beyond `send_message`), `get_mcp_tools()` returns one [`ScenarioMcpTool`](../src/glossogen/runtime/scenario_mcp_tool.py) per tool — that's where you wire up freetext-argument LLM judges, world state mutations, and the marker strings the tool result returns.
+For scenarios with custom tools (anything beyond `send_message`), `get_mcp_tools()` returns one [`ScenarioMcpTool`](../src/glossogen/runtime/scenario_mcp_tool.py) per tool. That is where you wire up freetext-argument LLM judges, world state mutations, and the marker strings the tool result returns.
 
 ### Optional platform hooks (post-simulation analysis)
 
@@ -198,7 +198,7 @@ Every prompt is a Jinja2 template, never a hardcoded string in Python. Required:
 - `<role>_injection.jinja` — one per agent. Rendered at each round start. Receives `round_number`, `current_case`, `previous_outcome`, `knobs`.
 - `postmortem_injection.jinja` — if `postmortem_enabled` can be true, render the postmortem-phase injection here.
 
-For scenarios with LLM judges, one `<judge_name>.jinja` per judge — these are the system prompts handed to the judge's `generate_structured(...)` call. Judges live in a separate `<scenario>_judge.py` module and pull their templates via `TemplateRenderer`.
+For scenarios with LLM judges, one `<judge_name>.jinja` per judge. These are the system prompts handed to the judge's `generate_structured(...)` call. Judges live in a separate `<scenario>_judge.py` module and pull their templates via `TemplateRenderer`.
 
 ### 9. (Optional) Write `evaluation/`
 
@@ -281,7 +281,7 @@ const SCENARIO_PLUGINS: Record<string, ScenarioPlugin> = {
 };
 ```
 
-The plug-in contract is in [scenario-plugin.ts](../frontend/src/features/runs/scenario-plugin.ts). The Veyru plug-in at [veyru/plugin.tsx](../frontend/src/features/runs/veyru/plugin.tsx) is the canonical example. Each slot is optional — return `null` / `{}` to fall through to the platform defaults.
+The plug-in contract is in [scenario-plugin.ts](../frontend/src/features/runs/scenario-plugin.ts). The Veyru plug-in at [veyru/plugin.tsx](../frontend/src/features/runs/veyru/plugin.tsx) is the canonical example. Each slot is optional: return `null` / `{}` to fall through to the platform defaults.
 
 ### 12. Register the scenario
 

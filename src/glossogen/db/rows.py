@@ -42,7 +42,7 @@ class DerivedSourceCountRow(BaseModel):
     """One source run that has derived children, with the child count.
 
     Aggregates the ``runs`` table by ``(source_run_scenario,
-    source_run_dir_name)`` — the timeline parent recorded for every
+    source_run_dir_name)``, the timeline parent recorded for every
     replace-agent, resume-at-round, and cross-run-replace-agent derivation.
     """
 

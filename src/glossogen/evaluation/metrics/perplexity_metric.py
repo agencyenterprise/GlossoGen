@@ -3,7 +3,7 @@
 Uses ``minicons.scorer.IncrementalLMScorer`` with ``gpt2`` to compute the mean
 per-token surprisal (in nats) of every message sent on the scenario's primary
 channel. Produces an overall scalar score plus a per-round breakdown.
-Deterministic — does not consult the LLM provider.
+Deterministic: it does not consult the LLM provider.
 
 Scores the **pristine** text the sender composed, not what the channel
 delivered: when a scenario transforms outgoing messages (e.g. veyru channel
@@ -176,7 +176,7 @@ def _score_all_rounds(
 def _score_messages(scorer_obj: Any, texts: list[str]) -> list[float]:
     """Return mean per-token surprisal in nats for each input text.
 
-    Drops scores that come back as NaN — minicons returns NaN for inputs that
+    Drops scores that come back as NaN. Minicons returns NaN for inputs that
     tokenize to a single token (no left context), and serializing NaN to JSON
     yields ``null`` which fails Pydantic validation downstream.
     """

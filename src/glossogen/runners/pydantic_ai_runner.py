@@ -148,8 +148,8 @@ async def _run_agent_call(
 ) -> PydanticAIAgentRunResult[str]:
     """Drive ``agent.iter`` so cumulative usage is captured even on cancellation.
 
-    The supplied ``record_usage`` callback is invoked exactly once per call —
-    on success, error, or cancellation — with the cumulative ``RunUsage`` for
+    The supplied ``record_usage`` callback is invoked exactly once per call,
+    on success, error, or cancellation, with the cumulative ``RunUsage`` for
     that attempt. This lets the caller flush a usage event for cycles that
     never reach a clean completion (e.g. when the supervisor cancels the
     agent task at scenario end).
@@ -540,15 +540,15 @@ class PydanticAIRunner(AgentRunner):
         """Emit a ContextCompacted for a completed compaction block, then reset it.
 
         No-op unless a compaction block is currently open. Called when the block
-        ends — i.e. when the generated response (text/thinking/tool call) that
+        ends, meaning when the generated response (text/thinking/tool call) that
         follows the compaction starts, or at agent-cycle end for a trailing block.
         The event's round is ``state.compaction_round`` (recorded when the block
-        started), so it reflects when compaction actually fired — agent cycles span
+        started), so it reflects when compaction actually fired. Agent cycles span
         many rounds, so flushing at cycle end with the current round would
         mis-attribute it. The summary text is accumulated across the block's
         per-delta ``CompactionPart`` events (which the parts manager overwrites
         rather than accumulates, and which can span multiple streams); it may be
-        empty when a real compaction returns no readable text — e.g. OpenAI, which
+        empty when a real compaction returns no readable text, as with OpenAI, which
         fires compaction but keeps the summary encrypted server-side (content None)
         while carrying the compaction payload in ``provider_details``. Such a block
         is still recorded (empty ``summary_text``) because it did compact; only a

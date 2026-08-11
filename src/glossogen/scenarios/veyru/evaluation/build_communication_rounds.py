@@ -28,7 +28,7 @@ def build_communication_rounds(events: list[SimulationEvent]) -> list[Communicat
     """Group link-channel messages by round and attach the motif/treatment ground truth.
 
     Rounds that have no link messages are still emitted as long as the
-    round has a ``VeyruCaseStarted`` event — those rounds are signal
+    round has a ``VeyruCaseStarted`` event, so those rounds are signal
     too (the team chose to stay silent on the link). Rounds with
     neither link messages nor ground truth are skipped.
     """

@@ -1,8 +1,8 @@
 """Canonical identifier constants for the warehouse robot recovery scenario.
 
 Centralizes agent IDs, channel IDs, role names, event reasons, template
-filenames, and tool name lists so every module — the scenario, the world,
-evaluators, and server readers — refers to the same literals.
+filenames, and tool name lists so every module (the scenario, the world,
+evaluators, and server readers) refers to the same literals.
 """
 
 FLOOR_ASSOCIATE_ID = "floor_associate"

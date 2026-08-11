@@ -2,7 +2,7 @@
 
 This folder packages a self-hosted, OpenAI-compatible LLM endpoint that the glossogen simulation runner consumes through the `--provider self-hosted` path.
 
-The current deployment serves **`meta-llama/Llama-3.3-70B-Instruct`** at bf16 on `H100:2` via [vLLM](https://docs.vllm.ai/), with native tool calling enabled (`--enable-auto-tool-choice --tool-call-parser llama3_json`). Modal is one possible host for this pattern — the same `serve_llama.py` skeleton works on RunPod, fly.io GPU, or any environment that runs vLLM behind an HTTP server.
+The current deployment serves **`meta-llama/Llama-3.3-70B-Instruct`** at bf16 on `H100:2` via [vLLM](https://docs.vllm.ai/), with native tool calling enabled (`--enable-auto-tool-choice --tool-call-parser llama3_json`). Modal is one possible host for this pattern. The same `serve_llama.py` skeleton works on RunPod, fly.io GPU, or any environment that runs vLLM behind an HTTP server.
 
 ## Available deployments
 
@@ -15,7 +15,7 @@ Two Modal apps are defined here, each serving a different model. They run in par
 
 GlossoGen's `--provider self-hosted` reads `SELF_HOSTED_BASE_URLS` (a JSON object mapping model name → `/v1` URL) and looks up the URL for the model the run is launched with. List the entries you want available in `.env` to switch from the UI without redeploying.
 
-The simulation runner forces `stream=False` on the OpenAI-compatible endpoint for `--provider self-hosted` to work around [vLLM issue #31871](https://github.com/vllm-project/vllm/issues/31871) — vLLM's `hermes` tool parser drops `<tool_call>` XML on the floor in streaming mode. Tool execution events still stream from pydantic-ai's `CallToolsNode`, so logging is unaffected.
+The simulation runner forces `stream=False` on the OpenAI-compatible endpoint for `--provider self-hosted` to work around [vLLM issue #31871](https://github.com/vllm-project/vllm/issues/31871): vLLM's `hermes` tool parser drops `<tool_call>` XML on the floor in streaming mode. Tool execution events still stream from pydantic-ai's `CallToolsNode`, so logging is unaffected.
 
 ## Files
 
@@ -59,7 +59,7 @@ Modal prints the public URL on success, e.g.:
     https://<workspace>--llama-3-3-70b-instruct-serve.modal.run
 ```
 
-The first deploy downloads ~140 GB of weights into the `huggingface-cache` Modal Volume — expect 2–4 minutes before the container is ready. Subsequent deploys hit the warm cache and start in ~30–90 s.
+The first deploy downloads ~140 GB of weights into the `huggingface-cache` Modal Volume, so expect 2–4 minutes before the container is ready. Subsequent deploys hit the warm cache and start in ~30–90 s.
 
 ## Wire to a local client
 
@@ -74,7 +74,7 @@ A **JSON object** mapping each served model name to its OpenAI-compatible `/v1` 
 | **Key** | The model identifier as known to vLLM — the same string passed to `vllm serve <MODEL>`. For the deployments here that is the HuggingFace model ID (e.g. `meta-llama/Llama-3.3-70B-Instruct`, `Qwen/Qwen3-32B`). |
 | **Value** | The fully-qualified base URL **including the `/v1` suffix**. Modal returns a hostname per app (`https://<workspace>--<app-name>-serve.modal.run`); append `/v1` to reach vLLM's OpenAI-compatible chat-completions API. |
 
-The frontend reads this map to populate the model dropdown — to add a new self-hosted model, deploy it (any host) and add a key/value pair here. No code change needed.
+The frontend reads this map to populate the model dropdown. To add a new self-hosted model, deploy it (any host) and add a key/value pair here. No code change needed.
 
 ### `SELF_HOSTED_API_KEY` (required)
 
@@ -87,7 +87,7 @@ SELF_HOSTED_BASE_URLS={"meta-llama/Llama-3.3-70B-Instruct":"https://<workspace>-
 SELF_HOSTED_API_KEY=<the VLLM_API_KEY value you generated above>
 ```
 
-The JSON value must be on a single line — `.env` files do not support multi-line strings without escaping. If glossogen can't parse the JSON it logs a warning and treats the map as empty (no self-hosted models will appear in the frontend).
+The JSON value must be on a single line, because `.env` files do not support multi-line strings without escaping. If glossogen can't parse the JSON it logs a warning and treats the map as empty (no self-hosted models will appear in the frontend).
 
 ### Launch a simulation
 
@@ -104,8 +104,8 @@ If you can't recover the `VLLM_API_KEY` from Modal (the CLI does not expose secr
 ## Verify
 
 Each smoke test reads its endpoint from the environment, since the hostname is
-namespaced by your Modal workspace. Set the variable for the app you are testing
-— no trailing slash, no `/v1` suffix:
+namespaced by your Modal workspace. Set the variable for the app you are testing,
+with no trailing slash and no `/v1` suffix:
 
 ```bash
 export MODAL_LLAMA_ENDPOINT_BASE=https://<workspace>--llama-3-3-70b-instruct-serve.modal.run
@@ -137,7 +137,7 @@ To confirm:
 modal app list | grep -E 'llama-3-3|qwen-3-32b'   # status should read "stopped"
 ```
 
-The `huggingface-cache` and `vllm-cache` Modal Volumes survive `app stop`, so the next `modal deploy` cold-starts in ~30–90 s instead of re-downloading 140–160 GB of weights. Stopping does not delete the Modal Secrets either — `huggingface-glossogen` and `vllm-api-key` persist in the workspace.
+The `huggingface-cache` and `vllm-cache` Modal Volumes survive `app stop`, so the next `modal deploy` cold-starts in ~30–90 s instead of re-downloading 140–160 GB of weights. Stopping does not delete the Modal Secrets either. `huggingface-glossogen` and `vllm-api-key` persist in the workspace.
 
 ## Operating notes
 

@@ -85,7 +85,7 @@ def _build_notification_payload(
     ``pending_count`` tells the agent how many additional notifications are
     still queued after this one is consumed. ``current_round`` is the round
     the simulation is in at delivery time so the agent can recognise that
-    instructions seen on a channel before the current round are stale —
+    instructions seen on a channel before the current round are stale,
     each ``read_channel`` and ``send_message`` response carries the same
     field, providing a consistent reference everywhere the agent looks.
     """
@@ -126,7 +126,7 @@ def _reject_if_terminated(session: AgentSession, tool_name: str) -> None:
     state-mutating tool call from a runner that has not yet noticed the
     Done signal would land under the new round / new occupant context
     and corrupt the simulation, so this check rejects them at the MCP
-    boundary. ``read_notifications`` is exempt — the dying runner must
+    boundary. ``read_notifications`` is exempt, because the dying runner must
     still be able to read its Done signal to exit cleanly.
     """
     if session.terminated:

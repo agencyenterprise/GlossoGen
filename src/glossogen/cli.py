@@ -1478,7 +1478,7 @@ async def _resolve_imported_model_from_source_b(
     """Read source B's ``AgentRegistered`` for the replaced agent.
 
     Returns ``(model, provider)``. Raises ``SystemExit`` if the agent is
-    missing — the orchestrator will catch the same case later, but this
+    missing. The orchestrator will catch the same case later, but this
     gives a clearer CLI error message.
     """
     log_path = source_b_run_dir / f"{scenario_name}.jsonl"
