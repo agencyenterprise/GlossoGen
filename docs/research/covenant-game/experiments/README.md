@@ -85,6 +85,7 @@ count that resolves it before launching.
 | [EXP-033](EXP-033-communication-free-baseline-calibration/experiment.md) | communication-free rules-only no-group calibration | complete | not supported: 96/96 remittances, so the practical ceiling remained | $0.36 |
 | [EXP-034](EXP-034-shared-service-communication-baseline/experiment.md) | shared-service communication baseline calibration | complete | not supported: 96/96 remittances; client-service framing and informal messages may explain the ceiling | $0.75 |
 | [EXP-035](EXP-035-framing-diagnostic/experiment.md) | professional-service versus neutral-allocation framing diagnostic | complete | supported: semantic framing changes the baseline; not a covenant result | $1.29 |
+| [EXP-036](EXP-036-framing-fresh-seed-replication/experiment.md) | fresh-seed replication of the framing diagnostic | planned | pending | — |
 
 Total API spend logged: **$422.68** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).

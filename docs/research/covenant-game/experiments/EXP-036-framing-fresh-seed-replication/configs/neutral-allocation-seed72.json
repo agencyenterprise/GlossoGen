@@ -1,0 +1,21 @@
+{
+  "round_count": 17,
+  "max_round_duration_seconds": 300.0,
+  "model_overrides": {},
+  "postmortem_duration_seconds": 0.0,
+  "replace_agent_default_channel_visibility": {},
+  "scheduled_events": [],
+  "agent_max_tokens": 16384,
+  "round_time_budget_seconds": null,
+  "compaction": {"enabled": false, "token_threshold": 50000},
+  "seed": 72,
+  "condition": "no_group",
+  "framing": "neutral_allocation",
+  "client_payment": 21,
+  "client_reserve": 7,
+  "covenant_bond": 14,
+  "pledge_entry_cost": 2.1,
+  "audit_probability": 0.0,
+  "audit_resolution_delay_rounds": 1,
+  "horizon_disclosed": false
+}

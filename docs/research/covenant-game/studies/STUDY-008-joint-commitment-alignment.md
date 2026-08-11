@@ -131,3 +131,8 @@ bundling them into this first human-parallel test.
    This closes the instrument as framing-sensitive, not as a covenant result:
    the next revision must specify a real repeated strategic consequence before
    group identity, pledge, or costly-pledge arms are meaningful.
+10. [EXP-036](../experiments/EXP-036-framing-fresh-seed-replication/experiment.md)
+    repeats the same framing diagnostic at fresh environmental seeds 72 and 73,
+    with three independent Sonnet trajectories per arm per seed. It is a
+    replication gate before concluding that the current instrument should be
+    retired.
