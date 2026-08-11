@@ -13,7 +13,7 @@
   "study_id": "STUDY-006",
   "experiment_role": "pilot",
   "experiment_id": "EXP-025",
-  "base_commit": "23b9957af0765a98fd6691816e5882b45ffcebda",
+  "base_commit": "5d979ecfa4a599b60e7afec10fc43e812674bbb5",
   "worktree_dirty": true,
   "commands": [
     "VIRTUAL_ENV= uv run --no-sync python -m glossogen run warehouse_commitment --model claude-sonnet-5 --provider anthropic --runs-dir ./runs --config docs/research/covenant-game/experiments/EXP-025-human-parallel-commitment-pilot/configs/no-group.json",
@@ -117,7 +117,7 @@ newcomers. It should not be used to make claims about them.
 
 ## Provenance
 
-- Base commit at planning: `23b9957af0765a98fd6691816e5882b45ffcebda`
+- Base commit at planning: `5d979ecfa4a599b60e7afec10fc43e812674bbb5`
 - Worktree dirty at planning: `true`, solely because the unrelated
   `.claude/worktrees/` directory remains untracked. The scenario, tests, and
   bundled launch configurations are committed at the recorded SHA.
