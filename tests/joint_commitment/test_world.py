@@ -56,8 +56,8 @@ def test_joint_safety_requires_both_providers_to_remit() -> None:
     assert world.provider(agent_id="provider_b").earnings == 21
 
 
-def test_covenant_requires_pledge_and_bond_before_a_decision() -> None:
-    """Covenant exposure is a world action rather than prompt-only text."""
+def test_covenant_affirmation_requires_a_bond_but_decline_allows_nonmember_work() -> None:
+    """Covenant membership is voluntary while bond exposure remains real."""
     world = JointCommitmentWorld(knobs=build_knobs(JointCommitmentCondition.COVENANT))
 
     world.begin_round(round_number=2)
@@ -84,6 +84,15 @@ def test_covenant_requires_pledge_and_bond_before_a_decision() -> None:
     else:
         raise AssertionError("decision was accepted before bond exposure")
 
+    world.submit_pledge(agent_id="provider_b", decision="decline")
+    declined_record = world.submit_decision(
+        agent_id="provider_b",
+        actual_action="retain",
+        public_attestation="retained",
+    )
+
+    assert declined_record.reserve_retained == 7
+
 
 def test_setup_requires_pledges_only_in_pledge_conditions() -> None:
     """The first shared setup phase resolves automatically outside pledge arms."""
@@ -99,9 +108,9 @@ def test_setup_requires_pledges_only_in_pledge_conditions() -> None:
     assert pledge.setup_complete() is True
 
 
-def test_pledge_decisions_are_visible_to_both_providers_after_setup() -> None:
-    """The decision-round prompt exposes both agents' completed pledge record."""
-    scenario = JointCommitmentScenario(knobs=build_knobs(JointCommitmentCondition.PLEDGE))
+def test_public_registry_is_visible_to_both_providers_after_setup() -> None:
+    """The decision prompt exposes both providers' institution-visible status."""
+    scenario = JointCommitmentScenario(knobs=build_knobs(JointCommitmentCondition.COVENANT))
 
     world = cast(JointCommitmentWorld, scenario.get_world())
     world.submit_pledge(agent_id="provider_a", decision="affirm")
@@ -109,9 +118,20 @@ def test_pledge_decisions_are_visible_to_both_providers_after_setup() -> None:
     injection = scenario.get_injection(round_number=2, agent_id="provider_a")
 
     assert injection is not None
-    assert "Public setup record:" in injection
-    assert "provider_a: affirm" in injection
-    assert "provider_b: decline" in injection
+    assert "Public group registry:" in injection
+    assert "provider_a: covenant membership pending | pledge: affirmed" in injection
+    assert "provider_b: outside covenant | pledge: declined" in injection
+
+
+def test_group_registry_shows_identity_without_a_pledge() -> None:
+    """The group arm supplies observable identity without commitment language."""
+    scenario = JointCommitmentScenario(knobs=build_knobs(JointCommitmentCondition.GROUP))
+
+    injection = scenario.get_injection(round_number=2, agent_id="provider_a")
+
+    assert injection is not None
+    assert "provider_a: group participant | pledge: not offered" in injection
+    assert "provider_b: group participant | pledge: not offered" in injection
 
 
 def test_audited_retention_forfeits_bond_and_revokes_good_standing() -> None:
@@ -146,7 +166,31 @@ def test_audited_retention_forfeits_bond_and_revokes_good_standing() -> None:
     assert provider_b_audit.bond_forfeited == 14
     provider_b = world.provider(agent_id="provider_b")
     assert provider_b.bond_forfeited == 14
+    assert provider_b.earnings == 7
     assert provider_b.membership_in_good_standing is False
+
+    scenario = JointCommitmentScenario(knobs=build_knobs(JointCommitmentCondition.COVENANT))
+    scenario_world = cast(JointCommitmentWorld, scenario.get_world())
+    for agent_id in ("provider_a", "provider_b"):
+        scenario_world.submit_pledge(agent_id=agent_id, decision="affirm")
+        scenario_world.post_bond(agent_id=agent_id)
+    scenario_world.begin_round(round_number=2)
+    scenario_world.submit_decision(
+        agent_id="provider_a",
+        actual_action="remit",
+        public_attestation="remitted",
+    )
+    scenario_world.submit_decision(
+        agent_id="provider_b",
+        actual_action="retain",
+        public_attestation="retained",
+    )
+    scenario_world.settle_round(round_number=2)
+    scenario_world.resolve_due_audits(round_number=3)
+    injection = scenario.get_injection(round_number=3, agent_id="provider_a")
+
+    assert injection is not None
+    assert "provider_b: former covenant member | pledge: affirmed | standing: revoked" in injection
 
 
 def test_audit_selection_excludes_rounds_that_cannot_resolve() -> None:

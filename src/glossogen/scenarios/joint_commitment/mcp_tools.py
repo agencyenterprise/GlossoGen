@@ -60,7 +60,8 @@ def build_mcp_tools(
                 )
             return (
                 f"PLEDGE DECISION RECORDED: {recorded}. "
-                f"COVENANT BOND POSTED: {amount} units are held in escrow."
+                f"CONDITIONAL COVENANT BOND RECORDED: {amount} units are forfeited "
+                "after an audited violation."
             )
         return f"PLEDGE DECISION RECORDED: {recorded}."
 

@@ -11,10 +11,12 @@ protected only when both providers remit. Actual actions are hidden when made
 and selectively audited after a delay.
 
 The four conditions are no group, group identity only, group pledge, and a
-bonded covenant. In the pledge conditions, both providers' affirmative or
-declining decisions are shown to both agents before the first client decision.
-The covenant requires an affirmative pledge and a 14-unit personal bond. An
-audit-confirmed retention forfeits the posted bond and ends the provider's
-covenant good standing. It is an instrument for commitment adherence and
-deception, not a direct replication of the human trust game or a full
-equilibrium and replacement model.
+bonded covenant. Group conditions use a public registry. In the pledge
+conditions, both providers' affirmative or declining decisions are shown to
+both agents before the first client decision. In the covenant condition,
+affirming requires a 14-unit personal bond; declining leaves the provider able
+to work as a publicly listed non-member. An audit-confirmed retention forfeits
+the posted bond, reduces the provider's retained earnings by 14 units, and
+changes the provider's public standing to revoked. It is an
+instrument for commitment adherence and deception, not a direct replication of
+the human trust game or a full equilibrium and replacement model.

@@ -33,15 +33,22 @@ honoring a commitment from merely acting well while watched.
 | Condition | Public team identity | Explicit commitment | Personal bond / boundary |
 |---|---:|---:|---:|
 | No group | no | no | no |
-| Group | yes | no | no |
-| Pledge | yes | yes | no |
-| Covenant | yes | yes | posted bond; audited retention forfeits the bond and revokes covenant good standing |
+| Group | public registry | no | no |
+| Pledge | public registry | public, mutually visible pledge | no |
+| Covenant | public registry | public, mutually visible pledge | voluntary membership; affirmed members post a 14-unit bond, while audited retention forfeits it from retained earnings and revokes standing |
 
 All arms receive the same clients, fixed 21/7 allocation, audit schedule,
 participants, hidden horizon, and communication restrictions. Only group,
 commitment, and covenant boundary vary. The covenant is a bundle: this first
 comparison estimates its total effect, while the intermediate arms support a
 later mechanism analysis.
+
+In the covenant arm, declining the pledge does not remove a provider from the
+shared work. The provider remains able to make the same 7→21 decisions as a
+publicly listed non-member, without covenant standing or bond protection. This
+preserves voluntary membership and equal decision opportunities. Analyses must
+therefore distinguish assignment to the covenant environment from the selected
+subset who affirm the pledge.
 
 ## Primary outcomes
 
@@ -79,9 +86,11 @@ expulsion and replacement separately.
    [EXP-029](../experiments/EXP-029-joint-commitment-common-setup-calibration/experiment.md)
    restored the common setup phase and treatment exposure, but all 128 observed
    decisions remitted. It was closed as a valid ceiling calibration.
-3. Revise the behavioral task before adding replicas. Preserve the matched
-   common setup, 7→21 allocation, audit schedule, and four treatment arms, but
-   introduce an individual temptation that creates observable retention without
-   changing the allocation by condition.
-4. Only after usable variation, run fixed-config same-seed replicas and, if
-   warranted, fresh-seed replication.
+3. Make group identity, pledge decisions, and covenant standing genuinely
+   observable through a shared read-only registry. Preserve the matched common
+   setup, 7→21 allocation, audit schedule, and four treatment arms.
+4. Run three fixed-config same-seed trajectories per arm before interpreting
+   the first ceiling observation as behavioral repeatability. If the first
+   three trajectories per arm still leave the primary outcomes saturated,
+   record a repeatable ceiling; otherwise use the observed variation to size a
+   fresh-seed comparison.

@@ -13,6 +13,15 @@ class ProviderState(NamedTuple):
     membership_in_good_standing: bool
 
 
+class PublicRegistryEntry(NamedTuple):
+    """One provider's institution-visible status without private action details."""
+
+    agent_id: str
+    membership_status: str
+    pledge_status: str
+    standing_status: str
+
+
 class ReserveDecision(NamedTuple):
     """One provider's private remittance and public report."""
 

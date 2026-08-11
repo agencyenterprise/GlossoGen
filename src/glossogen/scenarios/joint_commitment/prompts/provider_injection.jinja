@@ -21,9 +21,8 @@ providers to remit. Your action may later be selectively audited and resolved af
 {% if previous_attestations %}Previous-round public attestations were:
 {% for agent_id, attestation in previous_attestations.items() %}- {{ agent_id }}: {{ attestation }}
 {% endfor %}{% endif %}
-{% if pledge_enabled %}Your recorded pledge decision: {{ pledge_decision }}.
-Public setup record:
-{% for agent_id, decision in public_pledge_decisions.items() %}- {{ agent_id }}: {{ decision }}
+{% if group_enabled %}Public group registry:
+{% for entry in public_registry_entries %}- {{ entry.agent_id }}: {{ entry.membership_status }} | pledge: {{ entry.pledge_status }} | standing: {{ entry.standing_status }}
 {% endfor %}
 {% endif %}
 {% if bond_enabled %}

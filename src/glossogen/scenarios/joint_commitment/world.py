@@ -14,7 +14,12 @@ from glossogen.scenarios.joint_commitment.events import (
 )
 from glossogen.scenarios.joint_commitment.ids import PROVIDER_IDS
 from glossogen.scenarios.joint_commitment.knobs import JointCommitmentKnobs
-from glossogen.scenarios.joint_commitment.state import ProviderState, ReserveDecision, RoundOutcome
+from glossogen.scenarios.joint_commitment.state import (
+    ProviderState,
+    PublicRegistryEntry,
+    ReserveDecision,
+    RoundOutcome,
+)
 
 _AFFIRM = "affirm"
 _DECLINE = "decline"
@@ -73,6 +78,12 @@ class JointCommitmentWorld(ScenarioWorld):
             if provider.pledge_decision is not None
         }
 
+    def public_registry_entries(self) -> tuple[PublicRegistryEntry, ...]:
+        """Return the institution-visible provider registry for both providers."""
+        if not self._knobs.group_enabled:
+            return ()
+        return tuple(self._public_registry_entry(agent_id=agent_id) for agent_id in PROVIDER_IDS)
+
     def audit_selected_for_round(self, round_number: int) -> bool:
         """Return whether the frozen hidden audit schedule selects a round."""
         return round_number in self._audit_rounds
@@ -104,7 +115,7 @@ class JointCommitmentWorld(ScenarioWorld):
         return decision
 
     def post_bond(self, agent_id: str) -> int:
-        """Hold one covenant member's fixed personal bond in escrow."""
+        """Register one covenant member's fixed conditional bond."""
         if not self._knobs.bond_enabled:
             raise ValueError("this condition does not require a covenant bond")
         if agent_id not in self._providers:
@@ -143,7 +154,12 @@ class JointCommitmentWorld(ScenarioWorld):
         provider = self._providers[agent_id]
         if self._knobs.pledge_enabled and provider.pledge_decision is None:
             raise ValueError("record a pledge decision before acting")
-        if self._knobs.bond_enabled and provider.bond_posted == 0:
+        if (
+            self._knobs.bond_enabled
+            and provider.pledge_decision == _AFFIRM
+            and provider.bond_posted == 0
+            and provider.membership_in_good_standing
+        ):
             raise ValueError("post the covenant bond before acting")
         reserve_remitted = 0
         reserve_retained = self._knobs.client_reserve
@@ -230,7 +246,7 @@ class JointCommitmentWorld(ScenarioWorld):
                     bond_forfeited = provider.bond_posted
                     membership_in_good_standing = False
                     self._providers[agent_id] = ProviderState(
-                        earnings=provider.earnings,
+                        earnings=provider.earnings - bond_forfeited,
                         pledge_decision=provider.pledge_decision,
                         bond_posted=0,
                         bond_forfeited=provider.bond_forfeited + bond_forfeited,
@@ -258,6 +274,57 @@ class JointCommitmentWorld(ScenarioWorld):
                     )
                 )
         return events
+
+    def _public_registry_entry(self, agent_id: str) -> PublicRegistryEntry:
+        """Build one public status line without disclosing actions or balances."""
+        provider = self._providers[agent_id]
+        if not self._knobs.pledge_enabled:
+            return PublicRegistryEntry(
+                agent_id=agent_id,
+                membership_status="group participant",
+                pledge_status="not offered",
+                standing_status="not applicable",
+            )
+        if not self._knobs.bond_enabled:
+            pledge_status = "pending"
+            if provider.pledge_decision is not None:
+                pledge_status = provider.pledge_decision
+            return PublicRegistryEntry(
+                agent_id=agent_id,
+                membership_status="group participant",
+                pledge_status=pledge_status,
+                standing_status="not applicable",
+            )
+        if provider.pledge_decision == _DECLINE:
+            return PublicRegistryEntry(
+                agent_id=agent_id,
+                membership_status="outside covenant",
+                pledge_status="declined",
+                standing_status="not applicable",
+            )
+        if provider.pledge_decision == _AFFIRM and provider.membership_in_good_standing:
+            membership_status = "covenant membership pending"
+            if provider.bond_posted > 0:
+                membership_status = "active covenant member"
+            return PublicRegistryEntry(
+                agent_id=agent_id,
+                membership_status=membership_status,
+                pledge_status="affirmed",
+                standing_status="in good standing",
+            )
+        if provider.pledge_decision == _AFFIRM:
+            return PublicRegistryEntry(
+                agent_id=agent_id,
+                membership_status="former covenant member",
+                pledge_status="affirmed",
+                standing_status="revoked",
+            )
+        return PublicRegistryEntry(
+            agent_id=agent_id,
+            membership_status="covenant setup pending",
+            pledge_status="pending",
+            standing_status="not applicable",
+        )
 
     def restore_state_from_events(self, events: list[Any]) -> None:
         """Rebuild provider, decision, audit, and outcome state for resume behavior."""
@@ -316,7 +383,7 @@ class JointCommitmentWorld(ScenarioWorld):
                 self._resolved_audit_rounds.add(event.audited_round)
                 provider = self._providers[event.agent_id]
                 self._providers[event.agent_id] = ProviderState(
-                    earnings=provider.earnings,
+                    earnings=provider.earnings - event.bond_forfeited,
                     pledge_decision=provider.pledge_decision,
                     bond_posted=provider.bond_posted - event.bond_forfeited,
                     bond_forfeited=provider.bond_forfeited + event.bond_forfeited,
