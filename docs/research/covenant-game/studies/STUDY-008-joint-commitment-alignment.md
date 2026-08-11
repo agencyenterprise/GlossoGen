@@ -124,6 +124,10 @@ bundling them into this first human-parallel test.
    group/pledge/costly-pledge ladder is launched.
 9. [EXP-035](../experiments/EXP-035-framing-diagnostic/experiment.md) holds
    the allocation world and optional communication affordance constant while
-   varying only professional-service versus neutral-allocation language. It is
-   a calibration gate for the future institutional comparison, not a covenant
-   treatment test.
+   varying only professional-service versus neutral-allocation language. The
+   professional trajectories produced 38 `allocation_a` and 58
+   `allocation_b` decisions, while all 96 neutral decisions used
+   `allocation_a`. Agents in both arms inferred benefits absent from the world.
+   This closes the instrument as framing-sensitive, not as a covenant result:
+   the next revision must specify a real repeated strategic consequence before
+   group identity, pledge, or costly-pledge arms are meaningful.
