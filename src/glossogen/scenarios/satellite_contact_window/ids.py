@@ -1,8 +1,8 @@
 """Canonical identifier constants for the satellite contact window scenario.
 
 Centralizes agent IDs, channel IDs, role names, template filenames, and
-tool name lists so every module — the scenario, the world, evaluators, and
-server readers — refers to the same literals.
+tool name lists so every module (the scenario, the world, evaluators, and
+server readers) refers to the same literals.
 """
 
 TELEMETRY_OPERATOR_ID = "telemetry_operator"

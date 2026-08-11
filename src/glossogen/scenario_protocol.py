@@ -129,7 +129,7 @@ class SimulationScenario(ABC):
 
         Used by the web API to populate the per-agent model override UI
         before a simulation starts. Must not require a scenario instance, and
-        may receive a partial (or ``None``) knobs dict — read role-determining
+        may receive a partial (or ``None``) knobs dict, so read role-determining
         flags via ``resolve_bool_knob`` so missing values fall back to the
         model's declared defaults.
         """
@@ -150,7 +150,7 @@ class SimulationScenario(ABC):
 
         Reads ``field_name`` from ``knobs`` when present, otherwise falls back
         to the knobs model's declared default. When the field is required (no
-        declared default), falls back to ``False`` — the baseline layout shown
+        declared default), falls back to ``False``, the baseline layout shown
         before a run is configured. Lets ``get_agent_roles`` branch on
         role-determining flags without hardcoding a default that could drift
         from the model.
@@ -332,8 +332,9 @@ class SimulationScenario(ABC):
         return False
 
     def get_early_round_end_trigger(self) -> str | None:
-        """Return a trigger string when the current round has decisively ended,
-        or None if the round should continue.
+        """Return a trigger string when the round has decisively ended, else None.
+
+        A trigger ends the round; None lets it continue.
 
         The game clock checks this each iteration (outside the postmortem phase)
         and, when a non-None value is returned, immediately emits a
@@ -384,7 +385,7 @@ class SimulationScenario(ABC):
         Measurement per channel (suffixed by ``team_id`` for multi-team
         scenarios); the language-emergence judges treat every returned channel
         as primary. Return an empty list only when the scenario genuinely has
-        no channel evaluators should score — that silently skips every
+        no channel evaluators should score. That silently skips every
         primary-channel metric.
         """
         ...
@@ -398,7 +399,7 @@ class SimulationScenario(ABC):
         primary-channel messages with a scenario-rendered ground-truth
         block describing the round's case and agent information
         asymmetry. The open-coding and feature-presence metrics consume
-        these views directly — the metric code never branches on
+        these views directly, so the metric code never branches on
         scenario.
 
         The default returns ``[]``, which causes both metrics to skip
@@ -494,7 +495,7 @@ class SimulationScenario(ABC):
         Single-team scenarios return a one-element list with
         ``team_id=None``. Multi-team scenarios return one result per
         team. Return an empty list only when the scenario genuinely has
-        no per-round success criterion — that emits no
+        no per-round success criterion, which emits no
         ``RoundResultRecorded`` events and the generic metrics produce no
         Measurement for the run.
         """
@@ -516,7 +517,7 @@ class SimulationScenario(ABC):
 
         Returns ``None`` when no boundary exists, in which case the
         ``protocol_learned_after_swap`` metric skips with no Measurement.
-        Only the FIRST boundary in the run is reported — multi-swap
+        Only the FIRST boundary in the run is reported. Multi-swap
         runs surface later boundaries via the JSONL directly.
         """
         _ = agent_configs
@@ -560,8 +561,10 @@ class SimulationScenario(ABC):
 
     @classmethod
     def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:
-        """Return channel IDs whose ``send_message``/``read_channel`` traffic
-        should be stripped from a replaced agent's reconstructed tool history.
+        """Return channel IDs to strip from a replaced agent's tool history.
+
+        Their ``send_message`` and ``read_channel`` traffic is removed from the
+        reconstructed history.
 
         Used by the replace-agent flow to hide scenario-private channels
         (e.g. a discussion/postmortem channel) from the new agent so it

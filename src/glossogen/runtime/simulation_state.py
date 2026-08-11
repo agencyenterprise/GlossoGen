@@ -2,7 +2,7 @@
 
 Holds channel state, per-agent notification queues, per-channel write locks,
 per-agent tool authorization allowlists, world context, and event logging.
-Does not define MCP tools — those live in ``mcp_tools``.
+Does not define MCP tools; those live in ``mcp_tools``.
 """
 
 import asyncio
@@ -90,8 +90,8 @@ class SimulationRuntime:
     def simulation_start_time(self) -> datetime:
         """UTC time the simulation began, used to express message times as elapsed seconds.
 
-        Set once at construction — to ``now`` on a fresh run, or to the original
-        run's ``SimulationStarted`` timestamp on resume — so elapsed values stay
+        Set once at construction: to ``now`` on a fresh run, or to the original
+        run's ``SimulationStarted`` timestamp on resume, so elapsed values stay
         anchored to the same origin across a resume boundary.
         """
         return self._simulation_start_time

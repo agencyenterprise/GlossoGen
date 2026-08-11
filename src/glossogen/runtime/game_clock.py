@@ -1,7 +1,7 @@
 """Game clock that manages round progression, injection delivery, and termination.
 
 Runs as an asyncio task inside the simulation runtime process. Rounds are an
-internal concept — agents never see "round N started." Instead they receive
+internal concept. Agents never see "round N started." Instead they receive
 new information (injections) as if the world is evolving around them.
 """
 
@@ -76,7 +76,7 @@ class GameClock:
         """True when every agent is blocked on read_notifications with empty queues.
 
         Also requires that no agent has any non-blocking tool call in
-        flight (``active_non_blocking_calls == 0``) — pydantic-ai
+        flight (``active_non_blocking_calls == 0``). Pydantic-ai
         dispatches parallel tool calls, so a ``read_notifications`` can
         flip ``is_idle`` to True while the same agent's parallel
         ``send_message`` is still mid-execution; ending the round in
@@ -169,7 +169,7 @@ class GameClock:
         On a fresh-start simulation the boundary hook is fired inline by
         ``_advance_round`` after each ``RoundAdvanced``. On resume, the
         initial round was already advanced in the source so
-        ``start_initial_round`` cannot fire the hook — agent runners
+        ``start_initial_round`` cannot fire the hook, because agent runners
         don't exist yet, and ``execute_agent_swap`` requires a runner to
         drain. The supervisor calls this method after launching runners
         so any ``scheduled_events`` at ``round_start`` can fire against

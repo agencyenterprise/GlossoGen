@@ -1,13 +1,13 @@
 """Procedural per-round case generation for the container_yard_stacking scenario.
 
 Each round a batch of containers arrives in the yard's intake slots; each
-must be relocated to an assigned target bay. A container has no ID — it is a
+must be relocated to an assigned target bay. A container has no ID. It is a
 bundle of attributes (colour, size, type, marking). The full batch is known
 at round start: the spotter sees each container's attributes and intake slot,
 the planner sees each container's attributes and target bay, the crane sees
 only slot occupancy. Neither describer alone holds both a container's intake
 slot and its target bay, so the team must join their reports on the
-container's attributes — under a per-round-resampled assignment that cannot
+container's attributes, under a per-round-resampled assignment that cannot
 be memorized.
 
 Each round is built from an independent per-round RNG seeded from

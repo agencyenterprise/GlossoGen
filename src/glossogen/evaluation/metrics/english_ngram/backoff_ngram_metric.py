@@ -12,7 +12,7 @@ English-like.**
 
 Scores the **pristine** text the sender composed (resolved via the
 ``message_id`` link) rather than the channel-delivered text, so noise transforms
-do not contaminate the signal. Deterministic — does not consult the LLM provider.
+do not contaminate the signal. Deterministic: it does not consult the LLM provider.
 """
 
 import asyncio
@@ -172,7 +172,7 @@ def _score_all_rounds(rounds: list[RoundMessages]) -> list[RoundSurprisal]:
 def _score_messages(model: BackoffTrigramModel, texts: list[str]) -> list[float]:
     """Return mean per-character surprisal in nats for each input text.
 
-    Drops scores that come back as NaN — a message with no scorable characters
+    Drops scores that come back as NaN. A message with no scorable characters
     (e.g. all whitespace) yields NaN, and serializing NaN to JSON yields
     ``null`` which fails Pydantic validation downstream.
     """

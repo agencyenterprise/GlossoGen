@@ -77,7 +77,7 @@ class GlossoGenOAuthProvider:
         """Persist a dynamically registered OAuth client.
 
         The MCP SDK's registration handler has already assigned the
-        ``client_id``, the issued-at timestamp, and a ``client_secret`` —
+        ``client_id``, the issued-at timestamp, and a ``client_secret``,
         the latter only when ``token_endpoint_auth_method`` is not
         ``"none"``. Public clients (PKCE-only loopback clients such as
         Claude Code) register with ``token_endpoint_auth_method == "none"``

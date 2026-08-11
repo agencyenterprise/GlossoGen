@@ -5,7 +5,7 @@ to the park ranger, and ``evacuate`` to civil defense. ``open_gates``,
 ``notify_park``, and ``evacuate`` record the agent's decision on the world
 (the operator's gate setting is last-call-wins; the ranger and civil defense
 commits are monotonic) and log a JSONL event. None of the tool results
-reveals another agent's private information — in particular ``open_gates``
+reveals another agent's private information. In particular ``open_gates``
 never echoes the resulting reservoir level, which would leak the inflow only
 civil defense knows.
 """

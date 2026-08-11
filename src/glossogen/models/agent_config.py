@@ -1,4 +1,13 @@
-"""Pydantic model defining the configuration schema for a single agent in a simulation."""
+"""The two views of an agent, before and after a scenario is built.
+
+``AgentRole`` is just an id and a display name, available from the scenario class
+without constructing it. The API uses it to show who will take part before a run
+exists.
+
+``AgentConfig`` is the full definition handed to a runner: the rendered system
+prompt, which channels and tools the agent may touch, and which model answers for
+it. Per-agent model overrides are already resolved by the time one is built.
+"""
 
 from typing import NamedTuple
 

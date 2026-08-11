@@ -111,7 +111,7 @@ def build_agent_defs(
     postmortem_initially_active: bool,
     agent_display_names: dict[str, str],
 ) -> list[AgentDef]:
-    """Return the agent definition list — 3 single-team, 4 with intern, 6 two-team."""
+    """Return the agent definition list: 3 single-team, 4 with intern, 6 two-team."""
     if knobs.two_teams:
         return [
             *_agent_defs_for_team(

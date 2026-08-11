@@ -1,6 +1,6 @@
 # Scenario: Spillway Release
 
-Three agents jointly manage a reservoir each round: keep the dam from collapsing **and** from draining to shortage, without ever sending a gate release down the river while the downstream hiking park is occupied. The information needed to act is split three ways, so the team must coordinate over a shared, communication-budgeted channel every round. Scoring is fully deterministic — there is no LLM judge.
+Three agents jointly manage a reservoir each round: keep the dam from collapsing **and** from draining to shortage, without ever sending a gate release down the river while the downstream hiking park is occupied. The information needed to act is split three ways, so the team must coordinate over a shared, communication-budgeted channel every round. Scoring is fully deterministic; there is no LLM judge.
 
 ## Agents
 

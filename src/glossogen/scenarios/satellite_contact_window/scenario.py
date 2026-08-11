@@ -1,8 +1,8 @@
 """Satellite contact window simulation scenario.
 
-Three agents — a telemetry operator with live satellite readings, a
+Three agents (a telemetry operator with live satellite readings, a
 subsystem engineer with the live command resolver, and a flight director
-with the live authorization envelope — coordinate over a shared comm link
+with the live authorization envelope) coordinate over a shared comm link
 to recover a satellite during each contact window. The same telemetry
 pattern can require different command sequences depending on the
 satellite's mode, power state, thermal state, and what is authorized

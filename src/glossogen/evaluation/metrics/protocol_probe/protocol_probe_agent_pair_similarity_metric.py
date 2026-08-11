@@ -119,7 +119,7 @@ def _build_group(
     """Compute the agent×agent mean-similarity matrix for one group.
 
     Returns ``None`` when fewer than two agents matched the role filter
-    for this (question, cutoff) — single-team runs and incomplete probe
+    for this (question, cutoff): single-team runs and incomplete probe
     passes.
     """
     if len(rows_by_agent) < 2:

@@ -7,8 +7,8 @@ submissions. The world is mutated by the one scenario tool: a viewer calls
 (snapshotting its character count) once the submission requirement is met (one
 member, or both under ``all_must_submit``). The LLM judge then scores every
 submitted answer and ``record_team_verdict`` stores the combined verdict. At
-round end the world scores every team — correctness gate, then
-fewest-characters-wins — and reveals each team's result on its link channel.
+round end the world scores every team: correctness gate, then
+fewest-characters-wins, and reveals each team's result on its link channel.
 
 Heavy logic lives in dedicated sibling modules: :mod:`world_state` (the
 ``TeamState`` / ``DiffOutcome`` types and the round-scoring function) and
@@ -241,7 +241,7 @@ class SpotTheDifferenceWorld(ScenarioWorld):
 
         In isolated / solo mode the link channel is the team's own, so the update
         posts there. Under a shared link the channel is visible to the opposing
-        team, so the update is pushed privately to each team member instead — the
+        team, so the update is pushed privately to each team member instead, because the
         opponent sees the team's link messages but not its budget / lock / result.
         """
         if self._shared_link:
@@ -379,7 +379,7 @@ def _team_done(team: TeamState) -> bool:
     ending the round on the lock (or on the budget flag) would score the round
     before the verdict lands and record a stale ``found_count`` of 0. A team
     that has not locked is done when it exhausts its character budget (it can no
-    longer win) — under ``all_must_submit`` this also covers a team where only
+    longer win). Under ``all_must_submit`` this also covers a team where only
     one member ever submits.
     """
     if team.team_locked:

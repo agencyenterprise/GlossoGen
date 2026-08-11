@@ -1,4 +1,15 @@
-"""Shared base models for scenario knobs."""
+"""The knobs every scenario has, whatever it simulates.
+
+Each scenario defines its own knobs model extending ``BaseKnobs``, so it only
+declares what is specific to it. Round count, phase durations, per-agent model
+overrides, scheduled in-run swaps and history compaction all live here and work
+the same everywhere.
+
+The four fields with no default are the ones a run cannot be described without:
+round count, round duration, the per-agent model map, and the per-round
+communication budget. Everything else has a default that suits a scenario not
+using that feature.
+"""
 
 from pydantic import BaseModel, ConfigDict, Field
 

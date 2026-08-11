@@ -4,7 +4,7 @@ For a replace-agent run, three streams shape the new agent's first
 ``agent.run()`` call:
 
 1. The pydantic-ai system prompt configured on the ``Agent`` instance
-   (rendered from the *new* scenario knobs — so e.g. the discussion-phase
+   (rendered from the *new* scenario knobs, so the discussion-phase
    section is gone when ``postmortem_disabled_at_start=True``).
 2. The reconstructed message history passed as ``message_history`` —
    built by ``build_message_history`` with ``tool_calls_only=True`` and

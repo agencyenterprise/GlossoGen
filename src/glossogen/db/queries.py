@@ -181,7 +181,7 @@ async def list_children_of_run(
 
     A run is a child if its ``source_run_scenario`` / ``source_run_dir_name``
     columns match the parent. Covers ``replace-agent``, ``resume-at-round``,
-    and ``cross-run-replace-agent`` (source A) derivations — all three
+    and ``cross-run-replace-agent`` (source A) derivations: all three
     register through ``_register_derived_run`` with the timeline parent.
     """
     async with conn.cursor() as cur:
@@ -357,8 +357,8 @@ async def update_run_evaluation_content_hash(
     """Persist the digest of the last ``PUT /evaluation`` for a run.
 
     Called by the eval PUT handler immediately after ``write_report``. The
-    ``group_id`` scope is defensive — the row's identity is already
-    ``(scenario, run_dir_name)`` unique — so an UPDATE against a row
+    ``group_id`` scope is defensive. The row's identity is already
+    ``(scenario, run_dir_name)`` unique, so an UPDATE against a row
     belonging to another group is a no-op instead of a cross-tenant leak.
     An UPDATE that matches zero rows (e.g. a run only present on the
     filesystem, missed by the runs index) is not an error; the sync tool

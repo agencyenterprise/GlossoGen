@@ -5,7 +5,7 @@ full message history is re-sent on every model request, so two always-on
 transforms shrink it without losing information the agent still holds:
 
 1. Dedup ``read_channel`` messages already delivered in an earlier ``read_channel``
-   result — each channel message survives only in its earliest read.
+   result: each channel message survives only in its earliest read.
 2. Drop empty ``read_notifications`` poll round-trips (``no_activity``), which carry
    no signal but accumulate in the hundreds.
 

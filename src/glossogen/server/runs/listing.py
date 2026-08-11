@@ -100,8 +100,10 @@ def _decode_cursor(cursor: str) -> _KeysetKey | None:
 
 
 class PaginatedRuns(NamedTuple):
-    """One page of run summaries, the total matching the filters, and the
-    keyset cursor for the following page (``None`` when this is the last page)."""
+    """One page of run summaries.
+
+    Carries the total matching the filters and the keyset cursor for the next
+    page, which is ``None`` on the last page."""
 
     runs: list[RunSummary]
     total: int

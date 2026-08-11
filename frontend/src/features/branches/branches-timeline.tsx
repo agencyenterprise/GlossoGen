@@ -250,7 +250,7 @@ export function BranchesTimeline({ runId }: { runId: string }) {
 
                 return (
                   <div key={msg.message_id} className="contents">
-                    {/* Left column — message card */}
+                    {/* Left column: message card */}
                     <div className="mb-2 pr-2">
                       <div className="rounded-md border border-border px-3 py-2 transition-colors">
                         {/* Agent + channel + time */}
@@ -301,14 +301,14 @@ export function BranchesTimeline({ runId }: { runId: string }) {
                       </div>
                     </div>
 
-                    {/* Center column — trunk line + dot */}
+                    {/* Center column: trunk line + dot */}
                     <div className="relative mb-2 flex justify-center">
                       {/* Continuous vertical line behind the dot */}
                       <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border" />
                       <div className="relative z-10 mt-2.5 h-2.5 w-2.5 rounded-full bg-border" />
                     </div>
 
-                    {/* Right column — branches attach at round separators, not messages */}
+                    {/* Right column: branches attach at round separators, not messages */}
                     <div className="mb-2 pl-2" />
                   </div>
                 );

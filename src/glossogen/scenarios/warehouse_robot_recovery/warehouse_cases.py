@@ -19,7 +19,7 @@ class RobotFault(NamedTuple):
 
     ``recovery_template`` has ``{wait_seconds}``, ``{intensity}`` and
     ``{surface}`` placeholders. Values are filled in from the round's
-    ``RecoveryParameters`` — never by the robotics engineer.
+    ``RecoveryParameters``, never by the robotics engineer.
     """
 
     name: str

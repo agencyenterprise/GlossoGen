@@ -1,7 +1,7 @@
 """Foundation types shared by every event subclass.
 
 ``EventBase`` is the Pydantic base every concrete event subclasses. It
-intentionally does NOT declare ``event_type`` — every concrete subclass
+intentionally does NOT declare ``event_type``. Every concrete subclass
 declares its own ``event_type: Literal[...]`` so the discriminated-union
 JSONL parser dispatches correctly. Declaring it on the base would force
 every override to fight pyright's invariant-override check.

@@ -35,7 +35,7 @@ class ProtocolProbeOutput(BaseModel):
 class ProtocolProbeResponse(BaseModel):
     """One row in ``protocol_probe_responses.jsonl``.
 
-    The rendered prompt text is intentionally not stored — it can always be
+    The rendered prompt text is intentionally not stored. It can always be
     reconstructed from ``question_id`` plus the test bank file and the
     Jinja2 templates.
     """

@@ -145,7 +145,7 @@ def collect_source_agents(
 
     Filters to events whose timestamp is at or before
     ``boundary_timestamp`` so resuming a multi-swap source picks up each
-    agent's model/system_prompt as it was at the chosen boundary — not
+    agent's model/system_prompt as it was at the chosen boundary, not
     a later in-run swap registration that overwrote it.
     """
     out: dict[str, AgentRegistered] = {}
@@ -230,7 +230,7 @@ def _validate_replacement_payload(request: ReplaceAgentRequest) -> None:
     Every channel named in ``channel_history_floors`` must also appear in
     ``channels_with_visible_history`` (a windowed channel is still a
     visible channel), and each floor must satisfy ``1 <= floor <= round_start``
-    (``floor == round_start`` yields zero prior history — the no-history window).
+    (``floor == round_start`` yields zero prior history, the no-history window).
     """
     if request.replaced_agent_id is None:
         misset = [

@@ -2,7 +2,7 @@
 
 Holds OAuth clients, authorization codes, access/refresh tokens, and parked
 consent requests in process-local dicts. Tokens do not survive a server
-restart — acceptable for single-user local development, where the MCP client
+restart, which is acceptable for single-user local development, where the MCP client
 simply re-authenticates. Prod uses the Postgres-backed
 :class:`~glossogen.server.mcp.oauth_storage.OAuthStorage` instead.
 
@@ -169,7 +169,7 @@ class InMemoryOAuthStorage:
         """Drop expired authorization codes and tokens.
 
         In-memory state dies with the process, so this reclaims nothing across
-        restarts — it exists so both storage implementations satisfy the port
+        restarts. It exists so both storage implementations satisfy the port
         and the startup purge behaves the same in local and Clerk mode.
 
         The three stores wrap their payload under different names

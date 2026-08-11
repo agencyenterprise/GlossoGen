@@ -57,7 +57,7 @@ Add to your `.env` file:
 OLLAMA_BASE_URL="http://localhost:11434/v1"
 ```
 
-The `/v1` suffix is required — Pydantic AI uses the OpenAI-compatible endpoint.
+The `/v1` suffix is required, because Pydantic AI uses the OpenAI-compatible endpoint.
 
 ### Run a Simulation
 

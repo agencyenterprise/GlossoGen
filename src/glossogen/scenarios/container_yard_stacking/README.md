@@ -1,37 +1,37 @@
 # Scenario: Container Yard Stacking
 
-Three agents — a yard **spotter** who can read inbound containers' attributes and see their intake slots, a logistics **planner** who holds each container's target bay, and a **crane operator** who runs the crane from a cab and is blind to container attributes — coordinate over a shared link channel to sort each round's batch of inbound containers into their assigned bays. Containers carry no ID numbers: each is identified only by its visible attributes (colour, size, type, marking). The crane can move a container from any slot to any slot but cannot tell the containers apart, so a placement only happens when the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) are matched on the container's attributes. The assignment is drawn fresh every round, so it can never be memorized — and every character on the link channel costs one second of a fixed inspection window, so the team must compress a high-entropy, ambiguity-prone message under a binding budget.
+Three agents (a yard **spotter** who can read inbound containers' attributes and see their intake slots, a logistics **planner** who holds each container's target bay, and a **crane operator** who runs the crane from a cab and is blind to container attributes) coordinate over a shared link channel to sort each round's batch of inbound containers into their assigned bays. Containers carry no ID numbers: each is identified only by its visible attributes (colour, size, type, marking). The crane can move a container from any slot to any slot but cannot tell the containers apart, so a placement only happens when the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) are matched on the container's attributes. The assignment is drawn fresh every round, so it can never be memorized, and every character on the link channel costs one second of a fixed inspection window, so the team must compress a high-entropy, ambiguity-prone message under a binding budget.
 
-This is a deliberate contrast to a one-shot "point at a visible object" task: because no single agent holds both a container's current slot and its destination, and because the crane cannot perceive attributes, the team must develop a **shared, compact code for attribute bundles** that survives the join — a genuine protocol-discovery problem rather than plain description.
+This is a deliberate contrast to a one-shot "point at a visible object" task: because no single agent holds both a container's current slot and its destination, and because the crane cannot perceive attributes, the team must develop a **shared, compact code for attribute bundles** that survives the join, a genuine protocol-discovery problem rather than plain description.
 
 ## Domain
 
 A single **yard** of `yard_slot_count` slots (default 28), numbered from 1. Each round a **batch** of `batch_size` containers (default drawn from 8–12) arrives in distinct **intake slots**; each must be relocated to a distinct empty **target bay**. Intake slots and target bays are disjoint, so every relocation is an independent intake→bay move with no blockers and no ordering constraint.
 
-Each container is an attribute bundle — no ID:
+Each container is an attribute bundle, with no ID:
 
 - `colour` (8 values): red, blue, green, yellow, black, white, orange, teal
 - `size` (3): small, medium, large
 - `type` (6): standard, reefer, tank, flatrack, opentop, insulated
 - `marking` (4): plain, hazmat, fragile, priority
 
-Container bundles are distinct within a round, so a full description always identifies a container — but a full bundle is long, and the budget rewards compressing it. The whole batch is known at round start (no per-step reveal).
+Container bundles are distinct within a round, so a full description always identifies a container, but a full bundle is long, and the budget rewards compressing it. The whole batch is known at round start (no per-step reveal).
 
 ## Agents
 
 ### Yard Spotter
 
-Sees every inbound container's full attribute bundle and the intake slot it sits in. Does not see any target bay. Has no action tool — reports the batch on the link channel (`send_message` only).
+Sees every inbound container's full attribute bundle and the intake slot it sits in. Does not see any target bay. Has no action tool, so it reports the batch on the link channel (`send_message` only).
 
 ### Logistics Planner
 
-Holds the stowage assignment: every inbound container, identified by its attributes, paired with the target bay it must end up in. Does not see where any container currently sits (the intake slots) or the physical row. Has no action tool — reports the assignment on the link channel (`send_message` only).
+Holds the stowage assignment: every inbound container, identified by its attributes, paired with the target bay it must end up in. Does not see where any container currently sits (the intake slots) or the physical row. Has no action tool, so it reports the assignment on the link channel (`send_message` only).
 
 ### Crane Operator
 
-Works from the cab: sees which slots are occupied and which are empty, and is the only agent that can move a container. **Blind to container attributes** — cannot tell the containers apart by sight, so it must match the spotter's and planner's reports to work out each move.
+Works from the cab: sees which slots are occupied and which are empty, and is the only agent that can move a container. **Blind to container attributes**, so it cannot tell the containers apart by sight, so it must match the spotter's and planner's reports to work out each move.
 
-The three-way information split means no agent can act alone: the spotter knows *which container is where*, the planner knows *where each container goes*, and only the crane can move — but the crane needs both reports, joined on the container's attributes, to turn an intake slot into a correct destination.
+The three-way information split means no agent can act alone: the spotter knows *which container is where*, the planner knows *where each container goes*, and only the crane can move, but the crane needs both reports, joined on the container's attributes, to turn an intake slot into a correct destination.
 
 ## Channels
 
@@ -85,15 +85,15 @@ The same canonical seed (`42` per `CLAUDE.md`) produces the same sequence of cas
 
 ## Why This Requires a Real Protocol
 
-The difficulty is information-theoretic, not incidental. The message the team must move each round is high-entropy (a whole batch), the references are ambiguity-prone (a long attribute bundle per container), the answer is re-keyed every round (no memorization), and the budget binds (the full-English description of the batch overflows the window). To win, the team must converge on a **compact shared code for attribute bundles** so the spotter's report and the planner's assignment can be joined by the (attribute-blind) crane. Plain natural-language description does not fit the budget at scale, so a genuine emergent compression protocol has to develop over rounds — exactly what the language metrics target, and a sharp contrast with one-shot reference tasks where round 1 already succeeds.
+The difficulty is information-theoretic, not incidental. The message the team must move each round is high-entropy (a whole batch), the references are ambiguity-prone (a long attribute bundle per container), the answer is re-keyed every round (no memorization), and the budget binds (the full-English description of the batch overflows the window). To win, the team must converge on a **compact shared code for attribute bundles** so the spotter's report and the planner's assignment can be joined by the (attribute-blind) crane. Plain natural-language description does not fit the budget at scale, so a genuine emergent compression protocol has to develop over rounds, exactly what the language metrics target, and a sharp contrast with one-shot reference tasks where round 1 already succeeds.
 
 ## Budget and Failure Mechanics
 
-The world counts characters on the link channel only — postmortem is free. Notifications fire at 75% (`CRITICAL`) and 100% (`COMMUNICATION BUDGET EXCEEDED`, which also fails the round). Terminal-failure paths: a `move_container` naming the wrong source container or wrong bay; the budget being exhausted; or all agents going idle before the batch is placed (`all_agents_idle`, reported as `INCOMPLETE`). A round succeeds only if every container is placed correctly within the window. Structurally impossible moves are soft rejects the crane can retry.
+The world counts characters on the link channel only; postmortem is free. Notifications fire at 75% (`CRITICAL`) and 100% (`COMMUNICATION BUDGET EXCEEDED`, which also fails the round). Terminal-failure paths: a `move_container` naming the wrong source container or wrong bay; the budget being exhausted; or all agents going idle before the batch is placed (`all_agents_idle`, reported as `INCOMPLETE`). A round succeeds only if every container is placed correctly within the window. Structurally impossible moves are soft rejects the crane can retry.
 
 ## Evaluation
 
-Zero scenario-specific metrics — every measurement comes from the platform registry via these hooks:
+Zero scenario-specific metrics: every measurement comes from the platform registry via these hooks:
 
 - `judge_round_result` → `round_success` (and `round_success_after_resume`); two-team mode emits `round_success_team_a` / `round_success_team_b`.
 - `build_communication_rounds` → joins link messages with the per-round batch assignment (spotter view, planner view, crane occupancy) for `communication_open_coding`, `communication_feature_presence`, and `protocol_learned_after_swap`.

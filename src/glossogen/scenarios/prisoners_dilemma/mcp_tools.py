@@ -4,7 +4,7 @@
 the current round. Once both players have called it, the round resolves
 immediately: payoffs are computed from the configured payoff matrix and
 announced on the link channel. There is no LLM judge anywhere in this
-path — the decision is a strict enum argument and the payoff is pure
+path: the decision is a strict enum argument and the payoff is pure
 arithmetic.
 """
 

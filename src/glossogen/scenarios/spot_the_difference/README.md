@@ -1,7 +1,7 @@
 # spot_the_difference
 
 Reconstruction-from-split-data scenario. Each team has two symmetric **viewers**:
-the left viewer sees scene A, the right viewer sees scene B — two near-identical
+the left viewer sees scene A, the right viewer sees scene B, two near-identical
 scenes of objects (a shape with a size and color). The environment plants exactly
 **K** differences in scene B from a fixed taxonomy (attribute changed, object
 moved, object added, object removed). Neither viewer sees the other scene or the
@@ -13,7 +13,7 @@ than a serialize-and-diff dump:
 
 - **Duplicates.** The attribute vocabulary is small (4 shapes × 4 colors × 2
   sizes), so at the scene sizes used here identical objects recur. A bundle does
-  not identify an object — position does. Generation still guarantees each round
+  not identify an object; position does. Generation still guarantees each round
   is **solvable** and re-draws until it is:
   - *Uniquely decodable* — the residual objects (present in exactly one scene)
     have a single minimum-edit explanation, so the same pair of scenes can't be
@@ -30,7 +30,7 @@ than a serialize-and-diff dump:
 - **Optional character budget.** `round_time_budget_seconds` is an optional hard
   cap: when positive, every character a team sends on the link channel counts
   against it and exceeding it makes the team ineligible for the round. The
-  default is `-1` (no cap) — the competitive fewest-characters-wins objective
+  default is `-1` (no cap), since the competitive fewest-characters-wins objective
   already pressures teams to stay terse.
 
 ## Task & scoring
@@ -41,7 +41,7 @@ than a serialize-and-diff dump:
   `prompts/difference_judge.jinja`, haiku): it judges each item on its own,
   without using the ground truth as a decoding key, and **rejects** any item
   whose object, position, or change is carried only by codes, coordinates, or
-  invented shorthand — so the compression pressure stays on the link chat, not
+  invented shorthand, so the compression pressure stays on the link chat, not
   the submission. Ambiguous items (attributes shared by several objects with no
   position) and items matching no real difference are false positives.
 - **Gate:** a team is eligible only if it identifies every difference, with no

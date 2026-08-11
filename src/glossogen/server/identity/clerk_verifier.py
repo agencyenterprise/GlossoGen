@@ -8,7 +8,7 @@ the Clerk dashboard so verification stays networkless.
 Clerk session tokens come in two shapes:
 
 * **v2** (current default for new apps): org claims live under the nested
-  ``o`` object — ``o.id`` (org id), ``o.slg`` (org slug), ``o.rol``, etc.
+  ``o`` object: ``o.id`` (org id), ``o.slg`` (org slug), ``o.rol``, etc.
 * **v1** (legacy): flat ``org_id`` / ``org_slug`` claims at the top level.
 
 This verifier reads both shapes so it works regardless of which token
@@ -17,7 +17,7 @@ version the Clerk instance is configured to mint.
 The active org is the only source of truth for membership. Multi-org
 users are handled by Clerk's ``organizationSyncOptions`` on the frontend
 middleware, which activates the URL's org for the current request before
-the token is minted — see ``frontend/src/proxy.ts``.
+the token is minted; see ``frontend/src/proxy.ts``.
 """
 
 import logging

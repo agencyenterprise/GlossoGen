@@ -20,7 +20,7 @@ class ReplaceManifest(BaseModel):
     scripts read it to reconstruct what the replacement saw and which rounds
     were played after the swap.
 
-    ``replaced_agent_id`` is ``None`` for a round-anchored resume — every
+    ``replaced_agent_id`` is ``None`` for a round-anchored resume, where every
     agent keeps its full reconstructed history and no model/provider override
     is applied. ``replacement_model`` and ``replacement_provider`` are ``None``
     in the same case, and ``channels_with_visible_history`` /

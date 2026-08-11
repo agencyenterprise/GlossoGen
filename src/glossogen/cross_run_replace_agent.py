@@ -1,7 +1,7 @@
 """Core implementation of the cross-run replace-agent operation.
 
-Imports one agent — with its full pydantic-ai history (text, thinking,
-tool calls) — from a different completed run (``Sim B``) into a target
+Imports one agent, with its full pydantic-ai history (text, thinking,
+tool calls), from a different completed run (``Sim B``) into a target
 run (``Sim A``) at a chosen round boundary, and resumes the simulation.
 The target run's other agents continue with their full Sim A history.
 
@@ -125,7 +125,7 @@ def _compute_blocked_tool_call_channels(
 
     Combines the scenario's default blocked channels (e.g. veyru's
     postmortem) with any channel the imported agent had in Sim B that
-    does not exist in Sim A — those tool calls would reference channel
+    does not exist in Sim A, because those tool calls would reference channel
     IDs the live MCP server does not recognize.
     """
     scenario_blocked = scenario_cls.get_replace_agent_blocked_tool_call_channels()

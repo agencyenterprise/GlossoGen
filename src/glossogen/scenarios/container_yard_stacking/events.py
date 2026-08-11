@@ -1,6 +1,6 @@
 """Pydantic event types specific to the container_yard_stacking scenario.
 
-A container carries no ID — it is a bundle of attributes. Each round a batch
+A container carries no ID. It is a bundle of attributes. Each round a batch
 of containers arrives in intake slots and must be relocated to assigned
 target bays. The event log serializes the per-round ground truth (the
 occupancy row and the batch assignment) plus the deterministic verdict on

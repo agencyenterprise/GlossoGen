@@ -50,7 +50,7 @@ class VeyruCase(NamedTuple):
     """A single Veyru failure case presented per round.
 
     Composite cases have multiple stages, each corresponding to a single
-    failure motif. Symptoms are revealed one stage at a time — the next
+    failure motif. Symptoms are revealed one stage at a time. The next
     stage's symptoms appear only after the current stage is stabilized.
     The stellar reading shifts the treatment mapping and modifies physical
     parameters for this round.
@@ -68,7 +68,7 @@ class FailureMotif(NamedTuple):
 
     ``judge_procedure_template`` has ``{hold_duration}``, ``{starting_face}``
     and ``{intensity_level}`` placeholders. Those are filled in from the
-    round's ``StellarReading`` — never by the stabilization engineer.
+    round's ``StellarReading``, never by the stabilization engineer.
     """
 
     name: str
@@ -346,9 +346,9 @@ _INTENSITY_LEVELS: list[str] = ["gentle", "moderate", "firm"]
 def get_stellar_treatment_mapping(stellar_reading: StellarReading) -> list[StellarMapping]:
     """Build the full 14-entry symptom-to-action lookup for one round.
 
-    Each entry maps a symptom motif to the fully rendered procedure text —
-    with hold_duration, starting_face, and intensity_level already substituted
-    — that the stabilization engineer should relay to the observer.
+    Each entry maps a symptom motif to the fully rendered procedure text,
+    with hold_duration, starting_face, and intensity_level already substituted,
+    which the stabilization engineer should relay to the observer.
     """
     pool_size = len(FAILURE_MOTIFS)
     return [
@@ -465,7 +465,7 @@ class _AddendumEntryPayload(BaseModel):
     the engineer can match the observer's description to a motif AND apply
     its procedure. Decoys (motifs that aren't the actual case) share the
     same shape, so the engineer can't tell decoys from the real motif
-    structurally — they have to match symptoms.
+    structurally. They have to match symptoms.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -492,7 +492,7 @@ class InjectCasePayload(BaseModel):
     drives the engineer's per-round symptom→motif glossary and adds rows to
     their stellar-mapping table. When ``engineer_addendum`` is empty the
     engineer falls back to seeing just one extra row (the case's primary
-    motif → procedure) without symptom training — useful when the goal is
+    motif → procedure) without symptom training. Useful when the goal is
     a pure-novelty pressure test.
     """
 

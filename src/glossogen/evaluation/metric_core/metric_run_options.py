@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 class MetricRunOptions(BaseModel):
     """Options threaded through ``scenario.run_evaluation`` into each metric factory.
 
-    Carries flags only some metrics consume — most factories ignore the
+    Carries flags only some metrics consume. Most factories ignore the
     value and instantiate their metric with no constructor arguments.
     Every field is optional; the factory of any metric that requires a
     given option raises when the user has not supplied it. The

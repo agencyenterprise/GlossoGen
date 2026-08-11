@@ -5,7 +5,7 @@ the ``perplexity`` and English n-gram surprisal
 metrics. They ship in the optional ``metrics-ml`` extra so the simulation server
 image does not carry an ML stack it never executes.
 
-Every metric that needs them stays importable — and therefore registered —
+Every metric that needs them stays importable, and therefore registered,
 without the extra installed, so the absence surfaces as an explicit failure at
 compute time rather than an ``ImportError`` at registry-import time.
 
@@ -15,7 +15,7 @@ measure, which is how a broken environment gets mistaken for a valid result.
 The metrics therefore raise ``MetricsMlExtraMissing``. That is deliberately
 different from the not-applicable convention (returning no ``Measurement``),
 which is reserved for cases where the metric genuinely does not apply to the
-run — a scenario with no primary channel, say.
+run, such as a scenario with no primary channel.
 
 The two metric families have different requirements, so the probes are
 separate:

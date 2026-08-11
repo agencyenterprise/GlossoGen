@@ -1,7 +1,7 @@
 """Assemble agent and channel configurations from drive_module_repair knobs.
 
-The scenario runs three agents — field technician, diagnostics engineer, and
-spec engineer — on one shared bay channel, plus an optional postmortem
+The scenario runs three agents (field technician, diagnostics engineer, and
+spec engineer) on one shared bay channel, plus an optional postmortem
 discussion channel. These factory functions turn a validated
 ``DriveModuleRepairKnobs`` instance into the ``AgentConfig`` and ``Channel``
 lists the runtime expects, plus the display-name maps used by the UI.

@@ -6,7 +6,7 @@ possibly with no ``--probe-round`` for the full end-of-run snapshot), the
 resulting JSONL contains rows tagged with several distinct
 ``cutoff_round`` values for the same agent on the same question. This
 metric measures how similar an agent's responses are between adjacent
-cutoff snapshots — a proxy for "did the protocol stabilise across these
+cutoff snapshots, a proxy for "did the protocol stabilise across these
 rounds, or did it keep drifting?".
 
 For each ``(agent_id, question_id)`` pair with at least two distinct

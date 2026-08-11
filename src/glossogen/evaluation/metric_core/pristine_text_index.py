@@ -10,7 +10,7 @@ parses its ``result`` for the ``message_id``, and maps that id to the pristine
 
 Metrics that want the text the agent *intended* to send (rather than what the
 channel delivered) resolve each ``MessageSent`` through ``pristine_text_for``,
-which falls back to the transmitted text when no pristine record exists — runs
+which falls back to the transmitted text when no pristine record exists, since runs
 predating the ``message_id`` link, or scenarios with no transform.
 """
 

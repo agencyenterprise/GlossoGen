@@ -1,10 +1,10 @@
 """Mean Chars per Round (MCR) metric for primary-channel messages.
 
 Computes the total number of characters sent on the scenario's primary
-channel each round, then averages across rounds. Deterministic — does not
+channel each round, then averages across rounds. Deterministic: it does not
 consult the LLM provider.
 
-Captures channel utilization — how much of the per-round character budget
+Captures channel utilization: how much of the per-round character budget
 agents actually use.
 """
 

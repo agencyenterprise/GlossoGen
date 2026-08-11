@@ -29,7 +29,7 @@ async def register_run_standalone(
 ) -> None:
     """Open a one-shot connection and insert a ``runs`` row.
 
-    Raises if the group slug is unknown — that's a misconfiguration and the
+    Raises if the group slug is unknown. That is a misconfiguration and the
     subprocess should abort rather than silently lose ownership info. No-op in
     no-database local mode (``DATABASE_URL`` unset): the run directory on disk
     is itself the registration, surfaced by the filesystem listing.

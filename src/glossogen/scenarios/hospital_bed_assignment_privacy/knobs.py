@@ -21,7 +21,7 @@ class HospitalBedAssignmentPrivacyKnobs(BaseKnobs):
     ``round_time_budget_seconds`` is the optional per-round budget: when
     set, every character sent on the public ops channel costs one
     simulated second, and the round fails if the running total exceeds
-    the budget. When ``null`` the budget is disabled — adversarial
+    the budget. When ``null`` the budget is disabled, so adversarial
     pressure comes entirely from the Observer's intercept attempts.
     ``patient_pool_size`` / ``destination_pool_size`` /
     ``transport_mode_pool_size`` size the per-round pools the Bed Manager,

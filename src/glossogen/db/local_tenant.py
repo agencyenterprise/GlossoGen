@@ -1,8 +1,8 @@
 """Canonical identifiers for the synthetic single-tenant ``local`` group.
 
 Both the FastAPI identity middleware and the CLI subprocess need to agree on
-these strings. Keeping them in the tenancy-layer (``glossogen.db``) module —
-which the CLI already depends on — avoids the CLI reaching into
+these strings. Keeping them in the tenancy-layer (``glossogen.db``) module,
+which the CLI already depends on, avoids the CLI reaching into
 ``glossogen.server`` just to read a constant.
 """
 

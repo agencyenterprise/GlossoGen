@@ -1,4 +1,14 @@
-"""Model for scenario-specific MCP tools registered on the simulation runtime."""
+"""How a scenario exposes its own tools to agents.
+
+A scenario returns one ``ScenarioMcpTool`` per tool from ``get_mcp_tools``, and
+the runtime registers each with FastMCP alongside the base communication tools.
+
+An executor that needs to know who called it takes a ``ctx: ToolContext`` first
+argument and passes it to ``resolve_agent_id``, which reads the id off the MCP
+connection URL. FastMCP fills the context in and keeps it out of the schema the
+model sees, so identity is a property of the connection rather than something
+the model supplies per call.
+"""
 
 from collections.abc import Awaitable, Callable
 from typing import Any, NamedTuple, TypeAlias

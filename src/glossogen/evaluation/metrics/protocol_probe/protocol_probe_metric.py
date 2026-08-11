@@ -6,7 +6,7 @@ specific round), then runs ``probe_replicas`` independent ``agent.run(...)``
 calls under the agent's original model. Each call uses
 ``ProtocolProbeOutput`` as its structured output schema and contributes one
 row to ``protocol_probe_responses.jsonl`` inside the run directory. Each
-replica is independent — the same reconstructed history is reused, giving
+replica is independent. The same reconstructed history is reused, giving
 the natural "rollback before next question" semantics.
 
 Returns a single ``Measurement`` whose ``score`` is the count of probes
@@ -67,7 +67,7 @@ class ProtocolProbeMetric(Metric):
     captures the state through round 14, NOT through round 15.
 
     Each replica runs the same reconstructed history through one
-    ``agent.run(...)`` call — independent of every other replica — and
+    ``agent.run(...)`` call, independent of every other replica, and
     appends one row to ``protocol_probe_responses.jsonl``.
     """
 

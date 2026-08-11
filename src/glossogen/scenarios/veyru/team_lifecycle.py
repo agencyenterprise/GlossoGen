@@ -2,7 +2,7 @@
 
 The world owns the *state mutations* (`swap_observers`,
 `promote_intern_to_observer`); this module owns the *side-effect
-choreography* that has to happen at the same round boundary —
+choreography* that has to happen at the same round boundary:
 updating channel membership lists, clearing channel histories, sending
 the announcement messages, and toggling the postmortem channel when
 the swap closes it. All three transitions are gated by the round

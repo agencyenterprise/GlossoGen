@@ -4,7 +4,7 @@ Two agents, `player_a` and `player_b`, communicate over a single `link`
 channel and independently submit a `cooperate` / `defect` decision each
 round via the `submit_decision` tool. The round resolves as soon as both
 decisions are in; payoffs follow deterministically from the configured
-payoff matrix — there is no LLM judge anywhere in this scenario.
+payoff matrix. There is no LLM judge anywhere in this scenario.
 
 Heavy logic lives in sibling modules: :mod:`world` (decision tracking and
 payoff resolution), :mod:`mcp_tools` (the `submit_decision` tool).
@@ -46,7 +46,7 @@ class PrisonersDilemmaScenario(SimulationScenario):
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
-        """Return the two fixed player roles. Ignores ``knobs`` — the roster never varies."""
+        """Return the two fixed player roles. Ignores ``knobs``, since the roster never varies."""
         _ = knobs
         return [
             AgentRole(agent_id=PLAYER_A_ID, role_name=PLAYER_A_ROLE),

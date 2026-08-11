@@ -1,4 +1,11 @@
-"""Abstract base class for simulation metrics."""
+"""The contract every metric implements.
+
+``compute`` is the only entry point. It receives the run's events, the agent
+configs, the scenario and an LLM provider, and returns a list of measurements.
+
+The empty-list convention is the part worth knowing before writing one, and
+``compute`` documents it in full.
+"""
 
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -55,7 +62,7 @@ class Metric(ABC):
             metric that detects it does not apply to this run (e.g.
             ``round_success_after_resume`` on a non-resume run,
             cross-team probe similarity on a single-team run) returns
-            an empty list — the report records no entry for that metric,
+            an empty list, so the report records no entry for that metric,
             which is cleaner than a zero-score sentinel with a
             "does not apply" summary.
         """

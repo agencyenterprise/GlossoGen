@@ -1,8 +1,8 @@
 """Procedural per-round scene generation for the spot_the_difference scenario.
 
-Each round the environment builds one scene as a set of objects — each a
+Each round the environment builds one scene as a set of objects, each a
 ``shape, color, size`` bundle on a distinct ``(column, row)`` cell of a
-``grid_size`` x ``grid_size`` grid — then a near-identical copy (scene B) with
+``grid_size`` x ``grid_size`` grid, then a near-identical copy (scene B) with
 exactly K planted differences drawn from a fixed taxonomy: an attribute
 changed, an object moved, an object added, or an object removed.
 
@@ -430,8 +430,8 @@ def _build_one_case(
 
     The first attempt consumes ``rng`` (the round RNG already advanced past the
     object and difference counts) so a solvable round is byte-identical to a
-    build without the guardrail. A case that is not solvable — either not
-    uniquely decodable or not judge-attributable — is re-drawn with a bumped
+    build without the guardrail. A case that is not solvable, meaning not
+    uniquely decodable or not judge-attributable, is re-drawn with a bumped
     sub-seed until it is.
     """
     case = _attempt_case(

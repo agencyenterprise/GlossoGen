@@ -8,7 +8,7 @@ word boundaries are modeled.
 
 The built counts are cached to ``~/.cache/glossogen/english_char_trigram.json``;
 every later load reads the cache with no network. Higher surprisal means a
-string is less English-like — degenerate repetition (``LLLLLLL``), emergent
+string is less English-like: degenerate repetition (``LLLLLLL``), emergent
 codes (``Lf Lf``), and digit runs (``12``) all score high because the
 underlying character transitions are rare or absent in English.
 """
@@ -97,7 +97,7 @@ def load_english_trigram_model() -> EnglishTrigramModel:
 
     Reads ``~/.cache/glossogen/english_char_trigram.json`` when present; otherwise
     downloads ``wikitext-2-raw-v1``, trains the trigram, writes the cache, and
-    returns the model. CPU- and I/O-bound — callers should invoke this off the
+    returns the model. CPU- and I/O-bound, so callers should invoke this off the
     event loop via ``asyncio.to_thread``.
     """
     if _CACHE_PATH.exists():

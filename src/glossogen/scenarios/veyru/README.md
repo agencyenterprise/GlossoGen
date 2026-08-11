@@ -1,6 +1,6 @@
 # Scenario: Veyru Stabilization
 
-Two agents — a field technician observing a Veyru and a remote stabilization engineer — communicate over a single link to stabilize failing Veyru entities. Every character sent costs simulated seconds. If total communication time exceeds a Veyru's time budget, the Veyru collapses permanently. Fourteen failure motifs are combined into unique cases (one to five motifs per case), encouraging the development of compressed communication patterns. The position of reference star SAGWE392 changes each round, remapping which treatment procedure is correct for a given set of symptoms and varying the physical parameters (hold duration, starting face, intensity level). Only the stabilization engineer has the stellar reader, ensuring per-round communication is always required.
+Two agents (a field technician observing a Veyru and a remote stabilization engineer) communicate over a single link to stabilize failing Veyru entities. Every character sent costs simulated seconds. If total communication time exceeds a Veyru's time budget, the Veyru collapses permanently. Fourteen failure motifs are combined into unique cases (one to five motifs per case), encouraging the development of compressed communication patterns. The position of reference star SAGWE392 changes each round, remapping which treatment procedure is correct for a given set of symptoms and varying the physical parameters (hold duration, starting face, intensity level). Only the stabilization engineer has the stellar reader, ensuring per-round communication is always required.
 
 ![Scenario overview](../../../../images/veyru_overview.webp)
 
@@ -75,7 +75,7 @@ Priority-1/2 motifs are marked `# easy` in the source and are used in the forced
 
 ### Composite Failures
 
-Composite cases combine two to five motifs per round. Procedure order matters — agents must address motifs in priority sequence (handle critical failures first — leaks, stalled propagation, thermal bleed — then adjust intensity, then fix structural issues, then echo/boundaries, then pattern-level failures). Every round uses the same fixed time budget regardless of motif count, so multi-motif rounds impose more per-message pressure.
+Composite cases combine two to five motifs per round. Procedure order matters: agents must address motifs in priority sequence (handle critical failures first, meaning leaks, stalled propagation and thermal bleed, then adjust intensity, then fix structural issues, then echo/boundaries, then pattern-level failures). Every round uses the same fixed time budget regardless of motif count, so multi-motif rounds impose more per-message pressure.
 
 ### Case Generation
 
@@ -83,7 +83,7 @@ Cases are generated procedurally using a seed for reproducibility. Most rounds g
 
 ## Stellar Alignment — SAGWE392
 
-Each round the stabilization engineer receives a reading that maps every failure motif directly to a fully-parameterized procedure. The underlying stellar position still rotates which procedure each motif gets and which parameters apply, but the stabilization engineer never sees the offset or raw parameters — only 14 rendered procedures.
+Each round the stabilization engineer receives a reading that maps every failure motif directly to a fully-parameterized procedure. The underlying stellar position still rotates which procedure each motif gets and which parameters apply, but the stabilization engineer never sees the offset or raw parameters, only the rendered procedures.
 
 ### What the Stabilization Engineer Sees
 
@@ -100,11 +100,11 @@ Each round draws one value from each pool (hidden from both agents):
 
 ### Information Asymmetry
 
-Only the stabilization engineer has the stellar reader. The field observer is told that treatments depend on SAGWE392 but receives no stellar data. This prevents the observer from self-diagnosing and self-treating even if they learn all 14 motif procedures during postmortem discussions — the symptom→procedure pairing and parameters change every round.
+Only the stabilization engineer has the stellar reader. The field observer is told that treatments depend on SAGWE392 but receives no stellar data. This prevents the observer from self-diagnosing and self-treating even if they learn all 14 motif procedures during postmortem discussions, because the symptom→procedure pairing and parameters change every round.
 
 ### Stabilization Judge
 
-The LLM judge evaluates each `stabilize_veyru` call against the expected procedure (the same fully-rendered text the stabilization engineer received in the stellar reading). The judge checks action type, duration, face, and intensity — lenient on wording, strict on physical parameters.
+The LLM judge evaluates each `stabilize_veyru` call against the expected procedure (the same fully-rendered text the stabilization engineer received in the stellar reading). The judge checks action type, duration, face, and intensity, lenient on wording but strict on physical parameters.
 
 ## Budget and Collapse Mechanics
 
@@ -123,17 +123,17 @@ When `postmortem_enabled` is true, a discussion phase follows each round. Both a
 
 ## Evaluation
 
-Veyru opts into platform metrics by implementing the scenario-level hooks (`judge_round_result`, `build_communication_rounds`, `detect_protocol_boundary_window`, `get_protocol_probe_config`, `get_protocol_explanation_config`, `restore_state_from_events`, `get_replace_agent_blocked_tool_call_channels`). `get_protocol_explanation_config` points the `protocol_explanation` metric at the per-role describe templates in [`prompts/describe/`](prompts/describe/), so each agent is asked to describe its emergent #link protocol in Veyru's own terms. Every metric described below is a platform metric living under [`src/glossogen/evaluation/metrics/`](../../evaluation/metrics/) — Veyru ships no scenario-private metric classes. All metrics return `Measurement` entries (`score`, `score_unit`, `summary`, `per_round`, `per_agent`).
+Veyru opts into platform metrics by implementing the scenario-level hooks (`judge_round_result`, `build_communication_rounds`, `detect_protocol_boundary_window`, `get_protocol_probe_config`, `get_protocol_explanation_config`, `restore_state_from_events`, `get_replace_agent_blocked_tool_call_channels`). `get_protocol_explanation_config` points the `protocol_explanation` metric at the per-role describe templates in [`prompts/describe/`](prompts/describe/), so each agent is asked to describe its emergent #link protocol in Veyru's own terms. Every metric described below is a platform metric living under [`src/glossogen/evaluation/metrics/`](../../evaluation/metrics/). Veyru ships no scenario-private metric classes. All metrics return `Measurement` entries (`score`, `score_unit`, `summary`, `per_round`, `per_agent`).
 
 The communication-style metrics (`language_strangeness`, `slang_emergence`, `neologism`, `shorthand_codes`) replace the older single `language_emergence` metric; each LLM-judge prompt scopes a single phenomenon so the metrics are non-overlapping.
 
 **`round_success`** — How many rounds did the team stabilize the Veyru before collapse? Deterministic. The platform reads `RoundResultRecorded` events written by the game clock from `judge_round_result`. Single-team mode emits one `Measurement` (`metric_name="round_success"`); two-team mode emits two — `round_success_team_a` and `round_success_team_b` — each with its own per-team `per_round` outcomes.
 
-**`round_success_after_resume`** — Same accounting as `round_success` but restricted to the rounds played after a swap (either replace-agent or cross-run replace-agent). The metric reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor`. Re-scores the source run (Sim A in cross-run flows — i.e. the timeline that was modified) over the same round window and includes the resumed-vs-source delta in `summary`. Two-team mode splits into `round_success_after_resume_team_a` / `_team_b`. Returns a zero-score measurement on runs without either manifest.
+**`round_success_after_resume`** — Same accounting as `round_success` but restricted to the rounds played after a swap (either replace-agent or cross-run replace-agent). The metric reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor`. Re-scores the source run (Sim A in cross-run flows, the timeline that was modified) over the same round window and includes the resumed-vs-source delta in `summary`. Two-team mode splits into `round_success_after_resume_team_a` / `_team_b`. Returns a zero-score measurement on runs without either manifest.
 
 **`protocol_learned_after_swap`** — Applies in two-team swap mode and intern mode. Measures whether the newcomer adopted the pre-established communication protocol after the personnel change. The LLM judge returns one note per post-boundary round with observable evidence; the `score` is the count of those rounds.
 
-**`protocol_probe`** — Probes each agent post-simulation with a fixed test bank of hypothetical inputs and records what they would send on `#link`. The bank at [protocol_probe_questions.json](protocol_probe_questions.json) has 28 entries — one observer probe + one engineer probe per failure motif. Observer probes ask "if you saw symptoms X, what would you send to #link?"; engineer probes ask "if the observer sent X and the stellar reading mapped to procedure Y, what would you send back?". For each `(agent, question)` pair the metric reconstructs the agent's pydantic-ai message history from the JSONL log via `build_message_history(...)`, builds a tool-less `Agent` under the agent's *original* model (read from `AgentRegistered`, not the eval `--model`), and runs `--probe-replicas N` independent `agent.run(...)` calls — each replica is identical context with no rollback needed. The structured output schema [`ProtocolProbeOutput`](evaluation/metrics/protocol_probe/response_models.py) enforces a `reasoning` field (for debugging surprising responses, never read by any metric) and a `message` field (the body the agent would send). Each call appends one row to `protocol_probe_responses.jsonl` under the run directory. The metric requires `--probe-replicas N` with N ≥ 1; the optional `--probe-round R` cuts every reconstructed history at the start of round R so probes capture the protocol as it existed at that point. `score` is the total row count. Distance / similarity analysis across the JSONL is split into the three follow-on metrics described next. Test bank inputs are pulled verbatim from `FAILURE_MOTIFS.symptom_phrases` and `get_stellar_treatment_mapping(StellarReading(offset=0, hold_duration=10, starting_face="top", intensity_level="moderate"))`; regenerate via [scripts/build_probe_questions.py](scripts/build_probe_questions.py) whenever motif text changes. Two motifs (`Echo Saturation`, `Thermal Bleed`) override the default `symptom_phrases[0]` to avoid collisions with sibling motifs that present as "too bright everywhere" or "dim everywhere"; the override map lives in the generator.
+**`protocol_probe`** — Probes each agent post-simulation with a fixed test bank of hypothetical inputs and records what they would send on `#link`. The bank at [protocol_probe_questions.json](protocol_probe_questions.json) has one observer probe and one engineer probe per failure motif. Observer probes ask "if you saw symptoms X, what would you send to #link?"; engineer probes ask "if the observer sent X and the stellar reading mapped to procedure Y, what would you send back?". For each `(agent, question)` pair the metric reconstructs the agent's pydantic-ai message history from the JSONL log via `build_message_history(...)`, builds a tool-less `Agent` under the agent's *original* model (read from `AgentRegistered`, not the eval `--model`), and runs `--probe-replicas N` independent `agent.run(...)` calls. Each replica is identical context with no rollback needed. The structured output schema [`ProtocolProbeOutput`](evaluation/metrics/protocol_probe/response_models.py) enforces a `reasoning` field (for debugging surprising responses, never read by any metric) and a `message` field (the body the agent would send). Each call appends one row to `protocol_probe_responses.jsonl` under the run directory. The metric requires `--probe-replicas N` with N ≥ 1; the optional `--probe-round R` cuts every reconstructed history at the start of round R so probes capture the protocol as it existed at that point. `score` is the total row count. Distance / similarity analysis across the JSONL is split into the three follow-on metrics described next. Test bank inputs are pulled verbatim from `FAILURE_MOTIFS.symptom_phrases` and `get_stellar_treatment_mapping(StellarReading(offset=0, hold_duration=10, starting_face="top", intensity_level="moderate"))`; regenerate via [scripts/build_probe_questions.py](scripts/build_probe_questions.py) whenever motif text changes. Two motifs (`Echo Saturation`, `Thermal Bleed`) override the default `symptom_phrases[0]` to avoid collisions with sibling motifs that present as "too bright everywhere" or "dim everywhere"; the override map lives in the generator.
 
 **`protocol_probe_replica_self_similarity`** — Quantifies how consistent each agent's response is across the `--probe-replicas N` independent calls on the same probe question. For every `(agent_id, question_id, cutoff_round)` group with at least 2 replicas, computes the strict-upper-triangle mean of the replica × replica normalized-Levenshtein matrix on `response_text` (via `rapidfuzz.distance.Levenshtein`). The headline `score` is the macro mean across groups (mean of group means, so groups with more replicas don't dominate); full per-group matrices land in `protocol_probe_replica_self_similarity.json` for the streamlit "Probe similarity" tab. Saturation at `1.0` is the expected signal on a converged protocol where all replicas emit the same surface form (e.g. all replicas answer `!AC` for the same symptom). Deterministic, no LLM judge. Reads `protocol_probe_responses.jsonl`; emits a zero-score Measurement when that file is missing or no group has ≥2 replicas.
 
@@ -143,7 +143,7 @@ The communication-style metrics (`language_strangeness`, `slang_emergence`, `neo
 
 The generic `round_ended_idle` and `round_ended_timeout` metrics are also useful for veyru runs: they count rounds whose main phase ended via the `all_agents_idle` or `round_timeout` trigger, using the `round_ended` events emitted by the game clock.
 
-The generic `content_filter_refusal` metric counts `AgentRunCycleFailed` events with `error_type == ContentFilterError` and emits a per-agent breakdown of refusal counts. Useful on the Veyru stabilization engineer role, whose system prompt — detailing physical-manipulation instructions on a fictional box-shaped entity — sometimes triggers Claude's safety classifier.
+The generic `content_filter_refusal` metric counts `AgentRunCycleFailed` events with `error_type == ContentFilterError` and emits a per-agent breakdown of refusal counts. Useful on the Veyru stabilization engineer role, whose system prompt details physical-manipulation instructions on a fictional box-shaped entity, which sometimes triggers Claude's safety classifier.
 
 The generic `perplexity` metric scores `#link` messages — Veyru's primary channel, returned by `VeyruScenario.get_primary_channels()` — under a fixed `gpt2` language model via `minicons.IncrementalLMScorer`. It computes mean per-token surprisal (in nats) per message with `reduction = -x.mean(0)`, aggregates per round, and reports the run-wide mean as `score`. In two-team mode `get_primary_channels()` returns an empty list and the metric emits a no-op result. Empirically on opus-4-7 baselines, the score drops monotonically as `round_time_budget_seconds` grows from 150 → 2000 (~8.0 → 6.8 nats with postmortem; ~5.8 → 5.5 without), consistent with agents using more compressed / coded language under tight budgets.
 
@@ -159,7 +159,7 @@ The `veyru_case_started` event is emitted once per round at round start by `Veyr
 
 ### Communication-feature analysis: running the full pipeline
 
-Always set `LOG_LEVEL=DEBUG` in the environment and pipe stderr to a file during development — both metrics and the consolidation script log the verbatim system prompt, user prompt (with the per-round transcripts), and structured judge output at DEBUG. That file is the source of truth for "did the judge get the right data and nothing else".
+Always set `LOG_LEVEL=DEBUG` in the environment and pipe stderr to a file during development. Both metrics and the consolidation script log the verbatim system prompt, user prompt (with the per-round transcripts), and structured judge output at DEBUG. That file is the source of truth for "did the judge get the right data and nothing else".
 
 ```bash
 # 1. Open-coding (pass 1): per run
@@ -189,7 +189,7 @@ LOG_LEVEL=DEBUG VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru
 
 `LOG_LEVEL` defaults to `INFO`; set it to `DEBUG` only when you want to capture the full prompt/response. Run-id selection for consolidation is **explicit only** (`--run-id REPEATED` or `--run-ids-file PATH`) to avoid accidental inclusion of unrelated runs. The `--version` value becomes the `version` field on the JSON document, is the output filename stem (under `runs/veyru/_ontology/`), and is recorded on every downstream feature-presence sidecar.
 
-The consolidated ontology JSONs live under `runs/veyru/_ontology/` so they travel with any export of the runs tree. The whole `runs/` directory is gitignored — the ontology JSONs are regenerable from the per-run open-coding sidecars; ship them alongside the runs they were derived from rather than committing them.
+The consolidated ontology JSONs live under `runs/veyru/_ontology/` so they travel with any export of the runs tree. The whole `runs/` directory is gitignored. The ontology JSONs are regenerable from the per-run open-coding sidecars; ship them alongside the runs they were derived from rather than committing them.
 
 ### Communication-feature analysis: quickstart for new runs
 
@@ -197,7 +197,7 @@ Three flows, picked by what comparability you need.
 
 **A — One new run, score it against the current ontology (most common, ~$0.07, ~60s).**
 
-Most-recent ontology JSON in `runs/veyru/_ontology/` is the reference. Both passes in a single command — pass 1 writes the open-coding sidecar, pass 3 reads it implicitly via the same run dir.
+Most-recent ontology JSON in `runs/veyru/_ontology/` is the reference. Both passes in a single command: pass 1 writes the open-coding sidecar, pass 3 reads it implicitly via the same run dir.
 
 ```bash
 LOG_LEVEL=INFO VIRTUAL_ENV= uv run --no-sync python -m glossogen evaluate veyru \
@@ -218,7 +218,7 @@ bash src/glossogen/scenarios/veyru/scripts/run_communication_pipeline.sh --phase
 bash src/glossogen/scenarios/veyru/scripts/run_communication_pipeline.sh --phase 3    # feature presence on new runs only
 ```
 
-Skip phase 2 — the ontology stays fixed so new vectors remain comparable to prior runs.
+Skip phase 2, so the ontology stays fixed and new vectors remain comparable to prior runs.
 
 **C — Refresh the ontology from the full pool, then re-score everything.**
 
@@ -285,7 +285,7 @@ Setting `two_teams: true` enables an observer-swap study mode. Two isolated team
 | `observer_a` + `stabilization engineer_a` on `link_a` | `observer_b` + `stabilization engineer_b` on `link_b` |
 | Postmortem: `postmortem_a` (when enabled) | Postmortem: `postmortem_b` (when enabled) |
 
-Both teams face the same Veyru case each round (identical seed, identical queue) so their outcomes are directly comparable. Channels are fully isolated — neither observer sees the other team's traffic.
+Both teams face the same Veyru case each round (identical seed, identical queue) so their outcomes are directly comparable. Channels are fully isolated; neither observer sees the other team's traffic.
 
 At `swap_round + 1`, the two observers swap teams:
 
@@ -305,7 +305,7 @@ At `swap_round + 1`, the two observers swap teams:
 
 ![Intern mode](../../../../images/veyru_intern_mode.webp)
 
-Setting `intern_enabled: true` (single-team only) introduces a third agent — an intern observer — that joins the comm link mid-run and eventually replaces the field observer:
+Setting `intern_enabled: true` (single-team only) introduces a third agent, an intern observer, that joins the comm link mid-run and eventually replaces the field observer:
 
 - **Rounds 1..`intern_join_round` - 1**: Identical to the default single-team run (2 agents, 1 link channel, plus optional postmortem).
 - **Round `intern_join_round`**: The intern is added to the comm link. They cannot see the link history from before they joined. They receive no injections, have no turn prompt, and a `validate_outgoing_message` guard rejects any attempt to send a message. Their role is pure silent observation.

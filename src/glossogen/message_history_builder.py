@@ -9,7 +9,7 @@ structure pydantic-ai produces during a live run.
 Per-tool-call cutoff: a single ``LLMResponseReceived`` is logged at flush
 time (when the LLM cycle ends), so a cycle that starts in round N-1 and
 ends in round N is timestamped after the round-N rewind anchor and would
-otherwise drop all of its tool calls — even ones executed in round N-1.
+otherwise drop all of its tool calls, even ones executed in round N-1.
 This module instead consults each tool call's own ``ToolCallInvoked``
 event to filter individual calls, so pre-cutoff calls survive even when
 their parent batch finished post-cutoff.
@@ -77,7 +77,7 @@ def _tool_call_filtered_by_visibility(
       (its tool-return blob would leak older messages) and drops every
       ``send_message`` call whose ``ToolCallInvoked.round_number < R``.
       A missing ``ToolCallInvoked`` is treated as past-window so the
-      call is dropped — defensive against malformed logs.
+      call is dropped. Defensive against malformed logs.
     """
     if tool_call.tool_name not in CHANNEL_SCOPED_TOOLS:
         return False
@@ -112,7 +112,7 @@ def _derive_nonchannel_round_floor(
     The floor is the minimum ``round_floor`` across every
     ``ChannelVisibilityFromRound`` entry; non-channel calls before that round
     are dropped. Returns ``None`` (no filtering) when no channel uses
-    ``FromRound`` — fork/resume flows pass ``Full`` visibility and keep the
+    ``FromRound``. Fork and resume flows pass ``Full`` visibility and keep the
     full history intact.
     """
     floors = [
@@ -137,7 +137,7 @@ def _nonchannel_call_below_floor(
     windowed by ``_tool_call_filtered_by_visibility`` instead. Returns False
     when ``nonchannel_round_floor`` is ``None`` (no windowing) or for a
     channel-scoped tool. A missing ``ToolCallInvoked`` is treated as
-    past-window so the call is dropped — defensive against malformed logs.
+    past-window so the call is dropped. Defensive against malformed logs.
     """
     if nonchannel_round_floor is None:
         return False
@@ -161,7 +161,7 @@ def _tool_call_at_or_past_cutoff(
     filter by round (call.round_number >= cutoff_round drops the call).
     Otherwise filter by timestamp (call.timestamp > target_timestamp).
     A missing ``ToolCallInvoked`` is treated as past-cutoff so the call
-    is dropped — defensive against malformed logs.
+    is dropped. Defensive against malformed logs.
     """
     invoked = invoked_by_id.get(call_id)
     if invoked is None:
@@ -182,7 +182,7 @@ def _drop_call_without_result(
     otherwise the model API rejects the request. A tool call invoked
     before the rewind anchor whose result was logged afterwards (the
     result event therefore not in the rewritten JSONL) must be dropped
-    on both sides — keeping just the call would leave it dangling.
+    on both sides, because keeping just the call would leave it dangling.
     """
     return call_id not in tool_results_by_call_id
 
@@ -252,14 +252,14 @@ def _build_orphan_cycle(
 
     When an LLM cycle straddles the rewind anchor, its
     ``LLMResponseReceived`` is logged after the anchor and is not in
-    the rewritten JSONL — but the individual ``ToolCallInvoked`` events
+    the rewritten JSONL, but the individual ``ToolCallInvoked`` events
     that fired before the anchor *are* preserved (they were committed
     via subsequent committable events). Without their parent we'd lose
     the matching ``ToolCallPart``s entirely; instead we group them into
     one synthetic ``ModelResponse`` placed at the end of the agent's
     history (they are the most recent calls before resume). The
     channel-visibility filter still applies, and ``stop_reason`` is set
-    to ``end_turn`` so the cycle is treated as terminal — the resumed
+    to ``end_turn`` so the cycle is treated as terminal. The resumed
     agent picks up on a fresh prompt rather than a mid-batch continuation.
     """
     if not orphan_invoked:
@@ -418,7 +418,7 @@ def build_message_history(
     instances survive. When ``tool_calls_only`` is False, text and
     thinking are also stripped from any parent response that itself
     falls past the cutoff (its verbal output reflected post-cutoff
-    state). ``channel_visibility`` filters tool calls per channel —
+    state). ``channel_visibility`` filters tool calls per channel,
     ``Full`` keeps everything (the default for channels not listed),
     ``None`` drops every send/read on the channel, and
     ``FromRound(R)`` drops every read and drops sends from rounds <R.

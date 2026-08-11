@@ -1,7 +1,7 @@
 """Metric that measures how much each message redundantly re-encodes information.
 
 Under channel noise, agents defend against character loss by encoding the same
-information more than once within a message — repeating tokens (``Lf Lf 12 12``),
+information more than once within a message: repeating tokens (``Lf Lf 12 12``),
 dual-encoding a value two ways (``12 twelve``, ``12twelve``), or pairing an
 abbreviation with its full word (``gnt gentle``).
 
@@ -10,7 +10,7 @@ the *pristine* text the sender composed (before the noise transform) and fed to 
 LLM judge as an enumerated list. The judge returns one ``repetition_factor`` per
 message (>= 1.0; 1.0 = each piece of information stated once, 2.0 = roughly twice,
 3.0 = roughly three times). Each round is judged ``_JUDGE_REPLICAS`` times and the
-per-message factors are averaged across replicas — so the judge is called
+per-message factors are averaged across replicas, so the judge is called
 ``rounds * _JUDGE_REPLICAS`` times per run.
 
 The per-message factors are written to a ``language_repetition_messages.jsonl``

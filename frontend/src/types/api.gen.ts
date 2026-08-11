@@ -759,7 +759,7 @@ export interface components {
         };
         /**
          * ApproveConsentRequest
-         * @description Body for ``POST /mcp/consent/approve`` — the parked request to materialize.
+         * @description Body for ``POST /mcp/consent/approve``: the parked request to materialize.
          */
         ApproveConsentRequest: {
             /** Request Id */
@@ -767,7 +767,7 @@ export interface components {
         };
         /**
          * ApproveConsentResponse
-         * @description Response for ``POST /mcp/consent/approve`` — where the browser should go next.
+         * @description Response for ``POST /mcp/consent/approve``: where the browser should go next.
          */
         ApproveConsentResponse: {
             /** Redirect Url */
@@ -2388,7 +2388,7 @@ export interface components {
          * @description One team's outcome for one round (the correctness-gate + win/loss verdict).
          *
          *     ``team_id`` is ``null`` in single-team mode. ``reason`` is the human-readable
-         *     explanation written by ``judge_round_result`` (e.g. ``won — found 3/3, 465
+         *     explanation written by ``judge_round_result`` (e.g. ``won, found 3/3, 465
          *     chars`` / ``did not submit (found 0/3, 576 chars)``).
          */
         SpotTeamRoundResult: {
@@ -2718,7 +2718,7 @@ export interface components {
         };
         /**
          * WhoAmIResponse
-         * @description Response for ``GET /mcp/whoami`` — group bound to the calling OAuth token.
+         * @description Response for ``GET /mcp/whoami``: the group bound to the calling OAuth token.
          */
         WhoAmIResponse: {
             /** Group Id */

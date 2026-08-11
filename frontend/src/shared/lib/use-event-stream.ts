@@ -159,7 +159,7 @@ export function useEventStream(
         setIsConnected(false);
         errorCount += 1;
 
-        // Server rejected the connection (e.g. 409 — simulation not running yet).
+        // Server rejected the connection (e.g. 409, simulation not running yet).
         // EventSource goes to CLOSED and won't auto-reconnect.
         const serverRejected = eventSource.readyState === EventSource.CLOSED;
 

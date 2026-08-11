@@ -14,7 +14,7 @@ nothing memorizes:
   technician only observes symptoms. It is count-independent, so it never
   reveals how many units / faults there are.
 - the **service procedure**: each component's full replacement procedure for
-  this unit — a multi-step sequence (tool, torque, passes, calibration, and
+  this unit: a multi-step sequence (tool, torque, passes, calibration, and
   class-specific counts / patterns / hold durations) whose parameters are drawn
   **independently per unit**. The spec engineer holds these. The procedure
   *shape* follows the component's service class; the *parameters* re-randomize,
@@ -326,7 +326,7 @@ def _build_one_case(
 ) -> DriveModuleCase:
     """Generate one case: per-unit fault-tree, per-unit procedures, ordered stages.
 
-    ``module_replacement_counts`` has one entry per unit — the number of faulty
+    ``module_replacement_counts`` has one entry per unit: the number of faulty
     components on that unit.
     """
     components_by_id = {component.component_id: component for component in COMPONENTS}

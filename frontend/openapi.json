@@ -1757,7 +1757,7 @@
           "request_id"
         ],
         "title": "ApproveConsentRequest",
-        "description": "Body for ``POST /mcp/consent/approve`` \u2014 the parked request to materialize."
+        "description": "Body for ``POST /mcp/consent/approve``: the parked request to materialize."
       },
       "ApproveConsentResponse": {
         "properties": {
@@ -1776,7 +1776,7 @@
           "group_slug"
         ],
         "title": "ApproveConsentResponse",
-        "description": "Response for ``POST /mcp/consent/approve`` \u2014 where the browser should go next."
+        "description": "Response for ``POST /mcp/consent/approve``: where the browser should go next."
       },
       "Body_import_run_bundle_api_g__group_slug__runs_import_post": {
         "properties": {
@@ -5148,7 +5148,7 @@
           "reason"
         ],
         "title": "SpotTeamRoundResult",
-        "description": "One team's outcome for one round (the correctness-gate + win/loss verdict).\n\n``team_id`` is ``null`` in single-team mode. ``reason`` is the human-readable\nexplanation written by ``judge_round_result`` (e.g. ``won \u2014 found 3/3, 465\nchars`` / ``did not submit (found 0/3, 576 chars)``)."
+        "description": "One team's outcome for one round (the correctness-gate + win/loss verdict).\n\n``team_id`` is ``null`` in single-team mode. ``reason`` is the human-readable\nexplanation written by ``judge_round_result`` (e.g. ``won, found 3/3, 465\nchars`` / ``did not submit (found 0/3, 576 chars)``)."
       },
       "SpotTheDifferenceCaseSummary": {
         "properties": {
@@ -5845,7 +5845,7 @@
           "group_slug"
         ],
         "title": "WhoAmIResponse",
-        "description": "Response for ``GET /mcp/whoami`` \u2014 group bound to the calling OAuth token."
+        "description": "Response for ``GET /mcp/whoami``: the group bound to the calling OAuth token."
       }
     }
   }

@@ -1,6 +1,6 @@
 """Renders PDF export data into a self-contained HTML string via a Jinja2 template.
 
-The rendered HTML is designed for conversion to PDF with weasyprint —
+The rendered HTML is designed for conversion to PDF with weasyprint:
 all CSS is inlined and the document is self-contained.
 """
 

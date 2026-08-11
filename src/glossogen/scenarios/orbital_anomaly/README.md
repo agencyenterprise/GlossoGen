@@ -49,7 +49,7 @@ distribution), `easy_round_numbers` (warmup rounds forced to a single fault),
 `channel_noise_level` (per-character drop on the comm loop),
 `noise_replacement_mode` (`mask` → dropped chars become `_`, a visible
 erasure; `random_letter` → a different random letter, an unmarked
-substitution), and `postmortem_enabled` (the free debrief channel — also the
+substitution), and `postmortem_enabled` (the free debrief channel, also the
 on/off ablation lever for measuring how much it accelerates protocol
 convergence).
 

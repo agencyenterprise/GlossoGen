@@ -9,7 +9,7 @@ on the scenario's primary channel.
 
 Scenarios build the per-round view through the
 ``SimulationScenario.build_communication_rounds`` hook. The hook is
-the only scenario-specific surface in this pipeline — the metrics and
+the only scenario-specific surface in this pipeline. The metrics and
 prompts read ``CommunicationRoundView`` and never branch on scenario
 name.
 """

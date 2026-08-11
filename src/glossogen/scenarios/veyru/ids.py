@@ -1,8 +1,8 @@
 """Canonical identifier constants for the Veyru scenario.
 
 Centralizes agent IDs, channel IDs, team IDs, role names, event reasons,
-template filenames, and tool name lists so every module — the scenario,
-the world, evaluators, and server readers — refers to the same literals.
+template filenames, and tool name lists so every module (the scenario,
+the world, evaluators, and server readers) refers to the same literals.
 """
 
 from typing import Literal

@@ -5,7 +5,7 @@ Revises: 0002_oauth_tables
 Create Date: 2026-05-26
 
 In Clerk mode the OAuth ``authorize`` endpoint cannot synchronously create
-an authorization code — the user must first sign in via Clerk on the
+an authorization code. The user must first sign in via Clerk on the
 frontend and pick which group they want to authorize. The backend stores
 the original ``AuthorizationParams`` keyed by a random ``request_id`` and
 redirects the browser to the frontend consent page; the frontend POSTs

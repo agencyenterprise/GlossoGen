@@ -2,7 +2,7 @@
 
 Scores every primary-channel message by the Shannon entropy of its character
 distribution (``-Σ p(c)·log2 p(c)``, in bits/char) and reports the mean per
-round and overall. Model-free and deterministic — needs no language model or
+round and overall. Model-free and deterministic: it needs no language model or
 corpus, and does not consult the LLM provider.
 
 Unlike ``perplexity`` (GPT-2 per token) and ``english_ngram_surprisal`` (English

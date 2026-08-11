@@ -247,7 +247,7 @@ class HospitalWorld(ScenarioWorld):
 
         Returns the cached outcome on subsequent calls. If ``round_number``
         does not match the current round and no cached outcome exists,
-        returns None — the pending guess state is only meaningful for the
+        returns None. The pending guess state is only meaningful for the
         round currently in play.
         """
         if round_number < 1:

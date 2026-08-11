@@ -1,7 +1,7 @@
 """Error raised when one or more requested metrics could not be computed.
 
 Evaluation runs every requested metric before reporting failure, so a single
-broken metric does not discard the results of the others — the report is still
+broken metric does not discard the results of the others. The report is still
 written with whatever succeeded. The failure is then raised so the process exits
 non-zero.
 

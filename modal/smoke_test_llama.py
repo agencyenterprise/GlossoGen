@@ -113,7 +113,7 @@ def main() -> None:
 
     Modal returns one hostname per app, namespaced by workspace:
     ``https://<workspace>--llama-3-3-70b-instruct-serve.modal.run``.
-    Set ``MODAL_LLAMA_ENDPOINT_BASE`` to yours — no trailing slash, no ``/v1`` suffix.
+    Set ``MODAL_LLAMA_ENDPOINT_BASE`` to yours, with no trailing slash and no ``/v1`` suffix.
     """
     endpoint_base = os.environ.get("MODAL_LLAMA_ENDPOINT_BASE")
     if not endpoint_base:

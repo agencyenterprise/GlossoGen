@@ -1,6 +1,6 @@
 """Supervisor that launches the MCP server, game clock, and agent runners.
 
-Wires everything together but does not control turn order — agents act
+Wires everything together but does not control turn order. Agents act
 autonomously via MCP tools.
 """
 

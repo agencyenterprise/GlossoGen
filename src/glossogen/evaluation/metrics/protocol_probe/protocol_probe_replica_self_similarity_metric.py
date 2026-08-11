@@ -10,7 +10,7 @@ replicas don't dominate). The full per-group matrices are persisted to
 for the streamlit "Probe similarity" tab to render heatmaps from.
 
 A score near ``1.0`` is the expected signal for a converged protocol where
-the agent's surface form is deterministic — e.g. all replicas emit the same
+the agent's surface form is deterministic: all replicas emit the same
 short code like ``!AC``. The interesting variation lives at earlier
 ``cutoff_round`` snapshots (taken with ``--probe-round R`` before the
 protocol stabilised) and across agents/models.

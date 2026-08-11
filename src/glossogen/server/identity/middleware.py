@@ -2,8 +2,8 @@
 
 The active group is read from the URL slug (``/api/g/{slug}/...`` or
 ``/mcp/g/{slug}/...``). The Clerk JWT proves *what the user is allowed to
-do* — it must list the URL's slug among the user's organization
-memberships — but the URL declares *what they are doing right now*. This
+do*: it must list the URL's slug among the user's organization
+memberships, but the URL declares *what they are doing right now*. This
 makes a user who belongs to multiple Clerk orgs able to open them in
 parallel tabs without `setActive` races.
 
@@ -16,7 +16,7 @@ Three modes:
 * **Clerk mode** — verify token, parse the URL slug, assert the user is a
   member of that group, resolve the local Postgres group UUID, attach.
 
-Membership is proven by the standard ``org_slug`` claim — the user's
+Membership is proven by the standard ``org_slug`` claim. The user's
 currently active org. Multi-org users are supported via Clerk's
 ``organizationSyncOptions`` on the frontend middleware (see
 ``frontend/src/proxy.ts``): when a user navigates to ``/g/<slug>/...``,
