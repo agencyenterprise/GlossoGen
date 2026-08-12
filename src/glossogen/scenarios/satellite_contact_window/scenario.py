@@ -14,7 +14,7 @@ submitted command sequence does not satisfy the round-success criteria.
 import logging
 import random
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, ClassVar, NamedTuple
 
 from pydantic import BaseModel, ConfigDict
 
@@ -94,6 +94,8 @@ class SatelliteContactWindowScenario(SimulationScenario):
     submitted sequence against six criteria while the world enforces the
     contact-window budget deterministically.
     """
+
+    postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset({POSTMORTEM_CHANNEL_ID})
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
@@ -329,17 +331,6 @@ class SatelliteContactWindowScenario(SimulationScenario):
             len(rendered),
         )
         return rendered
-
-    def get_max_postmortem_duration_seconds(self) -> float:
-        """Return the configured postmortem duration, or 0 when disabled."""
-        if self._world.is_postmortem_disabled:
-            return 0.0
-        return self._knobs.postmortem_duration_seconds
-
-    def on_postmortem_started(self, round_number: int) -> None:
-        """Unlock the postmortem channel for discussion."""
-        _ = round_number
-        self._world.enter_postmortem()
 
     def get_early_round_end_trigger(self) -> str | None:
         """End the round once a command sequence has been judged or the window closes."""
@@ -607,8 +598,3 @@ class SatelliteContactWindowScenario(SimulationScenario):
                 executor=send_command_sequence,
             ),
         ]
-
-    @classmethod
-    def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:
-        """Hide the postmortem channel from any replaced agent's tool history."""
-        return frozenset({POSTMORTEM_CHANNEL_ID})

@@ -75,13 +75,17 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         shared_link: bool,
         all_must_submit: bool,
     ) -> None:
+        super().__init__(
+            postmortem_channel_ids=frozenset(
+                {POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID}
+            ),
+            postmortem_globally_disabled=postmortem_globally_disabled,
+        )
         self._cases = cases
         self._two_teams = two_teams
         self._shared_link = shared_link
         self._all_must_submit = all_must_submit
         self._current_case: DiffCase | None = None
-        self._in_postmortem: bool = False
-        self._postmortem_globally_disabled: bool = postmortem_globally_disabled
         self._teams: dict[str, TeamState] = self._build_teams(
             two_teams=two_teams, shared_link=shared_link, all_must_submit=all_must_submit
         )
@@ -140,16 +144,6 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         """The difference case for the current round (shared across teams)."""
         return self._current_case
 
-    @property
-    def in_postmortem(self) -> bool:
-        """Whether the simulation is in a postmortem discussion phase."""
-        return self._in_postmortem
-
-    @property
-    def is_postmortem_disabled(self) -> bool:
-        """Whether postmortem has been globally disabled."""
-        return self._postmortem_globally_disabled
-
     def current_round_characters(self, team_id: str) -> int:
         """Running character count on ``team_id``'s link channel this round."""
         return self._teams[team_id].current_round_characters
@@ -168,20 +162,6 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         if len(outcomes) == 0:
             return None
         return outcomes[-1]
-
-    def enter_postmortem(self) -> None:
-        """Mark the start of a postmortem discussion phase."""
-        self._in_postmortem = True
-
-    def exit_postmortem(self) -> None:
-        """Mark the end of a postmortem discussion phase."""
-        self._in_postmortem = False
-
-    def get_globally_disabled_channels(self) -> frozenset[str]:
-        """Postmortem channels when disabled (single-team and two-team variants)."""
-        if not self._postmortem_globally_disabled:
-            return frozenset()
-        return frozenset({POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID})
 
     @property
     def all_must_submit(self) -> bool:

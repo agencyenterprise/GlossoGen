@@ -26,7 +26,7 @@ action judge), :mod:`mcp_tools` (the ``actuate_panel`` tool),
 import logging
 import random
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
@@ -72,6 +72,8 @@ PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 class OrbitalAnomalyScenario(SimulationScenario):
     """Three-agent crewed-spacecraft anomaly scenario."""
+
+    postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset({POSTMORTEM_CHANNEL_ID})
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
@@ -171,19 +173,6 @@ class OrbitalAnomalyScenario(SimulationScenario):
             world=self._world,
             renderer=self._renderer,
         )
-
-    def get_max_postmortem_duration_seconds(self) -> float:
-        """Return the configured debrief duration, or 0 when disabled."""
-        if not self._knobs.postmortem_enabled:
-            return 0.0
-        if self._world.is_postmortem_disabled:
-            return 0.0
-        return self._knobs.postmortem_duration_seconds
-
-    def on_postmortem_started(self, round_number: int) -> None:
-        """Unlock the debrief channel for discussion."""
-        _ = round_number
-        self._world.enter_postmortem()
 
     def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
         """Return the single-team success verdict for the just-ended round."""
@@ -288,8 +277,3 @@ class OrbitalAnomalyScenario(SimulationScenario):
             judge_provider=self._judge_provider,
             get_runtime=lambda: self._runtime,
         )
-
-    @classmethod
-    def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:
-        """Hide the debrief channel from any replaced agent's tool history."""
-        return frozenset({POSTMORTEM_CHANNEL_ID})

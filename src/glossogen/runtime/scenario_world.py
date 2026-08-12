@@ -212,9 +212,46 @@ class ScenarioWorld(ABC):
 
     The ``run`` event loop is provided by the platform; it is started as an
     asyncio task by the supervisor and cancelled when the simulation ends.
+
+    Postmortem state lives here too. A postmortem phase is a platform concept:
+    the game clock opens and closes it, and the in-run swap logic asks which
+    channels are dead. Subclasses declare which of their channels carry
+    postmortem traffic and get the phase tracking from this class.
     """
 
     _context: WorldContext
+
+    def __init__(
+        self,
+        postmortem_channel_ids: frozenset[str],
+        postmortem_globally_disabled: bool,
+    ) -> None:
+        """Record the postmortem channels and whether they start closed.
+
+        ``postmortem_channel_ids`` is empty for a scenario with no postmortem,
+        which makes every method below a no-op without special-casing.
+        """
+        self._postmortem_channel_ids = postmortem_channel_ids
+        self._postmortem_globally_disabled = postmortem_globally_disabled
+        self._in_postmortem = False
+
+    @property
+    def in_postmortem(self) -> bool:
+        """Whether the simulation is in a postmortem discussion phase."""
+        return self._in_postmortem
+
+    @property
+    def is_postmortem_disabled(self) -> bool:
+        """Whether postmortem has been globally disabled."""
+        return self._postmortem_globally_disabled
+
+    def enter_postmortem(self) -> None:
+        """Mark the start of a postmortem discussion phase."""
+        self._in_postmortem = True
+
+    def exit_postmortem(self) -> None:
+        """Mark the end of a postmortem discussion phase."""
+        self._in_postmortem = False
 
     async def run(self, context: WorldContext) -> None:
         """Drain world events and dispatch each message to ``on_message_async``.
@@ -266,21 +303,18 @@ class ScenarioWorld(ABC):
         tool calls dropped) and excludes them from the wake-up
         notification so the new agent does not get spurious "you have
         new messages" alerts on a channel they shouldn't be reading.
-        Default returns the empty set; scenarios that disable channels
-        mid-run (via ``disable_postmortem_globally``) override to return
-        their postmortem channel IDs while the flag is set.
         """
-        return frozenset()
+        if not self._postmortem_globally_disabled:
+            return frozenset()
+        return self._postmortem_channel_ids
 
     def disable_postmortem_globally(self) -> None:
         """Close the postmortem channel(s) for the rest of the simulation.
 
-        Sets the ``_postmortem_globally_disabled`` flag that
-        ``get_globally_disabled_channels`` reads. Invoked by the
-        autonomous supervisor when a ``set_postmortem`` scheduled event
-        fires. Scenarios without a postmortem channel inherit this no-op
-        effect (the flag is set but their ``get_globally_disabled_channels``
-        override returns nothing).
+        Invoked by the autonomous supervisor when a ``set_postmortem``
+        scheduled event fires. A scenario that declared no postmortem
+        channels is unaffected: the flag is set and the disabled set stays
+        empty.
         """
         self._postmortem_globally_disabled = True
 

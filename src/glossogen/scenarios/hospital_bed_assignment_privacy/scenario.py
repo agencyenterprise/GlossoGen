@@ -15,7 +15,7 @@ pair AND the communication budget is not exhausted.
 
 import logging
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, ClassVar, NamedTuple
 
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
@@ -139,6 +139,8 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
     destination) pair, and the per-round communication budget is not
     exhausted.
     """
+
+    postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset({POSTMORTEM_CHANNEL_ID})
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
@@ -363,17 +365,6 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
             return None
         return rendered
 
-    def get_max_postmortem_duration_seconds(self) -> float:
-        """Return the configured postmortem duration, or 0 when disabled."""
-        if self._world.is_postmortem_disabled:
-            return 0.0
-        return self._knobs.postmortem_duration_seconds
-
-    def on_postmortem_started(self, round_number: int) -> None:
-        """Unlock the pair postmortem channel for discussion."""
-        _ = round_number
-        self._world.enter_postmortem()
-
     async def on_round_advanced(self, round_number: int) -> None:
         """Resolve the previous round's outcome and emit the new round's case event."""
         self._world.exit_postmortem()
@@ -461,11 +452,6 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
     def get_world(self) -> ScenarioWorld:
         """Return the hospital world that tracks per-round bed assignments and guesses."""
         return self._world
-
-    @classmethod
-    def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:
-        """Hide the postmortem channel from any replaced agent's tool history."""
-        return frozenset({POSTMORTEM_CHANNEL_ID})
 
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:
         """Return the Transport Lead's route_patient and Observer's submit_intercept tools."""

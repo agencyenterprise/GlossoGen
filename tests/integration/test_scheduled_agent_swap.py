@@ -104,7 +104,6 @@ def build_scenario(*, swap: SwapAgent) -> SmokeScenario:
             round_count=ROUND_COUNT,
             max_round_duration_seconds=45,
             model_overrides={},
-            round_time_budget_seconds=600,
             scheduled_events=[swap],
         )
     )

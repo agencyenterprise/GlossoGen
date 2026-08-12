@@ -12,7 +12,6 @@ from typing import Self
 from pydantic import model_validator
 
 from glossogen.scenarios.base_knobs import BaseKnobs
-from glossogen.scenarios.channel_noise import NoiseReplacementMode
 
 # Archetype weights are positional; this is the fixed order they map to.
 ARCHETYPE_ORDER = ("hold", "time_it", "keep_closed", "evacuate")
@@ -45,12 +44,8 @@ class SpillwayReleaseKnobs(BaseKnobs):
     never shifts another round's case under a fixed ``seed``.
     """
 
-    postmortem_enabled: bool
-    postmortem_disabled_at_start: bool
-    round_time_budget_seconds: int  # pyright: ignore[reportIncompatibleVariableOverride]
+    round_time_budget_seconds: int
     seed: int
-    channel_noise_level: float
-    noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     easy_round_numbers: frozenset[int]
     gate_count: int
     release_per_gate_per_hour: int
@@ -58,14 +53,6 @@ class SpillwayReleaseKnobs(BaseKnobs):
     min_level: int
     day_end_hours: float
     archetype_weights: list[int]
-
-    @model_validator(mode="after")
-    def _validate_channel_noise_level(self) -> Self:
-        if not 0.0 <= self.channel_noise_level <= 1.0:
-            raise ValueError(
-                f"channel_noise_level must be in [0.0, 1.0] (got {self.channel_noise_level})"
-            )
-        return self
 
     @model_validator(mode="after")
     def _validate_reservoir_band(self) -> Self:

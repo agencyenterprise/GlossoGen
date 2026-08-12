@@ -14,10 +14,9 @@ teams that find every difference the one with the fewest characters wins.
 
 from typing import Self
 
-from pydantic import Field, model_validator
+from pydantic import model_validator
 
 from glossogen.scenarios.base_knobs import BaseKnobs
-from glossogen.scenarios.channel_noise import NoiseReplacementMode
 from glossogen.scenarios.spot_the_difference.ids import DifferenceKind
 
 _VALID_DIFFERENCE_KINDS = frozenset(kind.value for kind in DifferenceKind)
@@ -63,9 +62,7 @@ class SpotTheDifferenceKnobs(BaseKnobs):
 
     judge_model: str
     judge_provider: str
-    postmortem_enabled: bool
-    postmortem_disabled_at_start: bool
-    round_time_budget_seconds: int  # pyright: ignore[reportIncompatibleVariableOverride]
+    round_time_budget_seconds: int
     seed: int
     grid_size: int
     object_count_values: list[int]
@@ -74,8 +71,6 @@ class SpotTheDifferenceKnobs(BaseKnobs):
     difference_count_weights: list[int]
     difference_kinds: list[str]
     easy_round_numbers: frozenset[int]
-    channel_noise_level: float = Field(ge=0.0, le=1.0)
-    noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     two_teams: bool = False
     shared_link: bool = False
     all_must_submit: bool = True

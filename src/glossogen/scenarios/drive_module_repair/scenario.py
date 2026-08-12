@@ -31,7 +31,7 @@ generation), :mod:`world_state` (the outcome type), and
 import logging
 import random
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
@@ -90,6 +90,8 @@ def _protocol_role_groups() -> dict[str, frozenset[str]]:
 
 class DriveModuleRepairScenario(SimulationScenario):
     """Three-agent drive-module repair coordination scenario."""
+
+    postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset({POSTMORTEM_CHANNEL_ID})
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
@@ -190,19 +192,6 @@ class DriveModuleRepairScenario(SimulationScenario):
             previous_outcome=self._world.previous_outcome(),
             renderer=self._renderer,
         )
-
-    def get_max_postmortem_duration_seconds(self) -> float:
-        """Return the configured postmortem duration, or 0 when disabled."""
-        if not self._knobs.postmortem_enabled:
-            return 0.0
-        if self._world.is_postmortem_disabled:
-            return 0.0
-        return self._knobs.postmortem_duration_seconds
-
-    def on_postmortem_started(self, round_number: int) -> None:
-        """Unlock the postmortem channel for discussion."""
-        _ = round_number
-        self._world.enter_postmortem()
 
     def judge_round_result(self, round_number: int, trigger: str) -> list[RoundResult]:
         """Return the single-team success verdict from the resolved outcome."""
@@ -326,8 +315,3 @@ class DriveModuleRepairScenario(SimulationScenario):
             judge_provider=self._judge_provider,
             get_runtime=lambda: self._runtime,
         )
-
-    @classmethod
-    def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:
-        """Hide the postmortem channel from any replaced agent's tool history."""
-        return frozenset({POSTMORTEM_CHANNEL_ID})

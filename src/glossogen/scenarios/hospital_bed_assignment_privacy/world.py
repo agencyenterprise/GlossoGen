@@ -90,11 +90,13 @@ class HospitalWorld(ScenarioWorld):
         cases: list[HospitalCase],
         postmortem_globally_disabled: bool,
     ) -> None:
+        super().__init__(
+            postmortem_channel_ids=frozenset({POSTMORTEM_CHANNEL_ID}),
+            postmortem_globally_disabled=postmortem_globally_disabled,
+        )
         self._cases = cases
         self._current_case: HospitalCase | None = None
         self._current_round_number: int = 0
-        self._in_postmortem: bool = False
-        self._postmortem_globally_disabled: bool = postmortem_globally_disabled
         self._current_round_characters: int = 0
         self._round_budget_exceeded: bool = False
         self._pending_routing: HospitalRouting | None = None
@@ -124,16 +126,6 @@ class HospitalWorld(ScenarioWorld):
         return self._round_budget_exceeded
 
     @property
-    def in_postmortem(self) -> bool:
-        """Whether the simulation is in a postmortem discussion phase."""
-        return self._in_postmortem
-
-    @property
-    def is_postmortem_disabled(self) -> bool:
-        """Whether postmortem has been globally disabled."""
-        return self._postmortem_globally_disabled
-
-    @property
     def outcomes(self) -> list[HospitalOutcome]:
         """All resolved round outcomes in order."""
         return self._outcomes
@@ -143,20 +135,6 @@ class HospitalWorld(ScenarioWorld):
         if len(self._outcomes) == 0:
             return None
         return self._outcomes[-1]
-
-    def enter_postmortem(self) -> None:
-        """Mark the start of a postmortem discussion phase."""
-        self._in_postmortem = True
-
-    def exit_postmortem(self) -> None:
-        """Mark the end of a postmortem discussion phase."""
-        self._in_postmortem = False
-
-    def get_globally_disabled_channels(self) -> frozenset[str]:
-        """Return the postmortem channel id when postmortem is globally disabled."""
-        if not self._postmortem_globally_disabled:
-            return frozenset()
-        return frozenset({POSTMORTEM_CHANNEL_ID})
 
     def record_routing(self, routing: HospitalRouting) -> None:
         """Store the Transport Lead's latest routing submission (overwrite-wins)."""

@@ -263,6 +263,47 @@ def test_round_one_injections_render(
         scenario.get_injection(round_number=1, agent_id=agent.agent_id)
 
 
+def test_the_postmortem_phase_lasts_exactly_as_long_as_it_is_open(
+    built: tuple[str, dict[str, Any], SimulationScenario],
+) -> None:
+    """A closed postmortem must report zero duration, not its configured length.
+
+    This was written out per scenario, and one of the nine copies had lost the
+    `postmortem_enabled` check, so it reported a full-length phase for a run
+    configured without one. Veyru's `knobs_baseline_no_postmortem_*` presets
+    exercise the closed branch.
+    """
+    _, _, scenario = built
+    knobs = scenario.get_knobs()
+    is_open = knobs.postmortem_enabled and not scenario.get_world().is_postmortem_disabled
+    duration = scenario.get_max_postmortem_duration_seconds()
+
+    assert (duration > 0.0) == is_open, f"postmortem open={is_open} but duration={duration}"
+
+
+def test_blocked_history_channels_are_the_declared_postmortem_channels(
+    built: tuple[str, dict[str, Any], SimulationScenario],
+) -> None:
+    """One declaration feeds the history filter, the phase, and the disabled set.
+
+    A replaced agent must not read the predecessor's postmortem traffic, which
+    is where agents discuss the protocol out of band. Listing the channels in
+    one place and the blocked set in another let a scenario block the shared
+    channel while leaving its per-team ones readable.
+    """
+    _, _, scenario = built
+    scenario_cls = type(scenario)
+    declared = scenario_cls.postmortem_channel_ids
+
+    assert scenario_cls.get_replace_agent_blocked_tool_call_channels() == declared
+
+    world = scenario.get_world()
+    world.disable_postmortem_globally()
+    assert (
+        world.get_globally_disabled_channels() == declared
+    ), "the world disables a different set than the scenario blocks"
+
+
 def test_postmortem_injections_render(
     built: tuple[str, dict[str, Any], SimulationScenario],
 ) -> None:
