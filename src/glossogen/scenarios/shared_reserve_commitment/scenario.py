@@ -9,6 +9,7 @@ from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.shared_reserve_commitment.events import (
+    SharedReserveDecisionMissed,
     SharedReserveLedgerPublished,
     SharedReserveRoundSettled,
     SharedReserveServiceTerminated,
@@ -225,10 +226,18 @@ class SharedReserveCommitmentScenario(SimulationScenario):
         if round_number == 1 or not self._world.service_active():
             return
         settlement = self._world.settle_round(round_number=round_number)
+        for agent_id in settlement.missing_provider_ids:
+            await self.runtime.event_logger.log(
+                event=SharedReserveDecisionMissed(
+                    round_number=round_number,
+                    agent_id=agent_id,
+                )
+            )
         await self.runtime.event_logger.log(
             event=SharedReserveRoundSettled(
                 round_number=round_number,
                 condition=self._knobs.condition.value,
+                missing_provider_ids=list(settlement.missing_provider_ids),
                 reserve_before_claim=settlement.reserve_before_claim,
                 client_claim_due=settlement.client_claim_due,
                 client_claim_paid=settlement.client_claim_paid,

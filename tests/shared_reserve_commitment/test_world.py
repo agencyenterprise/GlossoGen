@@ -113,6 +113,20 @@ def test_uncovered_claim_ends_future_shared_service() -> None:
     assert world.service_active() is False
 
 
+def test_missed_action_is_publicly_distinct_from_retention() -> None:
+    """Keep a missed tool action from crashing or being silently scored as retention."""
+    world = SharedReserveCommitmentWorld(knobs=build_knobs(SharedReserveCondition.NO_GROUP))
+
+    world.begin_round(round_number=2)
+    world.submit_decision(agent_id="provider_a", action="contribute")
+    settlement = world.settle_round(round_number=2)
+    ledger = world.ledger_text(settlement=settlement)
+
+    assert settlement.missing_provider_ids == ("provider_b",)
+    assert "provider_b: no_decision; contributed 0; retained 0." in ledger
+    assert world.provider(agent_id="provider_b").earnings == Decimal("21.0")
+
+
 def test_pledge_is_exposed_and_costly_affirmation_changes_real_balance() -> None:
     """Require the pledge treatment to be observable and financially real."""
     scenario = SharedReserveCommitmentScenario(

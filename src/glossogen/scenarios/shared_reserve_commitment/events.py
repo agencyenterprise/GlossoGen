@@ -43,11 +43,19 @@ class SharedReserveDecisionRecorded(EventBase):
     earnings_after: Decimal
 
 
+class SharedReserveDecisionMissed(EventBase):
+    """Records a provider who did not allocate their payment before round end."""
+
+    event_type: Literal["shared_reserve_decision_missed"] = "shared_reserve_decision_missed"
+    agent_id: str
+
+
 class SharedReserveRoundSettled(EventBase):
     """Records reserve state and client-continuity result after a round."""
 
     event_type: Literal["shared_reserve_round_settled"] = "shared_reserve_round_settled"
     condition: str
+    missing_provider_ids: list[str]
     reserve_before_claim: int
     client_claim_due: bool
     client_claim_paid: bool | None

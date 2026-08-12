@@ -154,11 +154,22 @@ class SharedReserveCommitmentWorld(ScenarioWorld):
         return record
 
     def settle_round(self, round_number: int) -> RoundSettlement:
-        """Apply the deterministic shared claim and retain the public outcome."""
+        """Apply the deterministic shared claim after submitted or missed actions."""
         if round_number != self._current_round:
             raise ValueError("cannot settle a round other than the active round")
-        if not self.decisions_complete():
-            raise ValueError("cannot settle until both providers have decided")
+        missing_provider_ids = tuple(
+            agent_id for agent_id in PROVIDER_IDS if agent_id not in self._decisions
+        )
+        for agent_id in missing_provider_ids:
+            provider = self._providers[agent_id]
+            self._decisions[agent_id] = ReserveDecision(
+                agent_id=agent_id,
+                action="no_decision",
+                contribution=0,
+                retained=0,
+                earnings_before=provider.earnings,
+                earnings_after=provider.earnings,
+            )
         contributions = sum(record.contribution for record in self._decisions.values())
         self._reserve_balance += contributions
         reserve_before_claim = self._reserve_balance
@@ -172,6 +183,7 @@ class SharedReserveCommitmentWorld(ScenarioWorld):
                 self._service_active = False
         settlement = RoundSettlement(
             round_number=round_number,
+            missing_provider_ids=missing_provider_ids,
             reserve_before_claim=reserve_before_claim,
             client_claim_due=client_claim_due,
             client_claim_paid=client_claim_paid,
@@ -220,7 +232,8 @@ class SharedReserveCommitmentWorld(ScenarioWorld):
             elif isinstance(event, SharedReserveEntryCostPaid):
                 self.pay_pledge_entry_cost(agent_id=event.agent_id)
             elif isinstance(event, SharedReserveDecisionRecorded):
-                self.begin_round(round_number=event.round_number)
+                if event.round_number != self._current_round:
+                    self.begin_round(round_number=event.round_number)
                 self.submit_decision(agent_id=event.agent_id, action=event.action)
             elif isinstance(event, SharedReserveRoundSettled):
                 self._reserve_balance = event.reserve_after_claim
@@ -228,6 +241,7 @@ class SharedReserveCommitmentWorld(ScenarioWorld):
                 self._settlements.append(
                     RoundSettlement(
                         round_number=event.round_number,
+                        missing_provider_ids=tuple(event.missing_provider_ids),
                         reserve_before_claim=event.reserve_before_claim,
                         client_claim_due=event.client_claim_due,
                         client_claim_paid=event.client_claim_paid,

@@ -27,6 +27,7 @@ class RoundSettlement(NamedTuple):
     """Public result of one round after both decisions are recorded."""
 
     round_number: int
+    missing_provider_ids: tuple[str, ...]
     reserve_before_claim: int
     client_claim_due: bool
     client_claim_paid: bool | None
