@@ -75,9 +75,11 @@ initial same-config calibration passes.
    replaces it with a public `no_decision` outcome. It tests whether the common
    good, public ledger, and shared consequence produce neither a universal
    contribution ceiling nor universal retention floor.
-2. Only if EXP-038 passes its prespecified variation and instrumentation gates,
-   run the four-condition group → pledge → costly-pledge ladder with three
-   independent trajectories per exact configuration.
+2. EXP-038 passed its prespecified variation and instrumentation gates. Reuse
+   its three exact no-group trajectories as the matched baseline, then run the
+   group → pledge → costly-pledge arms in
+   [EXP-039](../experiments/EXP-039-shared-reserve-commitment-ladder/experiment.md),
+   with three independent trajectories per exact configuration.
 3. Make at most one substantial revision to the reserve-claim schedule. If the
    baseline remains a universal floor or ceiling after that revision, retire the
    instrument rather than tuning toward a desired covenant result.

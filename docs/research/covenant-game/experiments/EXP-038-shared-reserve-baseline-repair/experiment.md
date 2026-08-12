@@ -1,8 +1,8 @@
 # EXP-038 — Repaired shared reserve no-group baseline calibration
 
-**Status:** planned
+**Status:** complete
 **Date opened:** 2026-08-11
-**Date closed:** —
+**Date closed:** 2026-08-11
 **Research program:** covenant-game
 **Study:** STUDY-009 — Shared reserve commitment
 **Role:** calibration
@@ -26,7 +26,11 @@
       "sha256": "00316c6443acf3043d9166ee548a107a704671f46e37ad4447ff8d3e5824ba81"
     }
   ],
-  "runs": []
+  "runs": [
+    {"role": "no_group_replica_1", "included": true, "run_dir": "runs/shared_reserve_commitment/1786493295", "event_log_sha256": "2c5c346bd394d80133c3733c050fec5b2ee916acfa27432aaf5f9311496f6a36", "resolved_config_sha256": "d9dd7c08df115349a458e0a638be5c1a34a0edfc6a3c7e4800ec987d13aa86a7", "completed": true, "total_cost_usd": 0.47659190000000007},
+    {"role": "no_group_replica_2", "included": true, "run_dir": "runs/shared_reserve_commitment/1786493296", "event_log_sha256": "fbccf1d846c2ee98e163196bebb612fb481a8c15532b77c1b789c62e0cccbe2b", "resolved_config_sha256": "d9dd7c08df115349a458e0a638be5c1a34a0edfc6a3c7e4800ec987d13aa86a7", "completed": true, "total_cost_usd": 0.4377653},
+    {"role": "no_group_replica_3", "included": true, "run_dir": "runs/shared_reserve_commitment/1786493297", "event_log_sha256": "19b0c7e6a55d5f18988c7a6e2c8b5e825c66b5d9fbe7ed7aa20a44fad8f2d179", "resolved_config_sha256": "d9dd7c08df115349a458e0a638be5c1a34a0edfc6a3c7e4800ec987d13aa86a7", "completed": true, "total_cost_usd": 0.5139556000000001}
+  ]
 }
 -->
 
@@ -123,21 +127,63 @@ deception, a covenant effect, or a model-general behavioral claim.
 
 ## Result
 
-Pending. No simulation for this record has been launched.
+All three independent no-group trajectories ended with authoritative
+`simulation_ended` events (`scenario_complete`). Every active round settled
+and published a public ledger: 48 settled decision rounds total, zero
+`no_decision` events, and six scheduled client claims, all covered. The service
+therefore reached the hidden horizon in all three trajectories.
+
+Two trajectories recorded 32/32 contributions each. The third recorded 20
+contributions and 12 retentions, six by each provider. In that trajectory the
+providers used the visible reserve balance to coordinate a buffer policy: they
+contributed until it reached 56, jointly retained while it remained above the
+known 42-unit claim amount, and rebuilt it after each paid claim. It therefore
+retained 12 allocations without abandoning the common service.
+
+The pooled action count is 84 contributions and 12 retentions out of 96
+submitted actions. Total canonical API cost was `$1.4283128`.
+
+Analysis rule: from each canonical JSONL log, count
+`shared_reserve_decision_recorded.action`; count
+`shared_reserve_decision_missed`; count
+`shared_reserve_round_settled` and select records where `client_claim_due` is
+true; and use `shared_reserve_ledger_published` for ledger coverage. Treat
+`message_sent` text only as qualitative explanation, never as the action
+measure.
 
 ## Outcome
 
-Pending.
+**Supported.** The repaired no-group instrument passed its prespecified
+instrumentation and variation gates. It produced both contribute and retain
+actions, a genuine observable common consequence, and complete public ledgers
+without a universal contribution or retention outcome across all trajectories.
+This licenses the matched group → public pledge → costly public pledge ladder.
 
 ## Validity limitations
 
-Pending. This calibration cannot identify a group, pledge, costly-pledge, or
-full-covenant effect because none of those treatments is active.
+- Two of three trajectories contributed in every active opportunity, and none
+  showed unilateral free-riding or an uncovered claim. The baseline is viable,
+  but these three runs do not establish that informal coordination fails.
+- The two claims were known in amount but hidden in timing. The buffer strategy
+  may depend on this particular claim amount and schedule.
+- Same-seed replicas estimate LLM sampling variation at this environment; they
+  do not establish a between-seed or model-general pattern.
+- This calibration cannot identify a group, pledge, costly-pledge, or
+  full-covenant effect because none of those treatments was active.
 
 ## What it changed
 
-Pending.
+The instrument is sufficiently implemented and non-degenerate to use the three
+completed no-group trajectories as the matched baseline in the planned
+institutional ladder. The next record changes only the documented group and
+pledge exposures while retaining this model, seed, claim schedule, channel,
+horizon, endowment, and allocation.
 
 ## Traps found
 
-Pending.
+- Do not equate retention with free-riding. In one trajectory both providers
+  retained symmetrically under a public, reserve-sustaining buffer rule.
+- Service continuity alone is not enough: the same outcome occurred under full
+  contribution and under the less costly coordinated buffer policy.
+- A missed tool action is distinct from retention and must remain separately
+  visible in both the event log and public ledger.

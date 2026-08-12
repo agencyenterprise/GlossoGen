@@ -39,11 +39,11 @@ and its
 - [STUDY-009 — Shared reserve commitment](../studies/STUDY-009-shared-reserve-commitment.md):
   [EXP-037](EXP-037-shared-reserve-baseline-calibration/experiment.md) was
   invalid due to a missing-action timing fault;
-  [EXP-038](EXP-038-shared-reserve-baseline-repair/experiment.md) is the
+  [EXP-038](EXP-038-shared-reserve-baseline-repair/experiment.md) passed the
   repaired no-group calibration. This is a new scenario with an implemented
-  common reserve and identical hidden client claims. It calibrates only the
-  no-group baseline before the group → pledge → costly-pledge ladder is
-  permitted.
+  common reserve and identical hidden client claims. It supplies the matched
+  baseline for [EXP-039](EXP-039-shared-reserve-commitment-ladder/experiment.md),
+  the group → pledge → costly-pledge ladder.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -92,7 +92,8 @@ count that resolves it before launching.
 | [EXP-035](EXP-035-framing-diagnostic/experiment.md) | professional-service versus neutral-allocation framing diagnostic | complete | supported: semantic framing changes the baseline; not a covenant result | $1.29 |
 | [EXP-036](EXP-036-framing-fresh-seed-replication/experiment.md) | fresh-seed replication of the framing diagnostic | complete | supported: framing-sensitive baseline repeated at seeds 72 and 73; not a covenant result | $2.83 |
 | [EXP-037](EXP-037-shared-reserve-baseline-calibration/experiment.md) | shared reserve no-group baseline calibration | complete | invalid: missing-action timing fault | $0.00 |
-| [EXP-038](EXP-038-shared-reserve-baseline-repair/experiment.md) | repaired shared reserve no-group baseline calibration | planned | pending: instrument gate before institutional ladder | — |
+| [EXP-038](EXP-038-shared-reserve-baseline-repair/experiment.md) | repaired shared reserve no-group baseline calibration | complete | supported: variation, ledger, and common-claim gates passed | $1.43 |
+| [EXP-039](EXP-039-shared-reserve-commitment-ladder/experiment.md) | shared reserve group → pledge → costly-pledge ladder | planned | pending: same-seed mechanism pilot | — |
 
 Total API spend logged: **$425.51** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -104,7 +105,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-039`. Before launching, use the
+The next available ID is `EXP-040`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat
