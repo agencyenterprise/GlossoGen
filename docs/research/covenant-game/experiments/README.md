@@ -110,10 +110,18 @@ and its
   arm named `covenant` satisfies the paper's pledge-plus-cost definition
   completely and the orientation document's definition on one of seven
   requirements, failing the three load-bearing ones: non-rivalrous good, no
-  terminal value, irreversible breach. That reframes the program's five flat
-  ladders as consistent with the theory rather than evidence against it, and
-  inverts the next steps: the good comes before enforcement. See
-  [covenant-definition.md](../covenant-definition.md).
+  terminal value, irreversible breach. The five flat ladders are therefore
+  consistent with the theory and are not evidence against it — but they
+  **discriminate between nothing**, since the hypothesis that institutional
+  framing does not move these agents predicts the same nulls. An adversarial
+  review then rejected the successor design that audit had motivated: it had
+  inverted a necessary condition into a sufficient prediction, its decision table
+  could not discriminate given the orientation's own position on AI, and its
+  covenant arm bundled a sanction. The adopted sequence runs the collaboration's
+  explicit requests first — commitment reminder, then generational transmission —
+  and defers the non-rivalrous world to a separate study with a neutral-language
+  control. See [covenant-definition.md](../covenant-definition.md) for the five
+  rules and the corrections log.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected

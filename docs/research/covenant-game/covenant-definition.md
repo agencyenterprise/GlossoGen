@@ -120,18 +120,28 @@ horizon.
 **Consequence for how the program's null results are read.** The orientation
 predicts defection pressure for rivalrous goods and attractive defection near a
 terminal point. Five batches of flat institutional contrasts on rivalrous,
-finite-horizon goods are therefore consistent with Definition B rather than
-evidence against it. They are Definition B's control condition, run five times.
-EXP-045 recorded the two predictions directly: 72 of 450 retentions in the
-chosen-framing arms fell in the post-claim rounds where nothing remained at
-stake, and 28 of 30 providers broke a pledge whose breach carried no cost.
+finite-horizon goods are therefore **consistent with Definition B, and are not
+evidence against it**. They do **not** discriminate between Definition B and the
+rival hypothesis that institutional framing simply does not move these agents,
+which predicts the same five nulls. EXP-045 recorded the two predictions
+directly: 72 of 450 retentions in the chosen-framing arms fell in the post-claim
+rounds where nothing remained at stake, and 28 of 30 providers broke a pledge
+whose breach carried no cost — but those observations are equally consistent with
+both hypotheses.
+
+An earlier revision of this file, of STUDY-013, and of both index files called
+the five nulls "Definition B's control condition, run five times". That was an
+overclaim and is corrected here; see *Corrections* below.
 
 **Consequence for sequencing.** Adding an enforcement mechanism — loss of
-membership, forfeiture on breach — addresses B3 alone. Section II makes the
-non-rivalrous infinite-horizon good the precondition for stability, so B1 and B2
-come first; enforcement bolted onto a rivalrous finite good is predicted to fail
-by the same argument that predicts the unenforced version fails. Any successor
-instrument should establish B1 and B2 before a B3 ladder is built on it.
+membership, forfeiture on breach — addresses B3 alone. Section II's claim is a
+**necessary** condition: covenantal stability requires a non-rivalrous
+infinite-horizon good. It does not entail the converse — that supplying those
+conditions and adding a covenant will produce more cooperation. Establishing B1
+and B2 before a B3 ladder is therefore a **design preference of this program**,
+justified by not wanting to test enforcement on a substrate the theory excludes.
+It is not an entailment of the theory, and no experiment should be preregistered
+as if it were.
 
 ## One accidental alignment worth keeping
 
@@ -142,10 +152,52 @@ It was a side effect of removing computable sufficiency, not a deliberate
 implementation of Section II, but it is the one place where the instrument's
 information design matches the orientation rather than the paper.
 
-## Rule going forward
+## Rules going forward
 
-Do not name an arm `covenant` without stating, in the experiment record's
-`Design` section, which definition it implements and which checklist rows it
-fails. The failure list is the interpretation: a result from an arm failing B1
-and B2 cannot be reported as evidence about covenant in the orientation's sense,
-in either direction.
+1. Do not name an arm `covenant` without stating, in the experiment record's
+   `Design` section, which definition it implements and which checklist rows it
+   fails. The failure list is the interpretation: a result from an arm failing B1
+   and B2 cannot be reported as evidence about covenant in the orientation's
+   sense, in either direction.
+2. **An arm that carries a sanction has not identified commitment.** A covenant
+   arm bundling a pledge with expulsion, forfeiture, or loss of access confounds
+   commitment with threat avoidance. Such an arm requires a comparison arm with
+   **identical rules, costs, and sanctions but neutral language** ("protocol",
+   "eligibility rule") before any effect may be attributed to the commitment
+   framing rather than to the incentive.
+3. **Cap the inference at what was identified.** Even where covenantal framing
+   beats its neutral-language twin, write "the covenantal framing had an
+   incremental effect over materially equivalent rules and incentives" — never
+   "covenant worked". The stronger phrasing asserts a construct the design does
+   not reach.
+4. **A null does not refute Definition B.** Section V holds that AI systems
+   cannot be genuine covenantal partners, because forking removes
+   irreversibility. Definition B therefore predicts a null in agents, and a
+   positive result is awkward for it. No experiment on LLM agents may be
+   preregistered as confirmatory or disconfirmatory of Definition B. The
+   available target is the behavioural programme of Section VI: does covenantal
+   framing change cooperative behaviour? That question does not require genuine
+   stake.
+5. **Do not call simulated costs real.** Points in a simulation are not money to
+   a language model. Write conclusions about elicited policies of agents in
+   textual environments with represented incentives, not about stake in the
+   orientation's sense.
+
+## Corrections
+
+**2026-08-13 — the five nulls were overclaimed.** The first revision of this
+file, of [STUDY-013](studies/STUDY-013-choice-attribution.md), of the program
+README, and of the experiment index stated that the program's five flat
+institutional ladders "are Definition B's control condition, run five times".
+
+That attributed discriminative power the data do not have. The hypothesis that
+institutional framing does not move these agents predicts the same five nulls, so
+the nulls cannot separate it from Definition B. The defensible statement is the
+narrow one: the five nulls are consistent with Definition B, are not evidence
+against it, and discriminate between nothing.
+
+The same review established that this file's sequencing recommendation was
+derived by inverting Section II's necessary condition into a sufficient
+prediction. That inversion is corrected above, and rules 2 through 5 were added
+in the same pass. The overclaim is left recorded here rather than removed,
+because a research record that silently repairs its own errors cannot be audited.

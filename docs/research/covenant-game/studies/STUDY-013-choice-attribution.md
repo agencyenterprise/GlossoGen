@@ -82,44 +82,80 @@ definition once. Three failures are load-bearing:
 The orientation predicts defection pressure for rivalrous goods and attractive
 defection near a terminal point. This study measured both: 72 of 450 retentions
 in the chosen-framing arms fell after the claim resolved, and the universal
-pledge breach is exactly what the orientation says follows from absent
-irreversibility. **The program's five flat ladders are consistent with the
-theory, not evidence against it** — they are its control condition.
+pledge breach is what the orientation says follows from absent irreversibility.
+**The program's five flat ladders are consistent with the theory and are not
+evidence against it. They discriminate between nothing** — the hypothesis that
+institutional framing simply does not move these agents predicts the same five
+nulls. An earlier revision of this section called them "its control condition",
+which attributed discriminative power the data do not have; see
+[Corrections](../covenant-definition.md#corrections).
 
 ## What is not authorised
 
 - **No seventh institutional ladder on a rivalrous, finite-horizon good.** Six
   batches, two instruments, one result. The measurement is adequate; the world
   is the constraint.
-- **No enforcement ladder on `pledge_breach` as it stands.** Loss of membership
-  addresses irreversibility alone, and the orientation makes the non-rivalrous
-  infinite-horizon good the precondition for stability. Enforcement first would
-  test a mechanism the theory says cannot hold on this substrate, and a null
-  would be uninterpretable a seventh time.
+- **No experiment on LLM agents preregistered as confirmatory or disconfirmatory
+  of Definition B.** Section V of the orientation holds that AI systems cannot be
+  genuine covenantal partners, so Definition B predicts a null in agents and a
+  positive result is awkward for it. Neither outcome discriminates. The available
+  target is Section VI's behavioural question.
+- **No covenant arm carrying a sanction without a neutral-language twin.** A
+  pledge bundled with expulsion or loss of access confounds commitment with
+  threat avoidance, and the threat is strongest in exactly the early rounds where
+  commitment-before-comprehension would be demonstrated.
 - **No claim that group identity, pledges, or membership costs do not work.**
-  They were tested only where the theory predicts they cannot. That is a scope
-  limit, not a finding about the treatments.
+  They were tested in one instrument on one substrate. That is a scope limit, not
+  a finding about the treatments.
 
-## What the successor instrument must carry
+## Sequence adopted after external review
 
-In priority order, from [covenant-definition.md](../covenant-definition.md):
+An adversarial review of the proposed non-rivalrous successor (2026-08-13) found
+that its central inference inverted Section II's necessary condition into a
+sufficient prediction, that its decision table could not discriminate given
+Section V, that its covenant arm bundled a sanction, and that EXP-045 cannot
+serve as the rivalrous cell of a rivalry contrast because nearly every feature
+differs between the two worlds. The rules added to
+[covenant-definition.md](../covenant-definition.md) come from that review.
 
-1. **A non-rivalrous shared good** (B1). Sharing must not deplete what the
-   sharer holds. The orientation names the candidates: understanding, epistemic
-   capacity, mutual transparency.
-2. **No terminal value** (B2). No announced final round and no single event whose
-   resolution ends the exposure.
-3. **A live partner** (B5) and **an inclusion decision** (B6), which together
-   make the Moral Quality Filter testable. The orientation calls it the most
-   important mechanism its human work has found, and a scripted partner makes it
-   structurally unmeasurable.
-4. Only then **irreversible breach** (B3) — the loss-of-membership mechanism the
-   collaboration asked for in March.
+The adopted order puts the collaboration's own explicit requests first, because
+each is cheaper, is aimed at a question the collaboration actually formulated,
+and improves the design of anything built afterwards:
 
-`pledge_breach` should be kept, not retired. It is the program's only working
-causal instrument and it is the right control for a non-rivalrous successor:
-same institutional ladder, same measure, rivalrous good. A successor that shows
-a ladder effect where `pledge_breach` shows none isolates the good as the cause.
+1. **Commitment reminder.** A tool the provider may call that returns its own
+   affirmed pledge, on `pledge_breach` as it stands. Requested in the shared
+   channel on 2026-05-22, following a published report that an
+   ethical-commitment reminder lowered misaligned behaviour. The baseline is
+   already measured and dramatic: 58 of 60 chosen-framing simulations broke the
+   pledge. This is the most localised intervention available — it isolates
+   commitment salience from pledge, sanction, future access, and covenantal
+   semantics.
+2. **Generational transmission.** Agents replaced mid-run, inheriting adherence
+   with some transmission probability, testing whether the institution transmits
+   a cooperative policy across replacement. Requested on 2026-03-09. The
+   platform's scheduled-swap machinery and `protocol_learned_after_swap` already
+   exist. A null here is a null on a question the collaboration asked.
+3. **The knowledge-commons instrument, as a new study, not as this one
+   continued.** Its question changed materially under review: not "does covenant
+   work on the substrate the theory requires" but "in a non-rivalrous environment
+   with no known terminal point, does covenantal framing produce behaviour beyond
+   the material incentive of retaining access". `incentive_only` is the central
+   comparison; a private-notebook arm carrying the same documentation cost with no
+   beneficiary is required before the words "public good" or "free-riding" may be
+   used. Its calibration gate must guarantee variance in the **confirmatory**
+   endpoint, not in a per-round rate, and any recalibration must happen on a
+   discarded pilot.
+
+Results from steps 1 and 2 change the prior for step 3. If a reminder alone moves
+the 58 of 60, that shifts how much of the pledge needs to be present or salient
+in a covenant arm at all.
+
+`pledge_breach` is kept, not retired. It is the program's only instrument that has
+produced a clean causal contrast, and steps 1 and 2 both run on it. It is **not**
+a usable rivalrous control for a non-rivalrous successor: the two worlds differ in
+task, timing, partner count, contribution mechanism, sanction, and horizon, so a
+difference between them is not a rivalry effect. Testing that claim requires
+manipulating rivalry within one design.
 
 ## Experiments
 

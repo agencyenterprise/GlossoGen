@@ -76,11 +76,18 @@ orientation document's definition on one of seven requirements — failing the t
 load-bearing ones: a non-rivalrous good, no terminal value, and irreversibility of
 breach. The orientation predicts defection pressure for rivalrous goods and
 attractive defection near a terminal point, and EXP-045 measured both. **The five
-flat ladders are consistent with the theory rather than evidence against it.**
+flat ladders are consistent with the theory and are not evidence against it — and
+they discriminate between nothing**, because the hypothesis that institutional
+framing simply does not move these agents predicts the same five nulls. An earlier
+revision of this section overstated that as "the theory's control condition"; see
+[Corrections](covenant-definition.md#corrections).
 
-The next instrument must establish a non-rivalrous shared good with no terminal
-value, and restore a live partner and an inclusion decision, before any
-enforcement mechanism is tested. See
-[covenant-definition.md](covenant-definition.md) for the checklist and
-[STUDY-013](studies/STUDY-013-choice-attribution.md) for the ordering and what is
+The adopted next steps put the collaboration's own explicit requests first: a
+commitment-reminder tool on `pledge_breach`, then generational transmission with a
+transmission probability. The non-rivalrous knowledge-commons world follows as a
+separate study with a reframed question — whether covenantal framing adds anything
+over materially equivalent rules and incentives — and it requires a
+neutral-language control arm. See [covenant-definition.md](covenant-definition.md)
+for the five rules any covenant arm must satisfy and
+[STUDY-013](studies/STUDY-013-choice-attribution.md) for the sequence and what is
 not authorized.

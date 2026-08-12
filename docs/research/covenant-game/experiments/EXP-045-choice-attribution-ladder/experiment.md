@@ -2892,21 +2892,34 @@ nine-row checklist and this instrument scored against it. **No future arm may be
 named `covenant` without recording which definition it meets and which rows it
 fails.**
 
-**3. It re-reads the program's five flat ladders.** The orientation states that
-groups organised around rivalrous goods are always under defection pressure, and
-that defection becomes attractive when the game ends soon. Every instrument in
-this program organised cooperation around money over a finite horizon. This record
-measured both predictions: 72 of 450 retentions fell after the claim resolved, and
-28 of 30 providers broke a free-to-break pledge. The flat ladders are consistent
-with that theory rather than evidence against it — they are its control condition,
-run five times.
+**3. It re-reads the program's five flat ladders — but only weakly.** The
+orientation states that groups organised around rivalrous goods are always under
+defection pressure, and that defection becomes attractive when the game ends soon.
+Every instrument in this program organised cooperation around money over a finite
+horizon. This record measured both predictions: 72 of 450 retentions fell after the
+claim resolved, and 28 of 30 providers broke a free-to-break pledge.
 
-**4. It reorders the next experiments.** The plan's authorised successors were
-loss of membership and probing why. Loss of membership addresses irreversibility
-alone, and the orientation makes the non-rivalrous infinite-horizon good the
-*precondition* for stability. So the ordering is inverted: establish a
-non-rivalrous good with no terminal value first, restore a live partner and an
-inclusion decision second, and only then test enforcement. Recorded in
+The defensible reading is narrow: the flat ladders are **consistent with that
+theory and are not evidence against it**, and they **discriminate between
+nothing** — the hypothesis that institutional framing simply does not move these
+agents predicts the same five nulls, and predicts these two observations too. An
+earlier revision of this section, of `covenant-definition.md`, and of both index
+files called the nulls "its control condition, run five times". That attributed
+discriminative power the data do not have and is corrected; see
+[Corrections](../../covenant-definition.md#corrections).
+
+**4. It reorders the next experiments — twice.** The plan's authorised successors
+were loss of membership and probing why. The first reordering, on closing this
+record, put a non-rivalrous infinite-horizon good ahead of enforcement. An
+adversarial review then found that reordering was derived by inverting Section
+II's necessary condition into a sufficient prediction: "covenantal stability
+requires a non-rivalrous infinite-horizon good" does not entail "supplying those
+conditions and adding a covenant will produce more cooperation".
+
+The adopted order puts the collaboration's own explicit requests first — a
+commitment-reminder tool on this instrument, then generational transmission — and
+treats the knowledge-commons world as a separate later study with a reframed
+question and a neutral-language control arm. Recorded in
 [STUDY-013](../../studies/STUDY-013-choice-attribution.md).
 
 **5. It kills the seventh ladder.** No further institutional ladder on a
