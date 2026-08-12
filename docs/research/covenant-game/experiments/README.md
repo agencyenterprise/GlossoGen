@@ -44,7 +44,38 @@ and its
   common reserve and identical hidden client claims. It supplies the matched
   baseline for [EXP-039](EXP-039-shared-reserve-commitment-ladder/experiment.md),
   the group → pledge → costly-pledge ladder. [EXP-040](EXP-040-shared-reserve-fresh-seed-replication/experiment.md)
-  is its matched fresh-seed replication of the full ladder.
+  re-ran the full ladder and did not reproduce the candidate: every arm reached
+  near-universal contribution and every claim was covered.
+  [EXP-041](EXP-041-binding-claim-stressor/experiment.md) was the single
+  permitted claim-schedule revision, raising the client claim from 42 to 70. The
+  ceiling persisted, so this study and its instrument are **retired**.
+- [STUDY-010 — Commitment under non-computable sufficiency](../studies/STUDY-010-non-computable-sufficiency.md):
+  succeeds STUDY-009 on the same deterministic world. EXP-041 showed the
+  providers could compute the sufficient contribution level from a visible
+  reserve balance and a disclosed claim amount, so the instrument measured
+  constraint satisfaction rather than contribution policy. This study withholds
+  both — randomising nothing — and
+  [EXP-042](EXP-042-non-computable-sufficiency/experiment.md) is its four-arm
+  calibration. That calibration hardened the ceiling to zero retentions instead
+  of breaking it, refuting the study's own premise, so STUDY-010 is **retired**
+  after one batch.
+- [STUDY-011 — Public pledge as the sole social signal](../studies/STUDY-011-public-pledge-sole-social-signal.md):
+  every manipulation through EXP-042 changed what providers could *calculate*;
+  none changed what they could *see of each other*. This study closes that
+  channel — no ledger, no partner actions, no free-form messages — leaving the
+  pledge as the only social signal, with
+  [EXP-043](EXP-043-sealed-observation-pledge/experiment.md) as its four-arm
+  calibration. It was a floor probe, not a ladder rung: Gate A required the
+  no-treatment arm to produce retention before any arm-versus-arm contrast could
+  be reported. The floor never activated — 384 contributions in 384
+  opportunities — so this study is **retired** after one batch and
+  `shared_reserve_commitment` is retired as an instrument for
+  institutional-treatment questions. Three preregistered explanations for the
+  ceiling have now been refuted in sequence: claim magnitude, computable
+  sufficiency, and mutual observability. The open question is no longer which
+  institution raises contribution but what makes this model retain at all; a
+  successor instrument must show a usable retention rate in a no-treatment
+  baseline before any treatment ladder, covenant included, is built on it.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -95,9 +126,12 @@ count that resolves it before launching.
 | [EXP-037](EXP-037-shared-reserve-baseline-calibration/experiment.md) | shared reserve no-group baseline calibration | complete | invalid: missing-action timing fault | $0.00 |
 | [EXP-038](EXP-038-shared-reserve-baseline-repair/experiment.md) | repaired shared reserve no-group baseline calibration | complete | supported: variation, ledger, and common-claim gates passed | $1.43 |
 | [EXP-039](EXP-039-shared-reserve-commitment-ladder/experiment.md) | shared reserve group → pledge → costly-pledge ladder | complete | directional pledge candidate; fresh-seed replication required | $4.48 |
-| [EXP-040](EXP-040-shared-reserve-fresh-seed-replication/experiment.md) | shared reserve fresh-seed replication of the full ladder | planned | pending | — |
+| [EXP-040](EXP-040-shared-reserve-fresh-seed-replication/experiment.md) | shared reserve fresh-seed replication of the full ladder | complete | not supported: seed-74 pledge candidate did not repeat; all arms reached a contribution ceiling | $5.29 |
+| [EXP-041](EXP-041-binding-claim-stressor/experiment.md) | shared reserve ladder under a binding client claim (42 → 70) | complete | not supported; stressor unactivated: ceiling persisted, all 24 claims covered, instrument retired under guardrail 3 | $5.39 |
+| [EXP-042](EXP-042-non-computable-sufficiency/experiment.md) | four-arm ladder with reserve balance and claim amount withheld | complete | not supported: zero retentions in all 384 opportunities; ceiling hardened, EXP-041's computability diagnosis refuted, instrument family abandoned | $4.74 |
+| [EXP-043](EXP-043-sealed-observation-pledge/experiment.md) | four-arm ladder with observation sealed; pledge is the only social signal | complete | not supported: 384 contributions in 384 opportunities, zero retentions and zero missed decisions; Gate A failed, Gate C fired, instrument retired | $1.24 |
 
-Total API spend logged: **$425.51** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$430.80** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The
@@ -107,7 +141,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-041`. Before launching, use the
+The next available ID is `EXP-044`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat

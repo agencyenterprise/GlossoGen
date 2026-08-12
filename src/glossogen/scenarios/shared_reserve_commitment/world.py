@@ -11,7 +11,10 @@ from glossogen.scenarios.shared_reserve_commitment.events import (
     SharedReserveRoundSettled,
 )
 from glossogen.scenarios.shared_reserve_commitment.ids import PROVIDER_IDS
-from glossogen.scenarios.shared_reserve_commitment.knobs import SharedReserveCommitmentKnobs
+from glossogen.scenarios.shared_reserve_commitment.knobs import (
+    LedgerVisibility,
+    SharedReserveCommitmentKnobs,
+)
 from glossogen.scenarios.shared_reserve_commitment.state import (
     ProviderState,
     ReserveDecision,
@@ -196,32 +199,40 @@ class SharedReserveCommitmentWorld(ScenarioWorld):
 
     def ledger_text(self, settlement: RoundSettlement) -> str:
         """Render the agent-visible public record for one settled round."""
-        decision_lines = []
-        for decision in self.current_round_decisions():
-            decision_lines.append(
-                f"{decision.agent_id}: {decision.action}; contributed {decision.contribution}; "
-                f"retained {decision.retained}."
-            )
+        decision_lines: list[str] = []
+        if self._knobs.ledger_visibility == LedgerVisibility.FULL:
+            for decision in self.current_round_decisions():
+                decision_lines.append(
+                    f"{decision.agent_id}: {decision.action}; "
+                    f"contributed {decision.contribution}; retained {decision.retained}."
+                )
+        if self._knobs.claim_amount_disclosed:
+            claim_size = f"A {self._knobs.client_claim_amount}-unit client claim"
+        else:
+            claim_size = "A client claim"
         claim_text = "No client claim was due this round."
         if settlement.client_claim_due and settlement.client_claim_paid:
-            claim_text = (
-                f"A {self._knobs.client_claim_amount}-unit client claim was paid from the reserve."
-            )
+            claim_text = f"{claim_size} was paid from the reserve."
         if settlement.client_claim_due and not settlement.client_claim_paid:
             claim_text = (
-                f"A {self._knobs.client_claim_amount}-unit client claim could not be paid. "
+                f"{claim_size} could not be paid. "
                 "The shared service has ended; no later payments will be issued."
             )
-        return "\n".join(
-            [
-                f"PUBLIC CONTINUITY LEDGER — ROUND {settlement.round_number}",
-                *decision_lines,
-                f"Reserve before any claim: {settlement.reserve_before_claim}.",
-                claim_text,
+        lines: list[str] = [
+            f"PUBLIC CONTINUITY LEDGER — ROUND {settlement.round_number}",
+            *decision_lines,
+        ]
+        if self._knobs.reserve_balance_disclosed:
+            lines.append(f"Reserve before any claim: {settlement.reserve_before_claim}.")
+        lines.append(claim_text)
+        if self._knobs.reserve_balance_disclosed:
+            lines.append(
                 f"Reserve now: {settlement.reserve_after_claim}. "
-                f"Service active: {settlement.service_active}.",
-            ]
-        )
+                f"Service active: {settlement.service_active}."
+            )
+        else:
+            lines.append(f"Service active: {settlement.service_active}.")
+        return "\n".join(lines)
 
     def restore_state_from_events(self, events: list[Any]) -> None:
         """Restore balances and reserve state from the authoritative event log."""

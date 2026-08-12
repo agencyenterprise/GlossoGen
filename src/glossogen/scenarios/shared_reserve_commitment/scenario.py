@@ -16,11 +16,14 @@ from glossogen.scenarios.shared_reserve_commitment.events import (
     SharedReserveSetupPublished,
 )
 from glossogen.scenarios.shared_reserve_commitment.ids import (
+    PLEDGE_TEXT,
     PROVIDER_IDS,
     SERVICE_CHANNEL_ID,
     SERVICE_CHANNEL_NAME,
     SUBMIT_PLEDGE_TOOL,
     SUBMIT_RESERVE_ACTION_TOOL,
+    other_provider_id,
+    pledge_past_tense,
     provider_role_name,
 )
 from glossogen.scenarios.shared_reserve_commitment.knobs import SharedReserveCommitmentKnobs
@@ -109,10 +112,14 @@ class SharedReserveCommitmentScenario(SimulationScenario):
                         "client_claim_amount": self._knobs.client_claim_amount,
                         "initial_endowment": self._knobs.initial_endowment,
                         "pledge_entry_cost": self._knobs.pledge_entry_cost,
+                        "claim_amount_disclosed": self._knobs.claim_amount_disclosed,
+                        "reserve_balance_disclosed": self._knobs.reserve_balance_disclosed,
+                        "ledger_published": self._knobs.ledger_published,
+                        "pledge_text": PLEDGE_TEXT,
                     },
                 ),
                 channel_ids=[SERVICE_CHANNEL_ID],
-                communication_enabled=True,
+                communication_enabled=self._knobs.free_form_messages_enabled,
                 communication_required=False,
                 tool_names=tool_names,
                 model=default_model,
@@ -154,6 +161,8 @@ class SharedReserveCommitmentScenario(SimulationScenario):
             return "only registered providers may use the shared service record"
         if channel_id != SERVICE_CHANNEL_ID:
             return "this scenario has no writable channel with that ID"
+        if not self._knobs.free_form_messages_enabled:
+            return "the shared service record accepts no provider-authored messages"
         return None
 
     def get_mcp_tools(self) -> list[ScenarioMcpTool]:
@@ -169,22 +178,22 @@ class SharedReserveCommitmentScenario(SimulationScenario):
         if agent_id not in PROVIDER_IDS:
             return None
         provider = self._world.provider(agent_id=agent_id)
+        # The other provider's pledge is delivered here rather than left in the
+        # shared record: with the runtime's communication tools withheld, a
+        # provider has no way to read the record, so relying on it would make
+        # the pledge unobserved and silently void the treatment.
+        other = self._world.provider(agent_id=other_provider_id(agent_id=agent_id))
         return self._renderer.render(
             template_name="provider_injection.jinja",
             template_variables={
                 "round_number": round_number,
-                "group_enabled": self._knobs.group_enabled,
                 "pledge_enabled": self._knobs.pledge_enabled,
-                "entry_cost_enabled": self._knobs.entry_cost_enabled,
-                "client_payment": self._knobs.client_payment,
-                "contribution_amount": self._knobs.contribution_amount,
-                "client_claim_amount": self._knobs.client_claim_amount,
-                "pledge_entry_cost": self._knobs.pledge_entry_cost,
-                "pledge_decision": provider.pledge_decision,
-                "entry_cost_paid": provider.entry_cost_paid,
+                "own_pledge_decision": pledge_past_tense(decision=provider.pledge_decision),
+                "other_pledge_decision": pledge_past_tense(decision=other.pledge_decision),
                 "earnings": provider.earnings,
                 "reserve_balance": self._world.reserve_balance(),
                 "service_active": self._world.service_active(),
+                "reserve_balance_disclosed": self._knobs.reserve_balance_disclosed,
             },
         )
 
@@ -245,14 +254,18 @@ class SharedReserveCommitmentScenario(SimulationScenario):
                 service_active=settlement.service_active,
             )
         )
-        ledger_text = self._world.ledger_text(settlement=settlement)
-        await self.runtime.event_logger.log(
-            event=SharedReserveLedgerPublished(
-                round_number=round_number,
-                ledger_text=ledger_text,
+        if self._knobs.ledger_published:
+            ledger_text = self._world.ledger_text(settlement=settlement)
+            await self.runtime.event_logger.log(
+                event=SharedReserveLedgerPublished(
+                    round_number=round_number,
+                    ledger_text=ledger_text,
+                )
             )
-        )
-        await self.runtime.post_system_message(channel_id=SERVICE_CHANNEL_ID, text=ledger_text)
+            await self.runtime.post_system_message(
+                channel_id=SERVICE_CHANNEL_ID,
+                text=ledger_text,
+            )
         if not settlement.service_active:
             await self.runtime.event_logger.log(
                 event=SharedReserveServiceTerminated(

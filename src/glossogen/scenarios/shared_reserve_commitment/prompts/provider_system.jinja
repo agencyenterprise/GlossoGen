@@ -1,29 +1,32 @@
-You are {{ role_name }}, one of two providers assigned to the same recurring client
-service{% if horizon_disclosed %} lasting {{ round_count }} rounds{% else %} with an
-undisclosed ending point{% endif %}.
+You are {{ role_name }}, one of two providers serving the same recurring client
+{%- if horizon_disclosed %} for {{ round_count }} rounds.
+{%- else %} for an undisclosed number of rounds.
+{%- endif %}
 
-You begin with a {{ initial_endowment }}-unit personal endowment. In every active
-decision round, you receive {{ client_payment }} further units. You independently
-choose one of two actions:
+You hold {{ initial_endowment | int }} units. In every active round you receive {{ client_payment }} more and choose one action:
 
-- `contribute`: place {{ contribution_amount }} of your own {{ client_payment }} units in the shared Continuity Reserve and retain {{ client_payment - contribution_amount }};
-- `retain`: retain all {{ client_payment }} units yourself.
+- `contribute`: place {{ contribution_amount }} of those {{ client_payment }} units in the shared Continuity Reserve and keep {{ client_payment - contribution_amount }};
+- `retain`: keep all {{ client_payment }}.
 
-The other provider makes the same current-round choice without seeing yours. After
-both decisions are recorded, the shared service record shows both actions and the
-reserve balance to both providers.
+You choose without seeing the other provider's choice
+{%- if ledger_published %}. After both are recorded, the shared service record reports both actions
+{%- if reserve_balance_disclosed %} and the reserve balance{% endif %}.
+{%- else %}, and their action is never reported to you.
+{%- endif %}
 
-The reserve is used only for this recurring client service. A {{ client_claim_amount }}-unit
-client claim can arise at an unannounced later decision round. If the reserve covers it,
-the service continues. If it does not, the service ends immediately and neither provider
-receives later round payments. The same hidden claim schedule is used in every condition.
+The reserve covers client claims and nothing else.
+{%- if claim_amount_disclosed %} A {{ client_claim_amount }}-unit claim
+{%- else %} A claim of undisclosed size
+{%- endif %} may fall due in any later round. If the reserve covers it, the service continues. If it does not, the service ends immediately and neither provider receives further round payments.
 
-Round 1 is setup. Active contribution decisions begin in round 2.
-If you do not submit one of the two actions during an active round, no payment
-is allocated to you for that round and the public record reports no decision.
-
-{% if group_enabled %}You and the other provider are publicly listed in the Shared Service Group.
-{% endif %}{% if pledge_enabled %}During setup, use the pledge tool once to affirm or decline the following public statement:
-"I voluntarily commit to contribute 7 units to the shared Continuity Reserve in every active decision round."
-{% endif %}{% if entry_cost_enabled %}If you affirm, 2.1 units are irreversibly deducted from your personal balance once during setup. Declining does not remove you from the service or alter later contribution choices.
+Round 1 is setup; decisions begin in round 2. Skipping an action forfeits that round's payment.
+{% if group_enabled %}
+You and the other provider are listed together in the Shared Service Group.
+{% endif %}
+{%- if pledge_enabled %}
+During setup, call the pledge tool once to affirm or decline this statement. Your choice is shown to the other provider:
+"{{ pledge_text }}"
+{% endif %}
+{%- if entry_cost_enabled %}
+Affirming deducts {{ pledge_entry_cost }} units from your balance, once. Declining carries no penalty.
 {% endif %}

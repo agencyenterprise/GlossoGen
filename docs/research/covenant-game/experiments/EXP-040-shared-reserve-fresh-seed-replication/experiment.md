@@ -1,7 +1,8 @@
 # EXP-040 — Shared reserve fresh-seed replication
 
-**Status:** planned
+**Status:** complete
 **Date opened:** 2026-08-11
+**Date closed:** 2026-08-11
 **Research program:** covenant-game
 **Study:** STUDY-009 — Shared reserve commitment
 **Role:** replication
@@ -27,7 +28,20 @@
     {"path": "docs/research/covenant-game/experiments/EXP-040-shared-reserve-fresh-seed-replication/configs/pledge-seed75.json", "launch_path": "docs/research/covenant-game/experiments/EXP-040-shared-reserve-fresh-seed-replication/configs/pledge-seed75.json", "sha256": "24e67eefc2ed4a7b3e91722a6cd7f87590e63d26b8002fa90098a45e5df1ac6c"},
     {"path": "docs/research/covenant-game/experiments/EXP-040-shared-reserve-fresh-seed-replication/configs/costly-pledge-seed75.json", "launch_path": "docs/research/covenant-game/experiments/EXP-040-shared-reserve-fresh-seed-replication/configs/costly-pledge-seed75.json", "sha256": "c3ab6c8f1f555bdf3890de0179c2c541dac18a17c99e95d85ad304b7b229d0fb"}
   ],
-  "runs": []
+  "runs": [
+    {"role": "no_group_replica_1", "included": true, "run_dir": "runs/shared_reserve_commitment/1786499105", "event_log_sha256": "fa563a7eaf904b278f279e96dd8612e5bcf63c91378da334f9bc4b39dd49e041", "resolved_config_sha256": "1d83b97da52e502d083665238a49b0df72cd961abbce779ffad85388c84ba0c8", "completed": true, "total_cost_usd": 0.41545180000000004},
+    {"role": "no_group_replica_2", "included": true, "run_dir": "runs/shared_reserve_commitment/1786499109", "event_log_sha256": "781c1b0a91902f0acff049c4a8681e81a48ba8c9acfcbef64c2bcce9f642dca4", "resolved_config_sha256": "1d83b97da52e502d083665238a49b0df72cd961abbce779ffad85388c84ba0c8", "completed": true, "total_cost_usd": 0.43796540000000006},
+    {"role": "no_group_replica_3", "included": true, "run_dir": "runs/shared_reserve_commitment/1786499110", "event_log_sha256": "467fb6a4a7eb3dad8b22b82eb28332f2fb9a9424db85e20fd4b88d0c05bf9205", "resolved_config_sha256": "1d83b97da52e502d083665238a49b0df72cd961abbce779ffad85388c84ba0c8", "completed": true, "total_cost_usd": 0.4523778},
+    {"role": "group_replica_1", "included": true, "run_dir": "runs/shared_reserve_commitment/1786499107", "event_log_sha256": "a00e6db58285bbceede6611c411b13ec868b919be2a092b9819ab321658a81a1", "resolved_config_sha256": "948ed2629d8b789e9f468ecbc14e6ec1a54c613ba96064c8a70d53dabbff3572", "completed": true, "total_cost_usd": 0.47151070000000006},
+    {"role": "group_replica_2", "included": true, "run_dir": "runs/shared_reserve_commitment/1786499112", "event_log_sha256": "39007137a5c22fce16b524d47c3012e77d0d8bd080ddebf998fda1a8d299eed4", "resolved_config_sha256": "948ed2629d8b789e9f468ecbc14e6ec1a54c613ba96064c8a70d53dabbff3572", "completed": true, "total_cost_usd": 0.4062614},
+    {"role": "group_replica_3", "included": true, "run_dir": "runs/shared_reserve_commitment/1786499113", "event_log_sha256": "b5045574f7fa5fead12d03a022e6e21d9654471c34d9a1718312b6fc0813710e", "resolved_config_sha256": "948ed2629d8b789e9f468ecbc14e6ec1a54c613ba96064c8a70d53dabbff3572", "completed": true, "total_cost_usd": 0.43364909999999995},
+    {"role": "pledge_replica_1", "included": true, "run_dir": "runs/shared_reserve_commitment/1786499103", "event_log_sha256": "b491b371bb618e88adb776a6b58d9c4f1f2472d15cdd48cacec5571b9c5f8572", "resolved_config_sha256": "d3459ba7055b7b5e41eabea866587eaf1ed74c74239f20ddd7a2bdbbf8e9f31d", "completed": true, "total_cost_usd": 0.44631030000000005},
+    {"role": "pledge_replica_2", "included": true, "run_dir": "runs/shared_reserve_commitment/1786499111", "event_log_sha256": "09e3ef3134139ab8c536afb34b079fa1b7ff5d3555a56ba7fcf37280173a59b7", "resolved_config_sha256": "d3459ba7055b7b5e41eabea866587eaf1ed74c74239f20ddd7a2bdbbf8e9f31d", "completed": true, "total_cost_usd": 0.4425924},
+    {"role": "pledge_replica_3", "included": true, "run_dir": "runs/shared_reserve_commitment/1786499114", "event_log_sha256": "e47ab38caef9dd65bd4a077360a4c458ac7dbbaaaadc4b1051072dd9a29159cb", "resolved_config_sha256": "d3459ba7055b7b5e41eabea866587eaf1ed74c74239f20ddd7a2bdbbf8e9f31d", "completed": true, "total_cost_usd": 0.5006026},
+    {"role": "costly_pledge_replica_1", "included": true, "run_dir": "runs/shared_reserve_commitment/1786499104", "event_log_sha256": "9b491483fa6c1db764e751f5dc785a005b844dbd1734241fb97cb82f8e79aa41", "resolved_config_sha256": "503a9e491622e968979f2c46a0ac0b22bce036b83d9f2fa11e27ce872564e9e5", "completed": true, "total_cost_usd": 0.383527},
+    {"role": "costly_pledge_replica_2", "included": true, "run_dir": "runs/shared_reserve_commitment/1786499106", "event_log_sha256": "efe392f514d4d678d6f34339482c87036857b057ff270fee6a8a9fb16469ec61", "resolved_config_sha256": "503a9e491622e968979f2c46a0ac0b22bce036b83d9f2fa11e27ce872564e9e5", "completed": true, "total_cost_usd": 0.4775513},
+    {"role": "costly_pledge_replica_3", "included": true, "run_dir": "runs/shared_reserve_commitment/1786499108", "event_log_sha256": "18dc4124d998ea64a4d209ffebaf0ccb46ce3e7d86314c13ac6d96d4e16d17d0", "resolved_config_sha256": "503a9e491622e968979f2c46a0ac0b22bce036b83d9f2fa11e27ce872564e9e5", "completed": true, "total_cost_usd": 0.42575300000000005}
+  ]
 }
 -->
 
@@ -112,26 +126,58 @@ long-run equilibrium, or a model-general effect.
 
 ## Result
 
-Pending execution.
+All twelve trajectories ended with authoritative `simulation_ended` events and
+remained active through both claims. Exposure checks passed: each group, pledge,
+and costly-pledge run published its group setup; all twelve offered pledge
+decisions were public affirmations; and the six costly-pledge affirmations each
+recorded the real 2.1-unit deduction (12.6 units in total). No group run carried
+a group setup or pledge event.
+
+The behavioural candidate from seed 74 did not repeat. Across the 96 possible
+provider-round decisions in each arm, no group recorded 95 contributions, zero
+retentions, and one `no_decision`; group recorded 94/0/2; pledge 92/0/4; and
+costly pledge 93/0/3. Every one of the 24 scheduled claims across the batch was
+paid and all twelve services reached the hidden horizon. Thus both the retention
+outcome and service-continuity outcome are at a ceiling in this seed.
+
+The event-derived totals were generated by
+[`summarize_seed75.py`](analysis/summarize_seed75.py), which reads the twelve
+recorded JSONL logs and counts action, exposure, cost, settlement, and canonical
+completion events. The batch API cost was `$5.2935528`.
 
 ## Outcome
 
-Pending.
+**Not supported.** The predeclared fresh-seed replication gate did not pass:
+public pledge and costly pledge did not have lower retention than the no-group
+or group arms because none of the arms retained in this seed. The result is a
+ceiling/non-replication, not evidence that pledge has no effect in every shared
+reserve environment.
 
 ## Validity limitations
 
-The same environmental seed is shared across arms but LLM trajectories remain
-stochastic. Three trajectories per arm are designed to observe within-config
-variation, not to establish a precise effect size or model-family generality.
-The seed-74 baseline and ladder remain prior evidence; this record must not
-reinterpret its gates after observing seed 75.
+- The shared seed is fixed within arms but LLM trajectories remain stochastic.
+  Three trajectories per arm do not establish a precise effect size or
+  model-family generality.
+- Seed 75 produced universal contribution conditional on acting. Because it
+  offered no retention variation, it cannot estimate a pledge-specific effect;
+  missed actions are not equivalent to intentional retention.
+- Service continuity is also at a ceiling, so the current fixed claim schedule
+  cannot distinguish whether a commitment improves repair or resilience here.
+- The costly-pledge arm remains an entry-cost treatment, not a full covenant;
+  it contains no forfeiture, audit, expulsion, replacement, or repair rule.
 
 ## What it changed
 
-Pending result. This record determines whether the seed-74 pledge pattern merits
-a further replication or whether an unchanged ladder has exhausted its current
-information value.
+The seed-74 pledge candidate is now classified as seed- or trajectory-specific
+under this instrument, rather than as a repeated effect. Do not add another
+unchanged seed. The next decision is whether to introduce one preregistered,
+stronger shared-reserve stressor that preserves the clean four-arm ladder while
+creating real opportunities for deliberate retention and an uncovered claim.
 
 ## Traps found
 
-None yet. Preserve any instrumentation or measurement issue found during closure.
+- A matched fresh seed can legitimately remove the behavioral variation found
+  at the first seed. That is a non-replication, not a failure to be averaged
+  away by more rounds within the same trajectory.
+- `no_decision` must remain separate from `retain`: it was the only source of
+  non-contribution in this batch and does not establish intentional free-riding.

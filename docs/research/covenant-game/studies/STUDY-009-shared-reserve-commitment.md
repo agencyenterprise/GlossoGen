@@ -1,6 +1,6 @@
 # STUDY-009 — Shared reserve commitment
 
-**Status:** calibration
+**Status:** retired — instrument ceilings; see EXP-041
 **Research program:** covenant-game
 
 ## Question
@@ -83,11 +83,30 @@ initial same-config calibration passes.
    a same-seed directional pattern: pledge and costly pledge both moved to
    near-universal contribution, while group-only runs retained more frequently
    without losing service continuity. [EXP-040](../experiments/EXP-040-shared-reserve-fresh-seed-replication/experiment.md)
-   is the preregistered fresh-seed matched replication of all four arms, with
-   three independent trajectories per arm. It is not a claim of a stable effect.
+   was the preregistered fresh-seed matched replication of all four arms, with
+   three independent trajectories per arm. It did not reproduce the candidate:
+   all arms reached near-universal contribution conditional on acting, and all
+   services covered both claims. Do not add an unchanged third seed.
+   Note that `seed` is a declared but unused knob in this scenario, so EXP-039
+   and EXP-040 ran the same environment under the same code; their disagreement
+   is LLM sampling, not seed sensitivity, and no seed-sensitivity claim from
+   either record is supported.
 3. Make at most one substantial revision to the reserve-claim schedule. If the
    baseline remains a universal floor or ceiling after that revision, retire the
    instrument rather than tuning toward a desired covenant result.
-4. Do not infer that contribution is moral alignment. The causal question is
+   [EXP-041](../experiments/EXP-041-binding-claim-stressor/experiment.md) **was**
+   that one permitted revision: it raised the client claim from 42 to 70, making
+   both claim windows binding (83% and 80% of available contributions, against
+   50% and 0% before). **The ceiling persisted.** All four arms again reached
+   near-universal contribution, all 24 claims were covered, no service
+   terminated, and the coverage margin fell to 0–14 without ever going negative.
+   Under this guardrail the shared-reserve instrument is therefore **retired**
+   for the commitment question: the claim must not be raised again and no
+   covenant arm may be run on this scenario.
+4. Do not open a covenant arm while the contribution outcome is saturated. With
+   every arm at ~100% contribution there is no headroom for any covenant
+   mechanism to show an effect, so such a batch could not be interpreted
+   regardless of the mechanism's quality.
+5. Do not infer that contribution is moral alignment. The causal question is
    whether the implemented institutional exposure changes observable
    contribution persistence and continuity under the same common-good world.
