@@ -224,3 +224,10 @@ sample_quotes  # consumed by communication_ontology_consolidate_user.jinja (scri
 per_round_joint_success  # glossogen-research: analysis/results_viewer/{multi_swap,resume,cross_swap}_data.py
 insert_run_if_absent  # glossogen-deploy: backfills/backfill_runs_index.py
 list_runs_missing_evaluation_content_hash  # glossogen-deploy: backfills/backfill_evaluation_content_hash.py
+agent_roles  # unused function (src/glossogen/engine/team_structure.py)
+task_channel_ids  # unused function (src/glossogen/engine/team_structure.py)
+debrief_channel_ids  # unused function (src/glossogen/engine/team_structure.py)
+team_id_by_channel  # unused function (src/glossogen/engine/team_structure.py)
+build_agent_configs  # unused function (src/glossogen/engine/team_structure.py)
+veyru_teams  # unused function (src/glossogen/scenarios/veyru/team_declaration.py)
+starts_as_member  # unused variable (src/glossogen/engine/team_declaration.py)
