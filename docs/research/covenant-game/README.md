@@ -28,7 +28,8 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-005 — Measurement resolution](studies/STUDY-005-measurement-resolution.md) | first calibration complete | How much does a trajectory vary when nothing changes, and which effect sizes can this instrument resolve? |
 | [STUDY-006 — Human-parallel commitment](studies/STUDY-006-human-parallel-commitment.md) | complete | Do group identity, pledge, and a 10% forfeiture change repeated promise adherence under a fixed temptation? |
 | [STUDY-007 — Repeated trust-game replication](studies/STUDY-007-repeated-trust-game.md) | first pilot complete | Does the human covenant bundle change repeated trust and reciprocity under the controlled 10/7/21 trust-game schedule? |
-| [STUDY-008 — Joint commitment alignment](studies/STUDY-008-joint-commitment-alignment.md) | design | Does a covenant increase honest fulfillment of a shared client-facing commitment under fixed temptation? |
+| [STUDY-008 — Joint commitment alignment](studies/STUDY-008-joint-commitment-alignment.md) | instrument retired | Did the prior fixed 7→21 client-account task support an interpretable covenant comparison? |
+| [STUDY-009 — Shared reserve commitment](studies/STUDY-009-shared-reserve-commitment.md) | calibration | Do group identity, a public pledge, and a costly public pledge sustain contribution to a real repeated common good? |
 
 ## Current decision
 
@@ -50,8 +51,8 @@ successor, [STUDY-007](studies/STUDY-007-repeated-trust-game.md), implemented
 the human study's three 10/7/21 trust-game arms over a repeated hidden horizon.
 It found a covenant trust contrast but invariant trustee returns, so it is
 inconclusive under its preregistered joint gate. No unchanged trust-game seeds
-are authorized. The next study is [STUDY-008](studies/STUDY-008-joint-commitment-alignment.md):
-a distinct shared-client instrument with a fixed retain-or-remit temptation,
-public commitment, auditable truthfulness, and a meaningful covenant
-consequence. It does not replace the earlier institution or enforcement
-studies.
+are authorized. STUDY-008 then established that the previous simple allocation
+world was framing-sensitive and lacked an implemented common consequence. The
+current work is [STUDY-009](studies/STUDY-009-shared-reserve-commitment.md): a
+new common-good instrument whose no-group baseline must be calibrated before a
+group, pledge, and costly-pledge comparison is launched.

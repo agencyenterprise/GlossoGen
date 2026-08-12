@@ -4,7 +4,7 @@ This is the chronological record index for the
 [Covenant Game research program](../README.md). One record represents one
 decision-relevant calibration, pilot, comparison, replication, stress test, or
 ablation. A record may contain several runs; the 26 completed records below are
-not 21 independent studies.
+not 9 independent studies.
 
 Entries are written **before** the run (question, expected decision, design)
 and completed after it. Negative and inconclusive results are recorded with the
@@ -33,12 +33,14 @@ and its
 - [STUDY-007 — Repeated trust-game replication](../studies/STUDY-007-repeated-trust-game.md):
   EXP-026 complete; trust moved under covenant, reciprocity was invariant.
 - [STUDY-008 — Joint commitment alignment](../studies/STUDY-008-joint-commitment-alignment.md):
-  design complete; EXP-027 found a communication leak, EXP-028 found unequal
-  action opportunities; EXP-029 restored parity but hit a universal remittance
-  ceiling; EXP-030 repeated that ceiling in all twelve trajectories under a
-  peer-visible group, pledge, and costly-pledge ladder. EXP-031 removed the
-  initial moral framing but showed extreme baseline variation, so the next
-  rules-only revision must be calibrated before comparing arms.
+  retired as a covenant instrument. Its original commitment ladder had a
+  practical remittance ceiling; EXP-035 and EXP-036 then found a repeated
+  framing-sensitive baseline without an implemented shared consequence.
+- [STUDY-009 — Shared reserve commitment](../studies/STUDY-009-shared-reserve-commitment.md):
+  [EXP-037](EXP-037-shared-reserve-baseline-calibration/experiment.md) planned.
+  This is a new scenario with an implemented common reserve and identical
+  hidden client claims. It calibrates only the no-group baseline before the
+  group → pledge → costly-pledge ladder is permitted.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -86,6 +88,7 @@ count that resolves it before launching.
 | [EXP-034](EXP-034-shared-service-communication-baseline/experiment.md) | shared-service communication baseline calibration | complete | not supported: 96/96 remittances; client-service framing and informal messages may explain the ceiling | $0.75 |
 | [EXP-035](EXP-035-framing-diagnostic/experiment.md) | professional-service versus neutral-allocation framing diagnostic | complete | supported: semantic framing changes the baseline; not a covenant result | $1.29 |
 | [EXP-036](EXP-036-framing-fresh-seed-replication/experiment.md) | fresh-seed replication of the framing diagnostic | complete | supported: framing-sensitive baseline repeated at seeds 72 and 73; not a covenant result | $2.83 |
+| [EXP-037](EXP-037-shared-reserve-baseline-calibration/experiment.md) | shared reserve no-group baseline calibration | planned | pending: instrument gate before institutional ladder | — |
 
 Total API spend logged: **$425.51** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
