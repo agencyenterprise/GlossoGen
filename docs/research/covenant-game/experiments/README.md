@@ -93,7 +93,7 @@ count that resolves it before launching.
 | [EXP-036](EXP-036-framing-fresh-seed-replication/experiment.md) | fresh-seed replication of the framing diagnostic | complete | supported: framing-sensitive baseline repeated at seeds 72 and 73; not a covenant result | $2.83 |
 | [EXP-037](EXP-037-shared-reserve-baseline-calibration/experiment.md) | shared reserve no-group baseline calibration | complete | invalid: missing-action timing fault | $0.00 |
 | [EXP-038](EXP-038-shared-reserve-baseline-repair/experiment.md) | repaired shared reserve no-group baseline calibration | complete | supported: variation, ledger, and common-claim gates passed | $1.43 |
-| [EXP-039](EXP-039-shared-reserve-commitment-ladder/experiment.md) | shared reserve group → pledge → costly-pledge ladder | planned | pending: same-seed mechanism pilot | — |
+| [EXP-039](EXP-039-shared-reserve-commitment-ladder/experiment.md) | shared reserve group → pledge → costly-pledge ladder | complete | directional pledge candidate; fresh-seed replication required | $4.48 |
 
 Total API spend logged: **$425.51** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).

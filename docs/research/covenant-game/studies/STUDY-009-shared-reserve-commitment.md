@@ -79,7 +79,11 @@ initial same-config calibration passes.
    its three exact no-group trajectories as the matched baseline, then run the
    group → pledge → costly-pledge arms in
    [EXP-039](../experiments/EXP-039-shared-reserve-commitment-ladder/experiment.md),
-   with three independent trajectories per exact configuration.
+   with three independent trajectories per exact configuration. EXP-039 found
+   a same-seed directional pattern: pledge and costly pledge both moved to
+   near-universal contribution, while group-only runs retained more frequently
+   without losing service continuity. The next step is a fresh-seed matched
+   replication, not a claim of a stable effect.
 3. Make at most one substantial revision to the reserve-claim schedule. If the
    baseline remains a universal floor or ceiling after that revision, retire the
    instrument rather than tuning toward a desired covenant result.
