@@ -24,6 +24,45 @@ This project is pre-1.0 and moves quickly. Fixes land on `main` and ship in the
 next tagged release; older tags are not patched. If you are running a deployment,
 track the latest release.
 
+## Containment of simulated agents
+
+All experiments take place in a closed environment. A simulated agent has no
+pathway to another model, to the host system, or to anything outside its own
+run.
+
+**The tool surface is the whole surface.** The only tools an agent can call come
+from a `comms` MCP server that the run process starts on `127.0.0.1` and that
+dies with that process. It exposes communication primitives (read notifications,
+read a channel, post to a channel, list channels, list members) plus whatever
+tools the running scenario declares, and each agent is served only the subset its
+allowlist permits. There is no shell, no filesystem access, no HTTP fetch, no
+code execution, and no way for an agent to add a tool. Scenario tools read and
+write simulation world state held in memory; nothing an agent writes is ever
+executed.
+
+**Agents cannot reach each other except through channels.** Agent identity is
+resolved from the MCP connection URL, not from tool arguments, so one agent
+cannot act as another. Membership is checked on every read and every send, so an
+agent cannot address a channel it does not belong to.
+
+**Agents do not originate model calls.** The runner holds the provider
+credentials and issues each inference request on the agent's behalf. An agent has
+no way to choose a model, reach a different provider, or direct its output
+anywhere but a channel in its own simulation. The only network egress during a
+run is the platform's own call to the configured inference endpoint, which may be
+a hosted provider or a self-hosted server the operator points it at.
+
+**Runs are bounded and terminal.** The game clock ends the simulation at
+`round_count` and each agent runner stops at `max_agent_turns`. What an agent
+produced is left behind as an append-only event log under `runs/`, read
+afterwards by humans and by the evaluation pipeline. No output of a simulation is
+fed back into a live system.
+
+The operator-facing side of the platform (the FastAPI server, its provider keys,
+the subprocesses it launches) is a normal piece of software with normal
+privileges, and the notes below apply to it. The containment claim above is about
+the simulated agents, which never touch it.
+
 ## Scope
 
 Reports about the platform itself are in scope: the simulation runtime, the

@@ -4,6 +4,8 @@ A platform for testing agent communication through real-life simulations. Agents
 
 ![Platform overview](images/platform_overview.webp)
 
+Experiments run in a contained environment. A simulated agent's only tools are the channel primitives and scenario tools served by a loopback-bound MCP server, so it has no route to another model, to the host system, or to anything outside its own run. See [Containment of simulated agents](SECURITY.md#containment-of-simulated-agents).
+
 ## Setup
 
 ### Prerequisites
