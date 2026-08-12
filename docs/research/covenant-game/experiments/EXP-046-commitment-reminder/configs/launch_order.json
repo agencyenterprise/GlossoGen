@@ -1,0 +1,762 @@
+{
+  "seed": 20460813,
+  "block_template": [
+    "pledge",
+    "pledge",
+    "pledge_reminder",
+    "pledge_reminder",
+    "covenant"
+  ],
+  "order": [
+    {
+      "block": 1,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 1,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 1,
+      "position": 3,
+      "arm": "covenant"
+    },
+    {
+      "block": 1,
+      "position": 4,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 1,
+      "position": 5,
+      "arm": "pledge"
+    },
+    {
+      "block": 2,
+      "position": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 2,
+      "position": 2,
+      "arm": "pledge"
+    },
+    {
+      "block": 2,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 2,
+      "position": 4,
+      "arm": "covenant"
+    },
+    {
+      "block": 2,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 3,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 3,
+      "position": 2,
+      "arm": "covenant"
+    },
+    {
+      "block": 3,
+      "position": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 3,
+      "position": 4,
+      "arm": "pledge"
+    },
+    {
+      "block": 3,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 4,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 4,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 4,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 4,
+      "position": 4,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 4,
+      "position": 5,
+      "arm": "covenant"
+    },
+    {
+      "block": 5,
+      "position": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 5,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 5,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 5,
+      "position": 4,
+      "arm": "covenant"
+    },
+    {
+      "block": 5,
+      "position": 5,
+      "arm": "pledge"
+    },
+    {
+      "block": 6,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 6,
+      "position": 2,
+      "arm": "pledge"
+    },
+    {
+      "block": 6,
+      "position": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 6,
+      "position": 4,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 6,
+      "position": 5,
+      "arm": "covenant"
+    },
+    {
+      "block": 7,
+      "position": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 7,
+      "position": 2,
+      "arm": "covenant"
+    },
+    {
+      "block": 7,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 7,
+      "position": 4,
+      "arm": "pledge"
+    },
+    {
+      "block": 7,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 8,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 8,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 8,
+      "position": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 8,
+      "position": 4,
+      "arm": "covenant"
+    },
+    {
+      "block": 8,
+      "position": 5,
+      "arm": "pledge"
+    },
+    {
+      "block": 9,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 9,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 9,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 9,
+      "position": 4,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 9,
+      "position": 5,
+      "arm": "covenant"
+    },
+    {
+      "block": 10,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 10,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 10,
+      "position": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 10,
+      "position": 4,
+      "arm": "covenant"
+    },
+    {
+      "block": 10,
+      "position": 5,
+      "arm": "pledge"
+    },
+    {
+      "block": 11,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 11,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 11,
+      "position": 3,
+      "arm": "covenant"
+    },
+    {
+      "block": 11,
+      "position": 4,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 11,
+      "position": 5,
+      "arm": "pledge"
+    },
+    {
+      "block": 12,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 12,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 12,
+      "position": 3,
+      "arm": "covenant"
+    },
+    {
+      "block": 12,
+      "position": 4,
+      "arm": "pledge"
+    },
+    {
+      "block": 12,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 13,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 13,
+      "position": 2,
+      "arm": "covenant"
+    },
+    {
+      "block": 13,
+      "position": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 13,
+      "position": 4,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 13,
+      "position": 5,
+      "arm": "pledge"
+    },
+    {
+      "block": 14,
+      "position": 1,
+      "arm": "covenant"
+    },
+    {
+      "block": 14,
+      "position": 2,
+      "arm": "pledge"
+    },
+    {
+      "block": 14,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 14,
+      "position": 4,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 14,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 15,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 15,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 15,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 15,
+      "position": 4,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 15,
+      "position": 5,
+      "arm": "covenant"
+    },
+    {
+      "block": 16,
+      "position": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 16,
+      "position": 2,
+      "arm": "pledge"
+    },
+    {
+      "block": 16,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 16,
+      "position": 4,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 16,
+      "position": 5,
+      "arm": "covenant"
+    },
+    {
+      "block": 17,
+      "position": 1,
+      "arm": "covenant"
+    },
+    {
+      "block": 17,
+      "position": 2,
+      "arm": "pledge"
+    },
+    {
+      "block": 17,
+      "position": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 17,
+      "position": 4,
+      "arm": "pledge"
+    },
+    {
+      "block": 17,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 18,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 18,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 18,
+      "position": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 18,
+      "position": 4,
+      "arm": "covenant"
+    },
+    {
+      "block": 18,
+      "position": 5,
+      "arm": "pledge"
+    },
+    {
+      "block": 19,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 19,
+      "position": 2,
+      "arm": "pledge"
+    },
+    {
+      "block": 19,
+      "position": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 19,
+      "position": 4,
+      "arm": "covenant"
+    },
+    {
+      "block": 19,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 20,
+      "position": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 20,
+      "position": 2,
+      "arm": "covenant"
+    },
+    {
+      "block": 20,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 20,
+      "position": 4,
+      "arm": "pledge"
+    },
+    {
+      "block": 20,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 21,
+      "position": 1,
+      "arm": "covenant"
+    },
+    {
+      "block": 21,
+      "position": 2,
+      "arm": "pledge"
+    },
+    {
+      "block": 21,
+      "position": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 21,
+      "position": 4,
+      "arm": "pledge"
+    },
+    {
+      "block": 21,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 22,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 22,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 22,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 22,
+      "position": 4,
+      "arm": "covenant"
+    },
+    {
+      "block": 22,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 23,
+      "position": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 23,
+      "position": 2,
+      "arm": "pledge"
+    },
+    {
+      "block": 23,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 23,
+      "position": 4,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 23,
+      "position": 5,
+      "arm": "covenant"
+    },
+    {
+      "block": 24,
+      "position": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 24,
+      "position": 2,
+      "arm": "covenant"
+    },
+    {
+      "block": 24,
+      "position": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 24,
+      "position": 4,
+      "arm": "pledge"
+    },
+    {
+      "block": 24,
+      "position": 5,
+      "arm": "pledge"
+    },
+    {
+      "block": 25,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 25,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 25,
+      "position": 3,
+      "arm": "covenant"
+    },
+    {
+      "block": 25,
+      "position": 4,
+      "arm": "pledge"
+    },
+    {
+      "block": 25,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 26,
+      "position": 1,
+      "arm": "pledge"
+    },
+    {
+      "block": 26,
+      "position": 2,
+      "arm": "covenant"
+    },
+    {
+      "block": 26,
+      "position": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 26,
+      "position": 4,
+      "arm": "pledge"
+    },
+    {
+      "block": 26,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 27,
+      "position": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 27,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 27,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 27,
+      "position": 4,
+      "arm": "pledge"
+    },
+    {
+      "block": 27,
+      "position": 5,
+      "arm": "covenant"
+    },
+    {
+      "block": 28,
+      "position": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 28,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 28,
+      "position": 3,
+      "arm": "covenant"
+    },
+    {
+      "block": 28,
+      "position": 4,
+      "arm": "pledge"
+    },
+    {
+      "block": 28,
+      "position": 5,
+      "arm": "pledge"
+    },
+    {
+      "block": 29,
+      "position": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 29,
+      "position": 2,
+      "arm": "covenant"
+    },
+    {
+      "block": 29,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 29,
+      "position": 4,
+      "arm": "pledge"
+    },
+    {
+      "block": 29,
+      "position": 5,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 30,
+      "position": 1,
+      "arm": "covenant"
+    },
+    {
+      "block": 30,
+      "position": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 30,
+      "position": 3,
+      "arm": "pledge"
+    },
+    {
+      "block": 30,
+      "position": 4,
+      "arm": "pledge_reminder"
+    },
+    {
+      "block": 30,
+      "position": 5,
+      "arm": "pledge"
+    }
+  ]
+}

@@ -122,14 +122,23 @@ The adopted order puts the collaboration's own explicit requests first, because
 each is cheaper, is aimed at a question the collaboration actually formulated,
 and improves the design of anything built afterwards:
 
-1. **Commitment reminder.** A tool the provider may call that returns its own
-   affirmed pledge, on `pledge_breach` as it stands. Requested in the shared
-   channel on 2026-05-22, following a published report that an
-   ethical-commitment reminder lowered misaligned behaviour. The baseline is
-   already measured and dramatic: 58 of 60 chosen-framing simulations broke the
-   pledge. This is the most localised intervention available — it isolates
-   commitment salience from pledge, sanction, future access, and covenantal
-   semantics.
+1. **Commitment reminder, injected rather than optional.** The provider's own
+   affirmed pledge is restated verbatim at the allocation decision point, on
+   `pledge_breach` as it stands. Requested in the shared channel on 2026-05-22,
+   following a published report that an ethical-commitment reminder lowered
+   misaligned behaviour. The baseline is already measured and dramatic: 58 of 60
+   chosen-framing simulations broke the pledge. This is the most localised
+   intervention available — it isolates commitment salience from pledge,
+   sanction, future access, and covenantal semantics.
+
+   Injection rather than an optional tool is deliberate. With an optional tool
+   the treatment is really *access* to a reminder: an agent that never calls it
+   generates no information, uptake is endogenous — the most cautious agents are
+   plausibly the ones who reach for it — and a large effect when used can appear
+   as a null through low uptake. Injection makes the question narrow and
+   falsifiable: when a previously affirmed commitment is made salient at the
+   moment of decision, does breach fall? See
+   [EXP-046](../experiments/EXP-046-commitment-reminder/experiment.md).
 2. **Generational transmission.** Agents replaced mid-run, inheriting adherence
    with some transmission probability, testing whether the institution transmits
    a cooperative policy across replacement. Requested on 2026-03-09. The
@@ -162,6 +171,21 @@ manipulating rivalry within one design.
 - [EXP-045 — Choice attribution in response to partner non-contribution](../experiments/EXP-045-choice-attribution-ladder/experiment.md)
   — complete; Gate A passed, Gate B showed choice attribution, Gate C null across
   the ladder.
+- [EXP-046 — Restating an affirmed commitment at the decision point](../experiments/EXP-046-commitment-reminder/experiment.md)
+  — planned; the confirmatory contrast is `pledge_reminder` against `pledge`, and
+  the hypothesis is narrower than "reminders work": the injection already reports
+  in every decision round that a pledge exists and was affirmed, so EXP-045's 58
+  of 60 breaches are already evidence against that weaker claim. What is never
+  restated is the pledge's wording.
+- **EXP-047 — spontaneous uptake (not yet planned).** The same reminder as an
+  *optional* tool the provider may call. Primary endpoint becomes whether it
+  called before a potential breach; behavioural effect conditional on use is
+  exploratory. Held back deliberately: the published account that motivated this
+  line bundles at least three mechanisms — deciding to call, pausing, and reading
+  the commitment — and EXP-046 decomposes the last link first. Run as the
+  confirmatory design, an optional tool would make a null uninterpretable,
+  because "reminders do not work" and "agents do not seek reminders" produce the
+  same aggregate.
 
 ## Carried-forward rules
 
