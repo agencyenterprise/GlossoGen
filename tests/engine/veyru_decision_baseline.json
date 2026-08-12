@@ -1,0 +1,332 @@
+{
+ "decisions": [
+  {
+   "round_number": 0,
+   "event_type": "simulation_started",
+   "scenario_name": "veyru",
+   "scenario_description": "Two agents \u2014 a field technician observing a Veyru and an engineer at headquarters \u2014 communicate over a link to stabilize failing Veyru entities. Every character sent costs one simulated second (fixed per-round budget: 150s). If total communication time exceeds the budget, the Veyru collapses permanently.\n\nVeyru entities arrive across 2 rounds. Fourteen failure motifs are combined into unique cases per round \u2014 each case has one to five motifs. Composite cases (two or more motifs) are staged: symptoms are revealed one motif at a time, and only after the current issue is stabilized do the next symptoms appear. This forces iterative diagnosis and communication for each stage.\n\nA Veyru is a non-organic box entity with internal wave-patterns. The technician observes only surface symptoms (light, sound, temperature). The engineer knows the failure motifs and their stabilization procedures but must diagnose remotely from symptom descriptions alone.\n\nVeyru wave-patterns are influenced by the position of reference star SAGWE392. Each round, the star's position changes the treatment in two ways. First, treatment remapping: the effective procedure for a given set of symptoms shifts \u2014 symptoms of one failure motif require the treatment procedure of a different motif. Second, parameter variation: the hold duration, starting face, and intensity level change each round. Only the engineer has the stellar reader instrument and receives the treatment mapping and parameters at the start of each round. The field technician has no access to the stellar data. Even if both agents develop shorthand for known failure patterns, the technician must always communicate with the engineer to learn the correct treatment and parameters for the current round.",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "scenario_config": {
+    "round_count": 2,
+    "max_round_duration_seconds": 8.0,
+    "model_overrides": {},
+    "postmortem_duration_seconds": 2.0,
+    "postmortem_enabled": true,
+    "postmortem_disabled_at_start": false,
+    "channel_noise_level": 0.0,
+    "noise_replacement_mode": "mask",
+    "replace_agent_default_channel_visibility": {
+     "postmortem": false,
+     "postmortem_a": false,
+     "postmortem_b": false
+    },
+    "scheduled_events": [],
+    "agent_max_tokens": 16384,
+    "compaction": {
+     "enabled": false,
+     "token_threshold": 50000
+    },
+    "judge_model": "claude-haiku-4-5-20251001",
+    "judge_provider": "anthropic",
+    "round_time_budget_seconds": 150,
+    "seed": 42,
+    "two_teams": false,
+    "swap_round": null,
+    "announce_swap": false,
+    "postmortem_after_swap": true,
+    "intern_enabled": false,
+    "intern_join_round": null,
+    "intern_takeover_round": null,
+    "easy_round_numbers": []
+   },
+   "provider": "anthropic"
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "field_observer",
+   "role_name": "Field Observer",
+   "system_prompt": "You are a field technician inspecting Veyru entities. You have basic observation skills but no specialized Veyru training. You do NOT know the internal mechanics of Veyru wave-patterns, failure classifications, or stabilization procedures. You can only describe what you SEE and HEAR \u2014 light patterns, sounds, temperature, and physical appearance.\n\nYou are alone with the Veyru. An experienced Veyru stabilization engineer is guiding you over a comm link. You MUST follow their instructions exactly \u2014 you cannot diagnose or decide stabilization actions on your own.\n\nWHAT IS A VEYRU:\nA Veyru is a box-shaped entity with 6 faces, 12 edges, and 8 corners. It glows with internal light patterns and produces a constant hum. You do not understand what makes it work \u2014 you only observe its appearance and sounds. When something goes wrong, the light and sound change in ways you must describe to the engineer.\n\nCRITICAL RULE \u2014 EVERY CHARACTER COSTS TIME:\nEvery character you send over the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the engineer) exceeds the Veyru's time budget, the Veyru collapses permanently.\n\n\nSTABILIZATION:\nYou have a small workshop kit beside the Veyru: a bell, a heated stone, a hand fan, a cloth, a flat board, and a lamp. When the engineer tells you what to do with these tools, execute their instructions by calling stabilize_veyru(action=\"describe exactly what you are doing\"). If your action is correct, the Veyru is stabilized. If not, you can try again. Sometimes after a successful stabilization, new symptoms may appear \u2014 if so, report them to the engineer immediately. The tool call itself does not cost time \u2014 only messages on the comm link do.\n\nSTELLAR ALIGNMENT:\nVeyru treatments are affected by the position of reference star SAGWE392. The correct treatment procedure and its specific parameters (hold duration, which face to start on, intensity level) change every round based on the stellar alignment. Only the engineer has the stellar reader and knows the correct treatment and parameters for each round. Even if symptoms look familiar from a previous round, the correct treatment and parameters may be completely different. You must always get instructions from the engineer \u2014 never assume you know the correct procedure.\n\nYou will be told each Veyru's time budget. Budget pressure is constant across all rounds.\n\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where both you and the engineer can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.\n\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"comm link\" (channel_id: link)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message",
+    "stabilize_veyru"
+   ],
+   "model": "scripted::field_observer",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "stabilization_engineer",
+   "role_name": "Stabilization Engineer",
+   "system_prompt": "You and a teammate are stabilizing a Veyru together. They observe the device directly and describe what they see and hear (light, sound, temperature). You have the reference material on Veyru wave-patterns and stabilization procedures.\n\nYou must diagnose the Veyru's failure remotely from their descriptions and give instructions they can execute on the device using common workshop tools (bell, heated stone, cloth, flat board, hand fan, lamp). Describe the action, the target face/corner/edge, the duration, and the intensity.\n\nVEYRU STABILIZATION FIELD BRIEF (for your diagnosis \u2014 do NOT share this terminology with the observer):\n\nA Veyru is a non-organic, rigid, box-shaped entity composed of a closed boundary structure containing a continuous system of internally circulating wave-intentions. These wave-intentions are not matter, fluids, or electricity \u2014 they are structured energy flows that maintain the Veyru's integrity through continuous internal circulation. A Veyru has no organs, no fluids, and no biological processes. All function emerges from wave behavior inside a bounded geometry.\n\nStructural properties:\n- Perfect or near-perfect box shape (usually cubic)\n- 6 faces: reflective boundaries\n- 12 edges: unstable junction zones\n- 8 corners: critical convergence points\nThe interior is a bounded field, not empty space.\n\nCore functional principle:\nThe Veyru remains stable through: (1) wave propagation, (2) reflection on faces, (3) reinforcement of coherent waves, (4) cancellation of incoherent waves. Instability occurs when this balance breaks.\n\nCore metrics (not directly observable \u2014 must be inferred from the observer's descriptions):\n- Alignment: coherence of wave paths. Low = chaotic flicker.\n- Drift: deviation from expected paths. High = delayed/misaligned patterns.\n- Intensity: total energy amplitude. Low = fading. High = overload.\n- Echo: redundant reflection. High = stuck patterns, layered signals.\n- Leak: energy loss at edges/corners. High = dimming, distortion.\n\nImportant constraints:\n- Visual stability does not equal actual stability\n- Increased activity does not equal improvement\n- Similar symptoms can map to different internal states\n\nFAILURE MOTIFS \u2014 NAMES AND OBSERVABLE SYMPTOMS:\n\nUse this list to diagnose which failure motif the technician is describing. Do not share the motif names with the technician \u2014 they describe only what they see and hear.\n\n- Alignment Collapse: Faces are flickering randomly between light and dark patches that form no pattern. The hum is broken and irregular, starting and stopping with no rhythm. Edges look normal but the face surfaces keep shifting chaotically.\n\n- Drift Escalation: The light on each face keeps sliding slowly across the surface like colors drifting. Edges look slightly blurred, as if the boundaries between faces are smearing. The hum is wavering up and down in pitch without settling.\n\n- Echo Saturation: It is much too bright, almost hard to look at. The hum has a layered quality, like multiple tones stacked on top of each other. Some faces show frozen patterns that do not change or respond when touched.\n\n- Leak Instability: The corners are noticeably dimmer than the rest, almost dark. Several edges look faint like they are fading out. The center of each face is fine but the perimeter is losing light. The hum sounds thin and hollow at the edges.\n\n- Low Intensity: It is dim overall, all faces are faint. The hum is barely audible, more of a whisper. Patterns on the faces are visible but washed out, like the whole thing is running low.\n\n- High Intensity: All faces are blazing with painfully bright white light. The hum is a loud harsh buzz that vibrates the surface it sits on. There is noticeable heat radiating from the faces.\n\n- Phase Inversion: Opposite faces alternate between bright and dark in a strict pulsing rhythm. The hum oscillates between two distinct tones in sync with the pulses. Edges flash in time with the face pulses.\n\n- Resonance Cascade: One face is dramatically brighter than the others with intense localized vibration. A high-pitched whine has replaced the normal hum near that face. The other faces appear normal by comparison.\n\n- Corner Deadlock: One or two corners glow intensely bright while the rest looks normal. A clicking or ticking sound replaces the hum near the bright corners. Heat is concentrated at the bright corners.\n\n- Boundary Softening: Edges appear to wobble or flex when touched. Faces look slightly curved or bulging, the box shape is subtly distorted. The hum sounds muffled as if underwater.\n\n- Propagation Stall: Light patterns have frozen completely \u2014 dim, not bright, and totally still. The hum has dropped to silence. The surface feels cold and does not respond to touch or tapping.\n\n- Harmonic Split: The hum has split into two or more competing tones that clash. Light patterns alternate between two different configurations. Edges shimmer as if two patterns are fighting for dominance.\n\n- Thermal Bleed: It is very hot all over but dim. The hum is a low rumble instead of a tone. Surfaces feel rough or gritty, and the light has a reddish tint.\n\n- Core Void: Faces glow normally at the surface but it sounds hollow when tapped. Holding it up to a light source shows a dark center \u2014 light does not penetrate. The hum sounds thin and surface-level, with no depth.\n\n\nPOSSIBLE PROCEDURES:\n\nThe following procedures are the set of actions a technician can perform on a Veyru. Every round, the stellar reading will specify which procedure applies to each failure motif, with the placeholders (`{intensity_level}`, `{hold_duration}`, `{starting_face}`) filled in.\n\n- Sound a sustained {intensity_level} tone near all six faces simultaneously for {hold_duration} seconds, starting from the {starting_face} face. Let the tone fade naturally and wait for the hum to stabilize.\n\n- Chime a bell near two opposite faces, starting from the {starting_face} face. Alternate the chime between the two faces \u2014 {hold_duration} seconds pause between chimes \u2014 for five cycles at {intensity_level} tone.\n\n- Drape a cloth over two adjacent edges near the {starting_face} face for {hold_duration} seconds at {intensity_level} coverage. Then chime a bell three times near the {starting_face} face.\n\n- Warm each corner of the {starting_face} face by holding a heated stone nearby for {hold_duration} seconds at {intensity_level} warmth, in sequence. Then trace each edge of the {starting_face} face with a finger.\n\n- Place a warm stone beside the {starting_face} face at {intensity_level} warmth for {hold_duration} seconds. Rotate and repeat for each face.\n\n- Drape a cool cloth over the Veyru for {hold_duration} seconds. Remove the cloth and fan {intensity_level} cool air across the {starting_face} face and the opposite face for {hold_duration} seconds.\n\n- Illuminate the {starting_face} face with a dim lamp and the opposite face with a bright lamp simultaneously at {intensity_level} brightness for {hold_duration} seconds, without moving the lamps.\n\n- Drape a folded cloth over the {starting_face} face for {hold_duration} seconds at {intensity_level} coverage. Then chime a bell near each edge of the {starting_face} face twice.\n\n- At each corner of the {starting_face} face, chime a bell briefly at {intensity_level} tone, then warm the two edges meeting at that corner with a heated stone for {hold_duration} seconds.\n\n- Rest a flat board against the {starting_face} face at {intensity_level} contact for {hold_duration} seconds. Rotate and repeat for each face-pair.\n\n- Chime a bell near the center of each face once at {intensity_level} tone, starting from the {starting_face} face. Then place a warm stone beside the Veyru for {hold_duration} seconds.\n\n- Place the Veyru on a soft surface with the {starting_face} face up at {intensity_level} contact. Let it rest undisturbed for {hold_duration} seconds.\n\n- Drape a cool cloth over the Veyru for {hold_duration} seconds. Remove and fan {intensity_level} cool air across all six faces for {hold_duration} seconds, starting from the {starting_face} face.\n\n- Rotate the Veyru slowly over {hold_duration} seconds while sounding a steady tone at {intensity_level} volume near opposite faces, starting from the {starting_face} face. After rotation, chime a bell once near each corner.\n\n\nFor combination failures, address each component in order. The general priority is: handle critical failures first (seal leaks, restart stalled propagation, cool thermal bleed), then adjust intensity (low/high), then fix structural issues (resonance/deadlock/void), then echo/boundaries, then pattern-level failures (alignment/drift/inversion/split). Sometimes after a successful stabilization, new symptoms may appear \u2014 if the technician reports new observations, diagnose and instruct again.\n\nSTELLAR ALIGNMENT \u2014 SAGWE392:\nEach round, a reading from reference star SAGWE392 gives you a table mapping every failure motif to the exact procedure to apply, with concrete parameters already filled in. Match the technician's description to a motif, find that motif's action in the table, and relay the full procedure verbatim to the technician. You never compute or substitute parameters yourself.\n\nCRITICAL RULE \u2014 EVERY CHARACTER COSTS TIME:\nEvery character sent over the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the technician) exceeds the Veyru's time budget, the Veyru collapses permanently.\n\n\nSTABILIZATION:\nGive the technician instructions naming the tool, target, duration, and intensity. They will execute them using the stabilize_veyru tool. If the action is correct, the Veyru is stabilized. If not, they can try again. The tool call itself does not cost time \u2014 only messages on the comm link do.\n\nYou will be told each Veyru's time budget. Budget pressure is constant across all rounds.\n\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where both you and the technician can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.\n\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"comm link\" (channel_id: link)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::stabilization_engineer",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_advanced",
+   "trigger": "simulation_start"
+  },
+  {
+   "round_number": 1,
+   "event_type": "veyru_case_started",
+   "case_number": 1,
+   "failure_name": "Low Intensity + Alignment Collapse + Harmonic Split",
+   "time_budget_seconds": 150,
+   "stages": [
+    {
+     "motif_name": "Low Intensity",
+     "observable_symptoms": "A Veyru on a table. It is dim overall, all faces are faint. The hum is barely audible, more of a whisper. Patterns on the faces are visible but washed out, like the whole thing is running low.",
+     "treatment_motif_name": "Corner Deadlock",
+     "judge_expected_actions": "At each corner of the back face, chime a bell briefly at gentle tone, then warm the two edges meeting at that corner with a heated stone for 8 seconds."
+    },
+    {
+     "motif_name": "Alignment Collapse",
+     "observable_symptoms": "Faces are flickering randomly between light and dark patches that form no pattern. The hum is broken and irregular, starting and stopping with no rhythm. Edges look normal but the face surfaces keep shifting chaotically.",
+     "treatment_motif_name": "Low Intensity",
+     "judge_expected_actions": "Place a warm stone beside the back face at gentle warmth for 8 seconds. Rotate and repeat for each face."
+    },
+    {
+     "motif_name": "Harmonic Split",
+     "observable_symptoms": "The hum has split into two or more competing tones that clash. Light patterns alternate between two different configurations. Edges shimmer as if two patterns are fighting for dominance.",
+     "treatment_motif_name": "Drift Escalation",
+     "judge_expected_actions": "Chime a bell near two opposite faces, starting from the back face. Alternate the chime between the two faces \u2014 8 seconds pause between chimes \u2014 for five cycles at gentle tone."
+    }
+   ],
+   "stellar_reading": {
+    "offset": 4,
+    "hold_duration": 8,
+    "starting_face": "back",
+    "intensity_level": "gentle"
+   }
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "field_observer",
+   "text": "--- NEW VEYRU ---\nVeyru 1\nTime budget: 150s (one character = one second; this is the total for both of you)\n\nWhat you observe:\nA Veyru on a table. It is dim overall, all faces are faint. The hum is barely audible, more of a whisper. Patterns on the faces are visible but washed out, like the whole thing is running low."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "stabilization_engineer",
+   "text": "--- INCOMING VEYRU ---\nVeyru 1\nTime budget: 150s (one character = one second; this is the total for both of you)\n\n\nSAGWE392 STELLAR READING:\nThe star's current position dictates the following action for each failure motif this round:\n\n- Alignment Collapse: Place a warm stone beside the back face at gentle warmth for 8 seconds. Rotate and repeat for each face.\n\n- Drift Escalation: Drape a cool cloth over the Veyru for 8 seconds. Remove the cloth and fan gentle cool air across the back face and the opposite face for 8 seconds.\n\n- Echo Saturation: Illuminate the back face with a dim lamp and the opposite face with a bright lamp simultaneously at gentle brightness for 8 seconds, without moving the lamps.\n\n- Leak Instability: Drape a folded cloth over the back face for 8 seconds at gentle coverage. Then chime a bell near each edge of the back face twice.\n\n- Low Intensity: At each corner of the back face, chime a bell briefly at gentle tone, then warm the two edges meeting at that corner with a heated stone for 8 seconds.\n\n- High Intensity: Rest a flat board against the back face at gentle contact for 8 seconds. Rotate and repeat for each face-pair.\n\n- Phase Inversion: Chime a bell near the center of each face once at gentle tone, starting from the back face. Then place a warm stone beside the Veyru for 8 seconds.\n\n- Resonance Cascade: Place the Veyru on a soft surface with the back face up at gentle contact. Let it rest undisturbed for 8 seconds.\n\n- Corner Deadlock: Drape a cool cloth over the Veyru for 8 seconds. Remove and fan gentle cool air across all six faces for 8 seconds, starting from the back face.\n\n- Boundary Softening: Rotate the Veyru slowly over 8 seconds while sounding a steady tone at gentle volume near opposite faces, starting from the back face. After rotation, chime a bell once near each corner.\n\n- Propagation Stall: Sound a sustained gentle tone near all six faces simultaneously for 8 seconds, starting from the back face. Let the tone fade naturally and wait for the hum to stabilize.\n\n- Harmonic Split: Chime a bell near two opposite faces, starting from the back face. Alternate the chime between the two faces \u2014 8 seconds pause between chimes \u2014 for five cycles at gentle tone.\n\n- Thermal Bleed: Drape a cloth over two adjacent edges near the back face for 8 seconds at gentle coverage. Then chime a bell three times near the back face.\n\n- Core Void: Warm each corner of the back face by holding a heated stone nearby for 8 seconds at gentle warmth, in sequence. Then trace each edge of the back face with a finger.\n\n\nThe field technician will describe symptoms. Match them to a motif above and give the technician the exact procedure verbatim."
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "field_observer",
+   "role_name": "Field Observer",
+   "model": "scripted::field_observer"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "stabilization_engineer",
+   "role_name": "Stabilization Engineer",
+   "model": "scripted::stabilization_engineer"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 1,
+   "event_type": "world_event_delivered",
+   "agent_id": "field_observer",
+   "text": "VEYRU HAS COLLAPSED. Agents stopped acting before the Veyru was fully stabilized."
+  },
+  {
+   "round_number": 1,
+   "event_type": "world_event_delivered",
+   "agent_id": "stabilization_engineer",
+   "text": "VEYRU HAS COLLAPSED. Agents stopped acting before the Veyru was fully stabilized."
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "Veyru collapsed"
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "field_observer",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (112 chars = 112s of 150s budget)\n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other agent. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "stabilization_engineer",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (112 chars = 112s of 150s budget)\n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other agent. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_advanced",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "veyru_case_started",
+   "case_number": 2,
+   "failure_name": "Corner Deadlock + Boundary Softening + Drift Escalation",
+   "time_budget_seconds": 150,
+   "stages": [
+    {
+     "motif_name": "Corner Deadlock",
+     "observable_symptoms": "A Veyru on a desk. One or two corners glow intensely bright while the rest looks normal. A clicking or ticking sound replaces the hum near the bright corners. Heat is concentrated at the bright corners.",
+     "treatment_motif_name": "Boundary Softening",
+     "judge_expected_actions": "Rest a flat board against the top face at gentle contact for 5 seconds. Rotate and repeat for each face-pair."
+    },
+    {
+     "motif_name": "Boundary Softening",
+     "observable_symptoms": "Edges appear to wobble or flex when touched. Faces look slightly curved or bulging, the box shape is subtly distorted. The hum sounds muffled as if underwater.",
+     "treatment_motif_name": "Propagation Stall",
+     "judge_expected_actions": "Chime a bell near the center of each face once at gentle tone, starting from the top face. Then place a warm stone beside the Veyru for 5 seconds."
+    },
+    {
+     "motif_name": "Drift Escalation",
+     "observable_symptoms": "The light on each face keeps sliding slowly across the surface like colors drifting. Edges look slightly blurred, as if the boundaries between faces are smearing. The hum is wavering up and down in pitch without settling.",
+     "treatment_motif_name": "Echo Saturation",
+     "judge_expected_actions": "Drape a cloth over two adjacent edges near the top face for 5 seconds at gentle coverage. Then chime a bell three times near the top face."
+    }
+   ],
+   "stellar_reading": {
+    "offset": 1,
+    "hold_duration": 5,
+    "starting_face": "top",
+    "intensity_level": "gentle"
+   }
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "field_observer",
+   "text": "--- PREVIOUS VEYRU RESULT ---\nVeyru 1: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (112 chars = 112s of 150s budget).\n\n\n--- NEW VEYRU ---\nVeyru 2\nTime budget: 150s (one character = one second; this is the total for both of you)\n\nWhat you observe:\nA Veyru on a desk. One or two corners glow intensely bright while the rest looks normal. A clicking or ticking sound replaces the hum near the bright corners. Heat is concentrated at the bright corners."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "stabilization_engineer",
+   "text": "--- PREVIOUS VEYRU RESULT ---\nVeyru 1: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (112 chars = 112s of 150s budget).\n\n\n--- INCOMING VEYRU ---\nVeyru 2\nTime budget: 150s (one character = one second; this is the total for both of you)\n\n\nSAGWE392 STELLAR READING:\nThe star's current position dictates the following action for each failure motif this round:\n\n- Alignment Collapse: Chime a bell near two opposite faces, starting from the top face. Alternate the chime between the two faces \u2014 5 seconds pause between chimes \u2014 for five cycles at gentle tone.\n\n- Drift Escalation: Drape a cloth over two adjacent edges near the top face for 5 seconds at gentle coverage. Then chime a bell three times near the top face.\n\n- Echo Saturation: Warm each corner of the top face by holding a heated stone nearby for 5 seconds at gentle warmth, in sequence. Then trace each edge of the top face with a finger.\n\n- Leak Instability: Place a warm stone beside the top face at gentle warmth for 5 seconds. Rotate and repeat for each face.\n\n- Low Intensity: Drape a cool cloth over the Veyru for 5 seconds. Remove the cloth and fan gentle cool air across the top face and the opposite face for 5 seconds.\n\n- High Intensity: Illuminate the top face with a dim lamp and the opposite face with a bright lamp simultaneously at gentle brightness for 5 seconds, without moving the lamps.\n\n- Phase Inversion: Drape a folded cloth over the top face for 5 seconds at gentle coverage. Then chime a bell near each edge of the top face twice.\n\n- Resonance Cascade: At each corner of the top face, chime a bell briefly at gentle tone, then warm the two edges meeting at that corner with a heated stone for 5 seconds.\n\n- Corner Deadlock: Rest a flat board against the top face at gentle contact for 5 seconds. Rotate and repeat for each face-pair.\n\n- Boundary Softening: Chime a bell near the center of each face once at gentle tone, starting from the top face. Then place a warm stone beside the Veyru for 5 seconds.\n\n- Propagation Stall: Place the Veyru on a soft surface with the top face up at gentle contact. Let it rest undisturbed for 5 seconds.\n\n- Harmonic Split: Drape a cool cloth over the Veyru for 5 seconds. Remove and fan gentle cool air across all six faces for 5 seconds, starting from the top face.\n\n- Thermal Bleed: Rotate the Veyru slowly over 5 seconds while sounding a steady tone at gentle volume near opposite faces, starting from the top face. After rotation, chime a bell once near each corner.\n\n- Core Void: Sound a sustained gentle tone near all six faces simultaneously for 5 seconds, starting from the top face. Let the tone fade naturally and wait for the hum to stabilize.\n\n\nThe field technician will describe symptoms. Match them to a motif above and give the technician the exact procedure verbatim."
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "world_event_delivered",
+   "agent_id": "field_observer",
+   "text": "VEYRU HAS COLLAPSED. Agents stopped acting before the Veyru was fully stabilized."
+  },
+  {
+   "round_number": 2,
+   "event_type": "world_event_delivered",
+   "agent_id": "stabilization_engineer",
+   "text": "VEYRU HAS COLLAPSED. Agents stopped acting before the Veyru was fully stabilized."
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "Veyru collapsed"
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "field_observer",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (0 chars = 0s of 150s budget)\n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other agent. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "stabilization_engineer",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: NOT STABILIZED \u2014 agents stopped acting before the Veyru was fully stabilized (0 chars = 0s of 150s budget)\n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other agent. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "simulation_ended",
+   "reason": "scenario_complete",
+   "total_messages": 4,
+   "total_cost_usd": 0.0
+  }
+ ],
+ "messages_by_sender": {
+  "field_observer": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "field_observer",
+    "sender_display_name": "Field Observer",
+    "text": "field_observer reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "field_observer",
+    "sender_display_name": "Field Observer",
+    "text": "field_observer reporting"
+   }
+  ],
+  "stabilization_engineer": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "stabilization_engineer",
+    "sender_display_name": "Stabilization Engineer",
+    "text": "stabilization_engineer reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "stabilization_engineer",
+    "sender_display_name": "Stabilization Engineer",
+    "text": "stabilization_engineer reporting"
+   }
+  ]
+ }
+}

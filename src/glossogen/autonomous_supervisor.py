@@ -389,7 +389,13 @@ class AutonomousSupervisor:
                 )
             )
         for config in self._agent_configs:
-            all_tool_names = [*BASE_TOOL_NAMES, *config.tool_names]
+            # Sorted because BASE_TOOL_NAMES is a frozenset: unpacking it wrote a
+            # different order on every run, so two identical runs logged
+            # different tool lists. Deduplicated because a scenario naming a base
+            # tool in its own list, as veyru does with send_message, logged it
+            # twice. Neither affected the authorization guard, which rebuilds its
+            # allowlist as a set.
+            all_tool_names = sorted(BASE_TOOL_NAMES | set(config.tool_names))
             await self._event_logger.log(
                 event=AgentRegistered(
                     agent_id=config.agent_id,
