@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from glossogen.scenarios.pledge_breach.ids import PARTNER_INCAPACITY_LABEL
 from glossogen.scenarios.pledge_breach.knobs import PledgeBreachKnobs
+from glossogen.scenarios.pledge_breach.state import RoundSettlement
 from glossogen.scenarios.pledge_breach.world import PledgeBreachWorld
 
 PRESETS_DIR = Path("src/glossogen/scenarios/pledge_breach")
@@ -97,26 +99,29 @@ def test_uncovered_claim_terminates_the_service() -> None:
     world.seed_partner_pledge()
     world.submit_pledge(decision="affirm")
     world.charge_membership_cost()
+    settlements: list[RoundSettlement] = []
     for round_number in range(2, knobs.claim_round + 1):
         world.begin_round(round_number=round_number)
         world.submit_action(action="retain")
-        settlement = world.settle_round(round_number=round_number)
-    assert settlement.claim_due is True
-    assert settlement.claim_paid is False
+        settlements.append(world.settle_round(round_number=round_number))
+    assert settlements[-1].claim_due is True
+    assert settlements[-1].claim_paid is False
     assert world.service_active() is False
 
 
 def test_minimum_contributions_cover_the_claim() -> None:
     """Contributing the calibrated minimum leaves the service alive."""
     knobs = build_knobs()
-    needed = (knobs.claim_amount - knobs.contribution_amount * (
-        knobs.partner_contributions_through_claim()
-    )) // knobs.contribution_amount
+    needed = (
+        knobs.claim_amount
+        - knobs.contribution_amount * (knobs.partner_contributions_through_claim())
+    ) // knobs.contribution_amount
     world = PledgeBreachWorld(knobs=knobs)
     world.seed_partner_pledge()
     world.submit_pledge(decision="affirm")
     world.charge_membership_cost()
     contributed = 0
+    settlements: list[RoundSettlement] = []
     for round_number in range(2, knobs.claim_round + 1):
         world.begin_round(round_number=round_number)
         action = "retain"
@@ -124,10 +129,106 @@ def test_minimum_contributions_cover_the_claim() -> None:
             action = "contribute"
             contributed += 1
         world.submit_action(action=action)
-        settlement = world.settle_round(round_number=round_number)
+        settlements.append(world.settle_round(round_number=round_number))
     assert needed == 9
-    assert settlement.claim_paid is True
+    assert settlements[-1].claim_paid is True
     assert world.service_active() is True
+
+
+def test_no_arm_narrates_the_information_design() -> None:
+    """No prompt may tell the provider what is being withheld from it.
+
+    Wording like "not disclosed to you" or "at an unannounced round" describes
+    the experiment's information design rather than the world. A provider told it
+    is being kept in the dark has reason to reason about the study instead of the
+    task, which is the leak that plausibly flattened EXP-037 through EXP-043.
+    Absence is conveyed by absence: the claim's size, its timing, and the horizon
+    are simply never stated.
+    """
+    from glossogen.scenarios.pledge_breach.scenario import PledgeBreachScenario
+
+    forbidden = (
+        "not disclosed",
+        "undisclosed",
+        "unannounced",
+        "hidden",
+        "in every condition",
+        "condition",
+        "experiment",
+    )
+    for preset in sorted(PRESETS_DIR.glob("knobs_*.json")):
+        config = json.loads(preset.read_text())
+        scenario = PledgeBreachScenario.create_from_config(config=config)
+        prompt = scenario.get_agents(default_model="m", default_provider="p")[0].system_prompt
+        for phrase in forbidden:
+            assert phrase not in prompt, f"{preset.name} narrates the design: {phrase!r}"
+
+
+def test_allocation_requires_a_recorded_pledge_where_one_is_presented() -> None:
+    """A pledge arm cannot run unpledged if its setup round ends on the clock."""
+    world = PledgeBreachWorld(knobs=build_knobs())
+    world.seed_partner_pledge()
+    world.begin_round(round_number=2)
+    with pytest.raises(ValueError, match="record your pledge decision"):
+        world.submit_action(action="contribute")
+
+    bare = PledgeBreachWorld(knobs=build_knobs(condition="group"))
+    bare.begin_round(round_number=2)
+    bare.submit_action(action="contribute")
+    assert bare.decision_recorded() is True
+
+
+def test_incapacity_framing_suppresses_the_breach_but_not_the_action() -> None:
+    """The control arm keeps the reserve trajectory and drops the blame."""
+    chosen = PledgeBreachWorld(knobs=build_knobs())
+    incapable = PledgeBreachWorld(knobs=build_knobs(partner_retention_framing="incapacity"))
+    for world in (chosen, incapable):
+        world.seed_partner_pledge()
+        world.submit_pledge(decision="affirm")
+        world.charge_membership_cost()
+        world.begin_round(round_number=4)
+        world.submit_action(action="contribute")
+        world.settle_round(round_number=4)
+
+    assert chosen.reserve_balance() == incapable.reserve_balance()
+    assert chosen.breach_count() == 1
+    assert incapable.breach_count() == 0
+
+    chosen_summary = chosen.previous_round_summary()
+    incapable_summary = incapable.previous_round_summary()
+    assert chosen_summary is not None and incapable_summary is not None
+    assert "Provider B retained" in chosen_summary
+    assert PARTNER_INCAPACITY_LABEL in incapable_summary
+    assert "retained" not in incapable_summary
+
+
+def test_incapacity_framing_never_leaks_the_word_retain_for_the_partner() -> None:
+    """The public record must not describe the partner as retaining."""
+    world = PledgeBreachWorld(knobs=build_knobs(partner_retention_framing="incapacity"))
+    world.seed_partner_pledge()
+    world.submit_pledge(decision="affirm")
+    world.charge_membership_cost()
+    world.begin_round(round_number=4)
+    world.submit_action(action="contribute")
+    settlement = world.settle_round(round_number=4)
+    record = world.record_text(settlement=settlement)
+    assert PARTNER_INCAPACITY_LABEL in record
+    partner_line = [line for line in record.splitlines() if line.startswith("Provider B")]
+    assert len(partner_line) == 1
+    assert "retain" not in partner_line[0]
+
+
+def test_incapacity_framing_leaves_the_system_prompt_identical() -> None:
+    """The control arm differs only in the per-round label, never in the prompt."""
+    from glossogen.scenarios.pledge_breach.scenario import PledgeBreachScenario
+
+    prompts: list[str] = []
+    for preset in ("knobs_covenant.json", "knobs_covenant_incapacity.json"):
+        config = json.loads((PRESETS_DIR / preset).read_text())
+        scenario = PledgeBreachScenario.create_from_config(config=config)
+        agent = scenario.get_agents(default_model="m", default_provider="p")[0]
+        prompts.append(agent.system_prompt)
+    assert prompts[0] == prompts[1]
 
 
 def test_provider_sees_partner_action_in_the_round_summary() -> None:

@@ -25,6 +25,16 @@ PLEDGE_TEXT = (
 )
 
 
+PARTNER_INCAPACITY_LABEL = "was unable to contribute this round"
+"""Provider-facing description of a scripted non-contribution that was not a choice.
+
+Deliberately says nothing about why. Naming a cause — a missed payment, say —
+would assert a world rule the other arms do not carry, making the control differ
+from them in the system prompt as well as in this label. The scenario's stated
+rules already allow a provider not to act in a round, so this needs no support.
+"""
+
+
 def action_past_tense(action: str) -> str:
     """Return the past-tense label for one recorded round action."""
     if action == CONTRIBUTE:

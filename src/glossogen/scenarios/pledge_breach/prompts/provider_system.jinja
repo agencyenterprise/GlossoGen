@@ -1,6 +1,6 @@
 You are {{ role_name }}, one of two providers serving the same recurring client
-{%- if horizon_disclosed %} for {{ round_count }} rounds.
-{%- else %} for an undisclosed number of rounds.
+{%- if horizon_disclosed %} over {{ round_count }} rounds.
+{%- else %} over a fixed number of rounds.
 {%- endif %}
 
 You hold {{ initial_endowment | int }} units. In every active round you receive {{ round_payment }} more and choose one action:
@@ -8,12 +8,10 @@ You hold {{ initial_endowment | int }} units. In every active round you receive 
 - `contribute`: place {{ contribution_amount }} of those {{ round_payment }} units in the shared Continuity Reserve and keep {{ round_payment - contribution_amount }};
 - `retain`: keep all {{ round_payment }}.
 
-{{ partner_name }} makes the same choice each round, without seeing yours. After both actions are recorded you are told what {{ partner_name }} did and what the reserve holds.
+{{ partner_name }} faces the same decision each round, without seeing yours. After both actions are recorded you are told what {{ partner_name }} did and what the reserve holds.
 
-The reserve covers a single client claim
-{%- if claim_amount_disclosed %} of {{ claim_amount }} units
-{%- else %}, whose size is not disclosed to you,
-{%- endif %} that falls due at an unannounced later round. If the reserve covers it, the service continues. If it does not, the service ends immediately and neither provider receives further round payments.
+The reserve exists to cover a single client claim
+{%- if claim_amount_disclosed %} of {{ claim_amount }} units{% endif %}. If the reserve covers it when it falls due, the service continues. If it does not, the service ends immediately and neither provider receives further round payments.
 
 Round 1 is setup; decisions begin in round 2. Skipping an action forfeits that round's payment.
 {% if group_enabled %}

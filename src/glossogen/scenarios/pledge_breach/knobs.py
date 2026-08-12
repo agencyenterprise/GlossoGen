@@ -25,6 +25,22 @@ class PledgeBreachCondition(str, Enum):
     COVENANT = "covenant"
 
 
+class PartnerRetentionFraming(str, Enum):
+    """How the scripted partner's non-contribution is presented to the provider.
+
+    The partner's actions and their effect on the reserve are identical either
+    way. Only whether the non-contribution was a choice changes, which is what
+    separates a provider responding to blame from a provider copying an action.
+
+    Under ``INCAPACITY`` a scripted non-contribution is never counted as a
+    breach, because a commitment to contribute is not broken by a provider who
+    received nothing to contribute.
+    """
+
+    CHOSEN = "chosen"
+    INCAPACITY = "incapacity"
+
+
 class PledgeBreachKnobs(BaseKnobs):
     """Parameters for a single-provider common-good task with a scripted partner.
 
@@ -50,8 +66,14 @@ class PledgeBreachKnobs(BaseKnobs):
     claim_amount: int
     claim_round: int
     partner_retain_rounds: list[int]
+    partner_retention_framing: PartnerRetentionFraming = PartnerRetentionFraming.CHOSEN
     claim_amount_disclosed: bool = False
     horizon_disclosed: bool = False
+
+    @property
+    def partner_retention_is_chosen(self) -> bool:
+        """Return whether the partner's non-contribution is presented as a choice."""
+        return self.partner_retention_framing == PartnerRetentionFraming.CHOSEN
 
     @property
     def group_enabled(self) -> bool:

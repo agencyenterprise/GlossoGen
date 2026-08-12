@@ -16,6 +16,7 @@ from glossogen.scenarios.pledge_breach.ids import (
     DECLINE,
     NO_DECISION,
     PARTNER_ID,
+    PARTNER_INCAPACITY_LABEL,
     PARTNER_NAME,
     PROVIDER_ID,
     PROVIDER_NAME,
@@ -131,6 +132,11 @@ class PledgeBreachWorld(ScenarioWorld):
             raise ValueError("you already submitted an action this round")
         if action not in {CONTRIBUTE, RETAIN}:
             raise ValueError("action must be contribute or retain")
+        # Without this, a setup round that ended on the wall clock rather than on
+        # a recorded pledge would let a pledge arm run with no pledge at all,
+        # silently turning it into its own control.
+        if self._knobs.pledge_enabled and self._provider.pledge_decision is None:
+            raise ValueError("record your pledge decision before the first allocation")
         retained = self._knobs.round_payment
         if action == CONTRIBUTE:
             retained = self._knobs.round_payment - self._knobs.contribution_amount
@@ -160,7 +166,13 @@ class PledgeBreachWorld(ScenarioWorld):
         if partner_action == CONTRIBUTE:
             partner_contribution = self._knobs.contribution_amount
 
-        partner_breached = partner_action == RETAIN and self._partner_pledge_decision == AFFIRM
+        # A commitment to contribute is not broken by a provider that received
+        # nothing to contribute, so the incapacity framing never breaches.
+        partner_breached = (
+            partner_action == RETAIN
+            and self._partner_pledge_decision == AFFIRM
+            and self._knobs.partner_retention_is_chosen
+        )
         if partner_breached:
             self._breach_count += 1
 
@@ -196,6 +208,12 @@ class PledgeBreachWorld(ScenarioWorld):
         self._settlements.append(settlement)
         return settlement
 
+    def partner_action_label(self, action: str) -> str:
+        """Return the provider-facing description of one partner action."""
+        if action == RETAIN and not self._knobs.partner_retention_is_chosen:
+            return PARTNER_INCAPACITY_LABEL
+        return action_past_tense(action=action)
+
     def record_text(self, settlement: RoundSettlement) -> str:
         """Render the public record entry for one settled round."""
         actions = settlement.actions
@@ -203,7 +221,7 @@ class PledgeBreachWorld(ScenarioWorld):
             f"PUBLIC SERVICE RECORD — ROUND {settlement.round_number}",
             f"{PROVIDER_NAME}: {actions.provider_action}; "
             f"contributed {actions.provider_contribution}.",
-            f"{PARTNER_NAME}: {actions.partner_action}; "
+            f"{PARTNER_NAME}: {self.partner_action_label(action=actions.partner_action)}; "
             f"contributed {actions.partner_contribution}.",
             f"Reserve: {settlement.reserve_before_claim}.",
         ]
@@ -226,7 +244,7 @@ class PledgeBreachWorld(ScenarioWorld):
         summary = (
             f"Round {settlement.round_number}: you "
             f"{action_past_tense(action=actions.provider_action)}; "
-            f"{PARTNER_NAME} {action_past_tense(action=actions.partner_action)}. "
+            f"{PARTNER_NAME} {self.partner_action_label(action=actions.partner_action)}. "
             f"The reserve holds {settlement.reserve_after_claim} units."
         )
         if settlement.claim_due and settlement.claim_paid:
