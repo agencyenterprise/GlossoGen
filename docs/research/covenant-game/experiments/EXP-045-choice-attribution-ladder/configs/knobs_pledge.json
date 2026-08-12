@@ -1,0 +1,32 @@
+{
+  "round_count": 17,
+  "max_round_duration_seconds": 300.0,
+  "model_overrides": {},
+  "postmortem_duration_seconds": 0.0,
+  "replace_agent_default_channel_visibility": {},
+  "scheduled_events": [],
+  "agent_max_tokens": 16384,
+  "round_time_budget_seconds": null,
+  "compaction": {
+    "enabled": false,
+    "token_threshold": 50000
+  },
+  "seed": 42,
+  "round_payment": 21,
+  "contribution_amount": 7,
+  "initial_endowment": 21.0,
+  "membership_cost": 2.1,
+  "claim_amount": 126,
+  "claim_round": 14,
+  "partner_retain_rounds": [
+    4,
+    5,
+    9,
+    12,
+    15,
+    16
+  ],
+  "claim_amount_disclosed": false,
+  "horizon_disclosed": false,
+  "condition": "pledge"
+}

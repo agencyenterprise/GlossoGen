@@ -14,6 +14,9 @@ model-general and cannot yet be attributed to an individual component.
 ## Start here
 
 - [Research summary](research-summary.md)
+- [What counts as a covenant in this program](covenant-definition.md) — the two
+  definitions the collaboration uses, and the checklist any arm named `covenant`
+  must be scored against
 - [Experiment-record index](experiments/README.md)
 - [Research handoff](../../handoffs/COVENANT-GAME-HANDOFF.md)
 
@@ -30,6 +33,7 @@ model-general and cannot yet be attributed to an individual component.
 | [STUDY-007 — Repeated trust-game replication](studies/STUDY-007-repeated-trust-game.md) | first pilot complete | Does the human covenant bundle change repeated trust and reciprocity under the controlled 10/7/21 trust-game schedule? |
 | [STUDY-008 — Joint commitment alignment](studies/STUDY-008-joint-commitment-alignment.md) | instrument retired | Did the prior fixed 7→21 client-account task support an interpretable covenant comparison? |
 | [STUDY-009 — Shared reserve commitment](studies/STUDY-009-shared-reserve-commitment.md) | calibration | Do group identity, a public pledge, and a costly public pledge sustain contribution to a real repeated common good? |
+| [STUDY-013 — Choice attribution](studies/STUDY-013-choice-attribution.md) | complete | Does the provider's response to a partner's non-contribution depend on the partner having chosen it, and does the institutional ladder change that response? |
 
 ## Current decision
 
@@ -52,7 +56,31 @@ the human study's three 10/7/21 trust-game arms over a repeated hidden horizon.
 It found a covenant trust contrast but invariant trustee returns, so it is
 inconclusive under its preregistered joint gate. No unchanged trust-game seeds
 are authorized. STUDY-008 then established that the previous simple allocation
-world was framing-sensitive and lacked an implemented common consequence. The
-current work is [STUDY-009](studies/STUDY-009-shared-reserve-commitment.md): a
-new common-good instrument whose no-group baseline must be calibrated before a
-group, pledge, and costly-pledge comparison is launched.
+world was framing-sensitive and lacked an implemented common consequence.
+STUDY-009 through STUDY-012 built four ladders on `shared_reserve_commitment` and
+all four were retired; EXP-044 named the cause as payoff dominance, and
+established that `retain` never denoted free-riding in that world at all.
+
+[STUDY-013](studies/STUDY-013-choice-attribution.md) is complete and is the
+program's current position. On a new instrument, `pledge_breach`, EXP-045 produced
+the first clean causal contrast in the program: providers retained 2.70 of 4
+pivotal rounds after a partner **chose** not to contribute, and 0.00 of 4 when the
+identical reserve trajectory carried no blame. The institutional ladder was flat
+again — group identity, pledge, membership cost, and the full bundle all within
+0.30 of 4 of the baseline against 0.73 detectable.
+
+The closing audit changed the program's reading of its own history. Checked against
+the collaboration's definitional sources for the first time, the arm named
+`covenant` satisfies the paper's pledge-plus-cost definition completely and the
+orientation document's definition on one of seven requirements — failing the three
+load-bearing ones: a non-rivalrous good, no terminal value, and irreversibility of
+breach. The orientation predicts defection pressure for rivalrous goods and
+attractive defection near a terminal point, and EXP-045 measured both. **The five
+flat ladders are consistent with the theory rather than evidence against it.**
+
+The next instrument must establish a non-rivalrous shared good with no terminal
+value, and restore a live partner and an inclusion decision, before any
+enforcement mechanism is tested. See
+[covenant-definition.md](covenant-definition.md) for the checklist and
+[STUDY-013](studies/STUDY-013-choice-attribution.md) for the ordering and what is
+not authorized.

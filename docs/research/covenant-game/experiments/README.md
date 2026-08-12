@@ -97,6 +97,23 @@ and its
   retired on payoff dominance — contributing beats retaining by roughly 45 to 1
   — which was upstream of all three earlier retirement rationales. STUDY-012 is
   **retired** with it.
+- [STUDY-013 — Choice attribution and the limits of an unenforced pledge](../studies/STUDY-013-choice-attribution.md):
+  moves to a new instrument, `pledge_breach` — one live provider against a
+  scripted partner, with the claim placed at material break-even so neither
+  action dominates. [EXP-045](EXP-045-choice-attribution-ladder/experiment.md)
+  ran six arms × 30 simulations and produced the program's first clean causal
+  contrast: providers retained 2.70 of 4 pivotal rounds after a partner **chose**
+  not to contribute and 0.00 of 4 when the identical reserve trajectory carried
+  no blame, on a byte-identical prompt. The institutional ladder was flat again,
+  now at adequate power. The closing audit — the first in this program to check
+  an arm against the collaboration's own definitional sources — found that the
+  arm named `covenant` satisfies the paper's pledge-plus-cost definition
+  completely and the orientation document's definition on one of seven
+  requirements, failing the three load-bearing ones: non-rivalrous good, no
+  terminal value, irreversible breach. That reframes the program's five flat
+  ladders as consistent with the theory rather than evidence against it, and
+  inverts the next steps: the good comes before enforcement. See
+  [covenant-definition.md](../covenant-definition.md).
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -152,8 +169,9 @@ count that resolves it before launching.
 | [EXP-042](EXP-042-non-computable-sufficiency/experiment.md) | four-arm ladder with reserve balance and claim amount withheld | complete | not supported: zero retentions in all 384 opportunities; ceiling hardened, EXP-041's computability diagnosis refuted, instrument family abandoned | $4.74 |
 | [EXP-043](EXP-043-sealed-observation-pledge/experiment.md) | four-arm ladder with observation sealed; pledge is the only social signal | complete | not supported: 384 contributions in 384 opportunities, zero retentions and zero missed decisions; Gate A failed, Gate C fired, instrument retired | $1.24 |
 | [EXP-044](EXP-044-corrected-prompt-ladder-replication/experiment.md) | batch-1 four-arm ladder relaunched under the corrected, non-disclosing prompt | complete | mixed: retention returned (32 in the untreated arms) but every one was slack harvesting, not free-riding; Gate A passes only literally, Gate B fails, instrument retired on payoff dominance | $9.87 |
+| [EXP-045](EXP-045-choice-attribution-ladder/experiment.md) | six-arm choice-attribution ladder on `pledge_breach`, 30 simulations per arm | complete | mixed: Gate A passed, Gate B supported (choice attribution, 2.70 vs 0.00, p < 0.0001), Gate C not supported (ladder flat, max difference 0.30 of 4 against 0.73 detectable); 90/90 affirmed the pledge and 58/60 broke it at zero cost | $18.72 |
 
-Total API spend logged: **$430.80** (plus $0.73 in phase-4 smoke tests and
+Total API spend logged: **$449.52** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
 
 **Cycle 1 is closed.** C0 → C1 → C2 on `gpt-5.4`, seed 42, one replica each. The
@@ -163,7 +181,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-045`. Before launching, use the
+The next available ID is `EXP-046`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat
