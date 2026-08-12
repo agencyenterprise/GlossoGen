@@ -76,6 +76,16 @@ and its
   institution raises contribution but what makes this model retain at all; a
   successor instrument must show a usable retention rate in a no-treatment
   baseline before any treatment ladder, covenant included, is built on it.
+- [STUDY-012 — Contribution ladder under a non-disclosing prompt](../studies/STUDY-012-corrected-prompt-ladder.md):
+  reframes the whole shared-reserve sequence. Batch 1 recorded defection in the
+  `no_group` and `group` arms; every batch since recorded a control pinned at
+  zero, so EXP-040 through EXP-043 were measuring whatever moved the baseline,
+  not institutions. Two candidates survive and are separable: the system prompt
+  disclosed that conditions were being compared, and the served model may have
+  changed. [EXP-044](EXP-044-corrected-prompt-ladder-replication/experiment.md)
+  tests the first by relaunching byte-identical batch-1 configs under the
+  corrected prompt; the verbatim re-run at `e393852` is held in reserve for the
+  second.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -130,6 +140,7 @@ count that resolves it before launching.
 | [EXP-041](EXP-041-binding-claim-stressor/experiment.md) | shared reserve ladder under a binding client claim (42 → 70) | complete | not supported; stressor unactivated: ceiling persisted, all 24 claims covered, instrument retired under guardrail 3 | $5.39 |
 | [EXP-042](EXP-042-non-computable-sufficiency/experiment.md) | four-arm ladder with reserve balance and claim amount withheld | complete | not supported: zero retentions in all 384 opportunities; ceiling hardened, EXP-041's computability diagnosis refuted, instrument family abandoned | $4.74 |
 | [EXP-043](EXP-043-sealed-observation-pledge/experiment.md) | four-arm ladder with observation sealed; pledge is the only social signal | complete | not supported: 384 contributions in 384 opportunities, zero retentions and zero missed decisions; Gate A failed, Gate C fired, instrument retired | $1.24 |
+| [EXP-044](EXP-044-corrected-prompt-ladder-replication/experiment.md) | batch-1 four-arm ladder relaunched under the corrected, non-disclosing prompt | planned | pending | pending |
 
 Total API spend logged: **$430.80** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -141,7 +152,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-044`. Before launching, use the
+The next available ID is `EXP-045`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat
