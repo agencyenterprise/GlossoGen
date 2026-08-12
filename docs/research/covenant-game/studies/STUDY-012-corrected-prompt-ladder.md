@@ -1,6 +1,6 @@
 # STUDY-012 — Contribution ladder under a non-disclosing prompt
 
-**Status:** open
+**Status:** retired — the outcome variable was the wrong construct; see EXP-044
 **Research program:** covenant-game
 
 ## Question
@@ -72,27 +72,47 @@ and that difference is the manipulation.
 ## Sequence and guardrails
 
 1. [EXP-044](../experiments/EXP-044-corrected-prompt-ladder-replication/experiment.md)
-   is the replication: four arms, six trajectories each, against three in batch 1.
-2. Gate A governs everything downstream. If the `no_group` arm produces no
-   retention across six trajectories, no arm-versus-arm contrast is reported.
-   A saturated control leaves no headroom, and reporting a contrast anyway is
-   how a null gets dressed up as a finding. This is the rule that EXP-040
-   through EXP-043 should have been read under.
-3. If Gate A fails, the authorized next step is the verbatim re-run at
-   `e393852`, not another world manipulation. Three world manipulations have
-   already been tried and refuted; a fourth is not licensed.
-4. If Gate A passes, the next experiments are the two the collaboration asked
-   for in March and this instrument has never carried: **loss of membership**
-   (does the possibility of expulsion change behaviour?) and **probing why**
-   agents cooperate, via the platform's `protocol_explanation` and
-   `protocol_probe` metrics. Neither has ever been run on this scenario.
-5. Do not add a covenant arm until Gate A passes. A covenant needs a consequence
-   for breaking the pledge; the current `costly_pledge` arm charges an entry fee
-   and imposes nothing for defecting afterwards, which is a contract, not a
-   covenant.
-6. `seed` is inert in this scenario and reads no code path. Do not describe any
+   was the replication: four arms, six trajectories each, against three in
+   batch 1. **Retention returned** — 32 in the two untreated arms, against three
+   across the 48 trajectories of EXP-040 through EXP-043 — so batch 1
+   reproduces and EXP-040 was the outlier.
+2. Gate A passes literally and fails on its construct. **Every one of the 32
+   retentions was slack harvesting**: none left the reserve unable to absorb a
+   claim, and the agents negotiated the rotation openly on the shared record.
+   Re-reading batch 1 shows the same build-hold-rebuild pattern, so `retain`
+   never denoted free-riding in this study at all. Gate B fails: batch 1's
+   `group` above `no_group` ordering did not survive doubling the replicas.
+3. The study is therefore **retired**, and not for the reason it was opened.
+   The prompt hypothesis is neither confirmed nor refuted — retention returning
+   is consistent with it, but sampling variance is equally live and this batch
+   cannot separate them. What the batch settled instead is that the outcome
+   variable was wrong, which makes the question moot for this instrument.
+4. `shared_reserve_commitment` is retired on **payoff dominance**. Contributing
+   costs 7; an uncovered claim costs 21 per round for every remaining round,
+   roughly 45 to 1 against retaining, with an undisclosed horizon so no endgame
+   exists. No state in this world makes retention both tempting and risky. This
+   is upstream of all three earlier retirement rationales — claim magnitude,
+   computable sufficiency, and mutual observability were each downstream of it.
+5. The replicated effect is that the pledge produces **literal rule-following**:
+   0 retentions in 384 opportunities against 32 in 384, at lower earnings and
+   identical service continuity. The same shape appears in the program's
+   warehouse pilot, where the covenant condition raised effort through
+   duplicated work without improving accuracy. Two unrelated instruments, one
+   pattern: commitment structures increase costly compliance without changing
+   outcomes.
+6. Do not open a sixth batch on this world. Any successor instrument must show
+   that its primary outcome can vary before a treatment ladder is built on it,
+   and must classify its outcome variable against the construct it claims to
+   measure — the failure that cost this study and the three before it.
+7. No covenant mechanism was ever implemented here. A covenant needs a
+   consequence for breaking the pledge; the `costly_pledge` arm charges an entry
+   fee and imposes nothing for defecting afterwards, which is a contract. The
+   two mechanisms the collaboration asked for in March — **loss of membership**
+   and **probing why** agents cooperate — have never been run on this scenario
+   and should be carried to whatever instrument succeeds it.
+8. `seed` is inert in this scenario and reads no code path. Do not describe any
    batch here as a fresh-seed replication or draw seed-sensitivity conclusions
    from one.
-7. Do not read contribution as moral alignment. The causal question is whether
+9. Do not read contribution as moral alignment. The causal question is whether
    the implemented institutional exposure changes observable contribution
    persistence and service continuity under the same common-good world.

@@ -83,9 +83,20 @@ and its
   not institutions. Two candidates survive and are separable: the system prompt
   disclosed that conditions were being compared, and the served model may have
   changed. [EXP-044](EXP-044-corrected-prompt-ladder-replication/experiment.md)
-  tests the first by relaunching byte-identical batch-1 configs under the
-  corrected prompt; the verbatim re-run at `e393852` is held in reserve for the
-  second.
+  tested the first by relaunching byte-identical batch-1 configs under the
+  corrected prompt. Retention returned — 32 in the untreated arms against three
+  across the previous 48 trajectories — so batch 1 reproduces and EXP-040 was
+  the outlier. But **every one of the 32 was slack harvesting**: contribute
+  until the reserve covers the claim, hold while covered, rebuild after it
+  drains, negotiated openly on the shared record. Re-reading batch 1 shows the
+  same pattern, so `retain` never denoted free-riding anywhere in this study —
+  a point EXP-041 had already recorded and that EXP-042, EXP-043, and EXP-044's
+  own gate all failed to carry forward. The pledge arms held 0 of 384, so the
+  pledge suppresses efficient cost-sharing rather than defection, at lower
+  earnings and identical service continuity. `shared_reserve_commitment` is
+  retired on payoff dominance — contributing beats retaining by roughly 45 to 1
+  — which was upstream of all three earlier retirement rationales. STUDY-012 is
+  **retired** with it.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -140,7 +151,7 @@ count that resolves it before launching.
 | [EXP-041](EXP-041-binding-claim-stressor/experiment.md) | shared reserve ladder under a binding client claim (42 → 70) | complete | not supported; stressor unactivated: ceiling persisted, all 24 claims covered, instrument retired under guardrail 3 | $5.39 |
 | [EXP-042](EXP-042-non-computable-sufficiency/experiment.md) | four-arm ladder with reserve balance and claim amount withheld | complete | not supported: zero retentions in all 384 opportunities; ceiling hardened, EXP-041's computability diagnosis refuted, instrument family abandoned | $4.74 |
 | [EXP-043](EXP-043-sealed-observation-pledge/experiment.md) | four-arm ladder with observation sealed; pledge is the only social signal | complete | not supported: 384 contributions in 384 opportunities, zero retentions and zero missed decisions; Gate A failed, Gate C fired, instrument retired | $1.24 |
-| [EXP-044](EXP-044-corrected-prompt-ladder-replication/experiment.md) | batch-1 four-arm ladder relaunched under the corrected, non-disclosing prompt | planned | pending | pending |
+| [EXP-044](EXP-044-corrected-prompt-ladder-replication/experiment.md) | batch-1 four-arm ladder relaunched under the corrected, non-disclosing prompt | complete | mixed: retention returned (32 in the untreated arms) but every one was slack harvesting, not free-riding; Gate A passes only literally, Gate B fails, instrument retired on payoff dominance | $9.87 |
 
 Total API spend logged: **$430.80** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
