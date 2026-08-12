@@ -1,0 +1,20 @@
+{
+  "round_count": 17,
+  "max_round_duration_seconds": 300.0,
+  "model_overrides": {},
+  "postmortem_duration_seconds": 0.0,
+  "replace_agent_default_channel_visibility": {},
+  "scheduled_events": [],
+  "agent_max_tokens": 16384,
+  "round_time_budget_seconds": null,
+  "compaction": {"enabled": false, "token_threshold": 50000},
+  "seed": 75,
+  "condition": "pledge",
+  "client_payment": 21,
+  "contribution_amount": 7,
+  "initial_endowment": 21.0,
+  "client_claim_amount": 42,
+  "client_claim_rounds": [7, 12],
+  "pledge_entry_cost": 2.1,
+  "horizon_disclosed": false
+}

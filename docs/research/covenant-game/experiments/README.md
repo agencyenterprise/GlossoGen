@@ -43,7 +43,8 @@ and its
   repaired no-group calibration. This is a new scenario with an implemented
   common reserve and identical hidden client claims. It supplies the matched
   baseline for [EXP-039](EXP-039-shared-reserve-commitment-ladder/experiment.md),
-  the group → pledge → costly-pledge ladder.
+  the group → pledge → costly-pledge ladder. [EXP-040](EXP-040-shared-reserve-fresh-seed-replication/experiment.md)
+  is its matched fresh-seed replication of the full ladder.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -94,6 +95,7 @@ count that resolves it before launching.
 | [EXP-037](EXP-037-shared-reserve-baseline-calibration/experiment.md) | shared reserve no-group baseline calibration | complete | invalid: missing-action timing fault | $0.00 |
 | [EXP-038](EXP-038-shared-reserve-baseline-repair/experiment.md) | repaired shared reserve no-group baseline calibration | complete | supported: variation, ledger, and common-claim gates passed | $1.43 |
 | [EXP-039](EXP-039-shared-reserve-commitment-ladder/experiment.md) | shared reserve group → pledge → costly-pledge ladder | complete | directional pledge candidate; fresh-seed replication required | $4.48 |
+| [EXP-040](EXP-040-shared-reserve-fresh-seed-replication/experiment.md) | shared reserve fresh-seed replication of the full ladder | planned | pending | — |
 
 Total API spend logged: **$425.51** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -105,7 +107,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-040`. Before launching, use the
+The next available ID is `EXP-041`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat

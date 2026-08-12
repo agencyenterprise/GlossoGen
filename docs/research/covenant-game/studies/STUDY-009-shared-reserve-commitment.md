@@ -82,8 +82,9 @@ initial same-config calibration passes.
    with three independent trajectories per exact configuration. EXP-039 found
    a same-seed directional pattern: pledge and costly pledge both moved to
    near-universal contribution, while group-only runs retained more frequently
-   without losing service continuity. The next step is a fresh-seed matched
-   replication, not a claim of a stable effect.
+   without losing service continuity. [EXP-040](../experiments/EXP-040-shared-reserve-fresh-seed-replication/experiment.md)
+   is the preregistered fresh-seed matched replication of all four arms, with
+   three independent trajectories per arm. It is not a claim of a stable effect.
 3. Make at most one substantial revision to the reserve-claim schedule. If the
    baseline remains a universal floor or ceiling after that revision, retire the
    instrument rather than tuning toward a desired covenant result.
