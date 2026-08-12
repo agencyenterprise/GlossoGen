@@ -8,7 +8,6 @@ and the LLM judge.
 from pydantic import model_validator
 
 from glossogen.scenarios.base_knobs import BaseKnobs
-from glossogen.scenarios.channel_noise import NoiseReplacementMode
 
 
 class SatelliteContactWindowKnobs(BaseKnobs):
@@ -38,22 +37,10 @@ class SatelliteContactWindowKnobs(BaseKnobs):
 
     judge_model: str
     judge_provider: str
-    postmortem_enabled: bool
-    postmortem_disabled_at_start: bool
-    round_time_budget_seconds: int  # pyright: ignore[reportIncompatibleVariableOverride]
+    round_time_budget_seconds: int
     seed: int
     pattern_count_min: int
     pattern_count_max: int
-    channel_noise_level: float
-    noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
-
-    @model_validator(mode="after")
-    def _validate_channel_noise_level(self) -> "SatelliteContactWindowKnobs":
-        if not 0.0 <= self.channel_noise_level <= 1.0:
-            raise ValueError(
-                f"channel_noise_level must be in [0.0, 1.0] (got {self.channel_noise_level})"
-            )
-        return self
 
     @model_validator(mode="after")
     def _validate_round_time_budget_seconds(self) -> "SatelliteContactWindowKnobs":

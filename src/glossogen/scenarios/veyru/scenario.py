@@ -23,7 +23,7 @@ join/takeover choreography), :mod:`case_event_conversion`
 import logging
 import random
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
@@ -119,6 +119,8 @@ class VeyruScenario(SimulationScenario):
     Veyru status updates to the affected team's channel when thresholds
     are crossed.
     """
+
+    postmortem_channel_ids: ClassVar[frozenset[str]] = POSTMORTEM_CHANNEL_IDS
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
@@ -265,17 +267,6 @@ class VeyruScenario(SimulationScenario):
             world=self._world,
             renderer=self._renderer,
         )
-
-    def get_max_postmortem_duration_seconds(self) -> float:
-        """Return the configured postmortem duration from knobs, or 0 when disabled."""
-        if self._world.is_postmortem_disabled:
-            return 0.0
-        return self._knobs.postmortem_duration_seconds
-
-    def on_postmortem_started(self, round_number: int) -> None:
-        """Unlock the postmortem channel for discussion."""
-        _ = round_number
-        self._world.enter_postmortem()
 
     def restore_state_from_events(self, events: list[Any]) -> None:
         """Seed the Veyru world's per-round outcomes from source events on resume."""
@@ -516,16 +507,6 @@ class VeyruScenario(SimulationScenario):
             agent_display_names=self._agent_display_names,
             get_runtime=lambda: self._runtime,
         )
-
-    @classmethod
-    def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:
-        """Hide every postmortem channel from the replaced agent's tool history.
-
-        The protocol the new agent is meant to learn is the *comm-link*
-        protocol; postmortem traffic is where agents discuss the protocol
-        out-of-band, so it is stripped to keep the experiment honest.
-        """
-        return POSTMORTEM_CHANNEL_IDS
 
     def get_protocol_probe_config(self) -> ProtocolProbeConfig | None:
         """Point the platform probe metrics at Veyru's question bank and prompts."""

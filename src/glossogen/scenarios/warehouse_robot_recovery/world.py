@@ -59,10 +59,12 @@ class WarehouseWorld(ScenarioWorld):
         cases: list[WarehouseCase],
         postmortem_globally_disabled: bool,
     ) -> None:
+        super().__init__(
+            postmortem_channel_ids=frozenset({POSTMORTEM_CHANNEL_ID}),
+            postmortem_globally_disabled=postmortem_globally_disabled,
+        )
         self._cases = cases
         self._current_case: WarehouseCase | None = None
-        self._in_postmortem: bool = False
-        self._postmortem_globally_disabled: bool = postmortem_globally_disabled
         self._current_round_characters: int = 0
         self._round_recovered: bool = False
         self._round_judge_passed: bool = False
@@ -83,16 +85,6 @@ class WarehouseWorld(ScenarioWorld):
         return self._current_case
 
     @property
-    def in_postmortem(self) -> bool:
-        """Whether the simulation is in a postmortem discussion phase."""
-        return self._in_postmortem
-
-    @property
-    def is_postmortem_disabled(self) -> bool:
-        """Whether postmortem has been globally disabled."""
-        return self._postmortem_globally_disabled
-
-    @property
     def current_round_characters(self) -> int:
         """Running character count for the current round on the radio channel."""
         return self._current_round_characters
@@ -111,20 +103,6 @@ class WarehouseWorld(ScenarioWorld):
     def outcomes(self) -> list[RecoveryOutcome]:
         """Historical per-round outcomes."""
         return self._outcomes
-
-    def enter_postmortem(self) -> None:
-        """Mark the start of a postmortem discussion phase."""
-        self._in_postmortem = True
-
-    def exit_postmortem(self) -> None:
-        """Mark the end of a postmortem discussion phase."""
-        self._in_postmortem = False
-
-    def get_globally_disabled_channels(self) -> frozenset[str]:
-        """Postmortem channel when disabled."""
-        if not self._postmortem_globally_disabled:
-            return frozenset()
-        return frozenset({POSTMORTEM_CHANNEL_ID})
 
     def previous_outcome(self) -> RecoveryOutcome | None:
         """Return the most recent recorded outcome, or None when no rounds finished."""

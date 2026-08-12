@@ -7,7 +7,7 @@ its agents, channels, injections, timing parameters, and evaluation logic.
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, NamedTuple, Protocol, Self
+from typing import Any, ClassVar, NamedTuple, Protocol, Self
 
 from pydantic_core import PydanticUndefined
 
@@ -92,6 +92,11 @@ class SimulationScenario(ABC):
     # Empty here so the default lookups fall through to the raw id.
     _agent_display_names: dict[str, str] = {}
     _channel_display_names: dict[str, str] = {}
+    # Channels carrying postmortem traffic. Declared once here and read by
+    # three places that used to be written out per scenario: the phase
+    # duration, the replaced-agent history filter, and the world's
+    # globally-disabled set. Empty means the scenario has no postmortem.
+    postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset()
 
     def __init__(self, knobs: BaseKnobs) -> None:
         """Construct the scenario from its validated knobs.
@@ -434,18 +439,26 @@ class SimulationScenario(ABC):
     def get_max_postmortem_duration_seconds(self) -> float:
         """Return the maximum wall-clock seconds a postmortem phase may last.
 
-        The game clock uses this as the timeout for the postmortem discussion.
-        Override to make the duration configurable via scenario knobs.
+        Zero when the scenario has postmortem switched off, or when the world
+        has closed it for the rest of the run. The game clock reads this once,
+        at construction, so it reflects the configuration the run starts with.
         """
-        return 60.0
+        knobs = self.get_knobs()
+        if not knobs.postmortem_enabled:
+            return 0.0
+        if self.get_world().is_postmortem_disabled:
+            return 0.0
+        return knobs.postmortem_duration_seconds
 
     def on_postmortem_started(self, round_number: int) -> None:
         """Called by the game clock when a postmortem phase begins after a round.
 
-        Scenarios use this to update internal state (e.g. unlock discussion
-        channels). The default is a no-op.
+        Opens the world's postmortem phase, which is what the scenario's
+        message validation checks to decide whether the discussion channel
+        accepts traffic yet.
         """
         _ = round_number
+        self.get_world().enter_postmortem()
 
     async def on_round_advanced(self, round_number: int) -> None:
         """Called by the game clock after advancing to a new round.
@@ -567,9 +580,9 @@ class SimulationScenario(ABC):
         reconstructed history.
 
         Used by the replace-agent flow to hide scenario-private channels
-        (e.g. a discussion/postmortem channel) from the new agent so it
-        cannot read protocol-defining content from the prior agent's
-        tool returns. The default is empty (= no scenario-specific
-        filtering).
+        from the new agent so it cannot read protocol-defining content from
+        the prior agent's tool returns. Defaults to the scenario's
+        ``postmortem_channel_ids``, which is where agents discuss the
+        protocol out of band; a scenario that declares none blocks nothing.
         """
-        return frozenset()
+        return cls.postmortem_channel_ids

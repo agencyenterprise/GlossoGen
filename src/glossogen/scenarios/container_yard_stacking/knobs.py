@@ -12,7 +12,6 @@ from typing import Self
 from pydantic import model_validator
 
 from glossogen.scenarios.base_knobs import BaseKnobs
-from glossogen.scenarios.channel_noise import NoiseReplacementMode
 from glossogen.scenarios.container_yard_stacking.ids import DEFAULT_YARD_SLOT_COUNT
 
 
@@ -42,12 +41,8 @@ class ContainerYardStackingKnobs(BaseKnobs):
     and clears link history.
     """
 
-    postmortem_enabled: bool
-    postmortem_disabled_at_start: bool
-    round_time_budget_seconds: int  # pyright: ignore[reportIncompatibleVariableOverride]
+    round_time_budget_seconds: int
     seed: int
-    channel_noise_level: float
-    noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     easy_round_numbers: frozenset[int]
     batch_size_values: list[int]
     batch_size_weights: list[int]
@@ -59,14 +54,6 @@ class ContainerYardStackingKnobs(BaseKnobs):
     intern_enabled: bool = False
     intern_join_round: int | None = None
     intern_takeover_round: int | None = None
-
-    @model_validator(mode="after")
-    def _validate_channel_noise_level(self) -> Self:
-        if not 0.0 <= self.channel_noise_level <= 1.0:
-            raise ValueError(
-                f"channel_noise_level must be in [0.0, 1.0] (got {self.channel_noise_level})"
-            )
-        return self
 
     @model_validator(mode="after")
     def _validate_batch_size_distribution(self) -> Self:

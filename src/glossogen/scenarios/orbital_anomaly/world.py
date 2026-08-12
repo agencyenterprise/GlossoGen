@@ -56,10 +56,12 @@ class OrbitalAnomalyWorld(ScenarioWorld):
     _context: WorldContext
 
     def __init__(self, cases: list[AnomalyCase], postmortem_globally_disabled: bool) -> None:
+        super().__init__(
+            postmortem_channel_ids=frozenset({POSTMORTEM_CHANNEL_ID}),
+            postmortem_globally_disabled=postmortem_globally_disabled,
+        )
         self._cases = cases
         self._current_case: AnomalyCase | None = None
-        self._in_postmortem: bool = False
-        self._postmortem_globally_disabled: bool = postmortem_globally_disabled
         self._current_round_characters: int = 0
         self._vehicle_alive: bool = True
         self._vehicle_stabilized: bool = False
@@ -76,30 +78,6 @@ class OrbitalAnomalyWorld(ScenarioWorld):
     def current_case(self) -> AnomalyCase | None:
         """The anomaly case for the current round."""
         return self._current_case
-
-    @property
-    def in_postmortem(self) -> bool:
-        """Whether the simulation is in a debrief discussion phase."""
-        return self._in_postmortem
-
-    @property
-    def is_postmortem_disabled(self) -> bool:
-        """Whether the debrief has been globally disabled."""
-        return self._postmortem_globally_disabled
-
-    def enter_postmortem(self) -> None:
-        """Mark the start of a debrief discussion phase."""
-        self._in_postmortem = True
-
-    def exit_postmortem(self) -> None:
-        """Mark the end of a debrief discussion phase."""
-        self._in_postmortem = False
-
-    def get_globally_disabled_channels(self) -> frozenset[str]:
-        """Return the debrief channel when it has been globally disabled."""
-        if not self._postmortem_globally_disabled:
-            return frozenset()
-        return frozenset({POSTMORTEM_CHANNEL_ID})
 
     def get_current_stage(self) -> AnomalyStage | None:
         """Return the active stage, or None if no case is loaded or all are done."""

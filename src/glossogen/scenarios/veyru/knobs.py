@@ -9,7 +9,6 @@ the LLM judge.
 from pydantic import model_validator
 
 from glossogen.scenarios.base_knobs import BaseKnobs
-from glossogen.scenarios.channel_noise import NoiseReplacementMode
 
 
 class VeyruKnobs(BaseKnobs):
@@ -56,28 +55,16 @@ class VeyruKnobs(BaseKnobs):
 
     judge_model: str
     judge_provider: str
-    postmortem_enabled: bool
-    round_time_budget_seconds: int  # pyright: ignore[reportIncompatibleVariableOverride]
+    round_time_budget_seconds: int
     seed: int
     two_teams: bool
     swap_round: int | None
     announce_swap: bool
     postmortem_after_swap: bool
-    postmortem_disabled_at_start: bool = False
     intern_enabled: bool
     intern_join_round: int | None
     intern_takeover_round: int | None
-    channel_noise_level: float
-    noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     easy_round_numbers: frozenset[int]
-
-    @model_validator(mode="after")
-    def _validate_channel_noise_level(self) -> "VeyruKnobs":
-        if not 0.0 <= self.channel_noise_level <= 1.0:
-            raise ValueError(
-                f"channel_noise_level must be in [0.0, 1.0] (got {self.channel_noise_level})"
-            )
-        return self
 
     @model_validator(mode="after")
     def _validate_swap_round(self) -> "VeyruKnobs":

@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from glossogen.models.compaction_config import CompactionConfig
 from glossogen.runtime.scheduled_events import ScheduledEvent
+from glossogen.scenarios.channel_noise import NoiseReplacementMode
 
 
 class AgentModelOverride(BaseModel):
@@ -55,16 +56,26 @@ class BaseKnobs(BaseModel):
     runs that hit ``vllm`` ``--max-model-len`` limits to reclaim input
     headroom.
 
-    ``round_time_budget_seconds`` is the canonical per-round communication
-    budget: one character on the scenario's primary channel costs one
-    simulated second, and the round fails when the running total exceeds
-    the budget. ``None`` means the scenario has no per-round budget and
-    applies a different pressure axis instead (e.g. a per-round guess count).
-
     ``compaction`` enables provider-native history compaction (off by
     default). When enabled, the runner attaches the provider's compaction
     capability so older messages are summarized once an agent's input
     tokens exceed ``compaction.token_threshold``.
+
+    ``postmortem_enabled`` opens a discussion phase after each round, and
+    ``postmortem_disabled_at_start`` closes it for the whole run from round
+    one. Both default off, so a scenario that never mentions postmortem
+    behaves as if the feature did not exist.
+
+    ``channel_noise_level`` is the per-character corruption probability the
+    platform applies to the scenario's noisy channels, and
+    ``noise_replacement_mode`` decides what a corrupted character becomes.
+    The default of 0.0 leaves messages untouched.
+
+    A field belongs here when platform code reads it. Values only the
+    scenario itself consumes, such as its case-generation seed or which model
+    judges its rounds, are declared by the scenario, because a default here
+    would describe behaviour the platform does not have. That is why there is
+    no ``judge_model``: three scenarios resolve their rounds without an LLM.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -73,8 +84,11 @@ class BaseKnobs(BaseModel):
     max_round_duration_seconds: float
     model_overrides: dict[str, AgentModelOverride]
     postmortem_duration_seconds: float = 120.0
+    postmortem_enabled: bool = False
+    postmortem_disabled_at_start: bool = False
+    channel_noise_level: float = Field(default=0.0, ge=0.0, le=1.0)
+    noise_replacement_mode: NoiseReplacementMode = NoiseReplacementMode.MASK
     replace_agent_default_channel_visibility: dict[str, bool] = {}
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list[ScheduledEvent])
     agent_max_tokens: int = 16384
-    round_time_budget_seconds: int | None
     compaction: CompactionConfig = CompactionConfig()

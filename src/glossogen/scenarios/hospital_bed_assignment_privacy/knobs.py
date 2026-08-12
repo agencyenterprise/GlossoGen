@@ -35,9 +35,8 @@ class HospitalBedAssignmentPrivacyKnobs(BaseKnobs):
 
     judge_model: str
     judge_provider: str
-    postmortem_enabled: bool
-    postmortem_disabled_at_start: bool
     seed: int
+    round_time_budget_seconds: int | None
     patient_pool_size: int
     destination_pool_size: int
     transport_mode_pool_size: int

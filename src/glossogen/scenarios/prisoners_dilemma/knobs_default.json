@@ -1,10 +1,9 @@
 {
-  "round_count": 10,
   "max_round_duration_seconds": 120,
   "model_overrides": {},
-  "round_time_budget_seconds": null,
-  "payoff_temptation": 5.0,
-  "payoff_reward": 3.0,
   "payoff_punishment": 1.0,
-  "payoff_sucker": 0.0
+  "payoff_reward": 3.0,
+  "payoff_sucker": 0.0,
+  "payoff_temptation": 5.0,
+  "round_count": 10
 }

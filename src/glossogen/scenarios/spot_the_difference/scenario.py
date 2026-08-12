@@ -24,7 +24,7 @@ submission judge), :mod:`mcp_tools` (the ``submit_differences`` tool),
 import logging
 import random
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
@@ -108,6 +108,10 @@ _VIEWER_ROLE_NAMES = frozenset(
 
 class SpotTheDifferenceScenario(SimulationScenario):
     """Two-viewer-per-team spot-the-difference reconstruction scenario."""
+
+    postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset(
+        {POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID}
+    )
 
     @classmethod
     def get_agent_roles(cls, knobs: dict[str, Any] | None) -> list[AgentRole]:
@@ -237,19 +241,6 @@ class SpotTheDifferenceScenario(SimulationScenario):
             two_teams=self._knobs.two_teams,
             renderer=self._renderer,
         )
-
-    def get_max_postmortem_duration_seconds(self) -> float:
-        """Return the configured postmortem duration, or 0 when disabled."""
-        if not self._knobs.postmortem_enabled:
-            return 0.0
-        if self._world.is_postmortem_disabled:
-            return 0.0
-        return self._knobs.postmortem_duration_seconds
-
-    def on_postmortem_started(self, round_number: int) -> None:
-        """Unlock the postmortem channel for discussion."""
-        _ = round_number
-        self._world.enter_postmortem()
 
     def restore_state_from_events(self, events: list[Any]) -> None:
         """Seed the world's per-round outcomes from source events on resume."""
@@ -387,11 +378,6 @@ class SpotTheDifferenceScenario(SimulationScenario):
             judge_provider=self._judge_provider,
             get_runtime=lambda: self._runtime,
         )
-
-    @classmethod
-    def get_replace_agent_blocked_tool_call_channels(cls) -> frozenset[str]:
-        """Hide the postmortem channels from any replaced agent's tool history."""
-        return _POSTMORTEM_CHANNELS
 
 
 def _outcome_reason(outcome: DiffOutcome) -> str:

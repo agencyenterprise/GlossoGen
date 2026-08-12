@@ -72,11 +72,15 @@ class VeyruWorld(ScenarioWorld):
         teams: dict[TeamId, TeamState],
         postmortem_globally_disabled: bool,
     ) -> None:
+        super().__init__(
+            postmortem_channel_ids=frozenset(
+                {POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID}
+            ),
+            postmortem_globally_disabled=postmortem_globally_disabled,
+        )
         self._veyru_cases = veyru_cases
         self._teams = teams
         self._current_case: VeyruCase | None = None
-        self._in_postmortem: bool = False
-        self._postmortem_globally_disabled: bool = postmortem_globally_disabled
         self._swap_just_happened: bool = False
         self._intern_takeover_just_happened: bool = False
         self._just_swapped_agent_round: dict[str, int] = {}
@@ -149,30 +153,6 @@ class VeyruWorld(ScenarioWorld):
     def current_case(self) -> VeyruCase | None:
         """The Veyru case for the current round (shared across teams)."""
         return self._current_case
-
-    @property
-    def in_postmortem(self) -> bool:
-        """Whether the simulation is in a postmortem discussion phase."""
-        return self._in_postmortem
-
-    @property
-    def is_postmortem_disabled(self) -> bool:
-        """Whether postmortem has been globally disabled (e.g. post-swap)."""
-        return self._postmortem_globally_disabled
-
-    def enter_postmortem(self) -> None:
-        """Mark the start of a postmortem discussion phase."""
-        self._in_postmortem = True
-
-    def exit_postmortem(self) -> None:
-        """Mark the end of a postmortem discussion phase."""
-        self._in_postmortem = False
-
-    def get_globally_disabled_channels(self) -> frozenset[str]:
-        """Postmortem channels (single-team and two-team variants) when disabled."""
-        if not self._postmortem_globally_disabled:
-            return frozenset()
-        return frozenset({POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID})
 
     def on_agent_swapped_mid_run(self, agent_id: str, round_number: int) -> None:
         """Record that an agent was swapped at the start of ``round_number``.

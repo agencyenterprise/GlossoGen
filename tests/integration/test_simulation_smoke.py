@@ -28,7 +28,6 @@ def build_scenario(*, round_count: int, round_seconds: float) -> SmokeScenario:
             round_count=round_count,
             max_round_duration_seconds=round_seconds,
             model_overrides={},
-            round_time_budget_seconds=600,
         )
     )
 

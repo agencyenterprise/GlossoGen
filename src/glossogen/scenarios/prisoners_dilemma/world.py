@@ -36,6 +36,10 @@ class PrisonersDilemmaWorld(ScenarioWorld):
         payoff_punishment: float,
         payoff_sucker: float,
     ) -> None:
+        super().__init__(
+            postmortem_channel_ids=frozenset(),
+            postmortem_globally_disabled=False,
+        )
         self._payoff_temptation = payoff_temptation
         self._payoff_reward = payoff_reward
         self._payoff_punishment = payoff_punishment

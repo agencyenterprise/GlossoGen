@@ -80,10 +80,12 @@ class DriveModuleWorld(ScenarioWorld):
         cases: list[DriveModuleCase],
         postmortem_globally_disabled: bool,
     ) -> None:
+        super().__init__(
+            postmortem_channel_ids=frozenset({POSTMORTEM_CHANNEL_ID}),
+            postmortem_globally_disabled=postmortem_globally_disabled,
+        )
         self._cases = cases
         self._current_case: DriveModuleCase | None = None
-        self._in_postmortem: bool = False
-        self._postmortem_globally_disabled: bool = postmortem_globally_disabled
         self._current_round_characters: int = 0
         self._round_budget_exceeded: bool = False
         self._current_stage_index: int = 0
@@ -103,33 +105,9 @@ class DriveModuleWorld(ScenarioWorld):
         return self._current_case
 
     @property
-    def in_postmortem(self) -> bool:
-        """Whether the simulation is in a postmortem discussion phase."""
-        return self._in_postmortem
-
-    @property
-    def is_postmortem_disabled(self) -> bool:
-        """Whether postmortem has been globally disabled."""
-        return self._postmortem_globally_disabled
-
-    @property
     def round_budget_exceeded(self) -> bool:
         """Whether the communication budget has been exceeded this round."""
         return self._round_budget_exceeded
-
-    def enter_postmortem(self) -> None:
-        """Mark the start of a postmortem discussion phase."""
-        self._in_postmortem = True
-
-    def exit_postmortem(self) -> None:
-        """Mark the end of a postmortem discussion phase."""
-        self._in_postmortem = False
-
-    def get_globally_disabled_channels(self) -> frozenset[str]:
-        """Postmortem channel when globally disabled, else empty."""
-        if not self._postmortem_globally_disabled:
-            return frozenset()
-        return frozenset({POSTMORTEM_CHANNEL_ID})
 
     def get_current_stage(self) -> Stage | None:
         """Return the replacement the technician must perform next, or None."""

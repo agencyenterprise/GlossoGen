@@ -104,7 +104,6 @@ async def build_metric_run(
             round_count=ROUND_COUNT,
             max_round_duration_seconds=round_seconds,
             model_overrides={},
-            round_time_budget_seconds=600,
             scheduled_events=scheduled_events,
             postmortem_enabled=postmortem_seconds is not None,
             postmortem_duration_seconds=(

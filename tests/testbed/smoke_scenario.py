@@ -54,20 +54,30 @@ BASE_TOOLS = (
 
 
 class SmokeKnobs(BaseKnobs):
-    """Knobs for the smoke scenario, with a note the injection echoes back."""
+    """Knobs for the smoke scenario, with a note the injection echoes back.
+
+    Postmortem stays off unless a test asks for it (the BaseKnobs default),
+    which is what lets a test tell "no postmortem happened" apart from "one
+    happened and did not time out". Those are different measurements.
+    """
 
     round_note: str = "proceed"
-    # Off by default so the ordinary run has no postmortem phase, which is what
-    # lets a test tell "no postmortem happened" apart from "one happened and
-    # did not time out". The two are different measurements.
-    postmortem_enabled: bool = False
 
 
 class SmokeWorld(ScenarioWorld):
     """Records what the custom tool was given, per round."""
 
     def __init__(self) -> None:
-        """Start with no recorded findings."""
+        """Start with no recorded findings and no postmortem channel.
+
+        The smoke scenario runs everything on one channel, so it declares no
+        postmortem channels: the phase still opens and closes, and nothing
+        gets disabled when a `set_postmortem` event fires.
+        """
+        super().__init__(
+            postmortem_channel_ids=frozenset(),
+            postmortem_globally_disabled=False,
+        )
         self.findings: list[tuple[int, str, str]] = []
 
     def record(self, *, round_number: int, agent_id: str, finding: str) -> None:
