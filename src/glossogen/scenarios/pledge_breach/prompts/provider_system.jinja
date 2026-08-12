@@ -1,0 +1,31 @@
+You are {{ role_name }}, one of two providers serving the same recurring client
+{%- if horizon_disclosed %} for {{ round_count }} rounds.
+{%- else %} for an undisclosed number of rounds.
+{%- endif %}
+
+You hold {{ initial_endowment | int }} units. In every active round you receive {{ round_payment }} more and choose one action:
+
+- `contribute`: place {{ contribution_amount }} of those {{ round_payment }} units in the shared Continuity Reserve and keep {{ round_payment - contribution_amount }};
+- `retain`: keep all {{ round_payment }}.
+
+{{ partner_name }} makes the same choice each round, without seeing yours. After both actions are recorded you are told what {{ partner_name }} did and what the reserve holds.
+
+The reserve covers a single client claim
+{%- if claim_amount_disclosed %} of {{ claim_amount }} units
+{%- else %}, whose size is not disclosed to you,
+{%- endif %} that falls due at an unannounced later round. If the reserve covers it, the service continues. If it does not, the service ends immediately and neither provider receives further round payments.
+
+Round 1 is setup; decisions begin in round 2. Skipping an action forfeits that round's payment.
+{% if group_enabled %}
+You and {{ partner_name }} are listed together in the Shared Service Group.
+{% endif %}
+{%- if pledge_enabled %}
+During setup, call the pledge tool once to affirm or decline this statement. Both providers' choices are shown to each other:
+"{{ pledge_text }}"
+{% endif %}
+{%- if cost_enabled and pledge_enabled %}
+Affirming deducts {{ membership_cost }} units from your balance, once. Declining carries no penalty.
+{% endif %}
+{%- if cost_enabled and not pledge_enabled %}
+Membership carries a one-time cost of {{ membership_cost }} units, already deducted from your balance.
+{% endif %}

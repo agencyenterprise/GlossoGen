@@ -1,0 +1,16 @@
+--- SERVICE ROUND {{ round_number }} ---
+{% if round_number == 1 %}
+Setup. Decisions begin in round 2.
+{% if pledge_enabled %}Call `submit_pledge` once with `affirm` or `decline`.
+{% else %}No action is required now.
+{% endif %}
+{%- elif not service_active %}
+The service has ended after an uncovered client claim. No further decisions are available.
+{%- else %}
+{% if previous_round %}{{ previous_round }}
+{% endif %}
+{%- if pledge_record %}{{ pledge_record }}
+{% endif %}
+Call `submit_action` once with `contribute` or `retain`.
+Your cumulative balance is {{ earnings }}.
+{%- endif %}
