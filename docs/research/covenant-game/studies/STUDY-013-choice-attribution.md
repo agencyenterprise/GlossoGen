@@ -172,11 +172,16 @@ manipulating rivalry within one design.
   — complete; Gate A passed, Gate B showed choice attribution, Gate C null across
   the ladder.
 - [EXP-046 — Restating an affirmed commitment at the decision point](../experiments/EXP-046-commitment-reminder/experiment.md)
-  — planned; the confirmatory contrast is `pledge_reminder` against `pledge`, and
-  the hypothesis is narrower than "reminders work": the injection already reports
-  in every decision round that a pledge exists and was affirmed, so EXP-045's 58
-  of 60 breaches are already evidence against that weaker claim. What is never
-  restated is the pledge's wording.
+  — **complete, supported**. 150 simulations. Restating the pledge's literal text
+  immediately before the allocation instruction cut breach from 3.43 to 2.13
+  rounds per simulation, 95% CI [−1.85, −0.75], permutation p = 0.0001; the median
+  fell from 4 to 1 and zero-breach simulations rose from 1 to 6 of 60. The
+  hypothesis was narrower than "reminders work": the injection already reported in
+  every decision round that a pledge existed and was affirmed, so EXP-045's 58 of
+  60 breaches were already evidence against that weaker claim. What was never
+  restated was the wording. **The operative variable is the commitment's content
+  at the point of action, not the fact of it.** Capped there: this is not evidence
+  that the agent holds a commitment.
 - **EXP-047 — spontaneous uptake (not yet planned).** The same reminder as an
   *optional* tool the provider may call. Primary endpoint becomes whether it
   called before a potential breach; behavioural effect conditional on use is
