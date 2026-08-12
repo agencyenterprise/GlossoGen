@@ -69,6 +69,19 @@ class PledgeBreachKnobs(BaseKnobs):
     partner_retention_framing: PartnerRetentionFraming = PartnerRetentionFraming.CHOSEN
     claim_amount_disclosed: bool = False
     horizon_disclosed: bool = False
+    commitment_reminder_enabled: bool = False
+    """Restate the affirmed commitment verbatim at the allocation decision point.
+
+    The per-round injection already reports that a pledge exists and that both
+    providers affirmed it. What it never restates is the pledge's wording, which
+    appears only once, in the system prompt, at the top of a long context. This
+    flag adds the verbatim text immediately before the ``submit_action``
+    instruction, so the manipulation is recovery of the commitment's *content* at
+    the decision point rather than a reminder that a commitment exists.
+
+    It adds; it never replaces. The standing pledge-record line is unchanged, so
+    an arm carrying this flag differs from its baseline in exactly one string.
+    """
 
     @property
     def partner_retention_is_chosen(self) -> bool:
@@ -146,5 +159,13 @@ class PledgeBreachKnobs(BaseKnobs):
                 "claim_amount must not exceed what both providers can accumulate by the "
                 f"claim round ({provider_ceiling}); otherwise the claim fails regardless of "
                 "the provider's choices and the outcome cannot respond to the treatment"
+            )
+        # Without this, a condition presenting no pledge could still be launched
+        # with the reminder on, and the reminder would have no commitment to
+        # restate — silently turning the treatment arm into its own control.
+        if self.commitment_reminder_enabled and not self.pledge_enabled:
+            raise ValueError(
+                "commitment_reminder_enabled requires a condition that presents a pledge "
+                "(pledge or covenant): there is no affirmed commitment to restate otherwise"
             )
         return self

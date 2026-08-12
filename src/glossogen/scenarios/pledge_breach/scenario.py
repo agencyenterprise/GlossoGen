@@ -195,6 +195,7 @@ class PledgeBreachScenario(SimulationScenario):
                 "pledge_enabled": self._knobs.pledge_enabled,
                 "previous_round": self._world.previous_round_summary(),
                 "pledge_record": self._world.pledge_record_text(),
+                "commitment_reminder": self._world.commitment_reminder_text(),
                 "earnings": provider.earnings,
                 "service_active": self._world.service_active(),
             },

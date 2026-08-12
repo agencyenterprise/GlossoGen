@@ -231,6 +231,93 @@ def test_incapacity_framing_leaves_the_system_prompt_identical() -> None:
     assert prompts[0] == prompts[1]
 
 
+EXP046_CONFIGS = Path("docs/research/covenant-game/experiments/EXP-046-commitment-reminder/configs")
+
+
+def render_injection(config_path: Path, round_number: int) -> str:
+    """Render one decision round's provider injection from a config file.
+
+    The world is driven through setup and every prior round with `contribute`,
+    so the rendered text is the one a compliant provider would actually see.
+    """
+    from glossogen.scenarios.pledge_breach.ids import PROVIDER_ID
+    from glossogen.scenarios.pledge_breach.scenario import PledgeBreachScenario
+
+    scenario = PledgeBreachScenario.create_from_config(config=json.loads(config_path.read_text()))
+    world = scenario.get_world()
+    assert isinstance(world, PledgeBreachWorld)
+    world.seed_partner_pledge()
+    world.submit_pledge(decision="affirm")
+    if world.provider().membership_cost_paid == Decimal("0.0"):
+        try:
+            world.charge_membership_cost()
+        except ValueError:
+            pass
+    for played in range(2, round_number):
+        world.begin_round(round_number=played)
+        world.submit_action(action="contribute")
+        world.settle_round(round_number=played)
+    world.begin_round(round_number=round_number)
+    injection = scenario.get_injection(round_number=round_number, agent_id=PROVIDER_ID)
+    assert injection is not None
+    return injection
+
+
+def test_reminder_off_renders_the_exp045_preset_unchanged() -> None:
+    """The EXP-046 baseline arm must render exactly what EXP-045's did.
+
+    EXP-046's confirmatory contrast is `pledge_reminder` against `pledge`, and the
+    `pledge` arm is the same bundled config EXP-045 launched. If adding the knob
+    perturbed that rendering at all — a stray newline is enough — the baseline
+    would no longer be the baseline. This makes "we only changed one thing" a
+    tested property rather than a claim.
+    """
+    scenario_preset = render_injection(
+        config_path=PRESETS_DIR / "knobs_pledge.json", round_number=6
+    )
+    bundled = render_injection(config_path=EXP046_CONFIGS / "knobs_pledge.json", round_number=6)
+    assert scenario_preset == bundled
+    assert "Standing pledge record" in bundled
+    assert "Your commitment reads" not in bundled
+
+
+def test_reminder_adds_exactly_one_line_at_the_preregistered_position() -> None:
+    """The treatment differs from its baseline by one insertion, in one place.
+
+    The permitted insertion is the pledge's verbatim text, and its preregistered
+    position is the last thing said before the allocation instruction. Anything
+    else appearing, moving, or disappearing fails.
+    """
+    from glossogen.scenarios.pledge_breach.ids import PLEDGE_TEXT
+
+    off = render_injection(config_path=EXP046_CONFIGS / "knobs_pledge.json", round_number=6)
+    on = render_injection(config_path=EXP046_CONFIGS / "knobs_pledge_reminder.json", round_number=6)
+    off_lines = off.splitlines()
+    on_lines = on.splitlines()
+    added = [line for line in on_lines if line not in off_lines]
+    assert len(added) == 1, f"more than one line changed: {added}"
+    assert PLEDGE_TEXT in added[0]
+    assert [line for line in off_lines if line not in on_lines] == []
+    instruction = next(
+        i for i, line in enumerate(on_lines) if line.startswith("Call `submit_action`")
+    )
+    assert [line for line in on_lines[:instruction] if line][-1] == added[0]
+
+
+def test_reminder_is_withheld_from_a_provider_that_declined() -> None:
+    """A declined pledge leaves no affirmed commitment to restate."""
+    world = PledgeBreachWorld(knobs=build_knobs(commitment_reminder_enabled=True))
+    world.seed_partner_pledge()
+    world.submit_pledge(decision="decline")
+    assert world.commitment_reminder_text() is None
+
+
+def test_reminder_requires_a_condition_that_presents_a_pledge() -> None:
+    """The reminder cannot be enabled where no commitment is ever affirmed."""
+    with pytest.raises(ValidationError, match="requires a condition that presents a pledge"):
+        build_knobs(condition="cost", commitment_reminder_enabled=True)
+
+
 def test_provider_sees_partner_action_in_the_round_summary() -> None:
     """The previous-round summary names the partner's action."""
     world = PledgeBreachWorld(knobs=build_knobs())

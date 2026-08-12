@@ -18,6 +18,7 @@ from glossogen.scenarios.pledge_breach.ids import (
     PARTNER_ID,
     PARTNER_INCAPACITY_LABEL,
     PARTNER_NAME,
+    PLEDGE_TEXT,
     PROVIDER_ID,
     PROVIDER_NAME,
     RETAIN,
@@ -268,6 +269,19 @@ class PledgeBreachWorld(ScenarioWorld):
             f"Standing pledge record: you {pledge_past_tense(decision=own)} it; "
             f"{PARTNER_NAME} {pledge_past_tense(decision=partner)} it."
         )
+
+    def commitment_reminder_text(self) -> str | None:
+        """Render the verbatim affirmed commitment, or None where it does not apply.
+
+        Returns None unless the reminder is enabled and the provider actually
+        affirmed: a declined pledge has no commitment to recover, and restating
+        the text to a provider who refused it would be a different manipulation.
+        """
+        if not self._knobs.commitment_reminder_enabled:
+            return None
+        if self._provider.pledge_decision != AFFIRM:
+            return None
+        return f"Your commitment reads: “{PLEDGE_TEXT}”"
 
     def restore_state_from_events(self, events: list[Any]) -> None:
         """Restore balances and reserve state from the authoritative event log."""
