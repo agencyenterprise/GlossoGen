@@ -1,14 +1,15 @@
-"""The structural log has to reproduce, or two implementations cannot be compared.
+"""What a run reproduces, pinned so a comparison can be built on it.
 
 Replacing a hand-written scenario with a generated one is only safe if the two
 can be shown to decide the same things. That comparison is worthless unless the
-thing being compared is stable for a single implementation first, which is what
-this pins.
+thing compared is stable for a single implementation first, which is what these
+establish.
 
-It guards the blocklist in `structural_equivalence` as much as the platform: if
-some event that varies run to run is later treated as structural, this fails and
-names it, rather than the comparison quietly becoming flaky for whoever is
-mid-migration.
+They also guard `structural_equivalence` itself. Comparing too much makes a
+flaky test: an earlier version compared messages as one global sequence, passed
+six times locally, and failed in CI where two agents interleaved the other way.
+Comparing too little makes a vacuous one, which is the failure that would let a
+broken engine through.
 """
 
 from pathlib import Path
@@ -17,7 +18,11 @@ from typing import Any
 import pytest
 
 from tests.scenarios.scenario_runtime import run_rounds
-from tests.testbed.structural_equivalence import describe_difference, structural_events
+from tests.testbed.structural_equivalence import (
+    decision_events,
+    describe_difference,
+    messages_by_sender,
+)
 
 pytestmark = pytest.mark.xdist_group("veyru")
 
@@ -48,27 +53,52 @@ async def test_two_identical_runs_decide_the_same_things(
     assert difference == "", difference
 
 
-async def test_the_structural_log_is_not_empty(
+async def test_the_comparison_still_looks_at_the_things_that_matter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A blocklist that swallowed everything would make the comparison vacuous.
+    """Filtering one type too many leaves a test that passes against anything.
 
-    Without this, filtering out one event type too many leaves an equivalence
-    test that passes against any implementation at all.
+    Each event named here is a decision the engine has to reproduce: which case
+    ran, what each agent was told, when the phase opened, what the world
+    announced, and how the round was scored.
     """
     events = await play_veyru(tmp_path / "only", monkeypatch)
 
-    structural = structural_events(events)
-    kinds = {e.get("event_type") for e in structural}
+    kinds = {e.get("event_type") for e in decision_events(events)}
 
-    assert len(structural) > 20, f"only {len(structural)} structural events survived the filter"
     for required in (
         "round_advanced",
         "round_ended",
         "round_result_recorded",
         "injection_delivered",
-        "message_sent",
         "veyru_case_started",
+        "postmortem_started",
+        "postmortem_ended",
+        "world_event_delivered",
         "simulation_ended",
     ):
-        assert required in kinds, f"{required} was filtered out of the structural log"
+        assert required in kinds, f"{required} was filtered out of the comparison"
+
+
+async def test_messages_are_compared_even_though_their_order_is_not(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Dropping global message order must not drop messages from the comparison.
+
+    Interleaving between agents varies, so messages are grouped by sender. What
+    each agent said still has to be compared, or an engine that stopped
+    delivering a role's messages entirely would pass.
+    """
+    events = await play_veyru(tmp_path / "messages", monkeypatch)
+
+    by_sender = messages_by_sender(events)
+
+    assert by_sender, "no messages were captured for comparison"
+    assert all(messages for messages in by_sender.values())
+    for messages in by_sender.values():
+        for message in messages:
+            assert "text" in message, "message text is not compared"
+            assert "channel_id" in message, "message channel is not compared"
+            assert (
+                "round_number" not in message
+            ), "round attribution depends on scheduling and would flake"
