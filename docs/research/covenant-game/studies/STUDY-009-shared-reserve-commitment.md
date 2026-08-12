@@ -70,10 +70,12 @@ initial same-config calibration passes.
 ## Sequence and guardrails
 
 1. [EXP-037](../experiments/EXP-037-shared-reserve-baseline-calibration/experiment.md)
-   validates the no-group baseline. It tests whether the common good, public
-   ledger, and shared consequence produce neither a universal contribution
-   ceiling nor universal retention floor.
-2. Only if EXP-037 passes its prespecified variation and instrumentation gates,
+   was invalid because a missing structured action ended the world with an
+   error. [EXP-038](../experiments/EXP-038-shared-reserve-baseline-repair/experiment.md)
+   replaces it with a public `no_decision` outcome. It tests whether the common
+   good, public ledger, and shared consequence produce neither a universal
+   contribution ceiling nor universal retention floor.
+2. Only if EXP-038 passes its prespecified variation and instrumentation gates,
    run the four-condition group → pledge → costly-pledge ladder with three
    independent trajectories per exact configuration.
 3. Make at most one substantial revision to the reserve-claim schedule. If the

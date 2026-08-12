@@ -3,8 +3,8 @@
 This is the chronological record index for the
 [Covenant Game research program](../README.md). One record represents one
 decision-relevant calibration, pilot, comparison, replication, stress test, or
-ablation. A record may contain several runs; the 26 completed records below are
-not 9 independent studies.
+ablation. A record may contain several runs; the completed records below are
+not independent studies.
 
 Entries are written **before** the run (question, expected decision, design)
 and completed after it. Negative and inconclusive results are recorded with the
@@ -37,10 +37,13 @@ and its
   practical remittance ceiling; EXP-035 and EXP-036 then found a repeated
   framing-sensitive baseline without an implemented shared consequence.
 - [STUDY-009 — Shared reserve commitment](../studies/STUDY-009-shared-reserve-commitment.md):
-  [EXP-037](EXP-037-shared-reserve-baseline-calibration/experiment.md) planned.
-  This is a new scenario with an implemented common reserve and identical
-  hidden client claims. It calibrates only the no-group baseline before the
-  group → pledge → costly-pledge ladder is permitted.
+  [EXP-037](EXP-037-shared-reserve-baseline-calibration/experiment.md) was
+  invalid due to a missing-action timing fault;
+  [EXP-038](EXP-038-shared-reserve-baseline-repair/experiment.md) is the
+  repaired no-group calibration. This is a new scenario with an implemented
+  common reserve and identical hidden client claims. It calibrates only the
+  no-group baseline before the group → pledge → costly-pledge ladder is
+  permitted.
 
 Working noise terms for sizing any new experiment in this program, from
 [EXP-024](EXP-024-baseline-variance/experiment.md): `s = 4.71` inspected
@@ -88,7 +91,8 @@ count that resolves it before launching.
 | [EXP-034](EXP-034-shared-service-communication-baseline/experiment.md) | shared-service communication baseline calibration | complete | not supported: 96/96 remittances; client-service framing and informal messages may explain the ceiling | $0.75 |
 | [EXP-035](EXP-035-framing-diagnostic/experiment.md) | professional-service versus neutral-allocation framing diagnostic | complete | supported: semantic framing changes the baseline; not a covenant result | $1.29 |
 | [EXP-036](EXP-036-framing-fresh-seed-replication/experiment.md) | fresh-seed replication of the framing diagnostic | complete | supported: framing-sensitive baseline repeated at seeds 72 and 73; not a covenant result | $2.83 |
-| [EXP-037](EXP-037-shared-reserve-baseline-calibration/experiment.md) | shared reserve no-group baseline calibration | planned | pending: instrument gate before institutional ladder | — |
+| [EXP-037](EXP-037-shared-reserve-baseline-calibration/experiment.md) | shared reserve no-group baseline calibration | complete | invalid: missing-action timing fault | $0.00 |
+| [EXP-038](EXP-038-shared-reserve-baseline-repair/experiment.md) | repaired shared reserve no-group baseline calibration | planned | pending: instrument gate before institutional ladder | — |
 
 Total API spend logged: **$425.51** (plus $0.73 in phase-4 smoke tests and
 interrupted/invalid team-production preflights not logged individually).
@@ -100,7 +104,7 @@ certainty and leaves the covenant no problem to solve.
 
 ## Creating the next record
 
-The next available ID is `EXP-037`. Before launching, use the
+The next available ID is `EXP-039`. Before launching, use the
 [`record-experiment`](../../../../.agents/skills/record-experiment/SKILL.md)
 skill to create a program- and study-scoped bundle, freeze its configs, record
 the decision rule, and validate the planned record. Do not copy an old flat

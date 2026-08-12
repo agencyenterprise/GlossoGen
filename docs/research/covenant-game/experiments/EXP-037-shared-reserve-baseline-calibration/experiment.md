@@ -1,8 +1,8 @@
 # EXP-037 — Shared reserve no-group baseline calibration
 
-**Status:** planned
+**Status:** complete
 **Date opened:** 2026-08-11
-**Date closed:** —
+**Date closed:** 2026-08-11
 **Research program:** covenant-game
 **Study:** STUDY-009 — Shared reserve commitment
 **Role:** calibration
@@ -26,7 +26,11 @@
       "sha256": "00316c6443acf3043d9166ee548a107a704671f46e37ad4447ff8d3e5824ba81"
     }
   ],
-  "runs": []
+  "runs": [
+    {"role": "no_group_replica_1", "included": false, "reason": "The generic runtime ended round 3 while one provider had not submitted an action, and the initial world implementation raised instead of representing that missing action distinctly.", "run_dir": "runs/shared_reserve_commitment/1786492853", "event_log_sha256": "7f84b3f98d8a4d47ed07fe5de80cc472ffca501613a40c59cc4f54fcec2d9651", "resolved_config_sha256": "d9dd7c08df115349a458e0a638be5c1a34a0edfc6a3c7e4800ec987d13aa86a7", "completed": true, "total_cost_usd": 0.0},
+    {"role": "no_group_replica_2", "included": false, "reason": "The generic runtime ended round 3 while one provider had not submitted an action, and the initial world implementation raised instead of representing that missing action distinctly.", "run_dir": "runs/shared_reserve_commitment/1786492854", "event_log_sha256": "fc152eb0aa7d771ff88484e28ee8cf44f7685f7c95af6d42a42fb11e920a3ced", "resolved_config_sha256": "d9dd7c08df115349a458e0a638be5c1a34a0edfc6a3c7e4800ec987d13aa86a7", "completed": true, "total_cost_usd": 0.0},
+    {"role": "no_group_replica_3", "included": false, "reason": "The generic runtime ended round 3 while one provider had not submitted an action, and the initial world implementation raised instead of representing that missing action distinctly.", "run_dir": "runs/shared_reserve_commitment/1786492855", "event_log_sha256": "eb918ad35bf2fe0c743dcdc778a8bce37561ff5a79d28219fabf5560abb9c404", "resolved_config_sha256": "d9dd7c08df115349a458e0a638be5c1a34a0edfc6a3c7e4800ec987d13aa86a7", "completed": true, "total_cost_usd": 0.0}
+  ]
 }
 -->
 
@@ -117,21 +121,46 @@ deception, a covenant effect, or a model-general behavioral claim.
 
 ## Result
 
-Pending. No simulation for this record has been launched.
+All three planned runs emitted an authoritative `simulation_ended` event with
+completion reason `error` in round 3, before a client claim could occur. The
+generic runtime may end an idle round before both providers use the structured
+allocation tool. The initial world then attempted to settle only one submitted
+decision and raised `ValueError: cannot settle until both providers have
+decided`.
+
+These are execution failures, not observations of contribution, retention, or
+free-riding. Each raw log, resolved-config hash, and canonical final cost
+(`$0.00`) is retained in the machine-readable record. No action rate or claim
+outcome is reported from them.
 
 ## Outcome
 
-Pending.
+**Invalid.** A possible missing action was not represented as an outcome and
+caused each trajectory to terminate with an error. The repaired world records
+`no_decision` separately from `retain`: it contributes zero, allocates no
+current-round payment, and is posted in the public ledger. The replacement
+calibration is registered as EXP-038 rather than silently replacing these runs.
 
 ## Validity limitations
 
-Pending. This calibration cannot identify a group, pledge, costly-pledge, or
-full-covenant effect because none of those treatments is active.
+- No trajectory reached a scheduled claim, so the common-good consequence was
+  not exercised.
+- All three trajectories are excluded; this record establishes neither a
+  behavioral baseline nor a treatment effect.
+- This calibration cannot identify a group, pledge, costly-pledge, or
+  full-covenant effect because none of those treatments was active.
 
 ## What it changed
 
-Pending.
+The successor adds an explicit, common-world rule for a provider who fails to
+submit before the round ends. It prevents a runtime timing condition from being
+misclassified as voluntary retention or from crashing the simulation. The rule
+applies identically to every future arm.
 
 ## Traps found
 
-Pending.
+- A structured decision tool is not guaranteed to be called before the generic
+  idle-round trigger fires.
+- Do not silently score a missing structured action as `retain`; it is a third,
+  observable outcome with different earnings and different interpretive
+  meaning.
