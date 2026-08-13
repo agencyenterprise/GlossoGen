@@ -49,3 +49,7 @@ class RoundOutcomeLog(Generic[OutcomeT]):
     def all_for(self, team_id: str) -> list[OutcomeT]:
         """Return one team's outcomes, oldest first."""
         return list(self._outcomes_by_team_id[team_id])
+
+    def team_ids(self) -> tuple[str, ...]:
+        """Return the teams this log holds, in the order it was given them."""
+        return tuple(self._outcomes_by_team_id)

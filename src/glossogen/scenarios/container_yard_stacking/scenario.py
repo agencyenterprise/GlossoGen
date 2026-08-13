@@ -13,8 +13,9 @@ the goal slot) and the live row. Round success requires every container to be
 relocated correctly and the communication budget on the link channel not to
 be exceeded.
 
-Heavy logic lives in dedicated sibling modules: :mod:`agent_factory`
-(agent/channel construction), :mod:`mcp_tools` (the move_container tool),
+Heavy logic lives in dedicated sibling modules: :mod:`team_declaration`
+(the teams, roles and channels the engine derives the run from),
+:mod:`mcp_tools` (the move_container tool),
 :mod:`injection_rendering` (per-round and postmortem prompts),
 :mod:`case_event_conversion` (yard-case → event-log adapters), and
 :mod:`team_routing` (agent/channel/team ID lookups).
@@ -152,6 +153,8 @@ class ContainerYardStackingScenario(SimulationScenario):
         self._channel_display_names = team_structure.channel_display_names(teams=self._team_specs)
         self._world = ContainerYardWorld(
             cases=self._cases,
+            team_specs=self._team_specs,
+            postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
             two_teams=knobs.two_teams,
         )

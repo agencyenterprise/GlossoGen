@@ -10,6 +10,7 @@ rounds are complete.
 
 from typing import Any
 
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
 from glossogen.models.event import MessageSent, RoundEnded
 from glossogen.scenarios.container_yard_stacking.case_rendering import render_container
 from glossogen.scenarios.container_yard_stacking.events import ContainerYardMoveJudged
@@ -20,19 +21,22 @@ from glossogen.scenarios.container_yard_stacking.team_routing import (
 )
 from glossogen.scenarios.container_yard_stacking.world_state import (
     StepOutcome,
-    TeamState,
     YardOutcome,
 )
 from glossogen.scenarios.container_yard_stacking.yard_cases import YardCase
 
 
 def restore_outcomes_from_events(
-    teams: dict[str, TeamState],
+    outcome_log: RoundOutcomeLog[YardOutcome],
     cases: list[YardCase],
     two_teams: bool,
     events: list[Any],
 ) -> None:
-    """Append a ``YardOutcome`` to each team for every completed round in ``events``."""
+    """Record a ``YardOutcome`` for every completed round in ``events``.
+
+    ``RoundOutcomeLog.record`` keeps whichever outcome reached a round first, so
+    a round already recorded is left as it stands.
+    """
     moves_by_round_team: dict[int, dict[str, list[ContainerYardMoveJudged]]] = {}
     characters_by_round_team: dict[int, dict[str, int]] = {}
     completed_rounds: set[int] = set()
@@ -54,17 +58,17 @@ def restore_outcomes_from_events(
     for round_number in sorted(completed_rounds):
         if round_number > len(cases):
             continue
-        for team_id, team in teams.items():
-            if any(outcome.case_number == round_number for outcome in team.outcomes):
-                continue
-            team.outcomes.append(
-                _reconstruct_outcome(
+        for team_id in outcome_log.team_ids():
+            outcome_log.record(
+                team_id=team_id,
+                round_number=round_number,
+                outcome=_reconstruct_outcome(
                     case=cases[round_number - 1],
                     round_number=round_number,
                     team_id=team_id,
                     moves=moves_by_round_team.get(round_number, {}).get(team_id, []),
                     characters_used=characters_by_round_team.get(round_number, {}).get(team_id, 0),
-                )
+                ),
             )
 
 

@@ -22,16 +22,16 @@ event log on resume), and :mod:`world_state` (the ``TeamState`` /
 import logging
 from typing import Any
 
-from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
+from glossogen.engine.round_world import RoundWorld
+from glossogen.engine.team_declaration import TeamSpec
+from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.container_yard_stacking.case_rendering import render_container
 from glossogen.scenarios.container_yard_stacking.ids import (
     BUDGET_EXCEEDED_MARKER,
     LINK_A_CHANNEL_ID,
     LINK_B_CHANNEL_ID,
     LINK_CHANNEL_ID,
-    POSTMORTEM_A_CHANNEL_ID,
-    POSTMORTEM_B_CHANNEL_ID,
-    POSTMORTEM_CHANNEL_ID,
     ROUND_FAILED_MARKER,
     ROUND_SUCCESS_MARKER,
     TEAM_A_ID,
@@ -68,7 +68,7 @@ __all__ = [
 ]
 
 
-class ContainerYardWorld(ScenarioWorld):
+class ContainerYardWorld(RoundWorld):
     """Per-team yard world that judges ``move_container`` calls deterministically.
 
     Single-team mode holds one ``TeamState`` keyed by ``TEAM_SOLO_ID``.
@@ -79,19 +79,24 @@ class ContainerYardWorld(ScenarioWorld):
     def __init__(
         self,
         cases: list[YardCase],
+        team_specs: tuple[TeamSpec, ...],
+        postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
         two_teams: bool,
     ) -> None:
         super().__init__(
-            postmortem_channel_ids=frozenset(
-                {POSTMORTEM_CHANNEL_ID, POSTMORTEM_A_CHANNEL_ID, POSTMORTEM_B_CHANNEL_ID}
-            ),
+            team_specs=team_specs,
+            round_budget_thresholds=(THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL),
+            postmortem_channel_ids=postmortem_channel_ids,
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._cases = cases
         self._two_teams = two_teams
         self._current_case: YardCase | None = None
         self._teams: dict[str, TeamState] = self._build_teams(two_teams=two_teams)
+        self._outcome_log: RoundOutcomeLog[YardOutcome] = RoundOutcomeLog(
+            team_ids=tuple(self._teams)
+        )
 
     @staticmethod
     def _build_teams(two_teams: bool) -> dict[str, TeamState]:
@@ -135,7 +140,7 @@ class ContainerYardWorld(ScenarioWorld):
 
     def current_round_characters(self, team_id: str) -> int:
         """Running character count on ``team_id``'s link channel."""
-        return self._teams[team_id].current_round_characters
+        return self.characters_used(team_id=team_id)
 
     def round_budget_exceeded(self, team_id: str) -> bool:
         """Whether ``team_id`` has exceeded its communication budget this round."""
@@ -147,11 +152,11 @@ class ContainerYardWorld(ScenarioWorld):
 
     def outcomes(self, team_id: str) -> list[YardOutcome]:
         """Historical per-round outcomes for one team."""
-        return self._teams[team_id].outcomes
+        return self._outcome_log.all_for(team_id=team_id)
 
     def previous_outcome(self, team_id: str) -> YardOutcome | None:
         """Return ``team_id``'s most recent outcome, or None when no rounds finished."""
-        outcomes = self._teams[team_id].outcomes
+        outcomes = self._outcome_log.all_for(team_id=team_id)
         if len(outcomes) == 0:
             return None
         return outcomes[-1]
@@ -159,7 +164,7 @@ class ContainerYardWorld(ScenarioWorld):
     def restore_outcomes_from_events(self, events: list[Any]) -> None:
         """Seed each team's ``outcomes`` from a JSONL event list on resume."""
         restore_outcomes_from_events(
-            teams=self._teams,
+            outcome_log=self._outcome_log,
             cases=self._cases,
             two_teams=self._two_teams,
             events=events,
@@ -202,10 +207,10 @@ class ContainerYardWorld(ScenarioWorld):
                 self._mark_outcome(team=team, case_number=round_number - 1)
         next_case = self._cases[round_number - 1]
         self._current_case = next_case
+        # After the outcomes above, which read the round that just ended.
+        self.begin_round()
         for team in self._teams.values():
-            team.current_round_characters = 0
             team.round_budget_exceeded = False
-            team.notified_thresholds = set()
             team.round_failed_terminally = False
             team.failure_reason = ""
             team.round_outcome_marked = False
@@ -257,20 +262,22 @@ class ContainerYardWorld(ScenarioWorld):
                 if not step.succeeded:
                     failure_step_index = step.step_index
                     break
-        team.outcomes.append(
-            YardOutcome(
+        self._outcome_log.record(
+            team_id=team.team_id,
+            round_number=case_number,
+            outcome=YardOutcome(
                 case_number=case_number,
                 team_id=team.team_id,
                 step_count=len(case.steps),
                 steps_succeeded=steps_succeeded,
                 step_outcomes=tuple(all_step_outcomes),
                 budget_exceeded=team.round_budget_exceeded,
-                characters_used=team.current_round_characters,
+                characters_used=self.characters_used(team_id=team.team_id),
                 round_time_budget_seconds=case.round_time_budget_seconds,
                 round_succeeded=round_succeeded,
                 failure_reason=team.failure_reason,
                 failure_step_index=failure_step_index,
-            )
+            ),
         )
         team.round_outcome_marked = True
 
@@ -290,17 +297,18 @@ class ContainerYardWorld(ScenarioWorld):
         token_count: int,
     ) -> None:
         """Accumulate characters and update budget state for the right team."""
-        _ = agent_id, token_count
-        team_id = team_id_for_channel(channel_id=channel_id)
+        super().on_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+        )
+        team_id = self.team_for_task_channel(channel_id=channel_id)
         if team_id is None:
             return
         team = self._teams.get(team_id)
         if team is None:
             return
-        team.current_round_characters += len(text)
         if self._current_case is None:
             return
-        if team.current_round_characters >= self._current_case.round_time_budget_seconds:
+        if self.characters_used(team_id=team_id) >= self._current_case.round_time_budget_seconds:
             team.round_budget_exceeded = True
             team.round_failed_terminally = True
             if team.failure_reason == "":
@@ -318,10 +326,15 @@ class ContainerYardWorld(ScenarioWorld):
         if self._current_case is None:
             return
         team = self._teams[team_id]
-        time_elapsed = team.current_round_characters
+        time_elapsed = self.characters_used(team_id=team_id)
         budget = self._current_case.round_time_budget_seconds
-        if team.round_budget_exceeded and THRESHOLD_BUDGET_EXCEEDED not in team.notified_thresholds:
-            team.notified_thresholds.update([THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL])
+        if team.round_budget_exceeded and self.claim_round_budget_threshold(
+            team_id=team_id, round_budget_threshold=THRESHOLD_BUDGET_EXCEEDED
+        ):
+            # Past the budget, the 75% warning has nothing left to warn about.
+            self.claim_round_budget_threshold(
+                team_id=team_id, round_budget_threshold=THRESHOLD_CRITICAL
+            )
             await context.send_update_to_channel(
                 channel_id=team.link_channel_id,
                 text=(
@@ -330,8 +343,9 @@ class ContainerYardWorld(ScenarioWorld):
                 ),
             )
             return
-        if time_elapsed >= budget * 0.75 and THRESHOLD_CRITICAL not in team.notified_thresholds:
-            team.notified_thresholds.add(THRESHOLD_CRITICAL)
+        if time_elapsed >= budget * 0.75 and self.claim_round_budget_threshold(
+            team_id=team_id, round_budget_threshold=THRESHOLD_CRITICAL
+        ):
             remaining = budget - time_elapsed
             await context.send_update_to_channel(
                 channel_id=team.link_channel_id,
