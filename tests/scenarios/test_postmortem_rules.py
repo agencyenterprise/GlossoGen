@@ -35,11 +35,6 @@ POSTMORTEM_OFF: dict[str, dict[str, Any]] = {
     "veyru": {"postmortem_enabled": False, "postmortem_after_swap": False},
 }
 
-# The characters-spent counter is public on the worlds that meter a per-round
-# budget. Scenarios applying a different pressure axis expose none, and are
-# skipped rather than asserted against something they do not have.
-CHARACTER_COUNTER = "current_round_characters"
-
 LONG_MESSAGE = "x" * 500
 
 
@@ -51,40 +46,18 @@ def postmortem_off_for(scenario_name: str) -> dict[str, Any]:
 def character_counter_of(world: ScenarioWorld, primary: PrimaryChannel) -> Callable[[], int] | None:
     """Return a reader for the characters spent on ``primary``, or None.
 
-    A world on the engine meters through ``RoundWorld``, so the count comes off
-    ``characters_used`` for the team that owns the primary channel. A world not
-    yet on the engine exposes its own: a property on single-team worlds, a
-    method taking the metered team on two-team worlds, which a two-team world
-    running a single-team preset names via ``team_ids``. A world metering no
-    characters returns None, and such a scenario applies a different pressure
-    axis entirely.
-
-    The property-or-method question is asked of the class rather than the
-    instance: reading it off the instance and testing with ``callable`` narrows
-    the type to one returning ``object``, which then has to be cast back.
+    Every world meters through ``RoundWorld``, so the count comes off
+    ``characters_used`` for the team that owns the primary channel. A scenario
+    whose primary channel no team meters, or that meters nothing at all,
+    returns None and applies a different pressure axis entirely.
     """
-    if isinstance(world, RoundWorld):
-        metered = world.team_for_task_channel(channel_id=primary.channel_id)
-        if metered is None:
-            return None
-        owner = metered
-        return lambda: world.characters_used(team_id=owner)
-
-    declared = getattr(type(world), CHARACTER_COUNTER, None)
-    if declared is None:
+    if not isinstance(world, RoundWorld):
         return None
-    if isinstance(declared, property):
-        return lambda: int(getattr(world, CHARACTER_COUNTER))
-
-    team_id = primary.team_id
-    if team_id is None:
-        teams: Any = getattr(world, "team_ids", None)
-        if not teams:
-            return None
-        team_id = str(sorted(teams)[0])
-    metered_team = team_id
-    per_team: Any = getattr(world, CHARACTER_COUNTER)
-    return lambda: int(per_team(team_id=metered_team))
+    owner = world.team_for_task_channel(channel_id=primary.channel_id)
+    if owner is None:
+        return None
+    metered = owner
+    return lambda: world.characters_used(team_id=metered)
 
 
 def budget_flag_of(world: ScenarioWorld) -> Callable[[], bool] | None:

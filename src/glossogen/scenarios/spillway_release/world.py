@@ -77,11 +77,6 @@ class SpillwayWorld(RoundWorld):
         return self._current_case
 
     @property
-    def current_round_characters(self) -> int:
-        """Running character count on the ops channel this round."""
-        return self.characters_used(team_id=TEAM_ID)
-
-    @property
     def round_budget_exceeded(self) -> bool:
         """Whether the communication budget has been exceeded this round."""
         return self._round_budget_exceeded

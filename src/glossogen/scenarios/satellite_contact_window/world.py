@@ -96,11 +96,6 @@ class SatelliteWorld(RoundWorld):
         return self._current_case
 
     @property
-    def current_round_characters(self) -> int:
-        """Running character count for the current round on the link channel."""
-        return self.characters_used(team_id=TEAM_ID)
-
-    @property
     def round_recovered(self) -> bool:
         """Whether the current round was successfully recovered."""
         return self._round_recovered

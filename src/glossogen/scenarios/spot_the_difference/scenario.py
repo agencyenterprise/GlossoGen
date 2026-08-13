@@ -161,6 +161,8 @@ class SpotTheDifferenceScenario(SimulationScenario):
         self._channel_display_names = team_structure.channel_display_names(teams=self._team_specs)
         self._world = SpotTheDifferenceWorld(
             cases=self._cases,
+            team_specs=self._team_specs,
+            postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
             two_teams=knobs.two_teams,
             shared_link=knobs.shared_link,

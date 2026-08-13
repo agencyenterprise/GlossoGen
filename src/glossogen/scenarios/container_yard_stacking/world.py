@@ -138,10 +138,6 @@ class ContainerYardWorld(RoundWorld):
             return False
         return team.placed_count >= len(case.steps)
 
-    def current_round_characters(self, team_id: str) -> int:
-        """Running character count on ``team_id``'s link channel."""
-        return self.characters_used(team_id=team_id)
-
     def round_budget_exceeded(self, team_id: str) -> bool:
         """Whether ``team_id`` has exceeded its communication budget this round."""
         return self._teams[team_id].round_budget_exceeded

@@ -119,11 +119,6 @@ class HospitalWorld(RoundWorld):
         return self._current_case
 
     @property
-    def current_round_characters(self) -> int:
-        """Running character count for the current round on the public ops channel."""
-        return self.characters_used(team_id=TEAM_ID)
-
-    @property
     def round_budget_exceeded(self) -> bool:
         """Whether the current round has exceeded its communication budget."""
         return self._round_budget_exceeded
