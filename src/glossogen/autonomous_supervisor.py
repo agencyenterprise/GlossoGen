@@ -571,6 +571,8 @@ class AutonomousSupervisor:
             try:
                 await mcp_task
             except asyncio.CancelledError:
+                # Awaiting a task we just cancelled: the cancellation is the
+                # expected outcome, not an error, so there is nothing to log.
                 pass
 
         total_messages = self._count_total_messages()
