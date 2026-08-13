@@ -57,17 +57,21 @@ def build_world() -> RoundWorld:
     )
 
 
-def send(world: RoundWorld, channel_id: str, text: str) -> None:
-    """Deliver one message to the world the way ``send_message`` does."""
-    world.on_message(agent_id="a_worker", channel_id=channel_id, text=text, token_count=0)
+def send(world: RoundWorld, agent_id: str, channel_id: str, text: str) -> None:
+    """Deliver one message to the world the way ``send_message`` does.
+
+    The sender is named because a message is charged to its team, and a channel
+    shared by two teams has no other way to say whose it was.
+    """
+    world.on_message(agent_id=agent_id, channel_id=channel_id, text=text, token_count=0)
 
 
 def test_a_team_is_charged_for_what_it_says_on_its_own_channel() -> None:
     """Characters, not tokens or messages, because the budget counts characters."""
     world = build_world()
 
-    send(world=world, channel_id="task_a", text="12345")
-    send(world=world, channel_id="task_a", text="678")
+    send(world=world, agent_id="a_worker", channel_id="task_a", text="12345")
+    send(world=world, agent_id="a_worker", channel_id="task_a", text="678")
 
     assert world.characters_used(team_id="a") == 8
 
@@ -80,7 +84,12 @@ def test_the_debrief_is_not_metered() -> None:
     """
     world = build_world()
 
-    send(world=world, channel_id="debrief_a", text="a long postmortem discussion")
+    send(
+        world=world,
+        agent_id="a_worker",
+        channel_id="debrief_a",
+        text="a long postmortem discussion",
+    )
 
     assert world.characters_used(team_id="a") == 0
 
@@ -89,7 +98,7 @@ def test_a_channel_nobody_meters_is_ignored() -> None:
     """An unknown channel is not an error and is not charged to anyone."""
     world = build_world()
 
-    send(world=world, channel_id="some_other_channel", text="chatter")
+    send(world=world, agent_id="a_worker", channel_id="some_other_channel", text="chatter")
 
     assert world.characters_used(team_id="a") == 0
     assert world.characters_used(team_id="b") == 0
@@ -99,8 +108,8 @@ def test_teams_are_metered_apart() -> None:
     """Two teams competing on identical cases must not spend each other's budget."""
     world = build_world()
 
-    send(world=world, channel_id="task_a", text="aaaa")
-    send(world=world, channel_id="task_b", text="bb")
+    send(world=world, agent_id="a_worker", channel_id="task_a", text="aaaa")
+    send(world=world, agent_id="b_worker", channel_id="task_b", text="bb")
 
     assert world.characters_used(team_id="a") == 4
     assert world.characters_used(team_id="b") == 2
@@ -109,8 +118,8 @@ def test_teams_are_metered_apart() -> None:
 def test_beginning_a_round_clears_every_team() -> None:
     """A counter surviving the round boundary makes round two start in debt."""
     world = build_world()
-    send(world=world, channel_id="task_a", text="aaaa")
-    send(world=world, channel_id="task_b", text="bb")
+    send(world=world, agent_id="a_worker", channel_id="task_a", text="aaaa")
+    send(world=world, agent_id="b_worker", channel_id="task_b", text="bb")
 
     world.begin_round()
 
@@ -182,7 +191,7 @@ def test_the_total_is_exact_at_the_boundary() -> None:
     """
     world = build_world()
 
-    send(world=world, channel_id="task_a", text="x" * 150)
+    send(world=world, agent_id="a_worker", channel_id="task_a", text="x" * 150)
 
     assert world.characters_used(team_id="a") == 150
 
@@ -194,3 +203,41 @@ def test_the_declared_debrief_channels_are_the_ones_disabled() -> None:
     world.disable_postmortem_globally()
 
     assert world.get_globally_disabled_channels() == DEBRIEF_IDS
+
+
+def shared_link_teams() -> tuple[TeamSpec, ...]:
+    """Build two teams that talk on one channel and debrief separately."""
+    return (
+        TeamSpec(
+            team_id="a",
+            task=TaskChannel(channel_id="link", name="link", display_name="the link"),
+            debrief=Debrief(channel_id="debrief_a", name="debrief_a", display_name="the huddle"),
+            roles=(role(agent_id="a_worker"),),
+        ),
+        TeamSpec(
+            team_id="b",
+            task=TaskChannel(channel_id="link", name="link", display_name="the link"),
+            debrief=Debrief(channel_id="debrief_b", name="debrief_b", display_name="the huddle"),
+            roles=(role(agent_id="b_worker"),),
+        ),
+    )
+
+
+def test_teams_sharing_one_channel_are_charged_for_their_own_words() -> None:
+    """Both teams overhear everything, and each pays only for what it said.
+
+    Charging by channel cannot express this: the channel belongs to both, so
+    one team would be billed for the other's messages, or for all of them.
+    """
+    world = RoundWorld(
+        team_specs=shared_link_teams(),
+        round_budget_thresholds=ROUND_BUDGET_THRESHOLDS,
+        postmortem_channel_ids=DEBRIEF_IDS,
+        postmortem_globally_disabled=False,
+    )
+
+    send(world=world, agent_id="a_worker", channel_id="link", text="aaaa")
+    send(world=world, agent_id="b_worker", channel_id="link", text="bb")
+
+    assert world.characters_used(team_id="a") == 4
+    assert world.characters_used(team_id="b") == 2

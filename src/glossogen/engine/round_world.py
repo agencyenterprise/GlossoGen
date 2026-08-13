@@ -45,10 +45,22 @@ class RoundWorld(ScenarioWorld):
             postmortem_channel_ids=postmortem_channel_ids,
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
-        # Which team owns each metered channel. Debrief channels are absent, so
-        # a lookup miss is how a message is recognised as not costing anything.
+        # Which channels cost a team anything. Debrief channels are absent, so
+        # a lookup miss is how a message is recognised as free.
+        self._task_channel_ids: frozenset[str] = frozenset(
+            team.task.channel_id for team in team_specs
+        )
+        # Which team owns each metered channel. Teams sharing one task channel
+        # have no single owner, so this holds only the channels that do.
         self._team_id_by_task_channel_id: dict[str, str] = {
-            team.task.channel_id: team.team_id for team in team_specs
+            team.task.channel_id: team.team_id
+            for team in team_specs
+            if sum(1 for other in team_specs if other.task.channel_id == team.task.channel_id) == 1
+        }
+        # Who each message costs. A message is charged to its sender's team,
+        # which is the only reading that survives two teams sharing a channel.
+        self._team_id_by_agent_id: dict[str, str] = {
+            role.agent_id: team.team_id for team in team_specs for role in team.roles
         }
         # What each team has spent since ``begin_round``.
         self._characters_used_by_team_id: dict[str, int] = {team.team_id: 0 for team in team_specs}
@@ -101,8 +113,10 @@ class RoundWorld(ScenarioWorld):
         so a scenario's action tool sees the updated total on the same turn the
         message was sent.
         """
-        _ = agent_id, token_count
-        team_id = self._team_id_by_task_channel_id.get(channel_id)
+        _ = token_count
+        if channel_id not in self._task_channel_ids:
+            return
+        team_id = self._team_id_by_agent_id.get(agent_id)
         if team_id is None:
             return
         self._characters_used_by_team_id[team_id] += len(text)

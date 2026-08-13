@@ -27,13 +27,17 @@ def channels(teams: tuple[TeamSpec, ...]) -> list[Channel]:
     build them in today, so a run's channel list does not reorder under the
     engine.
     """
+    # Teams may name the same task channel, which is how two of them are put on
+    # one link. That is one channel whose roster is both teams, not two.
+    rosters: dict[str, list[str]] = {}
+    names: dict[str, str] = {}
+    for team in teams:
+        members = rosters.setdefault(team.task.channel_id, [])
+        names[team.task.channel_id] = team.task.name
+        members.extend(role.agent_id for role in team.roles if role.starts_as_member)
     built: list[Channel] = [
-        Channel(
-            channel_id=team.task.channel_id,
-            name=team.task.name,
-            member_agent_ids=[role.agent_id for role in team.roles if role.starts_as_member],
-        )
-        for team in teams
+        Channel(channel_id=channel_id, name=names[channel_id], member_agent_ids=members)
+        for channel_id, members in rosters.items()
     ]
     for team in teams:
         if not isinstance(team.debrief, Debrief):
