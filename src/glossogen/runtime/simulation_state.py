@@ -18,7 +18,7 @@ from glossogen.models.channel import Channel
 from glossogen.models.event import InjectionDelivered, PostmortemStarted
 from glossogen.runtime.activity_notification import DoneNotification, NewInfoNotification
 from glossogen.runtime.agent_session import AgentSession
-from glossogen.runtime.scenario_world import WorldContext
+from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.scenario_protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -201,25 +201,42 @@ class SimulationRuntime:
             self._token_counters[agent_id] = counter
         return await counter.count(text=text)
 
-    def notify_world_of_message(
+    async def notify_world_of_message(
         self,
         agent_id: str,
         channel_id: str,
         text: str,
         token_count: int,
     ) -> None:
-        """Update world state synchronously, then enqueue the event for async processing."""
-        self._scenario.get_world().on_message(
+        """Update world state, then let the world react, before the send returns.
+
+        The world sees a message twice: once for state the sending agent must
+        observe on its own turn, and once for the reactions, which is where
+        budget notifications come from. Both happen here, in that order, while
+        the sender waits.
+
+        The reaction used to run on the world's own task, which left the
+        counter and the check reading different moments: two messages sent
+        close together could both land before either was reacted to, and a team
+        that should have been warned at 75% of its budget was warned only once
+        it was spent. Which warnings a team got then depended on how the loop
+        interleaved, so a run could not be reproduced.
+        """
+        world = self._scenario.get_world()
+        world.on_message(
             agent_id=agent_id,
             channel_id=channel_id,
             text=text,
             token_count=token_count,
         )
-        self._world_context.enqueue_message_event(
-            agent_id=agent_id,
-            channel_id=channel_id,
-            text=text,
-            token_count=token_count,
+        await world.on_message_async(
+            event=MessageEvent(
+                agent_id=agent_id,
+                channel_id=channel_id,
+                text=text,
+                token_count=token_count,
+            ),
+            context=self._world_context,
         )
 
     def broadcast_done(self, reason: str) -> None:

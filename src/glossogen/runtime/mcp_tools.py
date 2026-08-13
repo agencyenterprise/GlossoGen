@@ -519,7 +519,7 @@ def register_tools(mcp: FastMCP, runtime: SimulationRuntime) -> None:
 
                 runtime.fire_on_message_callbacks()
 
-            runtime.notify_world_of_message(
+            await runtime.notify_world_of_message(
                 agent_id=agent_id,
                 channel_id=channel_id,
                 text=text,

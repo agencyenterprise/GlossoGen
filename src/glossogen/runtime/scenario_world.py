@@ -189,23 +189,6 @@ class WorldContext:
             )
         )
 
-    def enqueue_message_event(
-        self,
-        agent_id: str,
-        channel_id: str,
-        text: str,
-        token_count: int,
-    ) -> None:
-        """Enqueue a message event from an agent. Called synchronously by the runtime."""
-        self._event_queue.put_nowait(
-            MessageEvent(
-                agent_id=agent_id,
-                channel_id=channel_id,
-                text=text,
-                token_count=token_count,
-            )
-        )
-
     def signal_round_advanced(self, round_number: int) -> None:
         """Enqueue a round advance event. Called synchronously by the game clock."""
         self._event_queue.put_nowait(RoundAdvancedEvent(round_number=round_number))
@@ -276,19 +259,19 @@ class ScenarioWorld(ABC):
         self._world_context = context
 
     async def run(self, context: WorldContext) -> None:
-        """Drain world events and dispatch each message to ``on_message_async``.
+        """Drain the world's event queue.
 
-        Round-advance events are drained without action (scenarios handle
-        round transitions via ``SimulationScenario.on_round_advanced``).
+        Messages are no longer routed here: a send awaits the world's reaction
+        directly, so the reaction cannot lag the count. What remains are
+        round-advance events, drained without action, since scenarios handle
+        round transitions through ``SimulationScenario.on_round_advanced``.
         Started as an asyncio task by the supervisor and cancelled at
         simulation end.
         """
         self.bind_context(context=context)
         try:
             while True:
-                event = await context.next_event()
-                if isinstance(event, MessageEvent):
-                    await self.on_message_async(event=event, context=context)
+                await context.next_event()
         except asyncio.CancelledError:
             return
 
