@@ -25,21 +25,17 @@ import random
 from pathlib import Path
 from typing import Any, ClassVar
 
+from glossogen.engine import team_structure
+from glossogen.engine.team_declaration import RoleSpec
 from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.models.agent_config import AgentConfig, AgentRole
-from glossogen.models.channel import Channel
+from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
-from glossogen.scenarios.container_yard_stacking.agent_factory import (
-    build_agent_display_names,
-    build_agents,
-    build_channel_display_names,
-    build_channels,
-)
 from glossogen.scenarios.container_yard_stacking.case_event_conversion import case_started_event
 from glossogen.scenarios.container_yard_stacking.evaluation.build_communication_rounds import (
     build_communication_rounds,
@@ -81,6 +77,7 @@ from glossogen.scenarios.container_yard_stacking.injection_rendering import (
 )
 from glossogen.scenarios.container_yard_stacking.knobs import ContainerYardStackingKnobs
 from glossogen.scenarios.container_yard_stacking.mcp_tools import build_mcp_tools
+from glossogen.scenarios.container_yard_stacking.team_declaration import container_yard_teams
 from glossogen.scenarios.container_yard_stacking.team_routing import team_id_for_agent
 from glossogen.scenarios.container_yard_stacking.world import ContainerYardWorld, YardOutcome
 from glossogen.scenarios.container_yard_stacking.yard_cases import get_cases
@@ -146,13 +143,11 @@ class ContainerYardStackingScenario(SimulationScenario):
             yard_slot_count=knobs.yard_slot_count,
         )
         self._noise_rng = random.Random(knobs.seed)
-        self._agent_display_names: dict[str, str] = build_agent_display_names(
-            two_teams=knobs.two_teams,
-            intern_enabled=knobs.intern_enabled,
+        self._team_specs = container_yard_teams(knobs=knobs)
+        self._agent_display_names = team_structure.agent_display_names(
+            teams=self._team_specs, world_name="Yard Monitor"
         )
-        self._channel_display_names: dict[str, str] = build_channel_display_names(
-            two_teams=knobs.two_teams,
-        )
+        self._channel_display_names = team_structure.channel_display_names(teams=self._team_specs)
         self._world = ContainerYardWorld(
             cases=self._cases,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
@@ -170,25 +165,34 @@ class ContainerYardStackingScenario(SimulationScenario):
             },
         )
 
+    def _render_system_prompt(self, role: RoleSpec, channels: list[ChannelTemplateEntry]) -> str:
+        """Render one role's system prompt over the channels it reaches."""
+        return self._renderer.render(
+            template_name=role.system_template,
+            template_variables={
+                "channels": channels,
+                "postmortem_enabled": self._postmortem_initially_active,
+                "channel_noise_level": self._knobs.channel_noise_level,
+                "noise_replacement_mode": self._knobs.noise_replacement_mode.value,
+                "intern_join_round": self._knobs.intern_join_round,
+                "intern_takeover_round": self._knobs.intern_takeover_round,
+            },
+        )
+
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
-        """Return agent configurations for the three-agent yard team."""
-        return build_agents(
-            knobs=self._knobs,
-            postmortem_initially_active=self._postmortem_initially_active,
-            agent_display_names=self._agent_display_names,
-            channel_display_names=self._channel_display_names,
-            renderer=self._renderer,
+        """Return one agent per declared role, wired to the channels it reaches."""
+        return team_structure.build_agent_configs(
+            teams=self._team_specs,
+            render_system_prompt=self._render_system_prompt,
             default_model=default_model,
             default_provider=default_provider,
+            max_tokens=self._knobs.agent_max_tokens,
+            compaction=self._knobs.compaction,
         )
 
     def get_channels(self) -> list[Channel]:
-        """Return per-team link + (optional) postmortem channels."""
-        return build_channels(
-            knobs=self._knobs,
-            postmortem_initially_active=self._postmortem_initially_active,
-            channel_display_names=self._channel_display_names,
-        )
+        """Return each team's link, then its debrief when this run holds one."""
+        return team_structure.channels(teams=self._team_specs)
 
     def _previous_outcome(self, team_id: str) -> YardOutcome | None:
         """Return the most recent round outcome for ``team_id``, or None on round 1."""

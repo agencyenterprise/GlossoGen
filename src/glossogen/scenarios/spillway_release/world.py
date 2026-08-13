@@ -14,15 +14,18 @@ budget, and the round fails when the running total reaches the budget.
 
 import logging
 
-from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
+from glossogen.engine.round_world import RoundWorld
+from glossogen.engine.team_declaration import TeamSpec
+from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.spillway_release.ids import (
     BUDGET_EXCEEDED_MARKER,
     OPS_CHANNEL_ID,
-    POSTMORTEM_CHANNEL_ID,
     ROUND_FAILED_MARKER,
     ROUND_SUCCESS_MARKER,
 )
 from glossogen.scenarios.spillway_release.spillway_cases import SpillwayCase
+from glossogen.scenarios.spillway_release.team_declaration import TEAM_ID
 from glossogen.scenarios.spillway_release.world_state import SpillwayOutcome, resolve_round
 
 logger = logging.getLogger(__name__)
@@ -37,31 +40,31 @@ __all__ = [
 ]
 
 
-class SpillwayWorld(ScenarioWorld):
+class SpillwayWorld(RoundWorld):
     """Single-team reservoir world that resolves each round deterministically."""
-
-    _context: WorldContext
 
     def __init__(
         self,
         cases: list[SpillwayCase],
+        team_specs: tuple[TeamSpec, ...],
+        postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
     ) -> None:
         super().__init__(
-            postmortem_channel_ids=frozenset({POSTMORTEM_CHANNEL_ID}),
+            team_specs=team_specs,
+            round_budget_thresholds=(THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL),
+            postmortem_channel_ids=postmortem_channel_ids,
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._cases = cases
         self._current_case: SpillwayCase | None = None
-        self._current_round_characters: int = 0
         self._round_budget_exceeded: bool = False
         self._gates_opened: int = 0
         self._release_duration_hours: float = 0.0
         self._park_secured: bool = False
         self._evacuated: bool = False
-        self._notified_thresholds: set[str] = set()
         self._round_outcome_marked: bool = False
-        self._outcomes: list[SpillwayOutcome] = []
+        self._outcome_log: RoundOutcomeLog[SpillwayOutcome] = RoundOutcomeLog(team_ids=(TEAM_ID,))
 
     @property
     def context(self) -> WorldContext:
@@ -76,7 +79,7 @@ class SpillwayWorld(ScenarioWorld):
     @property
     def current_round_characters(self) -> int:
         """Running character count on the ops channel this round."""
-        return self._current_round_characters
+        return self.characters_used(team_id=TEAM_ID)
 
     @property
     def round_budget_exceeded(self) -> bool:
@@ -108,9 +111,10 @@ class SpillwayWorld(ScenarioWorld):
 
     def previous_outcome(self) -> SpillwayOutcome | None:
         """Return the most recent finished round's outcome, or None on round 1."""
-        if len(self._outcomes) == 0:
+        recorded = self._outcome_log.all_for(team_id=TEAM_ID)
+        if not recorded:
             return None
-        return self._outcomes[-1]
+        return recorded[-1]
 
     def on_message(
         self,
@@ -120,13 +124,14 @@ class SpillwayWorld(ScenarioWorld):
         token_count: int,
     ) -> None:
         """Accumulate ops-channel characters and flag budget exhaustion synchronously."""
-        _ = agent_id, token_count
-        if channel_id != OPS_CHANNEL_ID:
+        super().on_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+        )
+        if self.team_for_task_channel(channel_id=channel_id) is None:
             return
-        self._current_round_characters += len(text)
         if self._current_case is None:
             return
-        if self._current_round_characters >= self._current_case.round_time_budget_seconds:
+        if self.characters_used(team_id=TEAM_ID) >= self._current_case.round_time_budget_seconds:
             self._round_budget_exceeded = True
 
     def finalize_round_sync(self, round_number: int) -> None:
@@ -137,13 +142,13 @@ class SpillwayWorld(ScenarioWorld):
         if round_number >= 2 and not self._round_outcome_marked:
             self._mark_outcome()
         self._current_case = self._cases[round_number - 1]
-        self._current_round_characters = 0
+        # After _mark_outcome above, which reads the round that just ended.
+        self.begin_round()
         self._round_budget_exceeded = False
         self._gates_opened = 0
         self._release_duration_hours = 0.0
         self._park_secured = False
         self._evacuated = False
-        self._notified_thresholds = set()
         self._round_outcome_marked = False
 
     def mark_round_outcome(self, round_number: int) -> None:
@@ -169,10 +174,10 @@ class SpillwayWorld(ScenarioWorld):
             release_duration_hours=self._release_duration_hours,
             park_secured=self._park_secured,
             evacuated=self._evacuated,
-            characters_used=self._current_round_characters,
+            characters_used=self.characters_used(team_id=TEAM_ID),
             budget_exceeded=self._round_budget_exceeded,
         )
-        self._outcomes.append(outcome)
+        self._outcome_log.record(team_id=TEAM_ID, round_number=outcome.case_number, outcome=outcome)
         self._round_outcome_marked = True
 
     def current_outcome(self) -> SpillwayOutcome | None:
@@ -186,7 +191,7 @@ class SpillwayWorld(ScenarioWorld):
             release_duration_hours=self._release_duration_hours,
             park_secured=self._park_secured,
             evacuated=self._evacuated,
-            characters_used=self._current_round_characters,
+            characters_used=self.characters_used(team_id=TEAM_ID),
             budget_exceeded=self._round_budget_exceeded,
         )
 
@@ -201,13 +206,15 @@ class SpillwayWorld(ScenarioWorld):
         case = self._current_case
         if case is None:
             return
-        elapsed = self._current_round_characters
+        elapsed = self.characters_used(team_id=TEAM_ID)
         budget = case.round_time_budget_seconds
-        if (
-            self._round_budget_exceeded
-            and THRESHOLD_BUDGET_EXCEEDED not in self._notified_thresholds
+        if self._round_budget_exceeded and self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=THRESHOLD_BUDGET_EXCEEDED
         ):
-            self._notified_thresholds.update([THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL])
+            # Past the budget, the 75% warning has nothing left to warn about.
+            self.claim_round_budget_threshold(
+                team_id=TEAM_ID, round_budget_threshold=THRESHOLD_CRITICAL
+            )
             await context.send_update_to_channel(
                 channel_id=OPS_CHANNEL_ID,
                 text=(
@@ -216,8 +223,9 @@ class SpillwayWorld(ScenarioWorld):
                 ),
             )
             return
-        if elapsed >= budget * 0.75 and THRESHOLD_CRITICAL not in self._notified_thresholds:
-            self._notified_thresholds.add(THRESHOLD_CRITICAL)
+        if elapsed >= budget * 0.75 and self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=THRESHOLD_CRITICAL
+        ):
             remaining = budget - elapsed
             await context.send_update_to_channel(
                 channel_id=OPS_CHANNEL_ID,

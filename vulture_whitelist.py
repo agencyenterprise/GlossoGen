@@ -224,11 +224,11 @@ sample_quotes  # consumed by communication_ontology_consolidate_user.jinja (scri
 per_round_joint_success  # glossogen-research: analysis/results_viewer/{multi_swap,resume,cross_swap}_data.py
 insert_run_if_absent  # glossogen-deploy: backfills/backfill_runs_index.py
 list_runs_missing_evaluation_content_hash  # glossogen-deploy: backfills/backfill_evaluation_content_hash.py
-agent_roles  # unused function (src/glossogen/engine/team_structure.py)
-task_channel_ids  # unused function (src/glossogen/engine/team_structure.py)
-debrief_channel_ids  # unused function (src/glossogen/engine/team_structure.py)
-team_id_by_channel  # unused function (src/glossogen/engine/team_structure.py)
-build_agent_configs  # unused function (src/glossogen/engine/team_structure.py)
-veyru_teams  # unused function (src/glossogen/scenarios/veyru/team_declaration.py)
-starts_as_member  # unused variable (src/glossogen/engine/team_declaration.py)
 IN_PROCESS_HOST_URL  # used by tests/testbed/simulation_harness.py (vulture scans src/ only)
+
+# Read as a dict key off the dumped config, never as an attribute: the CLI applies
+# it in _apply_agent_overrides, and replace-agent reads it back out of the source
+# run's scenario_config to pin per-agent models. BaseKnobs ignores extra keys, so
+# dropping the field would silently strip it from get_scenario_config()'s dump and
+# every resumed run would lose its per-agent models.
+model_overrides  # src/glossogen/scenarios/base_knobs.py

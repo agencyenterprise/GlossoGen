@@ -13,7 +13,7 @@ a golden file, checked in, and the migration is held against it.
 The file records only what `structural_equivalence` deems reproducible:
 decisions in order, and each agent's own messages. Regenerate with
 
-    GLOSSOGEN_UPDATE_BASELINE=1 uv run pytest tests/engine/test_veyru_decisions_unchanged.py
+    GLOSSOGEN_UPDATE_BASELINE=1 uv run pytest tests/engine/test_scenario_decisions_unchanged.py
 
 and read the diff before committing it. A regenerated baseline that silently
 absorbs a behaviour change is worse than no baseline, because it looks like
@@ -75,6 +75,18 @@ CONFIGURATIONS: dict[str, tuple[str, dict[str, Any]]] = {
 CONFIGURATIONS["veyru_debrief_closed"] = (
     "veyru",
     {"postmortem_enabled": False, "postmortem_after_swap": False},
+)
+# The shipped presets are single-team, so without this the two-team layouts,
+# where each team runs its own link and its own debrief, are recorded nowhere.
+#
+# Only spot_the_difference can be recorded today. Driving a scenario needs it to
+# name the channels its agents talk on, and in two-team mode veyru names none
+# while container_yard_stacking names `link`, which is the solo channel and
+# exists in neither team. Both are recordable once they name their per-team
+# links the way spot_the_difference already does.
+CONFIGURATIONS["spot_the_difference_two_teams"] = (
+    "spot_the_difference",
+    {"two_teams": True},
 )
 
 

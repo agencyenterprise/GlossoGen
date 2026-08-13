@@ -14,8 +14,11 @@ budget.
 
 import logging
 
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
+from glossogen.engine.round_world import RoundWorld
+from glossogen.engine.team_declaration import TeamSpec
 from glossogen.models.event import MessageSent, RoundResultRecorded, SimulationEvent
-from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
+from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.drive_module_repair.drive_module_cases import (
     DriveModuleCase,
     ModuleFaultTree,
@@ -32,9 +35,9 @@ from glossogen.scenarios.drive_module_repair.ids import (
     DEVICE_FAILED_MARKER,
     DEVICE_REPAIRED_MARKER,
     DIAGNOSTICS_ENGINEER_ID,
-    POSTMORTEM_CHANNEL_ID,
     SPEC_ENGINEER_ID,
 )
+from glossogen.scenarios.drive_module_repair.team_declaration import TEAM_ID
 from glossogen.scenarios.drive_module_repair.world_state import DriveModuleOutcome
 
 logger = logging.getLogger(__name__)
@@ -70,29 +73,31 @@ def _render_fault_tree(tree: ModuleFaultTree) -> str:
     return f"FAULT-TREE for {tree.module_label} (this unit's revision):\n{body}"
 
 
-class DriveModuleWorld(ScenarioWorld):
+class DriveModuleWorld(RoundWorld):
     """Single-team world that advances through ordered replacement stages."""
-
-    _context: WorldContext
 
     def __init__(
         self,
         cases: list[DriveModuleCase],
+        team_specs: tuple[TeamSpec, ...],
+        postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
     ) -> None:
         super().__init__(
-            postmortem_channel_ids=frozenset({POSTMORTEM_CHANNEL_ID}),
+            team_specs=team_specs,
+            round_budget_thresholds=(THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL),
+            postmortem_channel_ids=postmortem_channel_ids,
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._cases = cases
         self._current_case: DriveModuleCase | None = None
-        self._current_round_characters: int = 0
         self._round_budget_exceeded: bool = False
         self._current_stage_index: int = 0
-        self._notified_thresholds: set[str] = set()
         self._revealed_modules: set[str] = set()
         self._round_outcome_marked: bool = False
-        self._outcomes: list[DriveModuleOutcome] = []
+        self._outcome_log: RoundOutcomeLog[DriveModuleOutcome] = RoundOutcomeLog(
+            team_ids=(TEAM_ID,)
+        )
 
     @property
     def context(self) -> WorldContext:
@@ -179,9 +184,10 @@ class DriveModuleWorld(ScenarioWorld):
 
     def previous_outcome(self) -> DriveModuleOutcome | None:
         """Return the most recent finished round's outcome, or None on round 1."""
-        if len(self._outcomes) == 0:
+        recorded = self._outcome_log.all_for(team_id=TEAM_ID)
+        if not recorded:
             return None
-        return self._outcomes[-1]
+        return recorded[-1]
 
     def restore_outcomes_from_events(self, events: list[SimulationEvent]) -> None:
         """Rebuild ``_outcomes`` from a source event list on resume / fork / replace-agent.
@@ -211,7 +217,6 @@ class DriveModuleWorld(ScenarioWorld):
                     )
             elif isinstance(event, RoundResultRecorded):
                 succeeded[event.round_number] = event.success
-        outcomes: list[DriveModuleOutcome] = []
         for round_number in sorted(succeeded):
             case = cases.get(round_number)
             if case is None:
@@ -226,8 +231,10 @@ class DriveModuleWorld(ScenarioWorld):
                 failure_reason = "Round ended before all components were correctly replaced."
             else:
                 failure_reason = ""
-            outcomes.append(
-                DriveModuleOutcome(
+            self._outcome_log.record(
+                team_id=TEAM_ID,
+                round_number=round_number,
+                outcome=DriveModuleOutcome(
                     case_number=case.case_number,
                     module_count=case.module_count,
                     replacement_count=case.replacement_count,
@@ -238,9 +245,8 @@ class DriveModuleWorld(ScenarioWorld):
                     device_repaired=device_repaired,
                     round_succeeded=succeeded[round_number],
                     failure_reason=failure_reason,
-                )
+                ),
             )
-        self._outcomes = outcomes
 
     def on_message(
         self,
@@ -250,13 +256,14 @@ class DriveModuleWorld(ScenarioWorld):
         token_count: int,
     ) -> None:
         """Accumulate bay-channel characters and flag budget exhaustion synchronously."""
-        _ = agent_id, token_count
-        if channel_id != BAY_CHANNEL_ID:
+        super().on_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+        )
+        if self.team_for_task_channel(channel_id=channel_id) is None:
             return
-        self._current_round_characters += len(text)
         if self._current_case is None:
             return
-        if self._current_round_characters >= self._current_case.round_time_budget_seconds:
+        if self.characters_used(team_id=TEAM_ID) >= self._current_case.round_time_budget_seconds:
             self._round_budget_exceeded = True
 
     def finalize_round_sync(self, round_number: int) -> None:
@@ -267,10 +274,10 @@ class DriveModuleWorld(ScenarioWorld):
         if round_number >= 2 and not self._round_outcome_marked:
             self._mark_outcome()
         self._current_case = self._cases[round_number - 1]
-        self._current_round_characters = 0
+        # After _mark_outcome above, which reads the round that just ended.
+        self.begin_round()
         self._round_budget_exceeded = False
         self._current_stage_index = 0
-        self._notified_thresholds = set()
         # The first unit's spec sheet ships in the spec engineer's round-start
         # injection, so it counts as already revealed; later units are pushed
         # when the technician reaches them.
@@ -303,7 +310,7 @@ class DriveModuleWorld(ScenarioWorld):
             replacement_count=case.total_replacement_count,
             replacements_done=min(self._current_stage_index, len(case.stages)),
             budget_exceeded=self._round_budget_exceeded,
-            characters_used=self._current_round_characters,
+            characters_used=self.characters_used(team_id=TEAM_ID),
             round_time_budget_seconds=case.round_time_budget_seconds,
             device_repaired=device_repaired,
             round_succeeded=round_succeeded,
@@ -314,7 +321,8 @@ class DriveModuleWorld(ScenarioWorld):
         """Resolve the current round and append its outcome."""
         if self._current_case is None:
             return
-        self._outcomes.append(self._resolve())
+        outcome = self._resolve()
+        self._outcome_log.record(team_id=TEAM_ID, round_number=outcome.case_number, outcome=outcome)
         self._round_outcome_marked = True
 
     def current_outcome(self) -> DriveModuleOutcome | None:
@@ -334,13 +342,15 @@ class DriveModuleWorld(ScenarioWorld):
         case = self._current_case
         if case is None:
             return
-        elapsed = self._current_round_characters
+        elapsed = self.characters_used(team_id=TEAM_ID)
         budget = case.round_time_budget_seconds
-        if (
-            self._round_budget_exceeded
-            and THRESHOLD_BUDGET_EXCEEDED not in self._notified_thresholds
+        if self._round_budget_exceeded and self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=THRESHOLD_BUDGET_EXCEEDED
         ):
-            self._notified_thresholds.update([THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL])
+            # Past the budget, the 75% warning has nothing left to warn about.
+            self.claim_round_budget_threshold(
+                team_id=TEAM_ID, round_budget_threshold=THRESHOLD_CRITICAL
+            )
             await context.send_update_to_channel(
                 channel_id=BAY_CHANNEL_ID,
                 text=(
@@ -349,8 +359,9 @@ class DriveModuleWorld(ScenarioWorld):
                 ),
             )
             return
-        if elapsed >= budget * 0.75 and THRESHOLD_CRITICAL not in self._notified_thresholds:
-            self._notified_thresholds.add(THRESHOLD_CRITICAL)
+        if elapsed >= budget * 0.75 and self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=THRESHOLD_CRITICAL
+        ):
             remaining = budget - elapsed
             await context.send_update_to_channel(
                 channel_id=BAY_CHANNEL_ID,

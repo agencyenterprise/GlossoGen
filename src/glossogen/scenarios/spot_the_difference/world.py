@@ -65,8 +65,6 @@ class SpotTheDifferenceWorld(ScenarioWorld):
     two-team mode holds two, keyed by ``TEAM_A_ID`` / ``TEAM_B_ID``.
     """
 
-    _context: WorldContext
-
     def __init__(
         self,
         cases: list[DiffCase],

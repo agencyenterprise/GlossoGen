@@ -60,8 +60,6 @@ class SatelliteWorld(RoundWorld):
     from the command judge before the window closes.
     """
 
-    _context: WorldContext
-
     def __init__(
         self,
         cases: list[SatelliteCase],

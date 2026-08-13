@@ -20,8 +20,9 @@ against the current stage's expected (component, tool, torque, calibration).
 Round success requires every component replaced correctly, in order, within
 the communication budget.
 
-Heavy logic lives in dedicated sibling modules: :mod:`agent_factory`
-(agent/channel construction), :mod:`mcp_tools` (the service_component tool),
+Heavy logic lives in dedicated sibling modules: :mod:`team_declaration`
+(the teams, roles and channels the engine derives the run from),
+:mod:`mcp_tools` (the service_component tool),
 :mod:`replacement_judge` (the LLM judge), :mod:`injection_rendering`
 (per-round and postmortem prompts), :mod:`drive_module_cases` (per-round case
 generation), :mod:`world_state` (the outcome type), and
@@ -33,25 +34,24 @@ import random
 from pathlib import Path
 from typing import Any, ClassVar
 
+from glossogen.engine import team_structure
+from glossogen.engine.team_declaration import RoleSpec
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
-from glossogen.models.channel import Channel
+from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
-from glossogen.scenarios.drive_module_repair.agent_factory import (
-    build_agent_display_names,
-    build_agents,
-    build_channel_display_names,
-    build_channels,
-)
 from glossogen.scenarios.drive_module_repair.case_event_conversion import case_started_event
-from glossogen.scenarios.drive_module_repair.drive_module_cases import get_cases
+from glossogen.scenarios.drive_module_repair.drive_module_cases import (
+    component_access_order,
+    get_cases,
+)
 from glossogen.scenarios.drive_module_repair.evaluation.build_communication_rounds import (
     build_communication_rounds,
 )
@@ -71,6 +71,7 @@ from glossogen.scenarios.drive_module_repair.injection_rendering import (
 )
 from glossogen.scenarios.drive_module_repair.knobs import DriveModuleRepairKnobs
 from glossogen.scenarios.drive_module_repair.mcp_tools import build_mcp_tools
+from glossogen.scenarios.drive_module_repair.team_declaration import drive_module_teams
 from glossogen.scenarios.drive_module_repair.world import DriveModuleWorld
 from glossogen.template_renderer import TemplateRenderer
 
@@ -129,10 +130,15 @@ class DriveModuleRepairScenario(SimulationScenario):
             replacements_count_weights=knobs.replacements_count_weights,
         )
         self._noise_rng = random.Random(knobs.seed)
-        self._agent_display_names: dict[str, str] = build_agent_display_names()
-        self._channel_display_names: dict[str, str] = build_channel_display_names()
+        self._team_specs = drive_module_teams(knobs=knobs)
+        self._agent_display_names = team_structure.agent_display_names(
+            teams=self._team_specs, world_name="Bay Monitor"
+        )
+        self._channel_display_names = team_structure.channel_display_names(teams=self._team_specs)
         self._world = DriveModuleWorld(
             cases=self._cases,
+            team_specs=self._team_specs,
+            postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
         )
         self._judge_provider = DeferredLLMProvider(
@@ -152,23 +158,35 @@ class DriveModuleRepairScenario(SimulationScenario):
             },
         )
 
+    def _render_system_prompt(self, role: RoleSpec, channels: list[ChannelTemplateEntry]) -> str:
+        """Render one role's system prompt over the channels it reaches."""
+        return self._renderer.render(
+            template_name=role.system_template,
+            template_variables={
+                "channels": channels,
+                "postmortem_enabled": self._postmortem_initially_active,
+                "channel_noise_level": self._knobs.channel_noise_level,
+                "noise_replacement_mode": self._knobs.noise_replacement_mode.value,
+                "component_access_order": [
+                    component.component_id for component in component_access_order()
+                ],
+            },
+        )
+
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
-        """Return agent configurations for the three-agent team."""
-        return build_agents(
-            knobs=self._knobs,
-            postmortem_initially_active=self._postmortem_initially_active,
-            channel_display_names=self._channel_display_names,
-            renderer=self._renderer,
+        """Return one agent per declared role, wired to the channels it reaches."""
+        return team_structure.build_agent_configs(
+            teams=self._team_specs,
+            render_system_prompt=self._render_system_prompt,
             default_model=default_model,
             default_provider=default_provider,
+            max_tokens=self._knobs.agent_max_tokens,
+            compaction=self._knobs.compaction,
         )
 
     def get_channels(self) -> list[Channel]:
-        """Return the bay channel plus the optional postmortem channel."""
-        return build_channels(
-            postmortem_initially_active=self._postmortem_initially_active,
-            channel_display_names=self._channel_display_names,
-        )
+        """Return the bay channel, then the debrief when this run holds one."""
+        return team_structure.channels(teams=self._team_specs)
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
         """Return the per-round injection for one agent, or None."""

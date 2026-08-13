@@ -16,16 +16,19 @@ and a generic notice is broadcast to the comm loop.
 import logging
 from typing import NamedTuple
 
-from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
+from glossogen.engine.round_world import RoundWorld
+from glossogen.engine.team_declaration import TeamSpec
+from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.orbital_anomaly.ids import (
     LINK_CHANNEL_ID,
     NEW_ANOMALY_MARKER,
-    POSTMORTEM_CHANNEL_ID,
     TELEMETRY_OFFICER_ID,
     VEHICLE_LOST_MARKER,
     VEHICLE_STABILIZED_MARKER,
 )
 from glossogen.scenarios.orbital_anomaly.orbital_anomaly_cases import AnomalyCase, AnomalyStage
+from glossogen.scenarios.orbital_anomaly.team_declaration import TEAM_ID
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +47,7 @@ class AnomalyOutcome(NamedTuple):
     time_budget_seconds: int
 
 
-class OrbitalAnomalyWorld(ScenarioWorld):
+class OrbitalAnomalyWorld(RoundWorld):
     """Tracks comm-loop usage and pushes real-time anomaly status updates.
 
     Accumulates character count for the current anomaly. When simulated time
@@ -53,21 +56,25 @@ class OrbitalAnomalyWorld(ScenarioWorld):
     survives only if the astronaut resolves every stage before time runs out.
     """
 
-    _context: WorldContext
-
-    def __init__(self, cases: list[AnomalyCase], postmortem_globally_disabled: bool) -> None:
+    def __init__(
+        self,
+        cases: list[AnomalyCase],
+        team_specs: tuple[TeamSpec, ...],
+        postmortem_channel_ids: frozenset[str],
+        postmortem_globally_disabled: bool,
+    ) -> None:
         super().__init__(
-            postmortem_channel_ids=frozenset({POSTMORTEM_CHANNEL_ID}),
+            team_specs=team_specs,
+            round_budget_thresholds=(_THRESHOLD_LOST, _THRESHOLD_CRITICAL),
+            postmortem_channel_ids=postmortem_channel_ids,
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._cases = cases
         self._current_case: AnomalyCase | None = None
-        self._current_round_characters: int = 0
         self._vehicle_alive: bool = True
         self._vehicle_stabilized: bool = False
-        self._notified_thresholds: set[str] = set()
         self._current_stage_index: int = 0
-        self._outcomes: list[AnomalyOutcome] = []
+        self._outcome_log: RoundOutcomeLog[AnomalyOutcome] = RoundOutcomeLog(team_ids=(TEAM_ID,))
 
     @property
     def context(self) -> WorldContext:
@@ -131,17 +138,18 @@ class OrbitalAnomalyWorld(ScenarioWorld):
         ``actuate_panel`` sees correct state immediately. Messages on the
         debrief channel do not count toward the budget.
         """
-        _ = agent_id, token_count
-        if channel_id != LINK_CHANNEL_ID:
+        super().on_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+        )
+        if self.team_for_task_channel(channel_id=channel_id) is None:
             return
-        self._current_round_characters += len(text)
         if self._current_case is None:
             return
         if not self._vehicle_alive:
             return
         if self._vehicle_stabilized:
             return
-        if self._current_round_characters > self._current_case.time_budget_seconds:
+        if self.characters_used(team_id=TEAM_ID) > self._current_case.time_budget_seconds:
             self._vehicle_alive = False
 
     async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
@@ -155,10 +163,15 @@ class OrbitalAnomalyWorld(ScenarioWorld):
         """Broadcast a critical or loss notification when a budget threshold is crossed."""
         if self._current_case is None:
             return
-        time_elapsed = self._current_round_characters
+        time_elapsed = self.characters_used(team_id=TEAM_ID)
         budget = self._current_case.time_budget_seconds
-        if not self._vehicle_alive and _THRESHOLD_LOST not in self._notified_thresholds:
-            self._notified_thresholds.update([_THRESHOLD_LOST, _THRESHOLD_CRITICAL])
+        if not self._vehicle_alive and self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=_THRESHOLD_LOST
+        ):
+            # The vehicle is lost; the 75% warning has nothing left to warn about.
+            self.claim_round_budget_threshold(
+                team_id=TEAM_ID, round_budget_threshold=_THRESHOLD_CRITICAL
+            )
             await self._world_context.send_update_to_channel(
                 channel_id=LINK_CHANNEL_ID,
                 text=(
@@ -169,8 +182,9 @@ class OrbitalAnomalyWorld(ScenarioWorld):
             return
         if self._vehicle_stabilized:
             return
-        if time_elapsed > budget * 0.75 and _THRESHOLD_CRITICAL not in self._notified_thresholds:
-            self._notified_thresholds.add(_THRESHOLD_CRITICAL)
+        if time_elapsed > budget * 0.75 and self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=_THRESHOLD_CRITICAL
+        ):
             remaining = budget - time_elapsed
             await self._world_context.send_update_to_channel(
                 channel_id=LINK_CHANNEL_ID,
@@ -179,34 +193,37 @@ class OrbitalAnomalyWorld(ScenarioWorld):
 
     def finalize_round_sync(self, round_number: int) -> None:
         """Reset per-round state and load the case for ``round_number``."""
-        self._current_round_characters = 0
+        self.begin_round()
         self._vehicle_alive = True
         self._vehicle_stabilized = False
-        self._notified_thresholds = set()
         self._current_stage_index = 0
         self._current_case = self._cases[(round_number - 1) % len(self._cases)]
 
     def mark_round_outcome(self, round_number: int) -> None:
         """Build and append the outcome for the just-ended ``round_number``."""
-        _ = round_number
         if self._current_case is None:
             return
-        self._outcomes.append(
-            AnomalyOutcome(
+        # Cases cycle when the run outlasts them, so two rounds can share a
+        # case_number. The round is what identifies the outcome.
+        self._outcome_log.record(
+            team_id=TEAM_ID,
+            round_number=round_number,
+            outcome=AnomalyOutcome(
                 case_number=self._current_case.case_number,
                 fault_name=self._current_case.fault_name,
                 stabilized=self._vehicle_stabilized,
-                characters_used=self._current_round_characters,
-                time_elapsed_seconds=float(self._current_round_characters),
+                characters_used=self.characters_used(team_id=TEAM_ID),
+                time_elapsed_seconds=float(self.characters_used(team_id=TEAM_ID)),
                 time_budget_seconds=self._current_case.time_budget_seconds,
-            )
+            ),
         )
 
     def previous_outcome(self) -> AnomalyOutcome | None:
         """Return the most recent recorded anomaly outcome, or None before round 1 ends."""
-        if not self._outcomes:
+        recorded = self._outcome_log.all_for(team_id=TEAM_ID)
+        if not recorded:
             return None
-        return self._outcomes[-1]
+        return recorded[-1]
 
     async def emit_round_terminal_notification(self) -> None:
         """Emit a terminal notice when the round ends without a prior stabilized/lost marker.
@@ -217,9 +234,14 @@ class OrbitalAnomalyWorld(ScenarioWorld):
         """
         if self._vehicle_stabilized:
             return
-        if _THRESHOLD_LOST in self._notified_thresholds:
+        if not self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=_THRESHOLD_LOST
+        ):
             return
-        self._notified_thresholds.update([_THRESHOLD_LOST, _THRESHOLD_CRITICAL])
+        # The vehicle is lost; the 75% warning has nothing left to warn about.
+        self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=_THRESHOLD_CRITICAL
+        )
         self._vehicle_alive = False
         await self._world_context.send_update_to_channel(
             channel_id=LINK_CHANNEL_ID,

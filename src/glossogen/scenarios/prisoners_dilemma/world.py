@@ -27,8 +27,6 @@ class RoundOutcome(NamedTuple):
 class PrisonersDilemmaWorld(ScenarioWorld):
     """Tracks in-round decisions, cumulative scores, and resolved round history."""
 
-    _context: WorldContext
-
     def __init__(
         self,
         payoff_temptation: float,

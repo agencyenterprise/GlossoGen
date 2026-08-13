@@ -11,16 +11,19 @@ finalized in ``finalize_round_sync`` at round advance.
 import logging
 from typing import NamedTuple
 
-from glossogen.runtime.scenario_world import MessageEvent, ScenarioWorld, WorldContext
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
+from glossogen.engine.round_world import RoundWorld
+from glossogen.engine.team_declaration import TeamSpec
+from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.hospital_bed_assignment_privacy.hospital_cases import HospitalCase
 from glossogen.scenarios.hospital_bed_assignment_privacy.ids import (
     BED_MANAGER_ID,
     BUDGET_EXCEEDED_MARKER,
-    POSTMORTEM_CHANNEL_ID,
     PUBLIC_OPS_CHANNEL_ID,
     ROUND_FAILED_MARKER,
     ROUND_SUCCESS_MARKER,
 )
+from glossogen.scenarios.hospital_bed_assignment_privacy.team_declaration import TEAM_ID
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +76,7 @@ class HospitalOutcome(NamedTuple):
     full_success: bool
 
 
-class HospitalWorld(ScenarioWorld):
+class HospitalWorld(RoundWorld):
     """Live state for the hospital bed-assignment privacy scenario.
 
     The world tracks per-round message budget, the Transport Lead's
@@ -83,27 +86,27 @@ class HospitalWorld(ScenarioWorld):
     next round.
     """
 
-    _context: WorldContext
-
     def __init__(
         self,
         cases: list[HospitalCase],
+        team_specs: tuple[TeamSpec, ...],
+        postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
     ) -> None:
         super().__init__(
-            postmortem_channel_ids=frozenset({POSTMORTEM_CHANNEL_ID}),
+            team_specs=team_specs,
+            round_budget_thresholds=(THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL),
+            postmortem_channel_ids=postmortem_channel_ids,
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._cases = cases
         self._current_case: HospitalCase | None = None
         self._current_round_number: int = 0
-        self._current_round_characters: int = 0
         self._round_budget_exceeded: bool = False
         self._pending_routing: HospitalRouting | None = None
         self._pending_intercepts: list[HospitalIntercept] = []
         self._privacy_violations: list[str] = []
-        self._notified_thresholds: set[str] = set()
-        self._outcomes: list[HospitalOutcome] = []
+        self._outcome_log: RoundOutcomeLog[HospitalOutcome] = RoundOutcomeLog(team_ids=(TEAM_ID,))
 
     @property
     def context(self) -> WorldContext:
@@ -118,7 +121,7 @@ class HospitalWorld(ScenarioWorld):
     @property
     def current_round_characters(self) -> int:
         """Running character count for the current round on the public ops channel."""
-        return self._current_round_characters
+        return self.characters_used(team_id=TEAM_ID)
 
     @property
     def round_budget_exceeded(self) -> bool:
@@ -128,13 +131,14 @@ class HospitalWorld(ScenarioWorld):
     @property
     def outcomes(self) -> list[HospitalOutcome]:
         """All resolved round outcomes in order."""
-        return self._outcomes
+        return self._outcome_log.all_for(team_id=TEAM_ID)
 
     def previous_outcome(self) -> HospitalOutcome | None:
         """Return the most recent recorded outcome, or None when no rounds have ended."""
-        if len(self._outcomes) == 0:
+        recorded = self._outcome_log.all_for(team_id=TEAM_ID)
+        if not recorded:
             return None
-        return self._outcomes[-1]
+        return recorded[-1]
 
     def record_routing(self, routing: HospitalRouting) -> None:
         """Store the Transport Lead's latest routing submission (overwrite-wins)."""
@@ -162,17 +166,18 @@ class HospitalWorld(ScenarioWorld):
         postmortem channel is ignored. Restricted-vocabulary scanning is
         case-insensitive substring matching against Bed Manager messages.
         """
-        _ = token_count
-        if channel_id != PUBLIC_OPS_CHANNEL_ID:
+        super().on_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+        )
+        if self.team_for_task_channel(channel_id=channel_id) is None:
             return
-        self._current_round_characters += len(text)
         case = self._current_case
         if case is None:
             return
         budget = case.round_time_budget_seconds
         if (
             budget is not None
-            and self._current_round_characters > budget
+            and self.characters_used(team_id=TEAM_ID) > budget
             and not self._round_budget_exceeded
         ):
             self._round_budget_exceeded = True
@@ -196,13 +201,15 @@ class HospitalWorld(ScenarioWorld):
         budget = case.round_time_budget_seconds
         if budget is None:
             return
-        time_elapsed = self._current_round_characters
+        time_elapsed = self.characters_used(team_id=TEAM_ID)
 
-        if (
-            self._round_budget_exceeded
-            and THRESHOLD_BUDGET_EXCEEDED not in self._notified_thresholds
+        if self._round_budget_exceeded and self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=THRESHOLD_BUDGET_EXCEEDED
         ):
-            self._notified_thresholds.update([THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL])
+            # Past the budget, the 75% warning has nothing left to warn about.
+            self.claim_round_budget_threshold(
+                team_id=TEAM_ID, round_budget_threshold=THRESHOLD_CRITICAL
+            )
             await context.send_update_to_channel(
                 channel_id=PUBLIC_OPS_CHANNEL_ID,
                 text=(
@@ -212,8 +219,9 @@ class HospitalWorld(ScenarioWorld):
                 ),
             )
             return
-        if time_elapsed > budget * 0.75 and THRESHOLD_CRITICAL not in self._notified_thresholds:
-            self._notified_thresholds.add(THRESHOLD_CRITICAL)
+        if time_elapsed > budget * 0.75 and self.claim_round_budget_threshold(
+            team_id=TEAM_ID, round_budget_threshold=THRESHOLD_CRITICAL
+        ):
             remaining = budget - time_elapsed
             await context.send_update_to_channel(
                 channel_id=PUBLIC_OPS_CHANNEL_ID,
@@ -230,9 +238,9 @@ class HospitalWorld(ScenarioWorld):
         """
         if round_number < 1:
             return None
-        for existing in self._outcomes:
-            if existing.round_number == round_number:
-                return existing
+        recorded = self._outcome_log.recorded_for(team_id=TEAM_ID, round_number=round_number)
+        if recorded is not None:
+            return recorded
         if round_number != self._current_round_number:
             return None
         case = self._current_case
@@ -259,14 +267,13 @@ class HospitalWorld(ScenarioWorld):
             budget_exceeded=self._round_budget_exceeded,
             privacy_violated=privacy_violated,
             privacy_violations=privacy_violations,
-            characters_used=self._current_round_characters,
+            characters_used=self.characters_used(team_id=TEAM_ID),
             time_budget_seconds=case.round_time_budget_seconds,
             routing=routing,
             intercepts=tuple(self._pending_intercepts),
             full_success=full_success,
         )
-        self._outcomes.append(outcome)
-        return outcome
+        return self._outcome_log.record(team_id=TEAM_ID, round_number=round_number, outcome=outcome)
 
     def finalize_round_sync(self, new_round_number: int) -> None:
         """Resolve the previous round (if any) and advance to ``new_round_number``.
@@ -279,19 +286,21 @@ class HospitalWorld(ScenarioWorld):
             self.compute_outcome_if_needed(round_number=new_round_number - 1)
 
         self._current_round_number = new_round_number
-        self._current_round_characters = 0
+        # After the outcome above, which reads the round that just ended.
+        self.begin_round()
         self._round_budget_exceeded = False
         self._pending_routing = None
         self._pending_intercepts = []
         self._privacy_violations = []
-        self._notified_thresholds = set()
 
         case_index = (new_round_number - 1) % len(self._cases)
         self._current_case = self._cases[case_index]
 
     def append_restored_outcome(self, outcome: HospitalOutcome) -> None:
         """Append a pre-built outcome (used by ``restore_state_from_events``)."""
-        self._outcomes.append(outcome)
+        self._outcome_log.record(
+            team_id=TEAM_ID, round_number=outcome.round_number, outcome=outcome
+        )
 
     def has_pending_routing(self) -> bool:
         """Return True if the Transport Lead has already routed this round."""
