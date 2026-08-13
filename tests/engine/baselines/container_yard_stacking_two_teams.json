@@ -1564,20 +1564,6 @@
     "text": "yard_operator_a reporting"
    }
   ],
-  "yard_operator_b": [
-   {
-    "channel_id": "link_b",
-    "sender_agent_id": "yard_operator_b",
-    "sender_display_name": "Yard Scanner B",
-    "text": "yard_operator_b reporting"
-   },
-   {
-    "channel_id": "link_b",
-    "sender_agent_id": "yard_operator_b",
-    "sender_display_name": "Yard Scanner B",
-    "text": "yard_operator_b reporting"
-   }
-  ],
   "logistics_planner_a": [
    {
     "channel_id": "link_a",
@@ -1592,18 +1578,18 @@
     "text": "logistics_planner_a reporting"
    }
   ],
-  "logistics_planner_b": [
+  "yard_operator_b": [
    {
     "channel_id": "link_b",
-    "sender_agent_id": "logistics_planner_b",
-    "sender_display_name": "Logistics Planner B",
-    "text": "logistics_planner_b reporting"
+    "sender_agent_id": "yard_operator_b",
+    "sender_display_name": "Yard Scanner B",
+    "text": "yard_operator_b reporting"
    },
    {
     "channel_id": "link_b",
-    "sender_agent_id": "logistics_planner_b",
-    "sender_display_name": "Logistics Planner B",
-    "text": "logistics_planner_b reporting"
+    "sender_agent_id": "yard_operator_b",
+    "sender_display_name": "Yard Scanner B",
+    "text": "yard_operator_b reporting"
    }
   ],
   "crane_operator_a": [
@@ -1620,158 +1606,32 @@
     "text": "crane_operator_a reporting"
    }
   ],
-  "crane_operator_b": [
-   {
-    "channel_id": "link_b",
-    "sender_agent_id": "crane_operator_b",
-    "sender_display_name": "Crane Operator B",
-    "text": "crane_operator_b reporting"
-   },
-   {
-    "channel_id": "link_b",
-    "sender_agent_id": "crane_operator_b",
-    "sender_display_name": "Crane Operator B",
-    "text": "crane_operator_b reporting"
-   }
-  ]
- },
- "deliveries_by_recipient": {
-  "yard_operator_a": [
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_a",
-    "text": "CRITICAL: Yard window narrowing. 35 seconds of budget remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_a",
-    "text": "ROUND FAILED. Communication budget exhausted."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_a",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: 160 chars exceeded budget of 140s."
-   },
-   {
-    "round_number": 2,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_a",
-    "text": "ROUND FAILED. Round did not complete every placement."
-   }
-  ],
-  "logistics_planner_a": [
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_a",
-    "text": "CRITICAL: Yard window narrowing. 35 seconds of budget remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_a",
-    "text": "ROUND FAILED. Communication budget exhausted."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_a",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: 160 chars exceeded budget of 140s."
-   },
-   {
-    "round_number": 2,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_a",
-    "text": "ROUND FAILED. Round did not complete every placement."
-   }
-  ],
-  "crane_operator_a": [
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "crane_operator_a",
-    "text": "CRITICAL: Yard window narrowing. 35 seconds of budget remaining."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "crane_operator_a",
-    "text": "ROUND FAILED. Communication budget exhausted."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "crane_operator_a",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: 160 chars exceeded budget of 140s."
-   },
-   {
-    "round_number": 2,
-    "event_type": "world_event_delivered",
-    "agent_id": "crane_operator_a",
-    "text": "ROUND FAILED. Round did not complete every placement."
-   }
-  ],
-  "yard_operator_b": [
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_b",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: 160 chars exceeded budget of 140s."
-   },
-   {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_b",
-    "text": "ROUND FAILED. Communication budget exhausted."
-   },
-   {
-    "round_number": 2,
-    "event_type": "world_event_delivered",
-    "agent_id": "yard_operator_b",
-    "text": "ROUND FAILED. Round did not complete every placement."
-   }
-  ],
   "logistics_planner_b": [
    {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_b",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: 160 chars exceeded budget of 140s."
+    "channel_id": "link_b",
+    "sender_agent_id": "logistics_planner_b",
+    "sender_display_name": "Logistics Planner B",
+    "text": "logistics_planner_b reporting"
    },
    {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_b",
-    "text": "ROUND FAILED. Communication budget exhausted."
-   },
-   {
-    "round_number": 2,
-    "event_type": "world_event_delivered",
-    "agent_id": "logistics_planner_b",
-    "text": "ROUND FAILED. Round did not complete every placement."
+    "channel_id": "link_b",
+    "sender_agent_id": "logistics_planner_b",
+    "sender_display_name": "Logistics Planner B",
+    "text": "logistics_planner_b reporting"
    }
   ],
   "crane_operator_b": [
    {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "crane_operator_b",
-    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: 160 chars exceeded budget of 140s."
+    "channel_id": "link_b",
+    "sender_agent_id": "crane_operator_b",
+    "sender_display_name": "Crane Operator B",
+    "text": "crane_operator_b reporting"
    },
    {
-    "round_number": 1,
-    "event_type": "world_event_delivered",
-    "agent_id": "crane_operator_b",
-    "text": "ROUND FAILED. Communication budget exhausted."
-   },
-   {
-    "round_number": 2,
-    "event_type": "world_event_delivered",
-    "agent_id": "crane_operator_b",
-    "text": "ROUND FAILED. Round did not complete every placement."
+    "channel_id": "link_b",
+    "sender_agent_id": "crane_operator_b",
+    "sender_display_name": "Crane Operator B",
+    "text": "crane_operator_b reporting"
    }
   ]
  }

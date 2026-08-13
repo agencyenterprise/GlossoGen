@@ -92,6 +92,29 @@ CONFIGURATIONS["container_yard_stacking_two_teams"] = (
 )
 
 
+# Configurations whose world notifications are not reproducible, so they are
+# recorded and compared without them.
+#
+# A team is warned once when it passes 75% of its budget and once when it
+# exceeds it, and claiming the second suppresses the first. Which of those a
+# team gets therefore depends on whether a message lands between the two marks
+# or jumps past both, and that depends on how many messages the team got out
+# before the round ended. With one team the scripts settle that; with two, the
+# teams interleave, and on a loaded machine the loser of that race receives one
+# fewer notification. Asserting on the count asserts on the interleaving.
+#
+# What each of these still compares: the decisions in order and every agent's
+# own messages. A scenario deciding a different case, rendering a different
+# injection, or scoring a round differently still fails here.
+NOTIFICATIONS_NOT_COMPARED = frozenset(
+    {
+        "container_yard_stacking_two_teams",
+        "spot_the_difference_shared_link",
+        "veyru_two_teams",
+    }
+)
+
+
 def baseline_path(configuration: str) -> Path:
     """Return the golden file for one configuration."""
     return Path(__file__).parent / "baselines" / f"{configuration}.json"
@@ -112,13 +135,15 @@ async def play(
     return result.events
 
 
-def as_baseline(events: list[dict[str, Any]]) -> dict[str, Any]:
+def as_baseline(events: list[dict[str, Any]], configuration: str) -> dict[str, Any]:
     """Reduce a run to the part that reproduces, ready to serialise."""
-    return {
+    baseline: dict[str, Any] = {
         "decisions": decision_events(events),
         "messages_by_sender": messages_by_sender(events),
-        "deliveries_by_recipient": deliveries_by_recipient(events),
     }
+    if configuration not in NOTIFICATIONS_NOT_COMPARED:
+        baseline["deliveries_by_recipient"] = deliveries_by_recipient(events)
+    return baseline
 
 
 def to_events(baseline: dict[str, Any]) -> list[dict[str, Any]]:
@@ -138,7 +163,7 @@ def to_events(baseline: dict[str, Any]) -> list[dict[str, Any]]:
                     "message": {**message, "sender_agent_id": sender},
                 }
             )
-    for recipient, deliveries in baseline["deliveries_by_recipient"].items():
+    for recipient, deliveries in baseline.get("deliveries_by_recipient", {}).items():
         for delivered in deliveries:
             events.append({**delivered, "agent_id": recipient})
     return events
@@ -153,13 +178,16 @@ async def test_the_scenario_decides_what_the_baseline_recorded(
     path = baseline_path(configuration=configuration)
 
     if os.environ.get(UPDATE_ENV_VAR):
-        path.write_text(json.dumps(as_baseline(events), indent=1, default=str) + "\n")
+        path.write_text(
+            json.dumps(as_baseline(events, configuration=configuration), indent=1, default=str)
+            + "\n"
+        )
         pytest.skip(f"baseline rewritten; unset {UPDATE_ENV_VAR} and read the diff")
 
     assert path.exists(), f"no baseline recorded; create one with {UPDATE_ENV_VAR}=1"
     recorded = json.loads(path.read_text())
 
-    produced = as_baseline(events)
+    produced = as_baseline(events, configuration=configuration)
     difference = describe_difference(to_events(recorded), to_events(produced))
     if difference:
         # Write what this run actually decided, next to the baseline it failed
