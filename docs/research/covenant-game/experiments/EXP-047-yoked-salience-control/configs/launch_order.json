@@ -1,0 +1,1095 @@
+{
+  "seed": 20470813,
+  "arms": [
+    "pledge",
+    "pledge_reminder",
+    "pledge_yoked"
+  ],
+  "allocation": "1:1:1",
+  "blocks": 60,
+  "runs_per_arm": 60,
+  "total_runs": 180,
+  "rationale": "Interleaved block randomisation. Each block of three launches all three arms in a shuffled order, so any drift in the served model over the batch is spread across arms instead of loading onto whichever arm ran last. Frozen before launch; the batch is executed in this exact sequence.",
+  "order": [
+    {
+      "index": 1,
+      "block": 1,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 2,
+      "block": 1,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 3,
+      "block": 1,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 4,
+      "block": 2,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 5,
+      "block": 2,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 6,
+      "block": 2,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 7,
+      "block": 3,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 8,
+      "block": 3,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 9,
+      "block": 3,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 10,
+      "block": 4,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 11,
+      "block": 4,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 12,
+      "block": 4,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 13,
+      "block": 5,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 14,
+      "block": 5,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 15,
+      "block": 5,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 16,
+      "block": 6,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 17,
+      "block": 6,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 18,
+      "block": 6,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 19,
+      "block": 7,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 20,
+      "block": 7,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 21,
+      "block": 7,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 22,
+      "block": 8,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 23,
+      "block": 8,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 24,
+      "block": 8,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 25,
+      "block": 9,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 26,
+      "block": 9,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 27,
+      "block": 9,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 28,
+      "block": 10,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 29,
+      "block": 10,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 30,
+      "block": 10,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 31,
+      "block": 11,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 32,
+      "block": 11,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 33,
+      "block": 11,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 34,
+      "block": 12,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 35,
+      "block": 12,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 36,
+      "block": 12,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 37,
+      "block": 13,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 38,
+      "block": 13,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 39,
+      "block": 13,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 40,
+      "block": 14,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 41,
+      "block": 14,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 42,
+      "block": 14,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 43,
+      "block": 15,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 44,
+      "block": 15,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 45,
+      "block": 15,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 46,
+      "block": 16,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 47,
+      "block": 16,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 48,
+      "block": 16,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 49,
+      "block": 17,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 50,
+      "block": 17,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 51,
+      "block": 17,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 52,
+      "block": 18,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 53,
+      "block": 18,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 54,
+      "block": 18,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 55,
+      "block": 19,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 56,
+      "block": 19,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 57,
+      "block": 19,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 58,
+      "block": 20,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 59,
+      "block": 20,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 60,
+      "block": 20,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 61,
+      "block": 21,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 62,
+      "block": 21,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 63,
+      "block": 21,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 64,
+      "block": 22,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 65,
+      "block": 22,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 66,
+      "block": 22,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 67,
+      "block": 23,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 68,
+      "block": 23,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 69,
+      "block": 23,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 70,
+      "block": 24,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 71,
+      "block": 24,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 72,
+      "block": 24,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 73,
+      "block": 25,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 74,
+      "block": 25,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 75,
+      "block": 25,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 76,
+      "block": 26,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 77,
+      "block": 26,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 78,
+      "block": 26,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 79,
+      "block": 27,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 80,
+      "block": 27,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 81,
+      "block": 27,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 82,
+      "block": 28,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 83,
+      "block": 28,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 84,
+      "block": 28,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 85,
+      "block": 29,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 86,
+      "block": 29,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 87,
+      "block": 29,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 88,
+      "block": 30,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 89,
+      "block": 30,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 90,
+      "block": 30,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 91,
+      "block": 31,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 92,
+      "block": 31,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 93,
+      "block": 31,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 94,
+      "block": 32,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 95,
+      "block": 32,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 96,
+      "block": 32,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 97,
+      "block": 33,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 98,
+      "block": 33,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 99,
+      "block": 33,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 100,
+      "block": 34,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 101,
+      "block": 34,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 102,
+      "block": 34,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 103,
+      "block": 35,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 104,
+      "block": 35,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 105,
+      "block": 35,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 106,
+      "block": 36,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 107,
+      "block": 36,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 108,
+      "block": 36,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 109,
+      "block": 37,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 110,
+      "block": 37,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 111,
+      "block": 37,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 112,
+      "block": 38,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 113,
+      "block": 38,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 114,
+      "block": 38,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 115,
+      "block": 39,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 116,
+      "block": 39,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 117,
+      "block": 39,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 118,
+      "block": 40,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 119,
+      "block": 40,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 120,
+      "block": 40,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 121,
+      "block": 41,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 122,
+      "block": 41,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 123,
+      "block": 41,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 124,
+      "block": 42,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 125,
+      "block": 42,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 126,
+      "block": 42,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 127,
+      "block": 43,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 128,
+      "block": 43,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 129,
+      "block": 43,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 130,
+      "block": 44,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 131,
+      "block": 44,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 132,
+      "block": 44,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 133,
+      "block": 45,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 134,
+      "block": 45,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 135,
+      "block": 45,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 136,
+      "block": 46,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 137,
+      "block": 46,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 138,
+      "block": 46,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 139,
+      "block": 47,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 140,
+      "block": 47,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 141,
+      "block": 47,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 142,
+      "block": 48,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 143,
+      "block": 48,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 144,
+      "block": 48,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 145,
+      "block": 49,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 146,
+      "block": 49,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 147,
+      "block": 49,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 148,
+      "block": 50,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 149,
+      "block": 50,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 150,
+      "block": 50,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 151,
+      "block": 51,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 152,
+      "block": 51,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 153,
+      "block": 51,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 154,
+      "block": 52,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 155,
+      "block": 52,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 156,
+      "block": 52,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 157,
+      "block": 53,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 158,
+      "block": 53,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 159,
+      "block": 53,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 160,
+      "block": 54,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 161,
+      "block": 54,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 162,
+      "block": 54,
+      "slot": 3,
+      "arm": "pledge"
+    },
+    {
+      "index": 163,
+      "block": 55,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 164,
+      "block": 55,
+      "slot": 2,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 165,
+      "block": 55,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 166,
+      "block": 56,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 167,
+      "block": 56,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 168,
+      "block": 56,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 169,
+      "block": 57,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 170,
+      "block": 57,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 171,
+      "block": 57,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 172,
+      "block": 58,
+      "slot": 1,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 173,
+      "block": 58,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 174,
+      "block": 58,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 175,
+      "block": 59,
+      "slot": 1,
+      "arm": "pledge"
+    },
+    {
+      "index": 176,
+      "block": 59,
+      "slot": 2,
+      "arm": "pledge_yoked"
+    },
+    {
+      "index": 177,
+      "block": 59,
+      "slot": 3,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 178,
+      "block": 60,
+      "slot": 1,
+      "arm": "pledge_reminder"
+    },
+    {
+      "index": 179,
+      "block": 60,
+      "slot": 2,
+      "arm": "pledge"
+    },
+    {
+      "index": 180,
+      "block": 60,
+      "slot": 3,
+      "arm": "pledge_yoked"
+    }
+  ]
+}

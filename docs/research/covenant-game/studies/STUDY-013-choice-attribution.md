@@ -139,6 +139,15 @@ and improves the design of anything built afterwards:
    falsifiable: when a previously affirmed commitment is made salient at the
    moment of decision, does breach fall? See
    [EXP-046](../experiments/EXP-046-commitment-reminder/experiment.md).
+   **Sequence amended 2026-08-13, after EXP-046 closed.** The reminder result
+   arrived with two live explanations its own design cannot separate — the
+   commitment's content, or the slot the line occupies. That ambiguity is
+   upstream of everything else in this list: a covenant-versus-neutral contrast
+   run with "retrieval held constant" is meaningless if we have misidentified what
+   retrieval is. So the yoked control
+   ([EXP-047](../experiments/EXP-047-yoked-salience-control/experiment.md)) is
+   inserted here, before transmission, as a debt on step 1 rather than a new
+   direction.
 2. **Generational transmission.** Agents replaced mid-run, inheriting adherence
    with some transmission probability, testing whether the institution transmits
    a cooperative policy across replacement. Requested on 2026-03-09. The
@@ -182,7 +191,16 @@ manipulating rivalry within one design.
   restated was the wording. **The operative variable is the commitment's content
   at the point of action, not the fact of it.** Capped there: this is not evidence
   that the agent holds a commitment.
-- **EXP-047 — spontaneous uptake (not yet planned).** The same reminder as an
+- [EXP-047 — Is the commitment reminder's effect about the commitment, or about the slot?](../experiments/EXP-047-yoked-salience-control/experiment.md)
+  — **planned**, 180 simulations, 3 arms. EXP-046 cannot separate two mechanisms:
+  the commitment's *content* was recovered at the decision point, or *any* text in
+  the slot immediately before the action instruction shifts the decision. The
+  yoked arm inserts a commitment-free line matched at 132 characters, in the same
+  slot, restating round-numbering mechanics the provider already holds. The
+  confirmatory contrast is exclusively `pledge_yoked` against `pledge_reminder`.
+  A position result renames EXP-046 from a commitment finding to a placement
+  finding and blocks step 3 below until it is renamed; this is why it runs first.
+- **EXP-048 — spontaneous uptake (not yet planned).** The same reminder as an
   *optional* tool the provider may call. Primary endpoint becomes whether it
   called before a potential breach; behavioural effect conditional on use is
   exploratory. Held back deliberately: the published account that motivated this

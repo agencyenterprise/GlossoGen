@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-
 RUNS = (
     ("covenant", 1, Path("runs/warehouse_commitment/1786417789/warehouse_commitment.jsonl")),
     ("no_group", 1, Path("runs/warehouse_commitment/1786417790/warehouse_commitment.jsonl")),
@@ -28,19 +27,13 @@ def load_events(path: Path) -> list[dict[str, object]]:
 def print_summary(condition: str, replicate: int, events: list[dict[str, object]]) -> None:
     """Print action, pledge, forfeiture, and completion facts for one arm."""
     actions = [
-        event
-        for event in events
-        if event["event_type"] == "warehouse_commitment_action_chosen"
+        event for event in events if event["event_type"] == "warehouse_commitment_action_chosen"
     ]
     pledges = [
-        event
-        for event in events
-        if event["event_type"] == "warehouse_commitment_pledge_submitted"
+        event for event in events if event["event_type"] == "warehouse_commitment_pledge_submitted"
     ]
     settled = [
-        event
-        for event in events
-        if event["event_type"] == "warehouse_commitment_round_settled"
+        event for event in events if event["event_type"] == "warehouse_commitment_round_settled"
     ]
     completed = [event for event in settled if event["completed"]]
     inspections = [event for event in actions if event["inspected"]]
