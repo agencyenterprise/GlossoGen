@@ -265,6 +265,16 @@ class ScenarioWorld(ABC):
         """Mark the end of a postmortem discussion phase."""
         self._in_postmortem = False
 
+    def bind_context(self, context: WorldContext) -> None:
+        """Attach the context the world sends updates through.
+
+        Called when the world is wired, before its task is created. Binding
+        inside ``run`` instead leaves a window: ``create_task`` schedules the
+        coroutine without running it, so a tool call arriving before the task is
+        first scheduled finds no context and fails.
+        """
+        self._world_context = context
+
     async def run(self, context: WorldContext) -> None:
         """Drain world events and dispatch each message to ``on_message_async``.
 
@@ -273,7 +283,7 @@ class ScenarioWorld(ABC):
         Started as an asyncio task by the supervisor and cancelled at
         simulation end.
         """
-        self._world_context = context
+        self.bind_context(context=context)
         try:
             while True:
                 event = await context.next_event()

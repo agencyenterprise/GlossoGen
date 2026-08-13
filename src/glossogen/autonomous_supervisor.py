@@ -500,6 +500,9 @@ class AutonomousSupervisor:
 
         # Start the world simulation task.
         world = self._scenario.get_world()
+        # Bind before the task exists: create_task schedules run() without
+        # running it, and a tool call in that window needs the context already.
+        world.bind_context(context=world_context)
         world_task = asyncio.create_task(
             world.run(context=world_context),
             name="world",
