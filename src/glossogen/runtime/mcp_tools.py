@@ -33,7 +33,11 @@ from glossogen.runtime.activity_notification import (
     NoActivityNotification,
 )
 from glossogen.runtime.agent_session import AgentSession
-from glossogen.runtime.scenario_mcp_tool import ToolContext, resolve_agent_id
+from glossogen.runtime.scenario_mcp_tool import (
+    ToolContext,
+    calling_agent_id,
+    resolve_agent_id,
+)
 from glossogen.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
@@ -99,16 +103,20 @@ def _resolve_agent_from_context(ctx: ToolContext, runtime: SimulationRuntime) ->
     """Extract agent_id from the MCP request's query parameters and return the session.
 
     Agent identity is embedded in the Streamable HTTP connection URL
-    (e.g. ``http://localhost:8001/mcp?agent_id=engineer``). If the MCP
-    transport does not provide an HTTP request (e.g. stdio transport),
-    this raises a clear error.
+    (e.g. ``http://localhost:8001/mcp?agent_id=engineer``). A transport with no
+    HTTP request falls back to ``calling_agent_id``, which an in-process
+    dispatch sets because the tool runs in the calling agent's own task.
     """
     request = ctx.request_context.request
     if request is None:
-        raise ValueError(
-            "Cannot resolve agent identity: no HTTP request in MCP context. "
-            "Agent identity requires Streamable HTTP transport with ?agent_id= query parameter."
-        )
+        bound = calling_agent_id.get()
+        if bound is None:
+            raise ValueError(
+                "Cannot resolve agent identity: no HTTP request in MCP context and no "
+                "calling agent bound. Set calling_agent_id, or use Streamable HTTP with "
+                "an ?agent_id= query parameter."
+            )
+        return runtime.resolve_session(agent_id=bound)
     agent_id = request.query_params.get("agent_id")
     if agent_id is None:
         raise ValueError(

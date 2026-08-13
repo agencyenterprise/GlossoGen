@@ -12,6 +12,13 @@ than assumed:
   across six runs; on CI it was not, putting a different sender at the same
   position. Anything comparing messages as one global sequence is a test that
   passes on a developer's machine and flakes in CI.
+- The order of world notifications, including those to the *same* agent. One
+  recipient's notifications come from more than one producer: the world reacts
+  to messages on its own task while the clock announces round outcomes from
+  another. Measured on container_yard_stacking, where a budget-exceeded
+  notification and a round-failed one arrive in either order. They are compared
+  as a multiset per recipient for that reason, which means this does not compare
+  the order an agent was told things in, only what it was told.
 - Which round a message is attributed to, since that depends on where the round
   boundary falls relative to an agent's cycle.
 
@@ -20,11 +27,12 @@ what each agent was told, when the phase opened and closed, what the world
 announced, and how each round was scored. Those were identical in order and
 content across six local runs and across CI.
 
-Messages are still compared, but per sender. One agent's messages cannot
-reorder relative to each other, because that agent sends them from a single
-sequential script, so a per-sender sequence is deterministic by construction
-rather than by observation. Their round attribution is left out for the reason
-above, which means this does not compare *when* something was said.
+Messages are compared per sender and in order: one agent sends them from a
+single sequential script, so they cannot reorder relative to each other, which is
+deterministic by construction rather than by observation. A message's round
+attribution is left out for the reason above, so this does not compare *when*
+something was said. Notifications are compared per recipient as a multiset, so it
+does compare everything an agent was told and not the order it heard it in.
 
 Decision events use a blocklist rather than an allowlist, so an event a
 scenario adds is compared without anyone remembering to register it.
@@ -41,8 +49,10 @@ AGENT_CYCLE_EVENTS = frozenset(
     }
 )
 
-# Compared separately, grouped by sender. See the module docstring.
+# Compared separately, grouped by the participant they belong to. See the module
+# docstring.
 MESSAGE_EVENT = "message_sent"
+WORLD_DELIVERY_EVENT = "world_event_delivered"
 
 # Identifiers and clocks that differ between any two runs and carry no behaviour.
 VOLATILE_FIELDS = frozenset(
@@ -77,13 +87,14 @@ def _strip(event: dict[str, Any]) -> dict[str, Any]:
 def decision_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Return the decisions a run made, in order, stripped of volatile fields.
 
-    Excludes agent chatter and messages; messages are compared by
-    ``messages_by_sender`` instead.
+    Excludes agent chatter, messages and world notifications; those are compared
+    by ``messages_by_sender`` and ``deliveries_by_recipient`` instead.
     """
     return [
         _strip(e)
         for e in events
-        if e.get("event_type") not in AGENT_CYCLE_EVENTS and e.get("event_type") != MESSAGE_EVENT
+        if e.get("event_type") not in AGENT_CYCLE_EVENTS
+        and e.get("event_type") not in (MESSAGE_EVENT, WORLD_DELIVERY_EVENT)
     ]
 
 
@@ -102,6 +113,18 @@ def messages_by_sender(events: list[dict[str, Any]]) -> dict[str, list[dict[str,
     return by_sender
 
 
+def deliveries_by_recipient(events: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Return each agent's world notifications, in the order it received them."""
+    by_recipient: dict[str, list[dict[str, Any]]] = {}
+    for event in events:
+        if event.get("event_type") != WORLD_DELIVERY_EVENT:
+            continue
+        payload = _without(event, VOLATILE_FIELDS)
+        recipient = str(payload.get("agent_id"))
+        by_recipient.setdefault(recipient, []).append(payload)
+    return by_recipient
+
+
 def describe_difference(left: list[dict[str, Any]], right: list[dict[str, Any]]) -> str:
     """Return a readable account of the first divergence, or '' when equivalent.
 
@@ -112,7 +135,17 @@ def describe_difference(left: list[dict[str, Any]], right: list[dict[str, Any]])
     decisions = _describe_sequence(decision_events(left), decision_events(right))
     if decisions:
         return decisions
-    return _describe_messages(messages_by_sender(left), messages_by_sender(right))
+    messages = _describe_streams(
+        messages_by_sender(left), messages_by_sender(right), label="sent by", ordered=True
+    )
+    if messages:
+        return messages
+    return _describe_streams(
+        deliveries_by_recipient(left),
+        deliveries_by_recipient(right),
+        label="delivered to",
+        ordered=False,
+    )
 
 
 def _describe_sequence(a: list[dict[str, Any]], b: list[dict[str, Any]]) -> str:
@@ -137,22 +170,40 @@ def _describe_sequence(a: list[dict[str, Any]], b: list[dict[str, Any]]) -> str:
     return ""
 
 
-def _describe_messages(
-    a: dict[str, list[dict[str, Any]]], b: dict[str, list[dict[str, Any]]]
+def _describe_streams(
+    a: dict[str, list[dict[str, Any]]],
+    b: dict[str, list[dict[str, Any]]],
+    label: str,
+    ordered: bool,
 ) -> str:
-    """Describe the first difference between two per-sender message sets."""
+    """Describe the first difference between two participant-keyed streams.
+
+    ``ordered`` says whether the stream's order is the participant's own. A
+    sender's messages are; a recipient's notifications are not, because more
+    than one producer writes to them.
+    """
     if set(a) != set(b):
-        return f"different senders: {sorted(set(a) ^ set(b))}"
-    for sender in sorted(a):
-        if a[sender] == b[sender]:
+        return f"different agents {label}: {sorted(set(a) ^ set(b))}"
+    for agent in sorted(a):
+        if ordered:
+            mine, theirs = a[agent], b[agent]
+        else:
+            mine = sorted(a[agent], key=_sort_key)
+            theirs = sorted(b[agent], key=_sort_key)
+        if mine == theirs:
             continue
-        if len(a[sender]) != len(b[sender]):
-            return f"{sender} sent {len(a[sender])} messages vs {len(b[sender])}"
-        for i, (x, y) in enumerate(zip(a[sender], b[sender])):
+        if len(mine) != len(theirs):
+            return f"{len(mine)} vs {len(theirs)} {label} {agent}"
+        for i, (x, y) in enumerate(zip(mine, theirs)):
             if x != y:
                 return (
-                    f"{sender} message {i} differs\n"
+                    f"entry {i} {label} {agent} differs\n"
                     f"  left  {str(x)[:200]}\n"
                     f"  right {str(y)[:200]}"
                 )
     return ""
+
+
+def _sort_key(entry: dict[str, Any]) -> str:
+    """Order entries deterministically so two multisets compare elementwise."""
+    return "|".join(f"{k}={entry[k]!r}" for k in sorted(entry))

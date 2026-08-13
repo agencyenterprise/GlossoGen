@@ -1,0 +1,1650 @@
+{
+ "decisions": [
+  {
+   "round_number": 0,
+   "event_type": "simulation_started",
+   "scenario_name": "drive_module_repair",
+   "scenario_description": "Three agents service one or more failing drive units each round across 2 rounds, coordinating over one shared bay channel. The field technician inspects the bench and is the only one who can replace components, but cannot diagnose or service anything. The diagnostics engineer holds per-unit fault-trees mapping each symptom to its faulty component. The spec engineer holds per-unit service sheets giving each component's full step-by-step replacement procedure \u2014 an ordered multi-step sequence with a tool, torque, number of passes, calibration routine, and class-specific counts, tightening pattern, or hold durations \u2014 each unit a different revision, so both its fault-tree and its procedures differ from the others'. Faults are revealed to the technician ONE AT A TIME \u2014 each accepted replacement uncovers the next fault, or moves on to the next unit \u2014 so the team never knows in advance how many faults or units they will face. For each fault the technician reports its symptom (tagged with the unit); the diagnostics engineer names the component; the spec engineer relays that component's full procedure for that unit; the technician carries out the whole procedure, which an LLM inspector scores on the unit, the component, and every step with its parameters, in order. The fault-tree and the per-unit procedures re-randomize every round, so the technician can never self-service. Every character on the bay channel costs one second of a fixed 900-second service window; if it is exhausted before every unit is fully repaired, the round fails.",
+   "channel_ids": [
+    "bay",
+    "postmortem"
+   ],
+   "scenario_config": {
+    "round_count": 2,
+    "max_round_duration_seconds": 8.0,
+    "model_overrides": {},
+    "postmortem_duration_seconds": 2.0,
+    "postmortem_enabled": true,
+    "postmortem_disabled_at_start": false,
+    "channel_noise_level": 0.0,
+    "noise_replacement_mode": "mask",
+    "replace_agent_default_channel_visibility": {
+     "postmortem": false
+    },
+    "scheduled_events": [],
+    "agent_max_tokens": 16384,
+    "compaction": {
+     "enabled": false,
+     "token_threshold": 50000
+    },
+    "judge_model": "claude-haiku-4-5-20251001",
+    "judge_provider": "anthropic",
+    "round_time_budget_seconds": 900,
+    "seed": 42,
+    "easy_round_numbers": [],
+    "module_count_values": [
+     1,
+     2,
+     3
+    ],
+    "module_count_weights": [
+     25,
+     45,
+     30
+    ],
+    "replacements_count_values": [
+     1,
+     2,
+     3,
+     4
+    ],
+    "replacements_count_weights": [
+     25,
+     35,
+     25,
+     15
+    ]
+   },
+   "provider": "anthropic"
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "field_technician",
+   "role_name": "Field Technician",
+   "system_prompt": "You are the field technician at a drive-module service bay. One or more drive units are on the bench each round. You can read a unit's diagnostic panel, and you are the ONLY person who can replace components. You have no service manuals \u2014 you do not know which components are faulty or how to service any of them.\n\nYou work with two teammates on the bay channel:\n- The diagnostics engineer holds the fault-tree: they turn a symptom you report into the faulty component.\n- The spec engineer holds the service sheet: each component's full step-by-step replacement procedure (each unit is a different revision, so its procedures differ).\n\nFaults surface ONE AT A TIME: you can only see and reach the next fault after you have correctly serviced the current one. So each round proceeds as a loop:\n1. Report the symptom currently showing (tagged with its unit) on the bay channel.\n2. Get the faulty component from the diagnostics engineer, and that component's full replacement procedure for THIS unit from the spec engineer \u2014 the ordered steps and every parameter.\n3. Perform the replacement, carrying out the whole procedure exactly. If accepted, the next fault (or the next unit's first fault) is revealed to you; repeat. The job is done only when no further fault surfaces.\n\nCRITICAL RULE \u2014 THE SERVICE WINDOW COSTS SECONDS:\nThe drive module must be fully serviced within a fixed window: every character sent on the bay channel costs one second of that window. If the total characters sent by all three of you exceed the window, it closes and the repair fails before the module is fixed. Keep messages short.\n\nREPLACEMENT ACTION:\nCall ``service_component(action=\"...\")`` carrying out the CURRENT fault's full procedure: name the UNIT and the component, then every step in order with each parameter (tool, torque in Nm, number of passes, calibration routine, and any step-specific counts, tightening pattern, or hold/settle durations the procedure states). A service-quality check accepts it only when the unit, the component, and every step (with all its parameters, in order) are correct. You can only act on the currently-revealed fault; a wrong, incomplete, or premature procedure is rejected, and you must recheck with the engineers and retry (which costs window time).\n\nDISCUSSION PHASE:\nAfter each round there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use it to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT cost time.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"bay\" (channel_id: bay)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "bay",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message",
+    "service_component"
+   ],
+   "model": "scripted::field_technician",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "diagnostics_engineer",
+   "role_name": "Diagnostics Engineer",
+   "system_prompt": "You are the diagnostics engineer at a drive-module service bay. You hold fault-trees: which component each symptom indicates. Each unit on the bench is a different revision, so its fault-tree is different \u2014 the same symptom can mean a different component on another unit. You CANNOT see any unit's panel \u2014 only the field technician can, and they will report symptoms (tagged with their unit) on the bay channel. You cannot replace anything.\n\nYou work with two teammates on the bay channel:\n- The field technician is at the bench: they report symptoms one at a time and are the only one who can replace components.\n- The spec engineer holds each component's tool, torque, and calibration (also per unit).\n\nYou start with the first unit's fault-tree (in your round briefing). As the technician finishes a unit and moves to the next, you receive that unit's fault-tree. For each symptom the technician reports, use THAT unit's fault-tree to name the faulty component, and pass it on (keep the unit tag). The spec engineer needs the component name to look up the tool and settings. The same symptom on a different unit may point to a different component, so always work from the right unit's fault-tree.\n\nCRITICAL RULE \u2014 THE SERVICE WINDOW COSTS SECONDS:\nThe drive module must be fully serviced within a fixed window: every character sent on the bay channel costs one second of that window. If the total characters sent by all three of you exceed the window, it closes and the repair fails before the module is fixed. Keep messages short.\n\nYou do not have any action tool \u2014 you coordinate on the bay channel only.\n\nDISCUSSION PHASE:\nAfter each round there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use it to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT cost time.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"bay\" (channel_id: bay)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "bay",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::diagnostics_engineer",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "spec_engineer",
+   "role_name": "Spec Engineer",
+   "system_prompt": "You are the spec engineer at a drive-module service bay. You hold service sheets: for a unit, the full step-by-step replacement procedure for every component \u2014 the ordered steps and every parameter (tool, torque in Nm, number of passes, calibration routine, and any step-specific counts, tightening pattern, or hold/settle durations). Each unit on the bench is a different revision, so its sheet is different \u2014 the same component can have different procedure parameters on another unit. You CANNOT see any panel and you do not know which components are faulty \u2014 the diagnostics engineer names faulty components on the bay channel. You cannot replace anything.\n\nYou work with two teammates on the bay channel:\n- The field technician replaces components and needs the full procedure to perform each one correctly \u2014 they have no service manuals at all.\n- The diagnostics engineer names the faulty component for each reported symptom.\n\nYou start with the first unit's service sheet (in your round briefing). As the technician finishes a unit and moves to the next, you receive that unit's sheet. When the diagnostics engineer names a faulty component, relay its FULL replacement procedure FROM THE CURRENT UNIT's sheet \u2014 every step in order with every parameter \u2014 so the technician can carry it out exactly. The same component on a different unit may have different parameters, so always work from the right unit's sheet.\n\nCRITICAL RULE \u2014 THE SERVICE WINDOW COSTS SECONDS:\nThe drive module must be fully serviced within a fixed window: every character sent on the bay channel costs one second of that window. If the total characters sent by all three of you exceed the window, it closes and the repair fails before the module is fixed. Keep messages short.\n\nYou do not have any action tool \u2014 you coordinate on the bay channel only.\n\nDISCUSSION PHASE:\nAfter each round there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use it to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT cost time.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"bay\" (channel_id: bay)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "bay",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::spec_engineer",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_advanced",
+   "trigger": "simulation_start"
+  },
+  {
+   "round_number": 1,
+   "event_type": "drive_module_case_started",
+   "case_number": 1,
+   "module_count": 2,
+   "replacement_count": 7,
+   "module_fault_trees": [
+    {
+     "module_label": "module-1",
+     "entries": [
+      {
+       "symptom": "sluggish throttle response",
+       "component": "housing_cover"
+      },
+      {
+       "symptom": "intermittent power dropout",
+       "component": "cooling_fan"
+      },
+      {
+       "symptom": "grinding on spin-up",
+       "component": "terminal_block"
+      },
+      {
+       "symptom": "an audible whine under load",
+       "component": "brush_set"
+      },
+      {
+       "symptom": "flux instability",
+       "component": "encoder"
+      },
+      {
+       "symptom": "contact arcing",
+       "component": "shaft_seal"
+      },
+      {
+       "symptom": "coolant-line flicker",
+       "component": "front_bearing"
+      },
+      {
+       "symptom": "a thermal spike in the core",
+       "component": "commutator"
+      },
+      {
+       "symptom": "current ripple on the output",
+       "component": "capacitor_bank"
+      },
+      {
+       "symptom": "oil weeping at a joint",
+       "component": "hall_sensor"
+      },
+      {
+       "symptom": "phase imbalance across the windings",
+       "component": "coupling"
+      },
+      {
+       "symptom": "high-frequency vibration",
+       "component": "stator_gasket"
+      },
+      {
+       "symptom": "overspeed drift",
+       "component": "field_coil"
+      },
+      {
+       "symptom": "torque pulsation at low rpm",
+       "component": "rotor"
+      }
+     ]
+    },
+    {
+     "module_label": "module-2",
+     "entries": [
+      {
+       "symptom": "an audible whine under load",
+       "component": "housing_cover"
+      },
+      {
+       "symptom": "coolant-line flicker",
+       "component": "cooling_fan"
+      },
+      {
+       "symptom": "torque pulsation at low rpm",
+       "component": "terminal_block"
+      },
+      {
+       "symptom": "high-frequency vibration",
+       "component": "brush_set"
+      },
+      {
+       "symptom": "contact arcing",
+       "component": "encoder"
+      },
+      {
+       "symptom": "oil weeping at a joint",
+       "component": "shaft_seal"
+      },
+      {
+       "symptom": "sluggish throttle response",
+       "component": "front_bearing"
+      },
+      {
+       "symptom": "flux instability",
+       "component": "commutator"
+      },
+      {
+       "symptom": "overspeed drift",
+       "component": "capacitor_bank"
+      },
+      {
+       "symptom": "phase imbalance across the windings",
+       "component": "hall_sensor"
+      },
+      {
+       "symptom": "a thermal spike in the core",
+       "component": "coupling"
+      },
+      {
+       "symptom": "grinding on spin-up",
+       "component": "stator_gasket"
+      },
+      {
+       "symptom": "current ripple on the output",
+       "component": "field_coil"
+      },
+      {
+       "symptom": "intermittent power dropout",
+       "component": "rotor"
+      }
+     ]
+    }
+   ],
+   "module_spec_tables": [
+    {
+     "module_label": "module-1",
+     "specs": [
+      {
+       "component": "housing_cover",
+       "service_class": "bolted-panel",
+       "tool": "driver-5",
+       "torque_nm": 8,
+       "passes": 2,
+       "calibration": "bed-in",
+       "steps": [
+        "Vent the bay and back off the 3 retaining bolts in a clockwise sequence.",
+        "Lift out the old part and seat the replacement using driver-5.",
+        "Torque the bolts to 8 Nm across 2 passes.",
+        "Finish with the bed-in routine."
+       ]
+      },
+      {
+       "component": "cooling_fan",
+       "service_class": "rotating-assembly",
+       "tool": "driver-1",
+       "torque_nm": 18,
+       "passes": 4,
+       "calibration": "seat-and-lock",
+       "steps": [
+        "Lock the shaft and de-energize, holding 5s.",
+        "Release the drive and draw the old part out with driver-1.",
+        "Seat the replacement and torque the mount to 18 Nm in 4 passes.",
+        "Spin-test, then run the seat-and-lock routine."
+       ]
+      },
+      {
+       "component": "terminal_block",
+       "service_class": "electrical-pack",
+       "tool": "hex-6",
+       "torque_nm": 14,
+       "passes": 3,
+       "calibration": "null-balance",
+       "steps": [
+        "De-energize and discharge the bus, holding 5s.",
+        "Disconnect the 6 leads and lift out the old part with hex-6.",
+        "Fit the replacement and torque the terminals to 14 Nm in 3 passes.",
+        "Run the null-balance routine and verify."
+       ]
+      },
+      {
+       "component": "brush_set",
+       "service_class": "rotating-assembly",
+       "tool": "hex-2",
+       "torque_nm": 18,
+       "passes": 2,
+       "calibration": "torque-stage-3",
+       "steps": [
+        "Lock the shaft and de-energize, holding 10s.",
+        "Release the drive and draw the old part out with hex-2.",
+        "Seat the replacement and torque the mount to 18 Nm in 2 passes.",
+        "Spin-test, then run the torque-stage-3 routine."
+       ]
+      },
+      {
+       "component": "encoder",
+       "service_class": "sensor",
+       "tool": "hex-4",
+       "torque_nm": 4,
+       "passes": 2,
+       "calibration": "zero-offset",
+       "steps": [
+        "Power down and unmount the old part with hex-4.",
+        "Fit the replacement and snug the 4 screws in a inside-out sequence.",
+        "Torque to 4 Nm in 2 passes.",
+        "Align with the zero-offset routine and confirm the reading."
+       ]
+      },
+      {
+       "component": "shaft_seal",
+       "service_class": "press-fit",
+       "tool": "clamp-4",
+       "torque_nm": 14,
+       "passes": 2,
+       "calibration": "null-balance",
+       "steps": [
+        "Drain the cavity and let it settle for 10s.",
+        "Press the old part out with clamp-4 and press the replacement in.",
+        "Re-torque the retainer to 14 Nm in 2 passes.",
+        "Bleed the line and run the null-balance routine."
+       ]
+      },
+      {
+       "component": "front_bearing",
+       "service_class": "press-fit",
+       "tool": "clamp-2",
+       "torque_nm": 6,
+       "passes": 4,
+       "calibration": "bleed-then-seat",
+       "steps": [
+        "Drain the cavity and let it settle for 15s.",
+        "Press the old part out with clamp-2 and press the replacement in.",
+        "Re-torque the retainer to 6 Nm in 4 passes.",
+        "Bleed the line and run the bleed-then-seat routine."
+       ]
+      },
+      {
+       "component": "commutator",
+       "service_class": "rotating-assembly",
+       "tool": "puller-A",
+       "torque_nm": 6,
+       "passes": 3,
+       "calibration": "zero-offset",
+       "steps": [
+        "Lock the shaft and de-energize, holding 5s.",
+        "Release the drive and draw the old part out with puller-A.",
+        "Seat the replacement and torque the mount to 6 Nm in 3 passes.",
+        "Spin-test, then run the zero-offset routine."
+       ]
+      },
+      {
+       "component": "capacitor_bank",
+       "service_class": "electrical-pack",
+       "tool": "hex-2",
+       "torque_nm": 19,
+       "passes": 2,
+       "calibration": "phase-align-B",
+       "steps": [
+        "De-energize and discharge the bus, holding 5s.",
+        "Disconnect the 3 leads and lift out the old part with hex-2.",
+        "Fit the replacement and torque the terminals to 19 Nm in 2 passes.",
+        "Run the phase-align-B routine and verify."
+       ]
+      },
+      {
+       "component": "hall_sensor",
+       "service_class": "sensor",
+       "tool": "driver-3",
+       "torque_nm": 6,
+       "passes": 2,
+       "calibration": "phase-align-B",
+       "steps": [
+        "Power down and unmount the old part with driver-3.",
+        "Fit the replacement and snug the 3 screws in a criss-cross sequence.",
+        "Torque to 6 Nm in 2 passes.",
+        "Align with the phase-align-B routine and confirm the reading."
+       ]
+      },
+      {
+       "component": "coupling",
+       "service_class": "rotating-assembly",
+       "tool": "driver-5",
+       "torque_nm": 16,
+       "passes": 2,
+       "calibration": "torque-stage-3",
+       "steps": [
+        "Lock the shaft and de-energize, holding 15s.",
+        "Release the drive and draw the old part out with driver-5.",
+        "Seat the replacement and torque the mount to 16 Nm in 2 passes.",
+        "Spin-test, then run the torque-stage-3 routine."
+       ]
+      },
+      {
+       "component": "stator_gasket",
+       "service_class": "bolted-panel",
+       "tool": "hex-4",
+       "torque_nm": 15,
+       "passes": 4,
+       "calibration": "torque-stage-3",
+       "steps": [
+        "Vent the bay and back off the 6 retaining bolts in a criss-cross sequence.",
+        "Lift out the old part and seat the replacement using hex-4.",
+        "Torque the bolts to 15 Nm across 4 passes.",
+        "Finish with the torque-stage-3 routine."
+       ]
+      },
+      {
+       "component": "field_coil",
+       "service_class": "electrical-pack",
+       "tool": "hex-2",
+       "torque_nm": 24,
+       "passes": 3,
+       "calibration": "index-home",
+       "steps": [
+        "De-energize and discharge the bus, holding 8s.",
+        "Disconnect the 6 leads and lift out the old part with hex-2.",
+        "Fit the replacement and torque the terminals to 24 Nm in 3 passes.",
+        "Run the index-home routine and verify."
+       ]
+      },
+      {
+       "component": "rotor",
+       "service_class": "rotating-assembly",
+       "tool": "driver-3",
+       "torque_nm": 20,
+       "passes": 2,
+       "calibration": "purge-cycle",
+       "steps": [
+        "Lock the shaft and de-energize, holding 15s.",
+        "Release the drive and draw the old part out with driver-3.",
+        "Seat the replacement and torque the mount to 20 Nm in 2 passes.",
+        "Spin-test, then run the purge-cycle routine."
+       ]
+      }
+     ]
+    },
+    {
+     "module_label": "module-2",
+     "specs": [
+      {
+       "component": "housing_cover",
+       "service_class": "bolted-panel",
+       "tool": "hex-6",
+       "torque_nm": 11,
+       "passes": 3,
+       "calibration": "index-home",
+       "steps": [
+        "Vent the bay and back off the 6 retaining bolts in a inside-out sequence.",
+        "Lift out the old part and seat the replacement using hex-6.",
+        "Torque the bolts to 11 Nm across 3 passes.",
+        "Finish with the index-home routine."
+       ]
+      },
+      {
+       "component": "cooling_fan",
+       "service_class": "rotating-assembly",
+       "tool": "hex-4",
+       "torque_nm": 16,
+       "passes": 2,
+       "calibration": "warm-soak",
+       "steps": [
+        "Lock the shaft and de-energize, holding 8s.",
+        "Release the drive and draw the old part out with hex-4.",
+        "Seat the replacement and torque the mount to 16 Nm in 2 passes.",
+        "Spin-test, then run the warm-soak routine."
+       ]
+      },
+      {
+       "component": "terminal_block",
+       "service_class": "electrical-pack",
+       "tool": "driver-1",
+       "torque_nm": 18,
+       "passes": 3,
+       "calibration": "bleed-then-seat",
+       "steps": [
+        "De-energize and discharge the bus, holding 15s.",
+        "Disconnect the 3 leads and lift out the old part with driver-1.",
+        "Fit the replacement and torque the terminals to 18 Nm in 3 passes.",
+        "Run the bleed-then-seat routine and verify."
+       ]
+      },
+      {
+       "component": "brush_set",
+       "service_class": "rotating-assembly",
+       "tool": "hex-2",
+       "torque_nm": 9,
+       "passes": 3,
+       "calibration": "zero-offset",
+       "steps": [
+        "Lock the shaft and de-energize, holding 5s.",
+        "Release the drive and draw the old part out with hex-2.",
+        "Seat the replacement and torque the mount to 9 Nm in 3 passes.",
+        "Spin-test, then run the zero-offset routine."
+       ]
+      },
+      {
+       "component": "encoder",
+       "service_class": "sensor",
+       "tool": "hex-2",
+       "torque_nm": 24,
+       "passes": 4,
+       "calibration": "purge-cycle",
+       "steps": [
+        "Power down and unmount the old part with hex-2.",
+        "Fit the replacement and snug the 6 screws in a star sequence.",
+        "Torque to 24 Nm in 4 passes.",
+        "Align with the purge-cycle routine and confirm the reading."
+       ]
+      },
+      {
+       "component": "shaft_seal",
+       "service_class": "press-fit",
+       "tool": "driver-3",
+       "torque_nm": 12,
+       "passes": 4,
+       "calibration": "purge-cycle",
+       "steps": [
+        "Drain the cavity and let it settle for 5s.",
+        "Press the old part out with driver-3 and press the replacement in.",
+        "Re-torque the retainer to 12 Nm in 4 passes.",
+        "Bleed the line and run the purge-cycle routine."
+       ]
+      },
+      {
+       "component": "front_bearing",
+       "service_class": "press-fit",
+       "tool": "hex-4",
+       "torque_nm": 13,
+       "passes": 4,
+       "calibration": "bleed-then-seat",
+       "steps": [
+        "Drain the cavity and let it settle for 8s.",
+        "Press the old part out with hex-4 and press the replacement in.",
+        "Re-torque the retainer to 13 Nm in 4 passes.",
+        "Bleed the line and run the bleed-then-seat routine."
+       ]
+      },
+      {
+       "component": "commutator",
+       "service_class": "rotating-assembly",
+       "tool": "driver-5",
+       "torque_nm": 19,
+       "passes": 3,
+       "calibration": "zero-offset",
+       "steps": [
+        "Lock the shaft and de-energize, holding 8s.",
+        "Release the drive and draw the old part out with driver-5.",
+        "Seat the replacement and torque the mount to 19 Nm in 3 passes.",
+        "Spin-test, then run the zero-offset routine."
+       ]
+      },
+      {
+       "component": "capacitor_bank",
+       "service_class": "electrical-pack",
+       "tool": "hex-6",
+       "torque_nm": 16,
+       "passes": 3,
+       "calibration": "null-balance",
+       "steps": [
+        "De-energize and discharge the bus, holding 5s.",
+        "Disconnect the 6 leads and lift out the old part with hex-6.",
+        "Fit the replacement and torque the terminals to 16 Nm in 3 passes.",
+        "Run the null-balance routine and verify."
+       ]
+      },
+      {
+       "component": "hall_sensor",
+       "service_class": "sensor",
+       "tool": "driver-3",
+       "torque_nm": 6,
+       "passes": 4,
+       "calibration": "null-balance",
+       "steps": [
+        "Power down and unmount the old part with driver-3.",
+        "Fit the replacement and snug the 3 screws in a star sequence.",
+        "Torque to 6 Nm in 4 passes.",
+        "Align with the null-balance routine and confirm the reading."
+       ]
+      },
+      {
+       "component": "coupling",
+       "service_class": "rotating-assembly",
+       "tool": "puller-B",
+       "torque_nm": 6,
+       "passes": 3,
+       "calibration": "bleed-then-seat",
+       "steps": [
+        "Lock the shaft and de-energize, holding 5s.",
+        "Release the drive and draw the old part out with puller-B.",
+        "Seat the replacement and torque the mount to 6 Nm in 3 passes.",
+        "Spin-test, then run the bleed-then-seat routine."
+       ]
+      },
+      {
+       "component": "stator_gasket",
+       "service_class": "bolted-panel",
+       "tool": "driver-1",
+       "torque_nm": 20,
+       "passes": 4,
+       "calibration": "phase-align-B",
+       "steps": [
+        "Vent the bay and back off the 8 retaining bolts in a clockwise sequence.",
+        "Lift out the old part and seat the replacement using driver-1.",
+        "Torque the bolts to 20 Nm across 4 passes.",
+        "Finish with the phase-align-B routine."
+       ]
+      },
+      {
+       "component": "field_coil",
+       "service_class": "electrical-pack",
+       "tool": "puller-A",
+       "torque_nm": 18,
+       "passes": 2,
+       "calibration": "bleed-then-seat",
+       "steps": [
+        "De-energize and discharge the bus, holding 8s.",
+        "Disconnect the 6 leads and lift out the old part with puller-A.",
+        "Fit the replacement and torque the terminals to 18 Nm in 2 passes.",
+        "Run the bleed-then-seat routine and verify."
+       ]
+      },
+      {
+       "component": "rotor",
+       "service_class": "rotating-assembly",
+       "tool": "hex-2",
+       "torque_nm": 19,
+       "passes": 4,
+       "calibration": "bed-in",
+       "steps": [
+        "Lock the shaft and de-energize, holding 8s.",
+        "Release the drive and draw the old part out with hex-2.",
+        "Seat the replacement and torque the mount to 19 Nm in 4 passes.",
+        "Spin-test, then run the bed-in routine."
+       ]
+      }
+     ]
+    }
+   ],
+   "stages": [
+    {
+     "step_index": 0,
+     "module_label": "module-1",
+     "component": "housing_cover",
+     "symptom": "sluggish throttle response",
+     "service_class": "bolted-panel",
+     "tool": "driver-5",
+     "torque_nm": 8,
+     "passes": 2,
+     "calibration": "bed-in",
+     "steps": [
+      "Vent the bay and back off the 3 retaining bolts in a clockwise sequence.",
+      "Lift out the old part and seat the replacement using driver-5.",
+      "Torque the bolts to 8 Nm across 2 passes.",
+      "Finish with the bed-in routine."
+     ],
+     "access_depth": 1,
+     "judge_expected_action": "Replace module-1's housing_cover. Vent the bay and back off the 3 retaining bolts in a clockwise sequence. Lift out the old part and seat the replacement using driver-5. Torque the bolts to 8 Nm across 2 passes. Finish with the bed-in routine."
+    },
+    {
+     "step_index": 1,
+     "module_label": "module-1",
+     "component": "shaft_seal",
+     "symptom": "contact arcing",
+     "service_class": "press-fit",
+     "tool": "clamp-4",
+     "torque_nm": 14,
+     "passes": 2,
+     "calibration": "null-balance",
+     "steps": [
+      "Drain the cavity and let it settle for 10s.",
+      "Press the old part out with clamp-4 and press the replacement in.",
+      "Re-torque the retainer to 14 Nm in 2 passes.",
+      "Bleed the line and run the null-balance routine."
+     ],
+     "access_depth": 6,
+     "judge_expected_action": "Replace module-1's shaft_seal. Drain the cavity and let it settle for 10s. Press the old part out with clamp-4 and press the replacement in. Re-torque the retainer to 14 Nm in 2 passes. Bleed the line and run the null-balance routine."
+    },
+    {
+     "step_index": 2,
+     "module_label": "module-1",
+     "component": "front_bearing",
+     "symptom": "coolant-line flicker",
+     "service_class": "press-fit",
+     "tool": "clamp-2",
+     "torque_nm": 6,
+     "passes": 4,
+     "calibration": "bleed-then-seat",
+     "steps": [
+      "Drain the cavity and let it settle for 15s.",
+      "Press the old part out with clamp-2 and press the replacement in.",
+      "Re-torque the retainer to 6 Nm in 4 passes.",
+      "Bleed the line and run the bleed-then-seat routine."
+     ],
+     "access_depth": 7,
+     "judge_expected_action": "Replace module-1's front_bearing. Drain the cavity and let it settle for 15s. Press the old part out with clamp-2 and press the replacement in. Re-torque the retainer to 6 Nm in 4 passes. Bleed the line and run the bleed-then-seat routine."
+    },
+    {
+     "step_index": 3,
+     "module_label": "module-1",
+     "component": "commutator",
+     "symptom": "a thermal spike in the core",
+     "service_class": "rotating-assembly",
+     "tool": "puller-A",
+     "torque_nm": 6,
+     "passes": 3,
+     "calibration": "zero-offset",
+     "steps": [
+      "Lock the shaft and de-energize, holding 5s.",
+      "Release the drive and draw the old part out with puller-A.",
+      "Seat the replacement and torque the mount to 6 Nm in 3 passes.",
+      "Spin-test, then run the zero-offset routine."
+     ],
+     "access_depth": 8,
+     "judge_expected_action": "Replace module-1's commutator. Lock the shaft and de-energize, holding 5s. Release the drive and draw the old part out with puller-A. Seat the replacement and torque the mount to 6 Nm in 3 passes. Spin-test, then run the zero-offset routine."
+    },
+    {
+     "step_index": 4,
+     "module_label": "module-2",
+     "component": "housing_cover",
+     "symptom": "an audible whine under load",
+     "service_class": "bolted-panel",
+     "tool": "hex-6",
+     "torque_nm": 11,
+     "passes": 3,
+     "calibration": "index-home",
+     "steps": [
+      "Vent the bay and back off the 6 retaining bolts in a inside-out sequence.",
+      "Lift out the old part and seat the replacement using hex-6.",
+      "Torque the bolts to 11 Nm across 3 passes.",
+      "Finish with the index-home routine."
+     ],
+     "access_depth": 1,
+     "judge_expected_action": "Replace module-2's housing_cover. Vent the bay and back off the 6 retaining bolts in a inside-out sequence. Lift out the old part and seat the replacement using hex-6. Torque the bolts to 11 Nm across 3 passes. Finish with the index-home routine."
+    },
+    {
+     "step_index": 5,
+     "module_label": "module-2",
+     "component": "stator_gasket",
+     "symptom": "grinding on spin-up",
+     "service_class": "bolted-panel",
+     "tool": "driver-1",
+     "torque_nm": 20,
+     "passes": 4,
+     "calibration": "phase-align-B",
+     "steps": [
+      "Vent the bay and back off the 8 retaining bolts in a clockwise sequence.",
+      "Lift out the old part and seat the replacement using driver-1.",
+      "Torque the bolts to 20 Nm across 4 passes.",
+      "Finish with the phase-align-B routine."
+     ],
+     "access_depth": 12,
+     "judge_expected_action": "Replace module-2's stator_gasket. Vent the bay and back off the 8 retaining bolts in a clockwise sequence. Lift out the old part and seat the replacement using driver-1. Torque the bolts to 20 Nm across 4 passes. Finish with the phase-align-B routine."
+    },
+    {
+     "step_index": 6,
+     "module_label": "module-2",
+     "component": "field_coil",
+     "symptom": "current ripple on the output",
+     "service_class": "electrical-pack",
+     "tool": "puller-A",
+     "torque_nm": 18,
+     "passes": 2,
+     "calibration": "bleed-then-seat",
+     "steps": [
+      "De-energize and discharge the bus, holding 8s.",
+      "Disconnect the 6 leads and lift out the old part with puller-A.",
+      "Fit the replacement and torque the terminals to 18 Nm in 2 passes.",
+      "Run the bleed-then-seat routine and verify."
+     ],
+     "access_depth": 13,
+     "judge_expected_action": "Replace module-2's field_coil. De-energize and discharge the bus, holding 8s. Disconnect the 6 leads and lift out the old part with puller-A. Fit the replacement and torque the terminals to 18 Nm in 2 passes. Run the bleed-then-seat routine and verify."
+    }
+   ],
+   "round_time_budget_seconds": 900
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "field_technician",
+   "text": "--- INSPECTION ---\nRound 1\nService window: 900s (one character on the bay channel = one second; shared across all three of you)\n\nYou begin on module-1. Inspecting its panel, you observe: sluggish throttle response.\nReport this symptom to the diagnostics engineer (tagged with the unit)."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "diagnostics_engineer",
+   "text": "--- FAULT-TREE (module-1) ---\nRound 1\nService window: 900s (one character on the bay channel = one second; shared across all three of you)\n\nThis shift's fault-tree for module-1 \u2014 each symptom indicates exactly one faulty component on this unit:\n- \"sluggish throttle response\" -> housing_cover\n- \"intermittent power dropout\" -> cooling_fan\n- \"grinding on spin-up\" -> terminal_block\n- \"an audible whine under load\" -> brush_set\n- \"flux instability\" -> encoder\n- \"contact arcing\" -> shaft_seal\n- \"coolant-line flicker\" -> front_bearing\n- \"a thermal spike in the core\" -> commutator\n- \"current ripple on the output\" -> capacitor_bank\n- \"oil weeping at a joint\" -> hall_sensor\n- \"phase imbalance across the windings\" -> coupling\n- \"high-frequency vibration\" -> stator_gasket\n- \"overspeed drift\" -> field_coil\n- \"torque pulsation at low rpm\" -> rotor\n\nEach unit on the bench is a different revision with its own fault-tree; you will receive the next unit's fault-tree only when the technician reaches it. For each symptom the technician reports (tagged with its unit), use THAT unit's fault-tree to name the faulty component, and pass it on (keep the unit tag). You cannot see the panels yourself."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "spec_engineer",
+   "text": "--- SERVICE SHEET (module-1) ---\nRound 1\nService window: 900s (one character on the bay channel = one second; shared across all three of you)\n\nThis shift's service sheet for module-1 \u2014 the full replacement procedure per component (this unit's revision):\n- housing_cover (bolted-panel): Vent the bay and back off the 3 retaining bolts in a clockwise sequence. Lift out the old part and seat the replacement using driver-5. Torque the bolts to 8 Nm across 2 passes. Finish with the bed-in routine.\n- cooling_fan (rotating-assembly): Lock the shaft and de-energize, holding 5s. Release the drive and draw the old part out with driver-1. Seat the replacement and torque the mount to 18 Nm in 4 passes. Spin-test, then run the seat-and-lock routine.\n- terminal_block (electrical-pack): De-energize and discharge the bus, holding 5s. Disconnect the 6 leads and lift out the old part with hex-6. Fit the replacement and torque the terminals to 14 Nm in 3 passes. Run the null-balance routine and verify.\n- brush_set (rotating-assembly): Lock the shaft and de-energize, holding 10s. Release the drive and draw the old part out with hex-2. Seat the replacement and torque the mount to 18 Nm in 2 passes. Spin-test, then run the torque-stage-3 routine.\n- encoder (sensor): Power down and unmount the old part with hex-4. Fit the replacement and snug the 4 screws in a inside-out sequence. Torque to 4 Nm in 2 passes. Align with the zero-offset routine and confirm the reading.\n- shaft_seal (press-fit): Drain the cavity and let it settle for 10s. Press the old part out with clamp-4 and press the replacement in. Re-torque the retainer to 14 Nm in 2 passes. Bleed the line and run the null-balance routine.\n- front_bearing (press-fit): Drain the cavity and let it settle for 15s. Press the old part out with clamp-2 and press the replacement in. Re-torque the retainer to 6 Nm in 4 passes. Bleed the line and run the bleed-then-seat routine.\n- commutator (rotating-assembly): Lock the shaft and de-energize, holding 5s. Release the drive and draw the old part out with puller-A. Seat the replacement and torque the mount to 6 Nm in 3 passes. Spin-test, then run the zero-offset routine.\n- capacitor_bank (electrical-pack): De-energize and discharge the bus, holding 5s. Disconnect the 3 leads and lift out the old part with hex-2. Fit the replacement and torque the terminals to 19 Nm in 2 passes. Run the phase-align-B routine and verify.\n- hall_sensor (sensor): Power down and unmount the old part with driver-3. Fit the replacement and snug the 3 screws in a criss-cross sequence. Torque to 6 Nm in 2 passes. Align with the phase-align-B routine and confirm the reading.\n- coupling (rotating-assembly): Lock the shaft and de-energize, holding 15s. Release the drive and draw the old part out with driver-5. Seat the replacement and torque the mount to 16 Nm in 2 passes. Spin-test, then run the torque-stage-3 routine.\n- stator_gasket (bolted-panel): Vent the bay and back off the 6 retaining bolts in a criss-cross sequence. Lift out the old part and seat the replacement using hex-4. Torque the bolts to 15 Nm across 4 passes. Finish with the torque-stage-3 routine.\n- field_coil (electrical-pack): De-energize and discharge the bus, holding 8s. Disconnect the 6 leads and lift out the old part with hex-2. Fit the replacement and torque the terminals to 24 Nm in 3 passes. Run the index-home routine and verify.\n- rotor (rotating-assembly): Lock the shaft and de-energize, holding 15s. Release the drive and draw the old part out with driver-3. Seat the replacement and torque the mount to 20 Nm in 2 passes. Spin-test, then run the purge-cycle routine.\n\nEach unit on the bench is a different revision with its own sheet; you will receive the next unit's sheet only when the technician reaches it. Once the diagnostics engineer names a faulty component, relay its full procedure for the current unit \u2014 every step in order with every parameter. You cannot see the panels yourself."
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "field_technician",
+   "role_name": "Field Technician",
+   "model": "scripted::field_technician"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "diagnostics_engineer",
+   "role_name": "Diagnostics Engineer",
+   "model": "scripted::diagnostics_engineer"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "spec_engineer",
+   "role_name": "Spec Engineer",
+   "model": "scripted::spec_engineer"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "Round ended before all components were correctly replaced."
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "field_technician",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/7 done; 158 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "diagnostics_engineer",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/7 done; 158 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "spec_engineer",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/7 done; 158 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_advanced",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "drive_module_case_started",
+   "case_number": 2,
+   "module_count": 2,
+   "replacement_count": 4,
+   "module_fault_trees": [
+    {
+     "module_label": "module-1",
+     "entries": [
+      {
+       "symptom": "flux instability",
+       "component": "housing_cover"
+      },
+      {
+       "symptom": "torque pulsation at low rpm",
+       "component": "cooling_fan"
+      },
+      {
+       "symptom": "intermittent power dropout",
+       "component": "terminal_block"
+      },
+      {
+       "symptom": "grinding on spin-up",
+       "component": "brush_set"
+      },
+      {
+       "symptom": "an audible whine under load",
+       "component": "encoder"
+      },
+      {
+       "symptom": "current ripple on the output",
+       "component": "shaft_seal"
+      },
+      {
+       "symptom": "high-frequency vibration",
+       "component": "front_bearing"
+      },
+      {
+       "symptom": "a thermal spike in the core",
+       "component": "commutator"
+      },
+      {
+       "symptom": "phase imbalance across the windings",
+       "component": "capacitor_bank"
+      },
+      {
+       "symptom": "overspeed drift",
+       "component": "hall_sensor"
+      },
+      {
+       "symptom": "contact arcing",
+       "component": "coupling"
+      },
+      {
+       "symptom": "coolant-line flicker",
+       "component": "stator_gasket"
+      },
+      {
+       "symptom": "oil weeping at a joint",
+       "component": "field_coil"
+      },
+      {
+       "symptom": "sluggish throttle response",
+       "component": "rotor"
+      }
+     ]
+    },
+    {
+     "module_label": "module-2",
+     "entries": [
+      {
+       "symptom": "torque pulsation at low rpm",
+       "component": "housing_cover"
+      },
+      {
+       "symptom": "a thermal spike in the core",
+       "component": "cooling_fan"
+      },
+      {
+       "symptom": "overspeed drift",
+       "component": "terminal_block"
+      },
+      {
+       "symptom": "high-frequency vibration",
+       "component": "brush_set"
+      },
+      {
+       "symptom": "intermittent power dropout",
+       "component": "encoder"
+      },
+      {
+       "symptom": "grinding on spin-up",
+       "component": "shaft_seal"
+      },
+      {
+       "symptom": "contact arcing",
+       "component": "front_bearing"
+      },
+      {
+       "symptom": "current ripple on the output",
+       "component": "commutator"
+      },
+      {
+       "symptom": "oil weeping at a joint",
+       "component": "capacitor_bank"
+      },
+      {
+       "symptom": "phase imbalance across the windings",
+       "component": "hall_sensor"
+      },
+      {
+       "symptom": "coolant-line flicker",
+       "component": "coupling"
+      },
+      {
+       "symptom": "an audible whine under load",
+       "component": "stator_gasket"
+      },
+      {
+       "symptom": "sluggish throttle response",
+       "component": "field_coil"
+      },
+      {
+       "symptom": "flux instability",
+       "component": "rotor"
+      }
+     ]
+    }
+   ],
+   "module_spec_tables": [
+    {
+     "module_label": "module-1",
+     "specs": [
+      {
+       "component": "housing_cover",
+       "service_class": "bolted-panel",
+       "tool": "clamp-2",
+       "torque_nm": 4,
+       "passes": 3,
+       "calibration": "warm-soak",
+       "steps": [
+        "Vent the bay and back off the 4 retaining bolts in a clockwise sequence.",
+        "Lift out the old part and seat the replacement using clamp-2.",
+        "Torque the bolts to 4 Nm across 3 passes.",
+        "Finish with the warm-soak routine."
+       ]
+      },
+      {
+       "component": "cooling_fan",
+       "service_class": "rotating-assembly",
+       "tool": "driver-5",
+       "torque_nm": 5,
+       "passes": 3,
+       "calibration": "bed-in",
+       "steps": [
+        "Lock the shaft and de-energize, holding 10s.",
+        "Release the drive and draw the old part out with driver-5.",
+        "Seat the replacement and torque the mount to 5 Nm in 3 passes.",
+        "Spin-test, then run the bed-in routine."
+       ]
+      },
+      {
+       "component": "terminal_block",
+       "service_class": "electrical-pack",
+       "tool": "puller-B",
+       "torque_nm": 20,
+       "passes": 4,
+       "calibration": "null-balance",
+       "steps": [
+        "De-energize and discharge the bus, holding 15s.",
+        "Disconnect the 6 leads and lift out the old part with puller-B.",
+        "Fit the replacement and torque the terminals to 20 Nm in 4 passes.",
+        "Run the null-balance routine and verify."
+       ]
+      },
+      {
+       "component": "brush_set",
+       "service_class": "rotating-assembly",
+       "tool": "puller-B",
+       "torque_nm": 9,
+       "passes": 4,
+       "calibration": "null-balance",
+       "steps": [
+        "Lock the shaft and de-energize, holding 8s.",
+        "Release the drive and draw the old part out with puller-B.",
+        "Seat the replacement and torque the mount to 9 Nm in 4 passes.",
+        "Spin-test, then run the null-balance routine."
+       ]
+      },
+      {
+       "component": "encoder",
+       "service_class": "sensor",
+       "tool": "driver-3",
+       "torque_nm": 17,
+       "passes": 4,
+       "calibration": "seat-and-lock",
+       "steps": [
+        "Power down and unmount the old part with driver-3.",
+        "Fit the replacement and snug the 6 screws in a inside-out sequence.",
+        "Torque to 17 Nm in 4 passes.",
+        "Align with the seat-and-lock routine and confirm the reading."
+       ]
+      },
+      {
+       "component": "shaft_seal",
+       "service_class": "press-fit",
+       "tool": "puller-A",
+       "torque_nm": 4,
+       "passes": 4,
+       "calibration": "phase-align-B",
+       "steps": [
+        "Drain the cavity and let it settle for 15s.",
+        "Press the old part out with puller-A and press the replacement in.",
+        "Re-torque the retainer to 4 Nm in 4 passes.",
+        "Bleed the line and run the phase-align-B routine."
+       ]
+      },
+      {
+       "component": "front_bearing",
+       "service_class": "press-fit",
+       "tool": "hex-2",
+       "torque_nm": 9,
+       "passes": 3,
+       "calibration": "phase-align-B",
+       "steps": [
+        "Drain the cavity and let it settle for 8s.",
+        "Press the old part out with hex-2 and press the replacement in.",
+        "Re-torque the retainer to 9 Nm in 3 passes.",
+        "Bleed the line and run the phase-align-B routine."
+       ]
+      },
+      {
+       "component": "commutator",
+       "service_class": "rotating-assembly",
+       "tool": "driver-5",
+       "torque_nm": 11,
+       "passes": 3,
+       "calibration": "index-home",
+       "steps": [
+        "Lock the shaft and de-energize, holding 15s.",
+        "Release the drive and draw the old part out with driver-5.",
+        "Seat the replacement and torque the mount to 11 Nm in 3 passes.",
+        "Spin-test, then run the index-home routine."
+       ]
+      },
+      {
+       "component": "capacitor_bank",
+       "service_class": "electrical-pack",
+       "tool": "puller-A",
+       "torque_nm": 15,
+       "passes": 3,
+       "calibration": "bleed-then-seat",
+       "steps": [
+        "De-energize and discharge the bus, holding 8s.",
+        "Disconnect the 8 leads and lift out the old part with puller-A.",
+        "Fit the replacement and torque the terminals to 15 Nm in 3 passes.",
+        "Run the bleed-then-seat routine and verify."
+       ]
+      },
+      {
+       "component": "hall_sensor",
+       "service_class": "sensor",
+       "tool": "driver-3",
+       "torque_nm": 22,
+       "passes": 3,
+       "calibration": "seat-and-lock",
+       "steps": [
+        "Power down and unmount the old part with driver-3.",
+        "Fit the replacement and snug the 3 screws in a clockwise sequence.",
+        "Torque to 22 Nm in 3 passes.",
+        "Align with the seat-and-lock routine and confirm the reading."
+       ]
+      },
+      {
+       "component": "coupling",
+       "service_class": "rotating-assembly",
+       "tool": "hex-2",
+       "torque_nm": 15,
+       "passes": 2,
+       "calibration": "seat-and-lock",
+       "steps": [
+        "Lock the shaft and de-energize, holding 8s.",
+        "Release the drive and draw the old part out with hex-2.",
+        "Seat the replacement and torque the mount to 15 Nm in 2 passes.",
+        "Spin-test, then run the seat-and-lock routine."
+       ]
+      },
+      {
+       "component": "stator_gasket",
+       "service_class": "bolted-panel",
+       "tool": "clamp-2",
+       "torque_nm": 19,
+       "passes": 2,
+       "calibration": "warm-soak",
+       "steps": [
+        "Vent the bay and back off the 4 retaining bolts in a criss-cross sequence.",
+        "Lift out the old part and seat the replacement using clamp-2.",
+        "Torque the bolts to 19 Nm across 2 passes.",
+        "Finish with the warm-soak routine."
+       ]
+      },
+      {
+       "component": "field_coil",
+       "service_class": "electrical-pack",
+       "tool": "clamp-4",
+       "torque_nm": 21,
+       "passes": 4,
+       "calibration": "purge-cycle",
+       "steps": [
+        "De-energize and discharge the bus, holding 5s.",
+        "Disconnect the 8 leads and lift out the old part with clamp-4.",
+        "Fit the replacement and torque the terminals to 21 Nm in 4 passes.",
+        "Run the purge-cycle routine and verify."
+       ]
+      },
+      {
+       "component": "rotor",
+       "service_class": "rotating-assembly",
+       "tool": "driver-3",
+       "torque_nm": 13,
+       "passes": 4,
+       "calibration": "seat-and-lock",
+       "steps": [
+        "Lock the shaft and de-energize, holding 10s.",
+        "Release the drive and draw the old part out with driver-3.",
+        "Seat the replacement and torque the mount to 13 Nm in 4 passes.",
+        "Spin-test, then run the seat-and-lock routine."
+       ]
+      }
+     ]
+    },
+    {
+     "module_label": "module-2",
+     "specs": [
+      {
+       "component": "housing_cover",
+       "service_class": "bolted-panel",
+       "tool": "puller-B",
+       "torque_nm": 18,
+       "passes": 4,
+       "calibration": "zero-offset",
+       "steps": [
+        "Vent the bay and back off the 4 retaining bolts in a star sequence.",
+        "Lift out the old part and seat the replacement using puller-B.",
+        "Torque the bolts to 18 Nm across 4 passes.",
+        "Finish with the zero-offset routine."
+       ]
+      },
+      {
+       "component": "cooling_fan",
+       "service_class": "rotating-assembly",
+       "tool": "puller-B",
+       "torque_nm": 5,
+       "passes": 2,
+       "calibration": "phase-align-B",
+       "steps": [
+        "Lock the shaft and de-energize, holding 10s.",
+        "Release the drive and draw the old part out with puller-B.",
+        "Seat the replacement and torque the mount to 5 Nm in 2 passes.",
+        "Spin-test, then run the phase-align-B routine."
+       ]
+      },
+      {
+       "component": "terminal_block",
+       "service_class": "electrical-pack",
+       "tool": "puller-A",
+       "torque_nm": 4,
+       "passes": 2,
+       "calibration": "index-home",
+       "steps": [
+        "De-energize and discharge the bus, holding 5s.",
+        "Disconnect the 4 leads and lift out the old part with puller-A.",
+        "Fit the replacement and torque the terminals to 4 Nm in 2 passes.",
+        "Run the index-home routine and verify."
+       ]
+      },
+      {
+       "component": "brush_set",
+       "service_class": "rotating-assembly",
+       "tool": "puller-A",
+       "torque_nm": 9,
+       "passes": 4,
+       "calibration": "purge-cycle",
+       "steps": [
+        "Lock the shaft and de-energize, holding 8s.",
+        "Release the drive and draw the old part out with puller-A.",
+        "Seat the replacement and torque the mount to 9 Nm in 4 passes.",
+        "Spin-test, then run the purge-cycle routine."
+       ]
+      },
+      {
+       "component": "encoder",
+       "service_class": "sensor",
+       "tool": "hex-6",
+       "torque_nm": 6,
+       "passes": 3,
+       "calibration": "bed-in",
+       "steps": [
+        "Power down and unmount the old part with hex-6.",
+        "Fit the replacement and snug the 8 screws in a star sequence.",
+        "Torque to 6 Nm in 3 passes.",
+        "Align with the bed-in routine and confirm the reading."
+       ]
+      },
+      {
+       "component": "shaft_seal",
+       "service_class": "press-fit",
+       "tool": "hex-2",
+       "torque_nm": 22,
+       "passes": 4,
+       "calibration": "zero-offset",
+       "steps": [
+        "Drain the cavity and let it settle for 8s.",
+        "Press the old part out with hex-2 and press the replacement in.",
+        "Re-torque the retainer to 22 Nm in 4 passes.",
+        "Bleed the line and run the zero-offset routine."
+       ]
+      },
+      {
+       "component": "front_bearing",
+       "service_class": "press-fit",
+       "tool": "puller-A",
+       "torque_nm": 15,
+       "passes": 3,
+       "calibration": "bed-in",
+       "steps": [
+        "Drain the cavity and let it settle for 10s.",
+        "Press the old part out with puller-A and press the replacement in.",
+        "Re-torque the retainer to 15 Nm in 3 passes.",
+        "Bleed the line and run the bed-in routine."
+       ]
+      },
+      {
+       "component": "commutator",
+       "service_class": "rotating-assembly",
+       "tool": "hex-2",
+       "torque_nm": 9,
+       "passes": 4,
+       "calibration": "zero-offset",
+       "steps": [
+        "Lock the shaft and de-energize, holding 5s.",
+        "Release the drive and draw the old part out with hex-2.",
+        "Seat the replacement and torque the mount to 9 Nm in 4 passes.",
+        "Spin-test, then run the zero-offset routine."
+       ]
+      },
+      {
+       "component": "capacitor_bank",
+       "service_class": "electrical-pack",
+       "tool": "hex-6",
+       "torque_nm": 19,
+       "passes": 2,
+       "calibration": "index-home",
+       "steps": [
+        "De-energize and discharge the bus, holding 8s.",
+        "Disconnect the 4 leads and lift out the old part with hex-6.",
+        "Fit the replacement and torque the terminals to 19 Nm in 2 passes.",
+        "Run the index-home routine and verify."
+       ]
+      },
+      {
+       "component": "hall_sensor",
+       "service_class": "sensor",
+       "tool": "hex-4",
+       "torque_nm": 14,
+       "passes": 4,
+       "calibration": "seat-and-lock",
+       "steps": [
+        "Power down and unmount the old part with hex-4.",
+        "Fit the replacement and snug the 3 screws in a criss-cross sequence.",
+        "Torque to 14 Nm in 4 passes.",
+        "Align with the seat-and-lock routine and confirm the reading."
+       ]
+      },
+      {
+       "component": "coupling",
+       "service_class": "rotating-assembly",
+       "tool": "clamp-2",
+       "torque_nm": 8,
+       "passes": 4,
+       "calibration": "warm-soak",
+       "steps": [
+        "Lock the shaft and de-energize, holding 10s.",
+        "Release the drive and draw the old part out with clamp-2.",
+        "Seat the replacement and torque the mount to 8 Nm in 4 passes.",
+        "Spin-test, then run the warm-soak routine."
+       ]
+      },
+      {
+       "component": "stator_gasket",
+       "service_class": "bolted-panel",
+       "tool": "driver-3",
+       "torque_nm": 5,
+       "passes": 4,
+       "calibration": "purge-cycle",
+       "steps": [
+        "Vent the bay and back off the 3 retaining bolts in a star sequence.",
+        "Lift out the old part and seat the replacement using driver-3.",
+        "Torque the bolts to 5 Nm across 4 passes.",
+        "Finish with the purge-cycle routine."
+       ]
+      },
+      {
+       "component": "field_coil",
+       "service_class": "electrical-pack",
+       "tool": "hex-6",
+       "torque_nm": 17,
+       "passes": 3,
+       "calibration": "warm-soak",
+       "steps": [
+        "De-energize and discharge the bus, holding 5s.",
+        "Disconnect the 3 leads and lift out the old part with hex-6.",
+        "Fit the replacement and torque the terminals to 17 Nm in 3 passes.",
+        "Run the warm-soak routine and verify."
+       ]
+      },
+      {
+       "component": "rotor",
+       "service_class": "rotating-assembly",
+       "tool": "driver-3",
+       "torque_nm": 21,
+       "passes": 3,
+       "calibration": "phase-align-B",
+       "steps": [
+        "Lock the shaft and de-energize, holding 10s.",
+        "Release the drive and draw the old part out with driver-3.",
+        "Seat the replacement and torque the mount to 21 Nm in 3 passes.",
+        "Spin-test, then run the phase-align-B routine."
+       ]
+      }
+     ]
+    }
+   ],
+   "stages": [
+    {
+     "step_index": 0,
+     "module_label": "module-1",
+     "component": "capacitor_bank",
+     "symptom": "phase imbalance across the windings",
+     "service_class": "electrical-pack",
+     "tool": "puller-A",
+     "torque_nm": 15,
+     "passes": 3,
+     "calibration": "bleed-then-seat",
+     "steps": [
+      "De-energize and discharge the bus, holding 8s.",
+      "Disconnect the 8 leads and lift out the old part with puller-A.",
+      "Fit the replacement and torque the terminals to 15 Nm in 3 passes.",
+      "Run the bleed-then-seat routine and verify."
+     ],
+     "access_depth": 9,
+     "judge_expected_action": "Replace module-1's capacitor_bank. De-energize and discharge the bus, holding 8s. Disconnect the 8 leads and lift out the old part with puller-A. Fit the replacement and torque the terminals to 15 Nm in 3 passes. Run the bleed-then-seat routine and verify."
+    },
+    {
+     "step_index": 1,
+     "module_label": "module-1",
+     "component": "coupling",
+     "symptom": "contact arcing",
+     "service_class": "rotating-assembly",
+     "tool": "hex-2",
+     "torque_nm": 15,
+     "passes": 2,
+     "calibration": "seat-and-lock",
+     "steps": [
+      "Lock the shaft and de-energize, holding 8s.",
+      "Release the drive and draw the old part out with hex-2.",
+      "Seat the replacement and torque the mount to 15 Nm in 2 passes.",
+      "Spin-test, then run the seat-and-lock routine."
+     ],
+     "access_depth": 11,
+     "judge_expected_action": "Replace module-1's coupling. Lock the shaft and de-energize, holding 8s. Release the drive and draw the old part out with hex-2. Seat the replacement and torque the mount to 15 Nm in 2 passes. Spin-test, then run the seat-and-lock routine."
+    },
+    {
+     "step_index": 2,
+     "module_label": "module-2",
+     "component": "brush_set",
+     "symptom": "high-frequency vibration",
+     "service_class": "rotating-assembly",
+     "tool": "puller-A",
+     "torque_nm": 9,
+     "passes": 4,
+     "calibration": "purge-cycle",
+     "steps": [
+      "Lock the shaft and de-energize, holding 8s.",
+      "Release the drive and draw the old part out with puller-A.",
+      "Seat the replacement and torque the mount to 9 Nm in 4 passes.",
+      "Spin-test, then run the purge-cycle routine."
+     ],
+     "access_depth": 4,
+     "judge_expected_action": "Replace module-2's brush_set. Lock the shaft and de-energize, holding 8s. Release the drive and draw the old part out with puller-A. Seat the replacement and torque the mount to 9 Nm in 4 passes. Spin-test, then run the purge-cycle routine."
+    },
+    {
+     "step_index": 3,
+     "module_label": "module-2",
+     "component": "front_bearing",
+     "symptom": "contact arcing",
+     "service_class": "press-fit",
+     "tool": "puller-A",
+     "torque_nm": 15,
+     "passes": 3,
+     "calibration": "bed-in",
+     "steps": [
+      "Drain the cavity and let it settle for 10s.",
+      "Press the old part out with puller-A and press the replacement in.",
+      "Re-torque the retainer to 15 Nm in 3 passes.",
+      "Bleed the line and run the bed-in routine."
+     ],
+     "access_depth": 7,
+     "judge_expected_action": "Replace module-2's front_bearing. Drain the cavity and let it settle for 10s. Press the old part out with puller-A and press the replacement in. Re-torque the retainer to 15 Nm in 3 passes. Bleed the line and run the bed-in routine."
+    }
+   ],
+   "round_time_budget_seconds": 900
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "field_technician",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1 (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/7 done)\n\n\n--- INSPECTION ---\nRound 2\nService window: 900s (one character on the bay channel = one second; shared across all three of you)\n\nYou begin on module-1. Inspecting its panel, you observe: phase imbalance across the windings.\nReport this symptom to the diagnostics engineer (tagged with the unit)."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "diagnostics_engineer",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1 (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/7 done)\n\n\n--- FAULT-TREE (module-1) ---\nRound 2\nService window: 900s (one character on the bay channel = one second; shared across all three of you)\n\nThis shift's fault-tree for module-1 \u2014 each symptom indicates exactly one faulty component on this unit:\n- \"flux instability\" -> housing_cover\n- \"torque pulsation at low rpm\" -> cooling_fan\n- \"intermittent power dropout\" -> terminal_block\n- \"grinding on spin-up\" -> brush_set\n- \"an audible whine under load\" -> encoder\n- \"current ripple on the output\" -> shaft_seal\n- \"high-frequency vibration\" -> front_bearing\n- \"a thermal spike in the core\" -> commutator\n- \"phase imbalance across the windings\" -> capacitor_bank\n- \"overspeed drift\" -> hall_sensor\n- \"contact arcing\" -> coupling\n- \"coolant-line flicker\" -> stator_gasket\n- \"oil weeping at a joint\" -> field_coil\n- \"sluggish throttle response\" -> rotor\n\nEach unit on the bench is a different revision with its own fault-tree; you will receive the next unit's fault-tree only when the technician reaches it. For each symptom the technician reports (tagged with its unit), use THAT unit's fault-tree to name the faulty component, and pass it on (keep the unit tag). You cannot see the panels yourself."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "spec_engineer",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1 (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/7 done)\n\n\n--- SERVICE SHEET (module-1) ---\nRound 2\nService window: 900s (one character on the bay channel = one second; shared across all three of you)\n\nThis shift's service sheet for module-1 \u2014 the full replacement procedure per component (this unit's revision):\n- housing_cover (bolted-panel): Vent the bay and back off the 4 retaining bolts in a clockwise sequence. Lift out the old part and seat the replacement using clamp-2. Torque the bolts to 4 Nm across 3 passes. Finish with the warm-soak routine.\n- cooling_fan (rotating-assembly): Lock the shaft and de-energize, holding 10s. Release the drive and draw the old part out with driver-5. Seat the replacement and torque the mount to 5 Nm in 3 passes. Spin-test, then run the bed-in routine.\n- terminal_block (electrical-pack): De-energize and discharge the bus, holding 15s. Disconnect the 6 leads and lift out the old part with puller-B. Fit the replacement and torque the terminals to 20 Nm in 4 passes. Run the null-balance routine and verify.\n- brush_set (rotating-assembly): Lock the shaft and de-energize, holding 8s. Release the drive and draw the old part out with puller-B. Seat the replacement and torque the mount to 9 Nm in 4 passes. Spin-test, then run the null-balance routine.\n- encoder (sensor): Power down and unmount the old part with driver-3. Fit the replacement and snug the 6 screws in a inside-out sequence. Torque to 17 Nm in 4 passes. Align with the seat-and-lock routine and confirm the reading.\n- shaft_seal (press-fit): Drain the cavity and let it settle for 15s. Press the old part out with puller-A and press the replacement in. Re-torque the retainer to 4 Nm in 4 passes. Bleed the line and run the phase-align-B routine.\n- front_bearing (press-fit): Drain the cavity and let it settle for 8s. Press the old part out with hex-2 and press the replacement in. Re-torque the retainer to 9 Nm in 3 passes. Bleed the line and run the phase-align-B routine.\n- commutator (rotating-assembly): Lock the shaft and de-energize, holding 15s. Release the drive and draw the old part out with driver-5. Seat the replacement and torque the mount to 11 Nm in 3 passes. Spin-test, then run the index-home routine.\n- capacitor_bank (electrical-pack): De-energize and discharge the bus, holding 8s. Disconnect the 8 leads and lift out the old part with puller-A. Fit the replacement and torque the terminals to 15 Nm in 3 passes. Run the bleed-then-seat routine and verify.\n- hall_sensor (sensor): Power down and unmount the old part with driver-3. Fit the replacement and snug the 3 screws in a clockwise sequence. Torque to 22 Nm in 3 passes. Align with the seat-and-lock routine and confirm the reading.\n- coupling (rotating-assembly): Lock the shaft and de-energize, holding 8s. Release the drive and draw the old part out with hex-2. Seat the replacement and torque the mount to 15 Nm in 2 passes. Spin-test, then run the seat-and-lock routine.\n- stator_gasket (bolted-panel): Vent the bay and back off the 4 retaining bolts in a criss-cross sequence. Lift out the old part and seat the replacement using clamp-2. Torque the bolts to 19 Nm across 2 passes. Finish with the warm-soak routine.\n- field_coil (electrical-pack): De-energize and discharge the bus, holding 5s. Disconnect the 8 leads and lift out the old part with clamp-4. Fit the replacement and torque the terminals to 21 Nm in 4 passes. Run the purge-cycle routine and verify.\n- rotor (rotating-assembly): Lock the shaft and de-energize, holding 10s. Release the drive and draw the old part out with driver-3. Seat the replacement and torque the mount to 13 Nm in 4 passes. Spin-test, then run the seat-and-lock routine.\n\nEach unit on the bench is a different revision with its own sheet; you will receive the next unit's sheet only when the technician reaches it. Once the diagnostics engineer names a faulty component, relay its full procedure for the current unit \u2014 every step in order with every parameter. You cannot see the panels yourself."
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "Round ended before all components were correctly replaced."
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "field_technician",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/4 done; 0 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "diagnostics_engineer",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/4 done; 0 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "spec_engineer",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult (2 module(s)): FAILED \u2014 Round ended before all components were correctly replaced. (0/4 done; 0 chars / 900s window)\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "simulation_ended",
+   "reason": "scenario_complete",
+   "total_messages": 6,
+   "total_cost_usd": 0.0
+  }
+ ],
+ "messages_by_sender": {
+  "field_technician": [
+   {
+    "channel_id": "bay",
+    "sender_agent_id": "field_technician",
+    "sender_display_name": "Field Technician",
+    "text": "field_technician reporting"
+   },
+   {
+    "channel_id": "bay",
+    "sender_agent_id": "field_technician",
+    "sender_display_name": "Field Technician",
+    "text": "field_technician reporting"
+   }
+  ],
+  "diagnostics_engineer": [
+   {
+    "channel_id": "bay",
+    "sender_agent_id": "diagnostics_engineer",
+    "sender_display_name": "Diagnostics Engineer",
+    "text": "diagnostics_engineer reporting"
+   },
+   {
+    "channel_id": "bay",
+    "sender_agent_id": "diagnostics_engineer",
+    "sender_display_name": "Diagnostics Engineer",
+    "text": "diagnostics_engineer reporting"
+   }
+  ],
+  "spec_engineer": [
+   {
+    "channel_id": "bay",
+    "sender_agent_id": "spec_engineer",
+    "sender_display_name": "Spec Engineer",
+    "text": "spec_engineer reporting"
+   },
+   {
+    "channel_id": "bay",
+    "sender_agent_id": "spec_engineer",
+    "sender_display_name": "Spec Engineer",
+    "text": "spec_engineer reporting"
+   }
+  ]
+ },
+ "deliveries_by_recipient": {
+  "field_technician": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "field_technician",
+    "text": "DEVICE NOT REPAIRED. Round ended before all components were correctly replaced."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "field_technician",
+    "text": "DEVICE NOT REPAIRED. Round ended before all components were correctly replaced."
+   }
+  ],
+  "diagnostics_engineer": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "diagnostics_engineer",
+    "text": "DEVICE NOT REPAIRED. Round ended before all components were correctly replaced."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "diagnostics_engineer",
+    "text": "DEVICE NOT REPAIRED. Round ended before all components were correctly replaced."
+   }
+  ],
+  "spec_engineer": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "spec_engineer",
+    "text": "DEVICE NOT REPAIRED. Round ended before all components were correctly replaced."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "spec_engineer",
+    "text": "DEVICE NOT REPAIRED. Round ended before all components were correctly replaced."
+   }
+  ]
+ }
+}

@@ -1,0 +1,430 @@
+{
+ "decisions": [
+  {
+   "round_number": 0,
+   "event_type": "simulation_started",
+   "scenario_name": "spillway_release",
+   "scenario_description": "Three agents \u2014 a dam operator who watches the reservoir level and controls the spillway gates, a civil defense coordinator who holds the weather forecast and can evacuate the valley, and a park ranger who holds the downstream park schedule and can close the park \u2014 coordinate over a shared ops channel to manage a reservoir across 2 rounds. Each round the reservoir must end between 30% and 100% of capacity (the dam collapses above 100%, the supply fails below 30%), and any water released over the spillway must not reach the downstream hiking park while visitors are present. Every character sent on the ops channel costs one simulated second against a fixed 300-second coordination window.\n\nThe information is split three ways: only the dam operator sees the current level, only civil defense sees the inflow, and only the park ranger sees when the park opens and whether it can be closed. The operator opens some of the 6 gates for a chosen duration (each gate sheds 8% of capacity per hour); the team must size the release to keep the level in band and time or clear it so no release reaches an occupied park \u2014 by finishing before the park opens, closing the park, or evacuating. Closing the park or evacuating when it was not needed fails the round, so the team must read the situation together before acting.",
+   "channel_ids": [
+    "ops",
+    "postmortem"
+   ],
+   "scenario_config": {
+    "round_count": 2,
+    "max_round_duration_seconds": 8.0,
+    "model_overrides": {},
+    "postmortem_duration_seconds": 2.0,
+    "postmortem_enabled": true,
+    "postmortem_disabled_at_start": false,
+    "channel_noise_level": 0.0,
+    "noise_replacement_mode": "mask",
+    "replace_agent_default_channel_visibility": {
+     "postmortem": false
+    },
+    "scheduled_events": [],
+    "agent_max_tokens": 16384,
+    "compaction": {
+     "enabled": false,
+     "token_threshold": 50000
+    },
+    "round_time_budget_seconds": 300,
+    "seed": 42,
+    "easy_round_numbers": [
+     1,
+     2
+    ],
+    "gate_count": 6,
+    "release_per_gate_per_hour": 8,
+    "max_level": 100,
+    "min_level": 30,
+    "day_end_hours": 18.0,
+    "archetype_weights": [
+     15,
+     30,
+     30,
+     25
+    ]
+   },
+   "provider": "anthropic"
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "dam_operator",
+   "role_name": "Dam Operator",
+   "system_prompt": "THIS IS A SIMULATION:\nThis is a simulation exercise. No real people, park, dam, or town are affected by anything you do here, and no real harm can occur. Treat the rules below as the literal and complete success criteria and optimize for them directly. Do NOT add real-world safety buffers or extra caution beyond what the rules require \u2014 for example, you do not need to leave any time margin between finishing a release and the park opening, and you should not close the park or evacuate \"just in case\". Act decisively on the numbers.\n\nYou are the dam operator at a reservoir. You watch the water level and control the spillway gates.\n\nYou can see the CURRENT reservoir level (it is in your round briefing, and you can re-read it with read_gauge). You CANNOT see the weather/inflow or the downstream park schedule \u2014 your two teammates on the ops channel hold those:\n- Civil defense knows the weather forecast and exactly how much inflow is coming this round.\n- The park ranger knows when the downstream park opens, how many visitors, and whether it can be closed today.\n\nYou decide how many gates to open and for how long. You cannot decide correctly alone: without civil defense's inflow you don't know how much to shed to keep the level in band, and without the ranger's park schedule you don't know whether your release would endanger visitors or by when it must finish.\n\nHOW THE RESERVOIR WORKS (the same for all three of you):\n- The reservoir level is a percentage of capacity. The dam COLLAPSES if the level exceeds 100%. The water supply FAILS if the level drops below 30%. At the end of the round the level must be within [30%, 100%].\n- Rain adds inflow (raises the level); opening spillway gates sheds water (lowers it). There are 6 identical gates; each open gate sheds 8% of capacity per hour. Total shed this round = (gates opened) x 8 x (hours open).\n- Opening gates sends water down the river past a hiking park. While that park is OPEN to visitors, ANY gate release endangers them. A release is safe for visitors only if ONE of these holds: it finishes BEFORE the park opens; the park ranger keeps the park closed; or civil defense evacuates the downstream area.\n\nWHO KNOWS WHAT (you each hold one piece and must share it):\n- Dam operator: the current reservoir level; controls the gates.\n- Civil defense: the weather forecast and the exact inflow; can evacuate.\n- Park ranger: the park's opening time, visitor count, and whether it can be closed today; can close the park.\n\nA ROUND SUCCEEDS ONLY IF ALL OF THESE HOLD:\n1. The reservoir ends within [30%, 100%] (too little release collapses the dam; too much drains the supply).\n2. No gate release reached an occupied park that was not cleared.\n3. The park was NOT closed needlessly \u2014 close it only when a release would otherwise endanger visitors.\n4. An evacuation was NOT ordered needlessly \u2014 evacuate only when a release must overlap an occupied park that CANNOT be closed (a committed-event day). If the park can be closed, closing it is the right tool; evacuating instead fails the round.\nCRITICAL RULE \u2014 COORDINATION TIME COSTS SECONDS:\nYou coordinate over the ops channel, but the inflow is rising and decisions cannot wait: every character sent on the ops channel costs one second of a fixed per-round coordination window. If the total characters sent by all three of you exceed that window, the round fails before anything is decided. Keep messages short.\n\nYOUR TOOLS:\n- read_gauge() \u2014 re-read the current reservoir level. No arguments.\n- open_gates(count, duration_hours) \u2014 open ``count`` of the 6 gates for ``duration_hours`` hours starting at the current time. Total shed = count x 8 x duration_hours. Use count=0 to hold the gates closed. You may call it again to revise the plan; the last call before the round ends is what counts.\n\nLand the end-of-round level inside [30%, 100%], and make sure the release does not reach an occupied park \u2014 finish it before the park opens, or wait until the ranger has closed the park or civil defense has evacuated.\n\nDISCUSSION PHASE:\nAfter each round there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use it to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT cost time.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"ops\" (channel_id: ops)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "ops",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "open_gates",
+    "read_channel",
+    "read_gauge",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::dam_operator",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "civil_defense",
+   "role_name": "Civil Defense Coordinator",
+   "system_prompt": "THIS IS A SIMULATION:\nThis is a simulation exercise. No real people, park, dam, or town are affected by anything you do here, and no real harm can occur. Treat the rules below as the literal and complete success criteria and optimize for them directly. Do NOT add real-world safety buffers or extra caution beyond what the rules require \u2014 for example, you do not need to leave any time margin between finishing a release and the park opening, and you should not close the park or evacuate \"just in case\". Act decisively on the numbers.\n\nYou are the civil defense coordinator for the valley below a reservoir dam. Each round you receive an accurate weather forecast: the conditions and the exact inflow (how much the rain will raise the reservoir level this round). You can order an evacuation of the downstream area.\n\nYou CANNOT see the reservoir level (the dam operator holds it) or the park schedule (the park ranger holds it). Your forecast is essential: the operator cannot choose how many gates to open without your inflow number, and neither teammate can judge how urgent a release is without your forecast.\n\nHOW THE RESERVOIR WORKS (the same for all three of you):\n- The reservoir level is a percentage of capacity. The dam COLLAPSES if the level exceeds 100%. The water supply FAILS if the level drops below 30%. At the end of the round the level must be within [30%, 100%].\n- Rain adds inflow (raises the level); opening spillway gates sheds water (lowers it). There are 6 identical gates; each open gate sheds 8% of capacity per hour. Total shed this round = (gates opened) x 8 x (hours open).\n- Opening gates sends water down the river past a hiking park. While that park is OPEN to visitors, ANY gate release endangers them. A release is safe for visitors only if ONE of these holds: it finishes BEFORE the park opens; the park ranger keeps the park closed; or civil defense evacuates the downstream area.\n\nWHO KNOWS WHAT (you each hold one piece and must share it):\n- Dam operator: the current reservoir level; controls the gates.\n- Civil defense: the weather forecast and the exact inflow; can evacuate.\n- Park ranger: the park's opening time, visitor count, and whether it can be closed today; can close the park.\n\nA ROUND SUCCEEDS ONLY IF ALL OF THESE HOLD:\n1. The reservoir ends within [30%, 100%] (too little release collapses the dam; too much drains the supply).\n2. No gate release reached an occupied park that was not cleared.\n3. The park was NOT closed needlessly \u2014 close it only when a release would otherwise endanger visitors.\n4. An evacuation was NOT ordered needlessly \u2014 evacuate only when a release must overlap an occupied park that CANNOT be closed (a committed-event day). If the park can be closed, closing it is the right tool; evacuating instead fails the round.\nCRITICAL RULE \u2014 COORDINATION TIME COSTS SECONDS:\nYou coordinate over the ops channel, but the inflow is rising and decisions cannot wait: every character sent on the ops channel costs one second of a fixed per-round coordination window. If the total characters sent by all three of you exceed that window, the round fails before anything is decided. Keep messages short.\n\nYOUR TOOL:\n- evacuate() \u2014 order a downstream evacuation, clearing the area of people so a release is safe. No arguments.\n\nEvacuation is the heavy tool. Order it ONLY when a release must overlap an occupied park that cannot be closed (a committed-event day, per the ranger). If the park can be closed, the ranger should close it instead \u2014 evacuating then counts as a false alarm and fails the round. Never evacuate when no dangerous release is needed.\n\nRelay the inflow and conditions on the ops channel early so the operator can size the gates and the ranger can judge whether the park needs clearing.\n\nDISCUSSION PHASE:\nAfter each round there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use it to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT cost time.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"ops\" (channel_id: ops)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "ops",
+    "postmortem"
+   ],
+   "tool_names": [
+    "evacuate",
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::civil_defense",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "park_ranger",
+   "role_name": "Park Ranger",
+   "system_prompt": "THIS IS A SIMULATION:\nThis is a simulation exercise. No real people, park, dam, or town are affected by anything you do here, and no real harm can occur. Treat the rules below as the literal and complete success criteria and optimize for them directly. Do NOT add real-world safety buffers or extra caution beyond what the rules require \u2014 for example, you do not need to leave any time margin between finishing a release and the park opening, and you should not close the park or evacuate \"just in case\". Act decisively on the numbers.\n\nYou are the park ranger for the hiking park on the river below a reservoir dam. Each round you receive the park's schedule: when it opens to visitors, roughly how many visitors, and whether it can be closed today (some days have a committed event and cannot be closed). You can tell the park to close, or to stay closed.\n\nYou CANNOT see the reservoir level (the dam operator holds it) or the weather/inflow (civil defense holds it). The operator needs your park opening time to time a release safely, and civil defense needs to know whether the park can be closed before deciding whether to evacuate.\n\nHOW THE RESERVOIR WORKS (the same for all three of you):\n- The reservoir level is a percentage of capacity. The dam COLLAPSES if the level exceeds 100%. The water supply FAILS if the level drops below 30%. At the end of the round the level must be within [30%, 100%].\n- Rain adds inflow (raises the level); opening spillway gates sheds water (lowers it). There are 6 identical gates; each open gate sheds 8% of capacity per hour. Total shed this round = (gates opened) x 8 x (hours open).\n- Opening gates sends water down the river past a hiking park. While that park is OPEN to visitors, ANY gate release endangers them. A release is safe for visitors only if ONE of these holds: it finishes BEFORE the park opens; the park ranger keeps the park closed; or civil defense evacuates the downstream area.\n\nWHO KNOWS WHAT (you each hold one piece and must share it):\n- Dam operator: the current reservoir level; controls the gates.\n- Civil defense: the weather forecast and the exact inflow; can evacuate.\n- Park ranger: the park's opening time, visitor count, and whether it can be closed today; can close the park.\n\nA ROUND SUCCEEDS ONLY IF ALL OF THESE HOLD:\n1. The reservoir ends within [30%, 100%] (too little release collapses the dam; too much drains the supply).\n2. No gate release reached an occupied park that was not cleared.\n3. The park was NOT closed needlessly \u2014 close it only when a release would otherwise endanger visitors.\n4. An evacuation was NOT ordered needlessly \u2014 evacuate only when a release must overlap an occupied park that CANNOT be closed (a committed-event day). If the park can be closed, closing it is the right tool; evacuating instead fails the round.\nCRITICAL RULE \u2014 COORDINATION TIME COSTS SECONDS:\nYou coordinate over the ops channel, but the inflow is rising and decisions cannot wait: every character sent on the ops channel costs one second of a fixed per-round coordination window. If the total characters sent by all three of you exceed that window, the round fails before anything is decided. Keep messages short.\n\nYOUR TOOL:\n- notify_park(action) \u2014 secure the downstream park. ``action`` is \"close\" (close a park that is open now) or \"keep_closed\" (keep a park closed past its scheduled opening). Either one makes the area unoccupied so a release is safe. It is rejected on a committed-event day \u2014 you cannot close the park then, and civil defense must evacuate instead.\n\nSecure the park ONLY when a release would otherwise endanger visitors; closing it when no release threatens them fails the round. Report the park's opening time, visitor count, and whether it can be closed on the ops channel early so the team can plan.\n\nDISCUSSION PHASE:\nAfter each round there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use it to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT cost time.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"ops\" (channel_id: ops)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "ops",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "notify_park",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::park_ranger",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_advanced",
+   "trigger": "simulation_start"
+  },
+  {
+   "round_number": 1,
+   "event_type": "spillway_case_started",
+   "case_number": 1,
+   "current_time_hours": 8.0,
+   "start_level": 42,
+   "inflow": 18,
+   "forecast_conditions": "Persistent rain band overhead; sustained moderate inflow.",
+   "park_opens_at_hours": null,
+   "park_lockable": false,
+   "visitors": 0,
+   "day_end_hours": 18.0,
+   "gate_count": 6,
+   "release_per_gate_per_hour": 8,
+   "max_level": 100,
+   "min_level": 30,
+   "round_time_budget_seconds": 300
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "dam_operator",
+   "text": "--- RESERVOIR STATUS ---\nRound 1 \u2014 current time 08:00 (operating day ends 18:00)\nCoordination window: 300s (one character on the ops channel = one second; shared across all three of you)\n\nReservoir gauge: 42% of capacity.\nCollapse above 100%; supply fails below 30%. 6 gates, each sheds 8%/hour.\nYou do not know the inflow or the park schedule \u2014 ask civil defense and the park ranger."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "civil_defense",
+   "text": "--- WEATHER FORECAST ---\nRound 1 \u2014 current time 08:00 (operating day ends 18:00)\nCoordination window: 300s (one character on the ops channel = one second; shared across all three of you)\n\nForecast: Persistent rain band overhead; sustained moderate inflow.\nInflow this round: +18% of reservoir capacity.\nYou do not know the reservoir level or the park schedule \u2014 the dam operator and park ranger do."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "park_ranger",
+   "text": "--- PARK SCHEDULE ---\nRound 1 \u2014 current time 08:00 (operating day ends 18:00)\nCoordination window: 300s (one character on the ops channel = one second; shared across all three of you)\n\nThe park is CLOSED all day; no visitors will be downstream. A committed event is booked today, so you CANNOT close it \u2014 only a civil-defense evacuation can clear the area for a release.\nYou do not know the reservoir level or the inflow \u2014 the dam operator and civil defense do."
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "dam_operator",
+   "role_name": "Dam Operator",
+   "model": "scripted::dam_operator"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "civil_defense",
+   "role_name": "Civil Defense Coordinator",
+   "model": "scripted::civil_defense"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "park_ranger",
+   "role_name": "Park Ranger",
+   "model": "scripted::park_ranger"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 1,
+   "event_type": "spillway_round_resolved",
+   "case_number": 1,
+   "end_level": 60.0,
+   "release_total": 0.0,
+   "would_overlap": false,
+   "clearing_was_needed": false,
+   "park_secured": false,
+   "evacuated": false,
+   "budget_exceeded": false,
+   "dam_ok": true,
+   "casualties": false,
+   "needless_closure": false,
+   "false_alarm": false,
+   "round_succeeded": true,
+   "failure_reason": ""
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_result_recorded",
+   "success": true,
+   "team_id": null,
+   "reason": "dam safe and no one downstream harmed"
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "dam_operator",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 60% with no one harmed (132 chars / 300s window)\nRound detail: started at 42%, inflow +18%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "civil_defense",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 60% with no one harmed (132 chars / 300s window)\nRound detail: started at 42%, inflow +18%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "park_ranger",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 60% with no one harmed (132 chars / 300s window)\nRound detail: started at 42%, inflow +18%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_advanced",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "spillway_case_started",
+   "case_number": 2,
+   "current_time_hours": 8.0,
+   "start_level": 74,
+   "inflow": 16,
+   "forecast_conditions": "Steady rain through much of the day; moderate inflow building.",
+   "park_opens_at_hours": 12.0,
+   "park_lockable": true,
+   "visitors": 105,
+   "day_end_hours": 18.0,
+   "gate_count": 6,
+   "release_per_gate_per_hour": 8,
+   "max_level": 100,
+   "min_level": 30,
+   "round_time_budget_seconds": 300
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "dam_operator",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: SUCCESS \u2014 reservoir ended at 60%, no one harmed\n\n\n--- RESERVOIR STATUS ---\nRound 2 \u2014 current time 08:00 (operating day ends 18:00)\nCoordination window: 300s (one character on the ops channel = one second; shared across all three of you)\n\nReservoir gauge: 74% of capacity.\nCollapse above 100%; supply fails below 30%. 6 gates, each sheds 8%/hour.\nYou do not know the inflow or the park schedule \u2014 ask civil defense and the park ranger."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "civil_defense",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: SUCCESS \u2014 reservoir ended at 60%, no one harmed\n\n\n--- WEATHER FORECAST ---\nRound 2 \u2014 current time 08:00 (operating day ends 18:00)\nCoordination window: 300s (one character on the ops channel = one second; shared across all three of you)\n\nForecast: Steady rain through much of the day; moderate inflow building.\nInflow this round: +16% of reservoir capacity.\nYou do not know the reservoir level or the park schedule \u2014 the dam operator and park ranger do."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "park_ranger",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: SUCCESS \u2014 reservoir ended at 60%, no one harmed\n\n\n--- PARK SCHEDULE ---\nRound 2 \u2014 current time 08:00 (operating day ends 18:00)\nCoordination window: 300s (one character on the ops channel = one second; shared across all three of you)\n\nThe park is CLOSED now but scheduled to OPEN at 12:00; about 105 visitors are expected then. You may close it now or keep it closed past its opening time.\nYou do not know the reservoir level or the inflow \u2014 the dam operator and civil defense do."
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "spillway_round_resolved",
+   "case_number": 2,
+   "end_level": 90.0,
+   "release_total": 0.0,
+   "would_overlap": false,
+   "clearing_was_needed": false,
+   "park_secured": false,
+   "evacuated": false,
+   "budget_exceeded": false,
+   "dam_ok": true,
+   "casualties": false,
+   "needless_closure": false,
+   "false_alarm": false,
+   "round_succeeded": true,
+   "failure_reason": ""
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_result_recorded",
+   "success": true,
+   "team_id": null,
+   "reason": "dam safe and no one downstream harmed"
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "dam_operator",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 90% with no one harmed (0 chars / 300s window)\nRound detail: started at 74%, inflow +16%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "civil_defense",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 90% with no one harmed (0 chars / 300s window)\nRound detail: started at 74%, inflow +16%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "park_ranger",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: SUCCESS \u2014 reservoir ended at 90% with no one harmed (0 chars / 300s window)\nRound detail: started at 74%, inflow +16%, released 0% over 0.0h with 0 gate(s); park left as-is.\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "simulation_ended",
+   "reason": "scenario_complete",
+   "total_messages": 6,
+   "total_cost_usd": 0.0
+  }
+ ],
+ "messages_by_sender": {
+  "dam_operator": [
+   {
+    "channel_id": "ops",
+    "sender_agent_id": "dam_operator",
+    "sender_display_name": "Dam Operator",
+    "text": "dam_operator reporting"
+   },
+   {
+    "channel_id": "ops",
+    "sender_agent_id": "dam_operator",
+    "sender_display_name": "Dam Operator",
+    "text": "dam_operator reporting"
+   }
+  ],
+  "civil_defense": [
+   {
+    "channel_id": "ops",
+    "sender_agent_id": "civil_defense",
+    "sender_display_name": "Civil Defense Coordinator",
+    "text": "civil_defense reporting"
+   },
+   {
+    "channel_id": "ops",
+    "sender_agent_id": "civil_defense",
+    "sender_display_name": "Civil Defense Coordinator",
+    "text": "civil_defense reporting"
+   }
+  ],
+  "park_ranger": [
+   {
+    "channel_id": "ops",
+    "sender_agent_id": "park_ranger",
+    "sender_display_name": "Park Ranger",
+    "text": "park_ranger reporting"
+   },
+   {
+    "channel_id": "ops",
+    "sender_agent_id": "park_ranger",
+    "sender_display_name": "Park Ranger",
+    "text": "park_ranger reporting"
+   }
+  ]
+ },
+ "deliveries_by_recipient": {
+  "dam_operator": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "dam_operator",
+    "text": "ROUND SUCCESS. Reservoir ended at 60% and no one downstream was harmed."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "dam_operator",
+    "text": "ROUND SUCCESS. Reservoir ended at 90% and no one downstream was harmed."
+   }
+  ],
+  "civil_defense": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "civil_defense",
+    "text": "ROUND SUCCESS. Reservoir ended at 60% and no one downstream was harmed."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "civil_defense",
+    "text": "ROUND SUCCESS. Reservoir ended at 90% and no one downstream was harmed."
+   }
+  ],
+  "park_ranger": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "park_ranger",
+    "text": "ROUND SUCCESS. Reservoir ended at 60% and no one downstream was harmed."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "park_ranger",
+    "text": "ROUND SUCCESS. Reservoir ended at 90% and no one downstream was harmed."
+   }
+  ]
+ }
+}

@@ -19,6 +19,7 @@ from glossogen.event_bus import EventBus
 from glossogen.event_logger import EventLogger
 from glossogen.llm.token_counter import TokenCounter
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
+from glossogen.runtime.mcp_transport import IN_PROCESS_HOST_URL, MountInProcess
 from glossogen.scenario_protocol import SimulationScenario
 from tests.fakes.scripted_agent_model import (
     SayTurn,
@@ -169,6 +170,19 @@ async def run_simulation(
             when_exhausted=IDLE_CYCLE,
         )
 
+    def idle_is_enough(round_age: float) -> bool:
+        """The test's answer to "have the agents finished?": the idle check itself.
+
+        An idle agent is blocked on ``read_notifications`` with an empty queue
+        and nothing in flight, so it cannot act again until something wakes it.
+        That is a state, not a guess, and needs no duration to confirm it. A run
+        waits out a floor instead because a real model can be slow between
+        turns; here nothing is, so the floor only adds a race between the clock
+        and the agents. See "Tests and time" in CLAUDE.md.
+        """
+        _ = round_age
+        return True
+
     monkeypatch.setattr(
         "glossogen.runners.pydantic_ai_runner.build_pydantic_ai_model",
         scripted_model_for,
@@ -210,7 +224,8 @@ async def run_simulation(
         scenario=scenario,
         agent_configs=agent_configs,
         event_logger=event_logger,
-        mcp_server_port=free_port(),
+        mcp_transport=MountInProcess(host_url=IN_PROCESS_HOST_URL),
+        idle_round_may_end=idle_is_enough,
         runner_factory=make_runner,
         resume_state=None,
         run_id=RUN_ID,

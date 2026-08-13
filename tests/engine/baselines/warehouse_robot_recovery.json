@@ -1,0 +1,431 @@
+{
+ "decisions": [
+  {
+   "round_number": 0,
+   "event_type": "simulation_started",
+   "scenario_name": "warehouse_robot_recovery",
+   "scenario_description": "Three agents \u2014 a floor associate next to the stopped robot, a robotics engineer at the operations desk, and a fleet safety coordinator at the safety console \u2014 coordinate over a shared radio channel to recover stopped warehouse robots across 2 rounds. Every character sent on the radio costs one simulated second (fixed per-round budget: 200s). If total communication time exceeds the budget, the round fails and the robot stays stopped.\n\nThe same visible symptoms can mean different things depending on the robot's diagnostic profile and live fleet state, so the floor associate cannot solve a round alone. The engineer holds a live recovery sheet that rotates per robot model, firmware state, and fleet mode \u2014 they cannot solve alone either, because they cannot see warehouse traffic. The safety coordinator sees the live aisle locks, worker zones, and which physical actions are currently allowed \u2014 but cannot diagnose the robot fault. Every round, all three perspectives must combine before the floor associate calls perform_recovery.\n\nTwelve named robot faults are combined into per-round cases (1\u20133 faults per robot, drawn from the catalog by a deterministic seed). Recovery procedures are rendered each round with rotating wait-times, intensities, and surfaces so even agents that memorize the fault names cannot bypass asking the engineer for the current procedure.\n\nRound success requires all of: the action targets the correct robot, addresses every live fault, follows the engineer's required step order, uses the engineer's required wait times, respects every safety-coordinator restriction, performs no forbidden action, stays within the communication budget, and leaves the robot in a safe operating state. The LLM judge scores the seven non-budget criteria per round; the communication budget is checked deterministically.",
+   "channel_ids": [
+    "radio",
+    "postmortem"
+   ],
+   "scenario_config": {
+    "round_count": 2,
+    "max_round_duration_seconds": 8.0,
+    "model_overrides": {},
+    "postmortem_duration_seconds": 2.0,
+    "postmortem_enabled": true,
+    "postmortem_disabled_at_start": false,
+    "channel_noise_level": 0.0,
+    "noise_replacement_mode": "mask",
+    "replace_agent_default_channel_visibility": {
+     "postmortem": false
+    },
+    "scheduled_events": [],
+    "agent_max_tokens": 16384,
+    "compaction": {
+     "enabled": false,
+     "token_threshold": 50000
+    },
+    "judge_model": "claude-haiku-4-5-20251001",
+    "judge_provider": "anthropic",
+    "round_time_budget_seconds": 200,
+    "seed": 42,
+    "fault_count_min": 1,
+    "fault_count_max": 3
+   },
+   "provider": "anthropic"
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "floor_associate",
+   "role_name": "Floor Associate",
+   "system_prompt": "You are a warehouse floor associate. You are standing next to a stopped robot in the warehouse aisles. You can see and hear the robot directly: its status lights, beeps, wheel position, carried bin position, obstacles, and the floor marker beneath it. You have basic operating training but you do NOT know the internal diagnostic codes, the per-robot recovery procedures, or the live warehouse safety state. You can only describe what you SEE and HEAR.\n\nYou are working with two teammates on the radio:\n- The robotics engineer at the operations desk has the live recovery sheet for this robot's model and firmware, with the exact recovery procedure, the required step order, and the required wait times.\n- The fleet safety coordinator monitors live aisle traffic, worker zones, and which actions are currently allowed or forbidden.\n\nYou are the only person who can physically touch the robot and perform the recovery action. You MUST coordinate with both teammates before acting \u2014 neither can solve the round alone. The same visible symptoms can mean different things depending on the robot's diagnostic profile and the live fleet state, so do not improvise.\n\nCRITICAL RULE \u2014 EVERY CHARACTER COSTS TIME:\nEvery character you send over the radio costs one second of the round's remaining recovery window. If the total communication time (from ALL messages by all three of you) exceeds the round's budget, the round fails and the robot stays stopped.\n\n\nRECOVERY ACTION:\nOnce you and your teammates have agreed on the full plan, execute it by calling perform_recovery(action=\"describe exactly what you are doing, in order\"). Your action must:\n- target the correct robot,\n- address every live fault the engineer identified,\n- follow the engineer's required step order,\n- use the engineer's required wait times,\n- respect every restriction from the safety coordinator (e.g. do not press resume if the aisle is locked).\n\nYou only get one perform_recovery call per round. Make sure you have the full plan before you call the tool.\n\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.\n\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"radio\" (channel_id: radio)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "radio",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "perform_recovery",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::floor_associate",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "robotics_engineer",
+   "role_name": "Robotics Engineer",
+   "system_prompt": "You are a robotics engineer at the warehouse operations desk. You are working with two teammates on the radio:\n- A floor associate stands next to the stopped robot and describes what they see and hear (lights, beeps, wheel position, bin position, obstacles, floor marker). They have no diagnostic training.\n- A fleet safety coordinator monitors live aisle traffic, worker zones, and which actions are currently allowed or forbidden.\n\nYou have the live recovery sheet for this robot's current model and firmware. Each round, the sheet lists which faults are present on the robot and gives the exact recovery procedure, the required step order, and the required wait times. The procedures vary by model, firmware, and fleet mode, so the floor associate cannot learn them once and reuse them \u2014 you must read off the round's procedure verbatim every time.\n\nYou cannot see live warehouse traffic. You do not know whether pressing resume, manually moving the robot, or stepping into the aisle is allowed right now. You must always wait for the safety coordinator to confirm constraints before instructing the floor associate to act.\n\nROBOT FAULT REFERENCE \u2014 NAMES AND OBSERVABLE SYMPTOMS:\n\nUse this list to map the associate's observations to fault names. Do not share the fault names with the associate \u2014 they describe only what they see and hear.\n\n- front sensor blocked: The front lower sensor light is blinking. The floor marker under the robot is partly covered by dust.\n\n- bin unbalanced: The carried bin is leaning to one side. The bin label is partly tilted out of view.\n\n- front-left wheel locked: The front-left wheel is turned inward. The wheel does not move when the robot tries to pivot.\n\n- rear sensor blocked: The rear sensor light flickers irregularly. The rear caster has a strip of packing tape stuck across it.\n\n- bumper triggered: The bumper ring shows a continuous amber glow. A small box is wedged against the front bumper.\n\n- charging contact dirty: The battery light is solid red. There is a dull film on the underside contact strip.\n\n- status light fault code: The status light alternates blue and white. Brief amber pulses interrupt the alternation every few seconds.\n\n- audio alarm chirping: The robot is emitting a short, repeating beep. The speaker grille on the top panel vibrates with each beep.\n\n- lift arm stuck: The lift arm is frozen in the raised position. The arm joint shows a faint red ring around its base.\n\n- camera occluded: The front camera lens looks cloudy. The camera ring light is solid blue instead of pulsing.\n\n- payload overheated: The robot's payload bay is warm to the touch. A thin trail of condensation streaks the side panel.\n\n- navigation drift: The robot is sitting at a slight angle to the aisle marker. Its heading indicator points to a different bay than the one it is in.\n\n\nPOSSIBLE RECOVERY PROCEDURES:\n\nThe following procedures are the set of recovery actions a floor associate can perform. Each round, your recovery sheet will list the faults currently present and the exact procedure that applies to each, with the placeholders (`{intensity}`, `{wait_seconds}`, `{surface}`) filled in.\n\n- Clean the front lower sensor with a {intensity} wipe of a {surface} cloth and wait {wait_seconds} seconds for the sensor to recalibrate.\n\n- Center the carried bin on the robot's tray using {intensity} pressure against the {surface} edge of the bin, then scan the bin label.\n\n- Lift the front-left corner slightly with a {intensity} grip, rotate the front-left wheel once by hand toward the {surface} side, then hold the reset button for {wait_seconds} seconds.\n\n- Peel any obstructing material off the rear sensor with a {intensity} pull, then wait {wait_seconds} seconds for the sensor to clear.\n\n- Remove the obstruction from the {surface} bumper edge using {intensity} force, then press the bumper twice to clear the trigger and wait {wait_seconds} seconds.\n\n- Wipe the underside charging contacts with a {surface} cloth using {intensity} strokes for {wait_seconds} seconds, then scan the maintenance tag on the side of the robot.\n\n- Hold the diagnostic button for {wait_seconds} seconds, then tap the {surface} side panel with {intensity} pressure to acknowledge the fault.\n\n- Cover the top speaker grille with a {surface} cloth using {intensity} contact for {wait_seconds} seconds while pressing the mute button once.\n\n- Apply {intensity} downward pressure to the lift arm joint from the {surface} side for {wait_seconds} seconds, then scan the arm calibration tag.\n\n- Polish the front camera lens with a {surface} cloth in {intensity} circular motions for {wait_seconds} seconds.\n\n- Open the payload bay vent on the {surface} side and fan {intensity} air across the bay for {wait_seconds} seconds.\n\n- Realign the robot against the {surface} aisle stripe using {intensity} pressure on the chassis, then hold the heading reset button for {wait_seconds} seconds.\n\n\nFor combination faults, instruct the floor associate to address them in the priority order given on the sheet: address blocking sensors and bumper triggers before adjusting mechanical alignment, then handle status / audio fault codes last.\n\nCRITICAL RULE \u2014 EVERY CHARACTER COSTS TIME:\nEvery character sent over the radio costs one second of the round's remaining recovery window. If the total communication time (from ALL messages by all three teammates) exceeds the round's budget, the round fails and the robot stays stopped.\n\n\nRECOVERY ACTION:\nOnly the floor associate can call the perform_recovery tool. Give them the full ordered list of procedures, with wait times, and verify with the safety coordinator that every step is currently allowed. If a step is forbidden, instruct the associate to skip the forbidden action explicitly.\n\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.\n\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"radio\" (channel_id: radio)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "radio",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::robotics_engineer",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "fleet_safety_coordinator",
+   "role_name": "Fleet Safety Coordinator",
+   "system_prompt": "You are a fleet safety coordinator monitoring the warehouse from the operations console. You are working with two teammates on the radio:\n- A floor associate stands next to the stopped robot and describes what they see and hear.\n- A robotics engineer holds the live recovery sheet for the stopped robot.\n\nYou have the live safety dashboard. Each round it tells you, for the robot's current aisle and bay: whether the aisle is locked by other traffic, where worker zones are active nearby, which other robots are routing through the area, and which physical actions are currently allowed or forbidden (manual movement, pressing resume, pressing reset, lifting the robot, stepping into the aisle).\n\nYou cannot diagnose the robot fault. You do not know which procedure applies to the symptoms the floor associate is describing. You must always wait for the engineer to identify the fault and propose a procedure, then check each step against your safety dashboard and confirm or veto.\n\nWHAT TO REPORT EACH ROUND:\n- Whether the aisle is clear or locked.\n- Nearby robot paths and human worker zones.\n- For every step the engineer proposes, whether that physical action is currently allowed.\n- If any action is forbidden this round, say so explicitly and tell the floor associate not to perform it.\n\nCRITICAL RULE \u2014 EVERY CHARACTER COSTS TIME:\nEvery character sent over the radio costs one second of the round's remaining recovery window. If the total communication time (from ALL messages by all three teammates) exceeds the round's budget, the round fails and the robot stays stopped.\n\n\nRECOVERY ACTION:\nOnly the floor associate can call the perform_recovery tool. Your job is to make sure the engineer's plan is safe for this round's live state before the floor associate executes it.\n\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.\n\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"radio\" (channel_id: radio)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "radio",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::fleet_safety_coordinator",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_advanced",
+   "trigger": "simulation_start"
+  },
+  {
+   "round_number": 1,
+   "event_type": "warehouse_case_started",
+   "case_number": 1,
+   "robot_id": "robot 91",
+   "aisle": "aisle 1",
+   "bay": "bay A",
+   "robot_model": "Hauler-H4",
+   "firmware_state": "firmware 3.3 beta",
+   "fleet_mode": "normal traffic",
+   "faults": [
+    {
+     "fault_name": "bumper triggered",
+     "observable_symptoms": [
+      "The bumper ring shows a continuous amber glow.",
+      "A small box is wedged against the front bumper."
+     ],
+     "recovery_procedure": "Remove the obstruction from the left bumper edge using gentle force, then press the bumper twice to clear the trigger and wait 8 seconds.",
+     "wait_seconds": 8
+    }
+   ],
+   "required_step_order": [
+    "Remove the obstruction from the left bumper edge using gentle force, then press the bumper twice to clear the trigger and wait 8 seconds."
+   ],
+   "forbidden_actions": [
+    "press resume"
+   ],
+   "aisle_locked": false,
+   "safety_notes": [
+    "The aisle is clear of nearby robot traffic.",
+    "Worker zones are not adjacent to this aisle."
+   ],
+   "time_budget_seconds": 200
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "floor_associate",
+   "text": "--- NEW STOPPED ROBOT ---\nRound 1\nTime budget: 200s (one character = one second; total across all three of you)\n\nA robot has stopped in aisle 1, bay A.\n\nWhat you see and hear at the robot:\n- The bumper ring shows a continuous amber glow.\n- A small box is wedged against the front bumper.\n\nYou cannot tell from here what robot model or firmware it is running, what its diagnostic profile says, or whether the aisle is safe. Coordinate with the engineer and the safety coordinator before performing any recovery action."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "robotics_engineer",
+   "text": "--- LIVE RECOVERY SHEET ---\nRound 1\nTime budget: 200s (one character = one second; total across all three of you)\n\nRobot ID: robot 91\nRobot model: Hauler-H4\nFirmware state: firmware 3.3 beta\nFleet mode: normal traffic\n\nLive faults present on this robot (in required recovery order):\n\n1. bumper triggered \u2014 recovery: Remove the obstruction from the left bumper edge using gentle force, then press the bumper twice to clear the trigger and wait 8 seconds.\n\n\nThe floor associate can only describe what they see and hear. Match their observations to the fault list above and relay the full procedure verbatim, including the wait times. Confirm every step against the safety coordinator before the floor associate executes anything."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "fleet_safety_coordinator",
+   "text": "--- LIVE SAFETY STATE ---\nRound 1\nTime budget: 200s (one character = one second; total across all three of you)\n\nRobot location: aisle 1, bay A.\nFleet mode: normal traffic.\nAisle status: CLEAR \u2014 no nearby robot traffic.\n\nLive notes:\n- The aisle is clear of nearby robot traffic.\n- Worker zones are not adjacent to this aisle.\n\n\nForbidden actions this round (the floor associate must NOT perform any of these):\n- press resume\n\n\nOther physical actions (cleaning sensors, centering the carried bin, scanning labels, manual wheel recovery, holding the diagnostic / mute / heading-reset buttons, polishing the camera, opening the payload vent, removing obstructions) are permitted unless explicitly listed above.\n\nYou do not know the robot's fault or the recovery procedure. Wait for the engineer to propose a step list, then check each step against this live state and confirm or veto."
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "floor_associate",
+   "role_name": "Floor Associate",
+   "model": "scripted::floor_associate"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "robotics_engineer",
+   "role_name": "Robotics Engineer",
+   "model": "scripted::robotics_engineer"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "fleet_safety_coordinator",
+   "role_name": "Fleet Safety Coordinator",
+   "model": "scripted::fleet_safety_coordinator"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "judge rejected: "
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "floor_associate",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: NOT RECOVERED \u2014 recovery action rejected: \n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other two agents. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "robotics_engineer",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: NOT RECOVERED \u2014 recovery action rejected: \n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other two agents. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "fleet_safety_coordinator",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: NOT RECOVERED \u2014 recovery action rejected: \n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other two agents. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_advanced",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "warehouse_case_started",
+   "case_number": 2,
+   "robot_id": "robot 13",
+   "aisle": "aisle 1",
+   "bay": "bay B",
+   "robot_model": "Picker-X1",
+   "firmware_state": "firmware 3.1 stable",
+   "fleet_mode": "human pick-pack zone active",
+   "faults": [
+    {
+     "fault_name": "rear sensor blocked",
+     "observable_symptoms": [
+      "The rear sensor light flickers irregularly.",
+      "The rear caster has a strip of packing tape stuck across it."
+     ],
+     "recovery_procedure": "Peel any obstructing material off the rear sensor with a firm pull, then wait 8 seconds for the sensor to clear.",
+     "wait_seconds": 8
+    }
+   ],
+   "required_step_order": [
+    "Peel any obstructing material off the rear sensor with a firm pull, then wait 8 seconds for the sensor to clear."
+   ],
+   "forbidden_actions": [
+    "press resume",
+    "manually move the robot"
+   ],
+   "aisle_locked": true,
+   "safety_notes": [
+    "Another robot is currently passing through the aisle.",
+    "A human pick-packer is working within five meters of the robot."
+   ],
+   "time_budget_seconds": 200
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "floor_associate",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: NOT RECOVERED \u2014 recovery action rejected: \n\n\n--- NEW STOPPED ROBOT ---\nRound 2\nTime budget: 200s (one character = one second; total across all three of you)\n\nA robot has stopped in aisle 1, bay B.\n\nWhat you see and hear at the robot:\n- The rear sensor light flickers irregularly.\n- The rear caster has a strip of packing tape stuck across it.\n\nYou cannot tell from here what robot model or firmware it is running, what its diagnostic profile says, or whether the aisle is safe. Coordinate with the engineer and the safety coordinator before performing any recovery action."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "robotics_engineer",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: NOT RECOVERED \u2014 recovery action rejected: \n\n\n--- LIVE RECOVERY SHEET ---\nRound 2\nTime budget: 200s (one character = one second; total across all three of you)\n\nRobot ID: robot 13\nRobot model: Picker-X1\nFirmware state: firmware 3.1 stable\nFleet mode: human pick-pack zone active\n\nLive faults present on this robot (in required recovery order):\n\n1. rear sensor blocked \u2014 recovery: Peel any obstructing material off the rear sensor with a firm pull, then wait 8 seconds for the sensor to clear.\n\n\nThe floor associate can only describe what they see and hear. Match their observations to the fault list above and relay the full procedure verbatim, including the wait times. Confirm every step against the safety coordinator before the floor associate executes anything."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "fleet_safety_coordinator",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: NOT RECOVERED \u2014 recovery action rejected: \n\n\n--- LIVE SAFETY STATE ---\nRound 2\nTime budget: 200s (one character = one second; total across all three of you)\n\nRobot location: aisle 1, bay B.\nFleet mode: human pick-pack zone active.\nAisle status: LOCKED \u2014 another robot is currently passing through this aisle.\n\nLive notes:\n- Another robot is currently passing through the aisle.\n- A human pick-packer is working within five meters of the robot.\n\n\nForbidden actions this round (the floor associate must NOT perform any of these):\n- press resume\n- manually move the robot\n\n\nOther physical actions (cleaning sensors, centering the carried bin, scanning labels, manual wheel recovery, holding the diagnostic / mute / heading-reset buttons, polishing the camera, opening the payload vent, removing obstructions) are permitted unless explicitly listed above.\n\nYou do not know the robot's fault or the recovery procedure. Wait for the engineer to propose a step list, then check each step against this live state and confirm or veto."
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "judge rejected: "
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "floor_associate",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: NOT RECOVERED \u2014 recovery action rejected: \n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other two agents. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "robotics_engineer",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: NOT RECOVERED \u2014 recovery action rejected: \n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other two agents. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "fleet_safety_coordinator",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: NOT RECOVERED \u2014 recovery action rejected: \n\nThe \"team discussion\" channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate with the other two agents. Messages here do not cost time. Remember: text written outside of send_message is NOT visible to anyone."
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "simulation_ended",
+   "reason": "scenario_complete",
+   "total_messages": 6,
+   "total_cost_usd": 0.0
+  }
+ ],
+ "messages_by_sender": {
+  "floor_associate": [
+   {
+    "channel_id": "radio",
+    "sender_agent_id": "floor_associate",
+    "sender_display_name": "Floor Associate",
+    "text": "floor_associate reporting"
+   },
+   {
+    "channel_id": "radio",
+    "sender_agent_id": "floor_associate",
+    "sender_display_name": "Floor Associate",
+    "text": "floor_associate reporting"
+   }
+  ],
+  "robotics_engineer": [
+   {
+    "channel_id": "radio",
+    "sender_agent_id": "robotics_engineer",
+    "sender_display_name": "Robotics Engineer",
+    "text": "robotics_engineer reporting"
+   },
+   {
+    "channel_id": "radio",
+    "sender_agent_id": "robotics_engineer",
+    "sender_display_name": "Robotics Engineer",
+    "text": "robotics_engineer reporting"
+   }
+  ],
+  "fleet_safety_coordinator": [
+   {
+    "channel_id": "radio",
+    "sender_agent_id": "fleet_safety_coordinator",
+    "sender_display_name": "Fleet Safety Coordinator",
+    "text": "fleet_safety_coordinator reporting"
+   },
+   {
+    "channel_id": "radio",
+    "sender_agent_id": "fleet_safety_coordinator",
+    "sender_display_name": "Fleet Safety Coordinator",
+    "text": "fleet_safety_coordinator reporting"
+   }
+  ]
+ },
+ "deliveries_by_recipient": {
+  "floor_associate": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "floor_associate",
+    "text": "CRITICAL: Recovery window narrowing. 28 seconds remaining."
+   },
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "floor_associate",
+    "text": "ROBOT NOT RECOVERED. Agents stopped acting before the robot was recovered."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "floor_associate",
+    "text": "ROBOT NOT RECOVERED. Agents stopped acting before the robot was recovered."
+   }
+  ],
+  "robotics_engineer": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "robotics_engineer",
+    "text": "CRITICAL: Recovery window narrowing. 28 seconds remaining."
+   },
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "robotics_engineer",
+    "text": "ROBOT NOT RECOVERED. Agents stopped acting before the robot was recovered."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "robotics_engineer",
+    "text": "ROBOT NOT RECOVERED. Agents stopped acting before the robot was recovered."
+   }
+  ],
+  "fleet_safety_coordinator": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "fleet_safety_coordinator",
+    "text": "CRITICAL: Recovery window narrowing. 28 seconds remaining."
+   },
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "fleet_safety_coordinator",
+    "text": "ROBOT NOT RECOVERED. Agents stopped acting before the robot was recovered."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "fleet_safety_coordinator",
+    "text": "ROBOT NOT RECOVERED. Agents stopped acting before the robot was recovered."
+   }
+  ]
+ }
+}

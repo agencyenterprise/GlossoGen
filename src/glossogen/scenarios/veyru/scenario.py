@@ -25,13 +25,15 @@ import random
 from pathlib import Path
 from typing import Any, ClassVar
 
+from glossogen.engine import team_structure
+from glossogen.engine.team_declaration import RoleSpec
 from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.models.agent_config import AgentConfig, AgentRole
-from glossogen.models.channel import Channel
+from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
 from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
@@ -39,9 +41,7 @@ from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationS
 from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.veyru.agent_factory import (
     build_agent_display_names,
-    build_agents,
     build_channel_display_names,
-    build_channels,
     build_teams,
 )
 from glossogen.scenarios.veyru.case_event_conversion import case_started_event
@@ -84,7 +84,12 @@ from glossogen.scenarios.veyru.team_lifecycle import (
     maybe_promote_intern,
     maybe_swap_observers,
 )
-from glossogen.scenarios.veyru.veyru_cases import VeyruCase, get_cases, parse_inject_case_payload
+from glossogen.scenarios.veyru.veyru_cases import (
+    FAILURE_MOTIFS,
+    VeyruCase,
+    get_cases,
+    parse_inject_case_payload,
+)
 from glossogen.scenarios.veyru.world import VeyruWorld
 from glossogen.template_renderer import TemplateRenderer
 
@@ -179,10 +184,11 @@ class VeyruScenario(SimulationScenario):
                 intern_enabled=knobs.intern_enabled,
             )
         )
+        self._team_specs = veyru_teams(knobs=knobs)
         self._world = VeyruWorld(
             veyru_cases=self._veyru_cases,
             teams=build_teams(knobs=knobs),
-            team_specs=veyru_teams(knobs=knobs),
+            team_specs=self._team_specs,
             postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
         )
@@ -217,20 +223,35 @@ class VeyruScenario(SimulationScenario):
             },
         )
 
+    def _render_system_prompt(self, role: RoleSpec, channels: list[ChannelTemplateEntry]) -> str:
+        """Render one role's system prompt over the channels it reaches."""
+        return self._renderer.render(
+            template_name=role.system_template,
+            template_variables={
+                "channels": channels,
+                "postmortem_enabled": self._postmortem_active,
+                "intern_join_round": self._knobs.intern_join_round,
+                "intern_takeover_round": self._knobs.intern_takeover_round,
+                "failure_motifs": FAILURE_MOTIFS,
+                "channel_noise_level": self._knobs.channel_noise_level,
+                "noise_replacement_mode": self._knobs.noise_replacement_mode.value,
+            },
+        )
+
     def get_agents(self, default_model: str, default_provider: str) -> list[AgentConfig]:
-        """Return agent configurations for the active single-team or two-team mode."""
-        return build_agents(
-            knobs=self._knobs,
-            postmortem_active=self._postmortem_active,
-            channel_display_names=self._channel_display_names_by_agent,
-            renderer=self._renderer,
+        """Return one agent per declared role, wired to the channels it reaches."""
+        return team_structure.build_agent_configs(
+            teams=self._team_specs,
+            render_system_prompt=self._render_system_prompt,
             default_model=default_model,
             default_provider=default_provider,
+            max_tokens=self._knobs.agent_max_tokens,
+            compaction=self._knobs.compaction,
         )
 
     def get_channels(self) -> list[Channel]:
-        """Return communication channels appropriate for the active mode."""
-        return build_channels(knobs=self._knobs, postmortem_active=self._postmortem_active)
+        """Return each team's task channel, then its debrief when it holds one."""
+        return team_structure.channels(teams=self._team_specs)
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
         """Return the display name for a channel as seen by a specific agent."""

@@ -65,6 +65,7 @@ from glossogen.runners.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
 )
+from glossogen.runtime.scenario_mcp_tool import calling_agent_id
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.server.runs.streaming_event import AgentCostUpdated
 from glossogen.telemetry_round_processor import current_round_source
@@ -243,6 +244,7 @@ class PydanticAIRunner(AgentRunner):
         self,
         agent_config: AgentConfig,
         mcp_server_url: str,
+        mcp_server_object: Any,
         runtime: SimulationRuntime,
         cost_tracker: dict[str, float],
     ) -> AgentRunResult:
@@ -265,7 +267,15 @@ class PydanticAIRunner(AgentRunner):
         )
 
         mcp_url = f"{mcp_server_url}?agent_id={agent_id}"
-        mcp_toolset = MCPToolset(mcp_url)
+        # A run leaves this None and the toolset connects over Streamable HTTP.
+        # A caller dispatching in-process passes the server object, and the
+        # toolset talks to it in memory. Either way the same protocol, tools and
+        # authorization guard run.
+        calling_agent_id.set(agent_id)
+        if mcp_server_object is None:
+            mcp_toolset = MCPToolset(mcp_url)
+        else:
+            mcp_toolset = MCPToolset(mcp_server_object)
 
         full_system_prompt = build_full_system_prompt(
             base_prompt=agent_config.system_prompt,

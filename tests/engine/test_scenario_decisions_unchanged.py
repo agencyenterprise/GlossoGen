@@ -1,4 +1,4 @@
-"""Veyru has to keep deciding what it decides today, one migration step at a time.
+"""Each scenario has to keep deciding what it decides today, one migration step at a time.
 
 The engine replaces veyru's mechanics in pieces. Each piece is a chance to
 change a decision by accident: a budget compared with the wrong operator, a
@@ -6,9 +6,9 @@ round finalised before its outcome is recorded, an injection rendered from the
 wrong case. None of those crash. They produce a run that completes and reports
 different numbers, which is the failure this exists to catch.
 
-Comparing the migrated veyru against the current one cannot be done by running
-both, since only one exists at a time. So what it decides is recorded here as a
-golden file, checked in, and the migration is held against it.
+Comparing a migrated scenario against the current one cannot be done by running
+both, since only one exists at a time. So what each decides is recorded here as
+a golden file, checked in, and the migration is held against it.
 
 The file records only what `structural_equivalence` deems reproducible:
 decisions in order, and each agent's own messages. Regenerate with
@@ -27,48 +27,71 @@ from typing import Any
 
 import pytest
 
+from glossogen.scenario_registry import SCENARIO_REGISTRY
 from tests.scenarios.scenario_runtime import run_rounds
 from tests.testbed.structural_equivalence import (
     decision_events,
+    deliveries_by_recipient,
     describe_difference,
     messages_by_sender,
 )
 
-pytestmark = pytest.mark.xdist_group("veyru")
-
 ROUNDS = 2
 UPDATE_ENV_VAR = "GLOSSOGEN_UPDATE_BASELINE"
 
-# Both settings are recorded because they exercise different code. With the
-# debrief open, the postmortem injection computes each round's outcome while the
-# character counters still hold that round, and `compute_outcome_if_needed` is
-# idempotent, so the round boundary only re-reads what is already stored. With
-# it closed, the boundary computes the outcome for the first time, and whether
-# the counters are reset before or after that becomes observable. Recording only
-# the open case hides an entire class of ordering bug.
-CONFIGURATIONS: dict[str, dict[str, Any]] = {
-    "debrief_open": {"seed": 42, "postmortem_enabled": True},
-    "debrief_closed": {
-        "seed": 42,
-        "postmortem_enabled": False,
-        "postmortem_after_swap": False,
-    },
+# Everything the platform logs for any scenario. What remains in a baseline is
+# the scenario's own, and a baseline holding none of those would not notice the
+# scenario running a different case.
+PLATFORM_EVENTS = frozenset(
+    {
+        "simulation_started",
+        "simulation_ended",
+        "agent_registered",
+        "agent_connected",
+        "round_advanced",
+        "round_ended",
+        "round_result_recorded",
+        "injection_delivered",
+        "postmortem_started",
+        "postmortem_ended",
+        "world_event_delivered",
+        "channel_history_cleared",
+        "channel_membership_changed",
+    }
+)
+
+# One per scenario from its shipped preset, which is the configuration a reader
+# assumes and the one experiments start from.
+#
+# Veyru carries a second with the debrief closed, because the two exercise
+# different code. With it open, the postmortem injection computes each round's
+# outcome while the character counters still hold that round, and
+# `compute_outcome_if_needed` is idempotent, so the round boundary only re-reads
+# what is stored. Closed, the boundary computes it for the first time and
+# whether the counters were reset first becomes observable.
+CONFIGURATIONS: dict[str, tuple[str, dict[str, Any]]] = {
+    name: (name, {}) for name in sorted(SCENARIO_REGISTRY)
 }
+CONFIGURATIONS["veyru_debrief_closed"] = (
+    "veyru",
+    {"postmortem_enabled": False, "postmortem_after_swap": False},
+)
 
 
 def baseline_path(configuration: str) -> Path:
     """Return the golden file for one configuration."""
-    return Path(__file__).parent / f"veyru_decision_baseline_{configuration}.json"
+    return Path(__file__).parent / "baselines" / f"{configuration}.json"
 
 
-async def play_veyru(
+async def play(
     configuration: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> list[dict[str, Any]]:
-    """Run veyru at the canonical seed under one configuration."""
+    """Run one configuration's scenario for the recorded number of rounds."""
+    scenario_name, overrides = CONFIGURATIONS[configuration]
     result = await run_rounds(
-        scenario_name="veyru",
+        scenario_name=scenario_name,
         round_count=ROUNDS,
-        overrides=dict(CONFIGURATIONS[configuration]),
+        overrides=dict(overrides),
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
     )
@@ -80,6 +103,7 @@ def as_baseline(events: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "decisions": decision_events(events),
         "messages_by_sender": messages_by_sender(events),
+        "deliveries_by_recipient": deliveries_by_recipient(events),
     }
 
 
@@ -100,15 +124,18 @@ def to_events(baseline: dict[str, Any]) -> list[dict[str, Any]]:
                     "message": {**message, "sender_agent_id": sender},
                 }
             )
+    for recipient, deliveries in baseline["deliveries_by_recipient"].items():
+        for delivered in deliveries:
+            events.append({**delivered, "agent_id": recipient})
     return events
 
 
 @pytest.mark.parametrize("configuration", sorted(CONFIGURATIONS))
-async def test_veyru_decides_what_the_baseline_recorded(
+async def test_the_scenario_decides_what_the_baseline_recorded(
     configuration: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The migration's contract, in one assertion."""
-    events = await play_veyru(configuration, tmp_path, monkeypatch)
+    events = await play(configuration, tmp_path, monkeypatch)
     path = baseline_path(configuration=configuration)
 
     if os.environ.get(UPDATE_ENV_VAR):
@@ -118,7 +145,14 @@ async def test_veyru_decides_what_the_baseline_recorded(
     assert path.exists(), f"no baseline recorded; create one with {UPDATE_ENV_VAR}=1"
     recorded = json.loads(path.read_text())
 
-    difference = describe_difference(to_events(recorded), to_events(as_baseline(events)))
+    produced = as_baseline(events)
+    difference = describe_difference(to_events(recorded), to_events(produced))
+    if difference:
+        # Write what this run actually decided, next to the baseline it failed
+        # against, so a divergence can be diffed instead of re-guessed.
+        actual_path = baseline_path(configuration=configuration).with_suffix(".actual.json")
+        actual_path.write_text(json.dumps(produced, indent=1, default=str) + "\n")
+        difference = f"{difference}\n\nwhat this run decided: {actual_path}"
 
     assert difference == "", difference
 
@@ -138,12 +172,17 @@ def test_the_baseline_records_the_decisions_worth_holding(configuration: str) ->
         "round_ended",
         "round_result_recorded",
         "injection_delivered",
-        "veyru_case_started",
         "simulation_ended",
     ):
         assert required in kinds, f"{required} is missing from the baseline"
+    scenario_events = kinds - PLATFORM_EVENTS
+    assert scenario_events, (
+        "the baseline holds no scenario-specific event, so it would not notice a "
+        "scenario deciding a different case"
+    )
     assert recorded["messages_by_sender"], "the baseline recorded no messages"
-    holds_debrief = CONFIGURATIONS[configuration]["postmortem_enabled"]
-    assert (
-        "postmortem_started" in kinds
-    ) == holds_debrief, "the baseline disagrees with the configuration about whether a debrief ran"
+    _, overrides = CONFIGURATIONS[configuration]
+    if overrides.get("postmortem_enabled") is False:
+        assert (
+            "postmortem_started" not in kinds
+        ), "the configuration switches the debrief off but the baseline recorded one"

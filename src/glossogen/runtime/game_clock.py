@@ -36,6 +36,20 @@ logger = logging.getLogger(__name__)
 IDLE_CHECK_INTERVAL_SECONDS = 0.5
 MIN_ROUND_DURATION_SECONDS = 5.0
 
+IdleRoundEndCheck = Callable[[float], bool]
+"""Given how long since the last message, may a round of idle agents end?
+
+A run has no way to tell an agent that has finished from one that is between
+cycles, so it waits ``MIN_ROUND_DURATION_SECONDS`` and assumes. A test knows the
+answer exactly, because it wrote the agents' scripts, and supplies a check that
+reads that instead of a clock. See "Tests and time" in CLAUDE.md.
+"""
+
+
+def minimum_duration_elapsed(round_age: float) -> bool:
+    """The run's answer: wait out the floor, then treat idle as finished."""
+    return round_age >= MIN_ROUND_DURATION_SECONDS
+
 
 class GameClock:
     """Advances rounds based on agent idle state or timeout, and delivers injections."""
@@ -51,6 +65,7 @@ class GameClock:
         start_round: int,
         resuming: bool,
         on_round_boundary: RoundBoundaryHook | None,
+        idle_round_may_end: IdleRoundEndCheck,
     ) -> None:
         self._scenario = scenario
         self._agent_sessions = agent_sessions
@@ -62,6 +77,7 @@ class GameClock:
         self._start_round = start_round
         self._resuming = resuming
         self._on_round_boundary = on_round_boundary
+        self._idle_round_may_end = idle_round_may_end
         runtime.set_current_round(round_number=start_round)
         self._round_start_time = time.monotonic()
         self._last_message_time = time.monotonic()
@@ -75,7 +91,8 @@ class GameClock:
     def _all_agents_idle(self) -> bool:
         """True when every agent is blocked on read_notifications with empty queues.
 
-        Also requires that no agent has any non-blocking tool call in
+        Also requires that the world has drained its event queue, and that no
+        agent has any non-blocking tool call in
         flight (``active_non_blocking_calls == 0``). Pydantic-ai
         dispatches parallel tool calls, so a ``read_notifications`` can
         flip ``is_idle`` to True while the same agent's parallel
@@ -89,7 +106,10 @@ class GameClock:
                 return False
             if session.has_pending_notifications():
                 return False
-        return True
+        # The world reacts to messages on its own task. Ending the round with
+        # events still queued drops those reactions, so a budget notification
+        # fires or does not depending on how the tasks interleaved.
+        return not self._world_context.has_unprocessed_events()
 
     def _phase_timed_out(self) -> bool:
         """Return True if the current phase has exceeded its wall-clock time limit.
@@ -238,7 +258,7 @@ class GameClock:
                     self._runtime.current_round,
                     trigger,
                 )
-            elif self._all_agents_idle() and round_age >= MIN_ROUND_DURATION_SECONDS:
+            elif self._all_agents_idle() and self._idle_round_may_end(round_age):
                 trigger = "all_agents_idle"
             elif self._phase_timed_out():
                 elapsed = time.monotonic() - self._last_message_time

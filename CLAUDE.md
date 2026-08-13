@@ -161,6 +161,33 @@ All prompts (agent system prompts, round injections) use Jinja2 templates stored
 
 - **Always use output schemas to enforce structured LLM responses.** Never parse free text from LLM responses. Define a Pydantic model for the desired output shape, pass it to `generate_structured()`, and use the validated instance directly.
 
+### Tests and time
+
+**No test may depend on wall-clock time.** No `sleep`, no waiting for a duration
+to elapse, no assertion that rests on a timeout firing on its own. A test that
+races real time passes on a quiet machine and fails under load, and the failure
+reads as a bug in the code under test rather than in the test.
+
+Monkeypatching a duration to a small number is not a fix. It narrows the race
+without removing it, and the smaller the number the tighter the race gets
+against scheduling jitter.
+
+Where the platform uses time as a proxy for a question, the test answers the
+question directly instead. The game clock waits `MIN_ROUND_DURATION_SECONDS`
+after the last message to guess whether the agents have finished; a test with
+scripted agents knows when they have finished, because it wrote the scripts. If
+the production path has no injection point for that, add one rather than tune
+the wait.
+
+A test that has to exercise a timeout drives the clock rather than waiting for
+one: advancing time is an explicit statement in the test.
+
+This was measured, not assumed. With that floor patched to 50ms,
+`container_yard_stacking` dropped a message roughly one full-suite run in six
+under `-n auto`, which changed what its world announced and broke a recorded
+baseline. Nothing about the scenario or the platform was wrong; the test was
+racing.
+
 ### Writing
 
 This applies to every word committed here: docstrings, comments, markdown, commit

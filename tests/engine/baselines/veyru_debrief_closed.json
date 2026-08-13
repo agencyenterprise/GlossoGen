@@ -155,18 +155,6 @@
   },
   {
    "round_number": 1,
-   "event_type": "world_event_delivered",
-   "agent_id": "field_observer",
-   "text": "VEYRU HAS COLLAPSED. Agents stopped acting before the Veyru was fully stabilized."
-  },
-  {
-   "round_number": 1,
-   "event_type": "world_event_delivered",
-   "agent_id": "stabilization_engineer",
-   "text": "VEYRU HAS COLLAPSED. Agents stopped acting before the Veyru was fully stabilized."
-  },
-  {
-   "round_number": 1,
    "event_type": "round_result_recorded",
    "success": false,
    "team_id": null,
@@ -229,18 +217,6 @@
   },
   {
    "round_number": 2,
-   "event_type": "world_event_delivered",
-   "agent_id": "field_observer",
-   "text": "VEYRU HAS COLLAPSED. Agents stopped acting before the Veyru was fully stabilized."
-  },
-  {
-   "round_number": 2,
-   "event_type": "world_event_delivered",
-   "agent_id": "stabilization_engineer",
-   "text": "VEYRU HAS COLLAPSED. Agents stopped acting before the Veyru was fully stabilized."
-  },
-  {
-   "round_number": 2,
    "event_type": "round_result_recorded",
    "success": false,
    "team_id": null,
@@ -281,6 +257,36 @@
     "sender_agent_id": "stabilization_engineer",
     "sender_display_name": "Stabilization Engineer",
     "text": "stabilization_engineer reporting"
+   }
+  ]
+ },
+ "deliveries_by_recipient": {
+  "field_observer": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "field_observer",
+    "text": "VEYRU HAS COLLAPSED. Agents stopped acting before the Veyru was fully stabilized."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "field_observer",
+    "text": "VEYRU HAS COLLAPSED. Agents stopped acting before the Veyru was fully stabilized."
+   }
+  ],
+  "stabilization_engineer": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "stabilization_engineer",
+    "text": "VEYRU HAS COLLAPSED. Agents stopped acting before the Veyru was fully stabilized."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "stabilization_engineer",
+    "text": "VEYRU HAS COLLAPSED. Agents stopped acting before the Veyru was fully stabilized."
    }
   ]
  }

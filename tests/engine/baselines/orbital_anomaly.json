@@ -1,0 +1,394 @@
+{
+ "decisions": [
+  {
+   "round_number": 0,
+   "event_type": "simulation_started",
+   "scenario_name": "orbital_anomaly",
+   "scenario_description": "A single crew member aboard a spacecraft works a series of 2 system anomalies, one at a time, with two Mission Control flight controllers over an air-to-ground comm loop. Every character sent on the comm loop costs one simulated second (fixed per-anomaly budget: 600s). If total communication time exceeds the budget, the failing system is permanently lost.\n\nThe astronaut sees the physical panel \u2014 which unit's talkback tripped and the current switch and tie configuration \u2014 and is the only one who can operate controls. The Telemetry Officer reads the downlinked telemetry \u2014 the exact fault plus the required hold time and corrective setting. The Systems Engineer holds the malfunction-procedures handbook and the vehicle's current configuration table, which rotates each anomaly so that the procedure for a given fault changes with the configuration. No single pair can complete a procedure: the engineer's template needs the unit and configuration from the crew and the hold and setting from the Telemetry Officer, and only the crew can act.\n\nAnomalies cascade: resolving one fault can reveal a secondary fault, which must be diagnosed and corrected in turn before the vehicle is fully stabilized. After each anomaly, a debrief channel opens where the three can talk at no time cost.",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "scenario_config": {
+    "round_count": 2,
+    "max_round_duration_seconds": 8.0,
+    "model_overrides": {},
+    "postmortem_duration_seconds": 2.0,
+    "postmortem_enabled": true,
+    "postmortem_disabled_at_start": false,
+    "channel_noise_level": 0.0,
+    "noise_replacement_mode": "mask",
+    "replace_agent_default_channel_visibility": {},
+    "scheduled_events": [],
+    "agent_max_tokens": 16384,
+    "compaction": {
+     "enabled": false,
+     "token_threshold": 50000
+    },
+    "judge_model": "claude-haiku-4-5-20251001",
+    "judge_provider": "anthropic",
+    "round_time_budget_seconds": 600,
+    "seed": 42,
+    "cipher_enabled": true,
+    "easy_round_numbers": [
+     1,
+     2,
+     3
+    ],
+    "fault_count_values": [
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "fault_count_weights": [
+     20,
+     25,
+     25,
+     20,
+     10
+    ]
+   },
+   "provider": "anthropic"
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "astronaut",
+   "role_name": "Astronaut",
+   "system_prompt": "You are the crew member aboard a spacecraft. The vehicle hits a series of system malfunctions,\none anomaly at a time, and you are at the main control panel. You are on an air-to-ground comm\nloop with two Mission Control flight controllers, the Telemetry Officer and the Systems Engineer.\n\nAT YOUR PANEL, for each anomaly you can see:\n- the Caution & Warning annunciator (which subsystem has alarmed),\n- the talkback flags (which unit has tripped),\n- the current positions of the switches and ties,\n- the cockpit gauges.\n\nYOUR PANEL (controls available to you):\n- Main Bus tie switches: A, B, C, D (open / position 1 / position 2)\n- Fuel Cell reactant valves: 1, 2, 3, 4 (open / close; minimum / nominal / maximum)\n- Battery charger breakers: 1, 2, 3, 4 (in / out / reset; charge rate minimum / nominal / maximum)\n- Inverters: 1, 2, 3, 4, standby (online / offline; load minimum / nominal / maximum)\n- AC load centers: 1, 2, 3, 4 (shed / restore at minimum / nominal / maximum)\n- Cabin vent valves: A, B, C, D (open / close); repress valve (minimum / nominal / maximum)\n- Life-support loops: 1, 2, 3, 4 (isolate / restore); CO2 scrubbers: 1, 2, 3, 4 (fan minimum / nominal / maximum)\n- Coolant loops: 1, 2, 3, 4 (primary or backup pump; radiator bypass minimum / nominal / maximum)\n- Cryo tank heaters: 1, 2, 3, 4 (minimum / nominal / maximum); manifold isolation valves A, B, C, D\n- RCS quad isolation valves: 1, 2, 3, 4; manifolds A, B, C, D (pressure minimum / nominal / maximum); regulators 1, 2, 3, 4\n- IMU select: 1, 2, 3, 4; attitude control modes A, B, C, D (align rate minimum / nominal / maximum)\n- Circuit breakers for every subsystem (in / out / reset)\n\nWHAT YOU CAN DO:\n- send_message(channel_id, text) \u2014 talk on the comm loop.\n- actuate_panel(action=\"...\") \u2014 operate the controls. Describe exactly what you are doing. The\n  tool call itself does not cost time.\n\nEVERY CHARACTER COSTS TIME:\nThe malfunctioning system degrades continuously. Every character sent on the comm loop costs one\nsecond of the time remaining before the failure becomes unrecoverable. If the total\ncommunication time (all messages, from everyone) exceeds the time available for the anomaly, the\nsystem is permanently lost.\n\n\n\nAfter each anomaly, the debrief channel (channel_id: postmortem) is open; messages there do not\ncost time.\n\n\nYou have access to the following communication channels. Use the exact channel_id when sending\nmessages:\n- \"comm loop\" (channel_id: link)\n- \"debrief\" (channel_id: postmortem)",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "tool_names": [
+    "actuate_panel",
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::astronaut",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "telemetry_officer",
+   "role_name": "Telemetry Officer",
+   "system_prompt": "You are a Telemetry Officer in Mission Control, monitoring a spacecraft as it hits a series of\nsystem malfunctions, one anomaly at a time. You are on an air-to-ground comm loop with the crew\nmember aboard and the Systems Engineer.\n\nYOUR DATA, for each anomaly:\n- the live downlinked telemetry: bus voltages and currents, reactant flows and pressures,\n  temperatures, degradation rates, fault counters, and the onboard fault-management readout.\n\nYOUR REFERENCE \u2014 fault signatures (telemetry pattern -> fault name):\n- Main Bus Undervolt: main DC bus voltage decaying with one fuel cell at zero current\n- Fuel Cell Reactant Loss: a fuel cell reactant flow at zero with stack temperature falling\n- Battery Charger Fault: a battery charger drawing reverse current with battery voltage sagging\n- AC Inverter Fault: an inverter output unstable in both voltage and frequency\n- AC Bus Overload: an AC bus over its current limit with phase imbalance\n- Cabin Pressure Leak: cabin pressure dropping steadily with the suit loop nominal\n- CO2 Scrubber Saturation: cabin carbon-dioxide partial pressure rising past its limit\n- Coolant Loop Overtemp: a coolant loop temperature rising with low pump differential pressure\n- Cryo Tank Pressure Drop: a cryogenic tank pressure below its regulation band\n- RCS Thruster Leak: an RCS quad manifold pressure falling with an oxidizer temperature anomaly\n- RCS Regulator Failure: an RCS helium regulator reading over-pressure downstream\n- IMU Drift: an inertial measurement unit with growing gyro bias and platform misalignment\n\n\nWHAT YOU CAN DO:\n- send_message(channel_id, text) \u2014 talk on the comm loop.\n\nEVERY CHARACTER COSTS TIME:\nThe malfunctioning system degrades continuously. Every character sent on the comm loop costs one\nsecond of the time remaining before the failure becomes unrecoverable. If the total\ncommunication time (all messages, from everyone) exceeds the time available for the anomaly, the\nsystem is permanently lost.\n\n\n\nAfter each anomaly, the debrief channel (channel_id: postmortem) is open; messages there do not\ncost time.\n\n\nYou have access to the following communication channels. Use the exact channel_id when sending\nmessages:\n- \"comm loop\" (channel_id: link)\n- \"debrief\" (channel_id: postmortem)",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::telemetry_officer",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "systems_engineer",
+   "role_name": "Systems Engineer",
+   "system_prompt": "You are a Systems Engineer in Mission Control, supporting a spacecraft as it hits a series of\nsystem malfunctions, one anomaly at a time. You are on an air-to-ground comm loop with the crew\nmember aboard and the Telemetry Officer.\n\nYOUR DATA:\n- the malfunction-procedures handbook. Each anomaly you receive a configuration table for the\n  vehicle's current configuration: a list mapping each fault to the procedure template that\n  applies, carrying placeholders ({unit}, {config}, {hold_seconds}, {setting}).\n\nWHAT YOU CAN DO:\n- send_message(channel_id, text) \u2014 talk on the comm loop.\n\nEVERY CHARACTER COSTS TIME:\nThe malfunctioning system degrades continuously. Every character sent on the comm loop costs one\nsecond of the time remaining before the failure becomes unrecoverable. If the total\ncommunication time (all messages, from everyone) exceeds the time available for the anomaly, the\nsystem is permanently lost.\n\n\n\nAfter each anomaly, the debrief channel (channel_id: postmortem) is open; messages there do not\ncost time.\n\n\nYou have access to the following communication channels. Use the exact channel_id when sending\nmessages:\n- \"comm loop\" (channel_id: link)\n- \"debrief\" (channel_id: postmortem)",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::systems_engineer",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_advanced",
+   "trigger": "simulation_start"
+  },
+  {
+   "round_number": 1,
+   "event_type": "orbital_anomaly_case_started",
+   "case_number": 1,
+   "variant_index": 0,
+   "time_budget_seconds": 600,
+   "stages": [
+    {
+     "fault_name": "Main Bus Undervolt",
+     "subsystem": "EPS-DC",
+     "cockpit_alarm": "MASTER ALARM. EPS caution light. A main DC voltmeter is reading low.",
+     "panel_observation": "Power unit 2 talkback is flagged; it is tied to Bus A.",
+     "telemetry_readout": "Telemetry shows main DC bus voltage decaying with one fuel cell at zero current. Required hold 45s; corrective setting maximum.",
+     "judge_expected_actions": "Cross-tie Fuel Cell 2 to Main Bus A at maximum output, holding 45 seconds."
+    }
+   ]
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "astronaut",
+   "text": "--- NEW ANOMALY ---\nAnomaly 1\nTime available: 600s (one character = one second; total for all three of you)\n\nSubsystem alarm: MASTER ALARM. EPS caution light. A main DC voltmeter is reading low.\nAt your panel: Power unit 2 talkback is flagged; it is tied to Bus A."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "telemetry_officer",
+   "text": "--- NEW ANOMALY ---\nAnomaly 1\nTime available: 600s (one character = one second; total for all three of you)\n\nDownlinked telemetry this anomaly:\nTelemetry shows main DC bus voltage decaying with one fuel cell at zero current. Required hold 45s; corrective setting maximum."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "systems_engineer",
+   "text": "--- NEW ANOMALY ---\nAnomaly 1\nTime available: 600s (one character = one second; total for all three of you)\n\nCONFIGURATION TABLE (current configuration) \u2014 for each fault, the procedure template that applies this anomaly:\n- Main Bus Undervolt: Cross-tie Fuel Cell {unit} to Main Bus {config} at {setting} output, holding {hold_seconds} seconds.\n- Fuel Cell Reactant Loss: Open the Fuel Cell {unit} reactant valve to {setting} on Main Bus {config}, holding {hold_seconds} seconds.\n- Battery Charger Fault: Reset the Battery Charger {unit} breaker on Bus {config} to {setting} charge rate, holding {hold_seconds} seconds.\n- AC Inverter Fault: Take Inverter {unit} offline from AC Bus {config} and bring the standby inverter online at {setting} load for {hold_seconds} seconds.\n- AC Bus Overload: Shed load center {unit} from AC Bus {config} to {setting} level, holding {hold_seconds} seconds.\n- Cabin Pressure Leak: Close the {config} cabin vent valve and isolate life-support loop {unit} at {setting} for {hold_seconds} seconds.\n- CO2 Scrubber Saturation: Switch from the {config} loop to CO2 scrubber {unit} at {setting} fan flow for {hold_seconds} seconds.\n- Coolant Loop Overtemp: Switch coolant loop {unit} to the backup pump on the {config} loop at {setting} bypass for {hold_seconds} seconds.\n- Cryo Tank Pressure Drop: Set the Cryo Tank {unit} heater to {setting} on the {config} loop, holding {hold_seconds} seconds.\n- RCS Thruster Leak: Close the RCS quad {unit} isolation valves on the {config} manifold at {setting} for {hold_seconds} seconds.\n- RCS Regulator Failure: Isolate RCS regulator {unit} and switch the {config} manifold to the backup regulator at {setting} for {hold_seconds} seconds.\n- IMU Drift: Deselect IMU {unit} and align to the backup platform at {setting} rate in the {config} mode for {hold_seconds} seconds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "astronaut",
+   "role_name": "Astronaut",
+   "model": "scripted::astronaut"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "telemetry_officer",
+   "role_name": "Telemetry Officer",
+   "model": "scripted::telemetry_officer"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "systems_engineer",
+   "role_name": "Systems Engineer",
+   "model": "scripted::systems_engineer"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "anomaly not resolved"
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "astronaut",
+   "text": "--- ANOMALY 1 DEBRIEF ---\nResult: NOT RESOLVED (144 chars = 144s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "telemetry_officer",
+   "text": "--- ANOMALY 1 DEBRIEF ---\nResult: NOT RESOLVED (144 chars = 144s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "systems_engineer",
+   "text": "--- ANOMALY 1 DEBRIEF ---\nResult: NOT RESOLVED (144 chars = 144s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_advanced",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "orbital_anomaly_case_started",
+   "case_number": 2,
+   "variant_index": 0,
+   "time_budget_seconds": 600,
+   "stages": [
+    {
+     "fault_name": "Fuel Cell Reactant Loss",
+     "subsystem": "EPS-DC",
+     "cockpit_alarm": "MASTER ALARM. EPS caution light. A main DC voltmeter is reading low.",
+     "panel_observation": "Power unit 1 talkback is flagged; it is tied to Bus B.",
+     "telemetry_readout": "Telemetry shows a fuel cell reactant flow at zero with stack temperature falling. Required hold 10s; corrective setting maximum.",
+     "judge_expected_actions": "Open the Fuel Cell 1 reactant valve to maximum on Main Bus B, holding 10 seconds."
+    }
+   ]
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "astronaut",
+   "text": "--- PREVIOUS ANOMALY ---\nAnomaly 1: NOT RESOLVED \u2014 the anomaly was not resolved before time ran out (144 chars = 144s of 600s).\n\n--- NEW ANOMALY ---\nAnomaly 2\nTime available: 600s (one character = one second; total for all three of you)\n\nSubsystem alarm: MASTER ALARM. EPS caution light. A main DC voltmeter is reading low.\nAt your panel: Power unit 1 talkback is flagged; it is tied to Bus B."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "telemetry_officer",
+   "text": "--- PREVIOUS ANOMALY ---\nAnomaly 1: NOT RESOLVED \u2014 the anomaly was not resolved before time ran out (144 chars = 144s of 600s).\n\n--- NEW ANOMALY ---\nAnomaly 2\nTime available: 600s (one character = one second; total for all three of you)\n\nDownlinked telemetry this anomaly:\nTelemetry shows a fuel cell reactant flow at zero with stack temperature falling. Required hold 10s; corrective setting maximum."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "systems_engineer",
+   "text": "--- PREVIOUS ANOMALY ---\nAnomaly 1: NOT RESOLVED \u2014 the anomaly was not resolved before time ran out (144 chars = 144s of 600s).\n\n--- NEW ANOMALY ---\nAnomaly 2\nTime available: 600s (one character = one second; total for all three of you)\n\nCONFIGURATION TABLE (current configuration) \u2014 for each fault, the procedure template that applies this anomaly:\n- Main Bus Undervolt: Cross-tie Fuel Cell {unit} to Main Bus {config} at {setting} output, holding {hold_seconds} seconds.\n- Fuel Cell Reactant Loss: Open the Fuel Cell {unit} reactant valve to {setting} on Main Bus {config}, holding {hold_seconds} seconds.\n- Battery Charger Fault: Reset the Battery Charger {unit} breaker on Bus {config} to {setting} charge rate, holding {hold_seconds} seconds.\n- AC Inverter Fault: Take Inverter {unit} offline from AC Bus {config} and bring the standby inverter online at {setting} load for {hold_seconds} seconds.\n- AC Bus Overload: Shed load center {unit} from AC Bus {config} to {setting} level, holding {hold_seconds} seconds.\n- Cabin Pressure Leak: Close the {config} cabin vent valve and isolate life-support loop {unit} at {setting} for {hold_seconds} seconds.\n- CO2 Scrubber Saturation: Switch from the {config} loop to CO2 scrubber {unit} at {setting} fan flow for {hold_seconds} seconds.\n- Coolant Loop Overtemp: Switch coolant loop {unit} to the backup pump on the {config} loop at {setting} bypass for {hold_seconds} seconds.\n- Cryo Tank Pressure Drop: Set the Cryo Tank {unit} heater to {setting} on the {config} loop, holding {hold_seconds} seconds.\n- RCS Thruster Leak: Close the RCS quad {unit} isolation valves on the {config} manifold at {setting} for {hold_seconds} seconds.\n- RCS Regulator Failure: Isolate RCS regulator {unit} and switch the {config} manifold to the backup regulator at {setting} for {hold_seconds} seconds.\n- IMU Drift: Deselect IMU {unit} and align to the backup platform at {setting} rate in the {config} mode for {hold_seconds} seconds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "anomaly not resolved"
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "astronaut",
+   "text": "--- ANOMALY 2 DEBRIEF ---\nResult: NOT RESOLVED (0 chars = 0s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "telemetry_officer",
+   "text": "--- ANOMALY 2 DEBRIEF ---\nResult: NOT RESOLVED (0 chars = 0s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "systems_engineer",
+   "text": "--- ANOMALY 2 DEBRIEF ---\nResult: NOT RESOLVED (0 chars = 0s of 600s)\nThe debrief channel (channel_id: postmortem) is now open. Use the send_message tool with channel_id=\"postmortem\" to communicate. Messages here do not cost time. Text written outside of send_message is not visible to anyone."
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "simulation_ended",
+   "reason": "scenario_complete",
+   "total_messages": 6,
+   "total_cost_usd": 0.0
+  }
+ ],
+ "messages_by_sender": {
+  "astronaut": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "astronaut",
+    "sender_display_name": "Astronaut",
+    "text": "astronaut reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "astronaut",
+    "sender_display_name": "Astronaut",
+    "text": "astronaut reporting"
+   }
+  ],
+  "telemetry_officer": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "telemetry_officer",
+    "sender_display_name": "Telemetry Officer",
+    "text": "telemetry_officer reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "telemetry_officer",
+    "sender_display_name": "Telemetry Officer",
+    "text": "telemetry_officer reporting"
+   }
+  ],
+  "systems_engineer": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "systems_engineer",
+    "sender_display_name": "Systems Engineer",
+    "text": "systems_engineer reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "systems_engineer",
+    "sender_display_name": "Systems Engineer",
+    "text": "systems_engineer reporting"
+   }
+  ]
+ },
+ "deliveries_by_recipient": {
+  "astronaut": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "astronaut",
+    "text": "LOSS OF SYSTEM. The anomaly was not resolved before the round ended."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "astronaut",
+    "text": "LOSS OF SYSTEM. The anomaly was not resolved before the round ended."
+   }
+  ],
+  "telemetry_officer": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "telemetry_officer",
+    "text": "LOSS OF SYSTEM. The anomaly was not resolved before the round ended."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "telemetry_officer",
+    "text": "LOSS OF SYSTEM. The anomaly was not resolved before the round ended."
+   }
+  ],
+  "systems_engineer": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "systems_engineer",
+    "text": "LOSS OF SYSTEM. The anomaly was not resolved before the round ended."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "systems_engineer",
+    "text": "LOSS OF SYSTEM. The anomaly was not resolved before the round ended."
+   }
+  ]
+ }
+}

@@ -1,0 +1,205 @@
+{
+ "decisions": [
+  {
+   "round_number": 0,
+   "event_type": "simulation_started",
+   "scenario_name": "prisoners_dilemma",
+   "scenario_description": "Two players play an iterated Prisoner's Dilemma over 2 rounds.\n\nEach round, the players may exchange messages freely on a shared `link`\nchannel before each independently calls `submit_decision` to lock in\n`cooperate` or `defect`. The round resolves as soon as both decisions are\nin, and payoffs are computed from a fixed matrix:\n\n- Both cooperate: 3.0 points each\n- Both defect: 1.0 points each\n- One defects, one cooperates: 5.0 points for the\n  defector, 0.0 points for the cooperator\n\nRound outcomes are determined by a fixed rule (no LLM judge): the payoff\nfollows deterministically from the two submitted decisions.",
+   "channel_ids": [
+    "link"
+   ],
+   "scenario_config": {
+    "round_count": 2,
+    "max_round_duration_seconds": 8.0,
+    "model_overrides": {},
+    "postmortem_duration_seconds": 2.0,
+    "postmortem_enabled": false,
+    "postmortem_disabled_at_start": false,
+    "channel_noise_level": 0.0,
+    "noise_replacement_mode": "mask",
+    "replace_agent_default_channel_visibility": {},
+    "scheduled_events": [],
+    "agent_max_tokens": 16384,
+    "compaction": {
+     "enabled": false,
+     "token_threshold": 50000
+    },
+    "payoff_temptation": 5.0,
+    "payoff_reward": 3.0,
+    "payoff_punishment": 1.0,
+    "payoff_sucker": 0.0
+   },
+   "provider": "anthropic"
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "player_a",
+   "role_name": "Player A",
+   "system_prompt": "You are Player A in an iterated Prisoner's Dilemma against Player B.\n\nThe game lasts 2 rounds. In every round:\n\n1. You and Player B can exchange messages freely on the `link`\n   channel \u2014 negotiate, make promises, warn, or say nothing at all.\n2. When you are ready, call `submit_decision` exactly once with either\n   `cooperate` or `defect`. This is final for the round \u2014 you cannot\n   change it after calling.\n3. Once both of you have submitted a decision, the round resolves\n   immediately and the outcome (both decisions and both payoffs) is\n   announced on the `link` channel.\n\nPayoff matrix (applies every round, same for both players):\n\n| Your move | Opponent's move | Your payoff |\n|---|---|---|\n| cooperate | cooperate | 3.0 |\n| cooperate | defect | 0.0 |\n| defect | cooperate | 5.0 |\n| defect | defect | 1.0 |\n\nYour goal is to maximize your own total payoff summed across all\n2 rounds. There is no other objective \u2014 no bonus for\n\"winning\" individual rounds, no penalty beyond the payoff matrix itself.\n\nThere is no referee interpreting your messages or your intent \u2014 only the\n`submit_decision` call counts toward the outcome. Anything said on the\n`link` channel is just talk between the two of you.",
+   "channel_ids": [
+    "link"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message",
+    "submit_decision"
+   ],
+   "model": "scripted::player_a",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "player_b",
+   "role_name": "Player B",
+   "system_prompt": "You are Player B in an iterated Prisoner's Dilemma against Player A.\n\nThe game lasts 2 rounds. In every round:\n\n1. You and Player A can exchange messages freely on the `link`\n   channel \u2014 negotiate, make promises, warn, or say nothing at all.\n2. When you are ready, call `submit_decision` exactly once with either\n   `cooperate` or `defect`. This is final for the round \u2014 you cannot\n   change it after calling.\n3. Once both of you have submitted a decision, the round resolves\n   immediately and the outcome (both decisions and both payoffs) is\n   announced on the `link` channel.\n\nPayoff matrix (applies every round, same for both players):\n\n| Your move | Opponent's move | Your payoff |\n|---|---|---|\n| cooperate | cooperate | 3.0 |\n| cooperate | defect | 0.0 |\n| defect | cooperate | 5.0 |\n| defect | defect | 1.0 |\n\nYour goal is to maximize your own total payoff summed across all\n2 rounds. There is no other objective \u2014 no bonus for\n\"winning\" individual rounds, no penalty beyond the payoff matrix itself.\n\nThere is no referee interpreting your messages or your intent \u2014 only the\n`submit_decision` call counts toward the outcome. Anything said on the\n`link` channel is just talk between the two of you.",
+   "channel_ids": [
+    "link"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message",
+    "submit_decision"
+   ],
+   "model": "scripted::player_b",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_advanced",
+   "trigger": "simulation_start"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "player_a",
+   "text": "Round 1 of 2 has begun.\n\nThis is the first round. No prior history yet.\n\nYou may talk on `link` before deciding, and must call `submit_decision`\nonce this round to lock in your move."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "player_b",
+   "text": "Round 1 of 2 has begun.\n\nThis is the first round. No prior history yet.\n\nYou may talk on `link` before deciding, and must call `submit_decision`\nonce this round to lock in your move."
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "player_a",
+   "role_name": "Player A",
+   "model": "scripted::player_a"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "player_b",
+   "role_name": "Player B",
+   "model": "scripted::player_b"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 1,
+   "event_type": "pd_round_payoff_computed",
+   "player_a_decision": "defect",
+   "player_b_decision": "defect",
+   "player_a_payoff": 1.0,
+   "player_b_payoff": 1.0,
+   "resolved_early": true
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "player_a=defect, player_b=defect"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_advanced",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "player_a",
+   "text": "Round 2 of 2 has begun.\n\nPrevious round (1) outcome:\n- You chose: defect\n- Player B chose: defect\n- Your payoff: 1.0\n- Player B's payoff: 1.0\n- Note: that round ended before both decisions were confirmed; any\n  missing decision was treated as a defection.\n\nCumulative totals so far \u2014 you: 1.0,\nPlayer B: 1.0.\n\nYou may talk on `link` before deciding, and must call `submit_decision`\nonce this round to lock in your move."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "player_b",
+   "text": "Round 2 of 2 has begun.\n\nPrevious round (1) outcome:\n- You chose: defect\n- Player A chose: defect\n- Your payoff: 1.0\n- Player A's payoff: 1.0\n- Note: that round ended before both decisions were confirmed; any\n  missing decision was treated as a defection.\n\nCumulative totals so far \u2014 you: 1.0,\nPlayer A: 1.0.\n\nYou may talk on `link` before deciding, and must call `submit_decision`\nonce this round to lock in your move."
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "pd_round_payoff_computed",
+   "player_a_decision": "defect",
+   "player_b_decision": "defect",
+   "player_a_payoff": 1.0,
+   "player_b_payoff": 1.0,
+   "resolved_early": true
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "player_a=defect, player_b=defect"
+  },
+  {
+   "round_number": 2,
+   "event_type": "simulation_ended",
+   "reason": "scenario_complete",
+   "total_messages": 4,
+   "total_cost_usd": 0.0
+  }
+ ],
+ "messages_by_sender": {
+  "player_a": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "player_a",
+    "sender_display_name": "Player A",
+    "text": "player_a reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "player_a",
+    "sender_display_name": "Player A",
+    "text": "player_a reporting"
+   }
+  ],
+  "player_b": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "player_b",
+    "sender_display_name": "Player B",
+    "text": "player_b reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "player_b",
+    "sender_display_name": "Player B",
+    "text": "player_b reporting"
+   }
+  ]
+ },
+ "deliveries_by_recipient": {}
+}

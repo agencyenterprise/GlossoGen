@@ -32,9 +32,10 @@ from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runtime.activity_notification import NewMessagesNotification
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.agent_swap import AgentSwapResources, execute_agent_swap
-from glossogen.runtime.game_clock import GameClock
-from glossogen.runtime.mcp_server import start_mcp_server
+from glossogen.runtime.game_clock import GameClock, IdleRoundEndCheck
+from glossogen.runtime.mcp_server import build_mcp_server, start_mcp_server
 from glossogen.runtime.mcp_tools import BASE_TOOL_NAMES
+from glossogen.runtime.mcp_transport import McpTransport, MountInProcess
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.scheduled_events import ScheduledEvent, SwapAgent
 from glossogen.runtime.scheduler import RoundBoundaryScheduler
@@ -60,7 +61,8 @@ class AutonomousSupervisor:
         scenario: SimulationScenario,
         agent_configs: list[AgentConfig],
         event_logger: EventLogger,
-        mcp_server_port: int,
+        mcp_transport: McpTransport,
+        idle_round_may_end: IdleRoundEndCheck,
         runner_factory: Callable[[], AgentRunner],
         resume_state: RewindState | None,
         run_id: str,
@@ -70,7 +72,8 @@ class AutonomousSupervisor:
         self._scenario = scenario
         self._agent_configs = agent_configs
         self._event_logger = event_logger
-        self._mcp_server_port = mcp_server_port
+        self._mcp_transport = mcp_transport
+        self._idle_round_may_end = idle_round_may_end
         self._runner_factory = runner_factory
         self._resume_state = resume_state
         self._run_id = run_id
@@ -95,6 +98,19 @@ class AutonomousSupervisor:
         self._runner_tasks: dict[str, asyncio.Task[Any]] = {}
         self._cost_tracker: dict[str, float] = {}
         self._mcp_server_url = ""
+        # Set only when dispatch is in-process rather than over a socket.
+        self._mcp_in_process_server: Any = None
+
+    def _mount_mcp_app(self, runtime: SimulationRuntime) -> None:
+        """Build the MCP server and keep it for in-process dispatch.
+
+        No socket, no ASGI app and no lifespan: the toolset talks to this object
+        over fastmcp's in-memory transport, so a tool call runs in the calling
+        agent's own task. Identity travels in ``calling_agent_id`` rather than a
+        query string, because there is no request to read one from.
+        """
+        self._mcp_in_process_server = build_mcp_server(runtime=runtime, port=0)
+        logger.info("MCP server mounted for in-process dispatch")
 
     @staticmethod
     def _parse_scheduled_events(raw: list[Any]) -> list[ScheduledEvent]:
@@ -121,6 +137,7 @@ class AutonomousSupervisor:
             log_path=self._log_path,
             run_dir=self._log_path.parent,
             mcp_server_url=self._mcp_server_url,
+            mcp_server_object=self._mcp_in_process_server,
             cost_tracker=self._cost_tracker,
         )
         await execute_agent_swap(spec=spec, resources=resources)
@@ -368,6 +385,7 @@ class AutonomousSupervisor:
             start_round=start_round,
             resuming=resuming,
             on_round_boundary=round_boundary_hook,
+            idle_round_may_end=self._idle_round_may_end,
         )
         runtime.add_on_message_callback(callback=game_clock.on_message_sent)
 
@@ -410,20 +428,27 @@ class AutonomousSupervisor:
                 )
             )
 
-        mcp_server_url = _mcp_server_url(port=self._mcp_server_port)
-        self._mcp_server_url = mcp_server_url
+        transport = self._mcp_transport
+        if isinstance(transport, MountInProcess):
+            mcp_server_url = transport.host_url
+            self._mcp_server_url = mcp_server_url
+            mcp_task = None
+            self._mount_mcp_app(runtime=runtime)
+        else:
+            mcp_server_url = _mcp_server_url(port=transport.port)
+            self._mcp_server_url = mcp_server_url
 
-        # Start MCP server as a background task.
-        mcp_task = asyncio.create_task(
-            start_mcp_server(runtime=runtime, port=self._mcp_server_port),
-            name="mcp-server",
-        )
+            # Start MCP server as a background task.
+            mcp_task = asyncio.create_task(
+                start_mcp_server(runtime=runtime, port=transport.port),
+                name="mcp-server",
+            )
 
-        # Wait for the MCP server to become ready or detect a startup failure.
-        await self._wait_for_mcp_server(
-            mcp_task=mcp_task,
-            port=self._mcp_server_port,
-        )
+            # Wait for the MCP server to become ready or detect a startup failure.
+            await self._wait_for_mcp_server(
+                mcp_task=mcp_task,
+                port=transport.port,
+            )
 
         # For resumed runs, inject the reconstructed message history so each
         # agent starts with proper multi-turn context of what happened.
@@ -447,6 +472,7 @@ class AutonomousSupervisor:
                 runner.start(
                     agent_config=config,
                     mcp_server_url=mcp_server_url,
+                    mcp_server_object=self._mcp_in_process_server,
                     runtime=runtime,
                     cost_tracker=self._cost_tracker,
                 ),
@@ -531,13 +557,17 @@ class AutonomousSupervisor:
         except asyncio.CancelledError:
             pass
 
-        # Stop the MCP server.
+        # Stop the MCP server. A mounted app has no server task; its lifespan is
+        # held open by a task of its own, which is closed instead.
         logger.info("Stopping MCP server")
-        mcp_task.cancel()
-        try:
-            await mcp_task
-        except asyncio.CancelledError:
-            pass
+        if mcp_task is None:
+            self._mcp_in_process_server = None
+        else:
+            mcp_task.cancel()
+            try:
+                await mcp_task
+            except asyncio.CancelledError:
+                pass
 
         total_messages = self._count_total_messages()
         await self._event_logger.log(

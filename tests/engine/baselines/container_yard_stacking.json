@@ -1,0 +1,1503 @@
+{
+ "decisions": [
+  {
+   "round_number": 0,
+   "event_type": "simulation_started",
+   "scenario_name": "container_yard_stacking",
+   "scenario_description": "Three agents \u2014 a yard spotter who can read inbound containers' attributes and see their intake slots, a logistics planner who holds each container's target bay, and a crane operator who runs the crane from a cab and cannot read container attributes \u2014 coordinate over a shared link channel to sort each round's batch of inbound containers into their assigned bays across 2 rounds. Containers carry no ID numbers: each is identified only by its visible attributes (colour, size, type, marking). Every character sent on the link channel costs one simulated second against a fixed 140-second window; if the window is exhausted the round fails.\n\nThe spotter knows each container's attributes and the intake slot it sits in, but not its destination. The planner knows each container's attributes and its target bay, but not where it currently sits. The crane operator can move a container from any slot to any slot but is blind to attributes, so it cannot tell the containers apart on its own. To place a container, the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) must be matched on the container's attributes \u2014 and the assignment is drawn fresh every round, so it cannot be memorized.",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "scenario_config": {
+    "round_count": 2,
+    "max_round_duration_seconds": 8.0,
+    "model_overrides": {},
+    "postmortem_duration_seconds": 2.0,
+    "postmortem_enabled": true,
+    "postmortem_disabled_at_start": false,
+    "channel_noise_level": 0.0,
+    "noise_replacement_mode": "mask",
+    "replace_agent_default_channel_visibility": {
+     "postmortem": false,
+     "postmortem_a": false,
+     "postmortem_b": false
+    },
+    "scheduled_events": [],
+    "agent_max_tokens": 16384,
+    "compaction": {
+     "enabled": false,
+     "token_threshold": 50000
+    },
+    "round_time_budget_seconds": 140,
+    "seed": 42,
+    "easy_round_numbers": [],
+    "batch_size_values": [
+     8,
+     10,
+     12
+    ],
+    "batch_size_weights": [
+     1,
+     1,
+     1
+    ],
+    "yard_slot_count": 28,
+    "two_teams": false,
+    "swap_round": null,
+    "announce_swap": false,
+    "postmortem_after_swap": true,
+    "intern_enabled": false,
+    "intern_join_round": null,
+    "intern_takeover_round": null
+   },
+   "provider": "anthropic"
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "yard_operator",
+   "role_name": "Yard Scanner",
+   "system_prompt": "You are the yard spotter at a container yard. Each round a batch of inbound containers sits in the intake area; you can read every container's attributes (colour, size, type, marking) and see which intake slot each one is in.\n\nYou work on the link channel with two teammates: the logistics planner, who handles where each container should go, and the crane operator, who runs the crane and physically moves containers.\n\nReport the intake batch on the link channel \u2014 each container and the slot it is in \u2014 so your teammates can place it. Report the whole batch; don't wait to be asked.\nCRITICAL RULE \u2014 INSPECTION DEADLINE COSTS TIME:\nEvery inbound container must reach its target bay within a fixed inspection window \u2014 customs inspectors are waiting at the bays and the inspection report can only be filed if every container is in place before the window expires. Every character sent on the link channel costs one second of the round's remaining inspection window. If the total communication time (from ALL messages by all three of you) exceeds the round's window, the inspection slot is missed and the round fails \u2014 the container is not placed and no inspection happens.\n\nYou have no action tool; you communicate only with send_message.\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT cost time.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"link\" (channel_id: link)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::yard_operator",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "logistics_planner",
+   "role_name": "Logistics Planner",
+   "system_prompt": "You are the logistics planner at a container yard. Each round you hold the stowage assignment: every inbound container, identified by its attributes (colour, size, type, marking), paired with the target bay (a slot number) it must end up in.\n\nYou work on the link channel with two teammates: the yard spotter, who reports the inbound batch, and the crane operator, who runs the crane and physically moves containers.\n\nReport each container's target bay on the link channel so the crane operator can place it. Report the whole assignment; don't wait to be asked.\nCRITICAL RULE \u2014 INSPECTION DEADLINE COSTS TIME:\nEvery inbound container must reach its target bay within a fixed inspection window \u2014 customs inspectors are waiting at the bays and the inspection report can only be filed if every container is in place before the window expires. Every character sent on the link channel costs one second of the round's remaining inspection window. If the total communication time (from ALL messages by all three of you) exceeds the round's window, the inspection slot is missed and the round fails \u2014 the container is not placed and no inspection happens.\n\nYou have no action tool; you communicate only with send_message.\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT cost time.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"link\" (channel_id: link)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::logistics_planner",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "crane_operator",
+   "role_name": "Crane Operator",
+   "system_prompt": "You are the crane operator at a container yard, working from the cab. You can see which slots are occupied and which are empty, and you can move a container from any occupied slot to any empty slot \u2014 but you cannot read container attributes from the cab, so you cannot tell the containers apart by sight.\n\nYou work on the link channel with two teammates: the yard spotter, who reports each inbound container's attributes and the slot it is in, and the logistics planner, who reports each container's target bay.\n\nFor each container, match the spotter's report (which container is in which slot) to the planner's report (which container goes to which bay) to work out a move, then call move_container(from_slot, to_slot). If you are unsure, check with your teammates before moving \u2014 a wrong move fails the round.\nCRITICAL RULE \u2014 INSPECTION DEADLINE COSTS TIME:\nEvery inbound container must reach its target bay within a fixed inspection window \u2014 customs inspectors are waiting at the bays and the inspection report can only be filed if every container is in place before the window expires. Every character sent on the link channel costs one second of the round's remaining inspection window. If the total communication time (from ALL messages by all three of you) exceeds the round's window, the inspection slot is missed and the round fails \u2014 the container is not placed and no inspection happens.\n\nCRANE ACTION:\n- move_container(from_slot, to_slot) \u2014 pick up the container at from_slot and set it down at to_slot. Slots are numbered from 1 upward.\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT cost time.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"link\" (channel_id: link)\n- \"team discussion\" (channel_id: postmortem)",
+   "channel_ids": [
+    "link",
+    "postmortem"
+   ],
+   "tool_names": [
+    "get_channel_members",
+    "list_channels",
+    "move_container",
+    "read_channel",
+    "read_notifications",
+    "send_message"
+   ],
+   "model": "scripted::crane_operator",
+   "provider": "anthropic",
+   "max_tokens": 16384
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_advanced",
+   "trigger": "simulation_start"
+  },
+  {
+   "round_number": 1,
+   "event_type": "container_yard_case_started",
+   "case_number": 1,
+   "round_time_budget_seconds": 140,
+   "yard_slot_count": 28,
+   "initial_row": [
+    {
+     "slot": 1,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "teal"
+       },
+       {
+        "name": "size",
+        "value": "medium"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "priority"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 2,
+     "container": null
+    },
+    {
+     "slot": 3,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "red"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "reefer"
+       },
+       {
+        "name": "marking",
+        "value": "fragile"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 4,
+     "container": null
+    },
+    {
+     "slot": 5,
+     "container": null
+    },
+    {
+     "slot": 6,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "red"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "hazmat"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 7,
+     "container": null
+    },
+    {
+     "slot": 8,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "blue"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "flatrack"
+       },
+       {
+        "name": "marking",
+        "value": "plain"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 9,
+     "container": null
+    },
+    {
+     "slot": 10,
+     "container": null
+    },
+    {
+     "slot": 11,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "teal"
+       },
+       {
+        "name": "size",
+        "value": "large"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "priority"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 12,
+     "container": null
+    },
+    {
+     "slot": 13,
+     "container": null
+    },
+    {
+     "slot": 14,
+     "container": null
+    },
+    {
+     "slot": 15,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "yellow"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "fragile"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 16,
+     "container": null
+    },
+    {
+     "slot": 17,
+     "container": null
+    },
+    {
+     "slot": 18,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "black"
+       },
+       {
+        "name": "size",
+        "value": "large"
+       },
+       {
+        "name": "type",
+        "value": "opentop"
+       },
+       {
+        "name": "marking",
+        "value": "fragile"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 19,
+     "container": null
+    },
+    {
+     "slot": 20,
+     "container": null
+    },
+    {
+     "slot": 21,
+     "container": null
+    },
+    {
+     "slot": 22,
+     "container": null
+    },
+    {
+     "slot": 23,
+     "container": null
+    },
+    {
+     "slot": 24,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "green"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "opentop"
+       },
+       {
+        "name": "marking",
+        "value": "priority"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 25,
+     "container": null
+    },
+    {
+     "slot": 26,
+     "container": null
+    },
+    {
+     "slot": 27,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "black"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "opentop"
+       },
+       {
+        "name": "marking",
+        "value": "hazmat"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 28,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "green"
+       },
+       {
+        "name": "size",
+        "value": "medium"
+       },
+       {
+        "name": "type",
+        "value": "reefer"
+       },
+       {
+        "name": "marking",
+        "value": "plain"
+       }
+      ]
+     }
+    }
+   ],
+   "batch": [
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "black"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "opentop"
+       },
+       {
+        "name": "marking",
+        "value": "hazmat"
+       }
+      ]
+     },
+     "intake_slot": 27,
+     "target_slot": 23
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "black"
+       },
+       {
+        "name": "size",
+        "value": "large"
+       },
+       {
+        "name": "type",
+        "value": "opentop"
+       },
+       {
+        "name": "marking",
+        "value": "fragile"
+       }
+      ]
+     },
+     "intake_slot": 18,
+     "target_slot": 17
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "yellow"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "fragile"
+       }
+      ]
+     },
+     "intake_slot": 15,
+     "target_slot": 7
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "green"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "opentop"
+       },
+       {
+        "name": "marking",
+        "value": "priority"
+       }
+      ]
+     },
+     "intake_slot": 24,
+     "target_slot": 22
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "green"
+       },
+       {
+        "name": "size",
+        "value": "medium"
+       },
+       {
+        "name": "type",
+        "value": "reefer"
+       },
+       {
+        "name": "marking",
+        "value": "plain"
+       }
+      ]
+     },
+     "intake_slot": 28,
+     "target_slot": 12
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "red"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "hazmat"
+       }
+      ]
+     },
+     "intake_slot": 6,
+     "target_slot": 25
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "teal"
+       },
+       {
+        "name": "size",
+        "value": "large"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "priority"
+       }
+      ]
+     },
+     "intake_slot": 11,
+     "target_slot": 9
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "red"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "reefer"
+       },
+       {
+        "name": "marking",
+        "value": "fragile"
+       }
+      ]
+     },
+     "intake_slot": 3,
+     "target_slot": 2
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "teal"
+       },
+       {
+        "name": "size",
+        "value": "medium"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "priority"
+       }
+      ]
+     },
+     "intake_slot": 1,
+     "target_slot": 19
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "blue"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "flatrack"
+       },
+       {
+        "name": "marking",
+        "value": "plain"
+       }
+      ]
+     },
+     "intake_slot": 8,
+     "target_slot": 13
+    }
+   ]
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "yard_operator",
+   "text": "--- INTAKE BATCH ---\nRound 1\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nINBOUND CONTAINERS (container attributes @ intake slot):\n- teal, medium, tank, priority @ slot 1\n- red, small, reefer, fragile @ slot 3\n- red, small, tank, hazmat @ slot 6\n- blue, small, flatrack, plain @ slot 8\n- teal, large, tank, priority @ slot 11\n- yellow, small, tank, fragile @ slot 15\n- black, large, opentop, fragile @ slot 18\n- green, small, opentop, priority @ slot 24\n- black, small, opentop, hazmat @ slot 27\n- green, medium, reefer, plain @ slot 28"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "logistics_planner",
+   "text": "--- STOWAGE ASSIGNMENT ---\nRound 1\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nASSIGNMENT (container attributes \u2192 target bay):\n- red, small, reefer, fragile \u2192 bay 2\n- yellow, small, tank, fragile \u2192 bay 7\n- teal, large, tank, priority \u2192 bay 9\n- green, medium, reefer, plain \u2192 bay 12\n- blue, small, flatrack, plain \u2192 bay 13\n- black, large, opentop, fragile \u2192 bay 17\n- teal, medium, tank, priority \u2192 bay 19\n- green, small, opentop, priority \u2192 bay 22\n- black, small, opentop, hazmat \u2192 bay 23\n- red, small, tank, hazmat \u2192 bay 25"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "crane_operator",
+   "text": "--- YARD OCCUPANCY ---\nRound 1\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nSLOTS (you cannot read container attributes from the cab):\n- Slot 1: FULL\n- Slot 2: EMPTY\n- Slot 3: FULL\n- Slot 4: EMPTY\n- Slot 5: EMPTY\n- Slot 6: FULL\n- Slot 7: EMPTY\n- Slot 8: FULL\n- Slot 9: EMPTY\n- Slot 10: EMPTY\n- Slot 11: FULL\n- Slot 12: EMPTY\n- Slot 13: EMPTY\n- Slot 14: EMPTY\n- Slot 15: FULL\n- Slot 16: EMPTY\n- Slot 17: EMPTY\n- Slot 18: FULL\n- Slot 19: EMPTY\n- Slot 20: EMPTY\n- Slot 21: EMPTY\n- Slot 22: EMPTY\n- Slot 23: EMPTY\n- Slot 24: FULL\n- Slot 25: EMPTY\n- Slot 26: EMPTY\n- Slot 27: FULL\n- Slot 28: FULL"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "yard_operator",
+   "role_name": "Yard Scanner",
+   "model": "scripted::yard_operator"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "logistics_planner",
+   "role_name": "Logistics Planner",
+   "model": "scripted::logistics_planner"
+  },
+  {
+   "round_number": 1,
+   "event_type": "agent_connected",
+   "agent_id": "crane_operator",
+   "role_name": "Crane Operator",
+   "model": "scripted::crane_operator"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_ended",
+   "trigger": "round_failed"
+  },
+  {
+   "round_number": 1,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "Communication budget exhausted."
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "yard_operator",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: FAILED \u2014 communication budget exceeded (148 chars, budget was 140s) after 0/10 container(s) placed\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "logistics_planner",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: FAILED \u2014 communication budget exceeded (148 chars, budget was 140s) after 0/10 container(s) placed\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "injection_delivered",
+   "agent_id": "crane_operator",
+   "text": "--- ROUND 1 DISCUSSION PHASE ---\n\nResult: FAILED \u2014 communication budget exceeded (148 chars, budget was 140s) after 0/10 container(s) placed\nPer-container outcomes:\n- FAILED \u2014 black, small, opentop, hazmat (slot 27 \u2192 bay 23)\n- FAILED \u2014 black, large, opentop, fragile (slot 18 \u2192 bay 17)\n- FAILED \u2014 yellow, small, tank, fragile (slot 15 \u2192 bay 7)\n- FAILED \u2014 green, small, opentop, priority (slot 24 \u2192 bay 22)\n- FAILED \u2014 green, medium, reefer, plain (slot 28 \u2192 bay 12)\n- FAILED \u2014 red, small, tank, hazmat (slot 6 \u2192 bay 25)\n- FAILED \u2014 teal, large, tank, priority (slot 11 \u2192 bay 9)\n- FAILED \u2014 red, small, reefer, fragile (slot 3 \u2192 bay 2)\n- FAILED \u2014 teal, medium, tank, priority (slot 1 \u2192 bay 19)\n- FAILED \u2014 blue, small, flatrack, plain (slot 8 \u2192 bay 13)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 1,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_advanced",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "container_yard_case_started",
+   "case_number": 2,
+   "round_time_budget_seconds": 140,
+   "yard_slot_count": 28,
+   "initial_row": [
+    {
+     "slot": 1,
+     "container": null
+    },
+    {
+     "slot": 2,
+     "container": null
+    },
+    {
+     "slot": 3,
+     "container": null
+    },
+    {
+     "slot": 4,
+     "container": null
+    },
+    {
+     "slot": 5,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "black"
+       },
+       {
+        "name": "size",
+        "value": "large"
+       },
+       {
+        "name": "type",
+        "value": "reefer"
+       },
+       {
+        "name": "marking",
+        "value": "plain"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 6,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "green"
+       },
+       {
+        "name": "size",
+        "value": "large"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "plain"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 7,
+     "container": null
+    },
+    {
+     "slot": 8,
+     "container": null
+    },
+    {
+     "slot": 9,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "yellow"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "standard"
+       },
+       {
+        "name": "marking",
+        "value": "priority"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 10,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "yellow"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "fragile"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 11,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "orange"
+       },
+       {
+        "name": "size",
+        "value": "large"
+       },
+       {
+        "name": "type",
+        "value": "insulated"
+       },
+       {
+        "name": "marking",
+        "value": "fragile"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 12,
+     "container": null
+    },
+    {
+     "slot": 13,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "black"
+       },
+       {
+        "name": "size",
+        "value": "large"
+       },
+       {
+        "name": "type",
+        "value": "opentop"
+       },
+       {
+        "name": "marking",
+        "value": "hazmat"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 14,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "yellow"
+       },
+       {
+        "name": "size",
+        "value": "medium"
+       },
+       {
+        "name": "type",
+        "value": "insulated"
+       },
+       {
+        "name": "marking",
+        "value": "hazmat"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 15,
+     "container": null
+    },
+    {
+     "slot": 16,
+     "container": null
+    },
+    {
+     "slot": 17,
+     "container": null
+    },
+    {
+     "slot": 18,
+     "container": null
+    },
+    {
+     "slot": 19,
+     "container": null
+    },
+    {
+     "slot": 20,
+     "container": null
+    },
+    {
+     "slot": 21,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "white"
+       },
+       {
+        "name": "size",
+        "value": "medium"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "priority"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 22,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "orange"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "priority"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 23,
+     "container": null
+    },
+    {
+     "slot": 24,
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "red"
+       },
+       {
+        "name": "size",
+        "value": "medium"
+       },
+       {
+        "name": "type",
+        "value": "opentop"
+       },
+       {
+        "name": "marking",
+        "value": "fragile"
+       }
+      ]
+     }
+    },
+    {
+     "slot": 25,
+     "container": null
+    },
+    {
+     "slot": 26,
+     "container": null
+    },
+    {
+     "slot": 27,
+     "container": null
+    },
+    {
+     "slot": 28,
+     "container": null
+    }
+   ],
+   "batch": [
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "black"
+       },
+       {
+        "name": "size",
+        "value": "large"
+       },
+       {
+        "name": "type",
+        "value": "opentop"
+       },
+       {
+        "name": "marking",
+        "value": "hazmat"
+       }
+      ]
+     },
+     "intake_slot": 13,
+     "target_slot": 17
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "black"
+       },
+       {
+        "name": "size",
+        "value": "large"
+       },
+       {
+        "name": "type",
+        "value": "reefer"
+       },
+       {
+        "name": "marking",
+        "value": "plain"
+       }
+      ]
+     },
+     "intake_slot": 5,
+     "target_slot": 1
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "yellow"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "standard"
+       },
+       {
+        "name": "marking",
+        "value": "priority"
+       }
+      ]
+     },
+     "intake_slot": 9,
+     "target_slot": 4
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "yellow"
+       },
+       {
+        "name": "size",
+        "value": "medium"
+       },
+       {
+        "name": "type",
+        "value": "insulated"
+       },
+       {
+        "name": "marking",
+        "value": "hazmat"
+       }
+      ]
+     },
+     "intake_slot": 14,
+     "target_slot": 26
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "orange"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "priority"
+       }
+      ]
+     },
+     "intake_slot": 22,
+     "target_slot": 16
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "yellow"
+       },
+       {
+        "name": "size",
+        "value": "small"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "fragile"
+       }
+      ]
+     },
+     "intake_slot": 10,
+     "target_slot": 27
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "red"
+       },
+       {
+        "name": "size",
+        "value": "medium"
+       },
+       {
+        "name": "type",
+        "value": "opentop"
+       },
+       {
+        "name": "marking",
+        "value": "fragile"
+       }
+      ]
+     },
+     "intake_slot": 24,
+     "target_slot": 7
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "orange"
+       },
+       {
+        "name": "size",
+        "value": "large"
+       },
+       {
+        "name": "type",
+        "value": "insulated"
+       },
+       {
+        "name": "marking",
+        "value": "fragile"
+       }
+      ]
+     },
+     "intake_slot": 11,
+     "target_slot": 20
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "white"
+       },
+       {
+        "name": "size",
+        "value": "medium"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "priority"
+       }
+      ]
+     },
+     "intake_slot": 21,
+     "target_slot": 18
+    },
+    {
+     "container": {
+      "attributes": [
+       {
+        "name": "colour",
+        "value": "green"
+       },
+       {
+        "name": "size",
+        "value": "large"
+       },
+       {
+        "name": "type",
+        "value": "tank"
+       },
+       {
+        "name": "marking",
+        "value": "plain"
+       }
+      ]
+     },
+     "intake_slot": 6,
+     "target_slot": 3
+    }
+   ]
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "yard_operator",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: FAILED \u2014 communication budget exceeded (148 chars, budget was 140s); placed 0/10 container(s)\n\n\n--- INTAKE BATCH ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nINBOUND CONTAINERS (container attributes @ intake slot):\n- black, large, reefer, plain @ slot 5\n- green, large, tank, plain @ slot 6\n- yellow, small, standard, priority @ slot 9\n- yellow, small, tank, fragile @ slot 10\n- orange, large, insulated, fragile @ slot 11\n- black, large, opentop, hazmat @ slot 13\n- yellow, medium, insulated, hazmat @ slot 14\n- white, medium, tank, priority @ slot 21\n- orange, small, tank, priority @ slot 22\n- red, medium, opentop, fragile @ slot 24"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "logistics_planner",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: FAILED \u2014 communication budget exceeded (148 chars, budget was 140s); placed 0/10 container(s)\n\n\n--- STOWAGE ASSIGNMENT ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nASSIGNMENT (container attributes \u2192 target bay):\n- black, large, reefer, plain \u2192 bay 1\n- green, large, tank, plain \u2192 bay 3\n- yellow, small, standard, priority \u2192 bay 4\n- red, medium, opentop, fragile \u2192 bay 7\n- orange, small, tank, priority \u2192 bay 16\n- black, large, opentop, hazmat \u2192 bay 17\n- white, medium, tank, priority \u2192 bay 18\n- orange, large, insulated, fragile \u2192 bay 20\n- yellow, medium, insulated, hazmat \u2192 bay 26\n- yellow, small, tank, fragile \u2192 bay 27"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "crane_operator",
+   "text": "--- PREVIOUS ROUND RESULT ---\nRound 1: FAILED \u2014 communication budget exceeded (148 chars, budget was 140s); placed 0/10 container(s)\n\n\n--- YARD OCCUPANCY ---\nRound 2\nInspection window: 140s before the customs slot is missed (one character = one second; total across all three of you)\n\nSLOTS (you cannot read container attributes from the cab):\n- Slot 1: EMPTY\n- Slot 2: EMPTY\n- Slot 3: EMPTY\n- Slot 4: EMPTY\n- Slot 5: FULL\n- Slot 6: FULL\n- Slot 7: EMPTY\n- Slot 8: EMPTY\n- Slot 9: FULL\n- Slot 10: FULL\n- Slot 11: FULL\n- Slot 12: EMPTY\n- Slot 13: FULL\n- Slot 14: FULL\n- Slot 15: EMPTY\n- Slot 16: EMPTY\n- Slot 17: EMPTY\n- Slot 18: EMPTY\n- Slot 19: EMPTY\n- Slot 20: EMPTY\n- Slot 21: FULL\n- Slot 22: FULL\n- Slot 23: EMPTY\n- Slot 24: FULL\n- Slot 25: EMPTY\n- Slot 26: EMPTY\n- Slot 27: EMPTY\n- Slot 28: EMPTY"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "round_result_recorded",
+   "success": false,
+   "team_id": null,
+   "reason": "all steps completed"
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_started"
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "yard_operator",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (0 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "logistics_planner",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (0 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "injection_delivered",
+   "agent_id": "crane_operator",
+   "text": "--- ROUND 2 DISCUSSION PHASE ---\n\nResult: INCOMPLETE \u2014 everyone stopped acting after 0/10 container(s) placed (0 chars / 140s budget). Each container needs the spotter's report (which container is in which slot) and the planner's report (which container goes to which bay) to be matched by the crane operator into a move.\nPer-container outcomes:\n- FAILED \u2014 black, large, opentop, hazmat (slot 13 \u2192 bay 17)\n- FAILED \u2014 black, large, reefer, plain (slot 5 \u2192 bay 1)\n- FAILED \u2014 yellow, small, standard, priority (slot 9 \u2192 bay 4)\n- FAILED \u2014 yellow, medium, insulated, hazmat (slot 14 \u2192 bay 26)\n- FAILED \u2014 orange, small, tank, priority (slot 22 \u2192 bay 16)\n- FAILED \u2014 yellow, small, tank, fragile (slot 10 \u2192 bay 27)\n- FAILED \u2014 red, medium, opentop, fragile (slot 24 \u2192 bay 7)\n- FAILED \u2014 orange, large, insulated, fragile (slot 11 \u2192 bay 20)\n- FAILED \u2014 white, medium, tank, priority (slot 21 \u2192 bay 18)\n- FAILED \u2014 green, large, tank, plain (slot 6 \u2192 bay 3)\n\n\nThe \"team discussion\" channel is now open. Messages here do not cost time. Use this time to develop shorthand and coordinate protocol conventions for future rounds."
+  },
+  {
+   "round_number": 2,
+   "event_type": "postmortem_ended",
+   "trigger": "all_agents_idle"
+  },
+  {
+   "round_number": 2,
+   "event_type": "simulation_ended",
+   "reason": "scenario_complete",
+   "total_messages": 6,
+   "total_cost_usd": 0.0
+  }
+ ],
+ "messages_by_sender": {
+  "yard_operator": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "yard_operator",
+    "sender_display_name": "Yard Scanner",
+    "text": "yard_operator reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "yard_operator",
+    "sender_display_name": "Yard Scanner",
+    "text": "yard_operator reporting"
+   }
+  ],
+  "logistics_planner": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "logistics_planner",
+    "sender_display_name": "Logistics Planner",
+    "text": "logistics_planner reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "logistics_planner",
+    "sender_display_name": "Logistics Planner",
+    "text": "logistics_planner reporting"
+   }
+  ],
+  "crane_operator": [
+   {
+    "channel_id": "link",
+    "sender_agent_id": "crane_operator",
+    "sender_display_name": "Crane Operator",
+    "text": "crane_operator reporting"
+   },
+   {
+    "channel_id": "link",
+    "sender_agent_id": "crane_operator",
+    "sender_display_name": "Crane Operator",
+    "text": "crane_operator reporting"
+   }
+  ]
+ },
+ "deliveries_by_recipient": {
+  "yard_operator": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "yard_operator",
+    "text": "CRITICAL: Yard window narrowing. 16 seconds of budget remaining."
+   },
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "yard_operator",
+    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: 148 chars exceeded budget of 140s."
+   },
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "yard_operator",
+    "text": "ROUND FAILED. Communication budget exhausted."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "yard_operator",
+    "text": "ROUND FAILED. Round did not complete every placement."
+   }
+  ],
+  "logistics_planner": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "logistics_planner",
+    "text": "CRITICAL: Yard window narrowing. 16 seconds of budget remaining."
+   },
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "logistics_planner",
+    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: 148 chars exceeded budget of 140s."
+   },
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "logistics_planner",
+    "text": "ROUND FAILED. Communication budget exhausted."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "logistics_planner",
+    "text": "ROUND FAILED. Round did not complete every placement."
+   }
+  ],
+  "crane_operator": [
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "crane_operator",
+    "text": "CRITICAL: Yard window narrowing. 16 seconds of budget remaining."
+   },
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "crane_operator",
+    "text": "COMMUNICATION BUDGET EXCEEDED. Communication time: 148 chars exceeded budget of 140s."
+   },
+   {
+    "round_number": 1,
+    "event_type": "world_event_delivered",
+    "agent_id": "crane_operator",
+    "text": "ROUND FAILED. Communication budget exhausted."
+   },
+   {
+    "round_number": 2,
+    "event_type": "world_event_delivered",
+    "agent_id": "crane_operator",
+    "text": "ROUND FAILED. Round did not complete every placement."
+   }
+  ]
+ }
+}

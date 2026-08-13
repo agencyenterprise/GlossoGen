@@ -11,6 +11,7 @@ the model supplies per call.
 """
 
 from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
 from typing import Any, NamedTuple, TypeAlias
 
 from mcp.server.fastmcp import Context
@@ -19,17 +20,32 @@ from mcp.server.fastmcp import Context
 ToolContext: TypeAlias = Context[Any, Any, Any]
 
 
-def resolve_agent_id(ctx: ToolContext) -> str:
-    """Extract agent_id from the MCP HTTP connection context.
+calling_agent_id: ContextVar[str | None] = ContextVar("calling_agent_id", default=None)
+"""The agent whose task is currently calling a tool.
 
-    Agent identity is embedded in the Streamable HTTP connection URL as a
-    query parameter (e.g. ``http://localhost:8001/mcp?agent_id=engineer``).
+Set by a runner around its own MCP work. Over Streamable HTTP identity comes
+from the connection URL and this stays unset; over an in-process transport the
+tool executes in the calling agent's own task, so the variable it set is the
+identity.
+"""
+
+
+def resolve_agent_id(ctx: ToolContext) -> str:
+    """Return the agent whose call this is.
+
+    Identity comes from the Streamable HTTP connection URL as a query parameter
+    (e.g. ``http://localhost:8001/mcp?agent_id=engineer``). A transport with no
+    HTTP request falls back to the calling task's ``calling_agent_id``.
     """
     request = ctx.request_context.request
     if request is None:
+        bound = calling_agent_id.get()
+        if bound is not None:
+            return bound
         raise ValueError(
-            "Cannot resolve agent identity: no HTTP request in MCP context. "
-            "Agent identity requires Streamable HTTP transport with ?agent_id= query parameter."
+            "Cannot resolve agent identity: no HTTP request in MCP context and no "
+            "calling agent bound. Set calling_agent_id, or use Streamable HTTP with "
+            "an ?agent_id= query parameter."
         )
     agent_id: str | None = request.query_params.get("agent_id")
     if agent_id is None:

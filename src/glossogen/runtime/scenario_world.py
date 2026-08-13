@@ -67,6 +67,18 @@ class WorldContext:
         """Block until the next world event (message or round advance)."""
         return await self._event_queue.get()
 
+    def has_unprocessed_events(self) -> bool:
+        """Whether messages are still queued for the world to react to.
+
+        A message is handed to the world twice: synchronously for state the
+        sending agent must see immediately, then on this queue for the
+        reactions, which is where budget notifications come from. A round that
+        ends while the queue holds anything drops those reactions, so the run
+        records the round differently depending on how the two tasks happened to
+        interleave.
+        """
+        return not self._event_queue.empty()
+
     async def send_update_to_channel(self, channel_id: str, text: str) -> None:
         """Push a world notification only to agents in the specified channel.
 
