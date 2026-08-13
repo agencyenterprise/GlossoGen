@@ -559,6 +559,8 @@ class AutonomousSupervisor:
         try:
             await world_task
         except asyncio.CancelledError:
+            # Awaiting a task we just cancelled: the cancellation is the
+            # expected outcome, not an error, so there is nothing to log.
             pass
 
         # Stop the MCP server. A mounted app has no server task; its lifespan is
