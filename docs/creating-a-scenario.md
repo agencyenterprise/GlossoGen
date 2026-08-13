@@ -294,7 +294,7 @@ The `SimulationScenario` subclass is the entry point the registry hands to the C
 
 - `name()` → the registry key (string).
 - `scenario_description()` → a short human-readable description.
-- `postmortem_channel_ids` → a `ClassVar[frozenset[str]]` naming every channel that carries postmortem traffic. Declare it if the scenario has a debrief at all. It is read by three places: the phase duration, the replaced-agent history filter, and the world's globally-disabled set. So it must list every mode the scenario can run in, not just the debriefs the current knobs declare. A two-layout scenario names the solo channel *and* both per-team ones. Pass it to the world as `type(self).postmortem_channel_ids` rather than re-importing the ids.
+- `postmortem_channel_ids` → a `ClassVar[frozenset[str]]` naming every channel that carries postmortem traffic. Declare it if the scenario has a debrief at all. It is what the replaced-agent history filter blocks, and what the world reports as globally disabled once a `set_postmortem` event closes the debrief. Both outlive the current configuration, so it must list every mode the scenario can run in, not just the debriefs the current knobs declare. A two-layout scenario names the solo channel *and* both per-team ones. Pass it to the world as `type(self).postmortem_channel_ids` rather than re-importing the ids.
 - `knobs_model()` → classmethod returning your `<YourKnobs>` class. The base derives `knobs_json_schema()` from it — you no longer write the schema accessor.
 - `get_knobs()` → return `self._knobs`. The base derives `get_round_count()`, `get_max_round_duration_seconds()`, and `get_scenario_config()` from it — you no longer write those getters.
 - `create_from_config(config)` → classmethod factory that validates the dict against `<YourKnobs>` and constructs the scenario.
@@ -306,7 +306,7 @@ The `SimulationScenario` subclass is the entry point the registry hands to the C
 - `on_round_advanced(round_number, world_context, event_logger)` → emit your `<Scenario>CaseStarted` event so metrics can read per-round ground truth.
 - `on_round_ended(round_number, world_context, event_logger)` → settle round-end state.
 - `validate_outgoing_message(...)`, `transform_outgoing_message(...)` → enforce / mutate messages (budget enforcement, noise injection).
-- `get_primary_channels()` → **required** — return the `PrimaryChannel` list telling generic metrics (perplexity, mean-chars-per-round, mean-chars-per-message, language judges) which channel(s) to score. Two-team scenarios return one entry per team's channel; return `[]` only if the scenario has no channel worth scoring.
+- `get_primary_channels()` → **required** — return the `PrimaryChannel` list telling generic metrics (perplexity, mean-chars-per-round, mean-chars-per-message, language judges) which channel(s) to score. One entry per independently metered channel, which is not the same as one per team: two teams on their own links give two entries carrying their `team_id`, and the metrics report `perplexity_team_a` / `_team_b`. Two teams sharing one link give a single entry with `team_id=None`, pooling both under the base metric names, because there is one conversation to score. [spot_the_difference](../src/glossogen/scenarios/spot_the_difference/scenario.py) does both, switched on its `shared_link` knob. Return `[]` only if the scenario has no channel worth scoring.
 - `get_early_round_end_trigger()` → optional; returns a trigger string when the round should end early (e.g. once a `target_placed` flag and `executed_moves` count match the expected sequence).
 - `judge_round_result(round_number, trigger)` → **required** — return a list of `RoundResult(success, team_id, reason)`. The game clock writes one `RoundResultRecorded` event per element; the platform `round_success` metric reads these directly and emits one Measurement per `team_id` (single-team scenarios pass `team_id=None` and get one Measurement named `round_success`). Return `[]` only if the scenario genuinely has no per-round success criterion. Despite the name this does not imply an LLM judge — [prisoners_dilemma](../src/glossogen/scenarios/prisoners_dilemma/scenario.py) resolves rounds deterministically from its payoff matrix with no LLM anywhere, while veyru calls one. Judge however the task demands.
 - `restore_state_from_events(events)` → optional. Called after a fork/resume rewind has been built and before the runtime starts. Walk the event list and seed any per-round outcomes you need so the first post-resume injection renders accurate "previous result" context (most scenarios need this only if their injection templates surface prior-round state).
@@ -479,7 +479,7 @@ Before opening a PR:
 - [ ] `judge_model = "claude-haiku-4-5-20251001"`, `judge_provider = "anthropic"`, `seed = 42` in the preset.
 - [ ] Prompts live in `prompts/*.jinja`, not in Python string literals.
 - [ ] `judge_round_result(round_number, trigger)` returns at least one `RoundResult` per round (single-team scenarios: one with `team_id=None`; multi-team: one per team). The game clock writes `RoundResultRecorded` events from these; the platform `round_success` metric reads them directly.
-- [ ] `get_primary_channels()` (required) returns a non-empty `PrimaryChannel` list — the comm-link channel for single-team, one entry per team's channel for two-team.
+- [ ] `get_primary_channels()` (required) returns a non-empty `PrimaryChannel` list: one entry per independently metered channel, carrying a `team_id` only where a team meters that channel alone. Teams sharing a link get one pooled entry, not one each.
 - [ ] If you added a run-detail extension, re-run `make gen-api-types` so `frontend/src/types/api.gen.ts` includes your `XxxRunExtras` variant.
 - [ ] `make lint` is clean. Regenerate the vulture whitelist (`VIRTUAL_ENV= uv run --no-sync vulture src/ --min-confidence 60 --make-whitelist > vulture_whitelist.py`) if Pydantic fields or auto-discovered classes get flagged.
 - [ ] At least one end-to-end smoke run completes and the `round_success` metric returns a non-empty per-round list.
@@ -487,6 +487,8 @@ Before opening a PR:
 ## Common pitfalls
 
 **Circular import on event discovery.** If you see `ImportError` mentioning your scenario at platform startup, check that (a) `__init__.py` is empty and (b) `events.py` doesn't import from `glossogen.models.event`.
+
+**A late-arriving agent saw the traffic it was meant to arrive after.** The run completes, the logs look right, and the measurement answered a different question than the one you asked. Check `starts_as_member` on that role: it governs the round-one roster, not which channels the role reaches, and the two are easy to conflate. See "`starts_as_member` is not `joins_debrief`" above.
 
 **Vulture flags scenario classes as unused.** Pydantic fields, auto-discovered extension classes, and metric classes can look unused. Regenerate the whitelist as shown above.
 
