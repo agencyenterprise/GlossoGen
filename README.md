@@ -145,10 +145,10 @@
 | src/glossogen/runtime/mcp\_tools.py                                                                    |      167 |       23 |       36 |        9 |     83% |114, 120-126, 141, 168-173, 182-189, 303-309, 366, 415, 442-465, 515-\>511, 574 |
 | src/glossogen/runtime/mcp\_transport.py                                                                |        7 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/scenario\_mcp\_tool.py                                                           |       19 |        5 |        6 |        2 |     64% |     45-56 |
-| src/glossogen/runtime/scenario\_world.py                                                               |      101 |       19 |       16 |        2 |     77% |93, 119, 148-165, 180-184 |
+| src/glossogen/runtime/scenario\_world.py                                                               |       97 |       19 |       14 |        2 |     76% |93, 119, 148-165, 180-184 |
 | src/glossogen/runtime/scheduled\_events.py                                                             |       40 |        5 |        8 |        1 |     79% |93-94, 118-120 |
 | src/glossogen/runtime/scheduler.py                                                                     |       32 |        4 |       12 |        2 |     82% |81, 94-100 |
-| src/glossogen/runtime/simulation\_state.py                                                             |      137 |        8 |       28 |        5 |     92% |124, 156, 179, 186, 244, 266-272, 279 |
+| src/glossogen/runtime/simulation\_state.py                                                             |      138 |        8 |       28 |        5 |     92% |124, 156, 179, 186, 261, 283-289, 296 |
 | src/glossogen/scenario\_loader.py                                                                      |        9 |        0 |        2 |        0 |    100% |           |
 | src/glossogen/scenario\_protocol.py                                                                    |      124 |        9 |       14 |        2 |     92% |109, 309, 329, 379, 415-416, 451, 496, 563 |
 | src/glossogen/scenario\_registry.py                                                                    |       12 |        0 |        0 |        0 |    100% |           |
@@ -355,7 +355,7 @@
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       92 |       92 |       62 |        0 |      0% |    14-239 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |       38 |        4 |        0 |      0% |    15-168 |
 | src/glossogen/token\_pricing.py                                                                        |       41 |       19 |       14 |        2 |     51% |126-131, 141-149, 158-160, 176 |
-| **TOTAL**                                                                                              | **17114** | **7592** | **4878** |  **688** | **52%** |           |
+| **TOTAL**                                                                                              | **17111** | **7592** | **4876** |  **688** | **52%** |           |
 
 
 ## Setup coverage badge
