@@ -28,7 +28,7 @@ from glossogen.runtime.scheduled_events import (
     SwapAgent,
 )
 from tests.fakes.scripted_agent_model import SayTurn, ScriptedTurn, ToolTurn
-from tests.testbed.simulation_harness import SimulationResult, run_simulation
+from tests.testbed.simulation_harness import SimulationResult, never_times_out, run_simulation
 from tests.testbed.smoke_scenario import (
     FIRST_AGENT_ID,
     LINK_CHANNEL_ID,
@@ -207,6 +207,7 @@ async def run_swap(
         },
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
     )
 
     reads = reads_after_the_swap(events=result.events, agent_id=FIRST_AGENT_ID)

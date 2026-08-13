@@ -1564,20 +1564,6 @@
     "text": "yard_operator_a reporting"
    }
   ],
-  "yard_operator_b": [
-   {
-    "channel_id": "link_b",
-    "sender_agent_id": "yard_operator_b",
-    "sender_display_name": "Yard Scanner B",
-    "text": "yard_operator_b reporting"
-   },
-   {
-    "channel_id": "link_b",
-    "sender_agent_id": "yard_operator_b",
-    "sender_display_name": "Yard Scanner B",
-    "text": "yard_operator_b reporting"
-   }
-  ],
   "logistics_planner_a": [
    {
     "channel_id": "link_a",
@@ -1592,18 +1578,18 @@
     "text": "logistics_planner_a reporting"
    }
   ],
-  "logistics_planner_b": [
+  "yard_operator_b": [
    {
     "channel_id": "link_b",
-    "sender_agent_id": "logistics_planner_b",
-    "sender_display_name": "Logistics Planner B",
-    "text": "logistics_planner_b reporting"
+    "sender_agent_id": "yard_operator_b",
+    "sender_display_name": "Yard Scanner B",
+    "text": "yard_operator_b reporting"
    },
    {
     "channel_id": "link_b",
-    "sender_agent_id": "logistics_planner_b",
-    "sender_display_name": "Logistics Planner B",
-    "text": "logistics_planner_b reporting"
+    "sender_agent_id": "yard_operator_b",
+    "sender_display_name": "Yard Scanner B",
+    "text": "yard_operator_b reporting"
    }
   ],
   "crane_operator_a": [
@@ -1618,6 +1604,20 @@
     "sender_agent_id": "crane_operator_a",
     "sender_display_name": "Crane Operator A",
     "text": "crane_operator_a reporting"
+   }
+  ],
+  "logistics_planner_b": [
+   {
+    "channel_id": "link_b",
+    "sender_agent_id": "logistics_planner_b",
+    "sender_display_name": "Logistics Planner B",
+    "text": "logistics_planner_b reporting"
+   },
+   {
+    "channel_id": "link_b",
+    "sender_agent_id": "logistics_planner_b",
+    "sender_display_name": "Logistics Planner B",
+    "text": "logistics_planner_b reporting"
    }
   ],
   "crane_operator_b": [

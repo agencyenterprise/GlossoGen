@@ -19,7 +19,24 @@ from glossogen.scenario_protocol import SimulationScenario
 from glossogen.scenario_registry import SCENARIO_REGISTRY
 from tests.scenarios.scenario_runtime import build_scenario
 
-ALL_SCENARIOS = sorted(SCENARIO_REGISTRY)
+
+def corrupts_its_channel(scenario_name: str) -> bool:
+    """Whether this scenario corrupts the channel it scores.
+
+    A scenario that never overrides ``transform_outgoing_message`` applies its
+    pressure some other way, and one with no primary channel has nothing to
+    corrupt. Neither has a noisy channel for these tests to look at.
+    """
+    scenario_class = SCENARIO_REGISTRY[scenario_name]
+    if scenario_class.transform_outgoing_message is SimulationScenario.transform_outgoing_message:
+        return False
+    return bool(build_scenario(scenario_name=scenario_name, overrides={}).get_primary_channels())
+
+
+# Parametrized over the scenarios that corrupt something, rather than over all
+# of them with the rest skipping. A skip reads as "did not run" long after
+# anyone remembers why; an absent parameter says the test never applied.
+NOISY_SCENARIOS = sorted(name for name in SCENARIO_REGISTRY if corrupts_its_channel(name))
 
 # Every character is corrupted at 1.0, so a single short message is enough to
 # tell a noisy channel from a clean one without depending on a lucky draw.
@@ -33,20 +50,15 @@ def build_noisy(scenario_name: str, level: float) -> SimulationScenario:
 
 
 def a_noisy_channel(scenario: SimulationScenario) -> str:
-    """Return the channel this scenario corrupts, or skip if it corrupts none.
+    """Return the channel this scenario corrupts.
 
     A scenario applies noise to the channel it scores, so the primary channel is
-    where to look. Scenarios that never implement the transform
-    (``hospital_bed_assignment_privacy``, ``prisoners_dilemma``) apply their
-    pressure some other way and have no noisy channel to check.
+    where to look. Only scenarios that corrupt something are parametrized here,
+    so a missing primary channel is a broken declaration rather than a scenario
+    this test does not apply to.
     """
-    owns_transform = (
-        type(scenario).transform_outgoing_message
-        is not SimulationScenario.transform_outgoing_message
-    )
     primaries = scenario.get_primary_channels()
-    if not owns_transform or not primaries:
-        pytest.skip("scenario applies no channel noise in this configuration")
+    assert primaries, f"{scenario.name()} corrupts a channel but names no primary channel"
     return primaries[0].channel_id
 
 
@@ -58,7 +70,7 @@ def a_member_of(scenario: SimulationScenario, channel_id: str) -> str:
     raise AssertionError(f"{scenario.name()}: nobody is in {channel_id}")
 
 
-@pytest.mark.parametrize("scenario_name", ALL_SCENARIOS)
+@pytest.mark.parametrize("scenario_name", NOISY_SCENARIOS)
 def test_the_task_channel_is_corrupted_when_noise_is_on(scenario_name: str) -> None:
     """At full noise, nothing an agent sends on the task channel survives intact."""
     scenario = build_noisy(scenario_name=scenario_name, level=TOTAL_NOISE)
@@ -76,7 +88,7 @@ def test_the_task_channel_is_corrupted_when_noise_is_on(scenario_name: str) -> N
     )
 
 
-@pytest.mark.parametrize("scenario_name", ALL_SCENARIOS)
+@pytest.mark.parametrize("scenario_name", NOISY_SCENARIOS)
 def test_the_discussion_channel_stays_clean(scenario_name: str) -> None:
     """The debrief is where agents compare notes, so it is never corrupted."""
     scenario = build_noisy(scenario_name=scenario_name, level=TOTAL_NOISE)
@@ -97,7 +109,7 @@ def test_the_discussion_channel_stays_clean(scenario_name: str) -> None:
     assert on_the_wire == MESSAGE, "the discussion channel was corrupted"
 
 
-@pytest.mark.parametrize("scenario_name", ALL_SCENARIOS)
+@pytest.mark.parametrize("scenario_name", NOISY_SCENARIOS)
 def test_noise_off_leaves_the_message_alone(scenario_name: str) -> None:
     """The default is a lossless channel, which most runs depend on."""
     scenario = build_noisy(scenario_name=scenario_name, level=0.0)
@@ -110,7 +122,7 @@ def test_noise_off_leaves_the_message_alone(scenario_name: str) -> None:
     )
 
 
-@pytest.mark.parametrize("scenario_name", ALL_SCENARIOS)
+@pytest.mark.parametrize("scenario_name", NOISY_SCENARIOS)
 def test_the_same_seed_corrupts_the_same_way(scenario_name: str) -> None:
     """Two runs of one preset have to produce the same wire, or nothing replicates.
 

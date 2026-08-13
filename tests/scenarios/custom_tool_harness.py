@@ -22,7 +22,7 @@ from glossogen.scenario_protocol import SimulationScenario
 from tests.fakes.scripted_agent_model import SayTurn, ScriptedTurn, ToolTurn
 from tests.fakes.stub_llm_provider import StubLLMProvider
 from tests.scenarios.scenario_runtime import ROUND_SECONDS, build_scenario
-from tests.testbed.simulation_harness import SimulationResult, run_simulation
+from tests.testbed.simulation_harness import SimulationResult, never_times_out, run_simulation
 
 # Enough queued verdicts that a scenario judging more than once per round (a
 # per-team or per-stage judge) does not run dry mid-test.
@@ -88,6 +88,7 @@ async def call_tool(
         scripts=scripts,
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
     )
 
 

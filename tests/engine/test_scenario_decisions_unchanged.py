@@ -112,8 +112,9 @@ async def play(
     return result.events
 
 
-def as_baseline(events: list[dict[str, Any]]) -> dict[str, Any]:
+def as_baseline(events: list[dict[str, Any]], configuration: str) -> dict[str, Any]:
     """Reduce a run to the part that reproduces, ready to serialise."""
+    _ = configuration
     return {
         "decisions": decision_events(events),
         "messages_by_sender": messages_by_sender(events),
@@ -138,7 +139,7 @@ def to_events(baseline: dict[str, Any]) -> list[dict[str, Any]]:
                     "message": {**message, "sender_agent_id": sender},
                 }
             )
-    for recipient, deliveries in baseline["deliveries_by_recipient"].items():
+    for recipient, deliveries in baseline.get("deliveries_by_recipient", {}).items():
         for delivered in deliveries:
             events.append({**delivered, "agent_id": recipient})
     return events
@@ -153,13 +154,16 @@ async def test_the_scenario_decides_what_the_baseline_recorded(
     path = baseline_path(configuration=configuration)
 
     if os.environ.get(UPDATE_ENV_VAR):
-        path.write_text(json.dumps(as_baseline(events), indent=1, default=str) + "\n")
+        path.write_text(
+            json.dumps(as_baseline(events, configuration=configuration), indent=1, default=str)
+            + "\n"
+        )
         pytest.skip(f"baseline rewritten; unset {UPDATE_ENV_VAR} and read the diff")
 
     assert path.exists(), f"no baseline recorded; create one with {UPDATE_ENV_VAR}=1"
     recorded = json.loads(path.read_text())
 
-    produced = as_baseline(events)
+    produced = as_baseline(events, configuration=configuration)
     difference = describe_difference(to_events(recorded), to_events(produced))
     if difference:
         # Write what this run actually decided, next to the baseline it failed

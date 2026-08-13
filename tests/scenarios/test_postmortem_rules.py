@@ -29,19 +29,6 @@ POSTMORTEM_SCENARIOS = sorted(
     name for name, cls in SCENARIO_REGISTRY.items() if cls.postmortem_channel_ids
 )
 
-# Switching the postmortem off is one knob everywhere except veyru, which
-# rejects the combination unless its post-swap knob goes with it.
-POSTMORTEM_OFF: dict[str, dict[str, Any]] = {
-    "veyru": {"postmortem_enabled": False, "postmortem_after_swap": False},
-}
-
-LONG_MESSAGE = "x" * 500
-
-
-def postmortem_off_for(scenario_name: str) -> dict[str, Any]:
-    """Return the knob overrides that switch this scenario's postmortem off."""
-    return POSTMORTEM_OFF.get(scenario_name, {"postmortem_enabled": False})
-
 
 def character_counter_of(world: ScenarioWorld, primary: PrimaryChannel) -> Callable[[], int] | None:
     """Return a reader for the characters spent on ``primary``, or None.
@@ -72,6 +59,37 @@ def budget_flag_of(world: ScenarioWorld) -> Callable[[], bool] | None:
     if callable(flag):
         return None
     return lambda: bool(getattr(world, "round_budget_exceeded"))
+
+
+def publishes_a_budget_verdict(scenario_name: str) -> bool:
+    """Whether this scenario's world exposes "the round overspent" as a flag.
+
+    Worlds that meter per team answer the question per team instead, and are
+    covered through their character counter by the test above.
+    """
+    world = build_scenario(scenario_name=scenario_name, overrides={}).get_world()
+    return budget_flag_of(world=world) is not None
+
+
+# Parametrized over the scenarios that publish the verdict, rather than over
+# every postmortem scenario with the rest skipping: a skip reads as "did not
+# run", while an absent parameter says the test never applied.
+BUDGET_VERDICT_SCENARIOS = sorted(
+    name for name in POSTMORTEM_SCENARIOS if publishes_a_budget_verdict(name)
+)
+
+# Switching the postmortem off is one knob everywhere except veyru, which
+# rejects the combination unless its post-swap knob goes with it.
+POSTMORTEM_OFF: dict[str, dict[str, Any]] = {
+    "veyru": {"postmortem_enabled": False, "postmortem_after_swap": False},
+}
+
+LONG_MESSAGE = "x" * 500
+
+
+def postmortem_off_for(scenario_name: str) -> dict[str, Any]:
+    """Return the knob overrides that switch this scenario's postmortem off."""
+    return POSTMORTEM_OFF.get(scenario_name, {"postmortem_enabled": False})
 
 
 def a_member_of(scenario: SimulationScenario, channel_id: str) -> str:
@@ -193,7 +211,7 @@ def test_the_preset_and_the_declaration_agree_about_having_a_postmortem(
     ), f"{scenario_name} declares postmortem channels but its default preset disables the phase"
 
 
-@pytest.mark.parametrize("scenario_name", POSTMORTEM_SCENARIOS)
+@pytest.mark.parametrize("scenario_name", BUDGET_VERDICT_SCENARIOS)
 def test_debrief_traffic_cannot_blow_the_budget(scenario_name: str) -> None:
     """The same rule seen through the verdict rather than the running count.
 
@@ -203,8 +221,7 @@ def test_debrief_traffic_cannot_blow_the_budget(scenario_name: str) -> None:
     scenario = build_scenario(scenario_name=scenario_name, overrides={"postmortem_enabled": True})
     world = scenario.get_world()
     read_flag = budget_flag_of(world=world)
-    if read_flag is None:
-        pytest.skip(f"{scenario_name} publishes no round-budget verdict")
+    assert read_flag is not None, f"{scenario_name} was parametrized but publishes no verdict"
     postmortem_id = a_channel_of(
         scenario=scenario, channel_ids=type(scenario).postmortem_channel_ids
     )

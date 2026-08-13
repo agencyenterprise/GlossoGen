@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from tests.fakes.scripted_agent_model import SayTurn, ToolTurn
-from tests.testbed.simulation_harness import run_simulation
+from tests.testbed.simulation_harness import never_times_out, run_simulation
 from tests.testbed.smoke_scenario import (
     FIRST_AGENT_ID,
     LINK_CHANNEL_ID,
@@ -73,6 +73,7 @@ async def test_a_full_round_writes_everything_to_the_jsonl(
         },
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
     )
 
     # The run identifies itself, including the scenario's own description.
@@ -149,6 +150,7 @@ async def test_all_agents_going_idle_advances_the_round(
         scripts={FIRST_AGENT_ID: list(idle_only), SECOND_AGENT_ID: list(idle_only)},
         tmp_path=tmp_path,
         monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
     )
 
     advances = result.of_type(event_type="round_advanced")

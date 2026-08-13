@@ -92,10 +92,11 @@ class SimulationScenario(ABC):
     # Empty here so the default lookups fall through to the raw id.
     _agent_display_names: dict[str, str] = {}
     _channel_display_names: dict[str, str] = {}
-    # Channels carrying postmortem traffic. Declared once here and read by
-    # three places that used to be written out per scenario: the phase
-    # duration, the replaced-agent history filter, and the world's
-    # globally-disabled set. Empty means the scenario has no postmortem.
+    # Channels carrying postmortem traffic, declared once here rather than
+    # written out per scenario. Read by the replaced-agent history filter
+    # below, and by the world it is handed to, which reports it as the
+    # globally-disabled set once the debrief closes. Empty means the scenario
+    # has no postmortem.
     postmortem_channel_ids: ClassVar[frozenset[str]] = frozenset()
 
     def __init__(self, knobs: BaseKnobs) -> None:
