@@ -20,6 +20,7 @@ Heavy logic lives in dedicated sibling modules: :mod:`world_state` (the
 
 import logging
 
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
 from glossogen.engine.round_world import RoundWorld
 from glossogen.engine.team_declaration import TeamSpec
 from glossogen.runtime.scenario_world import MessageEvent, WorldContext
@@ -74,13 +75,14 @@ class VeyruWorld(RoundWorld):
         postmortem_globally_disabled: bool,
     ) -> None:
         super().__init__(
-            teams=team_specs,
+            team_specs=team_specs,
             round_budget_thresholds=(THRESHOLD_COLLAPSED, THRESHOLD_CRITICAL),
             postmortem_channel_ids=postmortem_channel_ids,
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._veyru_cases = veyru_cases
         self._teams = teams
+        self._outcome_log: RoundOutcomeLog[VeyruOutcome] = RoundOutcomeLog(team_ids=tuple(teams))
         self._current_case: VeyruCase | None = None
         self._swap_just_happened: bool = False
         self._intern_takeover_just_happened: bool = False
@@ -135,7 +137,7 @@ class VeyruWorld(RoundWorld):
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def current_case(self) -> VeyruCase | None:
@@ -226,7 +228,7 @@ class VeyruWorld(RoundWorld):
 
     def get_outcomes_for_team(self, team_id: TeamId) -> list[VeyruOutcome]:
         """Return the list of outcomes recorded for the given team."""
-        return self._teams[team_id].outcomes
+        return self._outcome_log.all_for(team_id=team_id)
 
     def compute_outcome_if_needed(self, round_number: int, team_id: TeamId) -> VeyruOutcome | None:
         """Build and store the outcome for the given team/round if not already done."""
@@ -237,6 +239,7 @@ class VeyruWorld(RoundWorld):
             team_id=team_id,
             case_overrides=self._case_overrides,
             characters_used=self.characters_used(team_id=team_id),
+            outcome_log=self._outcome_log,
         )
 
     def finalize_round_sync(self, round_number: int) -> None:
@@ -280,6 +283,7 @@ class VeyruWorld(RoundWorld):
             teams=self._teams,
             veyru_cases=self._veyru_cases,
             events=events,
+            outcome_log=self._outcome_log,
         )
 
     def get_current_stage(self, team_id: TeamId) -> VeyruStage | None:
@@ -318,13 +322,13 @@ class VeyruWorld(RoundWorld):
         next_index = team.current_stage_index + 1
         if next_index >= len(self._current_case.stages):
             team.veyru_stabilized = True
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=team.link_channel_id,
                 text=f"{VEYRU_STABILIZED_MARKER}. All issues resolved.",
             )
             return False
         team.current_stage_index = next_index
-        await self._context.send_update_to_channel(
+        await self._world_context.send_update_to_channel(
             channel_id=team.link_channel_id,
             text="Issue stabilized, but the Veyru remains unstable — new symptoms detected.",
         )
@@ -433,7 +437,7 @@ class VeyruWorld(RoundWorld):
             ):
                 continue
             team.veyru_alive = False
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=team.link_channel_id,
                 text=f"{VEYRU_COLLAPSED_MARKER}. {reason}",
             )

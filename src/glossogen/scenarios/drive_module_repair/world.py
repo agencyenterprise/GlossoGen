@@ -97,7 +97,7 @@ class DriveModuleWorld(ScenarioWorld):
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def current_case(self) -> DriveModuleCase | None:
@@ -141,7 +141,7 @@ class DriveModuleWorld(ScenarioWorld):
         completed = case.stages[self._current_stage_index]
         self._current_stage_index += 1
         if self._current_stage_index >= len(case.stages):
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=BAY_CHANNEL_ID,
                 text=f"{DEVICE_REPAIRED_MARKER}. All units serviced.",
             )
@@ -168,11 +168,11 @@ class DriveModuleWorld(ScenarioWorld):
         if module_label in self._revealed_modules:
             return
         self._revealed_modules.add(module_label)
-        await self._context.send_update_to_agent(
+        await self._world_context.send_update_to_agent(
             agent_id=DIAGNOSTICS_ENGINEER_ID,
             text=_render_fault_tree(tree=case.fault_tree_for(module_label=module_label)),
         )
-        await self._context.send_update_to_agent(
+        await self._world_context.send_update_to_agent(
             agent_id=SPEC_ENGINEER_ID,
             text=_render_spec_sheet(table=case.spec_table_for(module_label=module_label)),
         )
@@ -368,4 +368,4 @@ class DriveModuleWorld(ScenarioWorld):
             )
         else:
             text = f"{DEVICE_FAILED_MARKER}. {outcome.failure_reason}"
-        await self._context.send_update_to_channel(channel_id=BAY_CHANNEL_ID, text=text)
+        await self._world_context.send_update_to_channel(channel_id=BAY_CHANNEL_ID, text=text)

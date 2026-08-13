@@ -23,7 +23,7 @@ class RoundWorld(ScenarioWorld):
 
     def __init__(
         self,
-        teams: tuple[TeamSpec, ...],
+        team_specs: tuple[TeamSpec, ...],
         round_budget_thresholds: tuple[str, ...],
         postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
@@ -36,7 +36,7 @@ class RoundWorld(ScenarioWorld):
         milder ones beneath it.
 
         ``postmortem_channel_ids`` covers every mode the scenario can run in,
-        not just the debriefs ``teams`` declares for this configuration, because
+        not just the debriefs ``team_specs`` declares for this configuration, because
         it is also the set the mid-run swap logic and the replaced-agent history
         filter read. Passing the scenario's class declaration keeps all three
         reading one list.
@@ -48,15 +48,15 @@ class RoundWorld(ScenarioWorld):
         # Which team owns each metered channel. Debrief channels are absent, so
         # a lookup miss is how a message is recognised as not costing anything.
         self._team_id_by_task_channel_id: dict[str, str] = {
-            team.task.channel_id: team.team_id for team in teams
+            team.task.channel_id: team.team_id for team in team_specs
         }
         # What each team has spent since ``begin_round``.
-        self._characters_used_by_team_id: dict[str, int] = {team.team_id: 0 for team in teams}
+        self._characters_used_by_team_id: dict[str, int] = {team.team_id: 0 for team in team_specs}
         # The announcements a round can make, most severe first.
         self._round_budget_thresholds: tuple[str, ...] = round_budget_thresholds
         # Which of those each team has already been told, this round.
         self._claimed_thresholds_by_team_id: dict[str, set[str]] = {
-            team.team_id: set() for team in teams
+            team.team_id: set() for team in team_specs
         }
 
     def team_for_task_channel(self, channel_id: str) -> str | None:

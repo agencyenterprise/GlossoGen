@@ -51,7 +51,7 @@ class PrisonersDilemmaWorld(ScenarioWorld):
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def cumulative_scores(self) -> dict[str, float]:

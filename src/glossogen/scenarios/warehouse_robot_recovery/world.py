@@ -77,7 +77,7 @@ class WarehouseWorld(ScenarioWorld):
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def current_case(self) -> WarehouseCase | None:
@@ -124,13 +124,13 @@ class WarehouseWorld(ScenarioWorld):
         self._round_judge_passed = judge_passed
         self._last_judge_explanation = explanation
         if not judge_passed:
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=RADIO_CHANNEL_ID,
                 text=f"{ROBOT_NOT_RECOVERED_MARKER}. The recovery action was rejected by review.",
             )
             return
         if self._round_budget_exceeded:
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=RADIO_CHANNEL_ID,
                 text=(
                     f"{ROBOT_NOT_RECOVERED_MARKER}. "
@@ -140,7 +140,7 @@ class WarehouseWorld(ScenarioWorld):
             )
             return
         self._round_recovered = True
-        await self._context.send_update_to_channel(
+        await self._world_context.send_update_to_channel(
             channel_id=RADIO_CHANNEL_ID,
             text=f"{ROBOT_RECOVERED_MARKER}. The robot is back in a safe operating state.",
         )
@@ -266,7 +266,7 @@ class WarehouseWorld(ScenarioWorld):
         if THRESHOLD_BUDGET_EXCEEDED in self._notified_thresholds:
             return
         self._notified_thresholds.update([THRESHOLD_BUDGET_EXCEEDED, THRESHOLD_CRITICAL])
-        await self._context.send_update_to_channel(
+        await self._world_context.send_update_to_channel(
             channel_id=RADIO_CHANNEL_ID,
             text=f"{ROBOT_NOT_RECOVERED_MARKER}. {reason}",
         )

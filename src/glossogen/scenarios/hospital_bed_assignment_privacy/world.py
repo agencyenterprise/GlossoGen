@@ -108,7 +108,7 @@ class HospitalWorld(ScenarioWorld):
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def current_case(self) -> HospitalCase | None:
@@ -315,7 +315,7 @@ class HospitalWorld(ScenarioWorld):
             if len(reasons) == 0:
                 reasons.append("round ended without success")
             text = f"{ROUND_FAILED_MARKER}. {'; '.join(reasons)}."
-        await self._context.send_update_to_channel(
+        await self._world_context.send_update_to_channel(
             channel_id=PUBLIC_OPS_CHANNEL_ID,
             text=text,
         )

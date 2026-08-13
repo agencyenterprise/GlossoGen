@@ -127,7 +127,7 @@ class SpotTheDifferenceWorld(ScenarioWorld):
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def two_teams(self) -> bool:
@@ -226,9 +226,9 @@ class SpotTheDifferenceWorld(ScenarioWorld):
         """
         if self._shared_link:
             for member_id in team.member_agent_ids:
-                await self._context.send_update_to_agent(agent_id=member_id, text=text)
+                await self._world_context.send_update_to_agent(agent_id=member_id, text=text)
             return
-        await self._context.send_update_to_channel(channel_id=team.link_channel_id, text=text)
+        await self._world_context.send_update_to_channel(channel_id=team.link_channel_id, text=text)
 
     async def announce_submission_locked(self, team_id: str) -> None:
         """Notify the team that its answer is locked for the round."""

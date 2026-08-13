@@ -50,7 +50,7 @@ TEAMS = (
 def build_world() -> RoundWorld:
     """Build a two-team world with its debrief channels declared."""
     return RoundWorld(
-        teams=TEAMS,
+        team_specs=TEAMS,
         round_budget_thresholds=ROUND_BUDGET_THRESHOLDS,
         postmortem_channel_ids=DEBRIEF_IDS,
         postmortem_globally_disabled=False,

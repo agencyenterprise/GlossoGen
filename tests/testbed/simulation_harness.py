@@ -55,10 +55,16 @@ def free_port() -> int:
 
 @dataclass(frozen=True)
 class SimulationResult:
-    """A finished run: the events it wrote and where they were written."""
+    """A finished run: the events it wrote, where, and the scenario that ran.
+
+    The scenario is kept because some of what a run decides never reaches the
+    event log. Whether the discussion phase was left open, for one, is world
+    state that shuts the task channel without recording anything.
+    """
 
     events: list[dict[str, Any]]
     log_path: Path
+    scenario: SimulationScenario
 
     def of_type(self, *, event_type: str) -> list[dict[str, Any]]:
         """Return every event of one type, in the order logged."""
@@ -216,4 +222,4 @@ async def run_simulation(
     events: list[dict[str, Any]] = [
         orjson.loads(line) for line in log_path.read_bytes().splitlines() if line.strip()
     ]
-    return SimulationResult(events=events, log_path=log_path)
+    return SimulationResult(events=events, log_path=log_path, scenario=scenario)

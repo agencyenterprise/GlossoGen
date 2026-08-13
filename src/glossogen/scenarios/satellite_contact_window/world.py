@@ -85,7 +85,7 @@ class SatelliteWorld(ScenarioWorld):
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def current_case(self) -> SatelliteCase | None:
@@ -142,7 +142,7 @@ class SatelliteWorld(ScenarioWorld):
         self._last_violations = violations
         self._last_submitted_sequence = submitted_sequence
         if not judge_passed:
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=LINK_CHANNEL_ID,
                 text=(
                     f"{COMMAND_REJECTED_MARKER}. {SATELLITE_NOT_RECOVERED_MARKER}. "
@@ -151,7 +151,7 @@ class SatelliteWorld(ScenarioWorld):
             )
             return
         if self._round_window_closed:
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=LINK_CHANNEL_ID,
                 text=(
                     f"{COMMAND_REJECTED_MARKER}. {SATELLITE_NOT_RECOVERED_MARKER}. "
@@ -161,7 +161,7 @@ class SatelliteWorld(ScenarioWorld):
             )
             return
         self._round_recovered = True
-        await self._context.send_update_to_channel(
+        await self._world_context.send_update_to_channel(
             channel_id=LINK_CHANNEL_ID,
             text=(
                 f"{COMMAND_ACCEPTED_MARKER}. {SATELLITE_RECOVERED_MARKER}. "
@@ -295,7 +295,7 @@ class SatelliteWorld(ScenarioWorld):
         if THRESHOLD_WINDOW_CLOSED in self._notified_thresholds:
             return
         self._notified_thresholds.update([THRESHOLD_WINDOW_CLOSED, THRESHOLD_CRITICAL])
-        await self._context.send_update_to_channel(
+        await self._world_context.send_update_to_channel(
             channel_id=LINK_CHANNEL_ID,
             text=f"{SATELLITE_NOT_RECOVERED_MARKER}. {reason}",
         )

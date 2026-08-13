@@ -367,7 +367,6 @@ class HospitalBedAssignmentPrivacyScenario(SimulationScenario):
 
     async def on_round_advanced(self, round_number: int) -> None:
         """Resolve the previous round's outcome and emit the new round's case event."""
-        self._world.exit_postmortem()
         self._world.finalize_round_sync(new_round_number=round_number)
         await self._emit_case_started_event(round_number=round_number)
 

@@ -66,7 +66,7 @@ class SpillwayWorld(ScenarioWorld):
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def current_case(self) -> SpillwayCase | None:
@@ -236,4 +236,4 @@ class SpillwayWorld(ScenarioWorld):
             )
         else:
             text = f"{ROUND_FAILED_MARKER}. {outcome.failure_reason}"
-        await self._context.send_update_to_channel(channel_id=OPS_CHANNEL_ID, text=text)
+        await self._world_context.send_update_to_channel(channel_id=OPS_CHANNEL_ID, text=text)

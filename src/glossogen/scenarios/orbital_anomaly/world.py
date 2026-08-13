@@ -72,7 +72,7 @@ class OrbitalAnomalyWorld(ScenarioWorld):
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def current_case(self) -> AnomalyCase | None:
@@ -107,18 +107,18 @@ class OrbitalAnomalyWorld(ScenarioWorld):
         next_index = self._current_stage_index + 1
         if next_index >= len(self._current_case.stages):
             self._vehicle_stabilized = True
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=LINK_CHANNEL_ID,
                 text=f"{VEHICLE_STABILIZED_MARKER}. All anomalies resolved.",
             )
             return None
         self._current_stage_index = next_index
         next_stage = self._current_case.stages[next_index]
-        await self._context.send_update_to_agent(
+        await self._world_context.send_update_to_agent(
             agent_id=TELEMETRY_OFFICER_ID,
             text=f"Downlinked telemetry update: {next_stage.telemetry_readout}",
         )
-        await self._context.send_update_to_channel(
+        await self._world_context.send_update_to_channel(
             channel_id=LINK_CHANNEL_ID,
             text=f"Stage resolved, but {NEW_ANOMALY_MARKER}.",
         )
@@ -159,7 +159,7 @@ class OrbitalAnomalyWorld(ScenarioWorld):
         budget = self._current_case.time_budget_seconds
         if not self._vehicle_alive and _THRESHOLD_LOST not in self._notified_thresholds:
             self._notified_thresholds.update([_THRESHOLD_LOST, _THRESHOLD_CRITICAL])
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=LINK_CHANNEL_ID,
                 text=(
                     f"{VEHICLE_LOST_MARKER}. Communication time {time_elapsed}s exceeded the "
@@ -172,7 +172,7 @@ class OrbitalAnomalyWorld(ScenarioWorld):
         if time_elapsed > budget * 0.75 and _THRESHOLD_CRITICAL not in self._notified_thresholds:
             self._notified_thresholds.add(_THRESHOLD_CRITICAL)
             remaining = budget - time_elapsed
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=LINK_CHANNEL_ID,
                 text=f"CRITICAL: the anomaly is approaching unrecoverable. {remaining}s remaining.",
             )
@@ -221,7 +221,7 @@ class OrbitalAnomalyWorld(ScenarioWorld):
             return
         self._notified_thresholds.update([_THRESHOLD_LOST, _THRESHOLD_CRITICAL])
         self._vehicle_alive = False
-        await self._context.send_update_to_channel(
+        await self._world_context.send_update_to_channel(
             channel_id=LINK_CHANNEL_ID,
             text=f"{VEHICLE_LOST_MARKER}. The anomaly was not resolved before the round ended.",
         )

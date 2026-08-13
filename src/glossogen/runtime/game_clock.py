@@ -123,6 +123,10 @@ class GameClock:
         if self._on_round_boundary is not None:
             await self._on_round_boundary(self._runtime.current_round)
 
+        # The clock opened this phase, so the clock closes it. Left to each
+        # scenario, one that forgot would leave its task channel shut for
+        # the rest of the run and report empty rounds.
+        self._scenario.get_world().exit_postmortem()
         await self._scenario.on_round_advanced(round_number=self._runtime.current_round)
         self._world_context.signal_round_advanced(round_number=self._runtime.current_round)
 
@@ -139,6 +143,10 @@ class GameClock:
         self._last_message_time = time.monotonic()
 
         if self._resuming:
+            # The clock opened this phase, so the clock closes it. Left to each
+            # scenario, one that forgot would leave its task channel shut for
+            # the rest of the run and report empty rounds.
+            self._scenario.get_world().exit_postmortem()
             await self._scenario.on_round_advanced(round_number=self._runtime.current_round)
             self._world_context.signal_round_advanced(round_number=self._runtime.current_round)
             logger.info(
@@ -154,6 +162,10 @@ class GameClock:
                     trigger="simulation_start",
                 )
             )
+            # The clock opened this phase, so the clock closes it. Left to each
+            # scenario, one that forgot would leave its task channel shut for
+            # the rest of the run and report empty rounds.
+            self._scenario.get_world().exit_postmortem()
             await self._scenario.on_round_advanced(round_number=self._runtime.current_round)
             self._world_context.signal_round_advanced(round_number=self._runtime.current_round)
             await self._runtime.deliver_round_injections(round_number=self._runtime.current_round)

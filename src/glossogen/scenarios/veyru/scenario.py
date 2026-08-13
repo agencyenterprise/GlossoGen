@@ -389,7 +389,6 @@ class VeyruScenario(SimulationScenario):
         """Finalize previous Veyru outcomes, prepare the next case, handle swap/intern."""
         self._world.consume_swap_just_happened()
         self._world.consume_intern_takeover()
-        self._world.exit_postmortem()
         self._world.finalize_round_sync(round_number=round_number)
         await self._emit_case_started_event(round_number=round_number)
         await maybe_swap_observers(world=self._world, knobs=self._knobs, round_number=round_number)

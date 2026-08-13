@@ -261,7 +261,7 @@ class ScenarioWorld(ABC):
         Started as an asyncio task by the supervisor and cancelled at
         simulation end.
         """
-        self._context = context
+        self._world_context = context
         try:
             while True:
                 event = await context.next_event()

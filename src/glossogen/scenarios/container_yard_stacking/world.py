@@ -110,7 +110,7 @@ class ContainerYardWorld(ScenarioWorld):
     @property
     def context(self) -> WorldContext:
         """Return the attached ``WorldContext``. Valid after ``run`` is started."""
-        return self._context
+        return self._world_context
 
     @property
     def two_teams(self) -> bool:
@@ -182,7 +182,7 @@ class ContainerYardWorld(ScenarioWorld):
         return await record_move(
             team=self._teams[team_id],
             case=self._current_case,
-            context=self._context,
+            context=self._world_context,
             submitted_from_slot=submitted_from_slot,
             submitted_to_slot=submitted_to_slot,
         )
@@ -357,7 +357,7 @@ class ContainerYardWorld(ScenarioWorld):
                 else:
                     reason = "Round did not complete every placement."
                 text = f"{ROUND_FAILED_MARKER}. {reason}"
-            await self._context.send_update_to_channel(
+            await self._world_context.send_update_to_channel(
                 channel_id=team.link_channel_id,
                 text=text,
             )

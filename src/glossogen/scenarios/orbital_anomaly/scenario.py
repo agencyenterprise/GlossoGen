@@ -204,7 +204,6 @@ class OrbitalAnomalyScenario(SimulationScenario):
 
     async def on_round_advanced(self, round_number: int) -> None:
         """Reset per-round state, load the next case, and log case-started."""
-        self._world.exit_postmortem()
         self._world.finalize_round_sync(round_number=round_number)
         await self._emit_case_started_event(round_number=round_number)
 

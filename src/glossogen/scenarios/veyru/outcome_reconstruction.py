@@ -14,6 +14,7 @@ Each entry point returns the same ``VeyruOutcome`` shape:
 
 from typing import Any
 
+from glossogen.engine.round_outcome_log import RoundOutcomeLog
 from glossogen.models.event import MessageSent, RoundEnded
 from glossogen.scenarios.veyru.events import VeyruStabilizationJudged
 from glossogen.scenarios.veyru.ids import TeamId
@@ -28,6 +29,7 @@ def compute_outcome_if_needed(
     team_id: TeamId,
     case_overrides: dict[int, VeyruCase],
     characters_used: int,
+    outcome_log: RoundOutcomeLog[VeyruOutcome],
 ) -> VeyruOutcome | None:
     """Compute and store the outcome for ``team_id`` / ``round_number`` if not already done.
 
@@ -41,9 +43,9 @@ def compute_outcome_if_needed(
     if round_number < 1:
         return None
     team = teams[team_id]
-    for existing in team.outcomes:
-        if existing.case_number == round_number:
-            return existing
+    recorded = outcome_log.recorded_for(team_id=team_id, round_number=round_number)
+    if recorded is not None:
+        return recorded
     override = case_overrides.get(round_number)
     if override is not None:
         case = override
@@ -70,14 +72,14 @@ def compute_outcome_if_needed(
         total_stages=len(case.stages),
         stage_outcomes=tuple(all_stage_outcomes),
     )
-    team.outcomes.append(outcome)
-    return outcome
+    return outcome_log.record(team_id=team_id, round_number=round_number, outcome=outcome)
 
 
 def restore_outcomes_from_events(
     teams: dict[TeamId, TeamState],
     veyru_cases: list[VeyruCase],
     events: list[Any],
+    outcome_log: RoundOutcomeLog[VeyruOutcome],
 ) -> None:
     """Seed per-team ``outcomes`` from a JSONL event list.
 
@@ -124,8 +126,8 @@ def restore_outcomes_from_events(
         stabilized_round = trigger == "veyru_stabilized"
         chars_for_round = characters_by_round_team.get(round_number, {})
         matched_for_round = matched_stages_by_round_team.get(round_number, {})
-        for team_id, team in teams.items():
-            if any(o.case_number == round_number for o in team.outcomes):
+        for team_id in teams:
+            if outcome_log.recorded_for(team_id=team_id, round_number=round_number) is not None:
                 continue
             chars = chars_for_round.get(team_id, 0)
             matched = matched_for_round.get(team_id, 0)
@@ -136,8 +138,10 @@ def restore_outcomes_from_events(
                 )
                 for i in range(len(case.stages))
             )
-            team.outcomes.append(
-                VeyruOutcome(
+            outcome_log.record(
+                team_id=team_id,
+                round_number=round_number,
+                outcome=VeyruOutcome(
                     team_id=team_id,
                     case_number=round_number,
                     failure_name=case.failure_name,
@@ -148,7 +152,7 @@ def restore_outcomes_from_events(
                     stages_completed=matched,
                     total_stages=len(case.stages),
                     stage_outcomes=stage_outcomes,
-                )
+                ),
             )
 
 
