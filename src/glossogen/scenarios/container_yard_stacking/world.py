@@ -29,14 +29,8 @@ from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.container_yard_stacking.case_rendering import render_container
 from glossogen.scenarios.container_yard_stacking.ids import (
     BUDGET_EXCEEDED_MARKER,
-    LINK_A_CHANNEL_ID,
-    LINK_B_CHANNEL_ID,
-    LINK_CHANNEL_ID,
     ROUND_FAILED_MARKER,
     ROUND_SUCCESS_MARKER,
-    TEAM_A_ID,
-    TEAM_B_ID,
-    TEAM_SOLO_ID,
 )
 from glossogen.scenarios.container_yard_stacking.judging import (
     MoveJudgement,
@@ -93,22 +87,15 @@ class ContainerYardWorld(RoundWorld):
         self._cases = cases
         self._two_teams = two_teams
         self._current_case: YardCase | None = None
-        self._teams: dict[str, TeamState] = self._build_teams(two_teams=two_teams)
+        # Derived from the declaration rather than rebuilt, so a team's link is
+        # named in one place.
+        self._teams: dict[str, TeamState] = {
+            spec.team_id: TeamState(team_id=spec.team_id, link_channel_id=spec.task.channel_id)
+            for spec in team_specs
+        }
         self._outcome_log: RoundOutcomeLog[YardOutcome] = RoundOutcomeLog(
             team_ids=tuple(self._teams)
         )
-
-    @staticmethod
-    def _build_teams(two_teams: bool) -> dict[str, TeamState]:
-        """Initialize the team-state map for single or two-team mode."""
-        if two_teams:
-            return {
-                TEAM_A_ID: TeamState(team_id=TEAM_A_ID, link_channel_id=LINK_A_CHANNEL_ID),
-                TEAM_B_ID: TeamState(team_id=TEAM_B_ID, link_channel_id=LINK_B_CHANNEL_ID),
-            }
-        return {
-            TEAM_SOLO_ID: TeamState(team_id=TEAM_SOLO_ID, link_channel_id=LINK_CHANNEL_ID),
-        }
 
     @property
     def context(self) -> WorldContext:
@@ -327,10 +314,6 @@ class ContainerYardWorld(RoundWorld):
         if team.round_budget_exceeded and self.claim_round_budget_threshold(
             team_id=team_id, round_budget_threshold=THRESHOLD_BUDGET_EXCEEDED
         ):
-            # Past the budget, the 75% warning has nothing left to warn about.
-            self.claim_round_budget_threshold(
-                team_id=team_id, round_budget_threshold=THRESHOLD_CRITICAL
-            )
             await context.send_update_to_channel(
                 channel_id=team.link_channel_id,
                 text=(

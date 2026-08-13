@@ -66,9 +66,10 @@ def agent_display_names(teams: tuple[TeamSpec, ...], world_name: str) -> dict[st
 def channel_display_names(teams: tuple[TeamSpec, ...]) -> dict[str, str]:
     """Map each channel id to the name agents are told to call it.
 
-    Teams name their own channels, so two teams that both call their link "comm
-    link" produce two entries with the same display name and different ids,
-    which is what keeps a rejection message readable to either team.
+    Teams usually name channels of their own, and two of them calling their link
+    "comm link" produce two entries with one display name and different ids,
+    which keeps a rejection message readable to either team. Teams sharing a
+    link produce one entry, and they had better agree on what to call it.
     """
     names: dict[str, str] = {}
     for team in teams:

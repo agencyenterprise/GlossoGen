@@ -117,3 +117,25 @@ def test_two_teams_keep_their_channels_and_rosters_apart() -> None:
 
     assert [c.channel_id for c in built] == ["task", "task_b", "debrief", "debrief_b"]
     assert [c.member_agent_ids for c in built] == [["full"], ["other"], ["full"], ["other"]]
+
+
+def test_teams_sharing_a_task_channel_build_one_channel_holding_both() -> None:
+    """Two teams on one link is one channel, not the id twice.
+
+    Sharing is what spot_the_difference's shared link is, and a second Channel
+    under the same id would give the runtime two rosters for one place.
+    """
+    shared = TaskChannel(channel_id="link", name="link", display_name="the link")
+    team_a = TeamSpec(team_id="a", task=shared, debrief=DEBRIEF, roles=(FULL,))
+    team_b = TeamSpec(
+        team_id="b",
+        task=shared,
+        debrief=Debrief(channel_id="debrief_b", name="debrief_b", display_name="the huddle"),
+        roles=(role(agent_id="other", joins_debrief=True, starts_as_member=True),),
+    )
+
+    built = team_structure.channels(teams=(team_a, team_b))
+
+    assert [c.channel_id for c in built] == ["link", "debrief", "debrief_b"]
+    assert built[0].member_agent_ids == ["full", "other"], "the shared link lost a team"
+    assert team_structure.channel_display_names(teams=(team_a, team_b))["link"] == "the link"

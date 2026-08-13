@@ -238,7 +238,7 @@ class SatelliteWorld(RoundWorld):
         super().on_message(
             agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
         )
-        if self.team_for_task_channel(channel_id=channel_id) is None:
+        if not self.meters_channel(channel_id=channel_id):
             return
         if self._current_case is None:
             return

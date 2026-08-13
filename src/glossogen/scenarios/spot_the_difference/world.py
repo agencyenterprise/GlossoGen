@@ -26,16 +26,10 @@ from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.spot_the_difference.ids import (
     BUDGET_EXCEEDED_MARKER,
     BUDGET_LOW_MARKER,
-    LINK_A_CHANNEL_ID,
-    LINK_B_CHANNEL_ID,
-    LINK_CHANNEL_ID,
     ROUND_LOST_MARKER,
     ROUND_RESULT_MARKER,
     ROUND_WON_MARKER,
     SUBMISSION_RECORDED_MARKER,
-    TEAM_A_ID,
-    TEAM_B_ID,
-    TEAM_SOLO_ID,
 )
 from glossogen.scenarios.spot_the_difference.outcome_reconstruction import (
     restore_outcomes_from_events,
@@ -43,8 +37,6 @@ from glossogen.scenarios.spot_the_difference.outcome_reconstruction import (
 from glossogen.scenarios.spot_the_difference.scene_generation import DiffCase
 from glossogen.scenarios.spot_the_difference.team_routing import (
     team_id_for_link_message,
-    viewer_left_id_for_team,
-    viewer_right_id_for_team,
 )
 from glossogen.scenarios.spot_the_difference.world_state import (
     DiffOutcome,
@@ -86,46 +78,21 @@ class SpotTheDifferenceWorld(RoundWorld):
         self._shared_link = shared_link
         self._all_must_submit = all_must_submit
         self._current_case: DiffCase | None = None
-        self._teams: dict[str, TeamState] = self._build_teams(
-            two_teams=two_teams, shared_link=shared_link, all_must_submit=all_must_submit
-        )
+        # Derived from the declaration rather than rebuilt. Under shared_link
+        # both teams declare the same link, so both hold that channel id here
+        # too, and what separates their totals is who spoke.
+        self._teams: dict[str, TeamState] = {
+            spec.team_id: TeamState(
+                team_id=spec.team_id,
+                link_channel_id=spec.task.channel_id,
+                member_agent_ids=frozenset(role.agent_id for role in spec.roles),
+                all_must_submit=all_must_submit,
+            )
+            for spec in team_specs
+        }
         self._outcome_log: RoundOutcomeLog[DiffOutcome] = RoundOutcomeLog(
             team_ids=tuple(self._teams)
         )
-
-    @staticmethod
-    def _build_teams(
-        two_teams: bool, shared_link: bool, all_must_submit: bool
-    ) -> dict[str, TeamState]:
-        """Initialize the team-state map for single or two-team mode.
-
-        Under ``shared_link`` both teams' ``link_channel_id`` is the single
-        shared channel; character totals are still per-team because messages are
-        attributed to their sender's team, not to the channel.
-        """
-        if two_teams and shared_link:
-            team_ids = [TEAM_A_ID, TEAM_B_ID]
-            link_ids = {TEAM_A_ID: LINK_CHANNEL_ID, TEAM_B_ID: LINK_CHANNEL_ID}
-        elif two_teams:
-            team_ids = [TEAM_A_ID, TEAM_B_ID]
-            link_ids = {TEAM_A_ID: LINK_A_CHANNEL_ID, TEAM_B_ID: LINK_B_CHANNEL_ID}
-        else:
-            team_ids = [TEAM_SOLO_ID]
-            link_ids = {TEAM_SOLO_ID: LINK_CHANNEL_ID}
-        return {
-            team_id: TeamState(
-                team_id=team_id,
-                link_channel_id=link_ids[team_id],
-                member_agent_ids=frozenset(
-                    {
-                        viewer_left_id_for_team(team_id=team_id),
-                        viewer_right_id_for_team(team_id=team_id),
-                    }
-                ),
-                all_must_submit=all_must_submit,
-            )
-            for team_id in team_ids
-        }
 
     @property
     def context(self) -> WorldContext:
@@ -351,10 +318,6 @@ class SpotTheDifferenceWorld(RoundWorld):
         if team.round_budget_exceeded and self.claim_round_budget_threshold(
             team_id=team_id, round_budget_threshold=_THRESHOLD_EXCEEDED
         ):
-            # Past the budget, the low-budget warning has nothing left to warn about.
-            self.claim_round_budget_threshold(
-                team_id=team_id, round_budget_threshold=_THRESHOLD_LOW
-            )
             await self._notify_team(
                 team=team,
                 text=(

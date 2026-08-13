@@ -164,7 +164,7 @@ class HospitalWorld(RoundWorld):
         super().on_message(
             agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
         )
-        if self.team_for_task_channel(channel_id=channel_id) is None:
+        if not self.meters_channel(channel_id=channel_id):
             return
         case = self._current_case
         if case is None:
@@ -201,10 +201,6 @@ class HospitalWorld(RoundWorld):
         if self._round_budget_exceeded and self.claim_round_budget_threshold(
             team_id=TEAM_ID, round_budget_threshold=THRESHOLD_BUDGET_EXCEEDED
         ):
-            # Past the budget, the 75% warning has nothing left to warn about.
-            self.claim_round_budget_threshold(
-                team_id=TEAM_ID, round_budget_threshold=THRESHOLD_CRITICAL
-            )
             await context.send_update_to_channel(
                 channel_id=PUBLIC_OPS_CHANNEL_ID,
                 text=(

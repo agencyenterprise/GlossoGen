@@ -38,11 +38,9 @@ from glossogen.scenarios.veyru.outcome_reconstruction import (
 )
 from glossogen.scenarios.veyru.veyru_cases import AddendumEntry, VeyruCase, VeyruStage
 from glossogen.scenarios.veyru.world_state import (
-    TEAM_IDS_BY_NAME,
     StageOutcome,
     TeamState,
     VeyruOutcome,
-    build_team_states,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,6 +72,7 @@ class VeyruWorld(RoundWorld):
         self,
         veyru_cases: list[VeyruCase],
         team_specs: tuple[TeamSpec, ...],
+        teams: dict[TeamId, TeamState],
         postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
     ) -> None:
@@ -84,7 +83,13 @@ class VeyruWorld(RoundWorld):
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._veyru_cases = veyru_cases
-        self._teams = build_team_states(team_specs=team_specs)
+        # Both this and ``team_specs`` are projections of one layout in
+        # ``team_declaration``, so neither can name a channel the other does not.
+        self._teams = teams
+        # Which team each link bills, in veyru's own ids.
+        self._team_id_by_link_channel: dict[str, TeamId] = {
+            state.link_channel_id: team_id for team_id, state in teams.items()
+        }
         self._outcome_log: RoundOutcomeLog[VeyruOutcome] = RoundOutcomeLog(
             team_ids=tuple(self._teams)
         )
@@ -373,11 +378,8 @@ class VeyruWorld(RoundWorld):
             team.reset_for_new_round()
 
     def _metered_team(self, channel_id: str) -> TeamId | None:
-        """Return the team metering ``channel_id``, as one of veyru's own ids."""
-        metered = self.team_for_task_channel(channel_id=channel_id)
-        if metered is None:
-            return None
-        return TEAM_IDS_BY_NAME.get(metered)
+        """Return the team whose budget ``channel_id`` spends, or None if none does."""
+        return self._team_id_by_link_channel.get(channel_id)
 
     async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
         """React to an agent message: push budget/threshold notifications when relevant."""

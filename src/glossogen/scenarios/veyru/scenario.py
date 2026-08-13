@@ -76,7 +76,11 @@ from glossogen.scenarios.veyru.injection_rendering import (
 )
 from glossogen.scenarios.veyru.knobs import VeyruKnobs
 from glossogen.scenarios.veyru.mcp_tools import build_mcp_tools
-from glossogen.scenarios.veyru.team_declaration import WORLD_DISPLAY_NAME, veyru_teams
+from glossogen.scenarios.veyru.team_declaration import (
+    WORLD_DISPLAY_NAME,
+    veyru_team_states,
+    veyru_teams,
+)
 from glossogen.scenarios.veyru.team_lifecycle import (
     maybe_join_intern,
     maybe_promote_intern,
@@ -180,6 +184,7 @@ class VeyruScenario(SimulationScenario):
         self._world = VeyruWorld(
             veyru_cases=self._veyru_cases,
             team_specs=self._team_specs,
+            teams=veyru_team_states(knobs=knobs),
             postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
         )

@@ -10,6 +10,8 @@ maps, which channels are metered and which are debriefs, is derived from what
 this returns.
 """
 
+from typing import NamedTuple
+
 from glossogen.engine.team_declaration import (
     Debrief,
     DebriefPolicy,
@@ -48,8 +50,10 @@ from glossogen.scenarios.veyru.ids import (
     TOOLS_INTERN,
     TOOLS_OBSERVER,
     TOOLS_STABILIZATION_ENGINEER,
+    TeamId,
 )
 from glossogen.scenarios.veyru.knobs import VeyruKnobs
+from glossogen.scenarios.veyru.world_state import TeamState
 
 LINK_DISPLAY_NAME = "comm link"
 DEBRIEF_DISPLAY_NAME = "team discussion"
@@ -107,74 +111,118 @@ def _intern(joins_debrief: bool) -> RoleSpec:
     )
 
 
+class _TeamLayout(NamedTuple):
+    """One team's seats and channels, before either projection is taken.
+
+    ``veyru_teams`` turns these into the engine's ``TeamSpec`` values and
+    ``veyru_team_states`` into the world's ``TeamState``. Both read this, so
+    neither can name a channel or a seat the other does not.
+    """
+
+    team_id: TeamId
+    link_channel_id: str
+    link_channel_name: str
+    postmortem_channel_id: str
+    postmortem_channel_name: str
+    observer_id: str
+    observer_role: str
+    engineer_id: str
+    engineer_role: str
+
+
+def _layouts(knobs: VeyruKnobs) -> tuple[_TeamLayout, ...]:
+    """Return the layout of every team this configuration runs."""
+    if knobs.two_teams:
+        return (
+            _TeamLayout(
+                team_id=TEAM_A_ID,
+                link_channel_id=LINK_A_CHANNEL_ID,
+                link_channel_name="link_a",
+                postmortem_channel_id=POSTMORTEM_A_CHANNEL_ID,
+                postmortem_channel_name="postmortem_a",
+                observer_id=OBSERVER_A_ID,
+                observer_role=FIELD_OBSERVER_A_ROLE,
+                engineer_id=STABILIZATION_ENGINEER_A_ID,
+                engineer_role=STABILIZATION_ENGINEER_A_ROLE,
+            ),
+            _TeamLayout(
+                team_id=TEAM_B_ID,
+                link_channel_id=LINK_B_CHANNEL_ID,
+                link_channel_name="link_b",
+                postmortem_channel_id=POSTMORTEM_B_CHANNEL_ID,
+                postmortem_channel_name="postmortem_b",
+                observer_id=OBSERVER_B_ID,
+                observer_role=FIELD_OBSERVER_B_ROLE,
+                engineer_id=STABILIZATION_ENGINEER_B_ID,
+                engineer_role=STABILIZATION_ENGINEER_B_ROLE,
+            ),
+        )
+    return (
+        _TeamLayout(
+            team_id=TEAM_SOLO_ID,
+            link_channel_id=LINK_CHANNEL_ID,
+            link_channel_name="link",
+            postmortem_channel_id=POSTMORTEM_CHANNEL_ID,
+            postmortem_channel_name="postmortem",
+            observer_id=FIELD_OBSERVER_ID,
+            observer_role=FIELD_OBSERVER_ROLE,
+            engineer_id=STABILIZATION_ENGINEER_ID,
+            engineer_role=STABILIZATION_ENGINEER_ROLE,
+        ),
+    )
+
+
 def veyru_teams(knobs: VeyruKnobs) -> tuple[TeamSpec, ...]:
     """Return the teams this configuration runs, one per isolated comm link."""
     debrief_active = knobs.postmortem_enabled and not knobs.postmortem_disabled_at_start
-    if knobs.two_teams:
-        return (
+    specs: list[TeamSpec] = []
+    for layout in _layouts(knobs=knobs):
+        roles = [
+            _observer(agent_id=layout.observer_id, role_name=layout.observer_role),
+            _engineer(agent_id=layout.engineer_id, role_name=layout.engineer_role),
+        ]
+        if not knobs.two_teams and knobs.intern_enabled:
+            roles.append(
+                _intern(joins_debrief=knobs.postmortem_enabled and knobs.postmortem_after_swap)
+            )
+        specs.append(
             TeamSpec(
-                team_id=TEAM_A_ID,
+                team_id=layout.team_id,
                 task=TaskChannel(
-                    channel_id=LINK_A_CHANNEL_ID,
-                    name="link_a",
+                    channel_id=layout.link_channel_id,
+                    name=layout.link_channel_name,
                     display_name=LINK_DISPLAY_NAME,
                 ),
                 debrief=_debrief(
-                    channel_id=POSTMORTEM_A_CHANNEL_ID,
-                    name="postmortem_a",
+                    channel_id=layout.postmortem_channel_id,
+                    name=layout.postmortem_channel_name,
                     active=debrief_active,
                 ),
-                roles=(
-                    _observer(agent_id=OBSERVER_A_ID, role_name=FIELD_OBSERVER_A_ROLE),
-                    _engineer(
-                        agent_id=STABILIZATION_ENGINEER_A_ID,
-                        role_name=STABILIZATION_ENGINEER_A_ROLE,
-                    ),
-                ),
-            ),
-            TeamSpec(
-                team_id=TEAM_B_ID,
-                task=TaskChannel(
-                    channel_id=LINK_B_CHANNEL_ID,
-                    name="link_b",
-                    display_name=LINK_DISPLAY_NAME,
-                ),
-                debrief=_debrief(
-                    channel_id=POSTMORTEM_B_CHANNEL_ID,
-                    name="postmortem_b",
-                    active=debrief_active,
-                ),
-                roles=(
-                    _observer(agent_id=OBSERVER_B_ID, role_name=FIELD_OBSERVER_B_ROLE),
-                    _engineer(
-                        agent_id=STABILIZATION_ENGINEER_B_ID,
-                        role_name=STABILIZATION_ENGINEER_B_ROLE,
-                    ),
-                ),
-            ),
+                roles=tuple(roles),
+            )
         )
+    return tuple(specs)
 
-    roles = [
-        _observer(agent_id=FIELD_OBSERVER_ID, role_name=FIELD_OBSERVER_ROLE),
-        _engineer(agent_id=STABILIZATION_ENGINEER_ID, role_name=STABILIZATION_ENGINEER_ROLE),
-    ]
-    if knobs.intern_enabled:
-        roles.append(
-            _intern(joins_debrief=knobs.postmortem_enabled and knobs.postmortem_after_swap)
+
+def veyru_team_states(knobs: VeyruKnobs) -> dict[TeamId, TeamState]:
+    """Return the world's per-team state for this configuration.
+
+    The seats come off the layout rather than being read back out of the specs,
+    so who observes for a team is a fact the declaration states, not one
+    inferred from which prompt file a role renders.
+    """
+    debrief_active = knobs.postmortem_enabled and not knobs.postmortem_disabled_at_start
+    states: dict[TeamId, TeamState] = {}
+    for layout in _layouts(knobs=knobs):
+        if debrief_active:
+            postmortem_channel_id: str | None = layout.postmortem_channel_id
+        else:
+            postmortem_channel_id = None
+        states[layout.team_id] = TeamState(
+            team_id=layout.team_id,
+            current_observer_id=layout.observer_id,
+            stabilization_engineer_id=layout.engineer_id,
+            link_channel_id=layout.link_channel_id,
+            postmortem_channel_id=postmortem_channel_id,
         )
-    return (
-        TeamSpec(
-            team_id=TEAM_SOLO_ID,
-            task=TaskChannel(
-                channel_id=LINK_CHANNEL_ID,
-                name="link",
-                display_name=LINK_DISPLAY_NAME,
-            ),
-            debrief=_debrief(
-                channel_id=POSTMORTEM_CHANNEL_ID,
-                name="postmortem",
-                active=debrief_active,
-            ),
-            roles=tuple(roles),
-        ),
-    )
+    return states

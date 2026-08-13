@@ -1,8 +1,8 @@
 """Per-team character accounting and threshold bookkeeping for budgeted rounds.
 
 Defines ``RoundWorld``, a ``ScenarioWorld`` that charges every message to the
-team owning the channel it landed on, counting task channels only, and tracks
-which points in the round budget each team has already been told about.
+team whose budget it spends, counting task channels only, and tracks which
+points in the round budget each team has already been told about.
 
 A scenario adds its own budget rule by overriding ``on_message`` and calling up,
 which is what makes the total accumulate. ``characters_used`` reads the running
@@ -15,10 +15,13 @@ from glossogen.runtime.scenario_world import ScenarioWorld
 
 
 class RoundWorld(ScenarioWorld):
-    """A world that meters each team's traffic on its own task channel.
+    """A world that meters what each team says on a task channel.
 
     Debrief channels are not metered: a debrief happens after the round is
     scored and does not spend the budget.
+
+    Teams usually have a task channel each, but they may share one, and then
+    what separates them is who spoke rather than where.
     """
 
     def __init__(
@@ -57,8 +60,9 @@ class RoundWorld(ScenarioWorld):
             for team in team_specs
             if sum(1 for other in team_specs if other.task.channel_id == team.task.channel_id) == 1
         }
-        # Who each message costs. A message is charged to its sender's team,
-        # which is the only reading that survives two teams sharing a channel.
+        # Who each message costs when its channel cannot say. Only a shared
+        # channel needs this, and there the sender's team is what separates
+        # one team's words from the other's.
         self._team_id_by_agent_id: dict[str, str] = {
             role.agent_id: team.team_id for team in team_specs for role in team.roles
         }
@@ -71,8 +75,16 @@ class RoundWorld(ScenarioWorld):
             team.team_id: set() for team in team_specs
         }
 
+    def meters_channel(self, channel_id: str) -> bool:
+        """Return whether traffic on ``channel_id`` costs a team anything."""
+        return channel_id in self._task_channel_ids
+
     def team_for_task_channel(self, channel_id: str) -> str | None:
-        """Return the team that meters ``channel_id``, or None if it is not metered."""
+        """Return the one team that meters ``channel_id``, if exactly one does.
+
+        None means no single team owns it: either nothing meters the channel,
+        or several teams share it. Ask ``meters_channel`` to tell those apart.
+        """
         return self._team_id_by_task_channel_id.get(channel_id)
 
     def characters_used(self, team_id: str) -> int:
@@ -107,7 +119,12 @@ class RoundWorld(ScenarioWorld):
         text: str,
         token_count: int,
     ) -> None:
-        """Charge a message to its team when it lands on a metered channel.
+        """Charge a message to the team whose budget it spends.
+
+        A channel with one team pays that team, whoever spoke: an agent that
+        moves to another team's channel spends the budget of the conversation
+        it joined, not the one it left. A channel shared by several teams has
+        no such answer, so there the sender's team pays for its own words.
 
         Called synchronously from ``send_message`` before the event is enqueued,
         so a scenario's action tool sees the updated total on the same turn the
@@ -116,7 +133,9 @@ class RoundWorld(ScenarioWorld):
         _ = token_count
         if channel_id not in self._task_channel_ids:
             return
-        team_id = self._team_id_by_agent_id.get(agent_id)
+        team_id = self._team_id_by_task_channel_id.get(channel_id)
+        if team_id is None:
+            team_id = self._team_id_by_agent_id.get(agent_id)
         if team_id is None:
             return
         self._characters_used_by_team_id[team_id] += len(text)

@@ -241,3 +241,19 @@ def test_teams_sharing_one_channel_are_charged_for_their_own_words() -> None:
 
     assert world.characters_used(team_id="a") == 4
     assert world.characters_used(team_id="b") == 2
+
+
+def test_an_agent_on_another_team_channel_spends_that_team_budget() -> None:
+    """Agents move between channels; the budget stays with the conversation.
+
+    Veyru swaps its observers by changing who is a member of each link, so
+    after a swap one team's agent is talking on the other's channel. What it
+    says costs the channel it joined, because that is the round whose budget is
+    being spent, not the one it left.
+    """
+    world = build_world()
+
+    send(world=world, agent_id="a_worker", channel_id="task_b", text="aaaa")
+
+    assert world.characters_used(team_id="b") == 4
+    assert world.characters_used(team_id="a") == 0

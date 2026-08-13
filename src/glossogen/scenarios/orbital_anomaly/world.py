@@ -141,7 +141,7 @@ class OrbitalAnomalyWorld(RoundWorld):
         super().on_message(
             agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
         )
-        if self.team_for_task_channel(channel_id=channel_id) is None:
+        if not self.meters_channel(channel_id=channel_id):
             return
         if self._current_case is None:
             return
@@ -168,10 +168,6 @@ class OrbitalAnomalyWorld(RoundWorld):
         if not self._vehicle_alive and self.claim_round_budget_threshold(
             team_id=TEAM_ID, round_budget_threshold=_THRESHOLD_LOST
         ):
-            # The vehicle is lost; the 75% warning has nothing left to warn about.
-            self.claim_round_budget_threshold(
-                team_id=TEAM_ID, round_budget_threshold=_THRESHOLD_CRITICAL
-            )
             await self._world_context.send_update_to_channel(
                 channel_id=LINK_CHANNEL_ID,
                 text=(
@@ -238,10 +234,6 @@ class OrbitalAnomalyWorld(RoundWorld):
             team_id=TEAM_ID, round_budget_threshold=_THRESHOLD_LOST
         ):
             return
-        # The vehicle is lost; the 75% warning has nothing left to warn about.
-        self.claim_round_budget_threshold(
-            team_id=TEAM_ID, round_budget_threshold=_THRESHOLD_CRITICAL
-        )
         self._vehicle_alive = False
         await self._world_context.send_update_to_channel(
             channel_id=LINK_CHANNEL_ID,
