@@ -53,6 +53,7 @@ from glossogen.scenarios.veyru.knobs import VeyruKnobs
 
 LINK_DISPLAY_NAME = "comm link"
 DEBRIEF_DISPLAY_NAME = "team discussion"
+WORLD_DISPLAY_NAME = "Veyru Monitor"
 
 
 def _debrief(channel_id: str, name: str, active: bool) -> DebriefPolicy:

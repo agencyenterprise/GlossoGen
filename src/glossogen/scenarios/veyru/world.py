@@ -37,7 +37,13 @@ from glossogen.scenarios.veyru.outcome_reconstruction import (
     restore_outcomes_from_events,
 )
 from glossogen.scenarios.veyru.veyru_cases import AddendumEntry, VeyruCase, VeyruStage
-from glossogen.scenarios.veyru.world_state import StageOutcome, TeamState, VeyruOutcome
+from glossogen.scenarios.veyru.world_state import (
+    TEAM_IDS_BY_NAME,
+    StageOutcome,
+    TeamState,
+    VeyruOutcome,
+    build_team_states,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +73,6 @@ class VeyruWorld(RoundWorld):
     def __init__(
         self,
         veyru_cases: list[VeyruCase],
-        teams: dict[TeamId, TeamState],
         team_specs: tuple[TeamSpec, ...],
         postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
@@ -79,8 +84,10 @@ class VeyruWorld(RoundWorld):
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._veyru_cases = veyru_cases
-        self._teams = teams
-        self._outcome_log: RoundOutcomeLog[VeyruOutcome] = RoundOutcomeLog(team_ids=tuple(teams))
+        self._teams = build_team_states(team_specs=team_specs)
+        self._outcome_log: RoundOutcomeLog[VeyruOutcome] = RoundOutcomeLog(
+            team_ids=tuple(self._teams)
+        )
         self._current_case: VeyruCase | None = None
         self._swap_just_happened: bool = False
         self._intern_takeover_just_happened: bool = False
@@ -264,8 +271,6 @@ class VeyruWorld(RoundWorld):
                     round_number=round_number - 1,
                     team_id=team_id,
                 )
-        for team in self._teams.values():
-            team.reset_for_new_round()
         # After the outcomes above, which read the round that just ended.
         self.begin_round()
         override = self._case_overrides.get(round_number)
@@ -361,18 +366,18 @@ class VeyruWorld(RoundWorld):
         if self.characters_used(team_id=team_id) > self._current_case.time_budget_seconds:
             team.veyru_alive = False
 
-    def _metered_team(self, channel_id: str) -> TeamId | None:
-        """Return the team metering ``channel_id``, as one of veyru's own ids.
+    def begin_round(self) -> None:
+        """Clear the engine's per-round counters and every team's own state."""
+        super().begin_round()
+        for team in self._teams.values():
+            team.reset_for_new_round()
 
-        The engine keys teams by an opaque string; veyru's ids are a ``Literal``
-        it declared. Resolving through its own team map narrows without
-        asserting: an id veyru does not know comes back as None rather than
-        being taken on trust.
-        """
+    def _metered_team(self, channel_id: str) -> TeamId | None:
+        """Return the team metering ``channel_id``, as one of veyru's own ids."""
         metered = self.team_for_task_channel(channel_id=channel_id)
         if metered is None:
             return None
-        return next((known for known in self._teams if known == metered), None)
+        return TEAM_IDS_BY_NAME.get(metered)
 
     async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
         """React to an agent message: push budget/threshold notifications when relevant."""

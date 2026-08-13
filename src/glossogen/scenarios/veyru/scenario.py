@@ -11,8 +11,9 @@ Every character sent on a team's comm link costs simulated seconds;
 Veyru entities collapse when their team's total communication time
 exceeds the case's time budget.
 
-Heavy logic lives in dedicated sibling modules: :mod:`agent_factory`
-(agent/channel/team construction), :mod:`mcp_tools` (the
+Heavy logic lives in dedicated sibling modules: :mod:`team_declaration`
+(the teams, roles and channels the engine derives the run from),
+:mod:`mcp_tools` (the
 ``stabilize_veyru`` tool), :mod:`injection_rendering` (per-round and
 postmortem prompts), :mod:`team_lifecycle` (observer swap and intern
 join/takeover choreography), :mod:`case_event_conversion`
@@ -39,11 +40,6 @@ from glossogen.runtime.scenario_mcp_tool import ScenarioMcpTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.scenario_protocol import PrimaryChannel, RoundResult, SimulationScenario
 from glossogen.scenarios.channel_noise import apply_character_noise
-from glossogen.scenarios.veyru.agent_factory import (
-    build_agent_display_names,
-    build_channel_display_names,
-    build_teams,
-)
 from glossogen.scenarios.veyru.case_event_conversion import case_started_event
 from glossogen.scenarios.veyru.evaluation.build_communication_rounds import (
     build_communication_rounds,
@@ -56,6 +52,8 @@ from glossogen.scenarios.veyru.ids import (
     FIELD_OBSERVER_ROLE,
     INTERN_ID,
     INTERN_ROLE,
+    LINK_A_CHANNEL_ID,
+    LINK_B_CHANNEL_ID,
     LINK_CHANNEL_ID,
     LINK_CHANNEL_IDS,
     OBSERVER_A_ID,
@@ -78,7 +76,7 @@ from glossogen.scenarios.veyru.injection_rendering import (
 )
 from glossogen.scenarios.veyru.knobs import VeyruKnobs
 from glossogen.scenarios.veyru.mcp_tools import build_mcp_tools
-from glossogen.scenarios.veyru.team_declaration import veyru_teams
+from glossogen.scenarios.veyru.team_declaration import WORLD_DISPLAY_NAME, veyru_teams
 from glossogen.scenarios.veyru.team_lifecycle import (
     maybe_join_intern,
     maybe_promote_intern,
@@ -174,20 +172,13 @@ class VeyruScenario(SimulationScenario):
             easy_round_numbers=knobs.easy_round_numbers,
         )
         self._noise_rng = random.Random(knobs.seed)
-        self._agent_display_names: dict[str, str] = build_agent_display_names(
-            two_teams=knobs.two_teams,
-            intern_enabled=knobs.intern_enabled,
-        )
-        self._channel_display_names_by_agent: dict[str, dict[str, str]] = (
-            build_channel_display_names(
-                two_teams=knobs.two_teams,
-                intern_enabled=knobs.intern_enabled,
-            )
-        )
         self._team_specs = veyru_teams(knobs=knobs)
+        self._agent_display_names = team_structure.agent_display_names(
+            teams=self._team_specs, world_name=WORLD_DISPLAY_NAME
+        )
+        self._channel_display_names = team_structure.channel_display_names(teams=self._team_specs)
         self._world = VeyruWorld(
             veyru_cases=self._veyru_cases,
-            teams=build_teams(knobs=knobs),
             team_specs=self._team_specs,
             postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
@@ -254,14 +245,13 @@ class VeyruScenario(SimulationScenario):
         return team_structure.channels(teams=self._team_specs)
 
     def get_channel_display_name(self, channel_id: str, agent_id: str) -> str:
-        """Return the display name for a channel as seen by a specific agent."""
-        channel_map = self._channel_display_names_by_agent.get(channel_id)
-        if channel_map is None:
-            return channel_id
-        agent_display = channel_map.get(agent_id)
-        if agent_display is None:
-            return channel_id
-        return agent_display
+        """Return the name agents are told to call ``channel_id``.
+
+        Every team calls its own link the same thing, so what an agent is told
+        does not depend on which agent is asking.
+        """
+        _ = agent_id
+        return self._channel_display_names.get(channel_id, channel_id)
 
     def get_agent_display_name(self, agent_id: str) -> str:
         """Return the human-readable display name for an agent."""
@@ -502,13 +492,17 @@ class VeyruScenario(SimulationScenario):
         )
 
     def get_primary_channels(self) -> list[PrimaryChannel]:
-        """Return the comm link channel where budget constraints apply.
+        """Return the comm link channel(s) where budget constraints apply.
 
-        Two-team mode returns an empty list: the per-team char/compression
-        metrics are not wired for veyru's two link channels yet.
+        Two-team mode meters each team's own link, so the char and language
+        metrics report one measurement per team. Single-team mode names no
+        team, which keeps its measurements on the base metric names.
         """
         if self._knobs.two_teams:
-            return []
+            return [
+                PrimaryChannel(channel_id=LINK_A_CHANNEL_ID, team_id=TEAM_A_ID),
+                PrimaryChannel(channel_id=LINK_B_CHANNEL_ID, team_id=TEAM_B_ID),
+            ]
         return [PrimaryChannel(channel_id=LINK_CHANNEL_ID, team_id=None)]
 
     def build_communication_rounds(

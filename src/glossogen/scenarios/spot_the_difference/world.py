@@ -282,6 +282,10 @@ class SpotTheDifferenceWorld(RoundWorld):
         self._current_case = self._cases[round_number - 1]
         # After the outcomes above, which read the round that just ended.
         self.begin_round()
+
+    def begin_round(self) -> None:
+        """Clear the engine's per-round counters and every team's own state."""
+        super().begin_round()
         for team in self._teams.values():
             team.reset_for_new_round()
 

@@ -14,7 +14,7 @@ submitted command sequence does not satisfy the round-success criteria.
 import logging
 import random
 from pathlib import Path
-from typing import Any, ClassVar, NamedTuple
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -58,16 +58,6 @@ from glossogen.scenarios.satellite_contact_window.world import SatelliteOutcome,
 from glossogen.template_renderer import TemplateRenderer
 
 logger = logging.getLogger(__name__)
-
-
-class AgentDef(NamedTuple):
-    """Lightweight definition of an agent before full AgentConfig construction."""
-
-    agent_id: str
-    role_name: str
-    channel_ids: list[str]
-    tool_names: list[str]
-    system_template: str
 
 
 class CommandStepArg(BaseModel):
@@ -163,18 +153,6 @@ class SatelliteContactWindowScenario(SimulationScenario):
                 "postmortem_enabled": self._postmortem_active,
             },
         )
-
-    def _channel_template_data(
-        self, agent_id: str, channel_ids: list[str]
-    ) -> list[ChannelTemplateEntry]:
-        """Build channel entries for Jinja2 system prompt templates."""
-        return [
-            ChannelTemplateEntry(
-                display_name=self.get_channel_display_name(channel_id=cid, agent_id=agent_id),
-                channel_id=cid,
-            )
-            for cid in channel_ids
-        ]
 
     def _render_system_prompt(self, role: RoleSpec, channels: list[ChannelTemplateEntry]) -> str:
         """Render one role's system prompt over the channels it reaches."""

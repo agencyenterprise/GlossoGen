@@ -81,11 +81,7 @@ CONFIGURATIONS["veyru_debrief_closed"] = (
 # spot_the_difference is the exception: its preset is already two-team, so what
 # it lacks is the shared link, where both teams talk on one channel and each is
 # charged only for what it said.
-#
-# veyru is absent because two-team mode names no primary channel there, so
-# nothing knows where its agents talk. That is a deliberate gap veyru documents,
-# not an oversight, and closing it changes what the char and language metrics
-# report for every two-team veyru run.
+CONFIGURATIONS["veyru_two_teams"] = ("veyru", {"two_teams": True})
 CONFIGURATIONS["spot_the_difference_shared_link"] = (
     "spot_the_difference",
     {"two_teams": True, "shared_link": True},
