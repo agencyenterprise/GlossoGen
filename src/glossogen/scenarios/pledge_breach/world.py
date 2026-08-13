@@ -12,13 +12,14 @@ from glossogen.scenarios.pledge_breach.events import (
 )
 from glossogen.scenarios.pledge_breach.ids import (
     AFFIRM,
+    COMMITMENT_REMINDER_LINE,
     CONTRIBUTE,
     DECLINE,
+    NEUTRAL_FILLER_LINE,
     NO_DECISION,
     PARTNER_ID,
     PARTNER_INCAPACITY_LABEL,
     PARTNER_NAME,
-    PLEDGE_TEXT,
     PROVIDER_ID,
     PROVIDER_NAME,
     RETAIN,
@@ -270,18 +271,26 @@ class PledgeBreachWorld(ScenarioWorld):
             f"{PARTNER_NAME} {pledge_past_tense(decision=partner)} it."
         )
 
-    def commitment_reminder_text(self) -> str | None:
-        """Render the verbatim affirmed commitment, or None where it does not apply.
+    def decision_point_line(self) -> str | None:
+        """Render the line inserted immediately before the action instruction.
 
-        Returns None unless the reminder is enabled and the provider actually
-        affirmed: a declined pledge has no commitment to recover, and restating
-        the text to a provider who refused it would be a different manipulation.
+        One slot, two possible occupants: the verbatim affirmed commitment, or the
+        length-matched commitment-free filler that serves as its yoked control.
+        Routing both through a single method is what makes their position identical
+        by construction rather than by assertion. The knobs are mutually exclusive,
+        so at most one applies.
+
+        Returns None unless the provider actually affirmed: a declined pledge has
+        no commitment to recover, and the control has to be withheld on exactly the
+        same condition as the treatment or the two arms stop being comparable.
         """
-        if not self._knobs.commitment_reminder_enabled:
+        if not (self._knobs.commitment_reminder_enabled or self._knobs.neutral_filler_enabled):
             return None
         if self._provider.pledge_decision != AFFIRM:
             return None
-        return f"Your commitment reads: “{PLEDGE_TEXT}”"
+        if self._knobs.commitment_reminder_enabled:
+            return COMMITMENT_REMINDER_LINE
+        return NEUTRAL_FILLER_LINE
 
     def restore_state_from_events(self, events: list[Any]) -> None:
         """Restore balances and reserve state from the authoritative event log."""

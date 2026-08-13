@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from glossogen.scenarios.pledge_breach.ids import PARTNER_INCAPACITY_LABEL
+from glossogen.scenarios.pledge_breach.ids import (
+    COMMITMENT_REMINDER_LINE,
+    NEUTRAL_FILLER_LINE,
+    PARTNER_INCAPACITY_LABEL,
+)
 from glossogen.scenarios.pledge_breach.knobs import PledgeBreachKnobs
 from glossogen.scenarios.pledge_breach.state import RoundSettlement
 from glossogen.scenarios.pledge_breach.world import PledgeBreachWorld
@@ -232,6 +236,9 @@ def test_incapacity_framing_leaves_the_system_prompt_identical() -> None:
 
 
 EXP046_CONFIGS = Path("docs/research/covenant-game/experiments/EXP-046-commitment-reminder/configs")
+EXP047_CONFIGS = Path(
+    "docs/research/covenant-game/experiments/EXP-047-yoked-salience-control/configs"
+)
 
 
 def render_injection(config_path: Path, round_number: int) -> str:
@@ -309,13 +316,91 @@ def test_reminder_is_withheld_from_a_provider_that_declined() -> None:
     world = PledgeBreachWorld(knobs=build_knobs(commitment_reminder_enabled=True))
     world.seed_partner_pledge()
     world.submit_pledge(decision="decline")
-    assert world.commitment_reminder_text() is None
+    assert world.decision_point_line() is None
 
 
 def test_reminder_requires_a_condition_that_presents_a_pledge() -> None:
     """The reminder cannot be enabled where no commitment is ever affirmed."""
     with pytest.raises(ValidationError, match="requires a condition that presents a pledge"):
         build_knobs(condition="cost", commitment_reminder_enabled=True)
+
+
+def test_the_filler_matches_the_reminder_character_for_character() -> None:
+    """The yoked control is only yoked if its length actually matches.
+
+    EXP-047 asks whether the reminder's effect comes from the commitment's content
+    or from any text occupying that slot. A filler that is materially shorter or
+    longer reintroduces the difference it exists to remove, so the match is a
+    tested invariant: edit either string and this fails.
+    """
+    assert len(NEUTRAL_FILLER_LINE) == len(COMMITMENT_REMINDER_LINE)
+
+
+def test_the_filler_carries_no_commitment_consequence_or_partner_content() -> None:
+    """The filler must be inert on every dimension that could move the outcome.
+
+    Obligation vocabulary would make it a second commitment reminder. Naming the
+    claim would reintroduce self-interest salience, and naming the partner could
+    cue reciprocity. Any of those would confound the contrast this control exists
+    to resolve, so each is excluded by test rather than by careful drafting.
+    """
+    lowered = NEUTRAL_FILLER_LINE.lower()
+    for forbidden in (
+        "commit",
+        "contribut",
+        "pledge",
+        "promise",
+        "must",
+        "should",
+        "claim",
+        "reserve",
+        "provider b",
+        "forfeit",
+    ):
+        assert forbidden not in lowered, f"filler leaks {forbidden!r}"
+
+
+def test_the_filler_occupies_the_reminder_slot_exactly() -> None:
+    """Treatment and control differ in one string, in the same position.
+
+    Both arms are rendered against the same baseline. Each must add exactly one
+    line, both added lines must sit in the same index, and that index must be the
+    last non-empty line before the allocation instruction.
+    """
+    baseline = render_injection(config_path=EXP047_CONFIGS / "knobs_pledge.json", round_number=6)
+    reminder = render_injection(
+        config_path=EXP047_CONFIGS / "knobs_pledge_reminder.json", round_number=6
+    )
+    filler = render_injection(
+        config_path=EXP047_CONFIGS / "knobs_pledge_yoked.json", round_number=6
+    )
+    base_lines = baseline.splitlines()
+
+    positions: list[int] = []
+    for rendered, expected in ((reminder, COMMITMENT_REMINDER_LINE), (filler, NEUTRAL_FILLER_LINE)):
+        lines = rendered.splitlines()
+        added = [line for line in lines if line not in base_lines]
+        assert added == [expected], f"unexpected insertion: {added}"
+        assert [line for line in base_lines if line not in lines] == []
+        instruction = next(
+            i for i, line in enumerate(lines) if line.startswith("Call `submit_action`")
+        )
+        assert [line for line in lines[:instruction] if line][-1] == expected
+        positions.append(lines.index(expected))
+
+    assert positions[0] == positions[1], "treatment and control sit at different line indices"
+
+
+def test_the_filler_requires_a_condition_that_presents_a_pledge() -> None:
+    """The control has to live in the same world as the treatment it controls."""
+    with pytest.raises(ValidationError, match="yoked control for the commitment reminder"):
+        build_knobs(condition="cost", neutral_filler_enabled=True)
+
+
+def test_reminder_and_filler_cannot_both_be_enabled() -> None:
+    """They share one slot, so enabling both would silently drop one."""
+    with pytest.raises(ValidationError, match="mutually exclusive"):
+        build_knobs(commitment_reminder_enabled=True, neutral_filler_enabled=True)
 
 
 def test_provider_sees_partner_action_in_the_round_summary() -> None:

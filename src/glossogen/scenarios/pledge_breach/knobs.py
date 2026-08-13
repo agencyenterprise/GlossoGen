@@ -82,6 +82,28 @@ class PledgeBreachKnobs(BaseKnobs):
     It adds; it never replaces. The standing pledge-record line is unchanged, so
     an arm carrying this flag differs from its baseline in exactly one string.
     """
+    neutral_filler_enabled: bool = False
+    """Insert a commitment-free line of matched length at the reminder's position.
+
+    This is the yoked control for ``commitment_reminder_enabled``. EXP-046 showed
+    that restating the commitment's wording at the decision point lowers breach,
+    but that result has two live explanations: the *content* of the commitment was
+    recovered, or *any* text occupying the slot immediately before the action
+    instruction shifts the decision. The two are indistinguishable without a line
+    that matches on length and position and differs only in carrying no
+    commitment.
+
+    The filler restates round-numbering mechanics the provider already has in its
+    system prompt. It is deliberately inert: it names no obligation, no
+    consequence of an uncovered claim, and not the partner. A filler mentioning
+    the claim would reintroduce self-interest salience, and one mentioning the
+    partner could cue reciprocity — either would confound the contrast it exists
+    to resolve.
+
+    Mutually exclusive with ``commitment_reminder_enabled``: both write the same
+    single slot, which is what makes the position identical by construction
+    rather than by assertion.
+    """
 
     @property
     def partner_retention_is_chosen(self) -> bool:
@@ -167,5 +189,22 @@ class PledgeBreachKnobs(BaseKnobs):
             raise ValueError(
                 "commitment_reminder_enabled requires a condition that presents a pledge "
                 "(pledge or covenant): there is no affirmed commitment to restate otherwise"
+            )
+        # The filler is only interpretable as a control for the reminder, so it
+        # has to sit in the same world the reminder sits in: same condition, same
+        # affirmed pledge, same everything but the string.
+        if self.neutral_filler_enabled and not self.pledge_enabled:
+            raise ValueError(
+                "neutral_filler_enabled requires a condition that presents a pledge "
+                "(pledge or covenant): the filler is the yoked control for the "
+                "commitment reminder and is uninterpretable outside that comparison"
+            )
+        # Both flags write one shared template slot. Enabling both would silently
+        # drop one of them rather than stacking, so reject it at preflight.
+        if self.neutral_filler_enabled and self.commitment_reminder_enabled:
+            raise ValueError(
+                "neutral_filler_enabled and commitment_reminder_enabled are mutually "
+                "exclusive: they occupy the same injection slot, so an arm must carry "
+                "the commitment text or the matched filler, never both"
             )
         return self
